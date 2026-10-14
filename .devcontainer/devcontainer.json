@@ -1,6 +1,7 @@
 {
   "name": "devzone",
-  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+  // Image de base + outils figés (k9s, uv, actionlint, gitleaks…) : voir Dockerfile
+  "build": { "dockerfile": "Dockerfile" },
 
   "features": {
     "ghcr.io/devcontainers/features/java:1": {
