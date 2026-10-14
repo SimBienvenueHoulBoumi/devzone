@@ -1,0 +1,5 @@
+# Scripts lancés dans le conteneur Linux : fins de ligne LF même sur un
+# checkout Windows (bash échoue sur les CRLF)
+*.sh        text eol=lf
+Dockerfile  text eol=lf
+Makefile    text eol=lf
