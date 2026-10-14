@@ -2,6 +2,11 @@
 
 Zone de dev conteneurisée : Java 21 + Maven, Node LTS + pnpm, Python 3.12 + uv, Docker (in-docker), kubectl, helm, k9s, gh, repowarden (hooks git globaux) et ses outils : shellcheck, bats, actionlint, gitleaks, ruff, vulture.
 
+## Prérequis (sur le Mac)
+
+- Docker Desktop lancé
+- VS Code + extension *Dev Containers*, **ou** `make` et Node (pour `npx @devcontainers/cli`)
+
 ## VS Code
 
 | Action | Commande (`Cmd+Shift+P`) |
@@ -27,12 +32,52 @@ Depuis le dossier `devzone/` :
 
 > Ne pas lancer `make up` pendant que VS Code ouvre ou reconstruit le conteneur : deux lancements simultanés créent des conteneurs en double.
 
+## Utilisation
+
+### Premier lancement
+
+1. `make shell` (ou *Reopen in Container* dans VS Code). Le premier build prend quelques minutes ; il se termine par `devzone prêt : java …, node …, python …, repowarden …`.
+2. Dans le conteneur, se connecter à GitHub (tickets, PR, `repowarden`) :
+   ```bash
+   gh auth login
+   gh auth setup-git      # git push/pull via gh
+   ```
+   À refaire après `make down` ou `make rebuild` (la session gh n'est pas dans un volume).
+3. Vérifier l'identité git : `git config --global user.name` / `user.email`. VS Code la recopie depuis le Mac ; en CLI, la définir si elle est vide.
+
+### Travailler sur un projet
+
+```bash
+cd /workspaces/devzone/workspace
+git clone https://github.com/<compte>/<projet>.git
+cd <projet>
+```
+
+Les hooks git de repowarden sont installés **globalement** (`repowarden install --global --lang fr`) : ils s'appliquent à tout dépôt cloné dans le conteneur, sans rien faire de plus. Ensuite, suivre les règles du projet (`AGENTS.md`, `CONTRIBUTING.md`) : `repowarden ticket <n>`, `repowarden cc …`.
+
+Les vérifications de la CI de repowarden se lancent telles quelles dans le conteneur (`shellcheck`, `actionlint`, `bats test/`), avec les mêmes versions.
+
+### Mettre à jour un outil
+
+| Outil | Où | Puis |
+|---|---|---|
+| k9s, actionlint, gitleaks | `.devcontainer/Dockerfile` : `ARG …_VERSION` **et** les empreintes `sha256` (arm64 + amd64) | `make rebuild` |
+| uv, ruff, vulture | `.devcontainer/Dockerfile` : `ARG …_VERSION` | `make rebuild` |
+| repowarden | `.devcontainer/post-create.sh` : `repowarden@x.y.z` | `make rebuild` |
+| Java, Node, Python, Docker, kubectl, helm, gh | `.devcontainer/devcontainer.json` (features) | `make rebuild` |
+
+Empreinte d'une archive : `curl -fsSL <url> | shasum -a 256`.
+
 ## Organisation
 
 ```
 devzone/
-├── .devcontainer/   # définition du conteneur
-└── workspace/       # tes projets (ignorés par git, chacun son dépôt)
+├── .devcontainer/
+│   ├── Dockerfile         # image de base + outils figés (versions et sha256)
+│   ├── devcontainer.json  # features (langages, Docker, k8s, gh), volumes, extensions
+│   └── post-create.sh     # au premier démarrage : droits des volumes, repowarden
+├── Makefile               # pilotage sans VS Code
+└── workspace/             # tes projets (ignorés par git, chacun son dépôt)
 ```
 
 ## Notes
