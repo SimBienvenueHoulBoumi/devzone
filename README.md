@@ -75,6 +75,7 @@ devzone/
 ├── .devcontainer/
 │   ├── Dockerfile         # image de base + outils figés (versions et sha256)
 │   ├── devcontainer.json  # features (langages, Docker, k8s, gh), volumes, extensions
+│   ├── kube-config.sh     # à chaque démarrage : kubectl relié au cluster de Docker Desktop
 │   └── post-create.sh     # au premier démarrage : droits des volumes, repowarden
 ├── Makefile               # pilotage sans VS Code
 └── workspace/             # tes projets (ignorés par git, chacun son dépôt)
@@ -84,4 +85,5 @@ devzone/
 
 - Docker-in-Docker : démon isolé, ses images ne sont pas partagées avec Docker Desktop.
 - Caches Maven (`~/.m2`) et pnpm stockés dans des volumes Docker (`devzone-m2`, `devzone-pnpm`) → conservés entre rebuilds.
-- Cluster K8s local : `kind` ou `k3d` à lancer dans le conteneur via le Docker interne.
+- Kubernetes : `kubectl`, `helm` et `k9s` utilisent le cluster de Docker Desktop (Settings → Kubernetes). À chaque démarrage, `kube-config.sh` recopie `~/.kube/config` du Mac (monté en lecture seule) en remplaçant `127.0.0.1` par `host.docker.internal` ; la config du Mac n'est jamais modifiée. Après un changement de cluster côté Mac : redémarrer le conteneur (`make stop && make up`).
+- `~/.kube` doit exister sur le Mac (Docker Desktop le crée), sinon le conteneur ne démarre pas.
