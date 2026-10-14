@@ -1,6 +1,6 @@
 # devzone
 
-Zone de dev conteneurisée : Java 21 + Maven, Node LTS + pnpm, Python 3.12 + uv, Docker (in-docker), kubectl, helm, k9s, gh, et [repowarden](https://github.com/simdevWarden/repowarden) (hooks actifs, shellcheck, bats, actionlint, gitleaks, ruff, vulture).
+Zone de dev conteneurisée : Java 21 + Maven, Node LTS + pnpm, Python 3.12 + uv, Docker (in-docker), kubectl, helm, k9s, gh, repowarden (hooks git globaux) et ses outils : shellcheck, bats, actionlint, gitleaks, ruff, vulture.
 
 ## VS Code
 
@@ -14,22 +14,18 @@ Zone de dev conteneurisée : Java 21 + Maven, Node LTS + pnpm, Python 3.12 + uv,
 
 Depuis le dossier `devzone/` :
 
-```bash
-# Lancer (crée le conteneur si absent, sinon le redémarre)
-npx @devcontainers/cli up --workspace-folder .
+| Commande | Action |
+|---|---|
+| `make up` | Lance le conteneur (le crée si absent) |
+| `make shell` | Ouvre un shell dedans (lance si besoin) |
+| `make stop` | Arrête le conteneur, état conservé |
+| `make down` | Supprime le conteneur (caches Maven/pnpm conservés dans leurs volumes) |
+| `make rebuild` | Reconstruit de zéro (après modif de `.devcontainer/`) |
+| `make status` | État du conteneur |
 
-# Ouvrir un shell dedans
-npx @devcontainers/cli exec --workspace-folder . bash
+`make` seul affiche cette liste. Les logs de `up`/`rebuild` vont dans `.devzone.log` ; seule la fin s'affiche en cas d'échec.
 
-# Arrêter (conserve le conteneur et son état)
-docker stop $(docker ps -q --filter "label=devcontainer.local_folder=$PWD")
-
-# Supprimer le conteneur (les caches Maven/pnpm restent dans leurs volumes)
-docker rm -f $(docker ps -aq --filter "label=devcontainer.local_folder=$PWD")
-
-# Reconstruire de zéro
-npx @devcontainers/cli up --workspace-folder . --remove-existing-container
-```
+> Ne pas lancer `make up` pendant que VS Code ouvre ou reconstruit le conteneur : deux lancements simultanés créent des conteneurs en double.
 
 ## Organisation
 
@@ -38,15 +34,6 @@ devzone/
 ├── .devcontainer/   # définition du conteneur
 └── workspace/       # tes projets (ignorés par git, chacun son dépôt)
 ```
-
-## Premier lancement
-
-```bash
-gh auth login              # tickets, PR, protection (repowarden ticket, repowarden proteger…)
-repowarden                 # état : hooks actifs, outils présents
-```
-
-Les hooks de repowarden s'appliquent à tous les projets du `workspace/` (commits, branches, secrets, formatage, tests). Versions d'actionlint et gitleaks identiques à la CI de repowarden, empreintes vérifiées à l'installation.
 
 ## Notes
 

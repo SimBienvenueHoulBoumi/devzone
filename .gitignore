@@ -3,3 +3,4 @@ workspace/*
 !workspace/.gitkeep
 
 .DS_Store
+.devzone.log
