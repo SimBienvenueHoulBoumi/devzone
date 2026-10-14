@@ -1,0 +1,5 @@
+# Chaque projet du workspace a son propre dépôt git
+workspace/*
+!workspace/.gitkeep
+
+.DS_Store
