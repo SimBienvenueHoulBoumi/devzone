@@ -29,14 +29,25 @@
   // Caches persistants : survivent aux rebuilds du conteneur
   "mounts": [
     "source=devzone-m2,target=/home/vscode/.m2,type=volume",
-    "source=devzone-pnpm,target=/home/vscode/.local/share/pnpm,type=volume",
-    // Cluster Kubernetes de Docker Desktop : config du Mac en lecture seule,
-    // adaptée au conteneur par kube-config.sh
-    "source=${localEnv:HOME}/.kube,target=/home/vscode/.kube-host,type=bind,readonly"
+    "source=devzone-pnpm,target=/home/vscode/.local/share/pnpm,type=volume"
+  ],
+
+  "runArgs": [
+    // Cluster Kubernetes de l'hôte : sa config en lecture seule, adaptée au
+    // conteneur par kube-config.sh. HOME (Mac, Linux) ou USERPROFILE (Windows) ;
+    // -v plutôt que mounts : crée ~/.kube s'il manque au lieu d'échouer
+    "-v", "${localEnv:HOME}${localEnv:USERPROFILE}/.kube:/home/vscode/.kube-host:ro",
+    // host.docker.internal existe d'office avec Docker Desktop, pas sous Linux
+    "--add-host=host.docker.internal:host-gateway"
   ],
 
   "postCreateCommand": "bash .devcontainer/post-create.sh",
   "postStartCommand": "bash .devcontainer/kube-config.sh",
+  // Clusters kind du conteneur (config) + cluster de l'hôte (hote.config,
+  // refait à chaque démarrage par kube-config.sh)
+  "remoteEnv": {
+    "KUBECONFIG": "/home/vscode/.kube/config:/home/vscode/.kube/hote.config"
+  },
   "remoteUser": "vscode",
 
   "customizations": {

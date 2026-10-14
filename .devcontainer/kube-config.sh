@@ -1,32 +1,67 @@
 #!/usr/bin/env bash
-# Config kubectl du conteneur, refaite à chaque démarrage (le port du cluster
-# Docker Desktop peut changer) : copie de ~/.kube du Mac (monté en lecture seule)
-# où 127.0.0.1/localhost deviennent host.docker.internal, l'adresse du Mac vue
-# du conteneur. tls-server-name garde le nom attendu par le certificat.
+# Clusters Kubernetes du conteneur, à chaque démarrage (le port du cluster de
+# l'hôte peut changer) :
+# - ~/.kube/hote.config : copie du ~/.kube de l'hôte (monté en lecture seule) où
+#   127.0.0.1/localhost deviennent host.docker.internal, l'hôte vu du conteneur ;
+#   tls-server-name garde le nom attendu par le certificat
+# - ~/.kube/config : clusters kind du conteneur, jamais touché ici
+# KUBECONFIG (devcontainer.json) combine les deux.
 set -euo pipefail
 
 SOURCE="$HOME/.kube-host/config"
-CIBLE="$HOME/.kube/config"
+HOTE="$HOME/.kube/hote.config"
 
-if [ ! -f "$SOURCE" ]; then
-    echo "kube-config : pas de $SOURCE, kubectl sans cluster"
-    exit 0
+mkdir -p "$HOME/.kube"
+rm -f "$HOTE"
+# Doit exister : sinon kind écrit dans hote.config, effacé au prochain démarrage
+[ -f "$HOME/.kube/config" ] || install -m 600 /dev/null "$HOME/.kube/config"
+
+if [ -f "$SOURCE" ]; then
+    install -m 600 "$SOURCE" "$HOTE"
+    KUBECONFIG="$HOTE" kubectl config view \
+        -o jsonpath='{range .clusters[*]}{.name}{"\t"}{.cluster.server}{"\n"}{end}' |
+        while IFS=$'\t' read -r nom serveur; do
+            case "$serveur" in
+                https://127.0.0.1:* | https://localhost:*) ;;
+                *) continue ;;
+            esac
+            hote="${serveur#https://}"
+            hote="${hote%%:*}"
+            KUBECONFIG="$HOTE" kubectl config set-cluster "$nom" \
+                --server="https://host.docker.internal:${serveur##*:}" \
+                --tls-server-name="$hote" >/dev/null
+        done
 fi
 
-mkdir -p "$(dirname "$CIBLE")"
-install -m 600 "$SOURCE" "$CIBLE"
+# Clusters kind qui ont survécu au redémarrage : contexte remis dans ~/.kube/config
+# (le Docker interne peut mettre quelques secondes à démarrer)
+for _ in 1 2 3 4 5 6 7 8 9 10; do docker info >/dev/null 2>&1 && break; sleep 1; done
+choix="$(KUBECONFIG="$HOME/.kube/config" kubectl config current-context 2>/dev/null || true)"
+for cluster in $(kind get clusters 2>/dev/null); do
+    kind export kubeconfig --name "$cluster" --kubeconfig "$HOME/.kube/config" >/dev/null 2>&1 || true
+done
 
-export KUBECONFIG="$CIBLE"
-kubectl config view -o jsonpath='{range .clusters[*]}{.name}{"\t"}{.cluster.server}{"\n"}{end}' |
-    while IFS=$'\t' read -r nom serveur; do
-        case "$serveur" in
-            https://127.0.0.1:* | https://localhost:*) ;;
-            *) continue ;;
-        esac
-        hote="${serveur#https://}"
-        hote="${hote%%:*}"
-        kubectl config set-cluster "$nom" \
-            --server="https://host.docker.internal:${serveur##*:}" \
-            --tls-server-name="$hote" >/dev/null
-        echo "kube-config : $nom → host.docker.internal:${serveur##*:}"
-    done
+# Cluster actif : celui choisi avant (kubectl config use-context), sinon celui
+# de l'hôte s'il en a un (current-context de hote.config), sinon kind
+export KUBECONFIG="$HOME/.kube/config:$HOTE"
+if [ -n "$choix" ] && kubectl config use-context "$choix" >/dev/null 2>&1; then
+    :
+elif [ -f "$HOTE" ] && [ -n "$(KUBECONFIG="$HOTE" kubectl config current-context 2>/dev/null)" ]; then
+    KUBECONFIG="$HOME/.kube/config" kubectl config unset current-context >/dev/null
+fi
+
+# Clusters joignables, parmi ceux de l'hôte et ceux de kind
+joignables=0
+for contexte in $(kubectl config get-contexts -o name 2>/dev/null); do
+    if kubectl --context "$contexte" --request-timeout=3s get --raw /readyz >/dev/null 2>&1; then
+        echo "kube-config : cluster joignable : $contexte"
+        joignables=$((joignables + 1))
+    elif [[ "$contexte" == kind-* ]]; then
+        echo "kube-config : cluster kind en cours de démarrage : $contexte"
+        joignables=$((joignables + 1))
+    fi
+done
+echo "kube-config : cluster actif : $(kubectl config current-context 2>/dev/null || echo aucun)"
+if [ "$joignables" -eq 0 ]; then
+    echo "kube-config : aucun cluster joignable ; en créer un dans le conteneur : kind create cluster"
+fi
