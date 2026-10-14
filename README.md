@@ -1,6 +1,6 @@
 # devzone
 
-Zone de dev conteneurisée : Java 21 + Maven, Node LTS + pnpm, Python 3.12 + uv, Docker (in-docker), kubectl, helm, k9s, gh, repowarden (hooks git globaux) et ses outils : shellcheck, bats, actionlint, gitleaks, ruff, vulture.
+Zone de dev conteneurisée : Java 21 + Maven, Node LTS + pnpm, Python 3.12 + uv, Docker (in-docker), kubectl, helm, k9s (reliés au cluster Kubernetes de Docker Desktop), gh, repowarden (hooks git globaux) et ses outils : shellcheck, bats, actionlint, gitleaks, ruff, vulture.
 
 ## Prérequis (sur le Mac)
 
@@ -36,14 +36,18 @@ Depuis le dossier `devzone/` :
 
 ### Premier lancement
 
-1. `make shell` (ou *Reopen in Container* dans VS Code). Le premier build prend quelques minutes ; il se termine par `devzone prêt : java …, node …, python …, repowarden …`.
+1. `make shell` (ou *Reopen in Container* dans VS Code). Le premier build prend quelques minutes. Pour vérifier les outils : `java -version`, `node -v`, `python3 --version`, `repowarden --version`, `kubectl get nodes`.
 2. Dans le conteneur, se connecter à GitHub (tickets, PR, `repowarden`) :
    ```bash
    gh auth login
    gh auth setup-git      # git push/pull via gh
    ```
    À refaire après `make down` ou `make rebuild` (la session gh n'est pas dans un volume).
-3. Vérifier l'identité git : `git config --global user.name` / `user.email`. VS Code la recopie depuis le Mac ; en CLI, la définir si elle est vide.
+3. Vérifier l'identité git (`git config --global user.name`). Si elle est vide (cas avec `make`), la définir ; à refaire après `make down` ou `make rebuild` :
+   ```bash
+   git config --global user.name "<nom>"
+   git config --global user.email "<email>"
+   ```
 
 ### Travailler sur un projet
 
@@ -55,7 +59,7 @@ cd <projet>
 
 Les hooks git de repowarden sont installés **globalement** (`repowarden install --global --lang fr`) : ils s'appliquent à tout dépôt cloné dans le conteneur, sans rien faire de plus. Ensuite, suivre les règles du projet (`AGENTS.md`, `CONTRIBUTING.md`) : `repowarden ticket <n>`, `repowarden cc …`.
 
-Les vérifications de la CI de repowarden se lancent telles quelles dans le conteneur (`shellcheck`, `actionlint`, `bats test/`), avec les mêmes versions.
+Les vérifications de la CI de repowarden se lancent telles quelles dans le conteneur (`shellcheck`, `actionlint`, `bats test/`). actionlint est à la même version que la CI ; shellcheck et bats sont ceux d'Ubuntu 24.04 et peuvent différer légèrement.
 
 ### Mettre à jour un outil
 
@@ -64,7 +68,7 @@ Les vérifications de la CI de repowarden se lancent telles quelles dans le cont
 | k9s, actionlint, gitleaks | `.devcontainer/Dockerfile` : `ARG …_VERSION` **et** les empreintes `sha256` (arm64 + amd64) | `make rebuild` |
 | uv, ruff, vulture | `.devcontainer/Dockerfile` : `ARG …_VERSION` | `make rebuild` |
 | repowarden | `.devcontainer/post-create.sh` : `repowarden@x.y.z` | `make rebuild` |
-| Java, Node, Python, Docker, kubectl, helm, gh | `.devcontainer/devcontainer.json` (features) | `make rebuild` |
+| Java, Node, Python, Docker, kubectl, helm, gh | `.devcontainer/devcontainer.json` (features), versions des features figées dans `devcontainer-lock.json` | `npx @devcontainers/cli upgrade --workspace-folder .` puis `make rebuild` |
 
 Empreinte d'une archive : `curl -fsSL <url> | shasum -a 256`.
 
@@ -74,6 +78,7 @@ Empreinte d'une archive : `curl -fsSL <url> | shasum -a 256`.
 devzone/
 ├── .devcontainer/
 │   ├── Dockerfile         # image de base + outils figés (versions et sha256)
+│   ├── devcontainer-lock.json  # versions figées des features
 │   ├── devcontainer.json  # features (langages, Docker, k8s, gh), volumes, extensions
 │   ├── kube-config.sh     # à chaque démarrage : kubectl relié au cluster de Docker Desktop
 │   └── post-create.sh     # au premier démarrage : droits des volumes, repowarden
