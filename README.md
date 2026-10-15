@@ -1,6 +1,6 @@
 # devzone
 
-Zone de dev conteneurisée : Java 21 + Maven, Node LTS + pnpm, Python 3.12 + uv, Docker (in-docker), kubectl, helm, k9s, kind (cluster de l'hôte s'il existe, sinon kind dans le conteneur), gh, repowarden (hooks git globaux) et ses outils : shellcheck, bats, actionlint, gitleaks, ruff, vulture ; assistants IA : Claude Code et opencode.
+Zone de dev conteneurisée : Java 21 + Maven, Node LTS + pnpm, Python 3.12 + uv, Docker (in-docker), kubectl, helm, k9s, kind (cluster de l'hôte s'il existe, sinon kind dans le conteneur), gh, repowarden (hooks git globaux) et ses outils : shellcheck, bats, actionlint, gitleaks, ruff, vulture, pytest ; assistants IA : Claude Code et opencode.
 
 ## Prérequis
 
@@ -94,7 +94,7 @@ Cas sans cluster de l'hôte joignable (kind fonctionne quand même) :
 | Outil | Où | Puis |
 |---|---|---|
 | k9s, actionlint, gitleaks, kind | `.devcontainer/Dockerfile` : `ARG …_VERSION` **et** les empreintes `sha256` (arm64 + amd64) | `make rebuild` |
-| uv, ruff, vulture | `.devcontainer/Dockerfile` : `ARG …_VERSION` | `make rebuild` |
+| uv, ruff, vulture, pytest | `.devcontainer/Dockerfile` : `ARG …_VERSION` | `make rebuild` |
 | repowarden | `.devcontainer/post-create.sh` : `repowarden@x.y.z` | `make rebuild` |
 | Claude Code, opencode | `.devcontainer/post-create.sh` : `@anthropic-ai/claude-code@x.y.z`, `opencode-ai@x.y.z` | `make rebuild` |
 | Java, Node, Python, Docker, kubectl, helm, gh | `.devcontainer/devcontainer.json` (features), versions des features figées dans `devcontainer-lock.json` | `npx @devcontainers/cli upgrade --workspace-folder .` puis `make rebuild` |
