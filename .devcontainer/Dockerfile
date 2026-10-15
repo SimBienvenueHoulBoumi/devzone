@@ -16,6 +16,8 @@ ARG GITLEAKS_VERSION=8.30.1
 ARG KIND_VERSION=0.33.0
 ARG RUFF_VERSION=0.17.0
 ARG VULTURE_VERSION=2.16
+# pytest : même version que la CI de repowarden (ci/requirements/e2e-python.in)
+ARG PYTEST_VERSION=9.1.1
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
@@ -60,10 +62,11 @@ RUN set -eu; \
 
 COPY --from=uv /uv /uvx /usr/local/bin/
 
-# ruff et vulture (repowarden code-mort a besoin des deux), installés pour
+# ruff, vulture (repowarden code-mort a besoin des deux) et pytest, installés pour
 # tous les utilisateurs, avec un Python géré par uv hors du home
 # (variables limitées au build : uv tool install reste dans ~/.local pour vscode)
 RUN export UV_TOOL_DIR=/opt/uv/tools UV_TOOL_BIN_DIR=/usr/local/bin \
         UV_PYTHON_INSTALL_DIR=/opt/uv/python \
     && uv tool install "ruff==${RUFF_VERSION}" \
-    && uv tool install "vulture==${VULTURE_VERSION}"
+    && uv tool install "vulture==${VULTURE_VERSION}" \
+    && uv tool install "pytest==${PYTEST_VERSION}"
