@@ -1,7 +1,7 @@
-# Releases automatiques : à chaque merge sur main, la version (semver) est
-# calculée depuis les Conventional Commits ; une PR « release x.y.z »
-# (changelog, version.txt) est validée par la CI puis mergée, et le tag vX.Y.Z
-# et la release GitHub sont créés. Aucun jeton à créer.
+# Releases, flux develop → main (mode tag) : préversion vX.Y.Z-next.N le soir
+# si develop a changé ; le vendredi matin (ou à la main), une demande de
+# livraison develop → main, dont le merge publie le tag vX.Y.Z et la release.
+# Aucune version n'est écrite dans les fichiers : elle est portée par le tag.
 #
 # Prérequis : Settings → Actions → General → Workflow permissions →
 # « Allow GitHub Actions to create and approve pull requests »
@@ -10,13 +10,17 @@ name: release
 
 on:
   push:
-    branches: [main]
-  workflow_dispatch:
+    branches: [main, develop]
+  schedule:
+    - cron: "0 19 * * *" # préversion du soir, si develop a changé
+    - cron: "0 7 * * 5" # fenêtre de livraison : le vendredi matin
+  workflow_dispatch: # à la main (et urgence) : préversion et demande de livraison
 
-# Une release à la fois
+# Une file par branche et par déclencheur ; une demande manuelle ou planifiée
+# remplace celle en attente ; un push n'annule jamais un run en cours
 concurrency:
-  group: release
-  cancel-in-progress: false
+  group: release-${{ github.ref_name }}-${{ github.event.schedule || github.event_name }}
+  cancel-in-progress: ${{ github.event_name != 'push' }}
 
 permissions: {}
 
@@ -24,3 +28,6 @@ jobs:
   release:
     uses: simdevWarden/repowarden/.github/workflows/release-auto.yml@v4
     permissions: { contents: write, pull-requests: write, actions: write, checks: read, statuses: write }
+    with:
+      mode: tag
+      delivery-schedule: "0 7 * * 5" # même cron que la fenêtre ci-dessus

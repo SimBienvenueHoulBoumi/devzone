@@ -107,7 +107,7 @@ Empreinte d'une archive : `curl -fsSL <url> | shasum -a 256`.
 
 ## Versions
 
-Publiées automatiquement par repowarden : à chaque merge sur `main`, une PR « release x.y.z » (changelog) est ouverte, validée par la CI puis mergée, ce qui crée le tag et la [release GitHub](https://github.com/SimBienvenueHoulBoumi/devzone/releases). La version suit les Conventional Commits des PR : `fix` → correctif, `feat` → mineure.
+Flux `develop` → `main`, géré par repowarden : le travail entre dans `develop` (branche par défaut) ; **seul `develop` entre dans `main`**, par la PR de livraison (une PR de travail ouverte vers `main` est reciblée vers `develop` par la CI). Une préversion `vX.Y.Z-next.N` est publiée le soir si `develop` a changé ; le vendredi matin (ou *Actions → release → Run workflow* sur `develop`), la PR de livraison `develop` → `main` est ouverte ; son merge, après revue, publie le tag `vX.Y.Z` et la [release GitHub](https://github.com/SimBienvenueHoulBoumi/devzone/releases). La version suit les Conventional Commits : `fix` → correctif, `feat` → mineure.
 
 ## Organisation
 
@@ -120,8 +120,10 @@ devzone/
 │   ├── kube-config.sh     # à chaque démarrage : cluster de l'hôte + contextes kind
 │   └── post-create.sh     # au premier démarrage : droits des volumes, repowarden, Claude Code, opencode
 ├── .github/workflows/
-│   ├── repowarden.yml     # vérifications repowarden de chaque PR
-│   └── release.yml        # versions publiées à chaque merge sur main (repowarden)
+│   ├── repowarden.yml     # vérifications repowarden de chaque PR (PR mal visée reciblée vers develop)
+│   ├── release.yml        # préversions sur develop, livraison develop → main (repowarden)
+│   └── nettoyage.yml      # branches mergées supprimées, main et develop conservées
+├── .repowarden.conf       # réglages repowarden partagés : flux develop → main
 ├── Makefile               # pilotage sans VS Code
 └── workspace/             # tes projets (ignorés par git, chacun son dépôt)
 ```
