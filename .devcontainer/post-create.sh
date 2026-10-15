@@ -22,7 +22,7 @@ git config --global url.https://github.com/.insteadOf git@github.com:
 
 # repowarden, version figée (il installe des hooks git globaux) ; mettre à jour
 # en changeant la version ici, puis Rebuild Container
-npm install -g repowarden@4.7.1
+npm install -g repowarden@4.8.0
 repowarden install --global --lang fr
 
 # Assistants IA en ligne de commande, versions figées ; mettre à jour en
