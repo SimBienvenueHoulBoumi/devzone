@@ -29,7 +29,11 @@
   // Caches persistants : survivent aux rebuilds du conteneur
   "mounts": [
     "source=devzone-m2,target=/home/vscode/.m2,type=volume",
-    "source=devzone-pnpm,target=/home/vscode/.local/share/pnpm,type=volume"
+    "source=devzone-pnpm,target=/home/vscode/.local/share/pnpm,type=volume",
+    // Assistants IA : connexion et réglages gardés d'un rebuild à l'autre
+    "source=devzone-claude,target=/home/vscode/.claude,type=volume",
+    "source=devzone-opencode-config,target=/home/vscode/.config/opencode,type=volume",
+    "source=devzone-opencode-data,target=/home/vscode/.local/share/opencode,type=volume"
   ],
 
   "runArgs": [
@@ -46,7 +50,10 @@
   // Clusters kind du conteneur (config) + cluster de l'hôte (hote.config,
   // refait à chaque démarrage par kube-config.sh)
   "remoteEnv": {
-    "KUBECONFIG": "/home/vscode/.kube/config:/home/vscode/.kube/hote.config"
+    "KUBECONFIG": "/home/vscode/.kube/config:/home/vscode/.kube/hote.config",
+    // Claude Code range aussi .claude.json (connexion, réglages) dans ce
+    // dossier, donc dans son volume, au lieu de ~/.claude.json
+    "CLAUDE_CONFIG_DIR": "/home/vscode/.claude"
   },
   "remoteUser": "vscode",
 

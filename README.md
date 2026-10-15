@@ -1,6 +1,6 @@
 # devzone
 
-Zone de dev conteneurisée : Java 21 + Maven, Node LTS + pnpm, Python 3.12 + uv, Docker (in-docker), kubectl, helm, k9s, kind (cluster de l'hôte s'il existe, sinon kind dans le conteneur), gh, repowarden (hooks git globaux) et ses outils : shellcheck, bats, actionlint, gitleaks, ruff, vulture.
+Zone de dev conteneurisée : Java 21 + Maven, Node LTS + pnpm, Python 3.12 + uv, Docker (in-docker), kubectl, helm, k9s, kind (cluster de l'hôte s'il existe, sinon kind dans le conteneur), gh, repowarden (hooks git globaux) et ses outils : shellcheck, bats, actionlint, gitleaks, ruff, vulture ; assistants IA : Claude Code et opencode.
 
 ## Prérequis
 
@@ -59,6 +59,7 @@ npx @devcontainers/cli up --workspace-folder . --remove-existing-container  # ma
    git config --global user.name "<nom>"
    git config --global user.email "<email>"
    ```
+4. Se connecter aux assistants IA, une seule fois : `claude` (puis `/login`), `opencode auth login`. Leur connexion et leurs réglages sont dans des volumes (`devzone-claude`, `devzone-opencode-*`) : ils survivent à `make rebuild` et `make down`.
 
 ### Travailler sur un projet
 
@@ -98,6 +99,7 @@ Cas sans cluster de l'hôte joignable (kind fonctionne quand même) :
 | k9s, actionlint, gitleaks, kind | `.devcontainer/Dockerfile` : `ARG …_VERSION` **et** les empreintes `sha256` (arm64 + amd64) | `make rebuild` |
 | uv, ruff, vulture | `.devcontainer/Dockerfile` : `ARG …_VERSION` | `make rebuild` |
 | repowarden | `.devcontainer/post-create.sh` : `repowarden@x.y.z` | `make rebuild` |
+| Claude Code, opencode | `.devcontainer/post-create.sh` : `@anthropic-ai/claude-code@x.y.z`, `opencode-ai@x.y.z` | `make rebuild` |
 | Java, Node, Python, Docker, kubectl, helm, gh | `.devcontainer/devcontainer.json` (features), versions des features figées dans `devcontainer-lock.json` | `npx @devcontainers/cli upgrade --workspace-folder .` puis `make rebuild` |
 
 Empreinte d'une archive : `curl -fsSL <url> | shasum -a 256`.
@@ -111,7 +113,7 @@ devzone/
 │   ├── devcontainer-lock.json  # versions figées des features
 │   ├── devcontainer.json  # features (langages, Docker, k8s, gh), volumes, extensions
 │   ├── kube-config.sh     # à chaque démarrage : cluster de l'hôte + contextes kind
-│   └── post-create.sh     # au premier démarrage : droits des volumes, repowarden
+│   └── post-create.sh     # au premier démarrage : droits des volumes, repowarden, Claude Code, opencode
 ├── Makefile               # pilotage sans VS Code
 └── workspace/             # tes projets (ignorés par git, chacun son dépôt)
 ```
