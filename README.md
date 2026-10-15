@@ -105,6 +105,10 @@ Cas sans cluster de l'hôte joignable (kind fonctionne quand même) :
 
 Empreinte d'une archive : `curl -fsSL <url> | shasum -a 256`.
 
+## Versions
+
+Publiées automatiquement par repowarden : à chaque merge sur `main`, une PR « release x.y.z » (changelog) est ouverte, validée par la CI puis mergée, ce qui crée le tag et la [release GitHub](https://github.com/SimBienvenueHoulBoumi/devzone/releases). La version suit les Conventional Commits des PR : `fix` → correctif, `feat` → mineure.
+
 ## Organisation
 
 ```
@@ -115,6 +119,9 @@ devzone/
 │   ├── devcontainer.json  # features (langages, Docker, k8s, gh), volumes, extensions
 │   ├── kube-config.sh     # à chaque démarrage : cluster de l'hôte + contextes kind
 │   └── post-create.sh     # au premier démarrage : droits des volumes, repowarden, Claude Code, opencode
+├── .github/workflows/
+│   ├── repowarden.yml     # vérifications repowarden de chaque PR
+│   └── release.yml        # versions publiées à chaque merge sur main (repowarden)
 ├── Makefile               # pilotage sans VS Code
 └── workspace/             # tes projets (ignorés par git, chacun son dépôt)
 ```

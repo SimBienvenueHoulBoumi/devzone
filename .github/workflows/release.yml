@@ -1,0 +1,26 @@
+# Releases automatiques : à chaque merge sur main, la version (semver) est
+# calculée depuis les Conventional Commits ; une PR « release x.y.z »
+# (changelog, version.txt) est validée par la CI puis mergée, et le tag vX.Y.Z
+# et la release GitHub sont créés. Aucun jeton à créer.
+#
+# Prérequis : Settings → Actions → General → Workflow permissions →
+# « Allow GitHub Actions to create and approve pull requests »
+# (repowarden proteger le règle).
+name: release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Une release à la fois
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  release:
+    uses: simdevWarden/repowarden/.github/workflows/release-auto.yml@v4
+    permissions: { contents: write, pull-requests: write, actions: write, checks: read, statuses: write }
