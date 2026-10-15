@@ -8,6 +8,7 @@ Fonctionne sur Mac (Apple Silicon ou Intel), Linux et Windows :
 
 - **Docker** : Docker Desktop (Mac, Windows, Linux) ou Docker Engine (Linux)
 - **VS Code** + extension *Dev Containers*, **ou** Node (pour `npx @devcontainers/cli`) et `make`
+- **Cluster Kubernetes sur l'hôte** (recommandé) : devzone n'installe pas de cluster, il fournit les outils (`kubectl`, `helm`, `k9s`, `kind`) et se connecte au cluster de l'hôte. Avec Docker Desktop : *Settings → Kubernetes → Enable Kubernetes*. Sans cluster sur l'hôte, en créer un dans le conteneur : `kind create cluster` (voir [Kubernetes](#kubernetes)).
 - **Windows** : cloner avec Git for Windows ; les scripts restent en fins de ligne LF (`.gitattributes`). Sans `make`, utiliser VS Code ou les commandes `npx` ci-dessous.
 
 ## VS Code
@@ -75,7 +76,7 @@ Les vérifications de la CI de repowarden se lancent telles quelles dans le cont
 
 ### Kubernetes
 
-Au démarrage, le conteneur se connecte au cluster de l'hôte s'il existe et qu'il est joignable (Docker Desktop sur Mac, Windows ou Linux). Sinon, ou en plus, créer un cluster dans le conteneur :
+devzone fournit les outils, pas le cluster. Au démarrage, le conteneur se connecte au cluster de l'hôte s'il existe et qu'il est joignable (Docker Desktop sur Mac, Windows ou Linux). Sinon, ou en plus, créer un cluster dans le conteneur :
 
 ```bash
 kind create cluster          # ~2 min la première fois (image gardée entre rebuilds)
