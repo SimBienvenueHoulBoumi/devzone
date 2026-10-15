@@ -27,7 +27,7 @@ permissions: {}
 jobs:
   release:
     uses: simdevWarden/repowarden/.github/workflows/release-auto.yml@v4
-    permissions: { contents: write, pull-requests: write, actions: write, checks: read, statuses: write }
+    permissions: { contents: write, pull-requests: write, actions: write, checks: read, statuses: write, issues: read }
     with:
       mode: tag
       delivery-schedule: "0 7 * * 5" # même cron que la fenêtre ci-dessus
