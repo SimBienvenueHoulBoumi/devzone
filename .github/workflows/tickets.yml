@@ -1,0 +1,29 @@
+# Suivi des tickets : le ticket d'abord, la branche en découle (créée à la
+# validation, liée au ticket), le premier push ouvre la PR en brouillon ;
+# statuts tenus à jour jusqu'à la production.
+name: tickets
+
+on:
+  pull_request_target:
+    types: [opened, reopened, edited, synchronize, ready_for_review, converted_to_draft, closed]
+  pull_request_review:
+    types: [submitted]
+  issues:
+    types: [opened, labeled, assigned, closed]
+  push:
+    branches-ignore: [main, master, develop]
+
+permissions: {}
+
+jobs:
+  tickets:
+    uses: simdevWarden/repowarden/.github/workflows/tickets.yml@v4
+    permissions: { contents: write, issues: write, pull-requests: write, statuses: write }
+    # GitHub App (repowarden app init) : ses actions déclenchent les autres workflows
+    # auto-create : true = crée un ticket « à valider » pour PR sans ticket,
+    # false = échec de la vérification avec la marche à suivre (défaut false)
+    with:
+      app-client-id: ${{ vars.REPOWARDEN_APP_CLIENT_ID }}
+      auto-create: false
+    secrets:
+      app-key: ${{ secrets.REPOWARDEN_APP_KEY }}
