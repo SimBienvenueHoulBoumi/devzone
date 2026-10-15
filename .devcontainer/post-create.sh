@@ -30,10 +30,7 @@ repowarden install --global --lang fr
 # volumes de devcontainer.json)
 npm install -g @anthropic-ai/claude-code@2.1.286 opencode-ai@1.18.34
 
-# Identité git : une fois, dans le volume (survit aux rebuilds)
-if [ -z "$(git config --get user.name || true)" ]; then
-    echo "Identité git à définir une fois : git config --file ~/.config/git/config user.name \"<nom>\" (et user.email)"
-fi
-gh auth status >/dev/null 2>&1 || echo "GitHub à connecter une fois : gh auth login"
+# Identité git : déduite du compte gh au démarrage (git-identite.sh)
+gh auth status >/dev/null 2>&1 || echo "GitHub à connecter une fois : gh auth login (donne aussi l'identité git)"
 
 echo "devzone prêt : java $(java -version 2>&1 | head -1 | cut -d'"' -f2), node $(node -v), python $(python3 --version | cut -d' ' -f2), repowarden $(repowarden --version), claude $(claude --version | cut -d' ' -f1), opencode $(opencode --version)"

@@ -51,11 +51,10 @@ npx @devcontainers/cli up --workspace-folder . --remove-existing-container  # ma
 1. `make shell` (ou *Reopen in Container* dans VS Code). Le premier build prend quelques minutes. Pour vérifier les outils : `java -version`, `node -v`, `python3 --version`, `repowarden --version`, `kubectl get nodes`.
 2. Dans le conteneur, une seule fois (conservé dans des volumes : survit à `make rebuild` et `make down`) :
    ```bash
-   gh auth login                                                   # GitHub : tickets, PR, repowarden, git push/pull
-   git config --file ~/.config/git/config user.name "<nom>"        # identité git
-   git config --file ~/.config/git/config user.email "<email>"
+   gh auth login                     # GitHub : tickets, PR, repowarden, git push/pull
+   bash .devcontainer/git-identite.sh  # identité git (sinon : au prochain démarrage)
    ```
-   `post-create.sh` rappelle ce qui manque. Git passe par le jeton de `gh` (https, même pour les remotes en `git@github.com:`), sans clé ssh à recopier, et les dépôts de `/workspaces/devzone` sont déclarés sûrs (`safe.directory`).
+   **Identité git** : déduite du compte `gh` de chacun, écrite dans `~/.config/git/config` (volume) : nom du profil GitHub (sinon login), email noreply `<id>+<login>@users.noreply.github.com` (commits rattachés au compte, email personnel non exposé). Une identité déjà définie n'est jamais remplacée ; pour un autre email : `git config --file ~/.config/git/config user.email "<email>"`. `post-create.sh` rappelle ce qui manque. Git passe par le jeton de `gh` (https, même pour les remotes en `git@github.com:`), sans clé ssh à recopier, et les dépôts de `/workspaces/devzone` sont déclarés sûrs (`safe.directory`).
 3. Se connecter aux assistants IA, une seule fois : `claude` (puis `/login`), `opencode auth login`. Leur connexion et leurs réglages sont dans des volumes (`devzone-claude`, `devzone-opencode-*`) : ils survivent à `make rebuild` et `make down`.
 
 ### Travailler sur un projet
