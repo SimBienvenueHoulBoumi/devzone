@@ -49,18 +49,14 @@ npx @devcontainers/cli up --workspace-folder . --remove-existing-container  # ma
 ### Premier lancement
 
 1. `make shell` (ou *Reopen in Container* dans VS Code). Le premier build prend quelques minutes. Pour vérifier les outils : `java -version`, `node -v`, `python3 --version`, `repowarden --version`, `kubectl get nodes`.
-2. Dans le conteneur, se connecter à GitHub (tickets, PR, `repowarden`) :
+2. Dans le conteneur, une seule fois (conservé dans des volumes : survit à `make rebuild` et `make down`) :
    ```bash
-   gh auth login
-   gh auth setup-git      # git push/pull via gh
+   gh auth login                                                   # GitHub : tickets, PR, repowarden, git push/pull
+   git config --file ~/.config/git/config user.name "<nom>"        # identité git
+   git config --file ~/.config/git/config user.email "<email>"
    ```
-   À refaire après `make down` ou `make rebuild` (la session gh n'est pas dans un volume).
-3. Vérifier l'identité git (`git config --global user.name`). Si elle est vide (cas avec `make`), la définir ; à refaire après `make down` ou `make rebuild` :
-   ```bash
-   git config --global user.name "<nom>"
-   git config --global user.email "<email>"
-   ```
-4. Se connecter aux assistants IA, une seule fois : `claude` (puis `/login`), `opencode auth login`. Leur connexion et leurs réglages sont dans des volumes (`devzone-claude`, `devzone-opencode-*`) : ils survivent à `make rebuild` et `make down`.
+   `post-create.sh` rappelle ce qui manque. Git passe par le jeton de `gh` (https, même pour les remotes en `git@github.com:`), sans clé ssh à recopier, et les dépôts de `/workspaces/devzone` sont déclarés sûrs (`safe.directory`).
+3. Se connecter aux assistants IA, une seule fois : `claude` (puis `/login`), `opencode auth login`. Leur connexion et leurs réglages sont dans des volumes (`devzone-claude`, `devzone-opencode-*`) : ils survivent à `make rebuild` et `make down`.
 
 ### Travailler sur un projet
 
@@ -105,6 +101,10 @@ Cas sans cluster de l'hôte joignable (kind fonctionne quand même) :
 
 Empreinte d'une archive : `curl -fsSL <url> | shasum -a 256`.
 
+## Versions
+
+Flux `develop` → `main`, géré par repowarden : le travail entre dans `develop` (branche par défaut) ; **seul `develop` entre dans `main`**, par la PR de livraison (une PR de travail ouverte vers `main` est reciblée vers `develop` par la CI). Une préversion `vX.Y.Z-next.N` est publiée le soir si `develop` a changé ; le vendredi matin (ou *Actions → release → Run workflow* sur `develop`), la PR de livraison `develop` → `main` est ouverte ; son merge, après revue, publie le tag `vX.Y.Z` et la [release GitHub](https://github.com/SimBienvenueHoulBoumi/devzone/releases). La version suit les Conventional Commits : `fix` → correctif, `feat` → mineure.
+
 ## Organisation
 
 ```
@@ -115,6 +115,11 @@ devzone/
 │   ├── devcontainer.json  # features (langages, Docker, k8s, gh), volumes, extensions
 │   ├── kube-config.sh     # à chaque démarrage : cluster de l'hôte + contextes kind
 │   └── post-create.sh     # au premier démarrage : droits des volumes, repowarden, Claude Code, opencode
+├── .github/workflows/
+│   ├── repowarden.yml     # vérifications repowarden de chaque PR (PR mal visée reciblée vers develop)
+│   ├── release.yml        # préversions sur develop, livraison develop → main (repowarden)
+│   └── nettoyage.yml      # branches mergées supprimées, main et develop conservées
+├── .repowarden.conf       # réglages repowarden partagés : flux develop → main
 ├── Makefile               # pilotage sans VS Code
 └── workspace/             # tes projets (ignorés par git, chacun son dépôt)
 ```

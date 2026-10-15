@@ -1,0 +1,42 @@
+# Releases, flux develop → main (mode tag) : préversion vX.Y.Z-next.N le soir
+# si develop a changé ; le vendredi matin (ou à la main), une demande de
+# livraison develop → main, dont le merge publie le tag vX.Y.Z et la release.
+# Aucune version n'est écrite dans les fichiers : elle est portée par le tag.
+#
+# Prérequis : Settings → Actions → General → Workflow permissions →
+# « Allow GitHub Actions to create and approve pull requests »
+# (repowarden proteger le règle).
+name: release
+
+on:
+  push:
+    branches: [main, develop]
+  schedule:
+    - cron: "0 19 * * *" # préversion du soir, si develop a changé
+    - cron: "0 7 * * 5" # fenêtre de livraison : le vendredi matin
+  workflow_dispatch: # à la main (et urgence) : préversion et demande de livraison
+
+# Une file par branche et par déclencheur ; une demande manuelle ou planifiée
+# remplace celle en attente ; un push n'annule jamais un run en cours
+concurrency:
+  group: release-${{ github.ref_name }}-${{ github.event.schedule || github.event_name }}
+  cancel-in-progress: ${{ github.event_name != 'push' }}
+
+permissions: {}
+
+jobs:
+  release:
+    uses: simdevWarden/repowarden/.github/workflows/release-auto.yml@v4
+    permissions: { contents: write, pull-requests: write, actions: write, checks: read, statuses: write, issues: read }
+    with:
+      mode: tag
+      delivery-schedule: "0 7 * * 5" # même cron que la fenêtre ci-dessus
+
+  # Suivi des tickets : livrés en préversion → préprod ; publiés → fermés
+  tickets:
+    needs: release
+    if: needs.release.outputs.release_created == 'true' || needs.release.outputs.prerelease_created == 'true'
+    uses: simdevWarden/repowarden/.github/workflows/tickets.yml@v4
+    permissions: { contents: write, issues: write, pull-requests: write, statuses: write }
+    with:
+      tag: ${{ needs.release.outputs.tag_name || needs.release.outputs.prerelease_tag }}

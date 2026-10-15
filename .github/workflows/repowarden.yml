@@ -8,11 +8,12 @@ on:
     # edited : revérifie quand le titre ou la description de la PR change
     types: [opened, synchronize, reopened, edited]
   push:
-    branches: [main]
+    branches: [main, develop]
   workflow_dispatch:
 
 permissions:
   contents: read
+  pull-requests: write # fix-pr : PR mal visée reciblée vers develop
 
 jobs:
   repowarden:
@@ -22,3 +23,7 @@ jobs:
         with:
           fetch-depth: 0 # historique complet : messages de commit, diff depuis la base
       - uses: simdevWarden/repowarden@v4
+        with:
+          # Seul develop entre dans main : une PR de travail ouverte vers main
+          # est reciblée vers develop avant les vérifications
+          fix-pr: "true"

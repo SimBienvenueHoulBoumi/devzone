@@ -1,0 +1,18 @@
+# Branches de PR supprimées après merge (la suppression automatique de GitHub
+# est désactivée dans le flux develop : elle supprimerait develop au merge de
+# la livraison). main, develop et toute branche encore source d'une PR ouverte
+# sont conservées.
+name: nettoyage
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions: {}
+
+jobs:
+  nettoyage:
+    uses: simdevWarden/repowarden/.github/workflows/nettoyage-branches.yml@v4
+    permissions:
+      contents: write
+      pull-requests: read
