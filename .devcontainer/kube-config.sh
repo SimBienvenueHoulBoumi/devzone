@@ -65,3 +65,6 @@ echo "kube-config : cluster actif : $(kubectl config current-context 2>/dev/null
 if [ "$joignables" -eq 0 ]; then
     echo "kube-config : aucun cluster joignable ; en créer un dans le conteneur : kind create cluster"
 fi
+
+# CPU/RAM dans k9s : metrics-server sur les clusters joignables qui ne l'ont pas
+bash "$(dirname "$0")/metrics-server.sh" || true

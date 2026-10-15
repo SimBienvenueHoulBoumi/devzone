@@ -82,6 +82,7 @@ kubectl config use-context <nom>
 
 - **Cluster actif par défaut** : celui de l'hôte ; un choix fait avec `use-context` est gardé aux redémarrages.
 - **Clusters kind** : tournent dans le Docker interne, redémarrent avec le conteneur (contexte remis par `kube-config.sh`) ; supprimés par `kind delete cluster`.
+- **CPU/RAM dans k9s** (`kubectl top`) : au démarrage, metrics-server est installé sur les clusters locaux joignables (Docker Desktop, kind…) qui ne l'ont pas, jamais sur un cluster distant (Docker Desktop et kind ne l'ont pas d'office). Après un `kind create cluster` : `bash .devcontainer/metrics-server.sh`.
 - Messages de démarrage (`kube-config : …`) : dans le terminal VS Code de création, ou relancer `bash .devcontainer/kube-config.sh`.
 - `~/.kube` de l'hôte est monté en lecture seule, jamais modifié ; sa copie adaptée est `~/.kube/hote.config` (`127.0.0.1` remplacé par `host.docker.internal`). Après un changement de cluster sur l'hôte : `make stop && make up`.
 
