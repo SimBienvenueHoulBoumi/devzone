@@ -1,11 +1,14 @@
-# Releases, flux develop → main (mode tag) : préversion vX.Y.Z-next.N le soir
-# si develop a changé ; le vendredi matin (ou à la main), une demande de
-# livraison develop → main, dont le merge publie le tag vX.Y.Z et la release.
-# Aucune version n'est écrite dans les fichiers : elle est portée par le tag.
+# Releases, flux develop → main (mode tag), sans geste : chaque merge d'un
+# ticket dans develop (la validation humaine) publie une préversion
+# vX.Y.Z-next.N et tient à jour la PR de livraison develop → main ; la GitHub
+# App la merge dès que ses vérifications sont vertes, ce qui publie sur main le
+# tag vX.Y.Z et la release. Aucune version n'est écrite dans les fichiers :
+# elle est portée par le tag. Retour au merge manuel de la livraison :
+# variable de dépôt LIVRAISON_AUTO=non.
 #
-# Prérequis : Settings → Actions → General → Workflow permissions →
-# « Allow GitHub Actions to create and approve pull requests »
-# (repowarden proteger le règle).
+# Prérequis : GitHub App (repowarden app init : variable
+# REPOWARDEN_APP_CLIENT_ID, secret REPOWARDEN_APP_KEY) ; Settings → Actions →
+# General → « Allow GitHub Actions to create and approve pull requests ».
 name: release
 
 on:
@@ -34,6 +37,44 @@ jobs:
       # Préversion publiée par le bot à chaque merge sur develop : la PR de
       # livraison est livrable aussitôt (vérification livraison)
       preversion-on-push: true
+      # GitHub App : la PR de livraison qu'elle ouvre lance sa CI d'elle-même
+      app-client-id: ${{ vars.REPOWARDEN_APP_CLIENT_ID }}
+    secrets:
+      app-key: ${{ secrets.REPOWARDEN_APP_KEY }}
+
+  # Livraison automatique : le merge d'un ticket dans develop est la validation
+  # humaine ; la PR de livraison develop → main part ensuite d'elle-même, dès
+  # que les vérifications exigées sur main (repowarden, livraison) sont vertes.
+  # Merge par l'App (pas le jeton des Actions) : il déclenche tag et release.
+  # Le job livraison de repowarden, lui, exige une approbation humaine : il
+  # n'est pas utilisé (pas de delivery-environment).
+  livraison-auto:
+    needs: release
+    if: github.ref_name == 'develop' && vars.LIVRAISON_AUTO != 'non'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Jeton de l'App
+        id: app
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.REPOWARDEN_APP_CLIENT_ID }}
+          private-key: ${{ secrets.REPOWARDEN_APP_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+      - name: Merge automatique de la livraison
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          pr="$(gh pr list --base main --head develop --state open --json number -q '.[0].number')"
+          if [ -z "$pr" ]; then
+            echo "::notice::Aucune PR de livraison ouverte : rien à livrer."
+            exit 0
+          fi
+          gh pr merge "$pr" --auto --merge
+          echo "::notice::PR de livraison #$pr : merge automatique armé ; il part dès que repowarden et livraison sont verts, puis tag et release."
 
   # Suivi des tickets : livrés en préversion → préprod ; publiés → fermés
   tickets:
@@ -43,3 +84,6 @@ jobs:
     permissions: { contents: write, issues: write, pull-requests: write, statuses: write }
     with:
       tag: ${{ needs.release.outputs.tag_name || needs.release.outputs.prerelease_tag }}
+      app-client-id: ${{ vars.REPOWARDEN_APP_CLIENT_ID }}
+    secrets:
+      app-key: ${{ secrets.REPOWARDEN_APP_KEY }}

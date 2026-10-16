@@ -195,21 +195,22 @@ Les tests fonctionnels travaillent sur une copie du dépôt, avec leurs propres 
 
 ## Versions et livraison
 
-Flux `develop` → `main`, géré par repowarden :
-1. Le travail entre dans `develop` (branche par défaut), par une PR liée à un ticket. Une PR de travail ouverte vers `main` est reciblée vers `develop` par la CI.
-2. Une **préversion** `vX.Y.Z-next.N` est publiée depuis `develop`.
-3. La **PR de livraison** `develop` → `main` exige cette préversion (vérification `livraison`). Son merge est une **décision humaine**, sans approbation exigée par ailleurs, et publie le tag `vX.Y.Z` et la [release GitHub](https://github.com/SimBienvenueHoulBoumi/devzone/releases).
+Flux `develop` → `main`, géré par repowarden, **sans geste après le merge d'un ticket** :
+1. Le travail entre dans `develop` (branche par défaut), par une PR liée à un ticket. **Son merge est la validation humaine.** Une PR de travail ouverte vers `main` est reciblée vers `develop` par la CI.
+2. Le bot de release publie aussitôt une **préversion** `vX.Y.Z-next.N` et tient à jour la **PR de livraison** `develop` → `main`.
+3. La GitHub App **merge la PR de livraison** dès que ses vérifications sont vertes (`repowarden`, et `livraison` : préversion publiée). Ce merge publie le tag `vX.Y.Z` et la [release GitHub](https://github.com/SimBienvenueHoulBoumi/devzone/releases). Une vérification rouge bloque la livraison, visible sur la PR.
 
-La version suit les Conventional Commits : `fix` → correctif, `feat` → mineure.
+`main` reste ainsi à jour avec `develop`. La version suit les Conventional Commits : `fix` → correctif, `feat` → mineure ; une livraison sans `fix` ni `feat` (documentation, CI…) met `main` à jour sans nouvelle version.
 
-**Rythme, au choix du projet** (`.github/workflows/release.yml`, job `release`, bloc `with:`) :
+**Réglages, au choix du mainteneur** :
 
-| Rythme | Préversion | Demande de livraison | Réglage |
-|---|---|---|---|
-| **Regroupé** (défaut) | le soir, si `develop` a changé | fenêtre du vendredi matin, à la main (*Actions → release → Run workflow* sur `develop`), ou merge étiqueté « urgent » | rien à ajouter |
-| **À chaque ticket** | à chaque merge sur `develop` | à chaque merge sur `develop` | `preversion-on-push: true` et `delivery-on-push: true` |
+| Réglage | Où | Effet |
+|---|---|---|
+| Livraison automatique (défaut de devzone) | rien | la PR de livraison part d'elle-même (job `livraison-auto` de `release.yml`) |
+| Livraison manuelle | variable de dépôt `LIVRAISON_AUTO=non` (*Settings → Secrets and variables → Actions → Variables*) | la PR de livraison attend ton merge |
+| Préversion à chaque merge (devzone) ou le soir | `release.yml`, job `release` : `preversion-on-push: true` ou rien | sans préversion à chaque merge, la livraison attend celle du soir |
 
-**devzone** : préversion publiée par le bot à chaque merge sur `develop` (`preversion-on-push: true`) ; la PR de livraison est donc livrable aussitôt, son merge reste manuel (livraison automatique : à venir, GitHub App).
+Prérequis de la livraison automatique : la GitHub App du dépôt (`repowarden app init`, lancé sur ta machine ; voir [Dépannage](#dépannage)). Sans elle, un merge fait par le jeton des Actions ne déclencherait pas la release.
 
 ## Dépannage
 
@@ -217,7 +218,10 @@ La version suit les Conventional Commits : `fix` → correctif, `feat` → mineu
 |---|---|---|
 | `git push` refusé : « refusing to allow an OAuth App to create or update workflow … without `workflow` scope » | jeton `gh` sans la permission `workflow` | `gh auth refresh -h github.com -s workflow` |
 | PR bloquée, run `action_required`, bandeau « Approve workflows to run » | PR ouverte ou poussée par le bot `github-actions` : pour les événements `pull_request` `opened`, `synchronize` et `reopened`, GitHub attend l'accord d'une personne ayant l'écriture ([doc GitHub](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow)) | vérifier les changements (surtout `.github/workflows/`), puis *Approve workflows to run* ; pour ne plus avoir à le faire : `repowarden app init` dans le projet |
-| PR de livraison bloquée : « aucune préversion vX.Y.Z-next.N » | la préversion n'est pas encore publiée (rythme regroupé) | attendre celle du soir, ou *Actions → release → Run workflow* sur `develop` |
+| PR de livraison bloquée : « aucune préversion vX.Y.Z-next.N » | la préversion n'est pas encore publiée (sans `preversion-on-push`, elle part le soir) | attendre celle du soir, *Actions → release → Run workflow* sur `develop`, ou `preversion-on-push: true` |
+| PR de livraison restée ouverte | une vérification rouge (voir la PR), `LIVRAISON_AUTO=non`, ou GitHub App absente (job `livraison-auto` en échec) | corriger la vérification ; `repowarden app init` sur ta machine |
+| `repowarden app init` depuis `make shell` : la page `http://127.0.0.1:…` ne s'ouvre pas, ou GitHub ne revient pas | la page est servie dans le conteneur, injoignable depuis le navigateur de ta machine | lancer la commande **sur ta machine** : `npx -y repowarden app init --repo <compte>/<dépôt>` |
+| `repowarden app init` : « nom déjà utilisé » | un essai précédent a créé l'App sans en récupérer les identifiants | supprimer l'App orpheline (*GitHub → Settings → Developer settings → GitHub Apps*), ou `--nom <autre-nom>` |
 | `git commit` : « Please tell me who you are » | identité git absente | avec GitHub : `gh auth login -s workflow` puis `bash .devcontainer/git-identite.sh` ; sans GitHub : `git config --file ~/.config/git/config user.name "<nom>"` et `user.email "<email>"` |
 | `gh auth login` : « Press Enter to open … in your browser », rien ne s'ouvre | pas de navigateur dans le conteneur (`make shell`) | ouvrir https://github.com/login/device à la main et saisir le code |
 | `k9s` : `Error: exit status 1` puis son aide ; `kubectl` : `localhost:8080` … `connection refused` | aucun cluster actif (module `kubernetes` désactivé, ou pas de cluster sur ta machine) | `devzone activer kubernetes` (cluster de ta machine), `kind create cluster`, ou `kubectl config use-context <nom>` |
