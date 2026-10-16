@@ -4,3 +4,4 @@ workspace/*
 
 .DS_Store
 .devzone.log
+.devzone.etat
