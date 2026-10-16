@@ -5,10 +5,10 @@ FILTRE := --filter "label=devcontainer.local_folder=$(CURDIR)"
 LOG    := $(CURDIR)/.devzone.log
 
 .DEFAULT_GOAL := help
-.PHONY: help up shell stop down rebuild status
+.PHONY: help up shell stop down rebuild status test-fonctionnel
 
 help: ## Liste les commandes
-	@grep -E '^[a-z]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  make %-8s %s\n", $$1, $$2}'
+	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  make %-16s %s\n", $$1, $$2}'
 
 up: ## Lance le conteneur (le crée si absent)
 	@$(DC) up $(WS) >$(LOG) 2>&1 && echo "devzone lancé" \
@@ -29,3 +29,6 @@ rebuild: ## Reconstruit de zéro (après modif de .devcontainer/)
 
 status: ## État du conteneur
 	@docker ps -a $(FILTRE) --format '{{.Status}}' | grep . || echo "aucun conteneur"
+
+test-fonctionnel: ## Tests fonctionnels : devzone isolé, construit puis supprimé (5 à 10 min)
+	@bash test/fonctionnel.sh

@@ -1,0 +1,30 @@
+# Tests fonctionnels : construit un devzone isolé et joue les scénarios d'un
+# utilisateur (outils, modules, Kubernetes avec kind, hooks, redémarrage,
+# rebuild) ; même script qu'en local (make test-fonctionnel). Lancés quand le
+# conteneur, les tests ou le Makefile changent, et à la main. Non exigés pour
+# merger (durée : une dizaine de minutes).
+name: fonctionnel
+
+on:
+  pull_request:
+    paths:
+      - ".devcontainer/**"
+      - "test/**"
+      - "Makefile"
+      - ".github/workflows/fonctionnel.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fonctionnel-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fonctionnel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+      - run: bash test/fonctionnel.sh

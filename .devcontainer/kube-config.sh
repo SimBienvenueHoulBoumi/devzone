@@ -15,7 +15,8 @@ ICI="$(dirname "$0")"
 module=off
 bash "$ICI/devzone" actif kubernetes && module=on
 
-SOURCE="$HOME/.kube-host/config"
+# DEVZONE_KUBE_SOURCE : tests fonctionnels (jamais le cluster de l'hôte)
+SOURCE="${DEVZONE_KUBE_SOURCE:-$HOME/.kube-host/config}"
 HOTE="$HOME/.kube/hote.config"
 
 mkdir -p "$HOME/.kube"
