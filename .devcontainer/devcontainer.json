@@ -57,12 +57,8 @@
   ],
 
   "postCreateCommand": "bash .devcontainer/post-create.sh",
-  // Indépendants : l'échec de l'un n'empêche pas l'autre
-  "postStartCommand": {
-    "kube": "bash .devcontainer/kube-config.sh",
-    // Identité git déduite du compte gh, si elle manque
-    "git": "bash .devcontainer/git-identite.sh"
-  },
+  // Identité git, clusters, puis récapitulatif de ce qui reste à faire
+  "postStartCommand": "bash .devcontainer/demarrage.sh",
   // Clusters kind du conteneur (config) + cluster de l'hôte (hote.config,
   // refait à chaque démarrage par kube-config.sh)
   "remoteEnv": {
