@@ -36,7 +36,7 @@ devzone appliquer
 # .github/workflows/ (fréquent avec repowarden). Un jeton sans ligne de
 # scopes (GH_TOKEN, fine-grained) n'est pas jugé.
 if ! statut_gh="$(gh auth status 2>&1)"; then
-    echo "GitHub à connecter une fois : gh auth login -s workflow (donne aussi l'identité git)"
+    echo "GitHub (facultatif) : gh auth login -s workflow : push et PR GitHub, tickets repowarden, identité git automatique"
 elif grep -q "Token scopes:" <<<"$statut_gh" && ! grep -q "'workflow'" <<<"$statut_gh"; then
     echo "gh sans la permission workflow (push de .github/workflows/ refusé) : gh auth refresh -h github.com -s workflow"
 fi
