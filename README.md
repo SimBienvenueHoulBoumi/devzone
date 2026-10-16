@@ -1,6 +1,6 @@
 # devzone
 
-Zone de dev conteneurisée : Java 21 + Maven, Node LTS + pnpm, Python 3.12 + uv, Docker (in-docker), kubectl, helm, k9s, kind (cluster de l'hôte s'il existe, sinon kind dans le conteneur), gh, repowarden (hooks git globaux) et ses outils : shellcheck, bats, actionlint, gitleaks, ruff, vulture, pytest ; assistants IA : Claude Code et opencode.
+Zone de dev conteneurisée : Java 21 + Maven, Node LTS + pnpm, Python 3.12 + uv, Docker (in-docker), kubectl, helm, k9s, kind (connexion au cluster de l'hôte s'il existe ; sinon, aucun cluster n'est créé d'office : `kind create cluster` dans le conteneur), gh, repowarden (hooks git globaux) et ses outils : shellcheck, bats, actionlint, gitleaks, ruff, vulture, pytest ; assistants IA : Claude Code et opencode.
 
 ## Prérequis
 
@@ -79,7 +79,7 @@ Les vérifications de la CI de repowarden se lancent telles quelles dans le cont
 
 ### Kubernetes
 
-devzone fournit les outils, pas le cluster. Au démarrage, le conteneur se connecte au cluster de l'hôte s'il existe et qu'il est joignable (Docker Desktop sur Mac, Windows ou Linux). Sinon, ou en plus, créer un cluster dans le conteneur :
+devzone fournit les outils, pas le cluster, et n'en crée jamais tout seul. Au démarrage, le conteneur se connecte au cluster de l'hôte s'il existe et qu'il est joignable (Docker Desktop sur Mac, Windows ou Linux). Sinon, ou en plus, créer un cluster dans le conteneur :
 
 ```bash
 kind create cluster          # ~2 min la première fois (image gardée entre rebuilds)
