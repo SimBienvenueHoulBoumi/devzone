@@ -22,14 +22,25 @@ Environnement de développement complet dans un conteneur (devcontainer) : les m
    **Facultatif** : GitHub (push et PR GitHub, tickets et bots repowarden), `devzone activer ia` (assistants IA), `devzone activer kubernetes` (cluster de ta machine) ; voir [Connexions et identité](#connexions-et-identité) et [Modules](#modules).
 4. **Vérifier** : `java -version`, `node -v`, `python3 --version`, `repowarden --version` ; avec un cluster : `kubectl get nodes`.
 
-Le premier démarrage rappelle ce qui manque (identité git) et ce qui est proposé (GitHub, modules désactivés), avec la commande pour chacun.
+**À chaque démarrage, un récapitulatif** dit ce qui est prêt et ce qui reste à faire, chaque point avec sa commande ; `devzone` le réaffiche à tout moment :
+
+```text
+devzone : état (devzone pour le réafficher)
+  ✖ identité git    nécessaire pour commiter : gh auth login -s workflow (automatique),
+                    ou git config --file ~/.config/git/config user.name "<nom>" et user.email "<email>"
+  ○ GitHub          facultatif (push et PR, tickets repowarden) : gh auth login -s workflow
+  ○ module ia         facultatif, assistants IA : Claude Code, opencode : devzone activer ia
+  ○ module kubernetes facultatif, connexion au cluster de l'hôte et metrics-server au démarrage : devzone activer kubernetes
+```
+
+✔ prêt, ✖ nécessaire, ○ facultatif, ⚠ à corriger (par exemple GitHub connecté sans la permission `workflow`). Dans VS Code, il s'affiche dans le terminal de création du conteneur.
 
 ## Modules
 
 Les fonctionnalités facultatives sont des modules, **désactivés par défaut**, activés à la demande depuis le conteneur, sans rebuild :
 
 ```bash
-devzone                        # état des modules
+devzone                        # état : identité git, GitHub, modules
 devzone activer <module>       # active et applique tout de suite
 devzone desactiver <module>    # désactive et applique tout de suite
 ```
@@ -119,7 +130,7 @@ kubectl config use-context <nom>
 - **Clusters kind** : tournent dans le Docker interne, redémarrent avec le conteneur, sont conservés par `make rebuild` et `make down` ; supprimés par `kind delete cluster` (ou `make desinstaller`).
 - **CPU et RAM dans k9s** (`kubectl top`) : module `kubernetes` actif, metrics-server est installé au démarrage sur les clusters **locaux** qui ne l'ont pas (Docker Desktop, kind…), jamais sur un cluster distant. Après un `kind create cluster` : `bash .devcontainer/metrics-server.sh` (ou `… metrics-server.sh <contexte>` pour un cluster précis).
 - **Cluster de l'hôte** : `~/.kube` est monté en lecture seule, jamais modifié ; sa copie adaptée est `~/.kube/hote.config` (`127.0.0.1` remplacé par `host.docker.internal`). Après un changement de cluster sur l'hôte : `make stop && make up`.
-- **Messages de démarrage** (`kube-config : …`, `metrics-server : …`) : dans le terminal de création, ou en relançant `bash .devcontainer/kube-config.sh`.
+- **Messages de démarrage** (`kube-config : …`, `metrics-server : …`, récapitulatif) : dans le terminal de création, ou en relançant `bash .devcontainer/demarrage.sh`.
 
 Le cluster de l'hôte n'est pas joignable dans deux cas (kind fonctionne quand même) :
 - **Codespaces, machine distante** : pas de `~/.kube` local ;
@@ -224,9 +235,10 @@ devzone/
 │   ├── devcontainer-lock.json  # versions figées des features
 │   ├── devzone                 # commande devzone : modules (ia, kubernetes), versions des assistants IA
 │   ├── post-create.sh          # premier démarrage : droits des volumes, git, repowarden, modules actifs
-│   ├── kube-config.sh          # chaque démarrage : contextes kind ; module kubernetes : cluster de l'hôte, metrics-server
+│   ├── demarrage.sh            # chaque démarrage : identité git, clusters, puis récapitulatif (devzone)
+│   ├── kube-config.sh          # contextes kind ; module kubernetes : cluster de l'hôte, metrics-server
 │   ├── metrics-server.sh       # metrics-server sur les clusters locaux (CPU et RAM dans k9s)
-│   └── git-identite.sh         # chaque démarrage : identité git déduite du compte gh si elle manque
+│   └── git-identite.sh         # identité git déduite du compte gh si elle manque
 ├── .github/workflows/
 │   ├── fonctionnel.yml         # tests fonctionnels (PR touchant .devcontainer/, test/ ou le Makefile)
 │   ├── repowarden.yml          # vérifications repowarden de chaque PR (PR mal visée reciblée vers develop)

@@ -75,11 +75,11 @@ for outil in java mvn node pnpm python3 uv docker kubectl helm k9s kind gh repow
     reussit "$outil présent" "command -v $outil"
 done
 
-echo "▶ Premier démarrage"
-reussit "modules désactivés par défaut" "devzone" "ia +off"
-reussit "kubernetes désactivé par défaut" "devzone" "kubernetes +off"
+echo "▶ Premier démarrage (récapitulatif affiché au démarrage)"
+reussit "modules désactivés par défaut" "devzone" "○ module ia"
+reussit "kubernetes désactivé par défaut" "devzone" "○ module kubernetes"
 echoue "assistants IA absents" "command -v claude"
-for message in "gh auth login -s workflow" "modules désactivés : ia kubernetes"; do
+for message in "✖ identité git" "○ GitHub          facultatif" "○ module ia"; do
     if grep -q "$message" "$JOURNAL"; then ok "message : $message"; else ko "message : $message" "$(tail -5 "$JOURNAL")"; fi
 done
 
@@ -111,10 +111,10 @@ echo "▶ Persistance"
 dz "devzone activer ia >/dev/null; echo témoin >~/.config/git/temoin" >/dev/null
 docker stop "$(docker ps -q --filter "label=devcontainer.local_folder=$COPIE")" >/dev/null
 demarrer
-reussit "redémarrage : modules gardés" "devzone" "ia +on"
+reussit "redémarrage : modules gardés" "devzone" "✔ module ia"
 reussit "redémarrage : volume gardé" "cat ~/.config/git/temoin" "témoin"
 demarrer --remove-existing-container
-reussit "rebuild : modules gardés" "devzone" "ia +on"
+reussit "rebuild : modules gardés" "devzone" "✔ module ia"
 reussit "rebuild : ia réinstallé" "claude --version" "Claude Code"
 reussit "rebuild : volume gardé" "cat ~/.config/git/temoin" "témoin"
 reussit "rebuild : cluster kind conservé" "kind get clusters" "^test$"

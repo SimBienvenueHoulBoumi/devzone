@@ -80,11 +80,32 @@ appliquer_kubernetes() {
     fi
 }
 
+# État complet : ✔ prêt, ✖ nécessaire, ○ facultatif, ⚠ à corriger ; chaque
+# point à faire avec sa commande (affiché à chaque démarrage)
 etat() {
-    local m
-    echo "Modules devzone (devzone activer|desactiver <module>) :"
+    local nom email statut m
+    echo "devzone : état (devzone pour le réafficher)"
+    nom="$(git config --get user.name || true)"
+    email="$(git config --get user.email || true)"
+    if [ -n "$nom" ] && [ -n "$email" ]; then
+        echo "  ✔ identité git    $nom <$email>"
+    else
+        echo "  ✖ identité git    nécessaire pour commiter : gh auth login -s workflow (automatique),"
+        echo "                    ou git config --file ~/.config/git/config user.name \"<nom>\" et user.email \"<email>\""
+    fi
+    if ! statut="$(gh auth status 2>&1)"; then
+        echo "  ○ GitHub          facultatif (push et PR, tickets repowarden) : gh auth login -s workflow"
+    elif grep -q "Token scopes:" <<<"$statut" && ! grep -q "'workflow'" <<<"$statut"; then
+        echo "  ⚠ GitHub          connecté, sans permission workflow (push de .github/workflows/ refusé) : gh auth refresh -h github.com -s workflow"
+    else
+        echo "  ✔ GitHub          connecté"
+    fi
     for m in "${MODULES[@]}"; do
-        printf '  %-11s %-4s %s\n' "$m" "$(valeur "$m")" "$(description "$m")"
+        if [ "$(valeur "$m")" = on ]; then
+            printf '  ✔ module %-10s actif : %s\n' "$m" "$(description "$m")"
+        else
+            printf '  ○ module %-10s facultatif, %s : devzone activer %s\n' "$m" "$(description "$m")" "$m"
+        fi
     done
 }
 
@@ -104,9 +125,6 @@ case "${1:-}" in
     desactiver) changer off "${2:-}" ;;
     appliquer)
         [ "$(valeur ia)" = off ] || appliquer_ia on
-        off=()
-        for m in "${MODULES[@]}"; do [ "$(valeur "$m")" = on ] || off+=("$m"); done
-        [ "${#off[@]}" -eq 0 ] || echo "devzone : modules désactivés : ${off[*]} (devzone pour le détail, devzone activer <module>)"
         ;;
     actif)
         connu "${2:-}" || { echo "devzone : module inconnu : ${2:-(aucun)}" >&2; exit 2; }

@@ -69,10 +69,8 @@ for contexte in $(kubectl config get-contexts -o name 2>/dev/null); do
         joignables=$((joignables + 1))
     fi
 done
-if [ "$module" = off ]; then
-    [ ! -f "$SOURCE" ] || echo "kube-config : cluster de l'hôte non connecté, module kubernetes désactivé : devzone activer kubernetes"
-    exit 0
-fi
+# Module désactivé : le récapitulatif de devzone le signale
+[ "$module" = on ] || exit 0
 echo "kube-config : cluster actif : $(kubectl config current-context 2>/dev/null || echo aucun)"
 if [ "$joignables" -eq 0 ]; then
     echo "kube-config : aucun cluster joignable ; en créer un dans le conteneur : kind create cluster"
