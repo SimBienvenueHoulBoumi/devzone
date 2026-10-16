@@ -76,6 +76,24 @@ jobs:
           gh pr merge "$pr" --auto --merge
           echo "::notice::PR de livraison #$pr : merge automatique armé ; il part dès que repowarden et livraison sont verts, puis tag et release."
 
+  # Paquet npm (npx devzone <dossier>), publié à chaque release sans jeton
+  # (publication de confiance). Activé par la variable REPOWARDEN_NPM ; mise en
+  # place, une fois, sur ta machine : npx repowarden npm-publication. Le secret
+  # NPM_TOKEN ne sert qu'à la toute première publication.
+  npm:
+    needs: release
+    # Nouvelle release, ou lancement manuel : rattrape la dernière release si
+    # elle n'est pas encore sur npm (sans effet sinon)
+    if: vars.REPOWARDEN_NPM == 'true' && (needs.release.outputs.release_created == 'true' || github.event_name == 'workflow_dispatch')
+    uses: simdevWarden/repowarden/.github/workflows/npm-publish.yml@v4
+    permissions:
+      contents: read
+      id-token: write
+    with:
+      tag: ${{ needs.release.outputs.tag_name }}
+    secrets:
+      npm-token: ${{ secrets.NPM_TOKEN }}
+
   # Suivi des tickets : livrés en préversion → préprod ; publiés → fermés
   tickets:
     needs: release

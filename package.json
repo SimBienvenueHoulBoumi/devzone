@@ -1,0 +1,25 @@
+{
+  "name": "devzone",
+  "version": "0.0.0",
+  "description": "Zone de dev conteneurisée : Java, Node, Python, Docker, Kubernetes et outils repowarden, dans un devcontainer",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SimBienvenueHoulBoumi/devzone.git"
+  },
+  "homepage": "https://github.com/SimBienvenueHoulBoumi/devzone#readme",
+  "bugs": "https://github.com/SimBienvenueHoulBoumi/devzone/issues",
+  "keywords": ["devcontainer", "docker", "kubernetes", "repowarden", "environnement"],
+  "bin": {
+    "devzone": "bin/devzone"
+  },
+  "files": [
+    "bin/",
+    ".devcontainer/",
+    "Makefile",
+    ".gitattributes",
+    "desinstaller.sh",
+    "README.md",
+    "LICENSE"
+  ]
+}

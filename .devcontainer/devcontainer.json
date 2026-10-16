@@ -28,6 +28,9 @@
     "ghcr.io/devcontainers/features/github-cli:1": {}
   },
 
+  // Toujours /workspaces/devzone, quel que soit le nom du dossier sur l'hôte
+  // (npx devzone <dossier>) : scripts et chemins du conteneur en dépendent
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspaces/devzone,type=bind,consistency=cached",
   "workspaceFolder": "/workspaces/devzone",
 
   // Caches persistants : survivent aux rebuilds du conteneur. Préfixe des
