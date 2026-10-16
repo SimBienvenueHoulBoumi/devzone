@@ -15,18 +15,32 @@ Environnement de développement complet dans un conteneur (devcontainer) : les m
 
 1. **Prérequis** : Docker (Docker Desktop, ou Docker Engine sous Linux), puis **soit** VS Code + extension *Dev Containers*, **soit** Node (pour `npx`) et `make`. Facultatif, pour Kubernetes : activer le cluster de Docker Desktop (*Settings → Kubernetes → Enable Kubernetes*). Sous Windows : cloner avec Git for Windows (les scripts restent en fins de ligne LF grâce à `.gitattributes`).
 2. **Lancer** depuis le dossier `devzone/` : `make shell` (ou, dans VS Code, *Dev Containers: Reopen in Container*). Le premier build prend quelques minutes (4 à 5 min mesurées, plus le téléchargement des images de base sur une machine neuve).
-3. **Se connecter à GitHub, une seule fois** (gardé ensuite, même après `make rebuild`) : `gh auth login -s workflow`. Donne aussi l'identité git ; nécessaire pour pousser, ouvrir des PR et utiliser les tickets repowarden.
-   **Facultatif** : `devzone activer ia` (assistants IA), `devzone activer kubernetes` (cluster de ta machine) ; voir [Modules](#modules).
+3. **Identité git**, une seule fois (nécessaire pour commiter, gardée ensuite, même après `make rebuild`) :
+   - avec GitHub : `gh auth login -s workflow` ; l'identité est déduite du compte ;
+   - sans GitHub : `git config --file ~/.config/git/config user.name "<nom>"`, puis de même `user.email "<email>"`.
+
+   **Facultatif** : GitHub (push et PR GitHub, tickets et bots repowarden), `devzone activer ia` (assistants IA), `devzone activer kubernetes` (cluster de ta machine) ; voir [Connexions et identité](#connexions-et-identité) et [Modules](#modules).
 4. **Vérifier** : `java -version`, `node -v`, `python3 --version`, `repowarden --version` ; avec un cluster : `kubectl get nodes`.
 
-Le premier démarrage rappelle ce qui manque (connexion GitHub, permission `workflow`) et liste les modules désactivés, avec la commande pour les activer.
+**À chaque démarrage, un récapitulatif** dit ce qui est prêt et ce qui reste à faire, chaque point avec sa commande ; `devzone` le réaffiche à tout moment :
+
+```text
+devzone : état (devzone pour le réafficher)
+  ✖ identité git    nécessaire pour commiter : gh auth login -s workflow (automatique),
+                    ou git config --file ~/.config/git/config user.name "<nom>" et user.email "<email>"
+  ○ GitHub          facultatif (push et PR, tickets repowarden) : gh auth login -s workflow
+  ○ module ia         facultatif, assistants IA : Claude Code, opencode : devzone activer ia
+  ○ module kubernetes facultatif, connexion au cluster de l'hôte et metrics-server au démarrage : devzone activer kubernetes
+```
+
+✔ prêt, ✖ nécessaire, ○ facultatif, ⚠ à corriger (par exemple GitHub connecté sans la permission `workflow`). Dans VS Code, il s'affiche dans le terminal de création du conteneur.
 
 ## Modules
 
 Les fonctionnalités facultatives sont des modules, **désactivés par défaut**, activés à la demande depuis le conteneur, sans rebuild :
 
 ```bash
-devzone                        # état des modules
+devzone                        # état : identité git, GitHub, modules
 devzone activer <module>       # active et applique tout de suite
 devzone desactiver <module>    # désactive et applique tout de suite
 ```
@@ -48,6 +62,7 @@ Le choix est **propre à chaque utilisateur** et gardé dans le volume `devzone-
 | Supprimer le conteneur | — | `make down` | — |
 | Reconstruire (après une modification de `.devcontainer/`) | *Dev Containers: Rebuild Container* | `make rebuild` | `npx @devcontainers/cli up --workspace-folder . --remove-existing-container` |
 | État | — | `make status` | — |
+| **Désinstaller** (tout ce que devzone a créé, après confirmation) | — | `make desinstaller` | `bash desinstaller.sh` |
 
 `make` seul affiche la liste. Les journaux de `up` et `rebuild` vont dans `.devzone.log` ; seule la fin s'affiche en cas d'échec.
 
@@ -55,11 +70,11 @@ Le choix est **propre à chaque utilisateur** et gardé dans le volume `devzone-
 
 ## Connexions et identité
 
-**GitHub (`gh`)** : `gh auth login -s workflow`. Git passe par le jeton de `gh` (https, même pour les remotes en `git@github.com:`), sans clé ssh à recopier. Les dépôts de `/workspaces/devzone` sont déclarés sûrs (`safe.directory`).
+**GitHub (facultatif)** : sert à pousser et ouvrir des PR sur GitHub, aux tickets et bots repowarden, et donne l'identité git automatiquement. Sans GitHub, git fonctionne normalement (dépôts locaux, autre hébergeur) ; seule l'identité se règle à la main. Pour l'utiliser : `gh auth login -s workflow`. Git passe alors par le jeton de `gh` (https, même pour les remotes en `git@github.com:`), sans clé ssh à recopier. Les dépôts de `/workspaces/devzone` sont déclarés sûrs (`safe.directory`).
 - **Permission `workflow`** : sans elle, GitHub refuse tout push qui modifie `.github/workflows/` (fréquent avec repowarden). Compte déjà connecté : `gh auth refresh -h github.com -s workflow`.
 - **Depuis `make shell`**, aucun navigateur ne s'ouvre depuis le conteneur : copier le code affiché par `gh` et ouvrir https://github.com/login/device à la main. L'avertissement « No clipboard utilities available » est sans conséquence.
 
-**Identité git** : déduite du compte `gh` à chaque démarrage, tant qu'elle manque (`git-identite.sh`) :
+**Identité git** (nécessaire pour commiter) : sans GitHub, à régler à la main (`git config --file ~/.config/git/config user.name "<nom>"` et `user.email "<email>"`) ; avec GitHub, déduite du compte `gh` à chaque démarrage, tant qu'elle manque (`git-identite.sh`) :
 - nom du profil GitHub (sinon le login) ;
 - email noreply `<id>+<login>@users.noreply.github.com` : les commits sont rattachés au compte, l'email personnel n'est pas exposé.
 
@@ -112,10 +127,10 @@ kubectl config use-context <nom>
 ```
 
 - **Cluster actif** : celui de l'hôte par défaut ; un choix fait avec `use-context` est gardé aux redémarrages.
-- **Clusters kind** : tournent dans le Docker interne, redémarrent avec le conteneur, sont conservés par `make rebuild` et `make down` ; supprimés seulement par `kind delete cluster`.
+- **Clusters kind** : tournent dans le Docker interne, redémarrent avec le conteneur, sont conservés par `make rebuild` et `make down` ; supprimés par `kind delete cluster` (ou `make desinstaller`).
 - **CPU et RAM dans k9s** (`kubectl top`) : module `kubernetes` actif, metrics-server est installé au démarrage sur les clusters **locaux** qui ne l'ont pas (Docker Desktop, kind…), jamais sur un cluster distant. Après un `kind create cluster` : `bash .devcontainer/metrics-server.sh` (ou `… metrics-server.sh <contexte>` pour un cluster précis).
 - **Cluster de l'hôte** : `~/.kube` est monté en lecture seule, jamais modifié ; sa copie adaptée est `~/.kube/hote.config` (`127.0.0.1` remplacé par `host.docker.internal`). Après un changement de cluster sur l'hôte : `make stop && make up`.
-- **Messages de démarrage** (`kube-config : …`, `metrics-server : …`) : dans le terminal de création, ou en relançant `bash .devcontainer/kube-config.sh`.
+- **Messages de démarrage** (`kube-config : …`, `metrics-server : …`, récapitulatif) : dans le terminal de création, ou en relançant `bash .devcontainer/demarrage.sh`.
 
 Le cluster de l'hôte n'est pas joignable dans deux cas (kind fonctionne quand même) :
 - **Codespaces, machine distante** : pas de `~/.kube` local ;
@@ -137,6 +152,24 @@ Le conteneur est jetable ; ce qui compte vit dans des volumes Docker, sur ta mac
 | `workspace/` (dossier de l'hôte) | tes projets | gardé | gardé | gardé |
 
 Tout le reste du conteneur (paquets installés à la main, fichiers hors de ces emplacements) est perdu à `make down` et `make rebuild`. Le Docker interne est isolé : ses images ne sont pas partagées avec Docker Desktop.
+
+## Désinstaller
+
+`make down` ne supprime que le conteneur. Pour retirer **tout ce que devzone a créé** sur ta machine :
+
+```bash
+make desinstaller                     # liste ce qui sera supprimé, puis demande « oui »
+make desinstaller GARDER=connexions   # pareil, mais garde gh, git, Claude Code, opencode et les modules
+```
+
+| Supprimé | Jamais touché |
+|---|---|
+| conteneur et image `vsc-devzone-…` | `workspace/` (tes projets) |
+| volumes `devzone-*` | l'image de base `mcr.microsoft.com/devcontainers/base` (partagée) |
+| volume du Docker interne (images et clusters kind) | un metrics-server que devzone n'a pas installé |
+| metrics-server **installé par devzone** sur les clusters locaux de ta machine (il porte l'étiquette `devzone=installe` ; vérifié avec le `kubectl` de ta machine) | |
+
+Fonctionne aussi après un `make down` : celui-ci note l'image et le Docker interne dans `.devzone.etat`. À la fin, la commande affiche ce qui reste à retirer toi-même si tu le souhaites : le cache `npx` (`~/.npm/_npx`), l'autorisation « GitHub CLI » de ton compte (*GitHub → Settings → Applications*) et le dossier `devzone/`. Sans terminal : `CONFIRMER=oui make desinstaller`.
 
 ## Mettre à jour un outil
 
@@ -183,7 +216,7 @@ La version suit les Conventional Commits : `fix` → correctif, `feat` → mineu
 | `git push` refusé : « refusing to allow an OAuth App to create or update workflow … without `workflow` scope » | jeton `gh` sans la permission `workflow` | `gh auth refresh -h github.com -s workflow` |
 | PR bloquée, run `action_required`, bandeau « Approve workflows to run » | PR ouverte ou poussée par le bot `github-actions` : pour les événements `pull_request` `opened`, `synchronize` et `reopened`, GitHub attend l'accord d'une personne ayant l'écriture ([doc GitHub](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow)) | vérifier les changements (surtout `.github/workflows/`), puis *Approve workflows to run* ; pour ne plus avoir à le faire : `repowarden app init` dans le projet |
 | PR de livraison bloquée : « aucune préversion vX.Y.Z-next.N » | la préversion n'est pas encore publiée (rythme regroupé) | attendre celle du soir, ou *Actions → release → Run workflow* sur `develop` |
-| `git commit` : « Please tell me who you are » | identité git absente (`gh` non connecté) | `gh auth login -s workflow` puis `bash .devcontainer/git-identite.sh` |
+| `git commit` : « Please tell me who you are » | identité git absente | avec GitHub : `gh auth login -s workflow` puis `bash .devcontainer/git-identite.sh` ; sans GitHub : `git config --file ~/.config/git/config user.name "<nom>"` et `user.email "<email>"` |
 | `gh auth login` : « Press Enter to open … in your browser », rien ne s'ouvre | pas de navigateur dans le conteneur (`make shell`) | ouvrir https://github.com/login/device à la main et saisir le code |
 | `k9s` : `Error: exit status 1` puis son aide ; `kubectl` : `localhost:8080` … `connection refused` | aucun cluster actif (module `kubernetes` désactivé, ou pas de cluster sur ta machine) | `devzone activer kubernetes` (cluster de ta machine), `kind create cluster`, ou `kubectl config use-context <nom>` |
 | `claude` ou `opencode` : « command not found » | module `ia` désactivé | `devzone activer ia` |
@@ -202,9 +235,10 @@ devzone/
 │   ├── devcontainer-lock.json  # versions figées des features
 │   ├── devzone                 # commande devzone : modules (ia, kubernetes), versions des assistants IA
 │   ├── post-create.sh          # premier démarrage : droits des volumes, git, repowarden, modules actifs
-│   ├── kube-config.sh          # chaque démarrage : contextes kind ; module kubernetes : cluster de l'hôte, metrics-server
+│   ├── demarrage.sh            # chaque démarrage : identité git, clusters, puis récapitulatif (devzone)
+│   ├── kube-config.sh          # contextes kind ; module kubernetes : cluster de l'hôte, metrics-server
 │   ├── metrics-server.sh       # metrics-server sur les clusters locaux (CPU et RAM dans k9s)
-│   └── git-identite.sh         # chaque démarrage : identité git déduite du compte gh si elle manque
+│   └── git-identite.sh         # identité git déduite du compte gh si elle manque
 ├── .github/workflows/
 │   ├── fonctionnel.yml         # tests fonctionnels (PR touchant .devcontainer/, test/ ou le Makefile)
 │   ├── repowarden.yml          # vérifications repowarden de chaque PR (PR mal visée reciblée vers develop)
@@ -213,6 +247,7 @@ devzone/
 │   └── nettoyage.yml           # branches mergées supprimées (main et develop conservées)
 ├── .repowarden.conf            # réglages repowarden : flux develop → main
 ├── Makefile                    # pilotage sans VS Code
+├── desinstaller.sh             # make desinstaller : retire tout ce que devzone a créé
 ├── test/
 │   ├── devzone.bats            # tests de la commande devzone (bats test/)
 │   └── fonctionnel.sh          # tests fonctionnels (make test-fonctionnel)

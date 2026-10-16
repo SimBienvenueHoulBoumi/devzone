@@ -31,15 +31,8 @@ repowarden install --global --lang fr
 sudo ln -sf /workspaces/devzone/.devcontainer/devzone /usr/local/bin/devzone
 devzone appliquer
 
-# Identité git : déduite du compte gh au démarrage (git-identite.sh).
-# Permission workflow : sans elle, GitHub refuse tout push qui modifie
-# .github/workflows/ (fréquent avec repowarden). Un jeton sans ligne de
-# scopes (GH_TOKEN, fine-grained) n'est pas jugé.
-if ! statut_gh="$(gh auth status 2>&1)"; then
-    echo "GitHub à connecter une fois : gh auth login -s workflow (donne aussi l'identité git)"
-elif grep -q "Token scopes:" <<<"$statut_gh" && ! grep -q "'workflow'" <<<"$statut_gh"; then
-    echo "gh sans la permission workflow (push de .github/workflows/ refusé) : gh auth refresh -h github.com -s workflow"
-fi
+# Ce qui reste à faire (identité git, GitHub, modules) : récapitulatif de
+# devzone, affiché à chaque démarrage (demarrage.sh)
 
 recap="java $(java -version 2>&1 | head -1 | cut -d'"' -f2), node $(node -v), python $(python3 --version | cut -d' ' -f2), repowarden $(repowarden --version)"
 ! command -v claude >/dev/null || recap+=", claude $(claude --version | cut -d' ' -f1)"

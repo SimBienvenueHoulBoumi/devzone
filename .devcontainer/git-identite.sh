@@ -13,10 +13,8 @@ email_git="$(git config --get user.email || true)"
 
 [ -n "$nom_git" ] && [ -n "$email_git" ] && exit 0
 
-if ! gh auth status >/dev/null 2>&1; then
-    echo "git-identite : identité git absente ; après gh auth login : bash .devcontainer/git-identite.sh"
-    exit 0
-fi
+# Sans gh : rien à déduire ; le récapitulatif de devzone le signale
+gh auth status >/dev/null 2>&1 || exit 0
 
 id="" login="" nom=""
 IFS=$'\t' read -r id login nom < <(gh api user --jq '[.id, .login, (.name // "")] | @tsv' 2>/dev/null || true)

@@ -10,15 +10,57 @@ setup() {
     printf '#!/usr/bin/env bash\necho "npm $*" >>"%s/npm.log"\n' "$BATS_TEST_TMPDIR" >"$BATS_TEST_TMPDIR/bin/npm"
     # kube-config.sh n'est pas lancé : kubernetes testé par l'état seul
     printf '#!/usr/bin/env bash\nexit 1\n' >"$BATS_TEST_TMPDIR/bin/kubectl"
+    # gh simulé : GH_ETAT = absent (défaut), sans (connecté sans workflow), avec
+    cat >"$BATS_TEST_TMPDIR/bin/gh" <<'GH'
+#!/usr/bin/env bash
+case "${GH_ETAT:-absent}" in
+    absent) echo "You are not logged into any GitHub hosts." >&2; exit 1 ;;
+    sans) echo "  - Token scopes: 'gist', 'read:org', 'repo'" ;;
+    avec) echo "  - Token scopes: 'gist', 'read:org', 'repo', 'workflow'" ;;
+esac
+GH
     chmod +x "$BATS_TEST_TMPDIR/bin/"*
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
 }
 
-@test "par défaut : tous les modules désactivés" {
+@test "par défaut : tous les modules désactivés, avec la commande pour les activer" {
     run bash "$DEVZONE"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"ia          off"* ]]
-    [[ "$output" == *"kubernetes  off"* ]]
+    [[ "$output" == *"○ module ia"*"devzone activer ia"* ]]
+    [[ "$output" == *"○ module kubernetes"*"devzone activer kubernetes"* ]]
+}
+
+@test "état : identité git absente → nécessaire, avec les deux voies" {
+    run bash "$DEVZONE"
+    [[ "$output" == *"✖ identité git"*"gh auth login -s workflow"* ]]
+    [[ "$output" == *"git config --file ~/.config/git/config user.name"* ]]
+}
+
+@test "état : identité git présente" {
+    git config --global user.name "Test" && git config --global user.email "t@example.invalid"
+    run bash "$DEVZONE"
+    [[ "$output" == *"✔ identité git    Test <t@example.invalid>"* ]]
+}
+
+@test "état : GitHub non connecté → facultatif" {
+    run bash "$DEVZONE"
+    [[ "$output" == *"○ GitHub          facultatif"* ]]
+}
+
+@test "état : GitHub connecté sans permission workflow → à corriger" {
+    GH_ETAT=sans run bash "$DEVZONE"
+    [[ "$output" == *"⚠ GitHub"*"gh auth refresh -h github.com -s workflow"* ]]
+}
+
+@test "état : GitHub connecté avec workflow" {
+    GH_ETAT=avec run bash "$DEVZONE"
+    [[ "$output" == *"✔ GitHub          connecté"* ]]
+}
+
+@test "état : module actif" {
+    bash "$DEVZONE" activer ia
+    run bash "$DEVZONE"
+    [[ "$output" == *"✔ module ia"*"actif"* ]]
 }
 
 @test "activer ia : installe les versions figées, état gardé" {
@@ -82,14 +124,12 @@ setup() {
     [ "$status" -ne 0 ]
 }
 
-@test "appliquer : installe ia s'il est actif, liste les modules désactivés" {
+@test "appliquer : installe ia seulement s'il est actif" {
     run bash "$DEVZONE" appliquer
     [ "$status" -eq 0 ]
     [ ! -e "$BATS_TEST_TMPDIR/npm.log" ]
-    [[ "$output" == *"modules désactivés : ia kubernetes"* ]]
     bash "$DEVZONE" activer ia
     rm -f "$BATS_TEST_TMPDIR/npm.log"
     run bash "$DEVZONE" appliquer
     grep -q "install -g" "$BATS_TEST_TMPDIR/npm.log"
-    [[ "$output" == *"modules désactivés : kubernetes"* ]]
 }

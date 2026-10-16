@@ -11,7 +11,8 @@ set -uo pipefail
 
 RACINE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 export DEVZONE_VOLUMES="devzone-test-$$"
-TMP="$(mktemp -d)"
+# Chemin physique : make (CURDIR) voit /private/var/… sous macOS, pas /var/…
+TMP="$(cd "$(mktemp -d)" && pwd -P)"
 COPIE="$TMP/devzone"
 DC=(npx -y @devcontainers/cli)
 WS=(--workspace-folder "$COPIE")
@@ -74,11 +75,11 @@ for outil in java mvn node pnpm python3 uv docker kubectl helm k9s kind gh repow
     reussit "$outil présent" "command -v $outil"
 done
 
-echo "▶ Premier démarrage"
-reussit "modules désactivés par défaut" "devzone" "ia +off"
-reussit "kubernetes désactivé par défaut" "devzone" "kubernetes +off"
+echo "▶ Premier démarrage (récapitulatif affiché au démarrage)"
+reussit "modules désactivés par défaut" "devzone" "○ module ia"
+reussit "kubernetes désactivé par défaut" "devzone" "○ module kubernetes"
 echoue "assistants IA absents" "command -v claude"
-for message in "gh auth login -s workflow" "modules désactivés : ia kubernetes"; do
+for message in "✖ identité git" "○ GitHub          facultatif" "○ module ia"; do
     if grep -q "$message" "$JOURNAL"; then ok "message : $message"; else ko "message : $message" "$(tail -5 "$JOURNAL")"; fi
 done
 
@@ -91,6 +92,10 @@ echo "▶ Module kubernetes (cluster kind, jamais celui de l'hôte)"
 reussit "kind create cluster" "kind create cluster --name test"
 reussit "activer kubernetes : metrics-server sur kind" "devzone activer kubernetes" "metrics-server : installé .*kind-test"
 reussit "métriques disponibles" "for i in \$(seq 1 36); do kubectl --context kind-test top nodes >/dev/null 2>&1 && exit 0; sleep 5; done; exit 1"
+reussit "metrics-server marqué comme installé par devzone" "kubectl --context kind-test -n kube-system get deployment metrics-server -o jsonpath='{.metadata.labels.devzone}'" "^installe$"
+# Désinstallation lancée dans le conteneur : seul le cluster kind-test est vu
+reussit "désinstaller : retire le metrics-server de devzone" "CONFIRMER=oui bash desinstaller.sh" "metrics-server retiré : kind-test"
+echoue "metrics-server absent après désinstallation" "kubectl --context kind-test -n kube-system get deployment metrics-server"
 echoue "metrics-server.sh : contexte inconnu" "bash .devcontainer/metrics-server.sh nexistepas" "contexte inconnu"
 reussit "désactiver kubernetes" "devzone desactiver kubernetes" "kubernetes désactivé"
 reussit "cluster kind toujours utilisable" "kubectl --context kind-test get nodes" "Ready"
@@ -106,13 +111,36 @@ echo "▶ Persistance"
 dz "devzone activer ia >/dev/null; echo témoin >~/.config/git/temoin" >/dev/null
 docker stop "$(docker ps -q --filter "label=devcontainer.local_folder=$COPIE")" >/dev/null
 demarrer
-reussit "redémarrage : modules gardés" "devzone" "ia +on"
+reussit "redémarrage : modules gardés" "devzone" "✔ module ia"
 reussit "redémarrage : volume gardé" "cat ~/.config/git/temoin" "témoin"
 demarrer --remove-existing-container
-reussit "rebuild : modules gardés" "devzone" "ia +on"
+reussit "rebuild : modules gardés" "devzone" "✔ module ia"
 reussit "rebuild : ia réinstallé" "claude --version" "Claude Code"
 reussit "rebuild : volume gardé" "cat ~/.config/git/temoin" "témoin"
 reussit "rebuild : cluster kind conservé" "kind get clusters" "^test$"
+
+echo "▶ Désinstallation (depuis l'hôte, sans aucun de ses clusters)"
+# KUBECONFIG vide : les clusters de l'hôte ne sont jamais examinés
+hote() { (cd "$COPIE" && KUBECONFIG=/nexiste/pas "$@") 2>&1; }
+restants() { docker volume ls -q | grep -c "^${DEVZONE_VOLUMES}-" || true; }
+id="$(docker ps -q --filter "label=devcontainer.local_folder=$COPIE")"
+IMAGE_TEST="$(docker inspect "$id" --format '{{.Config.Image}}')"
+DIND_TEST="$(docker inspect "$id" --format '{{range .Mounts}}{{if eq .Destination "/var/lib/docker"}}{{.Name}}{{end}}{{end}}')"
+(cd "$COPIE" && make down >/dev/null)
+if [ -f "$COPIE/.devzone.etat" ]; then ok "make down : image et Docker interne notés"; else ko "make down : image et Docker interne notés" "pas de .devzone.etat"; fi
+avant="$(restants)"
+if ! sortie="$(hote bash desinstaller.sh </dev/null)" && [ "$(restants)" = "$avant" ]; then ok "sans confirmation : rien n'est supprimé"; else ko "sans confirmation : rien n'est supprimé" "$sortie"; fi
+sortie="$(hote env CONFIRMER=oui GARDER=connexions bash desinstaller.sh)"
+gardes="$(docker volume ls -q | grep "^${DEVZONE_VOLUMES}-" | sed "s/^${DEVZONE_VOLUMES}-//" | sort | tr '\n' ' ')"
+if [ "$gardes" = "claude config gh git opencode-config opencode-data " ]; then ok "GARDER=connexions : seules les connexions restent"; else ko "GARDER=connexions : seules les connexions restent" "restants : $gardes"$'\n'"$sortie"; fi
+if [ -n "$DIND_TEST" ] && ! docker volume inspect "$DIND_TEST" >/dev/null 2>&1 && ! docker image inspect "$IMAGE_TEST" >/dev/null 2>&1; then ok "après make down : image et Docker interne supprimés"; else ko "après make down : image et Docker interne supprimés" "$IMAGE_TEST $DIND_TEST"; fi
+demarrer
+sortie="$(hote env CONFIRMER=oui bash desinstaller.sh)"
+if [ -z "$(docker ps -aq --filter "label=devcontainer.local_folder=$COPIE")" ] && [ "$(restants)" = 0 ] && ! docker image inspect "$IMAGE_TEST" >/dev/null 2>&1; then
+    ok "désinstallation complète : aucun conteneur, volume ni image"
+else
+    ko "désinstallation complète : aucun conteneur, volume ni image" "$sortie"
+fi
 
 echo
 echo "Résultat : $reussis réussi(s), $echecs échec(s)"
