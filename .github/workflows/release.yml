@@ -31,6 +31,9 @@ jobs:
     with:
       mode: tag
       delivery-schedule: "0 7 * * 5" # même cron que la fenêtre ci-dessus
+      # Préversion publiée par le bot à chaque merge sur develop : la PR de
+      # livraison est livrable aussitôt (vérification livraison)
+      preversion-on-push: true
 
   # Suivi des tickets : livrés en préversion → préprod ; publiés → fermés
   tickets:

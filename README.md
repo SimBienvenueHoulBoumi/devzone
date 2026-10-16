@@ -206,8 +206,10 @@ La version suit les Conventional Commits : `fix` → correctif, `feat` → mineu
 
 | Rythme | Préversion | Demande de livraison | Réglage |
 |---|---|---|---|
-| **Regroupé** (défaut, celui de devzone) | le soir, si `develop` a changé | fenêtre du vendredi matin, à la main (*Actions → release → Run workflow* sur `develop`), ou merge étiqueté « urgent » | rien à ajouter |
+| **Regroupé** (défaut) | le soir, si `develop` a changé | fenêtre du vendredi matin, à la main (*Actions → release → Run workflow* sur `develop`), ou merge étiqueté « urgent » | rien à ajouter |
 | **À chaque ticket** | à chaque merge sur `develop` | à chaque merge sur `develop` | `preversion-on-push: true` et `delivery-on-push: true` |
+
+**devzone** : préversion publiée par le bot à chaque merge sur `develop` (`preversion-on-push: true`) ; la PR de livraison est donc livrable aussitôt, son merge reste manuel (livraison automatique : à venir, GitHub App).
 
 ## Dépannage
 
