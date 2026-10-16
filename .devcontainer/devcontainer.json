@@ -41,7 +41,9 @@
     // Connexion gh et identité git (~/.config/git/config, lu par git comme
     // config globale) : le conteneur reconstruit peut commiter et pousser
     "source=devzone-gh,target=/home/vscode/.config/gh,type=volume",
-    "source=devzone-git,target=/home/vscode/.config/git,type=volume"
+    "source=devzone-git,target=/home/vscode/.config/git,type=volume",
+    // Modules activés (devzone activer|desactiver), propres à chaque utilisateur
+    "source=devzone-config,target=/home/vscode/.config/devzone,type=volume"
   ],
 
   "runArgs": [

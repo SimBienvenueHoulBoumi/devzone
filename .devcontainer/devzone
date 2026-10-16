@@ -1,0 +1,120 @@
+#!/usr/bin/env bash
+# Modules facultatifs de devzone, activés à la demande, sans rebuild :
+#   devzone                          état des modules
+#   devzone activer <module>         active et applique tout de suite
+#   devzone desactiver <module>      désactive et applique tout de suite
+#   devzone appliquer                installe ce qui est actif (post-create.sh)
+#   devzone actif <module>           code 0 si actif (scripts de démarrage)
+# État propre à chaque utilisateur : ~/.config/devzone/modules (volume
+# devzone-config, survit aux rebuilds), une ligne « module=on|off ».
+set -euo pipefail
+
+ETAT="${DEVZONE_ETAT:-$HOME/.config/devzone/modules}"
+ICI="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+MODULES=(ia kubernetes)
+
+# Assistants IA, versions figées : mettre à jour ici, puis devzone appliquer
+# (ou Rebuild Container)
+IA_PAQUETS=(@anthropic-ai/claude-code@2.1.286 opencode-ai@1.18.34)
+IA_NOMS=(@anthropic-ai/claude-code opencode-ai)
+
+description() {
+    case "$1" in
+        ia) echo "assistants IA : Claude Code, opencode" ;;
+        kubernetes) echo "connexion au cluster de l'hôte et metrics-server au démarrage" ;;
+    esac
+}
+
+connu() {
+    local m
+    for m in "${MODULES[@]}"; do [ "$m" = "$1" ] && return 0; done
+    return 1
+}
+
+# Premier démarrage (aucun état) : tout désactivé, sauf ia si une connexion
+# existe déjà dans les volumes (pas de régression pour qui s'en servait)
+initialiser() {
+    [ -f "$ETAT" ] && return 0
+    mkdir -p "$(dirname "$ETAT")"
+    local ia=off
+    if [ -f "$HOME/.claude/.credentials.json" ] || [ -f "$HOME/.local/share/opencode/auth.json" ]; then
+        ia=on
+        # stderr : initialiser est aussi appelé dans $(valeur …)
+        echo "devzone : connexion d'un assistant IA trouvée, module ia activé (devzone desactiver ia pour le retirer)" >&2
+    fi
+    printf 'ia=%s\nkubernetes=off\n' "$ia" >"$ETAT"
+}
+
+valeur() {
+    initialiser
+    local v
+    v="$(grep -E "^$1=" "$ETAT" | tail -1 | cut -d= -f2 || true)"
+    [ "$v" = on ] && echo on || echo off
+}
+
+ecrire() {
+    initialiser
+    local tmp
+    tmp="$(mktemp)"
+    grep -vE "^$1=" "$ETAT" >"$tmp" || true
+    echo "$1=$2" >>"$tmp"
+    mv "$tmp" "$ETAT"
+}
+
+appliquer_ia() {
+    if [ "$1" = on ]; then
+        npm install -g --no-fund --no-audit --loglevel=error "${IA_PAQUETS[@]}" >/dev/null
+        echo "devzone : ia actif : claude (puis /login), opencode auth login"
+    else
+        npm uninstall -g "${IA_NOMS[@]}" >/dev/null 2>&1 || true
+        echo "devzone : ia désactivé (connexions gardées dans leurs volumes)"
+    fi
+}
+
+appliquer_kubernetes() {
+    if [ "$1" = on ]; then
+        bash "$ICI/kube-config.sh"
+    else
+        rm -f "$HOME/.kube/hote.config"
+        echo "devzone : kubernetes désactivé (metrics-server reste installé sur les clusters où il l'a été)"
+    fi
+}
+
+etat() {
+    local m
+    echo "Modules devzone (devzone activer|desactiver <module>) :"
+    for m in "${MODULES[@]}"; do
+        printf '  %-11s %-4s %s\n' "$m" "$(valeur "$m")" "$(description "$m")"
+    done
+}
+
+changer() {
+    local m="${2:-}"
+    if [ -z "$m" ] || ! connu "$m"; then
+        echo "devzone : module inconnu : ${m:-(aucun)} ; modules : ${MODULES[*]}" >&2
+        exit 1
+    fi
+    ecrire "$m" "$1"
+    "appliquer_$m" "$1"
+}
+
+case "${1:-}" in
+    "" | etat | modules) etat ;;
+    activer) changer on "${2:-}" ;;
+    desactiver) changer off "${2:-}" ;;
+    appliquer)
+        [ "$(valeur ia)" = off ] || appliquer_ia on
+        off=()
+        for m in "${MODULES[@]}"; do [ "$(valeur "$m")" = on ] || off+=("$m"); done
+        [ "${#off[@]}" -eq 0 ] || echo "devzone : modules désactivés : ${off[*]} (devzone pour le détail, devzone activer <module>)"
+        ;;
+    actif)
+        connu "${2:-}" || { echo "devzone : module inconnu : ${2:-(aucun)}" >&2; exit 2; }
+        [ "$(valeur "$2")" = on ]
+        ;;
+    -h | --help | aide) sed -n '2,8p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' ;;
+    *)
+        echo "devzone : commande inconnue : $1 (devzone --help)" >&2
+        exit 1
+        ;;
+esac
