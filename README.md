@@ -115,6 +115,15 @@ Empreinte d'une archive : `curl -fsSL <url> | shasum -a 256`.
 
 Flux `develop` → `main`, géré par repowarden : le travail entre dans `develop` (branche par défaut) ; **seul `develop` entre dans `main`**, par la PR de livraison (une PR de travail ouverte vers `main` est reciblée vers `develop` par la CI). Une préversion `vX.Y.Z-next.N` est publiée le soir si `develop` a changé ; le vendredi matin (ou *Actions → release → Run workflow* sur `develop`), la PR de livraison `develop` → `main` est ouverte ; son merge, après revue, publie le tag `vX.Y.Z` et la [release GitHub](https://github.com/SimBienvenueHoulBoumi/devzone/releases). La version suit les Conventional Commits : `fix` → correctif, `feat` → mineure.
 
+**Rythme, au choix du projet** (`.github/workflows/release.yml`, job `release`, bloc `with:`) :
+
+| Rythme | Préversion | Demande de livraison | Réglage |
+|---|---|---|---|
+| **Regroupé** (défaut, celui de devzone) | le soir, si `develop` a changé | fenêtre du vendredi matin, ou à la main, ou merge étiqueté « urgent » | rien à ajouter |
+| **À chaque ticket** | à chaque merge sur `develop` | à chaque merge sur `develop` | `preversion-on-push: true` et `delivery-on-push: true` |
+
+Dans les deux cas, la livraison sur `main` reste une décision humaine : le merge de la PR de livraison.
+
 ## Organisation
 
 ```
