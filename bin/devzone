@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+# Commande devzone sur ta machine (paquet npm) :
+#   devzone <dossier>        crée un devzone dans <dossier> puis le lance
+#   devzone desinstaller     dans un dossier devzone : retire tout ce qu'il a créé
+#   devzone --version | --help
+# Dans le conteneur, « devzone » est une autre commande : les modules
+# (.devcontainer/devzone).
+# DEVZONE_SANS_DEMARRER=1 : copie seule, sans lancer le conteneur (tests).
+set -euo pipefail
+
+PAQUET="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")")/.." && pwd)"
+# Fichiers d'un devzone (même liste que « files » de package.json, sans bin/)
+FICHIERS=(.devcontainer Makefile .gitattributes desinstaller.sh README.md LICENSE)
+
+version() { node -p "require('$PAQUET/package.json').version" 2>/dev/null || echo inconnue; }
+
+aide() {
+    cat <<EOF
+devzone $(version) : environnement de développement conteneurisé
+
+  devzone <dossier>        crée un devzone dans <dossier> puis le lance (make up)
+  devzone desinstaller     dans un dossier devzone : retire conteneur, image, volumes
+                           (à lancer avant npm uninstall -g devzone)
+  devzone --version
+EOF
+}
+
+creer() {
+    local cible="$1"
+    if [ -e "$cible" ] && [ -n "$(ls -A "$cible" 2>/dev/null)" ]; then
+        echo "✖ $cible existe et n'est pas vide : rien n'est écrasé. Choisis un autre dossier." >&2
+        exit 1
+    fi
+    mkdir -p "$cible/workspace"
+    cp -R "${FICHIERS[@]/#/$PAQUET/}" "$cible/"
+    touch "$cible/workspace/.gitkeep"
+    # npm n'embarque jamais .gitignore : écrit ici
+    cat >"$cible/.gitignore" <<'EOF'
+# Chaque projet du workspace a son propre dépôt git
+workspace/*
+!workspace/.gitkeep
+
+.DS_Store
+.devzone.log
+.devzone.etat
+EOF
+    chmod +x "$cible/desinstaller.sh"
+    cible="$(cd "$cible" && pwd)"
+    echo "✔ devzone $(version) créé dans $cible"
+    if [ -n "${DEVZONE_SANS_DEMARRER:-}" ]; then
+        echo "Pour le lancer : cd $cible && make up"
+        return 0
+    fi
+    echo "▶ Lancement (quelques minutes la première fois)…"
+    if command -v make >/dev/null 2>&1; then
+        make -C "$cible" up
+    else
+        npx -y @devcontainers/cli up --workspace-folder "$cible" >"$cible/.devzone.log" 2>&1 || {
+            tail -15 "$cible/.devzone.log"
+            echo "✖ échec ; journal : $cible/.devzone.log" >&2
+            exit 1
+        }
+    fi
+    echo "Ensuite : cd $cible && make shell (ou ouvre le dossier dans VS Code : Reopen in Container)."
+}
+
+case "${1:-}" in
+    "" | -h | --help | aide) aide ;;
+    -v | --version) version ;;
+    desinstaller)
+        if [ ! -f desinstaller.sh ] || [ ! -d .devcontainer ]; then
+            echo "✖ À lancer dans un dossier devzone (desinstaller.sh introuvable ici)." >&2
+            exit 1
+        fi
+        bash desinstaller.sh
+        ;;
+    -*)
+        echo "✖ option inconnue : $1 (devzone --help)" >&2
+        exit 1
+        ;;
+    *) creer "$1" ;;
+esac

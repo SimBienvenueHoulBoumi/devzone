@@ -14,7 +14,11 @@ Environnement de développement complet dans un conteneur (devcontainer) : les m
 ## Démarrage rapide
 
 1. **Prérequis** : Docker (Docker Desktop, ou Docker Engine sous Linux), puis **soit** VS Code + extension *Dev Containers*, **soit** Node (pour `npx`) et `make`. Facultatif, pour Kubernetes : activer le cluster de Docker Desktop (*Settings → Kubernetes → Enable Kubernetes*). Sous Windows : cloner avec Git for Windows (les scripts restent en fins de ligne LF grâce à `.gitattributes`).
-2. **Lancer** depuis le dossier `devzone/` : `make shell` (ou, dans VS Code, *Dev Containers: Reopen in Container*). Le premier build prend quelques minutes (4 à 5 min mesurées, plus le téléchargement des images de base sur une machine neuve).
+2. **Obtenir devzone**, au choix :
+   - `npx devzone mon-devzone` : crée le dossier `mon-devzone/` et lance le conteneur (paquet npm `devzone`, une fois publié) ;
+   - ou `git clone https://github.com/SimBienvenueHoulBoumi/devzone.git`.
+   
+   **Lancer** depuis ce dossier : `make shell` (ou, dans VS Code, *Dev Containers: Reopen in Container*). Le premier build prend quelques minutes (4 à 5 min mesurées, plus le téléchargement des images de base sur une machine neuve).
 3. **Identité git**, une seule fois (nécessaire pour commiter, gardée ensuite, même après `make rebuild`) :
    - avec GitHub : `gh auth login -s workflow` ; l'identité est déduite du compte ;
    - sans GitHub : `git config --file ~/.config/git/config user.name "<nom>"`, puis de même `user.email "<email>"`.
@@ -162,6 +166,8 @@ make desinstaller                     # liste ce qui sera supprimé, puis demand
 make desinstaller GARDER=connexions   # pareil, mais garde gh, git, Claude Code, opencode et les modules
 ```
 
+Installé par npm : `devzone desinstaller` dans le dossier (même chose), **puis** `npm uninstall -g devzone`. npm ne retire que la commande `devzone` : sans la désinstallation, image, volumes et Docker interne resteraient.
+
 | Supprimé | Jamais touché |
 |---|---|
 | conteneur et image `vsc-devzone-…` | `workspace/` (tes projets) |
@@ -188,7 +194,7 @@ Empreinte d'une archive : `curl -fsSL <url> | shasum -a 256`.
 
 | Tests | Commande | Où | Durée |
 |---|---|---|---|
-| Commande `devzone` (unitaires) | `bats test/` | dans le conteneur | quelques secondes |
+| Commande `devzone` du conteneur et commande npm (unitaires) | `bats test/` | dans le conteneur | quelques secondes |
 | Fonctionnels : un devzone construit et utilisé comme par un utilisateur (outils, modules, Kubernetes avec kind, hooks repowarden, redémarrage, rebuild) | `make test-fonctionnel` | sur ta machine (Docker, Node) | 5 à 10 min |
 
 Les tests fonctionnels travaillent sur une copie du dépôt, avec leurs propres volumes (`devzone-test-…`), puis suppriment tout (conteneur, volumes, image), même en cas d'échec : ton devzone, tes connexions et le cluster de ta machine ne sont jamais touchés (seul un cluster kind de test est utilisé). En CI, le workflow `fonctionnel` les lance sur chaque PR qui modifie `.devcontainer/`, `test/` ou le `Makefile`, et à la main (*Actions → fonctionnel → Run workflow*).
@@ -255,8 +261,11 @@ devzone/
 ├── .repowarden.conf            # réglages repowarden : flux develop → main
 ├── Makefile                    # pilotage sans VS Code
 ├── desinstaller.sh             # make desinstaller : retire tout ce que devzone a créé
+├── bin/devzone                 # commande npm : npx devzone <dossier>, devzone desinstaller
+├── package.json, LICENSE       # paquet npm devzone (licence MIT)
 ├── test/
 │   ├── devzone.bats            # tests de la commande devzone (bats test/)
+│   ├── cli.bats                # tests de la commande npm et du contenu du paquet
 │   └── fonctionnel.sh          # tests fonctionnels (make test-fonctionnel)
 └── workspace/                  # tes projets (ignorés par git, chacun son dépôt)
 ```

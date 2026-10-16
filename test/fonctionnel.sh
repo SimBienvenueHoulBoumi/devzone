@@ -13,7 +13,9 @@ RACINE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 export DEVZONE_VOLUMES="devzone-test-$$"
 # Chemin physique : make (CURDIR) voit /private/var/… sous macOS, pas /var/…
 TMP="$(cd "$(mktemp -d)" && pwd -P)"
-COPIE="$TMP/devzone"
+# Nommée autrement que « devzone » : le conteneur doit fonctionner quel que soit
+# le nom du dossier (npx devzone <dossier>)
+COPIE="$TMP/mon-devzone"
 DC=(npx -y @devcontainers/cli)
 WS=(--workspace-folder "$COPIE")
 JOURNAL="$TMP/journal.log"
