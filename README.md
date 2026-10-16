@@ -151,6 +151,15 @@ Tout le reste du conteneur (paquets installés à la main, fichiers hors de ces 
 
 Empreinte d'une archive : `curl -fsSL <url> | shasum -a 256`.
 
+## Tests
+
+| Tests | Commande | Où | Durée |
+|---|---|---|---|
+| Commande `devzone` (unitaires) | `bats test/` | dans le conteneur | quelques secondes |
+| Fonctionnels : un devzone construit et utilisé comme par un utilisateur (outils, modules, Kubernetes avec kind, hooks repowarden, redémarrage, rebuild) | `make test-fonctionnel` | sur ta machine (Docker, Node) | 5 à 10 min |
+
+Les tests fonctionnels travaillent sur une copie du dépôt, avec leurs propres volumes (`devzone-test-…`), puis suppriment tout (conteneur, volumes, image), même en cas d'échec : ton devzone, tes connexions et le cluster de ta machine ne sont jamais touchés (seul un cluster kind de test est utilisé). En CI, le workflow `fonctionnel` les lance sur chaque PR qui modifie `.devcontainer/`, `test/` ou le `Makefile`, et à la main (*Actions → fonctionnel → Run workflow*).
+
 ## Versions et livraison
 
 Flux `develop` → `main`, géré par repowarden :
@@ -197,12 +206,15 @@ devzone/
 │   ├── metrics-server.sh       # metrics-server sur les clusters locaux (CPU et RAM dans k9s)
 │   └── git-identite.sh         # chaque démarrage : identité git déduite du compte gh si elle manque
 ├── .github/workflows/
+│   ├── fonctionnel.yml         # tests fonctionnels (PR touchant .devcontainer/, test/ ou le Makefile)
 │   ├── repowarden.yml          # vérifications repowarden de chaque PR (PR mal visée reciblée vers develop)
 │   ├── tickets.yml             # suivi des tickets : branche, PR brouillon, statuts jusqu'à la production
 │   ├── release.yml             # préversions sur develop, livraison develop → main
 │   └── nettoyage.yml           # branches mergées supprimées (main et develop conservées)
 ├── .repowarden.conf            # réglages repowarden : flux develop → main
 ├── Makefile                    # pilotage sans VS Code
-├── test/devzone.bats           # tests de la commande devzone (bats test/)
+├── test/
+│   ├── devzone.bats            # tests de la commande devzone (bats test/)
+│   └── fonctionnel.sh          # tests fonctionnels (make test-fonctionnel)
 └── workspace/                  # tes projets (ignorés par git, chacun son dépôt)
 ```
