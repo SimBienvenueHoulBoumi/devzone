@@ -30,18 +30,21 @@
 
   "workspaceFolder": "/workspaces/devzone",
 
-  // Caches persistants : survivent aux rebuilds du conteneur
+  // Caches persistants : survivent aux rebuilds du conteneur. Préfixe des
+  // volumes : devzone, ou DEVZONE_VOLUMES (tests fonctionnels, isolés)
   "mounts": [
-    "source=devzone-m2,target=/home/vscode/.m2,type=volume",
-    "source=devzone-pnpm,target=/home/vscode/.local/share/pnpm,type=volume",
+    "source=${localEnv:DEVZONE_VOLUMES:devzone}-m2,target=/home/vscode/.m2,type=volume",
+    "source=${localEnv:DEVZONE_VOLUMES:devzone}-pnpm,target=/home/vscode/.local/share/pnpm,type=volume",
     // Assistants IA : connexion et réglages gardés d'un rebuild à l'autre
-    "source=devzone-claude,target=/home/vscode/.claude,type=volume",
-    "source=devzone-opencode-config,target=/home/vscode/.config/opencode,type=volume",
-    "source=devzone-opencode-data,target=/home/vscode/.local/share/opencode,type=volume",
+    "source=${localEnv:DEVZONE_VOLUMES:devzone}-claude,target=/home/vscode/.claude,type=volume",
+    "source=${localEnv:DEVZONE_VOLUMES:devzone}-opencode-config,target=/home/vscode/.config/opencode,type=volume",
+    "source=${localEnv:DEVZONE_VOLUMES:devzone}-opencode-data,target=/home/vscode/.local/share/opencode,type=volume",
     // Connexion gh et identité git (~/.config/git/config, lu par git comme
     // config globale) : le conteneur reconstruit peut commiter et pousser
-    "source=devzone-gh,target=/home/vscode/.config/gh,type=volume",
-    "source=devzone-git,target=/home/vscode/.config/git,type=volume"
+    "source=${localEnv:DEVZONE_VOLUMES:devzone}-gh,target=/home/vscode/.config/gh,type=volume",
+    "source=${localEnv:DEVZONE_VOLUMES:devzone}-git,target=/home/vscode/.config/git,type=volume",
+    // Modules activés (devzone activer|desactiver), propres à chaque utilisateur
+    "source=${localEnv:DEVZONE_VOLUMES:devzone}-config,target=/home/vscode/.config/devzone,type=volume"
   ],
 
   "runArgs": [
