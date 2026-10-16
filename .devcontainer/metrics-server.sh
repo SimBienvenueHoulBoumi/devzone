@@ -45,7 +45,9 @@ for contexte in "$@"; do
     fi
     if "${k[@]}" apply -f "$MANIFESTE" >/dev/null &&
         "${k[@]}" -n kube-system patch deployment metrics-server --type=json \
-            -p '[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"}]' >/dev/null; then
+            -p '[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"}]' >/dev/null &&
+        # Marque : make desinstaller ne retire que ce que devzone a installé
+        "${k[@]}" -n kube-system label deployment metrics-server devzone=installe --overwrite >/dev/null; then
         echo "metrics-server : installé ($VERSION) : $contexte (métriques dans ~1 min)"
     else
         echo "metrics-server : échec de l'installation : $contexte" >&2

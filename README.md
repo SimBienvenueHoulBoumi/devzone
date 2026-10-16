@@ -48,6 +48,7 @@ Le choix est **propre à chaque utilisateur** et gardé dans le volume `devzone-
 | Supprimer le conteneur | — | `make down` | — |
 | Reconstruire (après une modification de `.devcontainer/`) | *Dev Containers: Rebuild Container* | `make rebuild` | `npx @devcontainers/cli up --workspace-folder . --remove-existing-container` |
 | État | — | `make status` | — |
+| **Désinstaller** (tout ce que devzone a créé, après confirmation) | — | `make desinstaller` | `bash desinstaller.sh` |
 
 `make` seul affiche la liste. Les journaux de `up` et `rebuild` vont dans `.devzone.log` ; seule la fin s'affiche en cas d'échec.
 
@@ -112,7 +113,7 @@ kubectl config use-context <nom>
 ```
 
 - **Cluster actif** : celui de l'hôte par défaut ; un choix fait avec `use-context` est gardé aux redémarrages.
-- **Clusters kind** : tournent dans le Docker interne, redémarrent avec le conteneur, sont conservés par `make rebuild` et `make down` ; supprimés seulement par `kind delete cluster`.
+- **Clusters kind** : tournent dans le Docker interne, redémarrent avec le conteneur, sont conservés par `make rebuild` et `make down` ; supprimés par `kind delete cluster` (ou `make desinstaller`).
 - **CPU et RAM dans k9s** (`kubectl top`) : module `kubernetes` actif, metrics-server est installé au démarrage sur les clusters **locaux** qui ne l'ont pas (Docker Desktop, kind…), jamais sur un cluster distant. Après un `kind create cluster` : `bash .devcontainer/metrics-server.sh` (ou `… metrics-server.sh <contexte>` pour un cluster précis).
 - **Cluster de l'hôte** : `~/.kube` est monté en lecture seule, jamais modifié ; sa copie adaptée est `~/.kube/hote.config` (`127.0.0.1` remplacé par `host.docker.internal`). Après un changement de cluster sur l'hôte : `make stop && make up`.
 - **Messages de démarrage** (`kube-config : …`, `metrics-server : …`) : dans le terminal de création, ou en relançant `bash .devcontainer/kube-config.sh`.
@@ -137,6 +138,24 @@ Le conteneur est jetable ; ce qui compte vit dans des volumes Docker, sur ta mac
 | `workspace/` (dossier de l'hôte) | tes projets | gardé | gardé | gardé |
 
 Tout le reste du conteneur (paquets installés à la main, fichiers hors de ces emplacements) est perdu à `make down` et `make rebuild`. Le Docker interne est isolé : ses images ne sont pas partagées avec Docker Desktop.
+
+## Désinstaller
+
+`make down` ne supprime que le conteneur. Pour retirer **tout ce que devzone a créé** sur ta machine :
+
+```bash
+make desinstaller                     # liste ce qui sera supprimé, puis demande « oui »
+make desinstaller GARDER=connexions   # pareil, mais garde gh, git, Claude Code, opencode et les modules
+```
+
+| Supprimé | Jamais touché |
+|---|---|
+| conteneur et image `vsc-devzone-…` | `workspace/` (tes projets) |
+| volumes `devzone-*` | l'image de base `mcr.microsoft.com/devcontainers/base` (partagée) |
+| volume du Docker interne (images et clusters kind) | un metrics-server que devzone n'a pas installé |
+| metrics-server **installé par devzone** sur les clusters locaux de ta machine (il porte l'étiquette `devzone=installe` ; vérifié avec le `kubectl` de ta machine) | |
+
+Fonctionne aussi après un `make down` : celui-ci note l'image et le Docker interne dans `.devzone.etat`. À la fin, la commande affiche ce qui reste à retirer toi-même si tu le souhaites : le cache `npx` (`~/.npm/_npx`), l'autorisation « GitHub CLI » de ton compte (*GitHub → Settings → Applications*) et le dossier `devzone/`. Sans terminal : `CONFIRMER=oui make desinstaller`.
 
 ## Mettre à jour un outil
 
@@ -213,6 +232,7 @@ devzone/
 │   └── nettoyage.yml           # branches mergées supprimées (main et develop conservées)
 ├── .repowarden.conf            # réglages repowarden : flux develop → main
 ├── Makefile                    # pilotage sans VS Code
+├── desinstaller.sh             # make desinstaller : retire tout ce que devzone a créé
 ├── test/
 │   ├── devzone.bats            # tests de la commande devzone (bats test/)
 │   └── fonctionnel.sh          # tests fonctionnels (make test-fonctionnel)
