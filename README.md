@@ -9,11 +9,11 @@ Environnement de développement complet dans un conteneur (devcontainer) : les m
 | GitHub, qualité | gh, repowarden (hooks git globaux), shellcheck, bats, actionlint, gitleaks, ruff, vulture, pytest |
 | Assistants IA | Claude Code, opencode |
 
-devzone fournit les outils Kubernetes, **pas de cluster** : il se connecte à celui de ta machine s'il existe ; sinon, tu en crées un avec `kind create cluster` (voir [Kubernetes](#kubernetes)).
+**Kubernetes est optionnel** : il ne sert qu'aux projets qui l'utilisent. devzone fournit les outils, pas de cluster : il se connecte à celui de ta machine s'il existe ; sinon, aucun cluster n'est créé, tu en crées un si besoin avec `kind create cluster` (voir [Kubernetes](#kubernetes)).
 
 ## Démarrage rapide
 
-1. **Prérequis** : Docker (Docker Desktop, ou Docker Engine sous Linux), puis **soit** VS Code + extension *Dev Containers*, **soit** Node (pour `npx`) et `make`. Recommandé : activer Kubernetes dans Docker Desktop (*Settings → Kubernetes → Enable Kubernetes*). Sous Windows : cloner avec Git for Windows (les scripts restent en fins de ligne LF grâce à `.gitattributes`).
+1. **Prérequis** : Docker (Docker Desktop, ou Docker Engine sous Linux), puis **soit** VS Code + extension *Dev Containers*, **soit** Node (pour `npx`) et `make`. Facultatif, pour Kubernetes : activer le cluster de Docker Desktop (*Settings → Kubernetes → Enable Kubernetes*). Sous Windows : cloner avec Git for Windows (les scripts restent en fins de ligne LF grâce à `.gitattributes`).
 2. **Lancer** depuis le dossier `devzone/` : `make shell` (ou, dans VS Code, *Dev Containers: Reopen in Container*). Le premier build prend quelques minutes (4 à 5 min mesurées, plus le téléchargement des images de base sur une machine neuve).
 3. **Se connecter, une seule fois** (gardé ensuite, même après `make rebuild`) :
    ```bash
@@ -21,9 +21,9 @@ devzone fournit les outils Kubernetes, **pas de cluster** : il se connecte à ce
    claude                      # puis /login
    opencode auth login
    ```
-4. **Vérifier** : `java -version`, `node -v`, `python3 --version`, `repowarden --version`, `kubectl get nodes`.
+4. **Vérifier** : `java -version`, `node -v`, `python3 --version`, `repowarden --version` ; avec un cluster : `kubectl get nodes`.
 
-Le premier démarrage rappelle ce qui manque (connexion GitHub, permission `workflow`, cluster).
+Le premier démarrage rappelle ce qui manque (connexion GitHub, permission `workflow`) et indique si un cluster Kubernetes est joignable ; sans cluster, tout le reste fonctionne.
 
 ## Commandes
 
