@@ -55,6 +55,7 @@ npx @devcontainers/cli up --workspace-folder . --remove-existing-container  # ma
    bash .devcontainer/git-identite.sh  # identité git (sinon : au prochain démarrage)
    ```
    **Permission `workflow`** : sans elle, GitHub refuse tout push qui modifie `.github/workflows/` (fréquent avec repowarden). Compte déjà connecté : `gh auth refresh -h github.com -s workflow`.
+   **Depuis `make shell`**, aucun navigateur ne s'ouvre depuis le conteneur : copier le code affiché par `gh`, ouvrir https://github.com/login/device à la main sur l'hôte. L'avertissement « No clipboard utilities available » est sans conséquence.
    **Identité git** : déduite du compte `gh` de chacun, écrite dans `~/.config/git/config` (volume) : nom du profil GitHub (sinon login), email noreply `<id>+<login>@users.noreply.github.com` (commits rattachés au compte, email personnel non exposé). Une identité déjà définie n'est jamais remplacée ; pour un autre email : `git config --file ~/.config/git/config user.email "<email>"`. `post-create.sh` rappelle ce qui manque. Git passe par le jeton de `gh` (https, même pour les remotes en `git@github.com:`), sans clé ssh à recopier, et les dépôts de `/workspaces/devzone` sont déclarés sûrs (`safe.directory`).
 3. Se connecter aux assistants IA, une seule fois : `claude` (puis `/login`), `opencode auth login`. Leur connexion et leurs réglages sont dans des volumes (`devzone-claude`, `devzone-opencode-*`) : ils survivent à `make rebuild` et `make down`.
 
@@ -87,10 +88,12 @@ kubectl config use-context <nom>
 ```
 
 - **Cluster actif par défaut** : celui de l'hôte ; un choix fait avec `use-context` est gardé aux redémarrages.
-- **Clusters kind** : tournent dans le Docker interne, redémarrent avec le conteneur (contexte remis par `kube-config.sh`) ; supprimés par `kind delete cluster`.
+- **Clusters kind** : tournent dans le Docker interne, redémarrent avec le conteneur (contexte remis par `kube-config.sh`) et sont conservés par `make rebuild` (volume du Docker interne gardé) ; supprimés seulement par `kind delete cluster`.
 - **CPU/RAM dans k9s** (`kubectl top`) : au démarrage, metrics-server est installé sur les clusters locaux joignables (Docker Desktop, kind…) qui ne l'ont pas, jamais sur un cluster distant (Docker Desktop et kind ne l'ont pas d'office). Après un `kind create cluster` : `bash .devcontainer/metrics-server.sh`.
 - Messages de démarrage (`kube-config : …`) : dans le terminal VS Code de création, ou relancer `bash .devcontainer/kube-config.sh`.
 - `~/.kube` de l'hôte est monté en lecture seule, jamais modifié ; sa copie adaptée est `~/.kube/hote.config` (`127.0.0.1` remplacé par `host.docker.internal`). Après un changement de cluster sur l'hôte : `make stop && make up`.
+
+**Aucun cluster actif**, symptômes : `k9s` répond `Error: exit status 1` puis son aide ; `kubectl` : `localhost:8080` … `connection refused`. Créer un cluster (`kind create cluster`) ou en choisir un (`kubectl config use-context <nom>`).
 
 Cas sans cluster de l'hôte joignable (kind fonctionne quand même) :
 - **Codespaces / machine distante** : pas de `~/.kube` local.
