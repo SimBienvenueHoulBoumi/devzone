@@ -30,7 +30,14 @@ repowarden install --global --lang fr
 # volumes de devcontainer.json)
 npm install -g @anthropic-ai/claude-code@2.1.286 opencode-ai@1.18.34
 
-# Identité git : déduite du compte gh au démarrage (git-identite.sh)
-gh auth status >/dev/null 2>&1 || echo "GitHub à connecter une fois : gh auth login (donne aussi l'identité git)"
+# Identité git : déduite du compte gh au démarrage (git-identite.sh).
+# Permission workflow : sans elle, GitHub refuse tout push qui modifie
+# .github/workflows/ (fréquent avec repowarden). Un jeton sans ligne de
+# scopes (GH_TOKEN, fine-grained) n'est pas jugé.
+if ! statut_gh="$(gh auth status 2>&1)"; then
+    echo "GitHub à connecter une fois : gh auth login -s workflow (donne aussi l'identité git)"
+elif grep -q "Token scopes:" <<<"$statut_gh" && ! grep -q "'workflow'" <<<"$statut_gh"; then
+    echo "gh sans la permission workflow (push de .github/workflows/ refusé) : gh auth refresh -h github.com -s workflow"
+fi
 
 echo "devzone prêt : java $(java -version 2>&1 | head -1 | cut -d'"' -f2), node $(node -v), python $(python3 --version | cut -d' ' -f2), repowarden $(repowarden --version), claude $(claude --version | cut -d' ' -f1), opencode $(opencode --version)"

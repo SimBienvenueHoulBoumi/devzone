@@ -51,9 +51,10 @@ npx @devcontainers/cli up --workspace-folder . --remove-existing-container  # ma
 1. `make shell` (ou *Reopen in Container* dans VS Code). Le premier build prend quelques minutes. Pour vérifier les outils : `java -version`, `node -v`, `python3 --version`, `repowarden --version`, `kubectl get nodes`.
 2. Dans le conteneur, une seule fois (conservé dans des volumes : survit à `make rebuild` et `make down`) :
    ```bash
-   gh auth login                     # GitHub : tickets, PR, repowarden, git push/pull
+   gh auth login -s workflow           # GitHub : tickets, PR, repowarden, git push/pull
    bash .devcontainer/git-identite.sh  # identité git (sinon : au prochain démarrage)
    ```
+   **Permission `workflow`** : sans elle, GitHub refuse tout push qui modifie `.github/workflows/` (fréquent avec repowarden). Compte déjà connecté : `gh auth refresh -h github.com -s workflow`.
    **Identité git** : déduite du compte `gh` de chacun, écrite dans `~/.config/git/config` (volume) : nom du profil GitHub (sinon login), email noreply `<id>+<login>@users.noreply.github.com` (commits rattachés au compte, email personnel non exposé). Une identité déjà définie n'est jamais remplacée ; pour un autre email : `git config --file ~/.config/git/config user.email "<email>"`. `post-create.sh` rappelle ce qui manque. Git passe par le jeton de `gh` (https, même pour les remotes en `git@github.com:`), sans clé ssh à recopier, et les dépôts de `/workspaces/devzone` sont déclarés sûrs (`safe.directory`).
 3. Se connecter aux assistants IA, une seule fois : `claude` (puis `/login`), `opencode auth login`. Leur connexion et leurs réglages sont dans des volumes (`devzone-claude`, `devzone-opencode-*`) : ils survivent à `make rebuild` et `make down`.
 
@@ -66,6 +67,12 @@ cd <projet>
 ```
 
 Les hooks git de repowarden sont installés **globalement** (`repowarden install --global --lang fr`) : ils s'appliquent à tout dépôt cloné dans le conteneur, sans rien faire de plus. Ensuite, suivre les règles du projet (`AGENTS.md`, `CONTRIBUTING.md`) : `repowarden ticket <n>`, `repowarden cc …`.
+
+**Bots repowarden** d'un projet (CI, releases, tickets, GitHub App, protection) : `repowarden bots` dans le projet, chaque bot avec ton accord. Sans GitHub App (`repowarden app init`), les workflows agissent sous le bot `github-actions`, dont les actions ne déclenchent aucun autre workflow (PR brouillon sans CI, merge automatique sans préversion…).
+
+**CI « en attente d'approbation »** (run `action_required`, bandeau dans la PR) : la PR a été ouverte ou poussée par le bot `github-actions` (PR brouillon d'un ticket, PR de livraison). GitHub ne lance alors les workflows `pull_request` (`opened`, `synchronize`, `reopened`) qu'après l'accord d'une personne ayant les droits d'écriture ([doc GitHub](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow)) :
+- **débloquer la PR** : l'ouvrir, vérifier ses changements (surtout `.github/workflows/`), puis *Approve workflows to run* ;
+- **ne plus avoir à le faire** : `repowarden app init` dans le projet ; les workflows passent par le jeton de la GitHub App, dont les PR lancent la CI d'elles-mêmes.
 
 Les vérifications de la CI de repowarden se lancent telles quelles dans le conteneur (`shellcheck`, `actionlint`, `bats test/`). actionlint est à la même version que la CI ; shellcheck et bats sont ceux d'Ubuntu 24.04 et peuvent différer légèrement.
 
