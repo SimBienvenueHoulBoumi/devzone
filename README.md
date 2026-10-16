@@ -15,11 +15,14 @@ Environnement de développement complet dans un conteneur (devcontainer) : les m
 
 1. **Prérequis** : Docker (Docker Desktop, ou Docker Engine sous Linux), puis **soit** VS Code + extension *Dev Containers*, **soit** Node (pour `npx`) et `make`. Facultatif, pour Kubernetes : activer le cluster de Docker Desktop (*Settings → Kubernetes → Enable Kubernetes*). Sous Windows : cloner avec Git for Windows (les scripts restent en fins de ligne LF grâce à `.gitattributes`).
 2. **Lancer** depuis le dossier `devzone/` : `make shell` (ou, dans VS Code, *Dev Containers: Reopen in Container*). Le premier build prend quelques minutes (4 à 5 min mesurées, plus le téléchargement des images de base sur une machine neuve).
-3. **Se connecter à GitHub, une seule fois** (gardé ensuite, même après `make rebuild`) : `gh auth login -s workflow`. Donne aussi l'identité git ; nécessaire pour pousser, ouvrir des PR et utiliser les tickets repowarden.
-   **Facultatif** : `devzone activer ia` (assistants IA), `devzone activer kubernetes` (cluster de ta machine) ; voir [Modules](#modules).
+3. **Identité git**, une seule fois (nécessaire pour commiter, gardée ensuite, même après `make rebuild`) :
+   - avec GitHub : `gh auth login -s workflow` ; l'identité est déduite du compte ;
+   - sans GitHub : `git config --file ~/.config/git/config user.name "<nom>"`, puis de même `user.email "<email>"`.
+
+   **Facultatif** : GitHub (push et PR GitHub, tickets et bots repowarden), `devzone activer ia` (assistants IA), `devzone activer kubernetes` (cluster de ta machine) ; voir [Connexions et identité](#connexions-et-identité) et [Modules](#modules).
 4. **Vérifier** : `java -version`, `node -v`, `python3 --version`, `repowarden --version` ; avec un cluster : `kubectl get nodes`.
 
-Le premier démarrage rappelle ce qui manque (connexion GitHub, permission `workflow`) et liste les modules désactivés, avec la commande pour les activer.
+Le premier démarrage rappelle ce qui manque (identité git) et ce qui est proposé (GitHub, modules désactivés), avec la commande pour chacun.
 
 ## Modules
 
@@ -56,11 +59,11 @@ Le choix est **propre à chaque utilisateur** et gardé dans le volume `devzone-
 
 ## Connexions et identité
 
-**GitHub (`gh`)** : `gh auth login -s workflow`. Git passe par le jeton de `gh` (https, même pour les remotes en `git@github.com:`), sans clé ssh à recopier. Les dépôts de `/workspaces/devzone` sont déclarés sûrs (`safe.directory`).
+**GitHub (facultatif)** : sert à pousser et ouvrir des PR sur GitHub, aux tickets et bots repowarden, et donne l'identité git automatiquement. Sans GitHub, git fonctionne normalement (dépôts locaux, autre hébergeur) ; seule l'identité se règle à la main. Pour l'utiliser : `gh auth login -s workflow`. Git passe alors par le jeton de `gh` (https, même pour les remotes en `git@github.com:`), sans clé ssh à recopier. Les dépôts de `/workspaces/devzone` sont déclarés sûrs (`safe.directory`).
 - **Permission `workflow`** : sans elle, GitHub refuse tout push qui modifie `.github/workflows/` (fréquent avec repowarden). Compte déjà connecté : `gh auth refresh -h github.com -s workflow`.
 - **Depuis `make shell`**, aucun navigateur ne s'ouvre depuis le conteneur : copier le code affiché par `gh` et ouvrir https://github.com/login/device à la main. L'avertissement « No clipboard utilities available » est sans conséquence.
 
-**Identité git** : déduite du compte `gh` à chaque démarrage, tant qu'elle manque (`git-identite.sh`) :
+**Identité git** (nécessaire pour commiter) : sans GitHub, à régler à la main (`git config --file ~/.config/git/config user.name "<nom>"` et `user.email "<email>"`) ; avec GitHub, déduite du compte `gh` à chaque démarrage, tant qu'elle manque (`git-identite.sh`) :
 - nom du profil GitHub (sinon le login) ;
 - email noreply `<id>+<login>@users.noreply.github.com` : les commits sont rattachés au compte, l'email personnel n'est pas exposé.
 
@@ -202,7 +205,7 @@ La version suit les Conventional Commits : `fix` → correctif, `feat` → mineu
 | `git push` refusé : « refusing to allow an OAuth App to create or update workflow … without `workflow` scope » | jeton `gh` sans la permission `workflow` | `gh auth refresh -h github.com -s workflow` |
 | PR bloquée, run `action_required`, bandeau « Approve workflows to run » | PR ouverte ou poussée par le bot `github-actions` : pour les événements `pull_request` `opened`, `synchronize` et `reopened`, GitHub attend l'accord d'une personne ayant l'écriture ([doc GitHub](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow)) | vérifier les changements (surtout `.github/workflows/`), puis *Approve workflows to run* ; pour ne plus avoir à le faire : `repowarden app init` dans le projet |
 | PR de livraison bloquée : « aucune préversion vX.Y.Z-next.N » | la préversion n'est pas encore publiée (rythme regroupé) | attendre celle du soir, ou *Actions → release → Run workflow* sur `develop` |
-| `git commit` : « Please tell me who you are » | identité git absente (`gh` non connecté) | `gh auth login -s workflow` puis `bash .devcontainer/git-identite.sh` |
+| `git commit` : « Please tell me who you are » | identité git absente | avec GitHub : `gh auth login -s workflow` puis `bash .devcontainer/git-identite.sh` ; sans GitHub : `git config --file ~/.config/git/config user.name "<nom>"` et `user.email "<email>"` |
 | `gh auth login` : « Press Enter to open … in your browser », rien ne s'ouvre | pas de navigateur dans le conteneur (`make shell`) | ouvrir https://github.com/login/device à la main et saisir le code |
 | `k9s` : `Error: exit status 1` puis son aide ; `kubectl` : `localhost:8080` … `connection refused` | aucun cluster actif (module `kubernetes` désactivé, ou pas de cluster sur ta machine) | `devzone activer kubernetes` (cluster de ta machine), `kind create cluster`, ou `kubectl config use-context <nom>` |
 | `claude` ou `opencode` : « command not found » | module `ia` désactivé | `devzone activer ia` |

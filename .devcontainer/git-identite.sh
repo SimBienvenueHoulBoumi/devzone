@@ -14,7 +14,7 @@ email_git="$(git config --get user.email || true)"
 [ -n "$nom_git" ] && [ -n "$email_git" ] && exit 0
 
 if ! gh auth status >/dev/null 2>&1; then
-    echo "git-identite : identité git absente ; après gh auth login : bash .devcontainer/git-identite.sh"
+    echo "git-identite : identité git absente (nécessaire pour commiter) : avec GitHub, gh auth login -s workflow puis bash .devcontainer/git-identite.sh ; sans GitHub, git config --file ~/.config/git/config user.name \"<nom>\" et user.email \"<email>\""
     exit 0
 fi
 
