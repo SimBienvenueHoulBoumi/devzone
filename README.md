@@ -52,16 +52,36 @@ Une identité déjà définie n'est jamais remplacée. Pour un autre email : `gi
 
 Chaque connexion est **propre à l'utilisateur** : elle vit dans les volumes Docker de sa machine (voir [Données conservées](#données-conservées)). Le dépôt ne contient aucun identifiant.
 
-## Travailler sur un projet
+## Mettre en route un projet
+
+Tes projets vont dans `workspace/` (`/workspaces/devzone/workspace` dans le conteneur), chacun avec son propre dépôt git. Les hooks repowarden y sont actifs d'office.
+
+**Projet existant, déjà équipé de repowarden** (`.repowarden.conf` et workflows présents) : il suffit de le cloner.
 
 ```bash
 cd /workspaces/devzone/workspace
 git clone https://github.com/<compte>/<projet>.git
 cd <projet>
+repowarden            # état du poste et du dépôt, étape suivante
 ```
 
+**Nouveau projet, ou projet sans repowarden** :
+
+```bash
+cd /workspaces/devzone/workspace
+mkdir <projet> && cd <projet> && git init -b main     # ou git clone d'un dépôt existant
+# … premiers fichiers, puis un premier commit : git add . && git cc
+gh repo create <compte>/<projet> --private --source . --push   # dépôt GitHub (si absent)
+repowarden bots       # CI, releases, tickets, GitHub App, protection : chacun avec ton accord
+repowarden            # vérifier
+```
+
+`repowarden bots` demande le flux (`main` seule, ou `develop` → `main`), montre ce qu'il va créer, puis attend ta confirmation ; un fichier existant n'est jamais écrasé. Il faut `gh` connecté et les droits d'administration du dépôt GitHub.
+
+## Travailler sur un projet
+
 - **Hooks repowarden** : installés globalement (`repowarden install --global --lang fr`), ils s'appliquent à tout dépôt cloné dans le conteneur (messages de commit, secrets, formatage, tests). Ensuite, suivre les règles du projet (`AGENTS.md`, `CONTRIBUTING.md`) : `repowarden ticket <n>`, `repowarden cc …`.
-- **Bots repowarden** d'un projet (CI, releases, tickets, GitHub App, protection) : `repowarden bots` dans le projet, chaque bot avec ton accord. Sans GitHub App (`repowarden app init`), les workflows agissent sous le bot `github-actions`, dont les actions ne déclenchent aucun autre workflow (PR brouillon sans CI, merge automatique sans préversion…).
+- **GitHub App** (proposée par `repowarden bots`, ou `repowarden app init`) : sans elle, les workflows agissent sous le bot `github-actions`, dont les actions ne déclenchent aucun autre workflow (PR brouillon sans CI, merge automatique sans préversion…) ; voir [Dépannage](#dépannage).
 - **Vérifications de la CI de repowarden** en local : `shellcheck`, `actionlint`, `bats test/`. actionlint est à la même version que la CI ; shellcheck et bats sont ceux d'Ubuntu 24.04 et peuvent différer légèrement.
 
 ## Kubernetes
