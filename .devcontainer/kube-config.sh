@@ -6,7 +6,14 @@
 #   tls-server-name garde le nom attendu par le certificat
 # - ~/.kube/config : clusters kind du conteneur, jamais touché ici
 # KUBECONFIG (devcontainer.json) combine les deux.
+# Module kubernetes (devzone activer kubernetes) : connexion au cluster de
+# l'hôte et metrics-server seulement s'il est actif ; les contextes kind sont
+# toujours remis (un cluster créé à la main reste utilisable).
 set -euo pipefail
+
+ICI="$(dirname "$0")"
+module=off
+bash "$ICI/devzone" actif kubernetes && module=on
 
 SOURCE="$HOME/.kube-host/config"
 HOTE="$HOME/.kube/hote.config"
@@ -16,7 +23,7 @@ rm -f "$HOTE"
 # Doit exister : sinon kind écrit dans hote.config, effacé au prochain démarrage
 [ -f "$HOME/.kube/config" ] || install -m 600 /dev/null "$HOME/.kube/config"
 
-if [ -f "$SOURCE" ]; then
+if [ "$module" = on ] && [ -f "$SOURCE" ]; then
     install -m 600 "$SOURCE" "$HOTE"
     KUBECONFIG="$HOTE" kubectl config view \
         -o jsonpath='{range .clusters[*]}{.name}{"\t"}{.cluster.server}{"\n"}{end}' |
@@ -61,10 +68,14 @@ for contexte in $(kubectl config get-contexts -o name 2>/dev/null); do
         joignables=$((joignables + 1))
     fi
 done
+if [ "$module" = off ]; then
+    [ ! -f "$SOURCE" ] || echo "kube-config : cluster de l'hôte non connecté, module kubernetes désactivé : devzone activer kubernetes"
+    exit 0
+fi
 echo "kube-config : cluster actif : $(kubectl config current-context 2>/dev/null || echo aucun)"
 if [ "$joignables" -eq 0 ]; then
     echo "kube-config : aucun cluster joignable ; en créer un dans le conteneur : kind create cluster"
 fi
 
 # CPU/RAM dans k9s : metrics-server sur les clusters joignables qui ne l'ont pas
-bash "$(dirname "$0")/metrics-server.sh" || true
+bash "$ICI/metrics-server.sh" || true

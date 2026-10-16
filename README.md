@@ -5,21 +5,38 @@ Environnement de développement complet dans un conteneur (devcontainer) : les m
 | Domaine | Outils |
 |---|---|
 | Langages | Java 21 + Maven, Node LTS + pnpm, Python 3.12 + uv |
-| Conteneurs, Kubernetes | Docker (Docker-in-Docker), kubectl, helm, k9s, kind |
+| Conteneurs, Kubernetes | Docker (Docker-in-Docker), kubectl, helm, k9s, kind ; connexion au cluster de l'hôte : [module](#modules) `kubernetes` |
 | GitHub, qualité | gh, repowarden (hooks git globaux), shellcheck, bats, actionlint, gitleaks, ruff, vulture, pytest |
-| Assistants IA (facultatifs) | Claude Code, opencode |
+| Assistants IA | Claude Code, opencode : [module](#modules) `ia`, désactivé par défaut |
 
-**Kubernetes est optionnel** : il ne sert qu'aux projets qui l'utilisent. devzone fournit les outils, pas de cluster : il se connecte à celui de ta machine s'il existe ; sinon, aucun cluster n'est créé, tu en crées un si besoin avec `kind create cluster` (voir [Kubernetes](#kubernetes)).
+**Ce qui est facultatif est désactivé par défaut** et s'active à la demande, sans rebuild (voir [Modules](#modules)) : les assistants IA (`devzone activer ia`) et la connexion au cluster Kubernetes de ta machine (`devzone activer kubernetes`). devzone ne crée jamais de cluster : sans celui de ta machine, tu en crées un si besoin avec `kind create cluster` (voir [Kubernetes](#kubernetes)).
 
 ## Démarrage rapide
 
 1. **Prérequis** : Docker (Docker Desktop, ou Docker Engine sous Linux), puis **soit** VS Code + extension *Dev Containers*, **soit** Node (pour `npx`) et `make`. Facultatif, pour Kubernetes : activer le cluster de Docker Desktop (*Settings → Kubernetes → Enable Kubernetes*). Sous Windows : cloner avec Git for Windows (les scripts restent en fins de ligne LF grâce à `.gitattributes`).
 2. **Lancer** depuis le dossier `devzone/` : `make shell` (ou, dans VS Code, *Dev Containers: Reopen in Container*). Le premier build prend quelques minutes (4 à 5 min mesurées, plus le téléchargement des images de base sur une machine neuve).
 3. **Se connecter à GitHub, une seule fois** (gardé ensuite, même après `make rebuild`) : `gh auth login -s workflow`. Donne aussi l'identité git ; nécessaire pour pousser, ouvrir des PR et utiliser les tickets repowarden.
-   **Facultatif** : les assistants IA sont installés mais rien n'en dépend ; s'en servir demande une connexion : `claude` (puis `/login`), `opencode auth login`.
+   **Facultatif** : `devzone activer ia` (assistants IA), `devzone activer kubernetes` (cluster de ta machine) ; voir [Modules](#modules).
 4. **Vérifier** : `java -version`, `node -v`, `python3 --version`, `repowarden --version` ; avec un cluster : `kubectl get nodes`.
 
-Le premier démarrage rappelle ce qui manque (connexion GitHub, permission `workflow`) et indique si un cluster Kubernetes est joignable ; sans cluster, tout le reste fonctionne.
+Le premier démarrage rappelle ce qui manque (connexion GitHub, permission `workflow`) et liste les modules désactivés, avec la commande pour les activer.
+
+## Modules
+
+Les fonctionnalités facultatives sont des modules, **désactivés par défaut**, activés à la demande depuis le conteneur, sans rebuild :
+
+```bash
+devzone                        # état des modules
+devzone activer <module>       # active et applique tout de suite
+devzone desactiver <module>    # désactive et applique tout de suite
+```
+
+| Module | Activé | Désactivé |
+|---|---|---|
+| `ia` | Claude Code et opencode installés (versions figées), réinstallés à chaque rebuild ; se connecter : `claude` (puis `/login`), `opencode auth login` | désinstallés ; les connexions restent dans leurs volumes |
+| `kubernetes` | à chaque démarrage : connexion au cluster de ta machine et metrics-server sur les clusters locaux (CPU et RAM dans k9s) | aucune connexion au cluster de ta machine ; kubectl, helm, k9s et kind restent installés, un cluster kind créé à la main reste utilisable ; metrics-server n'est pas retiré des clusters où il a été installé |
+
+Le choix est **propre à chaque utilisateur** et gardé dans le volume `devzone-config` (il survit aux rebuilds). Au premier démarrage, si une connexion Claude Code ou opencode existe déjà dans les volumes, le module `ia` est activé (et signalé) : rien ne disparaît pour qui s'en servait.
 
 ## Commandes
 
@@ -48,7 +65,7 @@ Le premier démarrage rappelle ce qui manque (connexion GitHub, permission `work
 
 Une identité déjà définie n'est jamais remplacée. Pour un autre email : `git config --file ~/.config/git/config user.email "<email>"`. Après un `gh auth login` en cours de session : `bash .devcontainer/git-identite.sh`.
 
-**Assistants IA (facultatifs)** : installés, mais rien dans devzone n'en dépend. Pour s'en servir : `claude` (puis `/login`), `opencode auth login`.
+**Assistants IA** (module `ia`, voir [Modules](#modules)) : `devzone activer ia`, puis `claude` (puis `/login`), `opencode auth login`.
 
 Chaque connexion est **propre à l'utilisateur** : elle vit dans les volumes Docker de sa machine (voir [Données conservées](#données-conservées)). Le dépôt ne contient aucun identifiant.
 
@@ -86,7 +103,7 @@ repowarden            # vérifier
 
 ## Kubernetes
 
-devzone fournit les outils, pas le cluster, et n'en crée jamais tout seul. Au démarrage, il se connecte au cluster de l'hôte s'il existe et répond (Docker Desktop sur Mac, Windows ou Linux). Sinon, ou en plus, créer un cluster dans le conteneur :
+devzone fournit les outils, pas le cluster, et n'en crée jamais tout seul. Avec le module `kubernetes` actif (`devzone activer kubernetes`), il se connecte à chaque démarrage au cluster de l'hôte s'il existe et répond (Docker Desktop sur Mac, Windows ou Linux). Sinon, ou en plus, créer un cluster dans le conteneur :
 
 ```bash
 kind create cluster          # ~2 min la première fois
@@ -96,7 +113,7 @@ kubectl config use-context <nom>
 
 - **Cluster actif** : celui de l'hôte par défaut ; un choix fait avec `use-context` est gardé aux redémarrages.
 - **Clusters kind** : tournent dans le Docker interne, redémarrent avec le conteneur, sont conservés par `make rebuild` et `make down` ; supprimés seulement par `kind delete cluster`.
-- **CPU et RAM dans k9s** (`kubectl top`) : au démarrage, metrics-server est installé sur les clusters **locaux** qui ne l'ont pas (Docker Desktop, kind…), jamais sur un cluster distant. Après un `kind create cluster` : `bash .devcontainer/metrics-server.sh` (ou `… metrics-server.sh <contexte>` pour un cluster précis).
+- **CPU et RAM dans k9s** (`kubectl top`) : module `kubernetes` actif, metrics-server est installé au démarrage sur les clusters **locaux** qui ne l'ont pas (Docker Desktop, kind…), jamais sur un cluster distant. Après un `kind create cluster` : `bash .devcontainer/metrics-server.sh` (ou `… metrics-server.sh <contexte>` pour un cluster précis).
 - **Cluster de l'hôte** : `~/.kube` est monté en lecture seule, jamais modifié ; sa copie adaptée est `~/.kube/hote.config` (`127.0.0.1` remplacé par `host.docker.internal`). Après un changement de cluster sur l'hôte : `make stop && make up`.
 - **Messages de démarrage** (`kube-config : …`, `metrics-server : …`) : dans le terminal de création, ou en relançant `bash .devcontainer/kube-config.sh`.
 
@@ -114,6 +131,7 @@ Le conteneur est jetable ; ce qui compte vit dans des volumes Docker, sur ta mac
 | `devzone-git` | identité git (`~/.config/git/config`) | gardé | gardé | gardé |
 | `devzone-claude` | connexion et réglages de Claude Code | gardé | gardé | gardé |
 | `devzone-opencode-config`, `devzone-opencode-data` | connexion et réglages d'opencode | gardé | gardé | gardé |
+| `devzone-config` | modules activés (`devzone activer`) | gardé | gardé | gardé |
 | `devzone-m2`, `devzone-pnpm` | caches Maven (`~/.m2`) et pnpm | gardé | gardé | gardé |
 | volume du Docker interne | images Docker et clusters kind du conteneur | gardé | gardé | gardé |
 | `workspace/` (dossier de l'hôte) | tes projets | gardé | gardé | gardé |
@@ -127,7 +145,7 @@ Tout le reste du conteneur (paquets installés à la main, fichiers hors de ces 
 | k9s, actionlint, gitleaks, kind | `.devcontainer/Dockerfile` : `ARG …_VERSION` **et** les empreintes `sha256` (arm64 + amd64) | `make rebuild` |
 | uv, ruff, vulture, pytest | `.devcontainer/Dockerfile` : `ARG …_VERSION` | `make rebuild` |
 | repowarden | `.devcontainer/post-create.sh` : `repowarden@x.y.z` | `make rebuild` |
-| Claude Code, opencode | `.devcontainer/post-create.sh` : `@anthropic-ai/claude-code@x.y.z`, `opencode-ai@x.y.z` | `make rebuild` |
+| Claude Code, opencode | `.devcontainer/devzone` : `IA_PAQUETS` (`@anthropic-ai/claude-code@x.y.z`, `opencode-ai@x.y.z`) | `devzone activer ia` (ou `make rebuild`) |
 | metrics-server | `.devcontainer/metrics-server.sh` : `VERSION` | `bash .devcontainer/metrics-server.sh` sur un nouveau cluster |
 | Java, Node, Python, Docker, kubectl, helm, gh | `.devcontainer/devcontainer.json` (features), versions figées dans `devcontainer-lock.json` | `npx @devcontainers/cli upgrade --workspace-folder .` puis `make rebuild` |
 
@@ -158,7 +176,8 @@ La version suit les Conventional Commits : `fix` → correctif, `feat` → mineu
 | PR de livraison bloquée : « aucune préversion vX.Y.Z-next.N » | la préversion n'est pas encore publiée (rythme regroupé) | attendre celle du soir, ou *Actions → release → Run workflow* sur `develop` |
 | `git commit` : « Please tell me who you are » | identité git absente (`gh` non connecté) | `gh auth login -s workflow` puis `bash .devcontainer/git-identite.sh` |
 | `gh auth login` : « Press Enter to open … in your browser », rien ne s'ouvre | pas de navigateur dans le conteneur (`make shell`) | ouvrir https://github.com/login/device à la main et saisir le code |
-| `k9s` : `Error: exit status 1` puis son aide ; `kubectl` : `localhost:8080` … `connection refused` | aucun cluster actif | `kind create cluster`, ou `kubectl config use-context <nom>` |
+| `k9s` : `Error: exit status 1` puis son aide ; `kubectl` : `localhost:8080` … `connection refused` | aucun cluster actif (module `kubernetes` désactivé, ou pas de cluster sur ta machine) | `devzone activer kubernetes` (cluster de ta machine), `kind create cluster`, ou `kubectl config use-context <nom>` |
+| `claude` ou `opencode` : « command not found » | module `ia` désactivé | `devzone activer ia` |
 | CPU et RAM vides dans k9s | metrics-server absent du cluster | `bash .devcontainer/metrics-server.sh` |
 | Deux conteneurs devzone | `make up` lancé pendant que VS Code ouvrait le conteneur | `make down`, puis un seul lancement |
 | Windows (Git Bash, MSYS) : `~/.kube` introuvable | `HOME` et `USERPROFILE` concaténés dans le chemin monté | lancer depuis VS Code ou PowerShell |
@@ -172,8 +191,9 @@ devzone/
 │   ├── Dockerfile              # image de base + outils figés (versions et sha256)
 │   ├── devcontainer.json       # features (langages, Docker, Kubernetes, gh), volumes, extensions VS Code
 │   ├── devcontainer-lock.json  # versions figées des features
-│   ├── post-create.sh          # premier démarrage : droits des volumes, git, repowarden, Claude Code, opencode
-│   ├── kube-config.sh          # chaque démarrage : cluster de l'hôte, contextes kind, puis metrics-server
+│   ├── devzone                 # commande devzone : modules (ia, kubernetes), versions des assistants IA
+│   ├── post-create.sh          # premier démarrage : droits des volumes, git, repowarden, modules actifs
+│   ├── kube-config.sh          # chaque démarrage : contextes kind ; module kubernetes : cluster de l'hôte, metrics-server
 │   ├── metrics-server.sh       # metrics-server sur les clusters locaux (CPU et RAM dans k9s)
 │   └── git-identite.sh         # chaque démarrage : identité git déduite du compte gh si elle manque
 ├── .github/workflows/
@@ -183,5 +203,6 @@ devzone/
 │   └── nettoyage.yml           # branches mergées supprimées (main et develop conservées)
 ├── .repowarden.conf            # réglages repowarden : flux develop → main
 ├── Makefile                    # pilotage sans VS Code
+├── test/devzone.bats           # tests de la commande devzone (bats test/)
 └── workspace/                  # tes projets (ignorés par git, chacun son dépôt)
 ```
