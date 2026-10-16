@@ -7,7 +7,7 @@ Environnement de développement complet dans un conteneur (devcontainer) : les m
 | Langages | Java 21 + Maven, Node LTS + pnpm, Python 3.12 + uv |
 | Conteneurs, Kubernetes | Docker (Docker-in-Docker), kubectl, helm, k9s, kind |
 | GitHub, qualité | gh, repowarden (hooks git globaux), shellcheck, bats, actionlint, gitleaks, ruff, vulture, pytest |
-| Assistants IA | Claude Code, opencode |
+| Assistants IA (facultatifs) | Claude Code, opencode |
 
 **Kubernetes est optionnel** : il ne sert qu'aux projets qui l'utilisent. devzone fournit les outils, pas de cluster : il se connecte à celui de ta machine s'il existe ; sinon, aucun cluster n'est créé, tu en crées un si besoin avec `kind create cluster` (voir [Kubernetes](#kubernetes)).
 
@@ -15,12 +15,8 @@ Environnement de développement complet dans un conteneur (devcontainer) : les m
 
 1. **Prérequis** : Docker (Docker Desktop, ou Docker Engine sous Linux), puis **soit** VS Code + extension *Dev Containers*, **soit** Node (pour `npx`) et `make`. Facultatif, pour Kubernetes : activer le cluster de Docker Desktop (*Settings → Kubernetes → Enable Kubernetes*). Sous Windows : cloner avec Git for Windows (les scripts restent en fins de ligne LF grâce à `.gitattributes`).
 2. **Lancer** depuis le dossier `devzone/` : `make shell` (ou, dans VS Code, *Dev Containers: Reopen in Container*). Le premier build prend quelques minutes (4 à 5 min mesurées, plus le téléchargement des images de base sur une machine neuve).
-3. **Se connecter, une seule fois** (gardé ensuite, même après `make rebuild`) :
-   ```bash
-   gh auth login -s workflow   # GitHub ; donne aussi l'identité git
-   claude                      # puis /login
-   opencode auth login
-   ```
+3. **Se connecter à GitHub, une seule fois** (gardé ensuite, même après `make rebuild`) : `gh auth login -s workflow`. Donne aussi l'identité git ; nécessaire pour pousser, ouvrir des PR et utiliser les tickets repowarden.
+   **Facultatif** : les assistants IA sont installés mais rien n'en dépend ; s'en servir demande une connexion : `claude` (puis `/login`), `opencode auth login`.
 4. **Vérifier** : `java -version`, `node -v`, `python3 --version`, `repowarden --version` ; avec un cluster : `kubectl get nodes`.
 
 Le premier démarrage rappelle ce qui manque (connexion GitHub, permission `workflow`) et indique si un cluster Kubernetes est joignable ; sans cluster, tout le reste fonctionne.
@@ -52,7 +48,7 @@ Le premier démarrage rappelle ce qui manque (connexion GitHub, permission `work
 
 Une identité déjà définie n'est jamais remplacée. Pour un autre email : `git config --file ~/.config/git/config user.email "<email>"`. Après un `gh auth login` en cours de session : `bash .devcontainer/git-identite.sh`.
 
-**Assistants IA** : `claude` (puis `/login`), `opencode auth login`.
+**Assistants IA (facultatifs)** : installés, mais rien dans devzone n'en dépend. Pour s'en servir : `claude` (puis `/login`), `opencode auth login`.
 
 Chaque connexion est **propre à l'utilisateur** : elle vit dans les volumes Docker de sa machine (voir [Données conservées](#données-conservées)). Le dépôt ne contient aucun identifiant.
 
