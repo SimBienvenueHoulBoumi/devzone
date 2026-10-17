@@ -2,8 +2,11 @@
 # utilisateur (outils, modules, Kubernetes avec kind, hooks, redémarrage,
 # rebuild) ; même script qu'en local (make test-fonctionnel). Job cli : la CLI
 # tapée dans un vrai terminal, chaque commande avec un délai maximal (make
-# test-cli). Lancés quand le conteneur, les tests ou la CLI changent, et à la
-# main. Non exigés pour merger (durée : une dizaine de minutes chacun).
+# test-cli). Job windows : fins de ligne, paquet npm installé en global et
+# commande devzone sous windows-latest (test/windows.sh, jouable en local),
+# aussi via le raccourci .cmd de npm. Lancés quand le conteneur, les tests, la
+# CLI, .gitattributes ou package.json changent, et à la main. Non exigés pour
+# merger (une dizaine de minutes chacun, 15 pour windows).
 name: fonctionnel
 
 on:
@@ -15,6 +18,8 @@ on:
       - "Makefile"
       - "lancer.sh"
       - "desinstaller.sh"
+      - ".gitattributes"
+      - "package.json"
       - ".github/workflows/fonctionnel.yml"
   workflow_dispatch:
 
@@ -39,3 +44,49 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - run: bash test/cli-terminal.sh
+
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      # Réglages d'un poste Windows ; avant le checkout, sinon la copie est déjà faite
+      - name: Checkout avec core.autocrlf true (comme un poste Windows)
+        shell: cmd
+        run: |
+          git config --global core.autocrlf true
+          git config --global core.safecrlf false
+      - uses: actions/checkout@v7
+      - name: Aucun CRLF dans les scripts de la copie de travail
+        shell: bash
+        run: |
+          set -euo pipefail
+          echec=0
+          for f in $(git ls-files '*.sh' 'bin/devzone' '.devcontainer/devzone' 'Makefile'); do
+            if grep -q $'\r' "$f"; then echo "✖ CRLF détecté dans $f"; echec=1; fi
+          done
+          exit $echec
+      - name: Tests Windows sous Git Bash (test/windows.sh)
+        shell: bash
+        run: bash test/windows.sh
+      - name: La commande devzone via le raccourci .cmd de npm (comme un utilisateur)
+        shell: cmd
+        run: |
+          for /f %%v in ('node -p "require('./package.json').version"') do set VERSION=%%v
+          call npm pack --silent --pack-destination %RUNNER_TEMP%
+          call npm install -g %RUNNER_TEMP%\devzone-%VERSION%.tgz
+          call devzone --version | findstr /x %VERSION% || exit /b 1
+          call devzone --help
+          call devzone --option-inconnue
+          if %errorlevel% equ 0 exit /b 1
+          set DEVZONE_SANS_DEMARRER=1
+          call devzone %RUNNER_TEMP%\dzcmd
+          if not exist %RUNNER_TEMP%\dzcmd\Makefile exit /b 1
+          if not exist %RUNNER_TEMP%\dzcmd\.devcontainer\devzone exit /b 1
+          mkdir %RUNNER_TEMP%\plein
+          echo important > %RUNNER_TEMP%\plein\fichier
+          call devzone %RUNNER_TEMP%\plein
+          if %errorlevel% equ 0 exit /b 1
+          if exist %RUNNER_TEMP%\plein\Makefile exit /b 1
+          cd /d %RUNNER_TEMP%
+          call devzone desinstaller
+          if %errorlevel% equ 0 exit /b 1

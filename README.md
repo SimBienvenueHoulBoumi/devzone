@@ -15,7 +15,7 @@ Environnement de développement complet dans un conteneur (devcontainer) : les m
 
 ## Démarrage rapide
 
-1. **Prérequis** : Docker (Docker Desktop, ou Docker Engine sous Linux), puis **soit** VS Code + extension *Dev Containers*, **soit** Node (pour `npx`) et `make`. Facultatif, pour Kubernetes : activer le cluster de Docker Desktop (*Settings → Kubernetes → Enable Kubernetes*). Sous Windows : cloner avec Git for Windows (les scripts restent en fins de ligne LF grâce à `.gitattributes`).
+1. **Prérequis** : Docker (Docker Desktop, ou Docker Engine sous Linux), puis **soit** VS Code + extension *Dev Containers*, **soit** Node (pour `npx`) et `make`. Facultatif, pour Kubernetes : activer le cluster de Docker Desktop (*Settings → Kubernetes → Enable Kubernetes*). Sous Windows : cloner avec Git for Windows (les scripts restent en fins de ligne LF grâce à `.gitattributes`, et la commande npm trouve le `bash` qu'elle exige).
 2. **Obtenir devzone**, au choix :
    - `npx devzone mon-devzone` : crée le dossier `mon-devzone/` et lance le conteneur (paquet npm `devzone`, une fois publié) ;
    - ou `git clone https://github.com/SimBienvenueHoulBoumi/devzone.git`.
@@ -199,8 +199,11 @@ Empreinte d'une archive : `curl -fsSL <url> | shasum -a 256`.
 | Commande `devzone` du conteneur et commande npm (unitaires) | `bats test/` | dans le conteneur | quelques secondes |
 | Fonctionnels : un devzone construit et utilisé comme par un utilisateur (outils, modules, Kubernetes avec kind, hooks repowarden, redémarrage, rebuild) | `make test-fonctionnel` | sur ta machine (Docker, Node) | 5 à 10 min |
 | CLI dans un vrai terminal : chaque commande tapée comme par un humain (pseudo-terminal), avec un délai maximal ; une commande qui attend une entrée échoue. Cibles `make` (`help`, `up`, `shell`, `status`, `stop`, `down`, `rebuild`, `desinstaller`), commande npm (`devzone <dossier>`, `desinstaller`, `--version`, `--help`), commande `devzone` du conteneur, scripts de démarrage | `make test-cli` | sur ta machine (Docker, Node, Python 3) | 10 à 15 min |
+| Windows (local et CI) | `bash test/windows.sh` | macOS/Linux (local) ou Windows Git Bash (CI) | quelques secondes |
 
-Les tests fonctionnels et ceux de la CLI travaillent sur une copie du dépôt, avec leurs propres volumes (`devzone-test-…`), puis suppriment tout (conteneur, volumes, image), même en cas d'échec : ton devzone, tes connexions et le cluster de ta machine ne sont jamais touchés (seul un cluster kind de test est utilisé). En CI, le workflow `fonctionnel` les lance (deux jobs en parallèle) sur chaque PR qui modifie `.devcontainer/`, `test/`, `bin/`, le `Makefile` ou les scripts `lancer.sh` et `desinstaller.sh`, et à la main (*Actions → fonctionnel → Run workflow*).
+**Windows (CI) : ce qui est vérifié / ce qui n'est pas (conteneur, VS Code).** Le job `windows` vérifie sous `windows-latest` (checkout avec `core.autocrlf=true`, comme un poste Windows) : aucun CRLF dans les scripts ciblés (`*.sh`, `bin/devzone`, `.devcontainer/devzone`, `Makefile`) ; empaquetage npm (`npm pack`) et installation globale de l'archive ; `devzone --version`, `devzone --help`, option inconnue (avec sortie en erreur) ; `devzone <dossier>` avec `DEVZONE_SANS_DEMARRER=1` (création des fichiers attendus, dossier non vide refusé sans écrasement) ; `devzone desinstaller` hors d'un dossier devzone refusé. Ces appels passent aussi par `cmd`, c'est-à-dire le raccourci `.cmd` de npm, comme le ferait un utilisateur Windows. Ce qui n'est **pas** vérifié sous Windows CI : `make up` et le conteneur Linux (impossibles sur les runners Windows de GitHub), ainsi que VS Code et Docker Desktop (vérifiés à la main).
+
+Les tests fonctionnels et ceux de la CLI travaillent sur une copie du dépôt, avec leurs propres volumes (`devzone-test-…`), puis suppriment tout (conteneur, volumes, image), même en cas d'échec : ton devzone, tes connexions et le cluster de ta machine ne sont jamais touchés (seul un cluster kind de test est utilisé). En CI, le workflow `fonctionnel` les lance (trois jobs : fonctionnel, cli et windows) sur chaque PR qui modifie `.devcontainer/`, `test/`, `bin/`, le `Makefile`, `lancer.sh`, `desinstaller.sh`, `.gitattributes` ou `package.json`, et à la main (*Actions → fonctionnel → Run workflow*).
 
 ## Versions et livraison
 
