@@ -1,5 +1,10 @@
-# Scripts lancés dans le conteneur Linux : fins de ligne LF même sur un
-# checkout Windows (bash échoue sur les CRLF)
-*.sh        text eol=lf
-Dockerfile  text eol=lf
-Makefile    text eol=lf
+# Scripts lancés par un interpréteur (bash, bats, Python) : fins de ligne LF
+# même sur un checkout Windows (l'interpréteur échoue sur les CRLF)
+*.sh                text eol=lf
+*.bats              text eol=lf
+*.py                text eol=lf
+Dockerfile          text eol=lf
+Makefile            text eol=lf
+# Scripts bash sans extension (lancés directement)
+bin/devzone             text eol=lf
+.devcontainer/devzone   text eol=lf
