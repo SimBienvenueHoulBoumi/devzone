@@ -81,7 +81,7 @@ fi
 
 echo "▶ devzone <dossier> avec DEVZONE_SANS_DEMARRER=1"
 reussit "crée un devzone complet" "DEVZONE_SANS_DEMARRER=1 devzone '$TESTDIR'" "créé dans"
-for f in .devcontainer/devcontainer.json .devcontainer/devzone Makefile .gitattributes lancer.sh desinstaller.sh README.md LICENSE workspace/.gitkeep .gitignore; do
+for f in .devcontainer/devcontainer.json .devcontainer/devzone Makefile .gitattributes scripts/lancer.sh scripts/desinstaller.sh README.md LICENSE workspace/.gitkeep .gitignore; do
     reussit "existe : $f" "[ -e '$TESTDIR/$f' ]"
 done
 reussit ".gitignore : workspace ignoré sauf .gitkeep" "grep -q '^workspace/\\*\$' '$TESTDIR/.gitignore'"
