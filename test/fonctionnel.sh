@@ -77,6 +77,10 @@ for outil in java mvn node pnpm python3 uv docker kubectl helm k9s kind gh repow
     reussit "$outil présent" "command -v $outil"
 done
 
+echo "▶ make dans le conteneur (refusé : il créerait un devzone imbriqué)"
+echoue "make rebuild dans le conteneur refusé" "cd /workspaces/devzone && make rebuild" "à lancer sur ta machine"
+reussit "aucun devzone imbriqué créé" "docker ps -a --format '{{.Image}}' | grep -c vsc- || true" "^0$"
+
 echo "▶ Premier démarrage (récapitulatif affiché au démarrage)"
 reussit "modules désactivés par défaut" "devzone" "○ module ia"
 reussit "kubernetes désactivé par défaut" "devzone" "○ module kubernetes"
