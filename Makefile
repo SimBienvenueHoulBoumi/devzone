@@ -2,10 +2,9 @@
 DC     := npx -y @devcontainers/cli
 WS     := --workspace-folder $(CURDIR)
 FILTRE := --filter "label=devcontainer.local_folder=$(CURDIR)"
-LOG    := $(CURDIR)/.devzone.log
 
 .DEFAULT_GOAL := help
-.PHONY: help hors-conteneur up shell stop down rebuild status test-fonctionnel desinstaller
+.PHONY: help hors-conteneur up shell stop down rebuild status test-fonctionnel test-cli desinstaller
 
 # Ces commandes pilotent le conteneur depuis la machine : lancées dans le
 # conteneur, elles créeraient un devzone dans son Docker interne, sans rien
@@ -19,9 +18,10 @@ hors-conteneur:
 help: ## Liste les commandes
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  make %-16s %s\n", $$1, $$2}'
 
+# up et rebuild : étapes affichées, journal complet dans .devzone.log, question
+# posée dans le conteneur signalée au lieu d'attendre (lancer.sh)
 up: hors-conteneur ## Lance le conteneur (le crée si absent)
-	@$(DC) up $(WS) >$(LOG) 2>&1 && echo "devzone lancé" \
-		|| { tail -15 $(LOG); echo "échec — log complet : .devzone.log"; exit 1; }
+	@bash lancer.sh up "$(CURDIR)"
 
 shell: hors-conteneur up ## Ouvre un shell dans le conteneur
 	@$(DC) exec $(WS) bash
@@ -35,14 +35,16 @@ down: hors-conteneur ## Supprime le conteneur (volumes, image et Docker interne 
 		docker rm -f $$ids >/dev/null && echo "devzone supprimé (désinstallation complète : make desinstaller)"; fi
 
 rebuild: hors-conteneur ## Reconstruit de zéro (après modif de .devcontainer/)
-	@$(DC) up $(WS) --remove-existing-container >$(LOG) 2>&1 && echo "devzone reconstruit" \
-		|| { tail -15 $(LOG); echo "échec — log complet : .devzone.log"; exit 1; }
+	@bash lancer.sh rebuild "$(CURDIR)"
 
 status: hors-conteneur ## État du conteneur
 	@docker ps -a $(FILTRE) --format '{{.Status}}' | grep . || echo "aucun conteneur"
 
 test-fonctionnel: hors-conteneur ## Tests fonctionnels : devzone isolé, construit puis supprimé (5 à 10 min)
 	@bash test/fonctionnel.sh
+
+test-cli: hors-conteneur ## Tests de la CLI dans un vrai terminal : devzone isolé, puis supprimé (10 à 15 min)
+	@bash test/cli-terminal.sh
 
 desinstaller: hors-conteneur ## Supprime tout ce que devzone a créé, après confirmation (GARDER=connexions : garde les connexions)
 	@GARDER="$(GARDER)" bash desinstaller.sh
