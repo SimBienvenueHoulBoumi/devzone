@@ -70,6 +70,9 @@ jobs:
       # Version lue par node avec le chemin en argument (%CD%\package.json, donc
       # jamais de quote imbriquée : dans un for /f de cmd, une ' non échappée
       # termine la chaîne), écrite dans un fichier puis relue par set /p
+      # Chaque sortie de devzone est écrite dans sortie.txt puis affichée
+      # (type) : un échec montre ce que la commande a répondu. Le code retour
+      # est lu dans %SORTIE% avant le type, qui le remettrait à zéro
       - name: La commande devzone via le raccourci .cmd de npm (comme un utilisateur)
         shell: cmd
         run: |
@@ -77,20 +80,36 @@ jobs:
           set /p VERSION=<%RUNNER_TEMP%\version.txt
           call npm pack --silent --pack-destination %RUNNER_TEMP% || exit /b 1
           call npm install -g %RUNNER_TEMP%\devzone-%VERSION%.tgz || exit /b 1
-          call devzone --version | findstr /x %VERSION% || exit /b 1
-          call devzone --help || exit /b 1
-          call devzone --option-inconnue
-          if %errorlevel% equ 0 exit /b 1
+          call devzone --version > %RUNNER_TEMP%\sortie.txt 2>&1
+          set SORTIE=%errorlevel%
+          type %RUNNER_TEMP%\sortie.txt
+          if not %SORTIE% equ 0 exit /b 1
+          findstr /x %VERSION% < %RUNNER_TEMP%\sortie.txt >nul || exit /b 1
+          call devzone --help > %RUNNER_TEMP%\sortie.txt 2>&1
+          set SORTIE=%errorlevel%
+          type %RUNNER_TEMP%\sortie.txt
+          if not %SORTIE% equ 0 exit /b 1
+          call devzone --option-inconnue > %RUNNER_TEMP%\sortie.txt 2>&1
+          set SORTIE=%errorlevel%
+          type %RUNNER_TEMP%\sortie.txt
+          if %SORTIE% equ 0 exit /b 1
           set DEVZONE_SANS_DEMARRER=1
-          call devzone %RUNNER_TEMP%\dzcmd || exit /b 1
+          call devzone %RUNNER_TEMP%\dzcmd > %RUNNER_TEMP%\sortie.txt 2>&1
+          set SORTIE=%errorlevel%
+          type %RUNNER_TEMP%\sortie.txt
+          if not %SORTIE% equ 0 exit /b 1
           if not exist %RUNNER_TEMP%\dzcmd\Makefile exit /b 1
           if not exist %RUNNER_TEMP%\dzcmd\.devcontainer\devzone exit /b 1
           mkdir %RUNNER_TEMP%\plein || exit /b 1
           echo important > %RUNNER_TEMP%\plein\fichier
-          call devzone %RUNNER_TEMP%\plein
-          if %errorlevel% equ 0 exit /b 1
+          call devzone %RUNNER_TEMP%\plein > %RUNNER_TEMP%\sortie.txt 2>&1
+          set SORTIE=%errorlevel%
+          type %RUNNER_TEMP%\sortie.txt
+          if %SORTIE% equ 0 exit /b 1
           if exist %RUNNER_TEMP%\plein\Makefile exit /b 1
           cd /d %RUNNER_TEMP% || exit /b 1
-          call devzone desinstaller
-          if %errorlevel% equ 0 exit /b 1
+          call devzone desinstaller > %RUNNER_TEMP%\sortie.txt 2>&1
+          set SORTIE=%errorlevel%
+          type %RUNNER_TEMP%\sortie.txt
+          if %SORTIE% equ 0 exit /b 1
           exit /b 0
