@@ -9,7 +9,10 @@ set -euo pipefail
 RACINE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TMP="$(cd "$(mktemp -d)" && pwd -P)"
 TESTDIR="$TMP/testdz"
-VERSION="$(node -p "require('$RACINE/package.json').version")"
+# Chemin passé en argument à node, jamais écrit dans le code JavaScript de -p :
+# sous Git Bash $RACINE vaut /d/a/… et seul un argument séparé est reconverti
+# pour un programme Windows
+VERSION="$(node -p 'require(process.argv[1]).version' "$RACINE/package.json")"
 # Préfixe npm isolé sous $TMP : la commande testée s'y installe en global sans
 # toucher à celui de la machine ; sous Windows les exécutables globaux sont à la
 # racine du préfixe, d'où les deux chemins ajoutés au PATH

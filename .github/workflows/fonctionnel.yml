@@ -70,7 +70,10 @@ jobs:
       - name: La commande devzone via le raccourci .cmd de npm (comme un utilisateur)
         shell: cmd
         run: |
-          for /f %%v in ('node -p "require('./package.json').version"') do set VERSION=%%v
+          # Chemin en argument à node : dans un for /f, les ' non échappées
+          # terminent la chaîne de commande, d'où redirection puis set /p
+          node -p "require(process.argv[1]).version" %CD%\package.json > %RUNNER_TEMP%\version.txt || exit /b 1
+          set /p VERSION=<%RUNNER_TEMP%\version.txt
           call npm pack --silent --pack-destination %RUNNER_TEMP% || exit /b 1
           call npm install -g %RUNNER_TEMP%\devzone-%VERSION%.tgz || exit /b 1
           call devzone --version | findstr /x %VERSION% || exit /b 1
