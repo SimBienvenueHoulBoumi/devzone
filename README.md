@@ -212,8 +212,8 @@ Flux `develop` → `main`, géré par repowarden, **sans geste après le merge d
 
 | Réglage | Où | Effet |
 |---|---|---|
-| Livraison automatique (défaut de devzone) | rien | la PR de livraison part d'elle-même (job `livraison-auto` de `release.yml`) |
-| Livraison manuelle | variable de dépôt `LIVRAISON_AUTO=non` (*Settings → Secrets and variables → Actions → Variables*) | la PR de livraison attend ton merge |
+| Livraison automatique (défaut de devzone) | `release.yml`, job `release` : `delivery-auto: true` et `delivery-on-push: true` ; `.repowarden.conf` : `deliveryApproval = auto` | la PR de livraison est armée en merge automatique par la GitHub App et part dès que ses vérifications sont vertes (réglage officiel de repowarden ≥ 4.9) |
+| Livraison manuelle | `release.yml` : `delivery-auto: false` (ou retiré) ; `.repowarden.conf` : `deliveryApproval = review` | la PR de livraison attend ton merge |
 | Préversion à chaque merge (devzone) ou le soir | `release.yml`, job `release` : `preversion-on-push: true` ou rien | sans préversion à chaque merge, la livraison attend celle du soir |
 | Préversion obligatoire avant une version stable (défaut, celui de devzone) | `release.yml`, job `release` : rien, ou `preversion-obligatoire: false` pour la désactiver | désactivée, la vérification `livraison` passe d'office (« préversion non exigée ») : la PR de livraison n'attend plus de préversion, mais la version stable n'a pas été testée en préversion |
 
@@ -226,7 +226,7 @@ Prérequis de la livraison automatique : la GitHub App du dépôt (`repowarden a
 | `git push` refusé : « refusing to allow an OAuth App to create or update workflow … without `workflow` scope » | jeton `gh` sans la permission `workflow` | `gh auth refresh -h github.com -s workflow` |
 | PR bloquée, run `action_required`, bandeau « Approve workflows to run » | PR ouverte ou poussée par le bot `github-actions` : pour les événements `pull_request` `opened`, `synchronize` et `reopened`, GitHub attend l'accord d'une personne ayant l'écriture ([doc GitHub](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow)) | vérifier les changements (surtout `.github/workflows/`), puis *Approve workflows to run* ; pour ne plus avoir à le faire : `repowarden app init` dans le projet |
 | PR de livraison bloquée : « aucune préversion vX.Y.Z-next.N » | la préversion n'est pas encore publiée (sans `preversion-on-push`, elle part le soir) | attendre celle du soir, *Actions → release → Run workflow* sur `develop`, `preversion-on-push: true`, ou ne plus l'exiger : `preversion-obligatoire: false` |
-| PR de livraison restée ouverte | une vérification rouge (voir la PR), `LIVRAISON_AUTO=non`, ou GitHub App absente (job `livraison-auto` en échec) | corriger la vérification ; `repowarden app init` sur ta machine |
+| PR de livraison restée ouverte | une vérification rouge (voir la PR), `delivery-auto: false`, ou GitHub App absente ou désinstallée (avertissement dans le run `release`) | corriger la vérification ; installer l'App (`repowarden app init` sur ta machine) |
 | `repowarden app init` depuis `make shell` : la page `http://127.0.0.1:…` ne s'ouvre pas, ou GitHub ne revient pas | la page est servie dans le conteneur, injoignable depuis le navigateur de ta machine | lancer la commande **sur ta machine** : `npx -y repowarden app init --repo <compte>/<dépôt>` |
 | `repowarden app init` : « nom déjà utilisé » | un essai précédent a créé l'App sans en récupérer les identifiants | supprimer l'App orpheline (*GitHub → Settings → Developer settings → GitHub Apps*), ou `--nom <autre-nom>` |
 | `git commit` : « Please tell me who you are » | identité git absente | avec GitHub : `gh auth login -s workflow` puis `bash .devcontainer/git-identite.sh` ; sans GitHub : `git config --file ~/.config/git/config user.name "<nom>"` et `user.email "<email>"` |
