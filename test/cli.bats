@@ -12,10 +12,11 @@ setup() {
     run bash "$CLI" mon-devzone
     [ "$status" -eq 0 ]
     [[ "$output" == *"créé dans"* ]]
-    for f in .devcontainer/devcontainer.json .devcontainer/devzone Makefile .gitattributes desinstaller.sh README.md LICENSE workspace/.gitkeep .gitignore; do
+    for f in .devcontainer/devcontainer.json .devcontainer/devzone Makefile .gitattributes lancer.sh desinstaller.sh README.md LICENSE workspace/.gitkeep .gitignore; do
         [ -e "mon-devzone/$f" ] || { echo "manquant : $f"; return 1; }
     done
     [ -x mon-devzone/desinstaller.sh ]
+    [ -x mon-devzone/lancer.sh ]
     grep -q '^workspace/\*$' mon-devzone/.gitignore
 }
 
@@ -61,8 +62,61 @@ setup() {
 @test "paquet npm : contenu attendu, aucun fichier local ni de développement" {
     command -v npm >/dev/null || skip "npm absent"
     fichiers="$(cd "$RACINE" && npm pack --dry-run --json 2>/dev/null | node -e 'for (const f of JSON.parse(require("fs").readFileSync(0))[0].files) console.log(f.path)')"
-    for f in bin/devzone .devcontainer/devcontainer.json .devcontainer/devzone Makefile desinstaller.sh README.md LICENSE package.json; do
+    for f in bin/devzone .devcontainer/devcontainer.json .devcontainer/devzone Makefile lancer.sh desinstaller.sh README.md LICENSE package.json; do
         grep -qx "$f" <<<"$fichiers" || { echo "absent du paquet : $f"; return 1; }
     done
     ! grep -qE '^(test/|\.github/|workspace/|\.devzone\.|\.repowarden\.conf)' <<<"$fichiers"
+}
+
+# lancer.sh (make up, make rebuild) avec un CLI devcontainer simulé : $1 = son script
+faux_cli() {
+    mkdir -p "$BATS_TEST_TMPDIR/faux"
+    { echo '#!/usr/bin/env bash'; echo "echo \"\$*\" >\"$BATS_TEST_TMPDIR/args\""; echo "$1"; } >"$BATS_TEST_TMPDIR/faux/npx"
+    chmod +x "$BATS_TEST_TMPDIR/faux/npx"
+    export PATH="$BATS_TEST_TMPDIR/faux:$PATH"
+    mkdir -p dz
+}
+
+@test "lancer.sh : étapes clés et état affichés, journal complet gardé" {
+    faux_cli 'printf "Start: Run: docker buildx build x\r\nbruit\r\nRunning the postStartCommand from devcontainer.json...\r\ndevzone : état\r\n  ○ module ia        facultatif\r\n"'
+    run bash "$RACINE/lancer.sh" up "$PWD/dz"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"▶ Construction de l'image"*"▶ Démarrage"*"○ module ia"*"devzone lancé"* ]]
+    [[ "$output" != *bruit* ]]
+    grep -q bruit dz/.devzone.log
+    [[ "$(cat "$BATS_TEST_TMPDIR/args")" == *"up --workspace-folder $PWD/dz"* ]]
+}
+
+@test "lancer.sh rebuild : conteneur recréé" {
+    faux_cli 'exit 0'
+    run bash "$RACINE/lancer.sh" rebuild "$PWD/dz"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"devzone reconstruit"* ]]
+    [[ "$(cat "$BATS_TEST_TMPDIR/args")" == *"--remove-existing-container"* ]]
+}
+
+@test "lancer.sh : question posée dans le conteneur signalée, lancement arrêté au lieu d'attendre" {
+    faux_cli 'printf "Running the postCreateCommand from devcontainer.json...\r\nConfigurer les bots de ce dépôt ? [o/N] "; sleep 60'
+    export DEVZONE_ATTENTE_QUESTION=2
+    debut="$(date +%s)"
+    run bash "$RACINE/lancer.sh" up "$PWD/dz"
+    [ "$status" -eq 1 ]
+    [ $(($(date +%s) - debut)) -lt 20 ]
+    [[ "$output" == *"pose une question"*"Configurer les bots de ce dépôt ? [o/N]"* ]]
+}
+
+@test "lancer.sh : silence signalé (signe de vie), sans le prendre pour une question" {
+    faux_cli 'printf "npm install en cours\r\n"; sleep 4'
+    export DEVZONE_SIGNE_DE_VIE=1 DEVZONE_ATTENTE_QUESTION=1
+    run bash "$RACINE/lancer.sh" up "$PWD/dz"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"aucune nouvelle ligne depuis"*"npm install en cours"* ]]
+    [[ "$output" == *"devzone lancé"* ]]
+}
+
+@test "lancer.sh : échec, fin du journal affichée" {
+    faux_cli 'echo "erreur de construction"; exit 1'
+    run bash "$RACINE/lancer.sh" up "$PWD/dz"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"erreur de construction"*"échec"* ]]
 }

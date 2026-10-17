@@ -3,6 +3,12 @@
 # - volumes montés au démarrage seulement
 # - npm fourni par la feature node, ajoutée après le Dockerfile
 set -euo pipefail
+# Jamais de question : le CLI devcontainer lance cette étape sous terminal,
+# sortie envoyée dans .devzone.log par make, donc invisible ; une question
+# (repowarden install propose « repowarden bots » dans un dépôt GitHub dont
+# gh est administrateur) attendrait indéfiniment. Entrée vide : chaque outil
+# passe en mode non interactif (bots : « plus tard, repowarden bots »)
+exec </dev/null
 
 # Volumes nommés créés en root → rendre au user vscode
 # (et ~/.config, créé par Docker pour monter ~/.config/opencode)
