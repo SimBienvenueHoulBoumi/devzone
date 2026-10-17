@@ -15,9 +15,26 @@ sudo chown vscode:vscode /home/vscode/.config
 # l'utilisateur qui lance git : volumes, Docker Desktop, outils lancés à part),
 # et accès à GitHub par le jeton de gh, conservé dans son volume (https, même
 # pour les remotes en git@github.com:, sans clé ssh à recopier)
+# Réglages de la machine dans ~/.gitconfig du conteneur (recréé à chaque
+# rebuild) : sans ce fichier, git config --global (et repowarden install)
+# écriraient dans ~/.config/git/config, le volume de l'identité, où ils
+# s'accumuleraient d'un rebuild à l'autre
+touch "$HOME/.gitconfig"
+# Volume touché par une version antérieure : seuls ces réglages en sont
+# retirés, l'identité et tout autre réglage sont conservés
+volume="$HOME/.config/git/config"
+if [ -f "$volume" ]; then
+    retirer() { git config --file "$volume" --unset-all "$@" 2>/dev/null || true; }
+    retirer safe.directory '^/workspaces/devzone'
+    retirer credential.https://github.com.helper
+    retirer url.https://github.com/.insteadOf
+    retirer core.hooksPath 'repowarden'
+    retirer alias.cc 'repowarden'
+    retirer repowarden.lang
+fi
 git config --global --add safe.directory /workspaces/devzone
 git config --global --add safe.directory '/workspaces/devzone/workspace/*'
-git config --global credential.https://github.com.helper ''
+git config --global --replace-all credential.https://github.com.helper ''
 git config --global --add credential.https://github.com.helper '!gh auth git-credential'
 git config --global url.https://github.com/.insteadOf git@github.com:
 
