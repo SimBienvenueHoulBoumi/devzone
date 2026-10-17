@@ -120,3 +120,18 @@ faux_cli() {
     [ "$status" -eq 1 ]
     [[ "$output" == *"erreur de construction"*"échec"* ]]
 }
+
+@test "scripts en LF" {
+    # Tout fichier suivi commençant par #! doit imposer eol=lf, sinon un clone
+    # Windows le reçoit en CRLF. Dans git ls-files --eol, les attributs
+    # (3e champ, avec des espaces) précèdent le nom, séparés par une tabulation.
+    run git -C "$RACINE" ls-files --eol
+    [ "$status" -eq 0 ]
+    while IFS= read -r ligne; do
+        attrs="${ligne%%$'\t'*}"
+        nom="${ligne#*$'\t'}"
+        if head -c 2 "$RACINE/$nom" 2>/dev/null | grep -q '^#!'; then
+            [[ "$attrs" == *"eol=lf"* ]] || { echo "sans eol=lf : $nom" >&2; false; }
+        fi
+    done <<<"$output"
+}

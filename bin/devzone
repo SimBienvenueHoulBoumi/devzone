@@ -12,7 +12,12 @@ PAQUET="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "
 # Fichiers d'un devzone (même liste que « files » de package.json, sans bin/)
 FICHIERS=(.devcontainer Makefile .gitattributes lancer.sh desinstaller.sh README.md LICENSE)
 
-version() { node -p "require('$PAQUET/package.json').version" 2>/dev/null || echo inconnue; }
+version() {
+    # Sous Windows (Git Bash), node ne comprend pas les chemins /c/… : convertis
+    local paquet="$PAQUET"
+    if command -v cygpath >/dev/null 2>&1; then paquet="$(cygpath -m "$paquet")"; fi
+    node -p "require('$paquet/package.json').version" 2>/dev/null || echo inconnue
+}
 
 aide() {
     cat <<EOF
