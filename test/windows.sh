@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Tests Windows et local (macOS/Linux) : fins de ligne, paquet npm installé en
-# global, puis comportement de la commande devzone — sans conteneur, donc sans
-# Docker ni make.
+# global dans un préfixe isolé sous $TMP (jamais celui de la machine), puis
+# comportement de la commande devzone — sans conteneur, donc sans Docker ni make.
 #   bash test/windows.sh     (en local, et dans le job windows de la CI)
 # Style identique à test/fonctionnel.sh (✔/✖, compteurs).
 set -euo pipefail
@@ -10,13 +10,15 @@ RACINE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TMP="$(cd "$(mktemp -d)" && pwd -P)"
 TESTDIR="$TMP/testdz"
 VERSION="$(node -p "require('$RACINE/package.json').version")"
-# devzone déjà installé en global sur la machine : jamais désinstallé
-DEJA="$(command -v devzone || true)"
+# Préfixe npm isolé sous $TMP : la commande testée s'y installe en global sans
+# toucher à celui de la machine ; sous Windows les exécutables globaux sont à la
+# racine du préfixe, d'où les deux chemins ajoutés au PATH
+export npm_config_prefix="$TMP/npm"
+export PATH="$TMP/npm/bin:$TMP/npm:$PATH"
 reussis=0
 echecs=0
 
 nettoyer() {
-    [ -n "$DEJA" ] || npm uninstall -g devzone >/dev/null 2>&1 || true
     rm -rf "$TMP"
 }
 trap nettoyer EXIT
@@ -39,9 +41,13 @@ echoue() {
     if ! sortie="$(bz "$2")" && { [ -z "${3:-}" ] || grep -qE -- "$3" <<<"$sortie"; }; then ok "$1"; else ko "$1" "$sortie"; fi
 }
 
+# Même critère que la garde « scripts en LF » de test/cli.bats : tout fichier
+# suivi commençant par #!, plus Makefile
 echo "▶ Fins de ligne (aucun CRLF dans les scripts)"
-for f in $(cd "$RACINE" && git ls-files '*.sh' 'bin/devzone' '.devcontainer/devzone' 'Makefile'); do
-    if grep -q $'\r' "$RACINE/$f"; then ko "pas de CRLF dans $f" "$(head -c 40 "$RACINE/$f" | od -An -tx1 | head -1)"; else ok "pas de CRLF dans $f"; fi
+for f in $(cd "$RACINE" && git ls-files); do
+    if head -c 2 "$RACINE/$f" 2>/dev/null | grep -q '^#!' || [ "$f" = Makefile ]; then
+        if grep -q $'\r' "$RACINE/$f"; then ko "pas de CRLF dans $f" "$(head -c 40 "$RACINE/$f" | od -An -tx1 | head -1)"; else ok "pas de CRLF dans $f"; fi
+    fi
 done
 
 echo "▶ Paquet npm : npm pack puis installation globale de l'archive"
