@@ -67,10 +67,14 @@ jobs:
       # commande qui doit réussir est suivie de || exit /b 1, et la fin du
       # script est explicite (sans elle, l'étape prend le code de la dernière
       # commande, ici un desinstaller qui échoue à raison)
+      # Version lue par node avec le chemin en argument (%CD%\package.json, donc
+      # jamais de quote imbriquée : dans un for /f de cmd, une ' non échappée
+      # termine la chaîne), écrite dans un fichier puis relue par set /p
       - name: La commande devzone via le raccourci .cmd de npm (comme un utilisateur)
         shell: cmd
         run: |
-          for /f %%v in ('node -p "require('./package.json').version"') do set VERSION=%%v
+          node -p "require(process.argv[1]).version" %CD%\package.json > %RUNNER_TEMP%\version.txt || exit /b 1
+          set /p VERSION=<%RUNNER_TEMP%\version.txt
           call npm pack --silent --pack-destination %RUNNER_TEMP% || exit /b 1
           call npm install -g %RUNNER_TEMP%\devzone-%VERSION%.tgz || exit /b 1
           call devzone --version | findstr /x %VERSION% || exit /b 1
