@@ -262,7 +262,7 @@ devzone/
 ├── Makefile                    # pilotage sans VS Code
 ├── desinstaller.sh             # make desinstaller : retire tout ce que devzone a créé
 ├── bin/devzone                 # commande npm : npx devzone <dossier>, devzone desinstaller
-├── package.json, LICENSE       # paquet npm devzone (licence GPL-3.0-or-later)
+├── package.json, LICENSE       # paquet npm devzone (licence GPL-3.0-only)
 ├── test/
 │   ├── devzone.bats            # tests de la commande devzone (bats test/)
 │   ├── cli.bats                # tests de la commande npm et du contenu du paquet
@@ -272,4 +272,4 @@ devzone/
 
 ## Licence
 
-devzone est un logiciel libre, distribué sous la [GNU General Public License version 3](LICENSE), ou (à ton choix) toute version ultérieure (`GPL-3.0-or-later`).
+devzone est un logiciel libre, distribué sous la [GNU General Public License version 3](LICENSE).
