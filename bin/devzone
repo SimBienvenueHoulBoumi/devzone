@@ -13,10 +13,10 @@ PAQUET="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "
 FICHIERS=(.devcontainer Makefile .gitattributes lancer.sh desinstaller.sh README.md LICENSE)
 
 version() {
-    # Sous Windows (Git Bash), node ne comprend pas les chemins /c/… : convertis
-    local paquet="$PAQUET"
-    if command -v cygpath >/dev/null 2>&1; then paquet="$(cygpath -m "$paquet")"; fi
-    node -p "require('$paquet/package.json').version" 2>/dev/null || echo inconnue
+    # Chemin passé en argument à node, jamais écrit dans le code JavaScript de -p :
+    # sous Git Bash $PAQUET vaut /c/… et seul un argument séparé est reconverti
+    # pour un programme Windows (cygpath inutile)
+    node -p 'require(process.argv[1]).version' "$PAQUET/package.json" 2>/dev/null || echo inconnue
 }
 
 aide() {
