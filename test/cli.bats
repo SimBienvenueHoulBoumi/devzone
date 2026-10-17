@@ -49,6 +49,18 @@ setup() {
     [[ "$output" == *"dossier devzone"* ]]
 }
 
+@test "devzone desinstaller : ancien devzone (desinstaller.sh à la racine) accepté" {
+    # devzone créé avant le rangement dans scripts/ : desinstaller.sh à la
+    # racine, pas de scripts/ ; la commande doit continuer à fonctionner
+    mkdir -p vieux/.devcontainer
+    printf '#!/usr/bin/env bash\necho ancien\n' >vieux/desinstaller.sh
+    chmod +x vieux/desinstaller.sh
+    cd vieux
+    run bash "$CLI" desinstaller
+    [ "$status" -eq 0 ]
+    [[ "$output" == *ancien* ]]
+}
+
 @test "devzone --version et --help" {
     run bash "$CLI" --version
     [ "$status" -eq 0 ]
