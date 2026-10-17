@@ -8,7 +8,15 @@
 # DEVZONE_SANS_DEMARRER=1 : copie seule, sans lancer le conteneur (tests).
 set -euo pipefail
 
-PAQUET="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")")/.." && pwd)"
+# Chemin du script : depuis cmd, le raccourci .cmd de npm appelle bash avec le
+# chemin Windows (C:\…\bin\devzone) : sans « / », dirname/readlink donneraient
+# « . » et PAQUET serait faux. On normalise d'abord (cygpath de Git Bash, sinon
+# \ → /) ; macOS/Linux : chemin POSIX, inchangé.
+SCRIPT="${BASH_SOURCE[0]}"
+case "$SCRIPT" in
+    [A-Za-z]:[\\/]*) SCRIPT="$(cygpath -u "$SCRIPT" 2>/dev/null || echo "${SCRIPT//\\//}")" ;;
+esac
+PAQUET="$(cd "$(dirname "$(readlink -f "$SCRIPT" 2>/dev/null || echo "$SCRIPT")")/.." && pwd)"
 # Fichiers d'un devzone (même liste que « files » de package.json, sans bin/)
 FICHIERS=(.devcontainer Makefile .gitattributes lancer.sh desinstaller.sh README.md LICENSE)
 

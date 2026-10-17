@@ -67,6 +67,18 @@ reussit "devzone --version : la version de package.json" "devzone --version" "^$
 reussit "devzone --help : l'aide" "devzone --help" "devzone <dossier>"
 echoue "devzone --option-inconnue : sortie en erreur" "devzone --option-inconnue" "option inconnue"
 
+echo "▶ devzone lancé comme le raccourci .cmd de npm (chemin Windows du script)"
+# Sous cmd, le raccourci .cmd de npm appelle bash avec le chemin Windows du
+# script (backslashes, lettre de lecteur) : reproduit ici depuis Git Bash en
+# passant ce même chemin à bash ; ignoré hors Windows (pas de cygpath)
+if command -v cygpath >/dev/null 2>&1; then
+    WINSCRIPT="$(cygpath -w "$TMP/npm/node_modules/devzone/bin/devzone")"
+    reussit "chemin Windows : --version donne la version" "bash '$WINSCRIPT' --version" "^$VERSION$"
+    reussit "chemin Windows : --help donne l'aide" "bash '$WINSCRIPT' --help" "devzone <dossier>"
+else
+    echo "  ○ ignoré (hors Windows : pas de cygpath)"
+fi
+
 echo "▶ devzone <dossier> avec DEVZONE_SANS_DEMARRER=1"
 reussit "crée un devzone complet" "DEVZONE_SANS_DEMARRER=1 devzone '$TESTDIR'" "créé dans"
 for f in .devcontainer/devcontainer.json .devcontainer/devzone Makefile .gitattributes lancer.sh desinstaller.sh README.md LICENSE workspace/.gitkeep .gitignore; do
