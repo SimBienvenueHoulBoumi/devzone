@@ -1,5 +1,7 @@
 # devzone
 
+[![npm](https://img.shields.io/npm/v/devzone)](https://www.npmjs.com/package/devzone) [![Licence GPL-3.0-only](https://img.shields.io/badge/licence-GPL--3.0--only-blue)](LICENSE)
+
 Environnement de développement complet dans un conteneur (devcontainer) : les mêmes outils, aux mêmes versions, sur Mac, Linux et Windows. Rien à installer sur ta machine à part Docker.
 
 | Domaine | Outils |
