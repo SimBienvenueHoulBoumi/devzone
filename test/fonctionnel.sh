@@ -111,6 +111,9 @@ echoue "jeton GitHub refusé (gitleaks)" "$G && echo \"T='ghp_\$(head -c 300 /de
 
 echo "▶ Persistance"
 dz "devzone activer ia >/dev/null; echo témoin >~/.config/git/temoin" >/dev/null
+# Identité dans le volume, et volume « pollué » comme par une version
+# antérieure (réglages machine en double) : le rebuild doit réussir et le nettoyer
+dz "V=~/.config/git/config; git config --file \$V user.name Test; git config --file \$V user.email test@example.invalid; git config --file \$V --add credential.https://github.com.helper ''; git config --file \$V --add credential.https://github.com.helper '!gh auth git-credential'; git config --file \$V --add safe.directory /workspaces/devzone" >/dev/null
 docker stop "$(docker ps -q --filter "label=devcontainer.local_folder=$COPIE")" >/dev/null
 demarrer
 reussit "redémarrage : modules gardés" "devzone" "✔ module ia"
@@ -120,6 +123,9 @@ reussit "rebuild : modules gardés" "devzone" "✔ module ia"
 reussit "rebuild : ia réinstallé" "claude --version" "Claude Code"
 reussit "rebuild : volume gardé" "cat ~/.config/git/temoin" "témoin"
 reussit "rebuild : cluster kind conservé" "kind get clusters" "^test$"
+reussit "rebuild : identité conservée dans le volume" "git config --file ~/.config/git/config user.name" "^Test$"
+echoue "rebuild : volume sans réglages machine" "git config --file ~/.config/git/config --get-all credential.https://github.com.helper"
+reussit "rebuild : réglages machine dans ~/.gitconfig" "git config --file ~/.gitconfig --get-all credential.https://github.com.helper" "gh auth git-credential"
 
 echo "▶ Désinstallation (depuis l'hôte, sans aucun de ses clusters)"
 # KUBECONFIG vide : les clusters de l'hôte ne sont jamais examinés
