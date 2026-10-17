@@ -10,7 +10,7 @@ set -euo pipefail
 
 PAQUET="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")")/.." && pwd)"
 # Fichiers d'un devzone (même liste que « files » de package.json, sans bin/)
-FICHIERS=(.devcontainer Makefile .gitattributes desinstaller.sh README.md LICENSE)
+FICHIERS=(.devcontainer Makefile .gitattributes lancer.sh desinstaller.sh README.md LICENSE)
 
 version() { node -p "require('$PAQUET/package.json').version" 2>/dev/null || echo inconnue; }
 
@@ -44,7 +44,7 @@ workspace/*
 .devzone.log
 .devzone.etat
 EOF
-    chmod +x "$cible/desinstaller.sh"
+    chmod +x "$cible/desinstaller.sh" "$cible/lancer.sh"
     cible="$(cd "$cible" && pwd)"
     echo "✔ devzone $(version) créé dans $cible"
     if [ -n "${DEVZONE_SANS_DEMARRER:-}" ]; then
@@ -55,11 +55,7 @@ EOF
     if command -v make >/dev/null 2>&1; then
         make -C "$cible" up
     else
-        npx -y @devcontainers/cli up --workspace-folder "$cible" >"$cible/.devzone.log" 2>&1 || {
-            tail -15 "$cible/.devzone.log"
-            echo "✖ échec ; journal : $cible/.devzone.log" >&2
-            exit 1
-        }
+        bash "$cible/lancer.sh" up "$cible"
     fi
     echo "Ensuite : cd $cible && make shell (ou ouvre le dossier dans VS Code : Reopen in Container)."
 }

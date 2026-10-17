@@ -18,6 +18,7 @@
     ".devcontainer/",
     "Makefile",
     ".gitattributes",
+    "lancer.sh",
     "desinstaller.sh",
     "README.md",
     "LICENSE"
