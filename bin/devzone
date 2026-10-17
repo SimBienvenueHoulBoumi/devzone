@@ -18,7 +18,7 @@ case "$SCRIPT" in
 esac
 PAQUET="$(cd "$(dirname "$(readlink -f "$SCRIPT" 2>/dev/null || echo "$SCRIPT")")/.." && pwd)"
 # Fichiers d'un devzone (même liste que « files » de package.json, sans bin/)
-FICHIERS=(.devcontainer Makefile .gitattributes lancer.sh desinstaller.sh README.md LICENSE)
+FICHIERS=(.devcontainer Makefile .gitattributes scripts README.md LICENSE)
 
 version() {
     # Chemin passé en argument à node, jamais écrit dans le code JavaScript de -p :
@@ -57,7 +57,7 @@ workspace/*
 .devzone.log
 .devzone.etat
 EOF
-    chmod +x "$cible/desinstaller.sh" "$cible/lancer.sh"
+    chmod +x "$cible/scripts/desinstaller.sh" "$cible/scripts/lancer.sh"
     cible="$(cd "$cible" && pwd)"
     echo "✔ devzone $(version) créé dans $cible"
     if [ -n "${DEVZONE_SANS_DEMARRER:-}" ]; then
@@ -68,7 +68,7 @@ EOF
     if command -v make >/dev/null 2>&1; then
         make -C "$cible" up
     else
-        bash "$cible/lancer.sh" up "$cible"
+        bash "$cible/scripts/lancer.sh" up "$cible"
     fi
     echo "Ensuite : cd $cible && make shell (ou ouvre le dossier dans VS Code : Reopen in Container)."
 }
@@ -77,11 +77,11 @@ case "${1:-}" in
     "" | -h | --help | aide) aide ;;
     -v | --version) version ;;
     desinstaller)
-        if [ ! -f desinstaller.sh ] || [ ! -d .devcontainer ]; then
-            echo "✖ À lancer dans un dossier devzone (desinstaller.sh introuvable ici)." >&2
+        if [ ! -f scripts/desinstaller.sh ] || [ ! -d .devcontainer ]; then
+            echo "✖ À lancer dans un dossier devzone (scripts/desinstaller.sh introuvable ici)." >&2
             exit 1
         fi
-        bash desinstaller.sh
+        bash scripts/desinstaller.sh
         ;;
     -*)
         echo "✖ option inconnue : $1 (devzone --help)" >&2
