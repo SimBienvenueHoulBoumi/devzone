@@ -77,14 +77,15 @@ case "${1:-}" in
     "" | -h | --help | aide) aide ;;
     -v | --version) version ;;
     desinstaller)
-        # Un devzone créé avant le rangement dans scripts/ a son desinstaller.sh
-        # à la racine : on accepte les deux emplacements, et on ne refuse que si
-        # aucun des deux n'est présent
-        if [ -f scripts/desinstaller.sh ]; then
-            desinstalleur=scripts/desinstaller.sh
-        elif [ -f desinstaller.sh ]; then
-            desinstalleur=desinstaller.sh
-        else
+        # Dossier devzone (.devcontainer/) ; un devzone créé avant le rangement
+        # dans scripts/ a son desinstaller.sh à la racine
+        desinstalleur=""
+        if [ -d .devcontainer ]; then
+            for f in scripts/desinstaller.sh desinstaller.sh; do
+                if [ -f "$f" ]; then desinstalleur="$f" && break; fi
+            done
+        fi
+        if [ -z "$desinstalleur" ]; then
             echo "✖ À lancer dans un dossier devzone (desinstaller.sh introuvable ici)." >&2
             exit 1
         fi

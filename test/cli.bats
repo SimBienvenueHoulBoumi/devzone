@@ -61,6 +61,15 @@ setup() {
     [[ "$output" == *ancien* ]]
 }
 
+@test "devzone desinstaller : desinstaller.sh sans .devcontainer refusé" {
+    mkdir pas-devzone
+    printf '#!/usr/bin/env bash\necho appele\n' >pas-devzone/desinstaller.sh
+    cd pas-devzone
+    run bash "$CLI" desinstaller
+    [ "$status" -eq 1 ]
+    [[ "$output" != *appele* ]] || false
+}
+
 @test "devzone --version et --help" {
     run bash "$CLI" --version
     [ "$status" -eq 0 ]
