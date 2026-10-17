@@ -100,7 +100,7 @@ reussit "activer kubernetes : metrics-server sur kind" "devzone activer kubernet
 reussit "métriques disponibles" "for i in \$(seq 1 36); do kubectl --context kind-test top nodes >/dev/null 2>&1 && exit 0; sleep 5; done; exit 1"
 reussit "metrics-server marqué comme installé par devzone" "kubectl --context kind-test -n kube-system get deployment metrics-server -o jsonpath='{.metadata.labels.devzone}'" "^installe$"
 # Désinstallation lancée dans le conteneur : seul le cluster kind-test est vu
-reussit "désinstaller : retire le metrics-server de devzone" "CONFIRMER=oui bash desinstaller.sh" "metrics-server retiré : kind-test"
+reussit "désinstaller : retire le metrics-server de devzone" "CONFIRMER=oui bash scripts/desinstaller.sh" "metrics-server retiré : kind-test"
 echoue "metrics-server absent après désinstallation" "kubectl --context kind-test -n kube-system get deployment metrics-server"
 echoue "metrics-server.sh : contexte inconnu" "bash .devcontainer/metrics-server.sh nexistepas" "contexte inconnu"
 reussit "désactiver kubernetes" "devzone desactiver kubernetes" "kubernetes désactivé"
@@ -141,13 +141,13 @@ DIND_TEST="$(docker inspect "$id" --format '{{range .Mounts}}{{if eq .Destinatio
 (cd "$COPIE" && make down >/dev/null)
 if [ -f "$COPIE/.devzone.etat" ]; then ok "make down : image et Docker interne notés"; else ko "make down : image et Docker interne notés" "pas de .devzone.etat"; fi
 avant="$(restants)"
-if ! sortie="$(hote bash desinstaller.sh </dev/null)" && [ "$(restants)" = "$avant" ]; then ok "sans confirmation : rien n'est supprimé"; else ko "sans confirmation : rien n'est supprimé" "$sortie"; fi
-sortie="$(hote env CONFIRMER=oui GARDER=connexions bash desinstaller.sh)"
+if ! sortie="$(hote bash scripts/desinstaller.sh </dev/null)" && [ "$(restants)" = "$avant" ]; then ok "sans confirmation : rien n'est supprimé"; else ko "sans confirmation : rien n'est supprimé" "$sortie"; fi
+sortie="$(hote env CONFIRMER=oui GARDER=connexions bash scripts/desinstaller.sh)"
 gardes="$(docker volume ls -q | grep "^${DEVZONE_VOLUMES}-" | sed "s/^${DEVZONE_VOLUMES}-//" | sort | tr '\n' ' ')"
 if [ "$gardes" = "claude config gh git opencode-config opencode-data " ]; then ok "GARDER=connexions : seules les connexions restent"; else ko "GARDER=connexions : seules les connexions restent" "restants : $gardes"$'\n'"$sortie"; fi
 if [ -n "$DIND_TEST" ] && ! docker volume inspect "$DIND_TEST" >/dev/null 2>&1 && ! docker image inspect "$IMAGE_TEST" >/dev/null 2>&1; then ok "après make down : image et Docker interne supprimés"; else ko "après make down : image et Docker interne supprimés" "$IMAGE_TEST $DIND_TEST"; fi
 demarrer
-sortie="$(hote env CONFIRMER=oui bash desinstaller.sh)"
+sortie="$(hote env CONFIRMER=oui bash scripts/desinstaller.sh)"
 if [ -z "$(docker ps -aq --filter "label=devcontainer.local_folder=$COPIE")" ] && [ "$(restants)" = 0 ] && ! docker image inspect "$IMAGE_TEST" >/dev/null 2>&1; then
     ok "désinstallation complète : aucun conteneur, volume ni image"
 else

@@ -68,7 +68,7 @@ Le choix est **propre à chaque utilisateur** et gardé dans le volume `devzone-
 | Supprimer le conteneur | — | `make down` | — |
 | Reconstruire (après une modification de `.devcontainer/`) | *Dev Containers: Rebuild Container* | `make rebuild` | `npx @devcontainers/cli up --workspace-folder . --remove-existing-container` |
 | État | — | `make status` | — |
-| **Désinstaller** (tout ce que devzone a créé, après confirmation) | — | `make desinstaller` | `bash desinstaller.sh` |
+| **Désinstaller** (tout ce que devzone a créé, après confirmation) | — | `make desinstaller` | `bash scripts/desinstaller.sh` |
 
 `make` seul affiche la liste. `up` et `rebuild` affichent leurs étapes (construction de l'image, installation, démarrage, puis l'état de devzone) et un signe de vie au moins toutes les 30 s ; le journal complet va dans `.devzone.log` (sa fin s'affiche en cas d'échec). Aucune étape automatique ne pose de question : si l'une le faisait, `make` l'afficherait et s'arrêterait au lieu d'attendre en silence (voir [Dépannage](#dépannage)).
 
@@ -203,7 +203,7 @@ Empreinte d'une archive : `curl -fsSL <url> | shasum -a 256`.
 
 **Windows (CI) : ce qui est vérifié / ce qui n'est pas (conteneur, VS Code).** Le job `windows` vérifie sous `windows-latest` (checkout avec `core.autocrlf=true`, comme un poste Windows) : aucun CRLF dans les scripts (tout fichier suivi commençant par `#!`, plus le `Makefile`) ; empaquetage npm (`npm pack`) et installation de l'archive — dans un préfixe npm isolé sous `$TMP` (le global de la machine n'est jamais touché) ; `devzone --version`, `devzone --help`, option inconnue (avec sortie en erreur) ; `devzone <dossier>` avec `DEVZONE_SANS_DEMARRER=1` (création des fichiers attendus, dossier non vide refusé sans écrasement) ; `devzone desinstaller` hors d'un dossier devzone refusé. Le même parcours passe ensuite par `cmd`, c'est-à-dire le raccourci `.cmd` de npm, avec cette fois une installation globale réelle (le cas d'un utilisateur Windows). Ce qui n'est **pas** vérifié sous Windows CI : `make up` et le conteneur Linux (impossibles sur les runners Windows de GitHub), ainsi que VS Code et Docker Desktop (vérifiés à la main).
 
-Les tests fonctionnels et ceux de la CLI travaillent sur une copie du dépôt, avec leurs propres volumes (`devzone-test-…`), puis suppriment tout (conteneur, volumes, image), même en cas d'échec : ton devzone, tes connexions et le cluster de ta machine ne sont jamais touchés (seul un cluster kind de test est utilisé). En CI, le workflow `fonctionnel` les lance (trois jobs : fonctionnel, cli et windows) sur chaque PR qui modifie `.devcontainer/`, `test/`, `bin/`, le `Makefile`, `lancer.sh`, `desinstaller.sh`, `.gitattributes` ou `package.json`, et à la main (*Actions → fonctionnel → Run workflow*).
+Les tests fonctionnels et ceux de la CLI travaillent sur une copie du dépôt, avec leurs propres volumes (`devzone-test-…`), puis suppriment tout (conteneur, volumes, image), même en cas d'échec : ton devzone, tes connexions et le cluster de ta machine ne sont jamais touchés (seul un cluster kind de test est utilisé). En CI, le workflow `fonctionnel` les lance (trois jobs : fonctionnel, cli et windows) sur chaque PR qui modifie `.devcontainer/`, `test/`, `bin/`, le `Makefile`, `scripts/`, `.gitattributes` ou `package.json`, et à la main (*Actions → fonctionnel → Run workflow*).
 
 ## Versions et livraison
 
@@ -267,13 +267,14 @@ devzone/
 │   └── nettoyage.yml           # branches mergées supprimées (main et develop conservées)
 ├── .repowarden.conf            # réglages repowarden : flux develop → main
 ├── Makefile                    # pilotage sans VS Code
-├── lancer.sh                   # make up / rebuild : étapes affichées, question du conteneur signalée
-├── desinstaller.sh             # make desinstaller : retire tout ce que devzone a créé
+├── scripts/
+│   ├── lancer.sh               # make up / rebuild : étapes affichées, question du conteneur signalée
+│   └── desinstaller.sh         # make desinstaller : retire tout ce que devzone a créé
 ├── bin/devzone                 # commande npm : npx devzone <dossier>, devzone desinstaller
 ├── package.json, LICENSE       # paquet npm devzone (licence GPL-3.0-only)
 ├── test/
 │   ├── devzone.bats            # tests de la commande devzone (bats test/)
-│   ├── cli.bats                # tests de la commande npm, du contenu du paquet et de lancer.sh
+│   ├── cli.bats                # tests de la commande npm, du contenu du paquet et de scripts/lancer.sh
 │   ├── fonctionnel.sh          # tests fonctionnels (make test-fonctionnel)
 │   ├── cli-terminal.sh         # tests de la CLI dans un vrai terminal (make test-cli)
 │   └── terminal.py             # lance une commande sous pseudo-terminal, avec délai maximal
