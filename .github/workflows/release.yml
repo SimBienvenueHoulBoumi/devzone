@@ -78,3 +78,19 @@ jobs:
       app-client-id: ${{ vars.REPOWARDEN_APP_CLIENT_ID }}
     secrets:
       app-key: ${{ secrets.REPOWARDEN_APP_KEY }}
+
+  # Livraison sans nouvelle version (ni fix ni feat : docs, refactor, CI…) :
+  # main est à jour mais aucun tag n'est créé, et repowarden ne ferme les
+  # tickets préprod qu'à un tag stable. Le même suivi est lancé avec, en guise
+  # de tag, « main » et le commit livré (sans « - » : lu comme la production),
+  # pour que ces tickets passent en done et soient fermés.
+  tickets-sans-version:
+    needs: release
+    if: github.event_name == 'push' && github.ref_name == 'main' && needs.release.outputs.release_created != 'true'
+    uses: simdevWarden/repowarden/.github/workflows/tickets.yml@v4
+    permissions: { contents: write, issues: write, pull-requests: write, statuses: write }
+    with:
+      tag: main, sans nouvelle version (${{ github.sha }})
+      app-client-id: ${{ vars.REPOWARDEN_APP_CLIENT_ID }}
+    secrets:
+      app-key: ${{ secrets.REPOWARDEN_APP_KEY }}

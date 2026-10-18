@@ -24,6 +24,8 @@ Flux `develop` → `main`, géré par repowarden, **sans geste après le merge d
 
 `main` reste ainsi à jour avec `develop`. La version suit les Conventional Commits : `fix` → correctif, `feat` → mineure ; une livraison sans `fix` ni `feat` (documentation, CI…) met `main` à jour sans nouvelle version.
 
+**Tickets** : à une version, le job `tickets` de `release.yml` passe les tickets `statut: préprod` en `statut: done` et les ferme, avec la version. repowarden ne le fait qu'à un tag stable : pour une livraison sans nouvelle version, le job `tickets-sans-version` lance le même suivi de repowarden, et les tickets sont fermés avec le commentaire « Publié dans **main, sans nouvelle version (<commit>)** ».
+
 **Réglages, au choix du mainteneur** :
 
 | Réglage | Où | Effet |
