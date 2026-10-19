@@ -12,6 +12,8 @@ setup() {
     export GIT_CONFIG_NOSYSTEM=1
     # npm simulé : journalise ses arguments
     printf '#!/usr/bin/env bash\necho "npm $*" >>"%s/npm.log"\n' "$BATS_TEST_TMPDIR" >"$BATS_TEST_TMPDIR/bin/npm"
+    # repowarden simulé : journalise ses arguments (garde-fou du module ia)
+    printf '#!/usr/bin/env bash\necho "repowarden $*" >>"%s/repowarden.log"\n' "$BATS_TEST_TMPDIR" >"$BATS_TEST_TMPDIR/bin/repowarden"
     # kube-config.sh n'est pas lancé : kubernetes testé par l'état seul
     printf '#!/usr/bin/env bash\nexit 1\n' >"$BATS_TEST_TMPDIR/bin/kubectl"
     # gh simulé : GH_ETAT = absent (défaut), sans (connecté sans workflow), avec
@@ -135,5 +137,31 @@ GH
     bash "$DEVZONE" activer ia
     rm -f "$BATS_TEST_TMPDIR/npm.log"
     run bash "$DEVZONE" appliquer
+    grep -q "install -g" "$BATS_TEST_TMPDIR/npm.log"
+}
+
+@test "activer ia : garde-fou repowarden branché pour Claude Code et opencode" {
+    run bash "$DEVZONE" activer ia
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"garde-fou repowarden actif"* ]]
+    grep -qx "repowarden agents init --global" "$BATS_TEST_TMPDIR/repowarden.log"
+}
+
+@test "garde-fou : rebranché à chaque appliquer avec ia actif, jamais avec ia désactivé" {
+    bash "$DEVZONE" activer ia
+    rm -f "$BATS_TEST_TMPDIR/repowarden.log"
+    bash "$DEVZONE" appliquer
+    grep -qx "repowarden agents init --global" "$BATS_TEST_TMPDIR/repowarden.log"
+    rm -f "$BATS_TEST_TMPDIR/repowarden.log"
+    bash "$DEVZONE" desactiver ia
+    bash "$DEVZONE" appliquer
+    [ ! -e "$BATS_TEST_TMPDIR/repowarden.log" ]
+}
+
+@test "garde-fou : repowarden absent -> ia activé quand même, commande à lancer" {
+    rm "$BATS_TEST_TMPDIR/bin/repowarden"
+    PATH="$BATS_TEST_TMPDIR/bin:/usr/bin:/bin" run bash "$DEVZONE" activer ia
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"garde-fou repowarden non branché"*"repowarden agents init --global"* ]]
     grep -q "install -g" "$BATS_TEST_TMPDIR/npm.log"
 }

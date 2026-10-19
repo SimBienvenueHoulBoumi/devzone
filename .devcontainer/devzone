@@ -64,6 +64,15 @@ ecrire() {
 appliquer_ia() {
     if [ "$1" = on ]; then
         npm install -g --no-fund --no-audit --loglevel=error "${IA_PAQUETS[@]}" >/dev/null
+        # Garde-fou repowarden (hook PreToolUse de Claude Code, plugin opencode) :
+        # agent arrêté avant de modifier main/develop, de commiter sans
+        # repowarden cc ou de contourner les hooks. Global, dans les volumes
+        # ~/.claude et ~/.config/opencode : gardé aux rebuilds ; relancé, rien ne change
+        if command -v repowarden >/dev/null 2>&1 && repowarden agents init --global >/dev/null 2>&1; then
+            echo "devzone : garde-fou repowarden actif pour Claude Code et opencode"
+        else
+            echo "devzone : garde-fou repowarden non branché (repowarden 4.10 ou plus requis) : repowarden agents init --global" >&2
+        fi
         echo "devzone : ia actif : claude (puis /login), opencode auth login"
     else
         npm uninstall -g "${IA_NOMS[@]}" >/dev/null 2>&1 || true
