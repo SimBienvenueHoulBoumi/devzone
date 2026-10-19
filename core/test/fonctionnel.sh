@@ -91,6 +91,10 @@ done
 
 echo "▶ Module ia"
 reussit "activer ia" "devzone activer ia && claude --version && opencode --version" "Claude Code"
+reussit "ia : garde-fou repowarden branché (Claude Code, opencode)" "grep -q 'repowarden garde' ~/.claude/settings.json && test -f ~/.config/opencode/plugins/repowarden-garde.js"
+# Action d'agent sur main dans un dépôt neuf (hooks repowarden globaux) : refusée (code 2)
+# shellcheck disable=SC2016 # commande développée dans le conteneur
+echoue "ia : garde-fou : modification sur main refusée" 'd="$(mktemp -d)" && cd "$d" && git init -q -b main && printf "{\"tool_name\":\"Write\",\"tool_input\":{\"file_path\":\"%s/a.txt\"},\"cwd\":\"%s\"}" "$d" "$d" | repowarden garde --format claude' "branche protégée"
 reussit "désactiver ia" "devzone desactiver ia && ! command -v claude"
 echoue "module inconnu refusé" "devzone activer nexistepas" "module inconnu"
 

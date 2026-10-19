@@ -21,9 +21,10 @@ ARG PYTEST_VERSION=9.1.1
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-# Contrôles shell de repowarden
+# Contrôles shell de repowarden ; jq : lu par son garde-fou des agents IA
+# (repowarden garde, module ia), qui sans lui ne vérifie rien
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends shellcheck bats \
+    && apt-get install -y --no-install-recommends shellcheck bats jq \
     && rm -rf /var/lib/apt/lists/*
 
 # k9s, actionlint (mêmes versions que la CI de repowarden), gitleaks, kind :
