@@ -4,14 +4,14 @@
 
 | Tests | Commande | Où | Durée |
 |---|---|---|---|
-| Commande `devzone` du conteneur et commande npm (unitaires) | `bats test/` | dans le conteneur | quelques secondes |
+| Commande `devzone` du conteneur et commande npm (unitaires) | `bats core/test/` | dans le conteneur | quelques secondes |
 | Fonctionnels : un devzone construit et utilisé comme par un utilisateur (outils, modules, Kubernetes avec kind, hooks repowarden, redémarrage, rebuild) | `make test-fonctionnel` | sur ta machine (Docker, Node) | 5 à 10 min |
 | CLI dans un vrai terminal : chaque commande tapée comme par un humain (pseudo-terminal), avec un délai maximal ; une commande qui attend une entrée échoue. Cibles `make` (`help`, `up`, `shell`, `status`, `stop`, `down`, `rebuild`, `desinstaller`), commande npm (`devzone <dossier>`, `desinstaller`, `--version`, `--help`), commande `devzone` du conteneur, scripts de démarrage | `make test-cli` | sur ta machine (Docker, Node, Python 3) | 10 à 15 min |
-| Windows (local et CI) | `bash test/windows.sh` | macOS/Linux (local) ou Windows Git Bash (CI) | quelques secondes |
+| Windows (local et CI) | `bash core/test/windows.sh` | macOS/Linux (local) ou Windows Git Bash (CI) | quelques secondes |
 
 **Windows (CI) : ce qui est vérifié / ce qui n'est pas (conteneur, VS Code).** Le job `windows` vérifie sous `windows-latest` (checkout avec `core.autocrlf=true`, comme un poste Windows) : aucun CRLF dans les scripts (tout fichier suivi commençant par `#!`, plus le `Makefile`) ; empaquetage npm (`npm pack`) et installation de l'archive — dans un préfixe npm isolé sous `$TMP` (le global de la machine n'est jamais touché) ; `devzone --version`, `devzone --help`, option inconnue (avec sortie en erreur) ; `devzone <dossier>` avec `DEVZONE_SANS_DEMARRER=1` (création des fichiers attendus, dossier non vide refusé sans écrasement) ; `devzone desinstaller` hors d'un dossier devzone refusé. Le même parcours passe ensuite par `cmd`, c'est-à-dire le raccourci `.cmd` de npm, avec cette fois une installation globale réelle (le cas d'un utilisateur Windows). Ce qui n'est **pas** vérifié sous Windows CI : `make up` et le conteneur Linux (impossibles sur les runners Windows de GitHub), ainsi que VS Code et Docker Desktop (vérifiés à la main).
 
-Les tests fonctionnels et ceux de la CLI travaillent sur une copie du dépôt, avec leurs propres volumes (`devzone-test-…`), puis suppriment tout (conteneur, volumes, image), même en cas d'échec : ton devzone, tes connexions et le cluster de ta machine ne sont jamais touchés (seul un cluster kind de test est utilisé). En CI, le workflow `fonctionnel` les lance (trois jobs : fonctionnel, cli et windows) sur chaque PR qui modifie `.devcontainer/`, `test/`, `bin/`, le `Makefile`, `scripts/`, `.gitattributes` ou `package.json`, et à la main (*Actions → fonctionnel → Run workflow*).
+Les tests fonctionnels et ceux de la CLI travaillent sur une copie du dépôt, avec leurs propres volumes (`devzone-test-…`), puis suppriment tout (conteneur, volumes, image), même en cas d'échec : ton devzone, tes connexions et le cluster de ta machine ne sont jamais touchés (seul un cluster kind de test est utilisé). En CI, le workflow `fonctionnel` les lance (trois jobs : fonctionnel, cli et windows) sur chaque PR qui modifie `.devcontainer/`, `core/` (commande npm, scripts, tests), le `Makefile`, `.gitattributes` ou `package.json`, et à la main (*Actions → fonctionnel → Run workflow*).
 
 
 
@@ -61,17 +61,18 @@ devzone/
 │   └── nettoyage.yml           # branches mergées supprimées (main et develop conservées)
 ├── .repowarden.conf            # réglages repowarden : flux develop → main
 ├── Makefile                    # pilotage sans VS Code
-├── scripts/
-│   ├── lancer.sh               # make up / rebuild : étapes affichées, question du conteneur signalée
-│   └── desinstaller.sh         # make desinstaller : retire tout ce que devzone a créé
-├── bin/devzone                 # commande npm : npx devzone <dossier>, devzone desinstaller
-├── package.json, LICENSE       # paquet npm devzone (licence GPL-3.0-only)
-├── test/
-│   ├── devzone.bats            # tests de la commande devzone (bats test/)
-│   ├── cli.bats                # tests de la commande npm, du contenu du paquet et de scripts/lancer.sh
-│   ├── fonctionnel.sh          # tests fonctionnels (make test-fonctionnel)
-│   ├── cli-terminal.sh         # tests de la CLI dans un vrai terminal (make test-cli)
-│   └── terminal.py             # lance une commande sous pseudo-terminal, avec délai maximal
+├── package.json, LICENSE       # paquet npm devzone (licence GPL-3.0-only) ; package.json reste à la racine (exigé par npm)
+├── core/                       # l'outil devzone (à la racine : seulement ce qui doit y être)
+│   ├── devzone                 # commande npm : npx devzone <dossier>, devzone desinstaller
+│   ├── scripts/
+│   │   ├── lancer.sh           # make up / rebuild : étapes affichées, question du conteneur signalée
+│   │   └── desinstaller.sh     # make desinstaller : retire tout ce que devzone a créé
+│   └── test/
+│       ├── devzone.bats        # tests de la commande devzone (bats core/test/)
+│       ├── cli.bats            # commande npm, contenu du paquet, core/scripts/lancer.sh, chemins de l'arborescence
+│       ├── fonctionnel.sh      # tests fonctionnels (make test-fonctionnel)
+│       ├── cli-terminal.sh     # tests de la CLI dans un vrai terminal (make test-cli)
+│       └── terminal.py         # lance une commande sous pseudo-terminal, avec délai maximal
 └── workspace/                  # tes projets (ignorés par git, chacun son dépôt)
 ```
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Lance le conteneur sur l'hôte, sans jamais rester muet :
-#   bash scripts/lancer.sh up [dossier]        (make up)
-#   bash scripts/lancer.sh rebuild [dossier]   (make rebuild : reconstruit de zéro)
+#   bash core/scripts/lancer.sh up [dossier]        (make up)
+#   bash core/scripts/lancer.sh rebuild [dossier]   (make rebuild : reconstruit de zéro)
 # Sortie complète du CLI devcontainer dans <dossier>/.devzone.log ; dans le
 # terminal : les étapes clés, un signe de vie au plus toutes les
 # DEVZONE_SIGNE_DE_VIE secondes (30), et une question posée dans le conteneur
@@ -17,7 +17,7 @@ case "$mode" in
     up) options=() fini="devzone lancé" ;;
     rebuild) options=(--remove-existing-container) fini="devzone reconstruit" ;;
     *)
-        echo "usage : bash scripts/lancer.sh up|rebuild [dossier]" >&2
+        echo "usage : bash core/scripts/lancer.sh up|rebuild [dossier]" >&2
         exit 2
         ;;
 esac
