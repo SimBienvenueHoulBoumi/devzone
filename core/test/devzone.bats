@@ -6,6 +6,10 @@ setup() {
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
     export HOME="$BATS_TEST_TMPDIR/home"
     mkdir -p "$HOME" "$BATS_TEST_TMPDIR/bin"
+    # Hors du clone : sa .git/config (identité locale d'un contributeur) et la
+    # configuration système fausseraient l'état « identité git »
+    cd "$BATS_TEST_TMPDIR" || return 1
+    export GIT_CONFIG_NOSYSTEM=1
     # npm simulé : journalise ses arguments
     printf '#!/usr/bin/env bash\necho "npm $*" >>"%s/npm.log"\n' "$BATS_TEST_TMPDIR" >"$BATS_TEST_TMPDIR/bin/npm"
     # kube-config.sh n'est pas lancé : kubernetes testé par l'état seul
