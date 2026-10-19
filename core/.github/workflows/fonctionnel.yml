@@ -1,0 +1,117 @@
+# Tests fonctionnels : construit un devzone isolé et joue les scénarios d'un
+# utilisateur (outils, modules, Kubernetes avec kind, hooks, redémarrage,
+# rebuild) ; même script qu'en local (make test-fonctionnel). Job cli : la CLI
+# tapée dans un vrai terminal, chaque commande avec un délai maximal (make
+# test-cli). Job windows : fins de ligne, paquet npm (installé dans un préfixe
+# isolé, jamais le global de la machine) et commande devzone sous windows-latest
+# (test/windows.sh, jouable en local), puis même parcours via cmd avec une
+# installation réellement globale (raccourci .cmd de npm, le cas d'un utilisateur
+# Windows). Lancés quand le conteneur, les tests, la CLI, .gitattributes ou
+# package.json changent, et à la main. Non exigés pour merger (une dizaine de
+# minutes chacun, 15 pour windows).
+name: fonctionnel
+
+on:
+  pull_request:
+    paths:
+      - ".devcontainer/**"
+      - "test/**"
+      - "bin/**"
+      - "Makefile"
+      - "scripts/**"
+      - ".gitattributes"
+      - "package.json"
+      - ".github/workflows/fonctionnel.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fonctionnel-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fonctionnel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+      - run: bash test/fonctionnel.sh
+
+  cli:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - run: bash test/cli-terminal.sh
+
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      # Réglages d'un poste Windows ; avant le checkout, sinon la copie est déjà faite
+      - name: Checkout avec core.autocrlf true (comme un poste Windows)
+        shell: cmd
+        run: |
+          git config --global core.autocrlf true
+          git config --global core.safecrlf false
+      - uses: actions/checkout@v7
+      # Les fins de ligne sont vérifiées par test/windows.sh (même critère que la
+      # garde de test/cli.bats : tout fichier suivi commençant par #!, Makefile)
+      - name: Tests Windows sous Git Bash (test/windows.sh)
+        shell: bash
+        run: bash test/windows.sh
+      # Sous shell: cmd, une commande qui échoue n'arrête pas le script : chaque
+      # commande qui doit réussir est suivie de || exit /b 1, et la fin du
+      # script est explicite (sans elle, l'étape prend le code de la dernière
+      # commande, ici un desinstaller qui échoue à raison)
+      # Version lue par node avec le chemin en argument (%CD%\package.json, donc
+      # jamais de quote imbriquée : dans un for /f de cmd, une ' non échappée
+      # termine la chaîne), écrite dans un fichier puis relue par set /p
+      # Chaque sortie de devzone est écrite dans sortie.txt puis affichée
+      # (type) : un échec montre ce que la commande a répondu. Le code retour
+      # est lu dans %SORTIE% avant le type, qui le remettrait à zéro
+      - name: La commande devzone via le raccourci .cmd de npm (comme un utilisateur)
+        shell: cmd
+        run: |
+          node -p "require(process.argv[1]).version" %CD%\package.json > %RUNNER_TEMP%\version.txt || exit /b 1
+          set /p VERSION=<%RUNNER_TEMP%\version.txt
+          call npm pack --silent --pack-destination %RUNNER_TEMP% || exit /b 1
+          call npm install -g %RUNNER_TEMP%\devzone-%VERSION%.tgz || exit /b 1
+          call devzone --version > %RUNNER_TEMP%\sortie.txt 2>&1
+          set SORTIE=%errorlevel%
+          type %RUNNER_TEMP%\sortie.txt
+          if not %SORTIE% equ 0 exit /b 1
+          set /p LUE=<%RUNNER_TEMP%\sortie.txt
+          if not "%LUE%"=="%VERSION%" exit /b 1
+          call devzone --help > %RUNNER_TEMP%\sortie.txt 2>&1
+          set SORTIE=%errorlevel%
+          type %RUNNER_TEMP%\sortie.txt
+          if not %SORTIE% equ 0 exit /b 1
+          call devzone --option-inconnue > %RUNNER_TEMP%\sortie.txt 2>&1
+          set SORTIE=%errorlevel%
+          type %RUNNER_TEMP%\sortie.txt
+          if %SORTIE% equ 0 exit /b 1
+          set DEVZONE_SANS_DEMARRER=1
+          call devzone %RUNNER_TEMP%\dzcmd > %RUNNER_TEMP%\sortie.txt 2>&1
+          set SORTIE=%errorlevel%
+          type %RUNNER_TEMP%\sortie.txt
+          if not %SORTIE% equ 0 exit /b 1
+          if not exist %RUNNER_TEMP%\dzcmd\Makefile exit /b 1
+          if not exist %RUNNER_TEMP%\dzcmd\.devcontainer\devzone exit /b 1
+          if not exist %RUNNER_TEMP%\dzcmd\scripts\lancer.sh exit /b 1
+          if not exist %RUNNER_TEMP%\dzcmd\scripts\desinstaller.sh exit /b 1
+          mkdir %RUNNER_TEMP%\plein || exit /b 1
+          echo important > %RUNNER_TEMP%\plein\fichier
+          call devzone %RUNNER_TEMP%\plein > %RUNNER_TEMP%\sortie.txt 2>&1
+          set SORTIE=%errorlevel%
+          type %RUNNER_TEMP%\sortie.txt
+          if %SORTIE% equ 0 exit /b 1
+          if exist %RUNNER_TEMP%\plein\Makefile exit /b 1
+          cd /d %RUNNER_TEMP% || exit /b 1
+          call devzone desinstaller > %RUNNER_TEMP%\sortie.txt 2>&1
+          set SORTIE=%errorlevel%
+          type %RUNNER_TEMP%\sortie.txt
+          if %SORTIE% equ 0 exit /b 1
+          exit /b 0

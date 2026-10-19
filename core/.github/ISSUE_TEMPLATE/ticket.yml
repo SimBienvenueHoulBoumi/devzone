@@ -1,0 +1,16 @@
+name: Ticket
+description: Une tâche à réaliser (fonctionnalité, correction, maintenance)
+labels: ["statut: à valider"]
+body:
+  - type: textarea
+    id: besoin
+    attributes:
+      label: Besoin
+      description: Le problème à résoudre, pas seulement la solution imaginée
+    validations:
+      required: true
+  - type: textarea
+    id: termine
+    attributes:
+      label: Terminé quand…
+      description: Critères d'acceptation, vérifiables
