@@ -58,10 +58,18 @@ devzone desactiver <module>    # désactive et applique tout de suite
 
 | Module | Activé | Désactivé |
 |---|---|---|
-| `ia` | Claude Code et opencode installés (versions figées), réinstallés à chaque rebuild ; se connecter : `claude` (puis `/login`), `opencode auth login` | désinstallés ; les connexions restent dans leurs volumes |
+| `ia` | Claude Code et opencode installés (versions figées), réinstallés à chaque rebuild, avec le [garde-fou repowarden](#garde-fou-des-assistants-ia) ; se connecter : `claude` (puis `/login`), `opencode auth login` | désinstallés ; les connexions restent dans leurs volumes, le garde-fou aussi (sans effet sans les assistants) |
 | `kubernetes` | à chaque démarrage : connexion au cluster de ta machine et metrics-server sur les clusters locaux (CPU et RAM dans k9s) | aucune connexion au cluster de ta machine ; kubectl, helm, k9s et kind restent installés, un cluster kind créé à la main reste utilisable ; metrics-server n'est pas retiré des clusters où il a été installé |
 
 Le choix est **propre à chaque utilisateur** et gardé dans le volume `devzone-config` (il survit aux rebuilds). Au premier démarrage, si une connexion Claude Code ou opencode existe déjà dans les volumes, le module `ia` est activé (et signalé) : rien ne disparaît pour qui s'en servait.
+
+### Garde-fou des assistants IA
+
+Avec le module `ia` actif, devzone branche le [garde-fou de repowarden](https://github.com/simdevWarden/repowarden/blob/main/docs/agents.md) pour Claude Code et opencode (`repowarden agents init --global`, à l'activation et à chaque démarrage ; relancé, rien ne change). Dans **tout dépôt** du conteneur, l'agent est arrêté **avant** son action, avec la commande repowarden à lancer à la place, quand il veut modifier `main` ou `develop`, commiter sans `repowarden cc` ou contourner les hooks (`--no-verify`).
+
+- **Où** : `~/.claude/settings.json` (hook `PreToolUse`) et `~/.config/opencode/plugins/repowarden-garde.js`, dans les volumes : gardés aux rebuilds. Un réglage déjà présent est complété, jamais écrasé.
+- **Le voir à l'œuvre** : dans un dépôt sur `main`, demander à l'assistant de modifier un fichier : il est refusé (« branche protégée ») avec la commande à lancer.
+- **Limites** : un filet, pas un mur. Une modification faite par le shell (`sed -i`, redirection `>`, script) n'est vue qu'au commit, par les hooks ; une commande cachée dans `bash -c "…"` n'est pas vue. Sans `repowarden` ni `jq`, rien n'est bloqué. `devzone desactiver ia` laisse le garde-fou en place, sans effet sans les assistants.
 
 
 
