@@ -98,7 +98,7 @@ Pour en savoir plus : [Mettre en route un projet](https://github.com/SimBienvenu
 | Supprimer le conteneur | — | `make down` | — |
 | Reconstruire (après une modification de `.devcontainer/`) | *Dev Containers: Rebuild Container* | `make rebuild` | `npx @devcontainers/cli up --workspace-folder . --remove-existing-container` |
 | État | — | `make status` | — |
-| **Désinstaller** (tout ce que devzone a créé, après confirmation) | — | `make desinstaller` | `bash scripts/desinstaller.sh` |
+| **Désinstaller** (tout ce que devzone a créé, après confirmation) | — | `make desinstaller` | `bash core/scripts/desinstaller.sh` |
 
 ## Options
 

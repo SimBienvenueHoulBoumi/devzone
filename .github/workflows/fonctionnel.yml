@@ -4,7 +4,7 @@
 # tapée dans un vrai terminal, chaque commande avec un délai maximal (make
 # test-cli). Job windows : fins de ligne, paquet npm (installé dans un préfixe
 # isolé, jamais le global de la machine) et commande devzone sous windows-latest
-# (test/windows.sh, jouable en local), puis même parcours via cmd avec une
+# (core/test/windows.sh, jouable en local), puis même parcours via cmd avec une
 # installation réellement globale (raccourci .cmd de npm, le cas d'un utilisateur
 # Windows). Lancés quand le conteneur, les tests, la CLI, .gitattributes ou
 # package.json changent, et à la main. Non exigés pour merger (une dizaine de
@@ -15,10 +15,8 @@ on:
   pull_request:
     paths:
       - ".devcontainer/**"
-      - "test/**"
-      - "bin/**"
+      - "core/**"
       - "Makefile"
-      - "scripts/**"
       - ".gitattributes"
       - "package.json"
       - ".github/workflows/fonctionnel.yml"
@@ -37,14 +35,14 @@ jobs:
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v7
-      - run: bash test/fonctionnel.sh
+      - run: bash core/test/fonctionnel.sh
 
   cli:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
-      - run: bash test/cli-terminal.sh
+      - run: bash core/test/cli-terminal.sh
 
   windows:
     runs-on: windows-latest
@@ -57,11 +55,11 @@ jobs:
           git config --global core.autocrlf true
           git config --global core.safecrlf false
       - uses: actions/checkout@v7
-      # Les fins de ligne sont vérifiées par test/windows.sh (même critère que la
-      # garde de test/cli.bats : tout fichier suivi commençant par #!, Makefile)
-      - name: Tests Windows sous Git Bash (test/windows.sh)
+      # Les fins de ligne sont vérifiées par core/test/windows.sh (même critère que la
+      # garde de core/test/cli.bats : tout fichier suivi commençant par #!, Makefile)
+      - name: Tests Windows sous Git Bash (core/test/windows.sh)
         shell: bash
-        run: bash test/windows.sh
+        run: bash core/test/windows.sh
       # Sous shell: cmd, une commande qui échoue n'arrête pas le script : chaque
       # commande qui doit réussir est suivie de || exit /b 1, et la fin du
       # script est explicite (sans elle, l'étape prend le code de la dernière
@@ -100,8 +98,8 @@ jobs:
           if not %SORTIE% equ 0 exit /b 1
           if not exist %RUNNER_TEMP%\dzcmd\Makefile exit /b 1
           if not exist %RUNNER_TEMP%\dzcmd\.devcontainer\devzone exit /b 1
-          if not exist %RUNNER_TEMP%\dzcmd\scripts\lancer.sh exit /b 1
-          if not exist %RUNNER_TEMP%\dzcmd\scripts\desinstaller.sh exit /b 1
+          if not exist %RUNNER_TEMP%\dzcmd\core\scripts\lancer.sh exit /b 1
+          if not exist %RUNNER_TEMP%\dzcmd\core\scripts\desinstaller.sh exit /b 1
           mkdir %RUNNER_TEMP%\plein || exit /b 1
           echo important > %RUNNER_TEMP%\plein\fichier
           call devzone %RUNNER_TEMP%\plein > %RUNNER_TEMP%\sortie.txt 2>&1

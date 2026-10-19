@@ -19,9 +19,9 @@ help: ## Liste les commandes
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  make %-16s %s\n", $$1, $$2}'
 
 # up et rebuild : étapes affichées, journal complet dans .devzone.log, question
-# posée dans le conteneur signalée au lieu d'attendre (scripts/lancer.sh)
+# posée dans le conteneur signalée au lieu d'attendre (core/scripts/lancer.sh)
 up: hors-conteneur ## Lance le conteneur (le crée si absent)
-	@bash scripts/lancer.sh up "$(CURDIR)"
+	@bash core/scripts/lancer.sh up "$(CURDIR)"
 
 shell: hors-conteneur up ## Ouvre un shell dans le conteneur
 	@$(DC) exec $(WS) bash
@@ -35,16 +35,16 @@ down: hors-conteneur ## Supprime le conteneur (volumes, image et Docker interne 
 		docker rm -f $$ids >/dev/null && echo "devzone supprimé (désinstallation complète : make desinstaller)"; fi
 
 rebuild: hors-conteneur ## Reconstruit de zéro (après modif de .devcontainer/)
-	@bash scripts/lancer.sh rebuild "$(CURDIR)"
+	@bash core/scripts/lancer.sh rebuild "$(CURDIR)"
 
 status: hors-conteneur ## État du conteneur
 	@docker ps -a $(FILTRE) --format '{{.Status}}' | grep . || echo "aucun conteneur"
 
 test-fonctionnel: hors-conteneur ## Tests fonctionnels : devzone isolé, construit puis supprimé (5 à 10 min)
-	@bash test/fonctionnel.sh
+	@bash core/test/fonctionnel.sh
 
 test-cli: hors-conteneur ## Tests de la CLI dans un vrai terminal : devzone isolé, puis supprimé (10 à 15 min)
-	@bash test/cli-terminal.sh
+	@bash core/test/cli-terminal.sh
 
 desinstaller: hors-conteneur ## Supprime tout ce que devzone a créé, après confirmation (GARDER=connexions : garde les connexions)
-	@GARDER="$(GARDER)" bash scripts/desinstaller.sh
+	@GARDER="$(GARDER)" bash core/scripts/desinstaller.sh
