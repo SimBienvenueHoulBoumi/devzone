@@ -10,9 +10,9 @@
 # Sans terminal : CONFIRMER=oui.
 set -euo pipefail
 
-# Dossier devzone : le parent du dossier du script (scripts/), pour que la
-# commande fonctionne lancée depuis n'importe quel dossier
-ICI="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Dossier devzone : deux niveaux au-dessus du script (core/scripts/), pour que
+# la commande fonctionne lancée depuis n'importe quel dossier
+ICI="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 ETAT="$ICI/.devzone.etat"
 GARDER="${GARDER:-}"
 CONNEXIONS=(gh git claude opencode-config opencode-data config)

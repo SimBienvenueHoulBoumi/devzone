@@ -11,14 +11,14 @@
   "bugs": "https://github.com/SimBienvenueHoulBoumi/devzone/issues",
   "keywords": ["devcontainer", "docker", "kubernetes", "repowarden", "environnement"],
   "bin": {
-    "devzone": "bin/devzone"
+    "devzone": "core/devzone"
   },
   "files": [
-    "bin/",
+    "core/devzone",
     ".devcontainer/",
     "Makefile",
     ".gitattributes",
-    "scripts/",
+    "core/scripts/",
     "README.md",
     "LICENSE"
   ]

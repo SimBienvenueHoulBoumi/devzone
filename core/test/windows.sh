@@ -2,11 +2,11 @@
 # Tests Windows et local (macOS/Linux) : fins de ligne, paquet npm installé en
 # global dans un préfixe isolé sous $TMP (jamais celui de la machine), puis
 # comportement de la commande devzone — sans conteneur, donc sans Docker ni make.
-#   bash test/windows.sh     (en local, et dans le job windows de la CI)
-# Style identique à test/fonctionnel.sh (✔/✖, compteurs).
+#   bash core/test/windows.sh     (en local, et dans le job windows de la CI)
+# Style identique à core/test/fonctionnel.sh (✔/✖, compteurs).
 set -euo pipefail
 
-RACINE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+RACINE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 TMP="$(cd "$(mktemp -d)" && pwd -P)"
 TESTDIR="$TMP/testdz"
 # Chemin passé en argument à node, jamais écrit dans le code JavaScript de -p :
@@ -44,7 +44,7 @@ echoue() {
     if ! sortie="$(bz "$2")" && { [ -z "${3:-}" ] || grep -qE -- "$3" <<<"$sortie"; }; then ok "$1"; else ko "$1" "$sortie"; fi
 }
 
-# Même critère que la garde « scripts en LF » de test/cli.bats : tout fichier
+# Même critère que la garde « scripts en LF » de core/test/cli.bats : tout fichier
 # suivi commençant par #!, plus Makefile
 echo "▶ Fins de ligne (aucun CRLF dans les scripts)"
 for f in $(cd "$RACINE" && git ls-files); do
@@ -72,7 +72,7 @@ echo "▶ devzone lancé comme le raccourci .cmd de npm (chemin Windows du scrip
 # script (backslashes, lettre de lecteur) : reproduit ici depuis Git Bash en
 # passant ce même chemin à bash ; ignoré hors Windows (pas de cygpath)
 if command -v cygpath >/dev/null 2>&1; then
-    WINSCRIPT="$(cygpath -w "$TMP/npm/node_modules/devzone/bin/devzone")"
+    WINSCRIPT="$(cygpath -w "$TMP/npm/node_modules/devzone/core/devzone")"
     reussit "chemin Windows : --version donne la version" "bash '$WINSCRIPT' --version" "^$VERSION$"
     reussit "chemin Windows : --help donne l'aide" "bash '$WINSCRIPT' --help" "devzone <dossier>"
 else
@@ -81,7 +81,7 @@ fi
 
 echo "▶ devzone <dossier> avec DEVZONE_SANS_DEMARRER=1"
 reussit "crée un devzone complet" "DEVZONE_SANS_DEMARRER=1 devzone '$TESTDIR'" "créé dans"
-for f in .devcontainer/devcontainer.json .devcontainer/devzone Makefile .gitattributes scripts/lancer.sh scripts/desinstaller.sh README.md LICENSE workspace/.gitkeep .gitignore; do
+for f in .devcontainer/devcontainer.json .devcontainer/devzone Makefile .gitattributes core/scripts/lancer.sh core/scripts/desinstaller.sh README.md LICENSE workspace/.gitkeep .gitignore; do
     reussit "existe : $f" "[ -e '$TESTDIR/$f' ]"
 done
 reussit ".gitignore : workspace ignoré sauf .gitkeep" "grep -q '^workspace/\\*\$' '$TESTDIR/.gitignore'"

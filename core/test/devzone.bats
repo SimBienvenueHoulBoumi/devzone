@@ -3,7 +3,7 @@
 # HOME temporaire ; npm et kubectl simulés (aucune installation réelle).
 
 setup() {
-    DEVZONE="$BATS_TEST_DIRNAME/../.devcontainer/devzone"
+    DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
     export HOME="$BATS_TEST_TMPDIR/home"
     mkdir -p "$HOME" "$BATS_TEST_TMPDIR/bin"
     # npm simulé : journalise ses arguments

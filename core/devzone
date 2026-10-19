@@ -17,8 +17,9 @@ case "$SCRIPT" in
     [A-Za-z]:[\\/]*) SCRIPT="$(cygpath -u "$SCRIPT" 2>/dev/null || echo "${SCRIPT//\\//}")" ;;
 esac
 PAQUET="$(cd "$(dirname "$(readlink -f "$SCRIPT" 2>/dev/null || echo "$SCRIPT")")/.." && pwd)"
-# Fichiers d'un devzone (même liste que « files » de package.json, sans bin/)
-FICHIERS=(.devcontainer Makefile .gitattributes scripts README.md LICENSE)
+# Fichiers d'un devzone (même liste que « files » de package.json, sans la
+# commande core/devzone) ; core/scripts copié à part, sous core/
+FICHIERS=(.devcontainer Makefile .gitattributes README.md LICENSE)
 
 version() {
     # Chemin passé en argument à node, jamais écrit dans le code JavaScript de -p :
@@ -44,8 +45,9 @@ creer() {
         echo "✖ $cible existe et n'est pas vide : rien n'est écrasé. Choisis un autre dossier." >&2
         exit 1
     fi
-    mkdir -p "$cible/workspace"
+    mkdir -p "$cible/workspace" "$cible/core"
     cp -R "${FICHIERS[@]/#/$PAQUET/}" "$cible/"
+    cp -R "$PAQUET/core/scripts" "$cible/core/"
     touch "$cible/workspace/.gitkeep"
     # npm n'embarque jamais .gitignore : écrit ici
     cat >"$cible/.gitignore" <<'EOF'
@@ -57,7 +59,7 @@ workspace/*
 .devzone.log
 .devzone.etat
 EOF
-    chmod +x "$cible/scripts/desinstaller.sh" "$cible/scripts/lancer.sh"
+    chmod +x "$cible/core/scripts/desinstaller.sh" "$cible/core/scripts/lancer.sh"
     cible="$(cd "$cible" && pwd)"
     echo "✔ devzone $(version) créé dans $cible"
     if [ -n "${DEVZONE_SANS_DEMARRER:-}" ]; then
@@ -68,7 +70,7 @@ EOF
     if command -v make >/dev/null 2>&1; then
         make -C "$cible" up
     else
-        bash "$cible/scripts/lancer.sh" up "$cible"
+        bash "$cible/core/scripts/lancer.sh" up "$cible"
     fi
     echo "Ensuite : cd $cible && make shell (ou ouvre le dossier dans VS Code : Reopen in Container)."
 }
@@ -77,11 +79,11 @@ case "${1:-}" in
     "" | -h | --help | aide) aide ;;
     -v | --version) version ;;
     desinstaller)
-        # Dossier devzone (.devcontainer/) ; un devzone créé avant le rangement
-        # dans scripts/ a son desinstaller.sh à la racine
+        # Dossier devzone (.devcontainer/) ; un devzone plus ancien a son
+        # desinstaller.sh dans scripts/ (avant core/), ou à la racine (avant scripts/)
         desinstalleur=""
         if [ -d .devcontainer ]; then
-            for f in scripts/desinstaller.sh desinstaller.sh; do
+            for f in core/scripts/desinstaller.sh scripts/desinstaller.sh desinstaller.sh; do
                 if [ -f "$f" ]; then desinstalleur="$f" && break; fi
             done
         fi
