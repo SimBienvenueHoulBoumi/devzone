@@ -165,3 +165,41 @@ GH
     [[ "$output" == *"garde-fou repowarden non branché"*"repowarden agents init --global"* ]]
     grep -q "install -g" "$BATS_TEST_TMPDIR/npm.log"
 }
+
+@test "activer ia : configuration opencode absente -> écrite depuis le modèle" {
+    run bash "$DEVZONE" activer ia
+    [ "$status" -eq 0 ]
+    [ -f "$HOME/.config/opencode/opencode.jsonc" ]
+    grep -q '^// devzone : configuration opencode par défaut' "$HOME/.config/opencode/opencode.jsonc"
+    grep -q '"model": "opencode/big-pickle"' "$HOME/.config/opencode/opencode.jsonc"
+    grep -q '"compaction": {' "$HOME/.config/opencode/opencode.jsonc"
+    [[ "$output" == *"opencode : configuration par défaut écrite"* ]]
+}
+
+@test "activer ia : configuration opencode avec le repère et différente -> mise à jour" {
+    mkdir -p "$HOME/.config/opencode"
+    printf '// devzone : configuration opencode par défaut (ancienne)\n{"model":"ancien"}\n' >"$HOME/.config/opencode/opencode.jsonc"
+    run bash "$DEVZONE" activer ia
+    [ "$status" -eq 0 ]
+    grep -q '"model": "opencode/big-pickle"' "$HOME/.config/opencode/opencode.jsonc"
+    [[ "$output" == *"opencode : configuration par défaut mise à jour"* ]]
+}
+
+@test "activer ia : configuration opencode avec seulement \$schema -> remplacée" {
+    mkdir -p "$HOME/.config/opencode"
+    printf '{\n  "$schema": "https://opencode.ai/config.json"\n}\n' >"$HOME/.config/opencode/opencode.jsonc"
+    run bash "$DEVZONE" activer ia
+    [ "$status" -eq 0 ]
+    grep -q '^// devzone : configuration opencode par défaut' "$HOME/.config/opencode/opencode.jsonc"
+    grep -q '"model": "opencode/big-pickle"' "$HOME/.config/opencode/opencode.jsonc"
+    [[ "$output" == *"opencode : configuration par défaut mise à jour"* ]]
+}
+
+@test "activer ia : configuration opencode sans le repère -> gardée" {
+    mkdir -p "$HOME/.config/opencode"
+    printf '{"model":"mon-modele"}\n' >"$HOME/.config/opencode/opencode.jsonc"
+    run bash "$DEVZONE" activer ia
+    [ "$status" -eq 0 ]
+    [ "$(cat "$HOME/.config/opencode/opencode.jsonc")" = '{"model":"mon-modele"}' ]
+    [[ "$output" == *"opencode : configuration personnalisée, gardée"* ]]
+}

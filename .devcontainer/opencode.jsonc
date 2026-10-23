@@ -1,0 +1,34 @@
+// devzone : configuration opencode par défaut (devzone activer ia la tient à jour ; retirer cette ligne pour la personnaliser)
+{
+  "$schema": "https://opencode.ai/config.json",
+  // Modèles gratuits de la version d'opencode fixée par devzone.
+  // Partage et mises à jour désactivés : les versions sont fixées par devzone.
+  "model": "opencode/big-pickle",
+  "small_model": "opencode/mimo-v2.6-flash-free",
+  "share": "disabled",
+  "autoupdate": false,
+  "compaction": {
+    "auto": true
+  },
+  // Le reste est encadré par le garde-fou repowarden des dépôts repowarden.
+  "permission": {
+    "edit": "allow",
+    "webfetch": "allow",
+    "bash": {
+      "*": "allow",
+      "sudo *": "ask",
+      "rm -rf /*": "ask",
+      "git push --force*": "ask",
+      "git push -f*": "ask"
+    }
+  },
+  "agent": {
+    "build": { "model": "opencode/big-pickle" },
+    "plan": { "model": "opencode/nemotron-3-ultra-free" },
+    "general": { "model": "opencode/deepseek-v4.1-flash-free" },
+    "explore": { "model": "opencode/nemotron-3.5-lightning-free" },
+    "title": { "model": "opencode/mimo-v2.6-flash-free" },
+    "summary": { "model": "opencode/mimo-v2.6-flash-free" },
+    "compaction": { "model": "opencode/deepseek-v4.1-flash-free" }
+  }
+}
