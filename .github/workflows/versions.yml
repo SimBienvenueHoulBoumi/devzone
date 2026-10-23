@@ -12,6 +12,9 @@
 # Écart assumé (montées de version seulement) : le workflow valide le ticket
 # qu'il crée, pour que la branche du ticket puisse naître ; le contrôle humain
 # reste le passage de la PR en ready.
+#
+# Un ticket au même titre ouvert par quelqu'un d'autre est ignoré : il ne peut
+# pas bloquer les montées.
 name: versions
 
 on:
@@ -71,15 +74,15 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app.outputs.token }}
           GH_REPO: ${{ github.repository }}
+          APP_SLUG: ${{ steps.app.outputs.app-slug }}
         run: |
           set -euo pipefail
           while read -r paquet ancienne nouvelle; do
             [ -n "$paquet" ] || continue
             titre="$paquet $nouvelle dans le conteneur"
-            # Un ticket ouvert pour ce paquet existe déjà (titre « paquet … »)
-            existant="$(gh issue list --state open --limit 200 \
-              --json number,title -q '.[] | "\(.number)\t\(.title)"' |
-              awk -F '\t' -v prefixe="$paquet " 'index($2, prefixe) == 1 { print; exit }')"
+            # Un ticket ouvert par l'App existe déjà pour ce paquet (titre « paquet … ») ;
+            # même titre ouvert par quelqu'un d'autre : ignoré, il ne bloque pas la montée.
+            existant="$(bash core/scripts/versions.sh --ticket-existant "$paquet" "app/${APP_SLUG}")"
             if [ -n "$existant" ]; then
               n="${existant%%$'\t'*}"
               titre_existant="${existant#*$'\t'}"
