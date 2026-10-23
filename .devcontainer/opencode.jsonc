@@ -1,0 +1,34 @@
+// devzone : configuration opencode par défaut (devzone activer ia la tient à jour ; retirer cette ligne pour la personnaliser)
+{
+  "$schema": "https://opencode.ai/config.json",
+  // Modèles gratuits par rôle, comme la configuration du poste du mainteneur.
+  // Partage et mises à jour désactivés : les versions sont fixées par devzone.
+  "model": "opencode/big-pickle",
+  "small_model": "opencode/muse-spark-1.3-contributor-free",
+  "share": "disabled",
+  "autoupdate": false,
+  "compaction": {
+    "auto": true
+  },
+  // Le reste est encadré par le garde-fou repowarden des dépôts repowarden.
+  "permission": {
+    "edit": "allow",
+    "webfetch": "allow",
+    "bash": {
+      "*": "allow",
+      "sudo *": "ask",
+      "rm -rf /*": "ask",
+      "git push --force*": "ask",
+      "git push -f*": "ask"
+    }
+  },
+  "agent": {
+    "build": { "model": "opencode/big-pickle" },
+    "plan": { "model": "opencode/nemotron-3-ultra-free" },
+    "general": { "model": "opencode/step-5-preview-free" },
+    "explore": { "model": "opencode/space-bunny-free" },
+    "title": { "model": "opencode/muse-spark-1.3-contributor-free" },
+    "summary": { "model": "opencode/ling-3.1-flash-free" },
+    "compaction": { "model": "opencode/longcat-2.5-preview-free" }
+  }
+}

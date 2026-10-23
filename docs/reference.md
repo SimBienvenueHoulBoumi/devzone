@@ -58,7 +58,7 @@ devzone desactiver <module>    # désactive et applique tout de suite
 
 | Module | Activé | Désactivé |
 |---|---|---|
-| `ia` | Claude Code et opencode installés (versions figées), réinstallés à chaque rebuild, avec le [garde-fou repowarden](#garde-fou-des-assistants-ia) ; se connecter : `claude` (puis `/login`), `opencode auth login` | désinstallés ; les connexions restent dans leurs volumes, le garde-fou aussi (sans effet sans les assistants) |
+| `ia` | Claude Code et opencode installés (versions figées), réinstallés à chaque rebuild, avec le [garde-fou repowarden](#garde-fou-des-assistants-ia) et une [configuration opencode par défaut](#configuration-dopencode) ; se connecter : `claude` (puis `/login`), `opencode auth login` | désinstallés ; les connexions restent dans leurs volumes, le garde-fou aussi (sans effet sans les assistants) |
 | `kubernetes` | à chaque démarrage : connexion au cluster de ta machine et metrics-server sur les clusters locaux (CPU et RAM dans k9s) | aucune connexion au cluster de ta machine ; kubectl, helm, k9s et kind restent installés, un cluster kind créé à la main reste utilisable ; metrics-server n'est pas retiré des clusters où il a été installé |
 
 Le choix est **propre à chaque utilisateur** et gardé dans le volume `devzone-config` (il survit aux rebuilds). Au premier démarrage, si une connexion Claude Code ou opencode existe déjà dans les volumes, le module `ia` est activé (et signalé) : rien ne disparaît pour qui s'en servait.
@@ -70,6 +70,15 @@ Avec le module `ia` actif, devzone branche le [garde-fou de repowarden](https://
 - **Où** : `~/.claude/settings.json` (hook `PreToolUse`) et `~/.config/opencode/plugins/repowarden-garde.js`, dans les volumes : gardés aux rebuilds. Un réglage déjà présent est complété, jamais écrasé.
 - **Le voir à l'œuvre** : dans un dépôt sur `main`, demander à l'assistant de modifier un fichier : il est refusé (« branche protégée ») avec la commande à lancer.
 - **Limites** : un filet, pas un mur. Une modification faite par le shell (`sed -i`, redirection `>`, script) n'est vue qu'au commit, par les hooks ; une commande cachée dans `bash -c "…"` n'est pas vue. Sans `repowarden` ni `jq`, rien n'est bloqué. `devzone desactiver ia` laisse le garde-fou en place, sans effet sans les assistants.
+
+### Configuration d'opencode
+
+Avec le module `ia`, devzone écrit une configuration opencode prête à l'emploi dans `~/.config/opencode/opencode.jsonc` (volume `devzone-opencode-config`) : modèles gratuits par rôle (`build`, `plan`, `general`, `explore`, titre, résumé, compaction), partage et mises à jour désactivés, et `sudo`, `rm -rf /` et les push forcés à confirmer. Elle est mise à jour à chaque `devzone activer ia` et à chaque démarrage, tant que sa première ligne repère `// devzone : configuration opencode par défaut …` est présente.
+
+- **La personnaliser** : retirer cette ligne repère. devzone la garde alors telle quelle, et signale « configuration personnalisée, gardée ».
+- **Changer de modèle** : modifier `model` (modèle par défaut), `small_model` (titre) et les `agent` concernés ; `opencode models` liste les modèles disponibles.
+- **Fournisseur payant** : `opencode auth login` (la connexion reste dans le volume `devzone-opencode-data`).
+- **Lancer opencode en tâche de fond** : `opencode run --model opencode/big-pickle "…" < /dev/null`. Sans la redirection `< /dev/null`, il attend son entrée et reste muet.
 
 
 
