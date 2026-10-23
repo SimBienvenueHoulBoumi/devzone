@@ -34,6 +34,25 @@ else
 fi
 EOF
     chmod +x "$BATS_TEST_TMPDIR/bin/npm"
+    export GH_TICKETS="$BATS_TEST_TMPDIR/tickets.json"
+    # gh simulé : « gh issue list » applique l'expression --jq aux tickets du JSON
+    cat >"$BATS_TEST_TMPDIR/bin/gh" <<'EOF'
+#!/usr/bin/env bash
+if [ "${1:-}" = issue ] && [ "${2:-}" = list ]; then
+    expression='.[]'
+    while [ "$#" -gt 0 ]; do
+        if [ "$1" = --jq ]; then
+            expression="$2"
+            shift
+        fi
+        shift
+    done
+    jq -r "$expression" "$GH_TICKETS"
+else
+    exit 2
+fi
+EOF
+    chmod +x "$BATS_TEST_TMPDIR/bin/gh"
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
 }
 
@@ -44,6 +63,19 @@ npm_versions() {
         printf '%s %s\n' "$1" "$2" >>"$NPM_VERSIONS"
         shift 2
     done
+}
+
+# Tickets renvoyés par gh : une suite de triplets numéro titre auteur
+tickets_ouverts() {
+    local separateur=""
+    printf '[' >"$GH_TICKETS"
+    while [ "$#" -gt 0 ]; do
+        printf '%s{"number":%s,"title":"%s","author":{"login":"%s"}}' \
+            "$separateur" "$1" "$2" "$3" >>"$GH_TICKETS"
+        separateur=","
+        shift 3
+    done
+    printf ']\n' >>"$GH_TICKETS"
 }
 
 @test "tout à jour : aucune ligne" {
@@ -123,4 +155,32 @@ npm_versions() {
     run bash "$VERSIONS" --appliquer repowarden
     [ "$status" -ne 0 ]
     [[ "$output" == *"--appliquer"* ]]
+}
+
+@test "--ticket-existant : ticket de l'App trouvé (numéro et titre)" {
+    tickets_ouverts 42 "repowarden 9.9.9 dans le conteneur" "app/repowarden-devzone"
+    run bash "$VERSIONS" --ticket-existant repowarden "app/repowarden-devzone"
+    [ "$status" -eq 0 ]
+    [ "$output" = $'42\trepowarden 9.9.9 dans le conteneur' ]
+}
+
+@test "--ticket-existant : même titre ouvert par un autre auteur ignoré" {
+    tickets_ouverts 43 "repowarden 9.9.9 dans le conteneur" "intrus"
+    run bash "$VERSIONS" --ticket-existant repowarden "app/repowarden-devzone"
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+}
+
+@test "--ticket-existant : forme [bot] de l'auteur ignorée" {
+    tickets_ouverts 45 "repowarden 9.9.9 dans le conteneur" "repowarden-devzone[bot]"
+    run bash "$VERSIONS" --ticket-existant repowarden "app/repowarden-devzone"
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+}
+
+@test "--ticket-existant : titre d'un autre paquet ignoré" {
+    tickets_ouverts 44 "opencode-ai 9.9.9 dans le conteneur" "app/repowarden-devzone"
+    run bash "$VERSIONS" --ticket-existant repowarden "app/repowarden-devzone"
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
 }
