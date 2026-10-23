@@ -144,6 +144,8 @@ Tout le reste du conteneur (paquets installés à la main, fichiers hors de ces 
 
 Empreinte d'une archive : `curl -fsSL <url> | shasum -a 256`.
 
+**Montées automatiques** : les versions de `repowarden` et des assistants IA (`IA_PAQUETS`) sont comparées chaque matin à npm par le workflow `versions` (`.github/workflows/versions.yml`). Pour chaque paquet en retard, il ouvre ou met à jour un ticket, crée sa branche, applique la montée (`core/scripts/versions.sh --appliquer`), commit et pousse : la PR brouillon s'ouvre et la CI teste le conteneur. Le mainteneur n'a plus qu'à passer la PR en ready. À la main : *Actions → versions → Run workflow* ; en local, `bash core/scripts/versions.sh` liste les paquets en retard.
+
 
 
 ## Dépannage

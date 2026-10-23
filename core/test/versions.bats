@@ -1,0 +1,126 @@
+#!/usr/bin/env bats
+# Script versions.sh : comparaison des versions figées du conteneur avec npm
+# (simulé) et application ciblée d'une montée.
+
+setup() {
+    RACINE="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
+    export HOME="$BATS_TEST_TMPDIR/home"
+    mkdir -p "$HOME" "$BATS_TEST_TMPDIR/bin" \
+        "$BATS_TEST_TMPDIR/dz/core/scripts" "$BATS_TEST_TMPDIR/dz/.devcontainer"
+    cp "$RACINE/core/scripts/versions.sh" "$BATS_TEST_TMPDIR/dz/core/scripts/"
+    VERSIONS="$BATS_TEST_TMPDIR/dz/core/scripts/versions.sh"
+    POST_CREATE="$BATS_TEST_TMPDIR/dz/.devcontainer/post-create.sh"
+    DEVZONE="$BATS_TEST_TMPDIR/dz/.devcontainer/devzone"
+    cat >"$POST_CREATE" <<'EOF'
+#!/usr/bin/env bash
+# repowarden, version figée
+npm install -g repowarden@4.12.0
+repowarden install --global --lang fr
+EOF
+    cat >"$DEVZONE" <<'EOF'
+#!/usr/bin/env bash
+IA_PAQUETS=(@anthropic-ai/claude-code@2.1.286 opencode-ai@1.18.34)
+IA_NOMS=(@anthropic-ai/claude-code opencode-ai)
+EOF
+    chmod +x "$DEVZONE" # comme dans le dépôt : devzone est exécutable
+    export NPM_VERSIONS="$BATS_TEST_TMPDIR/versions"
+    # npm simulé : « npm view <paquet> version » lit les versions du fichier
+    cat >"$BATS_TEST_TMPDIR/bin/npm" <<'EOF'
+#!/usr/bin/env bash
+if [ "${1:-}" = view ] && [ "${3:-}" = version ]; then
+    awk -v p="$2" '$1 == p { print $2; trouve = 1 } END { exit trouve ? 0 : 1 }' "$NPM_VERSIONS"
+else
+    exit 2
+fi
+EOF
+    chmod +x "$BATS_TEST_TMPDIR/bin/npm"
+    export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
+}
+
+# Versions renvoyées par npm : une suite de couples paquet version
+npm_versions() {
+    : >"$NPM_VERSIONS"
+    while [ "$#" -gt 0 ]; do
+        printf '%s %s\n' "$1" "$2" >>"$NPM_VERSIONS"
+        shift 2
+    done
+}
+
+@test "tout à jour : aucune ligne" {
+    npm_versions repowarden 4.12.0 @anthropic-ai/claude-code 2.1.286 opencode-ai 1.18.34
+    run bash "$VERSIONS"
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+}
+
+@test "un paquet en retard : une ligne paquet ancienne nouvelle" {
+    npm_versions repowarden 4.13.0 @anthropic-ai/claude-code 2.1.286 opencode-ai 1.18.34
+    run bash "$VERSIONS"
+    [ "$status" -eq 0 ]
+    [ "$output" = "repowarden 4.12.0 4.13.0" ]
+}
+
+@test "paquet IA scopé en retard : reconnu dans IA_PAQUETS" {
+    npm_versions repowarden 4.12.0 @anthropic-ai/claude-code 2.2.0 opencode-ai 1.18.34
+    run bash "$VERSIONS"
+    [ "$status" -eq 0 ]
+    [ "$output" = "@anthropic-ai/claude-code 2.1.286 2.2.0" ]
+}
+
+@test "paquet IA sans scope en retard : reconnu dans IA_PAQUETS" {
+    npm_versions repowarden 4.12.0 @anthropic-ai/claude-code 2.1.286 opencode-ai 1.19.0
+    run bash "$VERSIONS"
+    [ "$status" -eq 0 ]
+    [ "$output" = "opencode-ai 1.18.34 1.19.0" ]
+}
+
+@test "version npm plus ancienne que la version figée : pas de retour en arrière" {
+    npm_versions repowarden 4.11.0 @anthropic-ai/claude-code 2.1.286 opencode-ai 1.18.34
+    run bash "$VERSIONS"
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+}
+
+@test "--appliquer repowarden : seule la version de post-create.sh change" {
+    avant="$(cat "$DEVZONE")"
+    run bash "$VERSIONS" --appliquer repowarden 4.13.0
+    [ "$status" -eq 0 ]
+    grep -qx 'npm install -g repowarden@4.13.0' "$POST_CREATE"
+    [ "$(cat "$DEVZONE")" = "$avant" ]
+}
+
+@test "--appliquer un paquet IA : seule sa version change, l'autre reste" {
+    run bash "$VERSIONS" --appliquer @anthropic-ai/claude-code 2.2.0
+    [ "$status" -eq 0 ]
+    grep -qx 'IA_PAQUETS=(@anthropic-ai/claude-code@2.2.0 opencode-ai@1.18.34)' "$DEVZONE"
+    grep -qx 'npm install -g repowarden@4.12.0' "$POST_CREATE"
+}
+
+@test "--appliquer opencode-ai : la version scopée reste intacte" {
+    run bash "$VERSIONS" --appliquer opencode-ai 1.19.0
+    [ "$status" -eq 0 ]
+    grep -qx 'IA_PAQUETS=(@anthropic-ai/claude-code@2.1.286 opencode-ai@1.19.0)' "$DEVZONE"
+}
+
+@test "--appliquer garde le droit d'exécution de devzone" {
+    [ -x "$DEVZONE" ]
+    run bash "$VERSIONS" --appliquer opencode-ai 1.19.0
+    [ "$status" -eq 0 ]
+    [ -x "$DEVZONE" ]
+}
+
+@test "--appliquer : paquet inconnu refusé, fichiers intacts" {
+    avant_post="$(cat "$POST_CREATE")"
+    avant_devzone="$(cat "$DEVZONE")"
+    run bash "$VERSIONS" --appliquer nexistepas 1.0.0
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"paquet inconnu"* ]]
+    [ "$(cat "$POST_CREATE")" = "$avant_post" ]
+    [ "$(cat "$DEVZONE")" = "$avant_devzone" ]
+}
+
+@test "--appliquer sans version : usage rappelé" {
+    run bash "$VERSIONS" --appliquer repowarden
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"--appliquer"* ]]
+}

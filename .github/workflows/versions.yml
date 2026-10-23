@@ -1,0 +1,125 @@
+# Montées de version automatiques des outils figés du conteneur : repowarden
+# (post-create.sh) et assistants IA (IA_PAQUETS, devzone). Une fois par jour
+# et à la main, compare chaque version figée à npm ; pour chaque paquet en
+# retard, ouvre le ticket (ou met à jour celui déjà ouvert), poste la
+# conception, crée la branche du ticket, applique la montée, commit et pousse :
+# la PR brouillon s'ouvre par le circuit habituel, la CI teste le conteneur.
+#
+# La GitHub App (REPOWARDEN_APP_CLIENT_ID, REPOWARDEN_APP_KEY) signe les
+# actions : le push déclenche la CI et le suivi des tickets, comme les autres
+# workflows. Le mainteneur n'a plus qu'à passer la PR en ready.
+#
+# Écart assumé (montées de version seulement) : le workflow valide le ticket
+# qu'il crée, pour que la branche du ticket puisse naître ; le contrôle humain
+# reste le passage de la PR en ready.
+name: versions
+
+on:
+  schedule:
+    - cron: "0 6 * * *" # chaque matin
+  workflow_dispatch: # à la main (Actions → versions → Run workflow)
+
+permissions: {}
+
+# Une seule comparaison à la fois : deux runs ne doivent pas ouvrir le même ticket
+concurrency:
+  group: versions
+  cancel-in-progress: false
+
+jobs:
+  versions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Jeton de la GitHub App
+        id: app
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.REPOWARDEN_APP_CLIENT_ID }}
+          private-key: ${{ secrets.REPOWARDEN_APP_KEY }}
+          permission-contents: write
+          permission-issues: write
+          permission-pull-requests: write
+      - uses: actions/checkout@v7
+        with:
+          token: ${{ steps.app.outputs.token }}
+          fetch-depth: 0 # branches des tickets et historique complets
+      - name: Identité git de l'App
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        run: |
+          slug="${{ steps.app.outputs.app-slug }}"
+          id="$(gh api "users/${slug}[bot]" --jq .id)"
+          git config user.name "${slug}[bot]"
+          git config user.email "${id}+${slug}[bot]@users.noreply.github.com"
+      - name: Repowarden même version figée que le conteneur
+        run: |
+          version="$(sed -nE 's/.*npm install -g repowarden@([^[:space:]]+).*/\1/p' .devcontainer/post-create.sh | head -1)"
+          npm install -g "repowarden@$version"
+      - name: Comparer les versions figées à npm
+        id: retards
+        run: |
+          bash core/scripts/versions.sh > retards.txt
+          cat retards.txt
+          if [ -s retards.txt ]; then
+            echo "present=true" >>"$GITHUB_OUTPUT"
+          else
+            echo "present=false" >>"$GITHUB_OUTPUT"
+          fi
+      - name: Ticket et PR pour chaque paquet en retard
+        if: steps.retards.outputs.present == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          while read -r paquet ancienne nouvelle; do
+            [ -n "$paquet" ] || continue
+            titre="$paquet $nouvelle dans le conteneur"
+            # Un ticket ouvert pour ce paquet existe déjà (titre « paquet … »)
+            existant="$(gh issue list --state open --limit 200 \
+              --json number,title -q '.[] | "\(.number)\t\(.title)"' |
+              awk -F '\t' -v prefixe="$paquet " 'index($2, prefixe) == 1 { print; exit }')"
+            if [ -n "$existant" ]; then
+              n="${existant%%$'\t'*}"
+              titre_existant="${existant#*$'\t'}"
+              if [ "$titre_existant" != "$titre" ]; then
+                gh issue edit "$n" --title "$titre"
+                gh issue comment "$n" --body "Nouvelle version npm : $nouvelle (la version figée était $ancienne)."
+              fi
+              continue
+            fi
+            notes="https://www.npmjs.com/package/$paquet/v/$nouvelle"
+            corps="$(cat <<EOF
+          ## Besoin
+          La version figée de $paquet dans le conteneur ($ancienne) est dépassée : la dernière version npm est $nouvelle.
+
+          ## Notes de version
+          $notes
+
+          ## Terminé quand…
+          - [ ] $paquet@$nouvelle est figé dans le fichier du conteneur
+          - [ ] les tests fonctionnels et la CLI passent sur la PR
+          EOF
+            )"
+            n="$(repowarden ticket nouveau "$titre" --type chore --description "$corps" --porcelain)"
+            conception="$(cat <<EOF
+          ## Conception retenue
+
+          - Monter \`$paquet\` de \`$ancienne\` à \`$nouvelle\` (dernière version npm).
+          - \`core/scripts/versions.sh --appliquer $paquet $nouvelle\` remplace la seule version figée, dans son fichier.
+          - Commit \`chore(devcontainer): $paquet $nouvelle\`, puis push : la PR brouillon s'ouvre, la CI teste le conteneur.
+          EOF
+            )"
+            repowarden ticket comment "$n" "$conception"
+            # Validation d'office pour que la branche du ticket puisse naître
+            repowarden ticket label "$n" validé
+            repowarden ticket "$n"
+            bash core/scripts/versions.sh --appliquer "$paquet" "$nouvelle"
+            git add -- .devcontainer/post-create.sh .devcontainer/devzone
+            repowarden cc -m "$paquet $nouvelle" \
+              --type chore --scope devcontainer \
+              --body "Monte $paquet de $ancienne à $nouvelle, dernière version npm." \
+              --refs "Ticket : #$n"
+            git push -u origin "$(git branch --show-current)"
+          done <retards.txt
