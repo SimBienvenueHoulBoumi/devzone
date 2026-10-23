@@ -51,7 +51,7 @@ repowarden            # vérifier
 Les fonctionnalités facultatives sont des modules, **désactivés par défaut**, activés à la demande depuis le conteneur, sans rebuild :
 
 ```bash
-devzone                        # état : identité git, GitHub, modules
+devzone                        # état : identité git, GitHub, outils, modules
 devzone activer <module>       # active et applique tout de suite
 devzone desactiver <module>    # désactive et applique tout de suite
 ```
@@ -137,7 +137,7 @@ Tout le reste du conteneur (paquets installés à la main, fichiers hors de ces 
 |---|---|---|
 | k9s, actionlint, gitleaks, kind | `.devcontainer/Dockerfile` : `ARG …_VERSION` **et** les empreintes `sha256` (arm64 + amd64) | `make rebuild` |
 | uv, ruff, vulture, pytest | `.devcontainer/Dockerfile` : `ARG …_VERSION` | `make rebuild` |
-| repowarden | `.devcontainer/post-create.sh` : `repowarden@x.y.z` | `make rebuild` |
+| repowarden | `.devcontainer/post-create.sh` : `repowarden@x.y.z` | `devzone appliquer` (ou `make rebuild`) |
 | Claude Code, opencode | `.devcontainer/devzone` : `IA_PAQUETS` (`@anthropic-ai/claude-code@x.y.z`, `opencode-ai@x.y.z`) | `devzone activer ia` (ou `make rebuild`) |
 | metrics-server | `.devcontainer/metrics-server.sh` : `VERSION` | `bash .devcontainer/metrics-server.sh` sur un nouveau cluster |
 | Java, Node, Python, Docker, kubectl, helm, gh | `.devcontainer/devcontainer.json` (features), versions figées dans `devcontainer-lock.json` | `npx @devcontainers/cli upgrade --workspace-folder .` puis `make rebuild` |
@@ -145,6 +145,8 @@ Tout le reste du conteneur (paquets installés à la main, fichiers hors de ces 
 Empreinte d'une archive : `curl -fsSL <url> | shasum -a 256`.
 
 **Montées automatiques** : les versions de `repowarden` et des assistants IA (`IA_PAQUETS`) sont comparées chaque matin à npm par le workflow `versions` (`.github/workflows/versions.yml`). Pour chaque paquet en retard, il ouvre ou met à jour un ticket, crée sa branche, applique la montée (`core/scripts/versions.sh --appliquer`), commit et pousse : la PR brouillon s'ouvre et la CI teste le conteneur. Le mainteneur n'a plus qu'à passer la PR en ready. À la main : *Actions → versions → Run workflow* ; en local, `bash core/scripts/versions.sh` liste les paquets en retard.
+
+**Rattraper sans rebuild** : l'état affiché au démarrage (et par `devzone`) compare les outils installés à leur version figée. Une ligne `⚠ outils          repowarden 4.9.2 installé, 4.12.0 figé : devzone appliquer` signale un écart ; `devzone appliquer` réinstalle repowarden à la version figée et les modules actifs. `✔ outils          versions figées` indique que tout correspond. Les outils installés par `apt` ou l'image (Java, Node, Python, …) ne sont pas concernés.
 
 
 
