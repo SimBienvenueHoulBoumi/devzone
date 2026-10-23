@@ -11,6 +11,7 @@ set -euo pipefail
 
 ETAT="${DEVZONE_ETAT:-$HOME/.config/devzone/modules}"
 ICI="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+VERSIONS="$ICI/../core/scripts/versions.sh"
 MODULES=(ia kubernetes)
 
 # Assistants IA, versions figées : mettre à jour ici, puis devzone appliquer
@@ -126,10 +127,30 @@ appliquer_kubernetes() {
     fi
 }
 
+# Lignes « paquet figée installée » des outils en retard ; échoue si le script
+# versions.sh est absent ou ne peut pas répondre (l'état omet alors la ligne)
+outils_retard() {
+    [ -f "$VERSIONS" ] || return 1
+    bash "$VERSIONS" --installees 2>/dev/null
+}
+
+# Remet repowarden à la version figée s'il en diffère, comme post-create.sh
+# (il installe les hooks git globaux)
+appliquer_repowarden() {
+    local ligne figee installee
+    [ -f "$VERSIONS" ] || return 0
+    ligne="$(bash "$VERSIONS" --installees 2>/dev/null | awk '$1 == "repowarden"' || true)"
+    [ -n "$ligne" ] || return 0
+    read -r _ figee installee <<<"$ligne"
+    npm install -g "repowarden@$figee" >/dev/null
+    repowarden install --global --lang fr
+    echo "devzone : repowarden $installee → $figee"
+}
+
 # État complet : ✔ prêt, ✖ nécessaire, ○ facultatif, ⚠ à corriger ; chaque
 # point à faire avec sa commande (affiché à chaque démarrage)
 etat() {
-    local nom email statut m
+    local nom email statut m retards
     echo "devzone : état (devzone pour le réafficher)"
     nom="$(git config --get user.name || true)"
     email="$(git config --get user.email || true)"
@@ -145,6 +166,16 @@ etat() {
         echo "  ⚠ GitHub          connecté, sans permission workflow (push de .github/workflows/ refusé) : gh auth refresh -h github.com -s workflow"
     else
         echo "  ✔ GitHub          connecté"
+    fi
+    if retards="$(outils_retard)"; then
+        if [ -z "$retards" ]; then
+            echo "  ✔ outils          versions figées"
+        else
+            while read -r paquet figee installee; do
+                [ -n "$paquet" ] || continue
+                echo "  ⚠ outils          $paquet $installee installé, $figee figé : devzone appliquer"
+            done <<<"$retards"
+        fi
     fi
     for m in "${MODULES[@]}"; do
         if [ "$(valeur "$m")" = on ]; then
@@ -170,6 +201,7 @@ case "${1:-}" in
     activer) changer on "${2:-}" ;;
     desactiver) changer off "${2:-}" ;;
     appliquer)
+        appliquer_repowarden
         [ "$(valeur ia)" = off ] || appliquer_ia on
         ;;
     actif)

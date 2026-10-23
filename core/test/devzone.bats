@@ -10,8 +10,25 @@ setup() {
     # configuration système fausseraient l'état « identité git »
     cd "$BATS_TEST_TMPDIR" || return 1
     export GIT_CONFIG_NOSYSTEM=1
-    # npm simulé : journalise ses arguments
-    printf '#!/usr/bin/env bash\necho "npm $*" >>"%s/npm.log"\n' "$BATS_TEST_TMPDIR" >"$BATS_TEST_TMPDIR/bin/npm"
+    # npm simulé : journalise ses arguments ; « npm ls -g --depth=0 --json »
+    # renvoie les outils installés (NPM_INSTALLEES)
+    export NPM_LOG="$BATS_TEST_TMPDIR/npm.log"
+    export NPM_INSTALLEES="$BATS_TEST_TMPDIR/installees"
+    : >"$NPM_INSTALLEES"
+    cat >"$BATS_TEST_TMPDIR/bin/npm" <<'NPM'
+#!/usr/bin/env bash
+echo "npm $*" >>"$NPM_LOG"
+if [ "${1:-}" = ls ] && [ "${2:-}" = -g ]; then
+    printf '{"dependencies":{'
+    sep=""
+    while read -r p v; do
+        [ -n "$p" ] || continue
+        printf '%s"%s":{"version":"%s"}' "$sep" "$p" "$v"
+        sep=","
+    done <"$NPM_INSTALLEES"
+    printf '}}\n'
+fi
+NPM
     # repowarden simulé : journalise ses arguments (garde-fou du module ia)
     printf '#!/usr/bin/env bash\necho "repowarden $*" >>"%s/repowarden.log"\n' "$BATS_TEST_TMPDIR" >"$BATS_TEST_TMPDIR/bin/repowarden"
     # kube-config.sh n'est pas lancé : kubernetes testé par l'état seul
@@ -61,6 +78,20 @@ GH
 @test "état : GitHub connecté avec workflow" {
     GH_ETAT=avec run bash "$DEVZONE"
     [[ "$output" == *"✔ GitHub          connecté"* ]]
+}
+
+@test "état : outil en retard → ⚠ avec la commande devzone appliquer" {
+    printf 'repowarden 4.9.2\n' >"$NPM_INSTALLEES"
+    run bash "$DEVZONE"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"⚠ outils          repowarden 4.9.2 installé, 4.12.0 figé : devzone appliquer"* ]]
+}
+
+@test "état : versions figées installées → ✔ outils" {
+    printf 'repowarden 4.12.0\n@anthropic-ai/claude-code 2.1.286\nopencode-ai 1.18.34\n' >"$NPM_INSTALLEES"
+    run bash "$DEVZONE"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"✔ outils          versions figées"* ]]
 }
 
 @test "état : module actif" {
@@ -133,11 +164,20 @@ GH
 @test "appliquer : installe ia seulement s'il est actif" {
     run bash "$DEVZONE" appliquer
     [ "$status" -eq 0 ]
-    [ ! -e "$BATS_TEST_TMPDIR/npm.log" ]
+    ! grep -q "install -g" "$BATS_TEST_TMPDIR/npm.log"
     bash "$DEVZONE" activer ia
     rm -f "$BATS_TEST_TMPDIR/npm.log"
     run bash "$DEVZONE" appliquer
     grep -q "install -g" "$BATS_TEST_TMPDIR/npm.log"
+}
+
+@test "appliquer : repowarden en retard → installé à la version figée" {
+    printf 'repowarden 4.9.2\n' >"$NPM_INSTALLEES"
+    run bash "$DEVZONE" appliquer
+    [ "$status" -eq 0 ]
+    grep -qx "npm install -g repowarden@4.12.0" "$BATS_TEST_TMPDIR/npm.log"
+    grep -qx "repowarden install --global --lang fr" "$BATS_TEST_TMPDIR/repowarden.log"
+    [[ "$output" == *"repowarden 4.9.2 → 4.12.0"* ]]
 }
 
 @test "activer ia : garde-fou repowarden branché pour Claude Code et opencode" {
