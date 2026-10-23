@@ -92,6 +92,24 @@ done
 echo "▶ Module ia"
 reussit "activer ia" "devzone activer ia && claude --version && opencode --version" "Claude Code"
 reussit "ia : garde-fou repowarden branché (Claude Code, opencode)" "grep -q 'repowarden garde' ~/.claude/settings.json && test -f ~/.config/opencode/plugins/repowarden-garde.js"
+reussit "ia : configuration opencode par défaut en place" "grep -q '^// devzone : configuration opencode par défaut' ~/.config/opencode/opencode.jsonc && grep -q '\"model\": \"opencode/big-pickle\"' ~/.config/opencode/opencode.jsonc"
+# Chaque modèle de la configuration doit être proposé par la version installée
+modeles="$(dz "grep -oE '\"opencode/[^\"]+\"' ~/.config/opencode/opencode.jsonc | tr -d '\"' | sort -u")"
+modeles_dispo="$(dz "opencode models opencode")"
+for modele in $modeles; do
+    if grep -qxF "$modele" <<<"$modeles_dispo"; then
+        ok "ia : modèle disponible : $modele"
+    else
+        ko "ia : modèle absent d'opencode models : $modele" "$modele"
+    fi
+done
+# Modèle gratuit : répond si le réseau le permet ; sinon test sauté (pas un échec)
+sortie_opencode="$(dz "opencode run --model opencode/big-pickle 'Réponds OK' < /dev/null")" || true
+if grep -q 'OK' <<<"$sortie_opencode"; then
+    ok "ia : opencode répond avec le modèle par défaut"
+else
+    echo "  ↷ ia : opencode sans réponse (réseau ou fournisseur indisponible) : $(printf '%s' "$sortie_opencode" | tail -1)"
+fi
 # Action d'agent sur main dans un dépôt neuf (hooks repowarden globaux) : refusée (code 2)
 # shellcheck disable=SC2016 # commande développée dans le conteneur
 echoue "ia : garde-fou : modification sur main refusée" 'd="$(mktemp -d)" && cd "$d" && git init -q -b main && printf "{\"tool_name\":\"Write\",\"tool_input\":{\"file_path\":\"%s/a.txt\"},\"cwd\":\"%s\"}" "$d" "$d" | repowarden garde --format claude' "branche protégée"

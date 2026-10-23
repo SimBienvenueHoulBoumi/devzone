@@ -61,6 +61,42 @@ ecrire() {
     mv "$tmp" "$ETAT"
 }
 
+# Vrai si le fichier ne contient que la clé $schema (créé d'office par opencode)
+contient_seulement_schema() {
+    local autres
+    autres="$(grep -vcE '^[[:space:]]*([{}]|"?[$]schema"?[[:space:]]*:.*)?[[:space:]]*$' "$1" || true)"
+    [ "$autres" -eq 0 ] && grep -qF "\$schema" "$1"
+}
+
+# Configuration opencode par défaut (modèle versionné) : écrite au premier
+# usage, mise à jour tant qu'elle garde le repère devzone, personnalisée sinon.
+config_opencode() {
+    local modele="$ICI/opencode.jsonc" repere cible
+    repere='// devzone : configuration opencode par défaut'
+    if [ -f "$HOME/.config/opencode/opencode.jsonc" ]; then
+        cible="$HOME/.config/opencode/opencode.jsonc"
+    elif [ -f "$HOME/.config/opencode/opencode.json" ]; then
+        cible="$HOME/.config/opencode/opencode.json"
+    else
+        cible="$HOME/.config/opencode/opencode.jsonc"
+    fi
+    mkdir -p "$(dirname "$cible")"
+    if [ ! -f "$cible" ]; then
+        cp "$modele" "$cible"
+        echo "opencode : configuration par défaut écrite"
+    elif grep -qF "$repere" "$cible"; then
+        if ! cmp -s "$modele" "$cible"; then
+            cp "$modele" "$cible"
+            echo "opencode : configuration par défaut mise à jour"
+        fi
+    elif contient_seulement_schema "$cible"; then
+        cp "$modele" "$cible"
+        echo "opencode : configuration par défaut mise à jour"
+    else
+        echo "opencode : configuration personnalisée, gardée"
+    fi
+}
+
 appliquer_ia() {
     if [ "$1" = on ]; then
         npm install -g --no-fund --no-audit --loglevel=error "${IA_PAQUETS[@]}" >/dev/null
@@ -73,6 +109,7 @@ appliquer_ia() {
         else
             echo "devzone : garde-fou repowarden non branché (repowarden 4.10 ou plus requis) : repowarden agents init --global" >&2
         fi
+        config_opencode
         echo "devzone : ia actif : claude (puis /login), opencode auth login"
     else
         npm uninstall -g "${IA_NOMS[@]}" >/dev/null 2>&1 || true
