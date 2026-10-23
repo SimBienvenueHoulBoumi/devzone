@@ -11,24 +11,22 @@ setup() {
     VERSIONS="$BATS_TEST_TMPDIR/dz/core/scripts/versions.sh"
     POST_CREATE="$BATS_TEST_TMPDIR/dz/.devcontainer/post-create.sh"
     DEVZONE="$BATS_TEST_TMPDIR/dz/.devcontainer/devzone"
-    cat >"$POST_CREATE" <<'EOF'
+    cat >"$POST_CREATE" <<'EOFPOST'
 #!/usr/bin/env bash
 # repowarden, version figée
 npm install -g repowarden@4.12.0
 repowarden install --global --lang fr
-EOF
-    cat >"$DEVZONE" <<'EOF'
+EOFPOST
+    cat >"$DEVZONE" <<'EOFDZ'
 #!/usr/bin/env bash
 IA_PAQUETS=(@anthropic-ai/claude-code@2.1.286 opencode-ai@1.18.34)
 IA_NOMS=(@anthropic-ai/claude-code opencode-ai)
-EOF
-    chmod +x "$DEVZONE" # comme dans le dépôt : devzone est exécutable
+EOFDZ
+    chmod +x "$DEVZONE"
     export NPM_VERSIONS="$BATS_TEST_TMPDIR/versions"
     export NPM_INSTALLEES="$BATS_TEST_TMPDIR/installees"
     : >"$NPM_INSTALLEES"
-    # npm simulé : « npm view <paquet> version » lit les versions du fichier,
-    # « npm ls -g --depth=0 --json » les outils installés
-    cat >"$BATS_TEST_TMPDIR/bin/npm" <<'EOF'
+    cat >"$BATS_TEST_TMPDIR/bin/npm" <<'EOFNPM'
 #!/usr/bin/env bash
 if [ "${1:-}" = view ] && [ "${3:-}" = version ]; then
     awk -v p="$2" '$1 == p { print $2; trouve = 1 } END { exit trouve ? 0 : 1 }' "$NPM_VERSIONS"
@@ -44,12 +42,29 @@ elif [ "${1:-}" = ls ] && [ "${2:-}" = -g ]; then
 else
     exit 2
 fi
-EOF
+EOFNPM
     chmod +x "$BATS_TEST_TMPDIR/bin/npm"
+    export GH_TICKETS="$BATS_TEST_TMPDIR/tickets.json"
+    cat >"$BATS_TEST_TMPDIR/bin/gh" <<'EOFGH'
+#!/usr/bin/env bash
+if [ "${1:-}" = issue ] && [ "${2:-}" = list ]; then
+    expression='.[]'
+    while [ "$#" -gt 0 ]; do
+        if [ "$1" = --jq ]; then
+            expression="$2"
+            shift
+        fi
+        shift
+    done
+    jq -r "$expression" "$GH_TICKETS"
+else
+    exit 2
+fi
+EOFGH
+    chmod +x "$BATS_TEST_TMPDIR/bin/gh"
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
 }
 
-# Versions renvoyées par npm : une suite de couples paquet version
 npm_versions() {
     : >"$NPM_VERSIONS"
     while [ "$#" -gt 0 ]; do
@@ -58,13 +73,23 @@ npm_versions() {
     done
 }
 
-# Outils installés globalement : une suite de couples paquet version
 npm_installees() {
     : >"$NPM_INSTALLEES"
     while [ "$#" -gt 0 ]; do
         printf '%s %s\n' "$1" "$2" >>"$NPM_INSTALLEES"
         shift 2
     done
+}
+
+tickets_ouverts() {
+    local separateur=""
+    printf '[' >"$GH_TICKETS"
+    while [ "$#" -gt 0 ]; do
+        printf '%s{"number":%s,"title":"%s","author":{"login":"%s"}}' "$separateur" "$1" "$2" "$3" >>"$GH_TICKETS"
+        separateur=","
+        shift 3
+    done
+    printf ']\n' >>"$GH_TICKETS"
 }
 
 @test "tout à jour : aucune ligne" {
@@ -165,4 +190,32 @@ npm_installees() {
     run bash "$VERSIONS" --appliquer repowarden
     [ "$status" -ne 0 ]
     [[ "$output" == *"--appliquer"* ]]
+}
+
+@test "--ticket-existant : ticket de l'App trouvé (numéro et titre)" {
+    tickets_ouverts 42 "repowarden 9.9.9 dans le conteneur" "app/repowarden-devzone"
+    run bash "$VERSIONS" --ticket-existant repowarden "app/repowarden-devzone"
+    [ "$status" -eq 0 ]
+    [ "$output" = $'42	repowarden 9.9.9 dans le conteneur' ]
+}
+
+@test "--ticket-existant : même titre ouvert par un autre auteur ignoré" {
+    tickets_ouverts 43 "repowarden 9.9.9 dans le conteneur" "intrus"
+    run bash "$VERSIONS" --ticket-existant repowarden "app/repowarden-devzone"
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+}
+
+@test "--ticket-existant : forme [bot] de l'auteur ignorée" {
+    tickets_ouverts 45 "repowarden 9.9.9 dans le conteneur" "repowarden-devzone[bot]"
+    run bash "$VERSIONS" --ticket-existant repowarden "app/repowarden-devzone"
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+}
+
+@test "--ticket-existant : titre d'un autre paquet ignoré" {
+    tickets_ouverts 44 "opencode-ai 9.9.9 dans le conteneur" "app/repowarden-devzone"
+    run bash "$VERSIONS" --ticket-existant repowarden "app/repowarden-devzone"
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
 }

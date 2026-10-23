@@ -8,6 +8,8 @@
 #       une ligne « paquet figée installée » par outil installé en retard
 #   bash core/scripts/versions.sh --appliquer <paquet> <version>
 #       remplace cette version figée dans son fichier, rien d'autre
+#   bash core/scripts/versions.sh --ticket-existant <paquet> <auteur>
+#       « numéro<TAB>titre » du ticket ouvert par <auteur>, rien sinon
 # Compatible bash 3.2 (macOS).
 set -euo pipefail
 
@@ -92,6 +94,24 @@ comparer_installees() {
     done < <(figees)
 }
 
+# Affiche « numéro<TAB>titre » du ticket ouvert par $2 dont le titre commence
+# par « $1 », rien sinon : un ticket au même titre ouvert par un autre est ignoré.
+ticket_existant() {
+    local paquet="$1" auteur="$2" tickets numero titre auteur_ticket
+    tickets="$(gh issue list --state open --limit 200 --json number,title,author \
+        --jq '.[] | "\(.number)\t\(.title)\t\(.author.login)"')"
+    while IFS=$'\t' read -r numero titre auteur_ticket; do
+        [ -n "$numero" ] || continue
+        case "$titre" in
+            "$paquet "*) ;;
+            *) continue ;;
+        esac
+        [ "$auteur_ticket" = "$auteur" ] || continue
+        printf '%s\t%s\n' "$numero" "$titre"
+        return 0
+    done <<<"$tickets"
+}
+
 # Échappe $1 pour un motif sed (le délimiteur est « | »)
 echapper() {
     printf '%s' "$1" | sed "s/[][\\\\.*^$()+?{}|]/\\\\&/g"
@@ -131,12 +151,17 @@ case "${1:-}" in
     --installees) comparer_installees ;;
     --appliquer)
         [ "$#" -eq 3 ] ||
-            { echo "usage : bash core/scripts/versions.sh [--installees | --appliquer <paquet> <version>]" >&2; exit 2; }
+            { echo "usage : bash core/scripts/versions.sh [--installees | --appliquer <paquet> <version> | --ticket-existant <paquet> <auteur>]" >&2; exit 2; }
         appliquer "$2" "$3"
         ;;
-    -h | --help) sed -n '2,11p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' ;;
+    --ticket-existant)
+        [ "$#" -eq 3 ] ||
+            { echo "usage : bash core/scripts/versions.sh [--installees | --appliquer <paquet> <version> | --ticket-existant <paquet> <auteur>]" >&2; exit 2; }
+        ticket_existant "$2" "$3"
+        ;;
+    -h | --help) sed -n '2,17p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' ;;
     *)
-        echo "usage : bash core/scripts/versions.sh [--installees | --appliquer <paquet> <version>]" >&2
+        echo "usage : bash core/scripts/versions.sh [--installees | --appliquer <paquet> <version> | --ticket-existant <paquet> <auteur>]" >&2
         exit 2
         ;;
 esac

@@ -243,3 +243,28 @@ GH
     [ "$(cat "$HOME/.config/opencode/opencode.jsonc")" = '{"model":"mon-modele"}' ]
     [[ "$output" == *"opencode : configuration personnalisée, gardée"* ]]
 }
+
+@test "modèle opencode : défauts durcis (bash en accord, secrets et curl interdits)" {
+    modele="$BATS_TEST_DIRNAME/../../.devcontainer/opencode.jsonc"
+    grep -q '"edit": "allow"' "$modele"
+    grep -q '"webfetch": "ask"' "$modele"
+    grep -q '"\*": "ask"' "$modele"
+    grep -q '"git \*": "allow"' "$modele"
+    grep -q '"bats\*": "allow"' "$modele"
+    grep -q '"gh auth token\*": "deny"' "$modele"
+    grep -q '"gh auth status --show-token\*": "deny"' "$modele"
+    grep -q '"\*hosts.yml\*": "deny"' "$modele"
+    grep -q '"\*\.credentials\*": "deny"' "$modele"
+    grep -q '"\*auth.json\*": "deny"' "$modele"
+    grep -q '"\*/.ssh/\*": "deny"' "$modele"
+    grep -q '"curl\*": "deny"' "$modele"
+    grep -q '"wget\*": "deny"' "$modele"
+}
+
+@test "modèle opencode : les deny passent après les allow (dernier motif gagnant)" {
+    modele="$BATS_TEST_DIRNAME/../../.devcontainer/opencode.jsonc"
+    dernier_allow="$(grep -n '": "allow"' "$modele" | tail -1 | cut -d: -f1)"
+    premier_deny="$(grep -n '": "deny"' "$modele" | head -1 | cut -d: -f1)"
+    [ -n "$dernier_allow" ] && [ -n "$premier_deny" ]
+    [ "$premier_deny" -gt "$dernier_allow" ]
+}
