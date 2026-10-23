@@ -1,10 +1,10 @@
 // devzone : configuration opencode par défaut (devzone activer ia la tient à jour ; retirer cette ligne pour la personnaliser)
 {
   "$schema": "https://opencode.ai/config.json",
-  // Modèles gratuits par rôle, comme la configuration du poste du mainteneur.
+  // Modèles gratuits de la version d'opencode fixée par devzone.
   // Partage et mises à jour désactivés : les versions sont fixées par devzone.
   "model": "opencode/big-pickle",
-  "small_model": "opencode/muse-spark-1.3-contributor-free",
+  "small_model": "opencode/mimo-v2.6-flash-free",
   "share": "disabled",
   "autoupdate": false,
   "compaction": {
@@ -25,10 +25,10 @@
   "agent": {
     "build": { "model": "opencode/big-pickle" },
     "plan": { "model": "opencode/nemotron-3-ultra-free" },
-    "general": { "model": "opencode/step-5-preview-free" },
-    "explore": { "model": "opencode/space-bunny-free" },
-    "title": { "model": "opencode/muse-spark-1.3-contributor-free" },
-    "summary": { "model": "opencode/ling-3.1-flash-free" },
-    "compaction": { "model": "opencode/longcat-2.5-preview-free" }
+    "general": { "model": "opencode/deepseek-v4.1-flash-free" },
+    "explore": { "model": "opencode/nemotron-3.5-lightning-free" },
+    "title": { "model": "opencode/mimo-v2.6-flash-free" },
+    "summary": { "model": "opencode/mimo-v2.6-flash-free" },
+    "compaction": { "model": "opencode/deepseek-v4.1-flash-free" }
   }
 }

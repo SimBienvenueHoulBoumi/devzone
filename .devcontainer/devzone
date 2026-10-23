@@ -61,6 +61,13 @@ ecrire() {
     mv "$tmp" "$ETAT"
 }
 
+# Vrai si le fichier ne contient que la clé $schema (créé d'office par opencode)
+contient_seulement_schema() {
+    local autres
+    autres="$(grep -vcE '^[[:space:]]*([{}]|"?[$]schema"?[[:space:]]*:.*)?[[:space:]]*$' "$1" || true)"
+    [ "$autres" -eq 0 ] && grep -qF "\$schema" "$1"
+}
+
 # Configuration opencode par défaut (modèle versionné) : écrite au premier
 # usage, mise à jour tant qu'elle garde le repère devzone, personnalisée sinon.
 config_opencode() {
@@ -82,6 +89,9 @@ config_opencode() {
             cp "$modele" "$cible"
             echo "opencode : configuration par défaut mise à jour"
         fi
+    elif contient_seulement_schema "$cible"; then
+        cp "$modele" "$cible"
+        echo "opencode : configuration par défaut mise à jour"
     else
         echo "opencode : configuration personnalisée, gardée"
     fi

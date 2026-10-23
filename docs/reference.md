@@ -78,7 +78,7 @@ Avec le module `ia`, devzone écrit une configuration opencode prête à l'emplo
 - **La personnaliser** : retirer cette ligne repère. devzone la garde alors telle quelle, et signale « configuration personnalisée, gardée ».
 - **Changer de modèle** : modifier `model` (modèle par défaut), `small_model` (titre) et les `agent` concernés ; `opencode models` liste les modèles disponibles.
 - **Fournisseur payant** : `opencode auth login` (la connexion reste dans le volume `devzone-opencode-data`).
-- **Lancer opencode en tâche de fond** : `opencode run --model opencode/big-pickle "…" < /dev/null`. Sans la redirection `< /dev/null`, il attend son entrée et reste muet.
+- **Lancer opencode en tâche de fond** : `opencode run --auto "…" < /dev/null`. Sans `--auto`, toute demande de permission est refusée d'office et l'agent s'arrête ; sans `< /dev/null`, il attend son entrée et reste muet.
 
 
 
