@@ -73,9 +73,11 @@ Avec le module `ia` actif, devzone branche le [garde-fou de repowarden](https://
 
 ### Configuration d'opencode
 
-Avec le module `ia`, devzone écrit une configuration opencode prête à l'emploi dans `~/.config/opencode/opencode.jsonc` (volume `devzone-opencode-config`) : modèles gratuits par rôle (`build`, `plan`, `general`, `explore`, titre, résumé, compaction), partage et mises à jour désactivés, et `sudo`, `rm -rf /` et les push forcés à confirmer. Elle est mise à jour à chaque `devzone activer ia` et à chaque démarrage, tant que sa première ligne repère `// devzone : configuration opencode par défaut …` est présente.
+Avec le module `ia`, devzone écrit une configuration opencode prête à l'emploi dans `~/.config/opencode/opencode.jsonc` (volume `devzone-opencode-config`) : modèles gratuits par rôle (`build`, `plan`, `general`, `explore`, titre, résumé, compaction), partage et mises à jour désactivés. Elle est mise à jour à chaque `devzone activer ia` et à chaque démarrage, tant que sa première ligne repère `// devzone : configuration opencode par défaut …` est présente.
 
-- **La personnaliser** : retirer cette ligne repère. devzone la garde alors telle quelle, et signale « configuration personnalisée, gardée ».
+- **Permissions par défaut** : ce qui sert au travail est permis sans question (`edit`, `git`, `repowarden`, `gh` en lecture, lecture et recherche, fichiers du projet, tests, linters et build) ; le reste demande ton accord (`ask`, dont `webfetch`) ; les fuites possibles de secrets sont interdites (`deny`) : `gh auth token`, `gh auth status --show-token`, `~/.config/gh/hosts.yml`, `*.credentials*`, `auth.json`, `~/.ssh/*`, l'environnement (`env`, `printenv`, `set`, `export -p`), `curl`/`wget`, `nc`, `ssh`, `scp`, `sudo`, `rm -rf /` et les push forcés. Le dernier motif qui correspond l'emporte : les `deny` sont en fin de liste.
+- **Pourquoi `curl`/`wget` sont interdits** : une requête peut envoyer des données (jeton, fichier) vers l'extérieur. Le réseau passe par `webfetch`, qui reste disponible après ton accord.
+- **La personnaliser** : retirer cette ligne repère. devzone la garde alors telle quelle, et signale « configuration personnalisée, gardée » ; pour élargir, y ajouter un `allow` (par exemple une commande de plus).
 - **Changer de modèle** : modifier `model` (modèle par défaut), `small_model` (titre) et les `agent` concernés ; `opencode models` liste les modèles disponibles.
 - **Fournisseur payant** : `opencode auth login` (la connexion reste dans le volume `devzone-opencode-data`).
 - **Lancer opencode en tâche de fond** : `opencode run --auto "…" < /dev/null`. Sans `--auto`, toute demande de permission est refusée d'office et l'agent s'arrête ; sans `< /dev/null`, il attend son entrée et reste muet.
