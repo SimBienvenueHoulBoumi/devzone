@@ -11,32 +11,41 @@ setup() {
     VERSIONS="$BATS_TEST_TMPDIR/dz/core/scripts/versions.sh"
     POST_CREATE="$BATS_TEST_TMPDIR/dz/.devcontainer/post-create.sh"
     DEVZONE="$BATS_TEST_TMPDIR/dz/.devcontainer/devzone"
-    cat >"$POST_CREATE" <<'EOF'
+    cat >"$POST_CREATE" <<'EOFPOST'
 #!/usr/bin/env bash
 # repowarden, version figée
 npm install -g repowarden@4.12.0
 repowarden install --global --lang fr
-EOF
-    cat >"$DEVZONE" <<'EOF'
+EOFPOST
+    cat >"$DEVZONE" <<'EOFDZ'
 #!/usr/bin/env bash
 IA_PAQUETS=(@anthropic-ai/claude-code@2.1.286 opencode-ai@1.18.34)
 IA_NOMS=(@anthropic-ai/claude-code opencode-ai)
-EOF
-    chmod +x "$DEVZONE" # comme dans le dépôt : devzone est exécutable
+EOFDZ
+    chmod +x "$DEVZONE"
     export NPM_VERSIONS="$BATS_TEST_TMPDIR/versions"
-    # npm simulé : « npm view <paquet> version » lit les versions du fichier
-    cat >"$BATS_TEST_TMPDIR/bin/npm" <<'EOF'
+    export NPM_INSTALLEES="$BATS_TEST_TMPDIR/installees"
+    : >"$NPM_INSTALLEES"
+    cat >"$BATS_TEST_TMPDIR/bin/npm" <<'EOFNPM'
 #!/usr/bin/env bash
 if [ "${1:-}" = view ] && [ "${3:-}" = version ]; then
     awk -v p="$2" '$1 == p { print $2; trouve = 1 } END { exit trouve ? 0 : 1 }' "$NPM_VERSIONS"
+elif [ "${1:-}" = ls ] && [ "${2:-}" = -g ]; then
+    printf '{"dependencies":{'
+    sep=""
+    while read -r p v; do
+        [ -n "$p" ] || continue
+        printf '%s"%s":{"version":"%s"}' "$sep" "$p" "$v"
+        sep=","
+    done <"$NPM_INSTALLEES"
+    printf '}}\n'
 else
     exit 2
 fi
-EOF
+EOFNPM
     chmod +x "$BATS_TEST_TMPDIR/bin/npm"
     export GH_TICKETS="$BATS_TEST_TMPDIR/tickets.json"
-    # gh simulé : « gh issue list » applique l'expression --jq aux tickets du JSON
-    cat >"$BATS_TEST_TMPDIR/bin/gh" <<'EOF'
+    cat >"$BATS_TEST_TMPDIR/bin/gh" <<'EOFGH'
 #!/usr/bin/env bash
 if [ "${1:-}" = issue ] && [ "${2:-}" = list ]; then
     expression='.[]'
@@ -51,12 +60,11 @@ if [ "${1:-}" = issue ] && [ "${2:-}" = list ]; then
 else
     exit 2
 fi
-EOF
+EOFGH
     chmod +x "$BATS_TEST_TMPDIR/bin/gh"
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
 }
 
-# Versions renvoyées par npm : une suite de couples paquet version
 npm_versions() {
     : >"$NPM_VERSIONS"
     while [ "$#" -gt 0 ]; do
@@ -65,13 +73,19 @@ npm_versions() {
     done
 }
 
-# Tickets renvoyés par gh : une suite de triplets numéro titre auteur
+npm_installees() {
+    : >"$NPM_INSTALLEES"
+    while [ "$#" -gt 0 ]; do
+        printf '%s %s\n' "$1" "$2" >>"$NPM_INSTALLEES"
+        shift 2
+    done
+}
+
 tickets_ouverts() {
     local separateur=""
     printf '[' >"$GH_TICKETS"
     while [ "$#" -gt 0 ]; do
-        printf '%s{"number":%s,"title":"%s","author":{"login":"%s"}}' \
-            "$separateur" "$1" "$2" "$3" >>"$GH_TICKETS"
+        printf '%s{"number":%s,"title":"%s","author":{"login":"%s"}}' "$separateur" "$1" "$2" "$3" >>"$GH_TICKETS"
         separateur=","
         shift 3
     done
@@ -81,6 +95,27 @@ tickets_ouverts() {
 @test "tout à jour : aucune ligne" {
     npm_versions repowarden 4.12.0 @anthropic-ai/claude-code 2.1.286 opencode-ai 1.18.34
     run bash "$VERSIONS"
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+}
+
+@test "--installees tout à jour : aucune ligne" {
+    npm_installees repowarden 4.12.0 @anthropic-ai/claude-code 2.1.286 opencode-ai 1.18.34
+    run bash "$VERSIONS" --installees
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+}
+
+@test "--installees repowarden en retard : une ligne paquet figée installée" {
+    npm_installees repowarden 4.9.2 @anthropic-ai/claude-code 2.1.286 opencode-ai 1.18.34
+    run bash "$VERSIONS" --installees
+    [ "$status" -eq 0 ]
+    [ "$output" = "repowarden 4.12.0 4.9.2" ]
+}
+
+@test "--installees outil IA non installé : pas listé" {
+    npm_installees repowarden 4.12.0
+    run bash "$VERSIONS" --installees
     [ "$status" -eq 0 ]
     [ -z "$output" ]
 }
@@ -161,7 +196,7 @@ tickets_ouverts() {
     tickets_ouverts 42 "repowarden 9.9.9 dans le conteneur" "app/repowarden-devzone"
     run bash "$VERSIONS" --ticket-existant repowarden "app/repowarden-devzone"
     [ "$status" -eq 0 ]
-    [ "$output" = $'42\trepowarden 9.9.9 dans le conteneur' ]
+    [ "$output" = $'42	repowarden 9.9.9 dans le conteneur' ]
 }
 
 @test "--ticket-existant : même titre ouvert par un autre auteur ignoré" {

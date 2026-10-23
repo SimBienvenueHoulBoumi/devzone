@@ -4,6 +4,8 @@
 # une montée.
 #   bash core/scripts/versions.sh
 #       une ligne « paquet ancienne nouvelle » par paquet en retard, rien sinon
+#   bash core/scripts/versions.sh --installees
+#       une ligne « paquet figée installée » par outil installé en retard
 #   bash core/scripts/versions.sh --appliquer <paquet> <version>
 #       remplace cette version figée dans son fichier, rien d'autre
 #   bash core/scripts/versions.sh --ticket-existant <paquet> <auteur>
@@ -70,6 +72,28 @@ lister() {
     done < <(figees)
 }
 
+# Versions installées globalement (paquet version), lues en une seule fois ;
+# échoue si npm ou jq ne répond pas (l'état omet alors la ligne)
+installees() {
+    local json
+    json="$(npm ls -g --depth=0 --json 2>/dev/null || true)"
+    [ -n "$json" ] || return 1
+    printf '%s\n' "$json" | jq -r '.dependencies // {} | to_entries[] | "\(.key) \(.value.version)"'
+}
+
+# Une ligne « paquet figée installée » par outil installé dont la version
+# diffère de la version figée ; un outil non installé n'est pas listé
+comparer_installees() {
+    local paquet figee installee liste
+    liste="$(installees)"
+    while read -r paquet figee; do
+        [ -n "$paquet" ] || continue
+        installee="$(printf '%s\n' "$liste" | awk -v p="$paquet" '$1 == p { print $2; exit }')"
+        [ -n "$installee" ] || continue
+        [ "$installee" = "$figee" ] || echo "$paquet $figee $installee"
+    done < <(figees)
+}
+
 # Affiche « numéro<TAB>titre » du ticket ouvert par $2 dont le titre commence
 # par « $1 », rien sinon : un ticket au même titre ouvert par un autre est ignoré.
 ticket_existant() {
@@ -124,19 +148,20 @@ appliquer() {
 
 case "${1:-}" in
     "") lister ;;
+    --installees) comparer_installees ;;
     --appliquer)
         [ "$#" -eq 3 ] ||
-            { echo "usage : bash core/scripts/versions.sh [--appliquer <paquet> <version> | --ticket-existant <paquet> <auteur>]" >&2; exit 2; }
+            { echo "usage : bash core/scripts/versions.sh [--installees | --appliquer <paquet> <version> | --ticket-existant <paquet> <auteur>]" >&2; exit 2; }
         appliquer "$2" "$3"
         ;;
     --ticket-existant)
         [ "$#" -eq 3 ] ||
-            { echo "usage : bash core/scripts/versions.sh [--appliquer <paquet> <version> | --ticket-existant <paquet> <auteur>]" >&2; exit 2; }
+            { echo "usage : bash core/scripts/versions.sh [--installees | --appliquer <paquet> <version> | --ticket-existant <paquet> <auteur>]" >&2; exit 2; }
         ticket_existant "$2" "$3"
         ;;
-    -h | --help) sed -n '2,11p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' ;;
+    -h | --help) sed -n '2,17p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' ;;
     *)
-        echo "usage : bash core/scripts/versions.sh [--appliquer <paquet> <version> | --ticket-existant <paquet> <auteur>]" >&2
+        echo "usage : bash core/scripts/versions.sh [--installees | --appliquer <paquet> <version> | --ticket-existant <paquet> <auteur>]" >&2
         exit 2
         ;;
 esac
