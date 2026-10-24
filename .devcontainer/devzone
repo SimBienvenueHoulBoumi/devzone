@@ -106,24 +106,65 @@ config_opencode() {
     fi
 }
 
+# Lance une commande longue en écrivant « toujours en cours » toutes les
+# DEVZONE_PROGRESSION s sur stderr : une installation muette semble bloquée (#195)
+avec_progression() {
+    local pas="${DEVZONE_PROGRESSION:-30}" ecoule=0 pid code=0
+    "$@" &
+    pid=$!
+    while kill -0 "$pid" 2>/dev/null; do
+        sleep 1
+        ecoule=$((ecoule + 1))
+        if [ $((ecoule % pas)) -eq 0 ] && kill -0 "$pid" 2>/dev/null; then
+            echo "devzone : … toujours en cours (${ecoule} s)" >&2
+        fi
+    done
+    wait "$pid" || code=$?
+    return "$code"
+}
+
+# Fichier qui marque un module actif en échec (contenu : où regarder) ; à côté
+# de l'état, dans son volume : l'état l'affiche à chaque démarrage
+fichier_echec() {
+    echo "$ETAT-echec-$1"
+}
+
+# Journal du dernier npm (son chemin est à donner en cas d'échec), ou son
+# dossier ; noms horodatés : le dernier dans l'ordre du glob est le plus récent
+dernier_journal_npm() {
+    local journal="" f
+    for f in "$HOME"/.npm/_logs/*-debug-0.log; do
+        if [ -f "$f" ]; then journal="$f"; fi
+    done
+    echo "${journal:-$HOME/.npm/_logs}"
+}
+
 # Installe les assistants IA figés, vérifiés par leur --version, 3 essais : npm
 # abandonne en silence un binaire de plateforme non téléchargé (#194)
 installer_ia() {
     local essai
     for essai in 1 2 3; do
-        if npm install -g --no-fund --no-audit --loglevel=error "${IA_PAQUETS[@]}" >/dev/null &&
+        if avec_progression npm install -g --no-fund --no-audit --loglevel=error "${IA_PAQUETS[@]}" >/dev/null &&
             claude --version >/dev/null 2>&1 && opencode --version >/dev/null 2>&1; then
             return 0
         fi
         [ "$essai" -eq 3 ] || echo "devzone : installation des assistants IA incomplète, nouvel essai ($((essai + 1))/3)…" >&2
     done
-    echo "devzone : échec de l'installation de ${IA_PAQUETS[*]} après 3 essais (journal npm : ~/.npm/_logs)" >&2
     return 1
 }
 
 appliquer_ia() {
+    local journal
     if [ "$1" = on ]; then
-        installer_ia
+        echo "devzone : installation de Claude Code et opencode (quelques minutes)…"
+        if ! installer_ia; then
+            journal="$(dernier_journal_npm)"
+            echo "journal npm : $journal" >"$(fichier_echec ia)"
+            echo "devzone : échec de l'installation de ${IA_PAQUETS[*]} (npm install -g, 3 essais) ; journal npm : $journal ; réessayer : devzone appliquer" >&2
+            return 1
+        fi
+        rm -f "$(fichier_echec ia)"
+        echo "devzone : Claude Code et opencode installés"
         # Garde-fou repowarden (hook PreToolUse de Claude Code, plugin opencode) :
         # agent arrêté avant de modifier main/develop, de commiter sans
         # repowarden cc ou de contourner les hooks. Global, dans les volumes
@@ -137,6 +178,7 @@ appliquer_ia() {
         echo "devzone : ia actif : claude (puis /login), opencode auth login"
     else
         npm uninstall -g "${IA_NOMS[@]}" >/dev/null 2>&1 || true
+        rm -f "$(fichier_echec ia)"
         echo "devzone : ia désactivé (connexions gardées dans leurs volumes)"
     fi
 }
@@ -165,6 +207,7 @@ appliquer_repowarden() {
     ligne="$(bash "$VERSIONS" --installees 2>/dev/null | awk '$1 == "repowarden"' || true)"
     [ -n "$ligne" ] || return 0
     read -r _ figee installee <<<"$ligne"
+    echo "devzone : installation de repowarden $figee…"
     npm install -g "repowarden@$figee" >/dev/null
     repowarden install --global --lang fr
     echo "devzone : repowarden $installee → $figee"
@@ -225,7 +268,9 @@ etat() {
         echo "  ⚠ worktree        $chemin absent ici (créé hors du conteneur ?) : le gérer de ce côté-là, jamais git worktree prune ici (docs/reference.md, Worktrees git)"
     done < <(worktrees_absents)
     for m in "${MODULES[@]}"; do
-        if [ "$(valeur "$m")" = on ]; then
+        if [ "$(valeur "$m")" = on ] && [ -f "$(fichier_echec "$m")" ]; then
+            printf '  ✖ module %-10s en échec : installation incomplète (%s) : devzone appliquer\n' "$m" "$(cat "$(fichier_echec "$m")")"
+        elif [ "$(valeur "$m")" = on ]; then
             printf '  ✔ module %-10s actif : %s\n' "$m" "$(description "$m")"
         else
             printf '  ○ module %-10s facultatif, %s : devzone activer %s\n' "$m" "$(description "$m")" "$m"
