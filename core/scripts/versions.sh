@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Versions figées du conteneur : compare repowarden (post-create.sh) et les
-# assistants IA (IA_PAQUETS, devzone) à la dernière version npm, ou applique
+# assistants IA (lignes IA_…, devzone) à la dernière version npm, ou applique
 # une montée.
 #   bash core/scripts/versions.sh
 #       une ligne « paquet ancienne nouvelle » par paquet en retard, rien sinon
@@ -17,18 +17,17 @@ ICI="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 POST_CREATE="$ICI/.devcontainer/post-create.sh"
 DEVZONE="$ICI/.devcontainer/devzone"
 
-# Liste « paquet version » des versions figées dans les deux fichiers
+# Liste « paquet version » des versions figées dans les deux fichiers ; dans
+# devzone, une ligne IA_<NOM>=<paquet>@<version> par assistant IA
 figees() {
     local ligne element
     ligne="$(sed -nE 's/.*npm install -g (repowarden)@([^[:space:]]+).*/\1 \2/p' "$POST_CREATE" | head -1)"
     [ -z "$ligne" ] || echo "$ligne"
-    ligne="$(sed -nE 's/^IA_PAQUETS=\((.*)\)/\1/p' "$DEVZONE" | head -1)"
-    [ -n "$ligne" ] || return 0
-    for element in $ligne; do
+    while read -r element; do
         case "$element" in
-            *@*) echo "${element%@*} ${element##*@}" ;;
+            ?*@*) echo "${element%@*} ${element##*@}" ;;
         esac
-    done
+    done < <(sed -nE 's/^IA_[A-Z0-9_]+=([^[:space:]()"]+)$/\1/p' "$DEVZONE")
 }
 
 # Vrai si la version $1 est plus récente que $2 (composants numériques)
@@ -140,7 +139,7 @@ appliquer() {
             { echo "versions : paquet inconnu : $paquet" >&2; exit 1; }
         motif="$(echapper "$paquet")"
         tmp="$(mktemp)"
-        sed -E "s|(${motif}@)[^ )]+|\1${version}|" "$fichier" >"$tmp"
+        sed -E "s|^(IA_[A-Z0-9_]+=${motif}@)[^[:space:]]+$|\1${version}|" "$fichier" >"$tmp"
     fi
     cat "$tmp" >"$fichier"
     rm -f "$tmp"
