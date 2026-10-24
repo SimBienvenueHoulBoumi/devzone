@@ -16,7 +16,7 @@ MODULES=(ia kubernetes)
 
 # Assistants IA, versions figées : mettre à jour ici, puis devzone appliquer
 # (ou Rebuild Container)
-IA_PAQUETS=(@anthropic-ai/claude-code@2.1.286 opencode-ai@1.18.34)
+IA_PAQUETS=(@anthropic-ai/claude-code@2.1.310 opencode-ai@1.18.34)
 IA_NOMS=(@anthropic-ai/claude-code opencode-ai)
 
 description() {
