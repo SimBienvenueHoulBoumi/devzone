@@ -18,13 +18,28 @@ setup() {
     export DEVZONE_RACINE="$BATS_TEST_TMPDIR/racine"
     mkdir -p "$DEVZONE_RACINE/workspace"
     # npm simulé : journalise ses arguments ; « npm ls -g --depth=0 --json »
-    # renvoie les outils installés (NPM_INSTALLEES)
+    # renvoie les outils installés (NPM_INSTALLEES). Installation des
+    # assistants IA : crée claude et opencode factices ; les N premières
+    # échouent (NPM_IA_ECHECS) ou réussissent sans opencode (NPM_IA_SANS_BINAIRE :
+    # binaire optionnel abandonné par npm, #194)
     export NPM_LOG="$BATS_TEST_TMPDIR/npm.log"
     export NPM_INSTALLEES="$BATS_TEST_TMPDIR/installees"
+    export NPM_BIN="$BATS_TEST_TMPDIR/bin"
     : >"$NPM_INSTALLEES"
     cat >"$BATS_TEST_TMPDIR/bin/npm" <<'NPM'
 #!/usr/bin/env bash
 echo "npm $*" >>"$NPM_LOG"
+if [ "${1:-}" = install ] && [[ " $* " == *" opencode-ai@"* ]]; then
+    n="$(grep -c "^npm install.* opencode-ai@" "$NPM_LOG")"
+    [ "$n" -gt "${NPM_IA_ECHECS:-0}" ] || exit 1
+    printf '#!/usr/bin/env bash\necho "2.1.0 (Claude Code)"\n' >"$NPM_BIN/claude"
+    if [ "$n" -gt "${NPM_IA_SANS_BINAIRE:-0}" ]; then
+        printf '#!/usr/bin/env bash\necho 1.0.0\n' >"$NPM_BIN/opencode"
+    else
+        printf '#!/usr/bin/env bash\necho "binaire absent" >&2\nexit 1\n' >"$NPM_BIN/opencode"
+    fi
+    chmod +x "$NPM_BIN/claude" "$NPM_BIN/opencode"
+fi
 if [ "${1:-}" = ls ] && [ "${2:-}" = -g ]; then
     printf '{"dependencies":{'
     sep=""
@@ -146,6 +161,31 @@ GH
     grep -qE "install -g .* @anthropic-ai/claude-code@[0-9.]+ opencode-ai@[0-9.]+$" "$BATS_TEST_TMPDIR/npm.log"
     run bash "$DEVZONE" actif ia
     [ "$status" -eq 0 ]
+}
+
+@test "activer ia : binaire optionnel abandonné par npm (opencode ne répond pas) → réinstallé" {
+    NPM_IA_SANS_BINAIRE=1 run bash "$DEVZONE" activer ia
+    [ "$status" -eq 0 ]
+    [ "$(grep -c "^npm install -g .* opencode-ai@" "$BATS_TEST_TMPDIR/npm.log")" -eq 2 ]
+    [[ "$output" == *"nouvel essai"* ]] || false
+    run opencode --version
+    [ "$status" -eq 0 ]
+}
+
+@test "activer ia : npm en échec une fois → retenté, réussite" {
+    NPM_IA_ECHECS=1 run bash "$DEVZONE" activer ia
+    [ "$status" -eq 0 ]
+    [ "$(grep -c "^npm install -g .* opencode-ai@" "$BATS_TEST_TMPDIR/npm.log")" -eq 2 ]
+    [[ "$output" == *"ia actif"* ]] || false
+}
+
+@test "activer ia : échec à chaque essai → 3 essais, code non nul, paquets et journal npm cités" {
+    NPM_IA_ECHECS=9 run bash "$DEVZONE" activer ia
+    [ "$status" -ne 0 ]
+    [ "$(grep -c "^npm install -g .* opencode-ai@" "$BATS_TEST_TMPDIR/npm.log")" -eq 3 ]
+    [[ "$output" == *"opencode-ai@"* ]] || false
+    [[ "$output" == *".npm/_logs"* ]] || false
+    [[ "$output" != *"ia actif"* ]] || false
 }
 
 @test "désactiver ia : désinstalle, état gardé" {

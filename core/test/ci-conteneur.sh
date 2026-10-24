@@ -2,14 +2,15 @@
 # Tests du conteneur exigés pour merger (workflow fonctionnel.yml) :
 #   bash core/test/ci-conteneur.sh a-tester < fichiers-changés
 #       « true » si la PR touche le conteneur, les tests, la CLI,
-#       .gitattributes ou package.json (fonctionnel, cli et windows tournent),
+#       .gitattributes ou package.json (fonctionnel, cli, windows et ia-arm64 tournent),
 #       « false » sinon (une PR de docs seule n'attend pas 25 min)
-#   bash core/test/ci-conteneur.sh synthese <tester> <changements> <fonctionnel> <cli> <windows>
+#   bash core/test/ci-conteneur.sh synthese <tester> <changements> <fonctionnel> <cli> <windows> <ia-arm64>
 #       vérification tests-conteneur (exigée pour merger) : code 0 si rien
-#       n'était à tester, ou si les trois jobs ont réussi ; 1 sinon (échec,
+#       n'était à tester, ou si les quatre jobs ont réussi ; 1 sinon (échec,
 #       annulation, job sauté alors qu'il devait tourner)
 # Arguments de synthese : sortie tester du job changements, puis résultat
-# (needs.<job>.result) de changements, fonctionnel, cli et windows.
+# (needs.<job>.result) de changements, fonctionnel, cli, windows et ia-arm64
+# (assistants IA installés sur arm64, Mac Apple Silicon, #194).
 # Compatible bash 3.2 (macOS).
 set -euo pipefail
 
@@ -34,7 +35,7 @@ synthese() {
         echo "✔ rien à tester : la PR ne touche ni le conteneur, ni les tests, ni la CLI"
         return 0
     fi
-    for paire in "fonctionnel=$3" "cli=$4" "windows=$5"; do
+    for paire in "fonctionnel=$3" "cli=$4" "windows=$5" "ia-arm64=$6"; do
         job="${paire%%=*}"
         resultat="${paire#*=}"
         if [ "$resultat" = success ]; then
@@ -48,14 +49,14 @@ synthese() {
 }
 
 usage() {
-    echo "usage : bash core/test/ci-conteneur.sh a-tester < fichiers | synthese <tester> <changements> <fonctionnel> <cli> <windows>" >&2
+    echo "usage : bash core/test/ci-conteneur.sh a-tester < fichiers | synthese <tester> <changements> <fonctionnel> <cli> <windows> <ia-arm64>" >&2
     exit 2
 }
 
 case "${1:-}" in
     a-tester) a_tester ;;
     synthese)
-        [ "$#" -eq 6 ] || usage
+        [ "$#" -eq 7 ] || usage
         shift
         synthese "$@"
         ;;

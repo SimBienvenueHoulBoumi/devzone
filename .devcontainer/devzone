@@ -106,9 +106,24 @@ config_opencode() {
     fi
 }
 
+# Installe les assistants IA figés, vérifiés par leur --version, 3 essais : npm
+# abandonne en silence un binaire de plateforme non téléchargé (#194)
+installer_ia() {
+    local essai
+    for essai in 1 2 3; do
+        if npm install -g --no-fund --no-audit --loglevel=error "${IA_PAQUETS[@]}" >/dev/null &&
+            claude --version >/dev/null 2>&1 && opencode --version >/dev/null 2>&1; then
+            return 0
+        fi
+        [ "$essai" -eq 3 ] || echo "devzone : installation des assistants IA incomplète, nouvel essai ($((essai + 1))/3)…" >&2
+    done
+    echo "devzone : échec de l'installation de ${IA_PAQUETS[*]} après 3 essais (journal npm : ~/.npm/_logs)" >&2
+    return 1
+}
+
 appliquer_ia() {
     if [ "$1" = on ]; then
-        npm install -g --no-fund --no-audit --loglevel=error "${IA_PAQUETS[@]}" >/dev/null
+        installer_ia
         # Garde-fou repowarden (hook PreToolUse de Claude Code, plugin opencode) :
         # agent arrêté avant de modifier main/develop, de commiter sans
         # repowarden cc ou de contourner les hooks. Global, dans les volumes
