@@ -19,22 +19,34 @@ setup() {
     mkdir -p "$DEVZONE_RACINE/workspace"
     # npm simulé : journalise ses arguments ; « npm ls -g --depth=0 --json »
     # renvoie les outils installés (NPM_INSTALLEES). Installation des
-    # assistants IA : dure NPM_DUREE secondes ; NPM_ECHEC=1 → échec, avec un
-    # journal npm écrit comme le vrai (~/.npm/_logs)
+    # assistants IA : dure NPM_DUREE secondes, crée claude et opencode
+    # factices ; NPM_ECHEC=1 → toujours en échec, les N premières échouent
+    # (NPM_IA_ECHECS), avec un journal npm écrit comme le vrai (~/.npm/_logs),
+    # ou réussissent sans opencode (NPM_IA_SANS_BINAIRE : binaire optionnel
+    # abandonné par npm, #194)
     export NPM_LOG="$BATS_TEST_TMPDIR/npm.log"
     export NPM_INSTALLEES="$BATS_TEST_TMPDIR/installees"
+    export NPM_BIN="$BATS_TEST_TMPDIR/bin"
     : >"$NPM_INSTALLEES"
     cat >"$BATS_TEST_TMPDIR/bin/npm" <<'NPM'
 #!/usr/bin/env bash
 echo "npm $*" >>"$NPM_LOG"
 if [ "${1:-}" = install ] && [[ " $* " == *" opencode-ai@"* ]]; then
     sleep "${NPM_DUREE:-0}"
-    if [ "${NPM_ECHEC:-0}" = 1 ]; then
+    n="$(grep -c "^npm install.* opencode-ai@" "$NPM_LOG")"
+    if [ "${NPM_ECHEC:-0}" = 1 ] || [ "$n" -le "${NPM_IA_ECHECS:-0}" ]; then
         mkdir -p "$HOME/.npm/_logs"
         echo "error code EBADPLATFORM" >"$HOME/.npm/_logs/2026-10-24T11_46_18_245Z-debug-0.log"
         echo "npm error A complete log of this run can be found in: $HOME/.npm/_logs/2026-10-24T11_46_18_245Z-debug-0.log" >&2
         exit 1
     fi
+    printf '#!/usr/bin/env bash\necho "2.1.0 (Claude Code)"\n' >"$NPM_BIN/claude"
+    if [ "$n" -gt "${NPM_IA_SANS_BINAIRE:-0}" ]; then
+        printf '#!/usr/bin/env bash\necho 1.0.0\n' >"$NPM_BIN/opencode"
+    else
+        printf '#!/usr/bin/env bash\necho "binaire absent" >&2\nexit 1\n' >"$NPM_BIN/opencode"
+    fi
+    chmod +x "$NPM_BIN/claude" "$NPM_BIN/opencode"
 fi
 if [ "${1:-}" = ls ] && [ "${2:-}" = -g ]; then
     printf '{"dependencies":{'
@@ -157,6 +169,31 @@ GH
     grep -qE "install -g .* @anthropic-ai/claude-code@[0-9.]+ opencode-ai@[0-9.]+$" "$BATS_TEST_TMPDIR/npm.log"
     run bash "$DEVZONE" actif ia
     [ "$status" -eq 0 ]
+}
+
+@test "activer ia : binaire optionnel abandonné par npm (opencode ne répond pas) → réinstallé" {
+    NPM_IA_SANS_BINAIRE=1 run bash "$DEVZONE" activer ia
+    [ "$status" -eq 0 ]
+    [ "$(grep -c "^npm install -g .* opencode-ai@" "$BATS_TEST_TMPDIR/npm.log")" -eq 2 ]
+    [[ "$output" == *"nouvel essai"* ]] || false
+    run opencode --version
+    [ "$status" -eq 0 ]
+}
+
+@test "activer ia : npm en échec une fois → retenté, réussite" {
+    NPM_IA_ECHECS=1 run bash "$DEVZONE" activer ia
+    [ "$status" -eq 0 ]
+    [ "$(grep -c "^npm install -g .* opencode-ai@" "$BATS_TEST_TMPDIR/npm.log")" -eq 2 ]
+    [[ "$output" == *"ia actif"* ]] || false
+}
+
+@test "activer ia : échec à chaque essai → 3 essais, code non nul, paquets et journal npm cités" {
+    NPM_IA_ECHECS=9 run bash "$DEVZONE" activer ia
+    [ "$status" -ne 0 ]
+    [ "$(grep -c "^npm install -g .* opencode-ai@" "$BATS_TEST_TMPDIR/npm.log")" -eq 3 ]
+    [[ "$output" == *"opencode-ai@"* ]] || false
+    [[ "$output" == *".npm/_logs"* ]] || false
+    [[ "$output" != *"ia actif"* ]] || false
 }
 
 @test "activer ia : installation lente → annoncée, progression pendant, résultat après" {
