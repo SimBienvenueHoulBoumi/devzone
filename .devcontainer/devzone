@@ -21,7 +21,7 @@ MODULES=(ia kubernetes)
 # Claude Code
 IA_CLAUDE=@anthropic-ai/claude-code@2.1.286
 # opencode
-IA_OPENCODE=opencode-ai@1.18.34
+IA_OPENCODE=opencode-ai@1.19.4
 IA_PAQUETS=("$IA_CLAUDE" "$IA_OPENCODE")
 IA_NOMS=("${IA_CLAUDE%@*}" "${IA_OPENCODE%@*}")
 
