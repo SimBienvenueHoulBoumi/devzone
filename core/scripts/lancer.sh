@@ -80,6 +80,11 @@ arreter() {
 }
 trap 'arreter; echo; echo "interrompu — journal : .devzone.log"; exit 130' INT TERM
 
+# Docker d'abord : sans lui, le CLI ne donnerait qu'une erreur JSON brute
+# shellcheck source=SCRIPTDIR/docker.sh
+. "$(dirname "${BASH_SOURCE[0]}")/docker.sh"
+docker_pret "${DEVZONE_COMMANDE:-make $mode}" || exit 1
+
 : >"$LOG"
 debut="$(date +%s)"
 derniere_annonce="$debut"

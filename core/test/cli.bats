@@ -111,6 +111,99 @@ faux_cli() {
     chmod +x "$BATS_TEST_TMPDIR/faux/npx"
     export PATH="$BATS_TEST_TMPDIR/faux:$PATH"
     mkdir -p dz
+    # Docker démarré par défaut : les runners macOS n'en ont pas
+    faux_docker demarre
+}
+
+# docker simulé : $1 = demarre, arrete, droits ou absent (commande introuvable) ;
+# chaque appel est noté dans $BATS_TEST_TMPDIR/docker.log
+faux_docker() {
+    mkdir -p "$BATS_TEST_TMPDIR/faux"
+    if [ "$1" = absent ]; then
+        export DEVZONE_DOCKER=docker-introuvable-devzone
+        return 0
+    fi
+    export DEVZONE_DOCKER=docker
+    {
+        echo '#!/usr/bin/env bash'
+        echo "echo \"docker \$*\" >>\"$BATS_TEST_TMPDIR/docker.log\""
+        case "$1" in
+            demarre) echo 'exit 0' ;;
+            arrete) echo 'echo "failed to connect to the docker API at unix:///var/run/docker.sock; check if the path is correct and if the daemon is running: dial unix /var/run/docker.sock: connect: no such file or directory" >&2; exit 1' ;;
+            droits) echo 'echo "permission denied while trying to connect to the Docker daemon socket at unix:///var/run/docker.sock: dial unix /var/run/docker.sock: connect: permission denied" >&2; exit 1' ;;
+        esac
+    } >"$BATS_TEST_TMPDIR/faux/docker"
+    chmod +x "$BATS_TEST_TMPDIR/faux/docker"
+    export PATH="$BATS_TEST_TMPDIR/faux:$PATH"
+}
+
+@test "lancer.sh : Docker absent → comment l'installer, CLI devcontainers jamais lancé" {
+    faux_cli 'echo "{\"outcome\":\"error\"}"; exit 1'
+    faux_docker absent
+    run bash "$RACINE/core/scripts/lancer.sh" up "$PWD/dz"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"Docker introuvable"*"Docker Desktop"*"Docker Engine"*"make up"* ]] || false
+    [ ! -e "$BATS_TEST_TMPDIR/args" ]
+    [[ "$output" != *outcome* ]] || false
+}
+
+@test "lancer.sh : Docker arrêté → démarrer Docker Desktop puis relancer, sans erreur brute" {
+    faux_cli 'echo "{\"outcome\":\"error\"}"; exit 1'
+    faux_docker arrete
+    run bash "$RACINE/core/scripts/lancer.sh" rebuild "$PWD/dz"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"Démarre Docker Desktop"*"make rebuild"* ]] || false
+    [ ! -e "$BATS_TEST_TMPDIR/args" ]
+    [[ "$output" != *outcome* ]] || false
+    [[ "$output" != *"failed to connect"* ]] || false
+}
+
+@test "lancer.sh : Docker sans droits → la commande du groupe docker" {
+    faux_cli 'exit 0'
+    faux_docker droits
+    run bash "$RACINE/core/scripts/lancer.sh" up "$PWD/dz"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"sudo usermod -aG docker"*"make up"* ]] || false
+    [[ "$output" != *"permission denied while"* ]] || false
+    [ ! -e "$BATS_TEST_TMPDIR/args" ]
+}
+
+@test "desinstaller.sh : Docker arrêté → message clair, une seule fois, rien d'autre lancé" {
+    bash "$CLI" dz-des
+    faux_cli 'exit 1'
+    faux_docker arrete
+    run bash dz-des/core/scripts/desinstaller.sh
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"Démarre Docker Desktop"*"make desinstaller"* ]] || false
+    [[ "$output" != *"failed to connect"* ]] || false
+    [[ "$output" != *Inventaire* ]] || false
+    [ "$(grep -c "Démarre Docker Desktop" <<<"$output")" -eq 1 ]
+    [ "$(cat "$BATS_TEST_TMPDIR/docker.log")" = "docker info" ]
+}
+
+@test "devzone desinstaller : Docker arrêté → la commande à relancer est devzone desinstaller" {
+    bash "$CLI" dz-des
+    faux_cli 'exit 1'
+    faux_docker arrete
+    cd dz-des
+    run bash "$CLI" desinstaller
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"puis relance devzone desinstaller"* ]] || false
+}
+
+@test "devzone <dossier> sans Docker : dossier créé, comment lancer ensuite, sans erreur brute" {
+    unset DEVZONE_SANS_DEMARRER
+    faux_cli 'echo "{\"outcome\":\"error\"}"; exit 1'
+    faux_docker arrete
+    printf '#!/usr/bin/env bash\necho "make $*" >>"%s/make.log"\n' "$BATS_TEST_TMPDIR" >"$BATS_TEST_TMPDIR/faux/make"
+    chmod +x "$BATS_TEST_TMPDIR/faux/make"
+    run bash "$CLI" mon-devzone
+    [ "$status" -ne 0 ]
+    [ -f mon-devzone/Makefile ]
+    [[ "$output" == *"Démarre Docker Desktop"*"cd $PWD/mon-devzone && make shell"* ]] || false
+    [ ! -e "$BATS_TEST_TMPDIR/make.log" ]
+    [ ! -e "$BATS_TEST_TMPDIR/args" ]
+    [[ "$output" != *outcome* ]] || false
 }
 
 @test "lancer.sh : étapes clés et état affichés, journal complet gardé" {
