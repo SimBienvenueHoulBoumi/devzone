@@ -179,6 +179,8 @@ Empreinte d'une archive : `curl -fsSL <url> | shasum -a 256`.
 | `gh auth login` : « Press Enter to open … in your browser », rien ne s'ouvre | pas de navigateur dans le conteneur (`make shell`) | ouvrir https://github.com/login/device à la main et saisir le code |
 | `k9s` : `Error: exit status 1` puis son aide ; `kubectl` : `localhost:8080` … `connection refused` | aucun cluster actif (module `kubernetes` désactivé, ou pas de cluster sur ta machine) | `devzone activer kubernetes` (cluster de ta machine), `kind create cluster`, ou `kubectl config use-context <nom>` |
 | `claude` ou `opencode` : « command not found » | module `ia` désactivé | `devzone activer ia` |
+| `devzone` affiche `✖ module ia         en échec : installation incomplète (journal npm : …)` | l'installation de Claude Code ou d'opencode a échoué (réseau, paquet) ; le message d'échec nomme les paquets et le journal npm | lire le journal cité, puis `devzone appliquer` pour réessayer (ou `devzone desactiver ia`) |
+| `devzone activer ia` ou `devzone appliquer` sans rien afficher de neuf pendant plusieurs minutes | installation de Claude Code et opencode (plusieurs centaines de Mo) : annoncée, puis une ligne `… toujours en cours (N s)` toutes les 30 s | attendre la ligne `Claude Code et opencode installés` ou le message d'échec |
 | CPU et RAM vides dans k9s | metrics-server absent du cluster | `bash .devcontainer/metrics-server.sh` |
 | Deux conteneurs devzone | `make up` lancé pendant que VS Code ouvrait le conteneur | `make down`, puis un seul lancement |
 | Windows (Git Bash, MSYS) : `~/.kube` introuvable | `HOME` et `USERPROFILE` concaténés dans le chemin monté | lancer depuis VS Code ou PowerShell |
