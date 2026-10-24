@@ -4,6 +4,10 @@
 
 setup() {
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
+    # Versions figées lues dans les fichiers : une montée automatique (workflow
+    # versions) ne casse pas ces tests
+    REPOWARDEN_FIGE="$(sed -nE 's/.*npm install -g repowarden@([^[:space:]]+).*/\1/p' "$BATS_TEST_DIRNAME/../../.devcontainer/post-create.sh" | head -1)"
+    IA_FIGES="$(sed -nE 's/^IA_[A-Z0-9_]+=([^[:space:]()"]+)@([^@[:space:]()"]+)$/\1 \2/p' "$DEVZONE")"
     export HOME="$BATS_TEST_TMPDIR/home"
     mkdir -p "$HOME" "$BATS_TEST_TMPDIR/bin"
     # Hors du clone : sa .git/config (identité locale d'un contributeur) et la
@@ -84,11 +88,12 @@ GH
     printf 'repowarden 4.9.2\n' >"$NPM_INSTALLEES"
     run bash "$DEVZONE"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"⚠ outils          repowarden 4.9.2 installé, 4.12.0 figé : devzone appliquer"* ]]
+    [[ "$output" == *"⚠ outils          repowarden 4.9.2 installé, $REPOWARDEN_FIGE figé : devzone appliquer"* ]]
 }
 
 @test "état : versions figées installées → ✔ outils" {
-    printf 'repowarden 4.12.0\n@anthropic-ai/claude-code 2.1.286\nopencode-ai 1.18.34\n' >"$NPM_INSTALLEES"
+    [ "$(wc -l <<<"$IA_FIGES")" -eq 2 ]
+    printf 'repowarden %s\n%s\n' "$REPOWARDEN_FIGE" "$IA_FIGES" >"$NPM_INSTALLEES"
     run bash "$DEVZONE"
     [ "$status" -eq 0 ]
     [[ "$output" == *"✔ outils          versions figées"* ]]
@@ -174,9 +179,9 @@ GH
     printf 'repowarden 4.9.2\n' >"$NPM_INSTALLEES"
     run bash "$DEVZONE" appliquer
     [ "$status" -eq 0 ]
-    grep -qx "npm install -g repowarden@4.12.0" "$BATS_TEST_TMPDIR/npm.log"
+    grep -qx "npm install -g repowarden@$REPOWARDEN_FIGE" "$BATS_TEST_TMPDIR/npm.log"
     grep -qx "repowarden install --global --lang fr" "$BATS_TEST_TMPDIR/repowarden.log"
-    [[ "$output" == *"repowarden 4.9.2 → 4.12.0"* ]]
+    [[ "$output" == *"repowarden 4.9.2 → $REPOWARDEN_FIGE"* ]]
 }
 
 @test "activer ia : garde-fou repowarden branché pour Claude Code et opencode" {
