@@ -103,8 +103,7 @@ GH
 @test "activer ia : installe les versions figées, état gardé" {
     run bash "$DEVZONE" activer ia
     [ "$status" -eq 0 ]
-    grep -q "install -g .*@anthropic-ai/claude-code@[0-9]" "$BATS_TEST_TMPDIR/npm.log"
-    grep -q "opencode-ai@[0-9]" "$BATS_TEST_TMPDIR/npm.log"
+    grep -qE "install -g .* @anthropic-ai/claude-code@[0-9.]+ opencode-ai@[0-9.]+$" "$BATS_TEST_TMPDIR/npm.log"
     run bash "$DEVZONE" actif ia
     [ "$status" -eq 0 ]
 }
@@ -113,7 +112,7 @@ GH
     bash "$DEVZONE" activer ia
     run bash "$DEVZONE" desactiver ia
     [ "$status" -eq 0 ]
-    grep -q "npm uninstall -g" "$BATS_TEST_TMPDIR/npm.log"
+    grep -qx "npm uninstall -g @anthropic-ai/claude-code opencode-ai" "$BATS_TEST_TMPDIR/npm.log"
     run bash "$DEVZONE" actif ia
     [ "$status" -ne 0 ]
 }

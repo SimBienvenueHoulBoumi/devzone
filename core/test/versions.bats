@@ -19,8 +19,12 @@ repowarden install --global --lang fr
 EOFPOST
     cat >"$DEVZONE" <<'EOFDZ'
 #!/usr/bin/env bash
-IA_PAQUETS=(@anthropic-ai/claude-code@2.1.286 opencode-ai@1.18.34)
-IA_NOMS=(@anthropic-ai/claude-code opencode-ai)
+# Claude Code
+IA_CLAUDE=@anthropic-ai/claude-code@2.1.286
+# opencode
+IA_OPENCODE=opencode-ai@1.18.34
+IA_PAQUETS=("$IA_CLAUDE" "$IA_OPENCODE")
+IA_NOMS=("${IA_CLAUDE%@*}" "${IA_OPENCODE%@*}")
 EOFDZ
     chmod +x "$DEVZONE"
     export NPM_VERSIONS="$BATS_TEST_TMPDIR/versions"
@@ -127,14 +131,14 @@ tickets_ouverts() {
     [ "$output" = "repowarden 4.12.0 4.13.0" ]
 }
 
-@test "paquet IA scopé en retard : reconnu dans IA_PAQUETS" {
+@test "paquet IA scopé en retard : reconnu sur sa ligne IA_CLAUDE" {
     npm_versions repowarden 4.12.0 @anthropic-ai/claude-code 2.2.0 opencode-ai 1.18.34
     run bash "$VERSIONS"
     [ "$status" -eq 0 ]
     [ "$output" = "@anthropic-ai/claude-code 2.1.286 2.2.0" ]
 }
 
-@test "paquet IA sans scope en retard : reconnu dans IA_PAQUETS" {
+@test "paquet IA sans scope en retard : reconnu sur sa ligne IA_OPENCODE" {
     npm_versions repowarden 4.12.0 @anthropic-ai/claude-code 2.1.286 opencode-ai 1.19.0
     run bash "$VERSIONS"
     [ "$status" -eq 0 ]
@@ -159,14 +163,50 @@ tickets_ouverts() {
 @test "--appliquer un paquet IA : seule sa version change, l'autre reste" {
     run bash "$VERSIONS" --appliquer @anthropic-ai/claude-code 2.2.0
     [ "$status" -eq 0 ]
-    grep -qx 'IA_PAQUETS=(@anthropic-ai/claude-code@2.2.0 opencode-ai@1.18.34)' "$DEVZONE"
+    grep -qx 'IA_CLAUDE=@anthropic-ai/claude-code@2.2.0' "$DEVZONE"
+    grep -qx 'IA_OPENCODE=opencode-ai@1.18.34' "$DEVZONE"
+    grep -qxF 'IA_PAQUETS=("$IA_CLAUDE" "$IA_OPENCODE")' "$DEVZONE"
     grep -qx 'npm install -g repowarden@4.12.0' "$POST_CREATE"
 }
 
 @test "--appliquer opencode-ai : la version scopée reste intacte" {
     run bash "$VERSIONS" --appliquer opencode-ai 1.19.0
     [ "$status" -eq 0 ]
-    grep -qx 'IA_PAQUETS=(@anthropic-ai/claude-code@2.1.286 opencode-ai@1.19.0)' "$DEVZONE"
+    grep -qx 'IA_CLAUDE=@anthropic-ai/claude-code@2.1.286' "$DEVZONE"
+    grep -qx 'IA_OPENCODE=opencode-ai@1.19.0' "$DEVZONE"
+}
+
+@test "vrai fichier devzone : les deux assistants IA sont lus par versions.sh" {
+    npm_versions repowarden 999.0.0 @anthropic-ai/claude-code 999.0.0 opencode-ai 999.0.0
+    run bash "$RACINE/core/scripts/versions.sh"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"@anthropic-ai/claude-code "*" 999.0.0"* ]] || false
+    [[ "$output" == *"opencode-ai "*" 999.0.0"* ]] || false
+}
+
+@test "deux montées simultanées (Claude Code, opencode) : fusionnées l'une après l'autre sans conflit" {
+    # Le vrai fichier devzone, pour vérifier sa disposition
+    cp "$RACINE/.devcontainer/devzone" "$DEVZONE"
+    export GIT_CONFIG_NOSYSTEM=1 GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@example.invalid \
+        GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@example.invalid
+    cd "$BATS_TEST_TMPDIR/dz"
+    git init -q
+    base="$(git branch --show-current)"
+    git add .devcontainer core
+    git commit -qm base
+    git checkout -qb claude
+    bash "$VERSIONS" --appliquer @anthropic-ai/claude-code 999.0.0
+    git commit -qam claude
+    git checkout -q "$base"
+    git checkout -qb opencode
+    bash "$VERSIONS" --appliquer opencode-ai 999.1.0
+    git commit -qam opencode
+    git checkout -q "$base"
+    git merge -q --no-ff -m "fusion claude" claude
+    run git merge --no-ff -m "fusion opencode" opencode
+    [ "$status" -eq 0 ]
+    grep -qx 'IA_CLAUDE=@anthropic-ai/claude-code@999.0.0' "$DEVZONE"
+    grep -qx 'IA_OPENCODE=opencode-ai@999.1.0' "$DEVZONE"
 }
 
 @test "--appliquer garde le droit d'exécution de devzone" {
@@ -218,4 +258,10 @@ tickets_ouverts() {
     run bash "$VERSIONS" --ticket-existant repowarden "app/repowarden-devzone"
     [ "$status" -eq 0 ]
     [ -z "$output" ]
+}
+
+@test "workflow versions : conception proposée, jamais retenue (le mainteneur la reprend)" {
+    workflow="$RACINE/.github/workflows/versions.yml"
+    grep -q '^ *## Conception proposée$' "$workflow"
+    ! grep -q '^ *## Conception retenue' "$workflow"
 }

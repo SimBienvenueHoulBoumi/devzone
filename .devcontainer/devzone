@@ -15,9 +15,15 @@ VERSIONS="$ICI/../core/scripts/versions.sh"
 MODULES=(ia kubernetes)
 
 # Assistants IA, versions figées : mettre à jour ici, puis devzone appliquer
-# (ou Rebuild Container)
-IA_PAQUETS=(@anthropic-ai/claude-code@2.1.286 opencode-ai@1.18.34)
-IA_NOMS=(@anthropic-ai/claude-code opencode-ai)
+# (ou Rebuild Container). Une ligne par paquet, séparées par une ligne qui ne
+# change pas : deux montées simultanées (workflow versions) se fusionnent sans
+# conflit, git n'en signalant qu'entre lignes voisines modifiées.
+# Claude Code
+IA_CLAUDE=@anthropic-ai/claude-code@2.1.286
+# opencode
+IA_OPENCODE=opencode-ai@1.18.34
+IA_PAQUETS=("$IA_CLAUDE" "$IA_OPENCODE")
+IA_NOMS=("${IA_CLAUDE%@*}" "${IA_OPENCODE%@*}")
 
 description() {
     case "$1" in
