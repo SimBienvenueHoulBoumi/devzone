@@ -24,6 +24,11 @@ case "$GARDER" in "" | connexions) ;; *)
     ;;
 esac
 
+# Docker d'abord : sans lui, chaque appel docker afficherait son erreur brute
+# shellcheck source=SCRIPTDIR/docker.sh
+. "$(dirname "${BASH_SOURCE[0]}")/docker.sh"
+docker_pret "${DEVZONE_COMMANDE:-make desinstaller}" || exit 1
+
 # --- Inventaire --------------------------------------------------------------
 echo "▶ Inventaire (dossier $ICI)"
 conteneurs=() images=() dind=()

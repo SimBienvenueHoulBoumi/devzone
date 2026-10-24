@@ -66,6 +66,13 @@ EOF
         echo "Pour le lancer : cd $cible && make up"
         return 0
     fi
+    # Docker d'abord : le dossier reste prêt, à lancer une fois Docker démarré
+    # shellcheck source=SCRIPTDIR/scripts/docker.sh
+    . "$PAQUET/core/scripts/docker.sh"
+    if ! docker_pret "cd $cible && make shell"; then
+        echo "  Le dossier est prêt : rien à refaire, sauf ce lancement." >&2
+        exit 1
+    fi
     echo "▶ Lancement (quelques minutes la première fois)…"
     if command -v make >/dev/null 2>&1; then
         make -C "$cible" up
@@ -91,7 +98,7 @@ case "${1:-}" in
             echo "✖ À lancer dans un dossier devzone (desinstaller.sh introuvable ici)." >&2
             exit 1
         fi
-        bash "$desinstalleur"
+        DEVZONE_COMMANDE="devzone desinstaller" bash "$desinstalleur"
         ;;
     -*)
         echo "✖ option inconnue : $1 (devzone --help)" >&2
