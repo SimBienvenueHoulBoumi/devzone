@@ -4,12 +4,19 @@
 
 setup() {
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
+    # Versions figées lues dans les fichiers : une montée automatique (workflow
+    # versions) ne casse pas ces tests
+    REPOWARDEN_FIGE="$(sed -nE 's/.*npm install -g repowarden@([^[:space:]]+).*/\1/p' "$BATS_TEST_DIRNAME/../../.devcontainer/post-create.sh" | head -1)"
+    IA_FIGES="$(sed -nE 's/^IA_[A-Z0-9_]+=([^[:space:]()"]+)@([^@[:space:]()"]+)$/\1 \2/p' "$DEVZONE")"
     export HOME="$BATS_TEST_TMPDIR/home"
     mkdir -p "$HOME" "$BATS_TEST_TMPDIR/bin"
     # Hors du clone : sa .git/config (identité locale d'un contributeur) et la
     # configuration système fausseraient l'état « identité git »
     cd "$BATS_TEST_TMPDIR" || return 1
     export GIT_CONFIG_NOSYSTEM=1
+    # Racine de devzone simulée : les worktrees du vrai dépôt n'interfèrent pas
+    export DEVZONE_RACINE="$BATS_TEST_TMPDIR/racine"
+    mkdir -p "$DEVZONE_RACINE/workspace"
     # npm simulé : journalise ses arguments ; « npm ls -g --depth=0 --json »
     # renvoie les outils installés (NPM_INSTALLEES)
     export NPM_LOG="$BATS_TEST_TMPDIR/npm.log"
@@ -84,14 +91,47 @@ GH
     printf 'repowarden 4.9.2\n' >"$NPM_INSTALLEES"
     run bash "$DEVZONE"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"⚠ outils          repowarden 4.9.2 installé, 4.12.0 figé : devzone appliquer"* ]]
+    [[ "$output" == *"⚠ outils          repowarden 4.9.2 installé, $REPOWARDEN_FIGE figé : devzone appliquer"* ]]
 }
 
 @test "état : versions figées installées → ✔ outils" {
-    printf 'repowarden 4.12.0\n@anthropic-ai/claude-code 2.1.286\nopencode-ai 1.18.34\n' >"$NPM_INSTALLEES"
+    [ "$(wc -l <<<"$IA_FIGES")" -eq 2 ]
+    printf 'repowarden %s\n%s\n' "$REPOWARDEN_FIGE" "$IA_FIGES" >"$NPM_INSTALLEES"
     run bash "$DEVZONE"
     [ "$status" -eq 0 ]
     [[ "$output" == *"✔ outils          versions figées"* ]]
+}
+
+@test "état : worktree au chemin absent (créé de l'autre côté) → ⚠, rien supprimé" {
+    depot="$DEVZONE_RACINE/workspace/projet"
+    mkdir -p "$depot"
+    git -C "$depot" init -q
+    git -C "$depot" -c user.name=t -c user.email=t@example.invalid commit -q --allow-empty -m base
+    git -C "$depot" worktree add -q --detach "$BATS_TEST_TMPDIR/wt-hote"
+    # Dépôt rangé un niveau plus bas (workspace/<groupe>/<dépôt>)
+    imbrique="$DEVZONE_RACINE/workspace/groupe/autre"
+    mkdir -p "$imbrique"
+    git -C "$imbrique" init -q
+    git -C "$imbrique" -c user.name=t -c user.email=t@example.invalid commit -q --allow-empty -m base
+    git -C "$imbrique" worktree add -q --detach "$BATS_TEST_TMPDIR/wt-mac"
+    rm -rf "$BATS_TEST_TMPDIR/wt-hote" "$BATS_TEST_TMPDIR/wt-mac"
+    run bash "$DEVZONE"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"⚠ worktree        $BATS_TEST_TMPDIR/wt-hote absent ici"*"jamais git worktree prune"* ]] || false
+    [[ "$output" == *"⚠ worktree        $BATS_TEST_TMPDIR/wt-mac absent ici"* ]] || false
+    [ -d "$depot/.git/worktrees/wt-hote" ]
+    [ -d "$imbrique/.git/worktrees/wt-mac" ]
+}
+
+@test "état : worktree présent → aucun avertissement worktree" {
+    depot="$DEVZONE_RACINE/workspace/groupe/projet"
+    mkdir -p "$depot"
+    git -C "$depot" init -q
+    git -C "$depot" -c user.name=t -c user.email=t@example.invalid commit -q --allow-empty -m base
+    git -C "$depot" worktree add -q --detach "$BATS_TEST_TMPDIR/wt-ici"
+    run bash "$DEVZONE"
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"⚠ worktree"* ]] || false
 }
 
 @test "état : module actif" {
@@ -103,8 +143,7 @@ GH
 @test "activer ia : installe les versions figées, état gardé" {
     run bash "$DEVZONE" activer ia
     [ "$status" -eq 0 ]
-    grep -q "install -g .*@anthropic-ai/claude-code@[0-9]" "$BATS_TEST_TMPDIR/npm.log"
-    grep -q "opencode-ai@[0-9]" "$BATS_TEST_TMPDIR/npm.log"
+    grep -qE "install -g .* @anthropic-ai/claude-code@[0-9.]+ opencode-ai@[0-9.]+$" "$BATS_TEST_TMPDIR/npm.log"
     run bash "$DEVZONE" actif ia
     [ "$status" -eq 0 ]
 }
@@ -113,7 +152,7 @@ GH
     bash "$DEVZONE" activer ia
     run bash "$DEVZONE" desactiver ia
     [ "$status" -eq 0 ]
-    grep -q "npm uninstall -g" "$BATS_TEST_TMPDIR/npm.log"
+    grep -qx "npm uninstall -g @anthropic-ai/claude-code opencode-ai" "$BATS_TEST_TMPDIR/npm.log"
     run bash "$DEVZONE" actif ia
     [ "$status" -ne 0 ]
 }
@@ -175,9 +214,9 @@ GH
     printf 'repowarden 4.9.2\n' >"$NPM_INSTALLEES"
     run bash "$DEVZONE" appliquer
     [ "$status" -eq 0 ]
-    grep -qx "npm install -g repowarden@4.12.0" "$BATS_TEST_TMPDIR/npm.log"
+    grep -qx "npm install -g repowarden@$REPOWARDEN_FIGE" "$BATS_TEST_TMPDIR/npm.log"
     grep -qx "repowarden install --global --lang fr" "$BATS_TEST_TMPDIR/repowarden.log"
-    [[ "$output" == *"repowarden 4.9.2 → 4.12.0"* ]]
+    [[ "$output" == *"repowarden 4.9.2 → $REPOWARDEN_FIGE"* ]]
 }
 
 @test "activer ia : garde-fou repowarden branché pour Claude Code et opencode" {

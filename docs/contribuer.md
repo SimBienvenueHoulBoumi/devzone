@@ -13,6 +13,8 @@
 
 Les tests fonctionnels et ceux de la CLI travaillent sur une copie du dépôt, avec leurs propres volumes (`devzone-test-…`), puis suppriment tout (conteneur, volumes, image), même en cas d'échec : ton devzone, tes connexions et le cluster de ta machine ne sont jamais touchés (seul un cluster kind de test est utilisé). En CI, le workflow `fonctionnel` les lance (trois jobs : fonctionnel, cli et windows) sur chaque PR qui modifie `.devcontainer/`, `core/` (commande npm, scripts, tests), le `Makefile`, `.gitattributes` ou `package.json`, et à la main (*Actions → fonctionnel → Run workflow*).
 
+**Exigés pour merger.** Le workflow tourne sur chaque PR ; son job `changements` décide par chemin si les trois jobs doivent tourner (`core/test/ci-conteneur.sh`), et la vérification de synthèse **`tests-conteneur`** est exigée pour merger dans `develop` comme dans `main` (`requiredChecks` de `.repowarden.conf`) : elle réussit si `fonctionnel`, `cli` et `windows` ont réussi, ou s'ils n'avaient pas à tourner (PR de docs seule : quelques secondes) ; un échec ou une annulation la fait échouer. Une PR qui touche le conteneur ne peut donc pas être mergée tant que ses tests tournent. Après un changement de `requiredChecks` : `repowarden proteger --checks "repowarden,tests-conteneur"` (droits d'administration), vérifié par `repowarden proteger --verifier --checks "repowarden,tests-conteneur"`.
+
 
 
 ## Versions et livraison
@@ -20,7 +22,7 @@ Les tests fonctionnels et ceux de la CLI travaillent sur une copie du dépôt, a
 Flux `develop` → `main`, géré par repowarden, **sans geste après le merge d'un ticket** :
 1. Le travail entre dans `develop` (branche par défaut), par une PR liée à un ticket. **Son merge est la validation humaine.** Une PR de travail ouverte vers `main` est reciblée vers `develop` par la CI.
 2. Le bot de release publie aussitôt une **préversion** `vX.Y.Z-next.N` et tient à jour la **PR de livraison** `develop` → `main`.
-3. La GitHub App **merge la PR de livraison** dès que ses vérifications sont vertes (`repowarden`, et `livraison` : préversion publiée). Ce merge publie le tag `vX.Y.Z` et la [release GitHub](https://github.com/SimBienvenueHoulBoumi/devzone/releases). Une vérification rouge bloque la livraison, visible sur la PR.
+3. La GitHub App **merge la PR de livraison** dès que ses vérifications sont vertes (`repowarden`, `tests-conteneur` : tests du conteneur sur le commit livré, et `livraison` : préversion publiée). Ce merge publie le tag `vX.Y.Z` et la [release GitHub](https://github.com/SimBienvenueHoulBoumi/devzone/releases). Une vérification rouge bloque la livraison, visible sur la PR.
 
 `main` reste ainsi à jour avec `develop`. La version suit les Conventional Commits : `fix` → correctif, `feat` → mineure ; une livraison sans `fix` ni `feat` (documentation, CI…) met `main` à jour sans nouvelle version.
 
@@ -54,7 +56,7 @@ devzone/
 │   ├── metrics-server.sh       # metrics-server sur les clusters locaux (CPU et RAM dans k9s)
 │   └── git-identite.sh         # identité git déduite du compte gh si elle manque
 ├── .github/workflows/
-│   ├── fonctionnel.yml         # tests fonctionnels et de la CLI sous terminal (PR touchant le conteneur, les tests ou la CLI)
+│   ├── fonctionnel.yml         # tests du conteneur (fonctionnels, CLI, Windows) et synthèse tests-conteneur exigée pour merger
 │   ├── repowarden.yml          # vérifications repowarden de chaque PR (PR mal visée reciblée vers develop)
 │   ├── tickets.yml             # suivi des tickets : branche, PR brouillon, statuts jusqu'à la production
 │   ├── release.yml             # préversions sur develop, livraison develop → main
@@ -72,6 +74,7 @@ devzone/
 │       ├── cli.bats            # commande npm, contenu du paquet, core/scripts/lancer.sh, chemins de l'arborescence
 │       ├── fonctionnel.sh      # tests fonctionnels (make test-fonctionnel)
 │       ├── cli-terminal.sh     # tests de la CLI dans un vrai terminal (make test-cli)
+│       ├── ci-conteneur.sh     # CI : tests du conteneur à lancer (par chemin) et synthèse tests-conteneur
 │       └── terminal.py         # lance une commande sous pseudo-terminal, avec délai maximal
 └── workspace/                  # tes projets (ignorés par git, chacun son dépôt)
 ```

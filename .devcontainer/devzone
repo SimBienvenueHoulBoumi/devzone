@@ -12,12 +12,20 @@ set -euo pipefail
 ETAT="${DEVZONE_ETAT:-$HOME/.config/devzone/modules}"
 ICI="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
 VERSIONS="$ICI/../core/scripts/versions.sh"
+# Dossier de devzone (/workspaces/devzone) ; DEVZONE_RACINE pour les tests
+RACINE="${DEVZONE_RACINE:-$(dirname "$ICI")}"
 MODULES=(ia kubernetes)
 
 # Assistants IA, versions figées : mettre à jour ici, puis devzone appliquer
-# (ou Rebuild Container)
-IA_PAQUETS=(@anthropic-ai/claude-code@2.1.310 opencode-ai@1.19.4)
-IA_NOMS=(@anthropic-ai/claude-code opencode-ai)
+# (ou Rebuild Container). Une ligne par paquet, séparées par une ligne qui ne
+# change pas : deux montées simultanées (workflow versions) se fusionnent sans
+# conflit, git n'en signalant qu'entre lignes voisines modifiées.
+# Claude Code
+IA_CLAUDE=@anthropic-ai/claude-code@2.1.310
+# opencode
+IA_OPENCODE=opencode-ai@1.19.4
+IA_PAQUETS=("$IA_CLAUDE" "$IA_OPENCODE")
+IA_NOMS=("${IA_CLAUDE%@*}" "${IA_OPENCODE%@*}")
 
 description() {
     case "$1" in
@@ -147,10 +155,30 @@ appliquer_repowarden() {
     echo "devzone : repowarden $installee → $figee"
 }
 
+# Chemins des worktrees du dépôt devzone et des dépôts du workspace absents
+# ici : créés de l'autre côté (hôte), un git worktree prune les casserait.
+# Lecture seule : rien n'est supprimé ni réparé.
+worktrees_absents() {
+    local depot ligne chemin
+    {
+        [ -e "$RACINE/.git" ] && echo "$RACINE"
+        find "$RACINE/workspace" -mindepth 2 -maxdepth 3 -name .git -type d 2>/dev/null | sed 's|/\.git$||'
+    } | while IFS= read -r depot; do
+        { git -C "$depot" worktree list --porcelain 2>/dev/null || true; } | while IFS= read -r ligne; do
+            case "$ligne" in
+                "worktree "*)
+                    chemin="${ligne#worktree }"
+                    [ -d "$chemin" ] || echo "$chemin"
+                    ;;
+            esac
+        done
+    done || true
+}
+
 # État complet : ✔ prêt, ✖ nécessaire, ○ facultatif, ⚠ à corriger ; chaque
 # point à faire avec sa commande (affiché à chaque démarrage)
 etat() {
-    local nom email statut m retards
+    local nom email statut m retards chemin
     echo "devzone : état (devzone pour le réafficher)"
     nom="$(git config --get user.name || true)"
     email="$(git config --get user.email || true)"
@@ -177,6 +205,10 @@ etat() {
             done <<<"$retards"
         fi
     fi
+    while IFS= read -r chemin; do
+        [ -n "$chemin" ] || continue
+        echo "  ⚠ worktree        $chemin absent ici (créé hors du conteneur ?) : le gérer de ce côté-là, jamais git worktree prune ici (docs/reference.md, Worktrees git)"
+    done < <(worktrees_absents)
     for m in "${MODULES[@]}"; do
         if [ "$(valeur "$m")" = on ]; then
             printf '  ✔ module %-10s actif : %s\n' "$m" "$(description "$m")"
