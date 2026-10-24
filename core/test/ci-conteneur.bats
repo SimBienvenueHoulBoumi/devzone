@@ -36,36 +36,43 @@ setup() {
 }
 
 @test "synthese : rien à tester (jobs sautés) → réussite" {
-    run bash "$SCRIPT" synthese false success skipped skipped skipped
+    run bash "$SCRIPT" synthese false success skipped skipped skipped skipped
     [ "$status" -eq 0 ]
     [[ "$output" == *"rien à tester"* ]] || false
 }
 
-@test "synthese : fonctionnel, cli et windows réussis → réussite" {
-    run bash "$SCRIPT" synthese true success success success success
+@test "synthese : fonctionnel, cli, windows et ia-arm64 réussis → réussite" {
+    run bash "$SCRIPT" synthese true success success success success success
     [ "$status" -eq 0 ]
+    [[ "$output" == *"✔ ia-arm64 : success"* ]] || false
 }
 
 @test "synthese : un job en échec → échec, avec son nom" {
-    run bash "$SCRIPT" synthese true success success failure success
+    run bash "$SCRIPT" synthese true success success failure success success
     [ "$status" -ne 0 ]
     [[ "$output" == *"cli"*"failure"* ]] || false
 }
 
+@test "synthese : assistants IA non installables sur arm64 (ia-arm64 en échec) → échec, avec son nom" {
+    run bash "$SCRIPT" synthese true success success success success failure
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"✖ ia-arm64 : failure"* ]] || false
+}
+
 @test "synthese : un job annulé ou en cours d'abandon → échec" {
-    run bash "$SCRIPT" synthese true success cancelled success success
+    run bash "$SCRIPT" synthese true success cancelled success success success
     [ "$status" -ne 0 ]
     [[ "$output" == *"fonctionnel"*"cancelled"* ]] || false
 }
 
 @test "synthese : job sauté alors qu'il fallait tester → échec" {
-    run bash "$SCRIPT" synthese true success success success skipped
+    run bash "$SCRIPT" synthese true success success success skipped success
     [ "$status" -ne 0 ]
     [[ "$output" == *"windows"*"skipped"* ]] || false
 }
 
 @test "synthese : détection des changements en échec → échec" {
-    run bash "$SCRIPT" synthese "" failure skipped skipped skipped
+    run bash "$SCRIPT" synthese "" failure skipped skipped skipped skipped
     [ "$status" -ne 0 ]
     [[ "$output" == *"changements"*"failure"* ]] || false
 }
@@ -74,6 +81,19 @@ setup() {
     run bash "$SCRIPT" synthese true success
     [ "$status" -ne 0 ]
     [[ "$output" == *usage* ]] || false
+    run bash "$SCRIPT" synthese true success success success success
+    [ "$status" -ne 0 ]
+    [[ "$output" == *usage* ]] || false
+}
+
+@test "fonctionnel.yml : job ia-arm64 sur ubuntu-24.04-arm, décision par chemin, claude et opencode vérifiés" {
+    bloc="$(awk '/^  ia-arm64:/ { dans = 1; print; next } dans && /^  [a-z0-9-]+:/ { exit } dans { print }' "$WORKFLOW")"
+    [ -n "$bloc" ]
+    [[ "$bloc" == *"runs-on: ubuntu-24.04-arm"* ]] || false
+    [[ "$bloc" == *"if: needs.changements.outputs.tester == 'true'"* ]] || false
+    [[ "$bloc" == *"devzone activer ia"* ]] || false
+    [[ "$bloc" == *"claude --version"* ]] || false
+    [[ "$bloc" == *"opencode --version"* ]] || false
 }
 
 @test "fonctionnel.yml : aucun filtre paths, lancé sur chaque PR" {
@@ -82,15 +102,16 @@ setup() {
     grep -qE '^  pull_request:' "$WORKFLOW"
 }
 
-@test "fonctionnel.yml : synthèse tests-conteneur toujours lancée, après fonctionnel, cli et windows" {
+@test "fonctionnel.yml : synthèse tests-conteneur toujours lancée, après fonctionnel, cli, windows et ia-arm64" {
     # Bloc du job tests-conteneur : de sa ligne à la fin du fichier ou au job suivant
-    bloc="$(awk '/^  tests-conteneur:/ { dans = 1; print; next } dans && /^  [a-z-]+:/ { exit } dans { print }' "$WORKFLOW")"
+    bloc="$(awk '/^  tests-conteneur:/ { dans = 1; print; next } dans && /^  [a-z0-9-]+:/ { exit } dans { print }' "$WORKFLOW")"
     [ -n "$bloc" ]
     [[ "$bloc" == *"if: always()"* ]] || false
-    [[ "$bloc" == *"needs: [changements, fonctionnel, cli, windows]"* ]] || false
+    [[ "$bloc" == *"needs: [changements, fonctionnel, cli, windows, ia-arm64]"* ]] || false
     [[ "$bloc" == *"bash core/test/ci-conteneur.sh synthese"* ]] || false
-    for job in fonctionnel cli windows; do
-        awk -v j="  $job:" '$0 == j { dans = 1; next } dans && /^  [a-z-]+:/ { exit } dans { print }' "$WORKFLOW" |
+    [[ "$bloc" == *'"$WINDOWS" "$IA_ARM64"'* ]] || false
+    for job in fonctionnel cli windows ia-arm64; do
+        awk -v j="  $job:" '$0 == j { dans = 1; next } dans && /^  [a-z0-9-]+:/ { exit } dans { print }' "$WORKFLOW" |
             grep -q "if: needs.changements.outputs.tester == 'true'" || { echo "job $job lancé sans la décision par chemin"; false; }
     done
 }

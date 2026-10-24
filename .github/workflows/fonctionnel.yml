@@ -6,16 +6,17 @@
 # isolé, jamais le global de la machine) et commande devzone sous windows-latest
 # (core/test/windows.sh, jouable en local), puis même parcours via cmd avec une
 # installation réellement globale (raccourci .cmd de npm, le cas d'un utilisateur
-# Windows).
+# Windows). Job ia-arm64 : assistants IA installés aux versions figées sur
+# arm64 (Mac Apple Silicon), claude et opencode vérifiés.
 #
 # Exigés pour merger, dans develop comme dans main (livraison), par la
 # vérification de synthèse tests-conteneur (requiredChecks, .repowarden.conf).
 # Le workflow tourne sur chaque PR (aucun filtre paths : la synthèse doit
-# toujours exister) ; le job changements décide par chemin : fonctionnel, cli
-# et windows (une dizaine de minutes chacun, 15 pour windows) ne tournent que
-# si la PR touche le conteneur, les tests, la CLI, .gitattributes ou
-# package.json (core/test/ci-conteneur.sh) ; une PR de docs seule n'attend pas.
-# tests-conteneur réussit si les trois ont réussi, ou s'ils n'avaient pas à
+# toujours exister) ; le job changements décide par chemin : fonctionnel, cli,
+# windows et ia-arm64 (une dizaine de minutes chacun, 15 pour windows) ne
+# tournent que si la PR touche le conteneur, les tests, la CLI, .gitattributes
+# ou package.json (core/test/ci-conteneur.sh) ; une PR de docs seule n'attend pas.
+# tests-conteneur réussit si les quatre ont réussi, ou s'ils n'avaient pas à
 # tourner ; un échec ou une annulation la fait échouer. À la main : tout tourne.
 name: fonctionnel
 
@@ -146,10 +147,35 @@ jobs:
           if %SORTIE% equ 0 exit /b 1
           exit /b 0
 
+  # Assistants IA sur arm64 (Mac Apple Silicon), que les jobs x86_64 ne voient
+  # pas (#194) : le script devzone du conteneur installe les versions figées
+  # (Ubuntu 24.04, glibc, Node LTS comme l'image et sa feature node), puis
+  # claude et opencode doivent répondre. Une montée de version d'un assistant
+  # touche .devcontainer/devzone : ce job la valide avant le merge
+  ia-arm64:
+    needs: changements
+    if: needs.changements.outputs.tester == 'true'
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: lts/*
+      - name: devzone activer ia, puis claude --version et opencode --version
+        env:
+          DEVZONE_ETAT: ${{ runner.temp }}/devzone-modules
+        run: |
+          uname -m
+          node --version
+          bash .devcontainer/devzone activer ia
+          claude --version
+          opencode --version
+
   # Synthèse exigée pour merger (requiredChecks) : toujours lancée, jamais
   # « skipped » (GitHub compterait un job sauté comme réussi)
   tests-conteneur:
-    needs: [changements, fonctionnel, cli, windows]
+    needs: [changements, fonctionnel, cli, windows, ia-arm64]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -162,4 +188,5 @@ jobs:
           FONCTIONNEL: ${{ needs.fonctionnel.result }}
           CLI: ${{ needs.cli.result }}
           WINDOWS: ${{ needs.windows.result }}
-        run: bash core/test/ci-conteneur.sh synthese "$TESTER" "$CHANGEMENTS" "$FONCTIONNEL" "$CLI" "$WINDOWS"
+          IA_ARM64: ${{ needs.ia-arm64.result }}
+        run: bash core/test/ci-conteneur.sh synthese "$TESTER" "$CHANGEMENTS" "$FONCTIONNEL" "$CLI" "$WINDOWS" "$IA_ARM64"
