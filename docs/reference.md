@@ -44,6 +44,14 @@ repowarden            # vérifier
 
 `repowarden bots` demande le flux (`main` seule, ou `develop` → `main`), montre ce qu'il va créer, puis attend ta confirmation ; un fichier existant n'est jamais écrasé. Il faut `gh` connecté et les droits d'administration du dépôt GitHub.
 
+### Worktrees git
+
+**Règle** : un dépôt du workspace se manipule d'un seul côté. Les worktrees se créent **et** se suppriment dans le conteneur (`git worktree add`, `git worktree remove`) ; ne jamais lancer `git worktree prune` sur la machine hôte, ni laisser un outil de l'hôte le faire (VS Code, GitHub Desktop…).
+
+**Pourquoi** : le workspace est monté depuis l'hôte (`/Users/…/devzone` sur Mac → `/workspaces/devzone`). git enregistre le chemin **absolu** de chaque worktree dans `.git/worktrees/<nom>/gitdir` : `/workspaces/…` pour un worktree créé dans le conteneur, `/Users/…` pour un worktree créé sur le Mac. Vu de l'autre côté, ce chemin n'existe pas : le worktree paraît « prunable », et un `git worktree prune` efface ses métadonnées, ce qui casse le worktree là où il a été créé.
+
+**Signalement** : l'état affiché au démarrage (et par `devzone`) liste, sans rien supprimer, les worktrees du dépôt devzone et des dépôts du workspace dont le chemin n'existe pas dans le conteneur : `⚠ worktree        /Users/…/wt-42 absent ici (créé hors du conteneur ?) : …`. Le gérer depuis le côté qui l'a créé (le supprimer là-bas avec `git worktree remove`, puis le recréer dans le conteneur si besoin).
+
 
 
 ## Modules
@@ -161,6 +169,7 @@ Empreinte d'une archive : `curl -fsSL <url> | shasum -a 256`.
 | `✖ Docker refuse l'accès` | Linux : compte hors du groupe `docker` | `sudo usermod -aG docker $USER`, puis une nouvelle session (ou `newgrp docker`), puis relancer la commande |
 | `make up` ou `make rebuild` semble figé | une étape longue (première construction de l'image : plusieurs minutes), ou une question posée dans le conteneur | `make` affiche un signe de vie avec la dernière ligne du journal au moins toutes les 30 s : suivre le détail avec `tail -f .devzone.log`. Une question (ligne finissant par `[o/N]`, `?`…) est signalée et le lancement arrêté : la [signaler](https://github.com/SimBienvenueHoulBoumi/devzone/issues), puis `make rebuild`. Version antérieure de devzone, figée sur « Configurer les bots … ? [o/N] » (invisible) : `Ctrl+C`, mettre devzone à jour puis `make rebuild` ; les bots se configurent à la main dans le conteneur : `repowarden bots` |
 | `git push` refusé : « refusing to allow an OAuth App to create or update workflow … without `workflow` scope » | jeton `gh` sans la permission `workflow` | `gh auth refresh -h github.com -s workflow` |
+| `devzone` affiche `⚠ worktree … absent ici` ; ou un worktree cassé (« not a git repository: …/.git/worktrees/… ») | worktree créé de l'autre côté (hôte ↔ conteneur), ou métadonnées effacées par un `git worktree prune` lancé de l'autre côté | voir [Worktrees git](#worktrees-git) : gérer chaque worktree du côté qui l'a créé, jamais `git worktree prune` sur l'hôte |
 | PR bloquée, run `action_required`, bandeau « Approve workflows to run » | PR ouverte ou poussée par le bot `github-actions` : pour les événements `pull_request` `opened`, `synchronize` et `reopened`, GitHub attend l'accord d'une personne ayant l'écriture ([doc GitHub](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow)) | vérifier les changements (surtout `.github/workflows/`), puis *Approve workflows to run* ; pour ne plus avoir à le faire : `repowarden app init` dans le projet |
 | PR de livraison bloquée : « aucune préversion vX.Y.Z-next.N » | la préversion n'est pas encore publiée (sans `preversion-on-push`, elle part le soir) | attendre celle du soir, *Actions → release → Run workflow* sur `develop`, `preversion-on-push: true`, ou ne plus l'exiger : `preversion-obligatoire: false` |
 | PR de livraison restée ouverte | une vérification rouge (voir la PR), `delivery-auto: false`, ou GitHub App absente ou désinstallée (avertissement dans le run `release`) | corriger la vérification ; installer l'App (`repowarden app init` sur ta machine) |

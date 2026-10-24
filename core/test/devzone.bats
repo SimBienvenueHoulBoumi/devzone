@@ -10,6 +10,9 @@ setup() {
     # configuration système fausseraient l'état « identité git »
     cd "$BATS_TEST_TMPDIR" || return 1
     export GIT_CONFIG_NOSYSTEM=1
+    # Racine de devzone simulée : les worktrees du vrai dépôt n'interfèrent pas
+    export DEVZONE_RACINE="$BATS_TEST_TMPDIR/racine"
+    mkdir -p "$DEVZONE_RACINE/workspace"
     # npm simulé : journalise ses arguments ; « npm ls -g --depth=0 --json »
     # renvoie les outils installés (NPM_INSTALLEES)
     export NPM_LOG="$BATS_TEST_TMPDIR/npm.log"
@@ -92,6 +95,38 @@ GH
     run bash "$DEVZONE"
     [ "$status" -eq 0 ]
     [[ "$output" == *"✔ outils          versions figées"* ]]
+}
+
+@test "état : worktree au chemin absent (créé de l'autre côté) → ⚠, rien supprimé" {
+    depot="$DEVZONE_RACINE/workspace/projet"
+    mkdir -p "$depot"
+    git -C "$depot" init -q
+    git -C "$depot" -c user.name=t -c user.email=t@example.invalid commit -q --allow-empty -m base
+    git -C "$depot" worktree add -q --detach "$BATS_TEST_TMPDIR/wt-hote"
+    # Dépôt rangé un niveau plus bas (workspace/<groupe>/<dépôt>)
+    imbrique="$DEVZONE_RACINE/workspace/groupe/autre"
+    mkdir -p "$imbrique"
+    git -C "$imbrique" init -q
+    git -C "$imbrique" -c user.name=t -c user.email=t@example.invalid commit -q --allow-empty -m base
+    git -C "$imbrique" worktree add -q --detach "$BATS_TEST_TMPDIR/wt-mac"
+    rm -rf "$BATS_TEST_TMPDIR/wt-hote" "$BATS_TEST_TMPDIR/wt-mac"
+    run bash "$DEVZONE"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"⚠ worktree        $BATS_TEST_TMPDIR/wt-hote absent ici"*"jamais git worktree prune"* ]] || false
+    [[ "$output" == *"⚠ worktree        $BATS_TEST_TMPDIR/wt-mac absent ici"* ]] || false
+    [ -d "$depot/.git/worktrees/wt-hote" ]
+    [ -d "$imbrique/.git/worktrees/wt-mac" ]
+}
+
+@test "état : worktree présent → aucun avertissement worktree" {
+    depot="$DEVZONE_RACINE/workspace/groupe/projet"
+    mkdir -p "$depot"
+    git -C "$depot" init -q
+    git -C "$depot" -c user.name=t -c user.email=t@example.invalid commit -q --allow-empty -m base
+    git -C "$depot" worktree add -q --detach "$BATS_TEST_TMPDIR/wt-ici"
+    run bash "$DEVZONE"
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"⚠ worktree"* ]] || false
 }
 
 @test "état : module actif" {
