@@ -21,7 +21,7 @@ MODULES=(ia kubernetes)
 # change pas : deux montées simultanées (workflow versions) se fusionnent sans
 # conflit, git n'en signalant qu'entre lignes voisines modifiées.
 # Claude Code
-IA_CLAUDE=@anthropic-ai/claude-code@2.1.310
+IA_CLAUDE=@anthropic-ai/claude-code@2.1.311
 # opencode
 IA_OPENCODE=opencode-ai@1.19.4
 IA_PAQUETS=("$IA_CLAUDE" "$IA_OPENCODE")
