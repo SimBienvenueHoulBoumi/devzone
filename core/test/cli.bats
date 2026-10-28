@@ -278,7 +278,7 @@ faux_docker() {
         # .gitattributes : seules les entrées avec un « / » sont des chemins
         # (« Dockerfile » est un motif valable partout)
         awk '!/^#/ && NF && $1 ~ /\// && $1 !~ /\*/ { print $1 }' .gitattributes
-        # seuls les mots avec un « / » sont des chemins (« bash 3.2 », « bash --version » n'en sont pas)
+        # seuls les mots avec un « / » sont des chemins (ni « bash 3.2 » ni « bash --version »)
         grep -oE '(bash|run: bash) [A-Za-z0-9_.-]*/[A-Za-z0-9_./-]+' .github/workflows/fonctionnel.yml | awk '{ print $NF }'
         grep -oE '^ +- "[^"*]+' .github/workflows/fonctionnel.yml | sed 's/^ *- "//'
     )"

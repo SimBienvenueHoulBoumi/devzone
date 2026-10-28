@@ -170,6 +170,13 @@ setup() {
     [ -z "$(grep -v '|| false[[:space:]]*$' <<<"$output")" ] || { echo "$output"; false; }
 }
 
+# bash 3.2 lit l'apostrophe d'un commentaire placé dans un $( … ) multiligne
+# comme une chaîne ouverte : le fichier .bats entier ne se charge plus (#210)
+@test "tests bats : aucune apostrophe dans un commentaire à l'intérieur d'un \$( … ) multiligne" {
+    run awk '/\$\($/ { dans = 1; next } dans && /^[[:space:]]*\)/ { dans = 0 } dans && /^[[:space:]]*#.*'\''/ { print FILENAME ":" FNR }' "$RACINE"/core/test/*.bats
+    [ -z "$output" ] || { echo "apostrophe dans un commentaire de \$( … ) : $output"; false; }
+}
+
 @test ".repowarden.conf : tests-conteneur exigé pour merger" {
     exigees="$(git config -f "$RACINE/.repowarden.conf" repowarden.requiredChecks)"
     [[ ",$exigees," == *",repowarden,"* ]] || false
