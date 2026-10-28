@@ -4,7 +4,7 @@
 
 | Tests | Commande | Où | Durée |
 |---|---|---|---|
-| Commande `devzone` du conteneur et commande npm (unitaires) | `bats core/test/` | dans le conteneur ; en CI, job `bats` (ubuntu, et macOS sous bash 3.2 pour cli.bats, versions.bats, ci-conteneur.bats) sur chaque PR et chaque push de develop et main | quelques secondes |
+| Commande `devzone` du conteneur et commande npm (unitaires) | `bats core/test/` | dans le conteneur ; en CI, job `bats` (ubuntu, et macOS sous bash 3.2 pour cli.bats, versions.bats, ci-conteneur.bats) sur chaque PR et chaque push de develop et main. Règles tests bats sous bash 3.2 : chaque `[[ … ]]` ou `! commande` doit finir par `|| false` ; pas d'apostrophe dans un commentaire à l'intérieur d'un `$( … )` (bash 3.2 ne charge plus le fichier), contrôlé par `ci-conteneur.bats`. | quelques secondes |
 | Fonctionnels : un devzone construit et utilisé comme par un utilisateur (outils, modules, Kubernetes avec kind, hooks repowarden, redémarrage, rebuild) | `make test-fonctionnel` | sur ta machine (Docker, Node) | 5 à 10 min |
 | CLI dans un vrai terminal : chaque commande tapée comme par un humain (pseudo-terminal), avec un délai maximal ; une commande qui attend une entrée échoue. Cibles `make` (`help`, `up`, `shell`, `status`, `stop`, `down`, `rebuild`, `desinstaller`), commande npm (`devzone <dossier>`, `desinstaller`, `--version`, `--help`), commande `devzone` du conteneur, scripts de démarrage | `make test-cli` | sur ta machine (Docker, Node, Python 3) | 10 à 15 min |
 | Windows (local et CI) | `bash core/test/windows.sh` | macOS/Linux (local) ou Windows Git Bash (CI) | quelques secondes |
