@@ -79,42 +79,42 @@ GH
 @test "par défaut : tous les modules désactivés, avec la commande pour les activer" {
     run bash "$DEVZONE"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"○ module ia"*"devzone activer ia"* ]]
-    [[ "$output" == *"○ module kubernetes"*"devzone activer kubernetes"* ]]
+    [[ "$output" == *"○ module ia"*"devzone activer ia"* ]] || false
+    [[ "$output" == *"○ module kubernetes"*"devzone activer kubernetes"* ]] || false
 }
 
 @test "état : identité git absente → nécessaire, avec les deux voies" {
     run bash "$DEVZONE"
-    [[ "$output" == *"✖ identité git"*"gh auth login -s workflow"* ]]
-    [[ "$output" == *"git config --file ~/.config/git/config user.name"* ]]
+    [[ "$output" == *"✖ identité git"*"gh auth login -s workflow"* ]] || false
+    [[ "$output" == *"git config --file ~/.config/git/config user.name"* ]] || false
 }
 
 @test "état : identité git présente" {
     git config --global user.name "Test" && git config --global user.email "t@example.invalid"
     run bash "$DEVZONE"
-    [[ "$output" == *"✔ identité git    Test <t@example.invalid>"* ]]
+    [[ "$output" == *"✔ identité git    Test <t@example.invalid>"* ]] || false
 }
 
 @test "état : GitHub non connecté → facultatif" {
     run bash "$DEVZONE"
-    [[ "$output" == *"○ GitHub          facultatif"* ]]
+    [[ "$output" == *"○ GitHub          facultatif"* ]] || false
 }
 
 @test "état : GitHub connecté sans permission workflow → à corriger" {
     GH_ETAT=sans run bash "$DEVZONE"
-    [[ "$output" == *"⚠ GitHub"*"gh auth refresh -h github.com -s workflow"* ]]
+    [[ "$output" == *"⚠ GitHub"*"gh auth refresh -h github.com -s workflow"* ]] || false
 }
 
 @test "état : GitHub connecté avec workflow" {
     GH_ETAT=avec run bash "$DEVZONE"
-    [[ "$output" == *"✔ GitHub          connecté"* ]]
+    [[ "$output" == *"✔ GitHub          connecté"* ]] || false
 }
 
 @test "état : outil en retard → ⚠ avec la commande devzone appliquer" {
     printf 'repowarden 4.9.2\n' >"$NPM_INSTALLEES"
     run bash "$DEVZONE"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"⚠ outils          repowarden 4.9.2 installé, $REPOWARDEN_FIGE figé : devzone appliquer"* ]]
+    [[ "$output" == *"⚠ outils          repowarden 4.9.2 installé, $REPOWARDEN_FIGE figé : devzone appliquer"* ]] || false
 }
 
 @test "état : versions figées installées → ✔ outils" {
@@ -122,7 +122,7 @@ GH
     printf 'repowarden %s\n%s\n' "$REPOWARDEN_FIGE" "$IA_FIGES" >"$NPM_INSTALLEES"
     run bash "$DEVZONE"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"✔ outils          versions figées"* ]]
+    [[ "$output" == *"✔ outils          versions figées"* ]] || false
 }
 
 @test "état : worktree au chemin absent (créé de l'autre côté) → ⚠, rien supprimé" {
@@ -160,7 +160,7 @@ GH
 @test "état : module actif" {
     bash "$DEVZONE" activer ia
     run bash "$DEVZONE"
-    [[ "$output" == *"✔ module ia"*"actif"* ]]
+    [[ "$output" == *"✔ module ia"*"actif"* ]] || false
 }
 
 @test "activer ia : installe les versions figées, état gardé" {
@@ -251,13 +251,13 @@ GH
     run bash "$DEVZONE" desactiver kubernetes
     [ "$status" -eq 0 ]
     [ ! -e "$HOME/.kube/hote.config" ]
-    [[ "$output" == *"metrics-server reste installé"* ]]
+    [[ "$output" == *"metrics-server reste installé"* ]] || false
 }
 
 @test "module inconnu : message et erreur, état intact" {
     run bash "$DEVZONE" activer nexistepas
     [ "$status" -eq 1 ]
-    [[ "$output" == *"module inconnu : nexistepas"* ]]
+    [[ "$output" == *"module inconnu : nexistepas"* ]] || false
     run bash "$DEVZONE" activer
     [ "$status" -eq 1 ]
     run bash "$DEVZONE" actif nexistepas
@@ -273,7 +273,7 @@ GH
     mkdir -p "$HOME/.claude" && echo '{}' >"$HOME/.claude/.credentials.json"
     run bash "$DEVZONE" actif ia
     [ "$status" -eq 0 ]
-    [[ "$output" == *"module ia activé"* ]]
+    [[ "$output" == *"module ia activé"* ]] || false
 }
 
 @test "migration : connexion opencode existante → ia activé" {
@@ -292,7 +292,7 @@ GH
 @test "appliquer : installe ia seulement s'il est actif" {
     run bash "$DEVZONE" appliquer
     [ "$status" -eq 0 ]
-    ! grep -q "install -g" "$BATS_TEST_TMPDIR/npm.log"
+    ! grep -q "install -g" "$BATS_TEST_TMPDIR/npm.log" || false
     bash "$DEVZONE" activer ia
     rm -f "$BATS_TEST_TMPDIR/npm.log"
     run bash "$DEVZONE" appliquer
@@ -305,13 +305,13 @@ GH
     [ "$status" -eq 0 ]
     grep -qx "npm install -g repowarden@$REPOWARDEN_FIGE" "$BATS_TEST_TMPDIR/npm.log"
     grep -qx "repowarden install --global --lang fr" "$BATS_TEST_TMPDIR/repowarden.log"
-    [[ "$output" == *"repowarden 4.9.2 → $REPOWARDEN_FIGE"* ]]
+    [[ "$output" == *"repowarden 4.9.2 → $REPOWARDEN_FIGE"* ]] || false
 }
 
 @test "activer ia : garde-fou repowarden branché pour Claude Code et opencode" {
     run bash "$DEVZONE" activer ia
     [ "$status" -eq 0 ]
-    [[ "$output" == *"garde-fou repowarden actif"* ]]
+    [[ "$output" == *"garde-fou repowarden actif"* ]] || false
     grep -qx "repowarden agents init --global" "$BATS_TEST_TMPDIR/repowarden.log"
 }
 
@@ -330,7 +330,7 @@ GH
     rm "$BATS_TEST_TMPDIR/bin/repowarden"
     PATH="$BATS_TEST_TMPDIR/bin:/usr/bin:/bin" run bash "$DEVZONE" activer ia
     [ "$status" -eq 0 ]
-    [[ "$output" == *"garde-fou repowarden non branché"*"repowarden agents init --global"* ]]
+    [[ "$output" == *"garde-fou repowarden non branché"*"repowarden agents init --global"* ]] || false
     grep -q "install -g" "$BATS_TEST_TMPDIR/npm.log"
 }
 
@@ -341,7 +341,7 @@ GH
     grep -q '^// devzone : configuration opencode par défaut' "$HOME/.config/opencode/opencode.jsonc"
     grep -q '"model": "opencode/big-pickle"' "$HOME/.config/opencode/opencode.jsonc"
     grep -q '"compaction": {' "$HOME/.config/opencode/opencode.jsonc"
-    [[ "$output" == *"opencode : configuration par défaut écrite"* ]]
+    [[ "$output" == *"opencode : configuration par défaut écrite"* ]] || false
 }
 
 @test "activer ia : configuration opencode avec le repère et différente -> mise à jour" {
@@ -350,7 +350,7 @@ GH
     run bash "$DEVZONE" activer ia
     [ "$status" -eq 0 ]
     grep -q '"model": "opencode/big-pickle"' "$HOME/.config/opencode/opencode.jsonc"
-    [[ "$output" == *"opencode : configuration par défaut mise à jour"* ]]
+    [[ "$output" == *"opencode : configuration par défaut mise à jour"* ]] || false
 }
 
 @test "activer ia : configuration opencode avec seulement \$schema -> remplacée" {
@@ -360,7 +360,7 @@ GH
     [ "$status" -eq 0 ]
     grep -q '^// devzone : configuration opencode par défaut' "$HOME/.config/opencode/opencode.jsonc"
     grep -q '"model": "opencode/big-pickle"' "$HOME/.config/opencode/opencode.jsonc"
-    [[ "$output" == *"opencode : configuration par défaut mise à jour"* ]]
+    [[ "$output" == *"opencode : configuration par défaut mise à jour"* ]] || false
 }
 
 @test "activer ia : configuration opencode sans le repère -> gardée" {
@@ -369,7 +369,7 @@ GH
     run bash "$DEVZONE" activer ia
     [ "$status" -eq 0 ]
     [ "$(cat "$HOME/.config/opencode/opencode.jsonc")" = '{"model":"mon-modele"}' ]
-    [[ "$output" == *"opencode : configuration personnalisée, gardée"* ]]
+    [[ "$output" == *"opencode : configuration personnalisée, gardée"* ]] || false
 }
 
 @test "modèle opencode : défauts durcis (bash en accord, secrets et curl interdits)" {

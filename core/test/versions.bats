@@ -221,7 +221,7 @@ tickets_ouverts() {
     avant_devzone="$(cat "$DEVZONE")"
     run bash "$VERSIONS" --appliquer nexistepas 1.0.0
     [ "$status" -ne 0 ]
-    [[ "$output" == *"paquet inconnu"* ]]
+    [[ "$output" == *"paquet inconnu"* ]] || false
     [ "$(cat "$POST_CREATE")" = "$avant_post" ]
     [ "$(cat "$DEVZONE")" = "$avant_devzone" ]
 }
@@ -229,7 +229,7 @@ tickets_ouverts() {
 @test "--appliquer sans version : usage rappelé" {
     run bash "$VERSIONS" --appliquer repowarden
     [ "$status" -ne 0 ]
-    [[ "$output" == *"--appliquer"* ]]
+    [[ "$output" == *"--appliquer"* ]] || false
 }
 
 @test "--ticket-existant : ticket de l'App trouvé (numéro et titre)" {
@@ -263,5 +263,5 @@ tickets_ouverts() {
 @test "workflow versions : conception proposée, jamais retenue (le mainteneur la reprend)" {
     workflow="$RACINE/.github/workflows/versions.yml"
     grep -q '^ *## Conception proposée$' "$workflow"
-    ! grep -q '^ *## Conception retenue' "$workflow"
+    ! grep -q '^ *## Conception retenue' "$workflow" || false
 }
