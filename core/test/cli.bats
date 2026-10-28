@@ -11,7 +11,7 @@ setup() {
 @test "devzone <dossier> : crée un devzone complet dans un dossier neuf" {
     run bash "$CLI" mon-devzone
     [ "$status" -eq 0 ]
-    [[ "$output" == *"créé dans"* ]]
+    [[ "$output" == *"créé dans"* ]] || false
     for f in .devcontainer/devcontainer.json .devcontainer/devzone Makefile .gitattributes core/scripts/lancer.sh core/scripts/desinstaller.sh README.md LICENSE workspace/.gitkeep .gitignore; do
         [ -e "mon-devzone/$f" ] || { echo "manquant : $f"; return 1; }
     done
@@ -41,7 +41,7 @@ setup() {
     mkdir plein && echo important >plein/fichier
     run bash "$CLI" plein
     [ "$status" -eq 1 ]
-    [[ "$output" == *"pas vide"* ]]
+    [[ "$output" == *"pas vide"* ]] || false
     [ "$(cat plein/fichier)" = important ]
     [ ! -e plein/Makefile ]
 }
@@ -49,7 +49,7 @@ setup() {
 @test "devzone desinstaller : refusé hors d'un dossier devzone" {
     run bash "$CLI" desinstaller
     [ "$status" -eq 1 ]
-    [[ "$output" == *"dossier devzone"* ]]
+    [[ "$output" == *"dossier devzone"* ]] || false
 }
 
 @test "devzone desinstaller : ancien devzone (desinstaller.sh à la racine) accepté" {
@@ -61,7 +61,7 @@ setup() {
     cd vieux
     run bash "$CLI" desinstaller
     [ "$status" -eq 0 ]
-    [[ "$output" == *ancien* ]]
+    [[ "$output" == *ancien* ]] || false
 }
 
 @test "devzone desinstaller : devzone d'avant core/ (scripts/desinstaller.sh) accepté" {
@@ -73,7 +73,7 @@ setup() {
     cd avant-core
     run bash "$CLI" desinstaller
     [ "$status" -eq 0 ]
-    [[ "$output" == *avant-core* ]]
+    [[ "$output" == *avant-core* ]] || false
 }
 
 @test "devzone desinstaller : desinstaller.sh sans .devcontainer refusé" {
@@ -90,7 +90,7 @@ setup() {
     [ "$status" -eq 0 ]
     [ "$output" = "$(node -p "require('$RACINE/package.json').version")" ]
     run bash "$CLI" --help
-    [[ "$output" == *"devzone <dossier>"* ]]
+    [[ "$output" == *"devzone <dossier>"* ]] || false
     run bash "$CLI" --truc
     [ "$status" -eq 1 ]
 }
@@ -101,7 +101,7 @@ setup() {
     for f in core/devzone .devcontainer/devcontainer.json .devcontainer/devzone Makefile core/scripts/lancer.sh core/scripts/desinstaller.sh README.md LICENSE package.json; do
         grep -qx "$f" <<<"$fichiers" || { echo "absent du paquet : $f"; return 1; }
     done
-    ! grep -qE '^(core/test/|\.github/|workspace/|\.devzone\.|\.repowarden\.conf)' <<<"$fichiers"
+    ! grep -qE '^(core/test/|\.github/|workspace/|\.devzone\.|\.repowarden\.conf)' <<<"$fichiers" || false
 }
 
 # core/scripts/lancer.sh (make up, make rebuild) avec un CLI devcontainer simulé : $1 = son script
@@ -210,18 +210,18 @@ faux_docker() {
     faux_cli 'printf "Start: Run: docker buildx build x\r\nbruit\r\nRunning the postStartCommand from devcontainer.json...\r\ndevzone : état\r\n  ○ module ia        facultatif\r\n"'
     run bash "$RACINE/core/scripts/lancer.sh" up "$PWD/dz"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"▶ Construction de l'image"*"▶ Démarrage"*"○ module ia"*"devzone lancé"* ]]
-    [[ "$output" != *bruit* ]]
+    [[ "$output" == *"▶ Construction de l'image"*"▶ Démarrage"*"○ module ia"*"devzone lancé"* ]] || false
+    [[ "$output" != *bruit* ]] || false
     grep -q bruit dz/.devzone.log
-    [[ "$(cat "$BATS_TEST_TMPDIR/args")" == *"up --workspace-folder $PWD/dz"* ]]
+    [[ "$(cat "$BATS_TEST_TMPDIR/args")" == *"up --workspace-folder $PWD/dz"* ]] || false
 }
 
 @test "lancer.sh rebuild : conteneur recréé" {
     faux_cli 'exit 0'
     run bash "$RACINE/core/scripts/lancer.sh" rebuild "$PWD/dz"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"devzone reconstruit"* ]]
-    [[ "$(cat "$BATS_TEST_TMPDIR/args")" == *"--remove-existing-container"* ]]
+    [[ "$output" == *"devzone reconstruit"* ]] || false
+    [[ "$(cat "$BATS_TEST_TMPDIR/args")" == *"--remove-existing-container"* ]] || false
 }
 
 @test "lancer.sh : question posée dans le conteneur signalée, lancement arrêté au lieu d'attendre" {
@@ -231,7 +231,7 @@ faux_docker() {
     run bash "$RACINE/core/scripts/lancer.sh" up "$PWD/dz"
     [ "$status" -eq 1 ]
     [ $(($(date +%s) - debut)) -lt 20 ]
-    [[ "$output" == *"pose une question"*"Configurer les bots de ce dépôt ? [o/N]"* ]]
+    [[ "$output" == *"pose une question"*"Configurer les bots de ce dépôt ? [o/N]"* ]] || false
 }
 
 @test "lancer.sh : silence signalé (signe de vie), sans le prendre pour une question" {
@@ -239,15 +239,15 @@ faux_docker() {
     export DEVZONE_SIGNE_DE_VIE=1 DEVZONE_ATTENTE_QUESTION=1
     run bash "$RACINE/core/scripts/lancer.sh" up "$PWD/dz"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"aucune nouvelle ligne depuis"*"npm install en cours"* ]]
-    [[ "$output" == *"devzone lancé"* ]]
+    [[ "$output" == *"aucune nouvelle ligne depuis"*"npm install en cours"* ]] || false
+    [[ "$output" == *"devzone lancé"* ]] || false
 }
 
 @test "lancer.sh : échec, fin du journal affichée" {
     faux_cli 'echo "erreur de construction"; exit 1'
     run bash "$RACINE/core/scripts/lancer.sh" up "$PWD/dz"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"erreur de construction"*"échec"* ]]
+    [[ "$output" == *"erreur de construction"*"échec"* ]] || false
 }
 
 @test "scripts en LF" {
@@ -278,7 +278,8 @@ faux_docker() {
         # .gitattributes : seules les entrées avec un « / » sont des chemins
         # (« Dockerfile » est un motif valable partout)
         awk '!/^#/ && NF && $1 ~ /\// && $1 !~ /\*/ { print $1 }' .gitattributes
-        grep -oE '(bash|run: bash) [A-Za-z0-9_./-]+' .github/workflows/fonctionnel.yml | awk '{ print $NF }'
+        # seuls les mots avec un « / » sont des chemins (« bash 3.2 », « bash --version » n'en sont pas)
+        grep -oE '(bash|run: bash) [A-Za-z0-9_.-]*/[A-Za-z0-9_./-]+' .github/workflows/fonctionnel.yml | awk '{ print $NF }'
         grep -oE '^ +- "[^"*]+' .github/workflows/fonctionnel.yml | sed 's/^ *- "//'
     )"
     [ -n "$chemins" ]
