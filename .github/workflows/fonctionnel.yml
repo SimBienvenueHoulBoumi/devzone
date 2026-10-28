@@ -16,12 +16,18 @@
 # windows et ia-arm64 (une dizaine de minutes chacun, 15 pour windows) ne
 # tournent que si la PR touche le conteneur, les tests, la CLI, .gitattributes
 # ou package.json (core/test/ci-conteneur.sh) ; une PR de docs seule n'attend pas.
-# tests-conteneur réussit si les quatre ont réussi, ou s'ils n'avaient pas à
-# tourner ; un échec ou une annulation la fait échouer. À la main : tout tourne.
+# Job bats : bats core/test/ (tests unitaires) sur chaque PR, sans décision
+# par chemin (quelques secondes ; un test peut lire la doc ou un workflow),
+# sous ubuntu et sous macOS avec le bash 3.2 du système (scripts de l'hôte).
+# tests-conteneur réussit si bats a réussi et si les quatre autres ont réussi,
+# ou s'ils n'avaient pas à tourner ; un échec ou une annulation la fait
+# échouer. Push sur develop et main : bats seul. À la main : tout tourne.
 name: fonctionnel
 
 on:
   pull_request:
+  push:
+    branches: [develop, main]
   workflow_dispatch:
 
 permissions:
@@ -47,13 +53,15 @@ jobs:
           BASE: ${{ github.event.pull_request.base.sha }}
           TETE: ${{ github.event.pull_request.head.sha }}
         run: |
-          if [ "$GITHUB_EVENT_NAME" != pull_request ]; then
-            tester=true
-          else
-            git diff --name-only "$BASE...$TETE" >changes.txt
-            cat changes.txt
-            tester="$(bash core/test/ci-conteneur.sh a-tester <changes.txt)"
-          fi
+          case "$GITHUB_EVENT_NAME" in
+            pull_request)
+              git diff --name-only "$BASE...$TETE" >changes.txt
+              cat changes.txt
+              tester="$(bash core/test/ci-conteneur.sh a-tester <changes.txt)"
+              ;;
+            push) tester=false ;; # develop et main : déjà testés par la PR, bats seul
+            *) tester=true ;;     # à la main : tout tourne
+          esac
           echo "tester=$tester"
           echo "tester=$tester" >>"$GITHUB_OUTPUT"
 
@@ -172,10 +180,40 @@ jobs:
           claude --version
           opencode --version
 
+  # Tests unitaires (bats core/test/) sur chaque PR et chaque push de develop
+  # et main (#192). ubuntu : toute la suite. macOS : /bin/bash (3.2, celui du
+  # système) en tête du PATH, pour les scripts qui tournent sur l'hôte ou en
+  # CI (commande npm, lancer.sh, docker.sh, desinstaller.sh, versions.sh,
+  # ci-conteneur.sh) ; devzone.bats teste la commande du conteneur (Linux)
+  bats:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: bash 3.2 du système en tête du PATH (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          mkdir -p "$RUNNER_TEMP/bash32"
+          ln -s /bin/bash "$RUNNER_TEMP/bash32/bash"
+          echo "$RUNNER_TEMP/bash32" >>"$GITHUB_PATH"
+      - name: bats core/test/ (ubuntu)
+        if: runner.os == 'Linux'
+        run: npx --yes bats@1.10.0 core/test/
+      - name: bats des scripts de l'hôte sous bash 3.2 (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          bash --version | head -1
+          bash -c '[ "${BASH_VERSINFO[0]}" = 3 ]'
+          npx --yes bats@1.10.0 core/test/cli.bats core/test/versions.bats core/test/ci-conteneur.bats
+
   # Synthèse exigée pour merger (requiredChecks) : toujours lancée, jamais
   # « skipped » (GitHub compterait un job sauté comme réussi)
   tests-conteneur:
-    needs: [changements, fonctionnel, cli, windows, ia-arm64]
+    needs: [changements, fonctionnel, cli, windows, ia-arm64, bats]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -189,4 +227,5 @@ jobs:
           CLI: ${{ needs.cli.result }}
           WINDOWS: ${{ needs.windows.result }}
           IA_ARM64: ${{ needs.ia-arm64.result }}
-        run: bash core/test/ci-conteneur.sh synthese "$TESTER" "$CHANGEMENTS" "$FONCTIONNEL" "$CLI" "$WINDOWS" "$IA_ARM64"
+          BATS: ${{ needs.bats.result }}
+        run: bash core/test/ci-conteneur.sh synthese "$TESTER" "$CHANGEMENTS" "$FONCTIONNEL" "$CLI" "$WINDOWS" "$IA_ARM64" "$BATS"

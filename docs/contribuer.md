@@ -4,7 +4,7 @@
 
 | Tests | Commande | Où | Durée |
 |---|---|---|---|
-| Commande `devzone` du conteneur et commande npm (unitaires) | `bats core/test/` | dans le conteneur | quelques secondes |
+| Commande `devzone` du conteneur et commande npm (unitaires) | `bats core/test/` | dans le conteneur ; en CI, job `bats` (ubuntu, et macOS sous bash 3.2 pour cli.bats, versions.bats, ci-conteneur.bats) sur chaque PR et chaque push de develop et main | quelques secondes |
 | Fonctionnels : un devzone construit et utilisé comme par un utilisateur (outils, modules, Kubernetes avec kind, hooks repowarden, redémarrage, rebuild) | `make test-fonctionnel` | sur ta machine (Docker, Node) | 5 à 10 min |
 | CLI dans un vrai terminal : chaque commande tapée comme par un humain (pseudo-terminal), avec un délai maximal ; une commande qui attend une entrée échoue. Cibles `make` (`help`, `up`, `shell`, `status`, `stop`, `down`, `rebuild`, `desinstaller`), commande npm (`devzone <dossier>`, `desinstaller`, `--version`, `--help`), commande `devzone` du conteneur, scripts de démarrage | `make test-cli` | sur ta machine (Docker, Node, Python 3) | 10 à 15 min |
 | Windows (local et CI) | `bash core/test/windows.sh` | macOS/Linux (local) ou Windows Git Bash (CI) | quelques secondes |
@@ -13,7 +13,7 @@
 
 Les tests fonctionnels et ceux de la CLI travaillent sur une copie du dépôt, avec leurs propres volumes (`devzone-test-…`), puis suppriment tout (conteneur, volumes, image), même en cas d'échec : ton devzone, tes connexions et le cluster de ta machine ne sont jamais touchés (seul un cluster kind de test est utilisé). En CI, le workflow `fonctionnel` les lance (jobs fonctionnel, cli et windows, plus `ia-arm64` : `devzone activer ia` sur un runner arm64 `ubuntu-24.04-arm`, comme un Mac Apple Silicon, puis `claude --version` et `opencode --version` aux versions figées) sur chaque PR qui modifie `.devcontainer/`, `core/` (commande npm, scripts, tests), le `Makefile`, `.gitattributes` ou `package.json`, et à la main (*Actions → fonctionnel → Run workflow*).
 
-**Exigés pour merger.** Le workflow tourne sur chaque PR ; son job `changements` décide par chemin si les quatre jobs doivent tourner (`core/test/ci-conteneur.sh`), et la vérification de synthèse **`tests-conteneur`** est exigée pour merger dans `develop` comme dans `main` (`requiredChecks` de `.repowarden.conf`) : elle réussit si `fonctionnel`, `cli`, `windows` et `ia-arm64` ont réussi, ou s'ils n'avaient pas à tourner (PR de docs seule : quelques secondes) ; un échec ou une annulation la fait échouer. Une PR qui touche le conteneur ne peut donc pas être mergée tant que ses tests tournent. Après un changement de `requiredChecks` : `repowarden proteger --checks "repowarden,tests-conteneur"` (droits d'administration), vérifié par `repowarden proteger --verifier --checks "repowarden,tests-conteneur"`.
+**Exigés pour merger.** Le workflow tourne sur chaque PR ; le job `bats` tourne sur ubuntu-latest et macos-latest (bash 3.2 du système en tête du PATH) sans décision par chemin, sur `core/test/` entier sous ubuntu, et sur `core/test/cli.bats`, `core/test/versions.bats`, `core/test/ci-conteneur.bats` sous macOS (les autres `.bats` n'y tournent pas, dont `devzone.bats`). Son job `changements` décide par chemin si les quatre jobs du conteneur doivent tourner (`fonctionnel`, `cli`, `windows`, `ia-arm64`, `core/test/ci-conteneur.sh`) ; la vérification de synthèse **`tests-conteneur`** est exigée pour merger dans `develop` comme dans `main` (`requiredChecks` de `.repowarden.conf`) et dépend du job `bats` en plus des quatre : elle réussit si `bats` a réussi et si `fonctionnel`, `cli`, `windows` et `ia-arm64` ont réussi, ou s'ils n'avaient pas à tourner (PR de docs seule : quelques secondes) ; un échec ou une annulation la fait échouer. Une PR qui touche le conteneur ne peut donc pas être mergée tant que ses tests tournent. Sur `push` vers `develop` et `main`, seul le job `bats` tourne (`changements` répond `false`). Après un changement de `requiredChecks` : `repowarden proteger --checks "repowarden,tests-conteneur"` (droits d'administration), vérifié par `repowarden proteger --verifier --checks "repowarden,tests-conteneur"`.
 
 
 
@@ -56,7 +56,7 @@ devzone/
 │   ├── metrics-server.sh       # metrics-server sur les clusters locaux (CPU et RAM dans k9s)
 │   └── git-identite.sh         # identité git déduite du compte gh si elle manque
 ├── .github/workflows/
-│   ├── fonctionnel.yml         # tests du conteneur (fonctionnels, CLI, Windows) et synthèse tests-conteneur exigée pour merger
+│   ├── fonctionnel.yml         # tests du conteneur (fonctionnels, CLI, Windows, ia-arm64), job bats sur chaque PR/push develop/main, synthèse tests-conteneur exigée pour merger
 │   ├── repowarden.yml          # vérifications repowarden de chaque PR (PR mal visée reciblée vers develop)
 │   ├── tickets.yml             # suivi des tickets : branche, PR brouillon, statuts jusqu'à la production
 │   ├── release.yml             # préversions sur develop, livraison develop → main
