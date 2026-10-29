@@ -182,3 +182,71 @@ setup() {
     [[ ",$exigees," == *",repowarden,"* ]] || false
     [[ ",$exigees," == *",tests-conteneur,"* ]] || false
 }
+
+@test "bash32.sh : liste passée à docker = job macOS" {
+    SCRIPT="$RACINE/core/test/bash32.sh"
+    mkdir -p "$BATS_TEST_TMPDIR/bin"
+    cat > "$BATS_TEST_TMPDIR/bin/docker" <<'DOCKER'
+#!/usr/bin/env bash
+echo "docker $*" >>"$BATS_TEST_TMPDIR/docker.log"
+exit 0
+DOCKER
+    chmod +x "$BATS_TEST_TMPDIR/bin/docker"
+    for c in bash grep tr head; do
+        ln -sf "$(command -v "$c")" "$BATS_TEST_TMPDIR/bin/$c"
+    done
+    export PATH="$BATS_TEST_TMPDIR/bin:/usr/bin:/bin"
+    run bash "$SCRIPT"
+    [ "$status" -eq 0 ]
+    grep -q "bash:3.2" "$BATS_TEST_TMPDIR/docker.log"
+    grep -q "core/test/cli.bats core/test/versions.bats core/test/ci-conteneur.bats" "$BATS_TEST_TMPDIR/docker.log" || false
+}
+
+@test "bash32.sh : sans docker → code 2 et message" {
+    SCRIPT="$RACINE/core/test/bash32.sh"
+    mkdir -p "$BATS_TEST_TMPDIR/bin"
+    for c in bash grep tr head rm; do
+        ln -sf "$(command -v "$c")" "$BATS_TEST_TMPDIR/bin/$c"
+    done
+    export PATH="$BATS_TEST_TMPDIR/bin"
+    run bash "$SCRIPT"
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"Docker requis"* ]] || false
+}
+
+@test "bash32.sh : faux docker en échec → code 1" {
+    SCRIPT="$RACINE/core/test/bash32.sh"
+    mkdir -p "$BATS_TEST_TMPDIR/bin"
+    cat > "$BATS_TEST_TMPDIR/bin/docker" <<'DOCKER'
+#!/usr/bin/env bash
+echo "docker $*" >>"$BATS_TEST_TMPDIR/docker.log"
+exit 1
+DOCKER
+    chmod +x "$BATS_TEST_TMPDIR/bin/docker"
+    for c in bash grep tr head; do
+        ln -sf "$(command -v "$c")" "$BATS_TEST_TMPDIR/bin/$c"
+    done
+    export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
+    run bash "$SCRIPT"
+    [ "$status" -eq 1 ]
+}
+
+@test "bash32.sh : version bats du job macOS dans la liste docker" {
+    SCRIPT="$RACINE/core/test/bash32.sh"
+    mkdir -p "$BATS_TEST_TMPDIR/bin"
+    cat > "$BATS_TEST_TMPDIR/bin/docker" <<'DOCKER'
+#!/usr/bin/env bash
+echo "docker $*" >>"$BATS_TEST_TMPDIR/docker.log"
+exit 0
+DOCKER
+    chmod +x "$BATS_TEST_TMPDIR/bin/docker"
+    for c in bash grep tr head; do
+        ln -sf "$(command -v "$c")" "$BATS_TEST_TMPDIR/bin/$c"
+    done
+    export PATH="$BATS_TEST_TMPDIR/bin:/usr/bin:/bin"
+    run bash "$SCRIPT"
+    [ "$status" -eq 0 ]
+    grep -q "bash:3.2" "$BATS_TEST_TMPDIR/docker.log"
+    grep -q "core/test/cli.bats core/test/versions.bats core/test/ci-conteneur.bats" "$BATS_TEST_TMPDIR/docker.log" || false
+    grep -q "v1.10.0" "$BATS_TEST_TMPDIR/docker.log" || false
+}

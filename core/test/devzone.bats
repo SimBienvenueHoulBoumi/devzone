@@ -396,3 +396,8 @@ GH
     [ -n "$dernier_allow" ] && [ -n "$premier_deny" ]
     [ "$premier_deny" -gt "$dernier_allow" ]
 }
+
+@test "devzone --help cite test-bash32" {
+    run bash "$DEVZONE" --help
+    [[ "$output" == *"test-bash32"* ]] || false
+}
