@@ -16,15 +16,28 @@ devzone est un environnement de développement prêt en une commande : Java, Nod
 ### Prérequis
 
 - Docker Desktop (ou Docker Engine sous Linux). Pour Kubernetes (facultatif) : activer le cluster de Docker Desktop (*Settings → Kubernetes → Enable Kubernetes*).
-- Node (pour `npx`).
+- Node et npm (pour `npx` ou l'installation globale).
 - `make` (nécessaire pour `make shell` ; sous Windows sans `make`, voir le tableau « Au quotidien »).
 
 Sous Windows : il est recommandé de cloner avec Git for Windows (les scripts restent en fins de ligne LF grâce à `.gitattributes`, et la commande npm trouve le `bash` qu'elle exige).
 
 ### Lancer en une commande
 
+Deux façons via npm. Sans installation, à chaque usage :
+
 ```bash
 npx devzone mon-devzone
+cd mon-devzone
+make shell
+```
+
+Tu peux aussi l'installer une fois pour toutes :
+
+```bash
+npm install -g devzone
+devzone --version
+devzone --help
+devzone mon-devzone
 cd mon-devzone
 make shell
 ```
@@ -124,6 +137,18 @@ make desinstaller
 ```
 
 Cette commande supprime le conteneur, l'image `vsc-devzone-…`, les volumes `devzone-*`, le volume du Docker interne (images et clusters kind créés dans le conteneur) ainsi que les éventuels metrics-server installés par devzone sur les clusters locaux. Elle **ne touche jamais** à `workspace/` (tes projets). Pour garder tes connexions (GitHub, git, Claude Code, opencode et modules) : `make desinstaller GARDER=connexions`.
+
+Avec la commande installée globalement (`npm install -g devzone`), tu peux aussi lancer, dans le dossier du devzone :
+
+```bash
+devzone desinstaller
+```
+
+Même effet que `make desinstaller`. Ensuite seulement, pour retirer la commande de ta machine :
+
+```bash
+npm uninstall -g devzone
+```
 
 ## Pour aller plus loin
 

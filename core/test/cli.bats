@@ -104,6 +104,35 @@ setup() {
     ! grep -qE '^(core/test/|\.github/|workspace/|\.devzone\.|\.repowarden\.conf)' <<<"$fichiers" || false
 }
 
+@test "README : commandes npm citées, sous-commandes citées dans devzone --help" {
+    readme="$RACINE/README.md"
+    for c in 'npm install -g devzone' 'npm uninstall -g devzone' 'devzone desinstaller'; do
+        grep -q -- "$c" "$readme" || { echo "absent du README : $c"; return 1; }
+    done
+    run bash "$CLI" --help
+    [ "$status" -eq 0 ]
+    # Citations de la commande npm dans le README : blocs bash et inline code
+    # `devzone <mot>`. Le récapitulatif (fence text) et la prose citent le
+    # devzone du conteneur, autre commande (.devcontainer/devzone).
+    # (aucune citation en ligne : cas normal)
+    citations="$(
+        awk '/^```bash$/ { dans = 1; next } /^```$/ { dans = 0 } dans' "$readme"
+        grep -oE '`devzone [A-Za-z0-9_-]+`' "$readme" || true
+    )"
+    [ -n "$citations" ]
+    # Tout mot cité aussi après npx devzone est le nom du dossier (argument
+    # <dossier>), pas une sous-commande ; les options (--version, --help)
+    # non plus.
+    dossier="$(grep -oE 'npx devzone [A-Za-z0-9_-]+' "$readme" | awk '{ print $NF }' | sort -u)"
+    mots="$(grep -oE '(^|[^A-Za-z0-9_-])devzone [A-Za-z0-9_-]+' <<<"$citations" | awk '{ print $NF }' | sort -u)"
+    while IFS= read -r mot; do
+        [ -n "$mot" ] || continue
+        case "$mot" in -*) continue ;; esac
+        grep -qx "$mot" <<<"$dossier" && continue
+        grep -q -- "$mot" <<<"$output" || { echo "devzone $mot absent de devzone --help"; return 1; }
+    done <<<"$mots"
+}
+
 # core/scripts/lancer.sh (make up, make rebuild) avec un CLI devcontainer simulé : $1 = son script
 faux_cli() {
     mkdir -p "$BATS_TEST_TMPDIR/faux"
