@@ -122,7 +122,7 @@
   },
   "agent": {
     "build": { "model": "opencode/big-pickle" },
-    "plan": { "model": "opencode/nemotron-3-ultra-free" },
+    "plan": { "model": "opencode/glm-5.3-flash-free" },
     "general": { "model": "opencode/deepseek-v4.1-flash-free" },
     "explore": { "model": "opencode/nemotron-3.5-lightning-free" },
     "title": { "model": "opencode/mimo-v2.6-flash-free" },
