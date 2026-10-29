@@ -5,6 +5,7 @@
 #   devzone desactiver <module>      désactive et applique tout de suite
 #   devzone appliquer                installe ce qui est actif (post-create.sh)
 #   devzone actif <module>           code 0 si actif (scripts de démarrage)
+#   devzone test-bash32             lance les tests bats sous bash 3.2 (conteneur Docker)
 # État propre à chaque utilisateur : ~/.config/devzone/modules (volume
 # devzone-config, survit aux rebuilds), une ligne « module=on|off ».
 set -euo pipefail
@@ -300,7 +301,8 @@ case "${1:-}" in
         connu "${2:-}" || { echo "devzone : module inconnu : ${2:-(aucun)}" >&2; exit 2; }
         [ "$(valeur "$2")" = on ]
         ;;
-    -h | --help | aide) sed -n '2,8p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' ;;
+    -h | --help | aide) sed -n '2,9p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' ;;
+    test-bash32) bash "$RACINE/core/test/bash32.sh" ;;
     *)
         echo "devzone : commande inconnue : $1 (devzone --help)" >&2
         exit 1
