@@ -68,7 +68,7 @@ jobs:
   fonctionnel:
     needs: changements
     if: needs.changements.outputs.tester == 'true'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v7
