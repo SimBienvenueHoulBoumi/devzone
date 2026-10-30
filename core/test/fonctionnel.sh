@@ -117,6 +117,12 @@ reussit "désactiver ia" "devzone desactiver ia && ! command -v claude"
 echoue "module inconnu refusé" "devzone activer nexistepas" "module inconnu"
 
 echo "▶ Module kubernetes (cluster kind, jamais celui de l'hôte)"
+# #230 : avant de tenter le cluster kind, le daemon docker du conteneur doit répondre
+if ! dz "docker info" >/dev/null 2>&1; then
+    echo "↳ #230 : docker info échoué ; diagnostic du conteneur"
+    dz "uname -r; iptables --version; if command -v update-alternatives >/dev/null 2>&1; then update-alternatives --display iptables; fi; cat /proc/self/cgroup; if [ -f /tmp/dockerd.log ]; then tail -n 80 /tmp/dockerd.log; else echo 'dockerd.log introuvable'; fi" 2>&1 | sed "s/^/      /"
+fi
+reussit "Docker répond dans le conteneur" "docker info"
 reussit "kind create cluster" "kind create cluster --name test"
 reussit "activer kubernetes : metrics-server sur kind" "devzone activer kubernetes" "metrics-server : installé .*kind-test"
 reussit "métriques disponibles" "for i in \$(seq 1 36); do kubectl --context kind-test top nodes >/dev/null 2>&1 && exit 0; sleep 5; done; exit 1"
