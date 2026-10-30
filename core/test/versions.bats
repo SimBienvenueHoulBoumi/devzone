@@ -260,6 +260,13 @@ tickets_ouverts() {
     [ -z "$output" ]
 }
 
+@test "--ticket-existant : ticket déjà ouvert par l'App est mis à jour" {
+    tickets_ouverts 42 "repowarden 9.9.9 dans le conteneur" "app/repowarden-devzone"
+    run bash "$VERSIONS" --ticket-existant repowarden "app/repowarden-devzone"
+    [ "$status" -eq 0 ]
+    [ "$output" = $'42	repowarden 9.9.9 dans le conteneur' ]
+}
+
 @test "workflow versions : conception proposée, jamais retenue (le mainteneur la reprend)" {
     workflow="$RACINE/.github/workflows/versions.yml"
     grep -q '^ *## Conception proposée$' "$workflow"
