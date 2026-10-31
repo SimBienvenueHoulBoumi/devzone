@@ -52,9 +52,8 @@ repowarden install --global --lang fr
 
 # Modules facultatifs (assistants IA, Kubernetes) : commande devzone, état
 # gardé dans le dossier de l'instance ($RACINE/.devzone.modules) ; installe
-# ce qui est actif. Un module
-# en échec n'arrête pas la création : le conteneur reste utilisable et l'état
-# (devzone, à chaque démarrage) le montre « en échec »
+# ce qui est actif. Un module en échec n'arrête pas la création : le conteneur
+# reste utilisable et l'état (devzone, à chaque démarrage) le montre « en échec »
 sudo ln -sf /workspaces/devzone/.devcontainer/devzone /usr/local/bin/devzone
 devzone appliquer || echo "devzone : modules incomplets (détail ci-dessus), réessayer : devzone appliquer" >&2
 

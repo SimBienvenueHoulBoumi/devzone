@@ -276,22 +276,48 @@ GH
     [[ "$output" == *"○ module ia"*"devzone activer ia"* ]] || false
     [[ "$output" == *"○ module kubernetes"* ]] || false
     [[ "$output" != *"✔ module ia"* ]] || false
-    run bash "$DEVZONE" actif ia
-    [ "$status" -ne 0 ]
 }
 
-@test "connexion Claude partagée : signalée, pas d'activation de ia" {
+@test "actif : code 0 ou 1, sans rien écrire (test de scripts de démarrage)" {
+    run bash "$DEVZONE" actif ia
+    [ "$status" -ne 0 ]
+    [ -z "$output" ]
+    bash "$DEVZONE" activer ia >/dev/null
+    run bash "$DEVZONE" actif ia
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+    run bash "$DEVZONE" actif kubernetes
+    [ "$status" -ne 0 ]
+    [ -z "$output" ]
+}
+
+@test "connexion Claude partagée : signalée à la création de l'état, une seule fois" {
     mkdir -p "$HOME/.claude" && echo '{}' >"$HOME/.claude/.credentials.json"
     run bash "$DEVZONE" actif ia
     [ "$status" -ne 0 ]
     [[ "$output" == *"connexion Claude Code/opencode partagée trouvée : devzone activer ia pour l'utiliser ici"* ]] || false
+    run bash "$DEVZONE" actif ia
+    [ "$status" -ne 0 ]
+    [ -z "$output" ]
 }
 
-@test "connexion opencode partagée : signalée, pas d'activation de ia" {
+@test "connexion opencode partagée : signalée à la création de l'état, une seule fois" {
     mkdir -p "$HOME/.local/share/opencode" && echo '{}' >"$HOME/.local/share/opencode/auth.json"
     run bash "$DEVZONE" actif ia
     [ "$status" -ne 0 ]
     [[ "$output" == *"connexion Claude Code/opencode partagée trouvée"* ]] || false
+    run bash "$DEVZONE" actif ia
+    [ "$status" -ne 0 ]
+    [ -z "$output" ]
+}
+
+@test "connexion partagée : jamais signalée quand l'état est repris (migration)" {
+    mkdir -p "$HOME/.config/devzone" "$HOME/.claude"
+    printf 'ia=on\nkubernetes=on\n' >"$HOME/.config/devzone/modules"
+    echo '{}' >"$HOME/.claude/.credentials.json"
+    run bash "$DEVZONE" actif ia
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
 }
 
 @test "migration : ancien état global repris une fois, source supprimée" {

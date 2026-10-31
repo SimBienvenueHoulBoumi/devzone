@@ -57,6 +57,13 @@ initialiser() {
     [ -f "$ETAT" ] && return 0
     mkdir -p "$(dirname "$ETAT")"
     printf 'ia=off\nkubernetes=off\n' >"$ETAT"
+    # Connexion déjà établie par une autre devzone (volumes partagés) :
+    # signalée une seule fois, à la création de l'état de cette instance ;
+    # stderr : initialiser est aussi appelé dans $(valeur …). Rien pour un
+    # état repris de l'ancien état global : les choix y sont déjà gardés
+    if [ -f "$HOME/.claude/.credentials.json" ] || [ -f "$HOME/.local/share/opencode/auth.json" ]; then
+        echo "devzone : connexion Claude Code/opencode partagée trouvée : devzone activer ia pour l'utiliser ici" >&2
+    fi
 }
 
 valeur() {
@@ -303,15 +310,9 @@ case "${1:-}" in
         ;;
     actif)
         connu "${2:-}" || { echo "devzone : module inconnu : ${2:-(aucun)}" >&2; exit 2; }
-        if [ "$(valeur "$2")" = on ]; then
-            printf '✔ module %-10s actif : %s\n' "$2" "$(description "$2")"
-        elif [ -f "$HOME/.claude/.credentials.json" ] || [ -f "$HOME/.local/share/opencode/auth.json" ]; then
-            echo "devzone : connexion Claude Code/opencode partagée trouvée : devzone activer ia pour l'utiliser ici"
-            exit 1
-        else
-            printf '○ module %-10s facultatif, %s : devzone activer %s\n' "$2" "$(description "$2")" "$2"
-            exit 1
-        fi
+        # Test silencieux, appelé par les scripts de démarrage : code 0 si le
+        # module est actif, 1 sinon, sans rien écrire (kube-config.sh:16)
+        [ "$(valeur "$2")" = on ]
         ;;
     -h | --help | aide) sed -n '2,9p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' ;;
     test-bash32) bash "$RACINE/core/test/bash32.sh" ;;
