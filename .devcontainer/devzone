@@ -218,6 +218,7 @@ appliquer_kubernetes() {
 }
 
 appliquer_gitlab() {
+    local etat_courant
     if [ "$1" = on ]; then
         # Activer gitlab seulement si l'état ne dit pas « prêt »
         etat_courant="$(bash "$ICI/gitlab/gitlab.sh" etat)"
@@ -225,7 +226,11 @@ appliquer_gitlab() {
             echo "devzone : gitlab déjà actif, rien à faire."
         else
             echo "devzone : gitlab activation via installer…"
-            bash "$ICI/gitlab/gitlab.sh" installer
+            if ! bash "$ICI/gitlab/gitlab.sh" installer; then
+                echo "gitlab" > "$(fichier_echec gitlab)"
+                return 1
+            fi
+            rm -f "$(fichier_echec gitlab)"
         fi
     else
         # Désactiver gitlab seulement si un cluster gitlab existe
@@ -314,11 +319,11 @@ etat() {
         echo "  ⚠ worktree        $chemin absent ici (créé hors du conteneur ?) : le gérer de ce côté-là, jamais git worktree prune ici (docs/reference.md, Worktrees git)"
     done < <(worktrees_absents)
     for m in "${MODULES[@]}"; do
-        if [ "$m" = "gitlab" ]; then
-            printf '  ○ module %-10s %s\n' "$m" "$(bash "$ICI/gitlab/gitlab.sh" etat)"
-        fi
         if [ "$(valeur "$m")" = on ] && [ -f "$(fichier_echec "$m")" ]; then
             printf '  ✖ module %-10s en échec : installation incomplète (%s) : devzone appliquer\n' "$m" "$(cat "$(fichier_echec "$m")")"
+        elif [ "$(valeur "$m")" = on ] && [ "$m" = gitlab ]; then
+            # GitLab actif : son état réel (prêt, runner, en échec)
+            printf '  ✔ module %-10s %s\n' "$m" "$(bash "$ICI/gitlab/gitlab.sh" etat)"
         elif [ "$(valeur "$m")" = on ]; then
             printf '  ✔ module %-10s actif : %s\n' "$m" "$(description "$m")"
         else

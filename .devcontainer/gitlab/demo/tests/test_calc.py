@@ -1,7 +1,7 @@
 # Tests unitaires pour le module calc.
 # Exécutés par pytest dans la CI GitLab.
 
-from src.calc import addition, soustraction
+from calc import addition, soustraction
 
 
 def test_addition():

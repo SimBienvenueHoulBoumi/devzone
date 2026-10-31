@@ -40,6 +40,10 @@ nginx-ingress:
       ports:
         http: 80
         https: 443
+    replicaCount: 1
+    minAvailable: 0
+    service:
+      type: NodePort
 
 # Réplicas à 1 et ressources réduites
 gitlab:

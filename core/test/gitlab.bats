@@ -1,105 +1,177 @@
 #!/usr/bin/env bats
-# Tests du module gitlab : installer, desinstaller, etat, seed.
-# Utilise de faux binaires (kubectl, helm, kind, curl, git) simulant un cluster kind.
-# Ces tests ne tournent que sous Linux (kind cluster requis).
-# Les faux binaires journalisent leurs arguments dans /tmp/opencode/bin/.
+# Module gitlab (#239) : installer, désinstaller, état, seed. Faux kind,
+# kubectl, helm, curl et git dans le PATH : aucun cluster n'est créé. Chaque
+# faux binaire journalise ses arguments dans $BATS_TEST_TMPDIR/<outil>.log.
 
 setup() {
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
-    ICI="$BATS_TEST_DIRNAME/../../.devcontainer/gitlab"
-
+    GITLAB="$BATS_TEST_DIRNAME/../../.devcontainer/gitlab/gitlab.sh"
     export HOME="$BATS_TEST_TMPDIR/home"
-    mkdir -p "$HOME" "$BATS_TEST_TMPDIR/bin" "$BATS_TEST_TMPDIR/.kube" "$BATS_TEST_TMPDIR/workspace" "$BATS_TEST_TMPDIR/.gitlab"
-    cd "$BATS_TEST_TMPDIR" || return 1
-    export GIT_CONFIG_NOSYSTEM=1
     export DEVZONE_RACINE="$BATS_TEST_TMPDIR/racine"
-    mkdir -p "$DEVZONE_RACINE/workspace"
+    export DEVZONE_ETAT="$BATS_TEST_TMPDIR/modules"
+    export DEVZONE_MEMINFO="$BATS_TEST_TMPDIR/meminfo"
+    export KIND_CLUSTERS="$BATS_TEST_TMPDIR/clusters"
+    SECRETS="$DEVZONE_RACINE/workspace/.gitlab"
+    mkdir -p "$HOME" "$DEVZONE_RACINE/workspace" "$BATS_TEST_TMPDIR/bin"
+    printf 'MemAvailable: 16000000 kB\n' >"$DEVZONE_MEMINFO"
+    : >"$KIND_CLUSTERS"
 
-    # Créer des faux binaires qui journalisent leurs arguments
-    mkdir -p "$BATS_TEST_TMPDIR/bin"
-    printf '#!/usr/bin/env bash\nprintf "ARGS: %%s\\n" "$*" >> "%s/run.log"' "$BATS_TEST_TMPDIR" >"$BATS_TEST_TMPDIR/bin/kubectl"
-    chmod +x "$BATS_TEST_TMPDIR/bin/kubectl"
-    printf '#!/usr/bin/env bash\nprintf "ARGS: %%s\\n" "$*" >> "%s/run.log"' "$BATS_TEST_TMPDIR" >"$BATS_TEST_TMPDIR/bin/helm"
-    chmod +x "$BATS_TEST_TMPDIR/bin/helm"
-    printf '#!/usr/bin/env bash\nprintf "ARGS: %%s\\n" "$*" >> "%s/run.log"' "$BATS_TEST_TMPDIR" >"$BATS_TEST_TMPDIR/bin/kind"
-    chmod +x "$BATS_TEST_TMPDIR/bin/kind"
-    printf '#!/usr/bin/env bash\nprintf "ARGS: %%s\\n" "$*" >> "%s/run.log"' "$BATS_TEST_TMPDIR" >"$BATS_TEST_TMPDIR/bin/curl"
-    chmod +x "$BATS_TEST_TMPDIR/bin/curl"
-    printf '#!/usr/bin/env bash\nprintf "ARGS: %%s\\n" "$*" >> "%s/run.log"' "$BATS_TEST_TMPDIR" >"$BATS_TEST_TMPDIR/bin/git"
-    chmod +x "$BATS_TEST_TMPDIR/bin/git"
-
+    # kind : clusters tenus dans $KIND_CLUSTERS
+    cat >"$BATS_TEST_TMPDIR/bin/kind" <<'KIND'
+#!/usr/bin/env bash
+echo "kind $*" >>"$BATS_TEST_TMPDIR/kind.log"
+case "$1 $2" in
+    "get clusters") cat "$KIND_CLUSTERS" ;;
+    "create cluster") echo "${4:-}" >>"$KIND_CLUSTERS" ;;
+    "delete cluster") grep -vx "${4:-}" "$KIND_CLUSTERS" >"$KIND_CLUSTERS.tmp" || true; mv "$KIND_CLUSTERS.tmp" "$KIND_CLUSTERS" ;;
+esac
+KIND
+    # kubectl : secret root « password123 » (base64), pod toolbox, jeton root
+    cat >"$BATS_TEST_TMPDIR/bin/kubectl" <<'KUBE'
+#!/usr/bin/env bash
+echo "kubectl $*" >>"$BATS_TEST_TMPDIR/kubectl.log"
+case "$*" in
+    *"config current-context"*) echo "${FAUX_CONTEXTE:-}" ;;
+    *"get secret"*) echo "cGFzc3dvcmQxMjM=" ;;
+    *"get pod"*) echo "gitlab-toolbox-1" ;;
+    *"gitlab-rails runner"*) echo "jeton-root-secret" ;;
+esac
+KUBE
+    cat >"$BATS_TEST_TMPDIR/bin/helm" <<'HELM'
+#!/usr/bin/env bash
+echo "helm $*" >>"$BATS_TEST_TMPDIR/helm.log"
+HELM
+    # curl : API GitLab simulée ; FAUX_GROUPE_KO=1 fait échouer le groupe
+    cat >"$BATS_TEST_TMPDIR/bin/curl" <<'CURL'
+#!/usr/bin/env bash
+echo "curl $*" >>"$BATS_TEST_TMPDIR/curl.log"
+[ -n "${FAUX_GITLAB_KO:-}" ] && exit 7
+case "$*" in
+    *"api/v4/groups/devzone"*)
+        [ -n "${FAUX_GROUPE_KO:-}" ] && exit 22
+        echo '{"id":42}' ;;
+    *"--request POST"*"api/v4/groups"*) [ -n "${FAUX_GROUPE_KO:-}" ] && exit 22 ;;
+    *"--request POST"*"api/v4/user/runners"*) echo '{"token":"jeton-runner-secret"}' ;;
+    # Branche main : absente tant que le faux git n'a pas poussé
+    *"api/v4/projects/devzone%2Fdemo/repository"*) [ -f "$BATS_TEST_TMPDIR/pousse" ] || exit 22 ;;
+    *"--request POST"*) ;;
+    *"api/v4/projects/devzone%2Fdemo"*) exit 22 ;;
+    *"api/v4/users?username=dev"*) echo '[]' ;;
+    *"api/v4/runners/all"*) echo "${FAUX_RUNNERS:-[]}" ;;
+esac
+exit 0
+CURL
+    cat >"$BATS_TEST_TMPDIR/bin/git" <<'GIT'
+#!/usr/bin/env bash
+echo "git $*" >>"$BATS_TEST_TMPDIR/git.log"
+case "$*" in *" push "*) touch "$BATS_TEST_TMPDIR/pousse" ;; esac
+GIT
+    chmod +x "$BATS_TEST_TMPDIR"/bin/*
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
 }
 
-@test "par défaut : module gitlab désactivé" {
+@test "gitlab : désactivé par défaut" {
     run bash "$DEVZONE"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"○ module gitlab"* ]]
-    [[ "$output" == *"devzone activer gitlab"* ]]
+    [[ "$output" == *"○ module gitlab"* ]] || false
+    run bash "$DEVZONE" actif gitlab
+    [ "$status" -ne 0 ]
 }
 
-@test "etat : module gitlab désactivé (aucun cluster gitlab)" {
-    run bash "$ICI/gitlab.sh" etat
+@test "gitlab : moins de 8 Go de RAM libre → refus, rien lancé" {
+    printf 'MemAvailable: 4000000 kB\n' >"$DEVZONE_MEMINFO"
+    run bash "$GITLAB" installer
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"8 Go"* ]] || false
+    [ ! -e "$BATS_TEST_TMPDIR/kind.log" ] || ! grep -q "create" "$BATS_TEST_TMPDIR/kind.log" || false
+    [ ! -e "$BATS_TEST_TMPDIR/helm.log" ]
+}
+
+@test "gitlab : autre cluster présent, pas gitlab → cluster gitlab créé" {
+    echo "dev" >"$KIND_CLUSTERS"
+    run bash "$GITLAB" installer
     [ "$status" -eq 0 ]
-    [[ "$output" == *"désactivé"* ]]
+    grep -q "kind create cluster --name gitlab" "$BATS_TEST_TMPDIR/kind.log"
 }
 
-@test "installer gitlab : créé le cluster, helm avec --version 9.11.16 et --kube-context kind-gitlab" {
-    # S'assurer qu'il n'y a pas encore de cluster gitlab
-    kind delete cluster --name gitlab 2>/dev/null || true
-
-    bash "$DEVZONE" activer gitlab
-    bash "$ICI/gitlab.sh" installer 2>&1 || true
-
-    # Vérifier que kind create cluster --name gitlab a été appelé
-    grep -q "kind create cluster --name gitlab" "$BATS_TEST_TMPDIR/run.log" || true
-
-    # Vérifier que helm a reçu --version 9.11.16
-    grep -q "--version 9.11.16" "$BATS_TEST_TMPDIR/helm.log" || true
-
-    # Vérifier que helm a reçu --kube-context kind-gitlab
-    grep -q "--kube-context kind-gitlab" "$BATS_TEST_TMPDIR/helm.log" || true
-}
-
-@test "desinstaller gitlab : kind delete cluster --name gitlab + .gitlab/ supprimé + current-context restauré" {
-    bash "$DEVZONE" activer gitlab
-
-    # Créer un contexte précédent
-    mkdir -p "$DEVZONE_RACINE/.gitlab"
-    echo "kind-gitlab" > "$DEVZONE_RACINE/.gitlab/contexte-precedent"
-
-    bash "$ICI/gitlab.sh" desinstaller 2>&1 || true
-
-    # Vérifier que kind delete cluster --name gitlab a été appelé
-    grep -q "kind delete cluster --name gitlab" "$BATS_TEST_TMPDIR/run.log" || true
-
-    # Vérifier que .gitlab/ a été supprimé
-    [ ! -d "$DEVZONE_RACINE/workspace/.gitlab" ] || true
-
-    # Vérifier que current-context a été restauré
-    grep -q "current-context restauré" "$BATS_TEST_TMPDIR/run.log" || true
-}
-
-@test "activer puis désactiver gitlab → ~/.kube/config et workspace/ identiques à avant" {
-    # S'assurer qu'il n'y a pas encore de cluster gitlab
-    kind delete cluster --name gitlab 2>/dev/null || true
-
-    # Activer gitlab
-    bash "$DEVZONE" activer gitlab 2>&1 || true
-
-    # Sauvegarder l'état de ~/.kube/config avant désactivation
-    cp "$HOME/.kube/config" "$BATS_TEST_TMPDIR/config-before" 2>/dev/null || true
-
-    # Désactiver gitlab
-    bash "$DEVZONE" desactiver gitlab 2>&1 || true
-
-    # Vérifier que l'état du workspace est préservé (pas de secrets en clair)
-    [ ! -d "$DEVZONE_RACINE/workspace/.gitlab" ] || true
-}
-
-@test "etat gitlab : vérifie les états désactivé, prêt, en échec" {
-    # Test état désactivé (déjà par défaut)
-    run bash "$ICI/gitlab.sh" etat
+@test "gitlab : cluster gitlab déjà là → pas recréé" {
+    echo "gitlab" >"$KIND_CLUSTERS"
+    run bash "$GITLAB" installer
     [ "$status" -eq 0 ]
-    [[ "$output" == *"désactivé"* ]]
+    ! grep -q "kind create" "$BATS_TEST_TMPDIR/kind.log" || false
+}
+
+@test "gitlab : charts figés, contexte kind-gitlab explicite" {
+    run bash "$GITLAB" installer
+    [ "$status" -eq 0 ]
+    grep -q -- "--kube-context kind-gitlab upgrade --install gitlab gitlab/gitlab --version 9.11.16" "$BATS_TEST_TMPDIR/helm.log"
+    grep -q -- "--kube-context kind-gitlab upgrade --install gitlab-runner gitlab/gitlab-runner --version 0.88.2" "$BATS_TEST_TMPDIR/helm.log"
+}
+
+@test "gitlab : secrets dans workspace/.gitlab (600), jamais dans le dépôt ni affichés" {
+    run bash "$GITLAB" installer
+    [ "$status" -eq 0 ]
+    for f in root-password root-token runner-token dev-password; do
+        [ -f "$SECRETS/$f" ] || { echo "absent : $f"; false; }
+        [ "$(stat -c %a "$SECRETS/$f" 2>/dev/null || stat -f %Lp "$SECRETS/$f")" = 600 ]
+    done
+    [ "$(cat "$SECRETS/root-password")" = password123 ]
+    [ ! -e "$BATS_TEST_DIRNAME/../../.devcontainer/workspace" ]
+    [[ "$output" != *"password123"* ]] || false
+    [[ "$output" != *"jeton-root-secret"* ]] || false
+    [[ "$output" != *"jeton-runner-secret"* ]] || false
+}
+
+@test "gitlab : projet créé avec l'ID numérique du groupe, push avec le jeton root" {
+    run bash "$GITLAB" installer
+    [ "$status" -eq 0 ]
+    grep -q "namespace_id=42" "$BATS_TEST_TMPDIR/curl.log"
+    grep -q "oauth2:jeton-root-secret@127.0.0.1:8929/devzone/demo.git" "$BATS_TEST_TMPDIR/git.log"
+    ! grep -q "jeton-runner-secret@" "$BATS_TEST_TMPDIR/git.log" || false
+}
+
+@test "gitlab : installation relancée → projet demo pas re-poussé, RAM non revérifiée" {
+    run bash "$GITLAB" installer
+    [ "$status" -eq 0 ]
+    [ "$(grep -c " push " "$BATS_TEST_TMPDIR/git.log")" -eq 1 ]
+    # GitLab installé occupe la mémoire : la relance ne la revérifie pas
+    printf 'MemAvailable: 4000000 kB\n' >"$DEVZONE_MEMINFO"
+    run bash "$GITLAB" installer
+    [ "$status" -eq 0 ]
+    [ "$(grep -c " push " "$BATS_TEST_TMPDIR/git.log")" -eq 1 ]
+}
+
+@test "gitlab : échec du seed → installation en échec, message clair, pas de runner" {
+    export FAUX_GROUPE_KO=1
+    run bash "$GITLAB" installer
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"groupe devzone"* ]] || false
+    ! grep -q "gitlab-runner" "$BATS_TEST_TMPDIR/helm.log" || false
+}
+
+@test "gitlab : désinstaller retire cluster, contexte et secrets, restaure le contexte" {
+    export FAUX_CONTEXTE=kind-dev
+    run bash "$GITLAB" installer
+    [ "$status" -eq 0 ]
+    [ "$(cat "$SECRETS/contexte-precedent")" = kind-dev ]
+    run bash "$GITLAB" desinstaller
+    [ "$status" -eq 0 ]
+    grep -q "kind delete cluster --name gitlab" "$BATS_TEST_TMPDIR/kind.log"
+    grep -q "kubectl config delete-context kind-gitlab" "$BATS_TEST_TMPDIR/kubectl.log"
+    grep -q "kubectl config use-context kind-dev" "$BATS_TEST_TMPDIR/kubectl.log"
+    [ ! -e "$SECRETS" ]
+    [ ! -s "$KIND_CLUSTERS" ]
+}
+
+@test "gitlab : état désactivé, prêt (runner en ligne ou non), en échec" {
+    run bash "$GITLAB" etat
+    [ "$output" = "désactivé" ]
+    echo gitlab >"$KIND_CLUSTERS"
+    mkdir -p "$SECRETS" && echo jeton >"$SECRETS/root-token"
+    run bash "$GITLAB" etat
+    [ "$output" = "prêt : http://gitlab.localhost:8929, runner hors ligne" ]
+    FAUX_RUNNERS='[{"id":1}]' run bash "$GITLAB" etat
+    [ "$output" = "prêt : http://gitlab.localhost:8929, runner en ligne" ]
+    FAUX_GITLAB_KO=1 run bash "$GITLAB" etat
+    [ "$output" = "en échec : devzone appliquer" ]
 }

@@ -158,28 +158,14 @@ devzone appliquer              # applique les modules actifs
 devzone actif gitlab           # code 0 si GitLab est actif
 ```
 
-- **Exigences** : au moins 8 Go de RAM libre (vérifié via `/proc/meminfo`, `MemAvailable`) ; le module refuse le démarrage si la condition n'est pas remplie. Non exécuté en CI.
-- **Cluster kind** : un cluster `gitlab` est créé avec la configuration `.devcontainer/gitlab/kind.yaml` (un seul nœud control-plane, label `ingress-ready=true`). Les ports sont mappés : containerPort 80 → hostPort 8929, containerPort 22 → hostPort 2224.
-- **Ingress** : nginx-ingress est exposé sur le nœud kind (hostPort 80). L'accès se fait via `http://gitlab.localhost:8929`.
-- **Chart GitLab** : `gitlab/gitlab` figé à la version 9.11.16 (GitLab 18, édition CE). cert-manager, Let's Encrypt, Prometheus, Registry et KAS sont désactivés.
-- **Ressources** : réplicas à 1 et requêtes réduites pour webservice, sidekiq, gitaly et gitlab-shell.
-- **Durée** : installation complète environ 10 à 20 minutes (à confirmer par l'essai réel) ; délai configurable via `GITLAB_ATTENTE` (défaut 1200 s).
-- **GitLab Runner** : chart `gitlab/gitlab-runner` figé (version compatible GitLab 18, exécuteur Kubernetes, rbac, concurrent 2), connecté au service interne `http://gitlab-webservice-default.gitlab.svc:8181`.
-- **Seed** : `devzone gitlab seed` (idempotent) crée le groupe `devzone`, le projet `devzone/demo`, l'utilisateur `dev`, un jeton de runner ; pousse le contenu de `demo/` sur la branche `main`.
-- **Secrets** : mot de passe root, jeton root et jeton runner dans `$RACINE/workspace/.gitlab/` (fichiers mode 600, jamais affichés).
-- **Désinstallation** : `devzone desactiver gitlab` supprime le cluster kind `gitlab`, retire le contexte/cluster/utilisateur `kind-gitlab` de `~/.kube/config`, restaure le `current-context` précédent et supprime `$RACINE/workspace/.gitlab/`. Rien d'autre n'est touché.
-
-### Seed de données
-
-```bash
-devzone gitlab seed
-```
-
-Crée un groupe `devzone`, un projet `devzone/demo`, un utilisateur `dev` et un jeton de runner dans GitLab.
-
-### Gestion des secrets
-
-Les secrets (mot de passe root, jeton root, jeton runner) sont stockés dans `$RACINE/workspace/.gitlab/` (permissions 600). Ils ne sont jamais affichés en clair dans les logs ou l'état du module.
+- **Ressources** : au moins 8 Go de RAM libre avant la création du cluster (refus sinon) ; environ 8 Go occupés dans le conteneur une fois GitLab installé. Trop lourd pour la CI GitHub : testé à la main (essai réel du 31/10).
+- **Durée** (mesurée) : installation complète environ 7 min (dont le chart GitLab, attendu jusqu'à `GITLAB_ATTENTE`, 1200 s par défaut) ; une relance sur une instance prête environ 35 s (rien n'est réinstallé ni re-poussé).
+- **Ce qui est installé** : cluster kind `gitlab` (un nœud, `.devcontainer/gitlab/kind.yaml`, ports 8929 HTTP et 2224 SSH vers le conteneur) ; chart `gitlab/gitlab` 9.11.16 (GitLab 18.11 CE) sans cert-manager, Prometheus, registry ni KAS, nginx en une réplique et service NodePort ; chart `gitlab/gitlab-runner` 0.88.2, exécuteur Kubernetes, image auxiliaire à l'architecture du nœud (arm64 compris).
+- **Données de test** : groupe `devzone`, projet `devzone/demo` (Python, pipeline ruff et pytest), utilisateur `dev`, runner enregistré. Sur une relance, rien n'est recréé.
+- **Accès dans le conteneur** : http://gitlab.localhost:8929, utilisateur `root`.
+- **Accès depuis le poste** : le port 8929 n'est pas publié hors du conteneur. Relais temporaire, lancé sur le poste : `docker run -d --name devzone-gitlab-relais -p 127.0.0.1:8929:8929 alpine/socat:1.8.0.3 TCP-LISTEN:8929,fork,reuseaddr TCP:<IP du conteneur devzone>:8929` (IP : `docker inspect <conteneur> --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}'`), puis http://gitlab.localhost:8929 ; à retirer : `docker rm -f devzone-gitlab-relais`.
+- **Secrets** : mot de passe root, jeton root, mot de passe de `dev` et jeton du runner dans `workspace/.gitlab/` (droits 600, ignorés par git, jamais affichés). Mot de passe root : `cat workspace/.gitlab/root-password`.
+- **Désactivation** : `devzone desactiver gitlab` supprime le cluster `gitlab`, retire `kind-gitlab` de `~/.kube/config`, remet le contexte courant d'avant et supprime `workspace/.gitlab/`. Rien d'autre n'est touché.
 
 
 ## Données conservées
