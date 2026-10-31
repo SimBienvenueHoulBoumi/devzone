@@ -200,7 +200,7 @@ installer_ia() {
 }
 
 appliquer_ia() {
-    local journal
+    local journal tmp
     if [ "$1" = on ]; then
         echo "devzone : installation de Claude Code et opencode (quelques minutes)…"
         if ! installer_ia; then
@@ -271,19 +271,9 @@ appliquer_kubernetes() {
         bash "$ICI/kube-config.sh"
     else
         rm -f "$HOME/.kube/hote.config"
-        # metrics-server retiré des clusters où devzone l'a installé (label
-        # app.kubernetes.io/managed-by=devzone, ou ancienne version sans label
-        # mais même nom et espace de noms).
-        for contexte in $(kubectl config get-contexts -o name 2>/dev/null || true); do
-            [ -n "$contexte" ] || continue
-            if kubectl --context "$contexte" -n kube-system get deployment metrics-server >/dev/null 2>&1; then
-                if kubectl --context "$contexte" -n kube-system delete deployment metrics-server >/dev/null 2>&1; then
-                    echo "devzone : metrics-server retiré : $contexte"
-                else
-                    echo "devzone : metrics-server présent sans repère devzone, laissé : $contexte" >&2
-                fi
-            fi
-        done
+        # metrics-server retiré des clusters où devzone l'a installé (marqueur
+        # devzone=installe posé par metrics-server.sh) ; via sa sous-commande
+        bash "$ICI/metrics-server.sh" retirer || true
         echo "devzone : kubernetes désactivé"
     fi
 }

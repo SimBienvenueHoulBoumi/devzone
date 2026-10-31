@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Installe metrics-server (CPU/RAM dans k9s, kubectl top) sur les clusters qui
 # n'ont pas d'API Metrics. Docker Desktop et kind ne l'ont pas d'office.
-# Usage : metrics-server.sh [contexte...] (défaut : clusters locaux joignables)
+# Usage : metrics-server.sh [contexte...] | metrics-server.sh retirer [contexte...]
+#        (défaut : clusters locaux joignables ; retirer : ceux où devzone a installé)
 # --kubelet-insecure-tls : le kubelet de Docker Desktop et de kind a un
 # certificat auto-signé, sans cette option le pod ne devient jamais Ready.
 # Sortie en erreur si un contexte demandé est inconnu ou injoignable, ou si
@@ -12,6 +13,36 @@ VERSION=v0.9.0
 MANIFESTE="https://github.com/kubernetes-sigs/metrics-server/releases/download/${VERSION}/components.yaml"
 
 mapfile -t connus < <(kubectl config get-contexts -o name 2>/dev/null || true)
+
+if [ "${1:-}" = retirer ]; then
+    shift
+    # Retrait (désactivation de kubernetes) : ne retirer que les contextes dont
+    # devzone a installé metrics-server (marqueur devzone=installe)
+    demandes=$#
+    if [ "$demandes" -eq 0 ]; then
+        # Clusters locaux seulement : un retrait sur un cluster distant n'a rien
+        # à retirer (devzone n'y installe jamais)
+        mapfile -t contextes < <(printf '%s\n' ${connus[@]+"${connus[@]}"} |
+            grep -E "^(kind-.*|docker-desktop|rancher-desktop|orbstack|minikube)$" || true)
+        set -- ${contextes[@]+"${contextes[@]}"}
+    fi
+    code=0
+    for contexte in "$@"; do
+        if kubectl --context "$contexte" -n kube-system get deployment metrics-server -l devzone=installe >/dev/null 2>&1; then
+            if kubectl --context "$contexte" delete -f "$MANIFESTE" --ignore-not-found >/dev/null 2>&1; then
+                echo "metrics-server retiré ($VERSION) : $contexte"
+            else
+                echo "metrics-server : échec de retrait : $contexte" >&2
+                code=1
+            fi
+        elif kubectl --context "$contexte" -n kube-system get deployment metrics-server >/dev/null 2>&1; then
+            # Installé par quelqu'un d'autre : pas à devzone de le retirer
+            echo "metrics-server présent sans repère devzone, laissé : $contexte" >&2
+        fi
+    done
+    exit "$code"
+fi
+
 demandes=$#
 if [ "$demandes" -eq 0 ]; then
     # Clusters locaux seulement : jamais d'install automatique sur un cluster
