@@ -12,6 +12,22 @@ setup() {
     export GIT_CONFIG_NOSYSTEM=1
     export DEVZONE_RACINE="$BATS_TEST_TMPDIR/racine"
     mkdir -p "$DEVZONE_RACINE/workspace"
+    # npm simulé minimal pour l'activation du module ia (assistant requis par devzone agent)
+    export NPM_LOG="$BATS_TEST_TMPDIR/npm.log"
+    : >"$NPM_LOG"
+    cat >"$BATS_TEST_TMPDIR/bin/npm" <<'NPM'
+#!/usr/bin/env bash
+echo "npm $*" >>"$NPM_LOG"
+if [ "${1:-}" = install ]; then
+    printf '#!/usr/bin/env bash\necho 1.0.0\n' >"$BATS_TEST_TMPDIR/bin/claude"
+    printf '#!/usr/bin/env bash\necho 1.0.0\n' >"$BATS_TEST_TMPDIR/bin/opencode"
+    chmod +x "$BATS_TEST_TMPDIR/bin/claude" "$BATS_TEST_TMPDIR/bin/opencode"
+fi
+NPM
+    chmod +x "$BATS_TEST_TMPDIR/bin/npm"
+    export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
+    DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
+    bash "$DEVZONE" activer ia >/dev/null 2>&1 || true
     export FAKE_OP_LOG="$BATS_TEST_TMPDIR/opencode.log"
     export FAKE_OP_CONSIGNE_LOG="$BATS_TEST_TMPDIR/consignes.log"
     export FAKE_OP_CONFIG_LOG="$BATS_TEST_TMPDIR/config.log"

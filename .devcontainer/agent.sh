@@ -135,6 +135,10 @@ verrou_lacher() {
 }
 
 agent_lancer() {
+    # Module ia requis : sans assistants, rien à diriger.
+    if ! bash "$ICI/devzone" actif ia >/dev/null 2>&1; then
+        refuse "module ia désactivé : devzone activer ia"
+    fi
     local dossier="$1" consigne="$2"
     local journal etat debut m i pid code offset taille demarre freeze
     local consigne_courante repris=0 maintenant dernier sortie
@@ -253,7 +257,7 @@ agent_lancer() {
 # Sessions connues (journal, dernier modèle, début, dernier écrit) et modèles
 # écartés par le superviseur, avec l'heure de fin d'écart.
 agent_etat() {
-    local f m debut dernier e vu=0
+    local f m debut dernier e vu=0 maintenant
     echo "devzone agent : état"
     for f in "$RACINE"/workspace/.agents/*.log; do
         [ -e "$f" ] || continue
@@ -265,11 +269,15 @@ agent_etat() {
         echo "  session $(basename "$f") : modèle ${m:-inconnu}, depuis ${debut:-inconnu}, dernier écrit $dernier"
     done
     [ "$vu" = 1 ] || echo "  aucune session"
+    maintenant="$(date +%s)"
     for f in "$AGENT_ETAT"/muet-*; do
         [ -e "$f" ] || continue
         m="${f##*/muet-}"
         e="$(cat "$f" 2>/dev/null || true)"
-        echo "  modèle $m écarté jusqu'à $(heure "${e:-0}")"
+        [ -n "$e" ] || continue
+        # Seulement les écarts en cours : fin de l'écart = début + 3600 s
+        [ "$maintenant" -lt "$((e + 3600))" ] || continue
+        echo "  modèle $m écarté jusqu'à $(heure "$((e + 3600))")"
     done
 }
 

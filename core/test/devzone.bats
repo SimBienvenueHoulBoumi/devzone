@@ -251,7 +251,7 @@ GH
     run bash "$DEVZONE" desactiver kubernetes
     [ "$status" -eq 0 ]
     [ ! -e "$HOME/.kube/hote.config" ]
-    [[ "$output" == *"metrics-server reste installé"* ]] || false
+    [[ "$output" == *"kubernetes désactivé"* ]] || false
 }
 
 @test "module inconnu : message et erreur, état intact" {
@@ -376,6 +376,8 @@ GH
     grep -qx "repowarden agents init --global" "$BATS_TEST_TMPDIR/repowarden.log"
     rm -f "$BATS_TEST_TMPDIR/repowarden.log"
     bash "$DEVZONE" desactiver ia
+    grep -qx "repowarden agents retirer --global" "$BATS_TEST_TMPDIR/repowarden.log"
+    rm -f "$BATS_TEST_TMPDIR/repowarden.log"
     bash "$DEVZONE" appliquer
     [ ! -e "$BATS_TEST_TMPDIR/repowarden.log" ]
 }
