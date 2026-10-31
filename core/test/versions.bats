@@ -282,6 +282,6 @@ tickets_ouverts() {
         dans { print }
     ' "$workflow"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"if: steps.retards.outputs.present == 'true'"* ]]
-    [[ "$output" == *"npm install -g \"repowarden@\$version\""* ]]
+    [[ "$output" == *"if: steps.retards.outputs.present == 'true'"* ]] || false
+    [[ "$output" == *"npm install -g \"repowarden@\$version\""* ]] || false
 }
