@@ -1,0 +1,71 @@
+# valeurs pour le chart GitLab gitlab/gitlab (fixé à la v9.11.16)
+# Éditions et configuration globale
+global:
+  edition: ce               # édition communautaire (Free)
+  hosts:
+    domain: localhost       # domaine de base
+    https: false            # HTTPS désactivé pour le test
+    gitlab:
+      name: gitlab.localhost  # hostname GitLab
+  ingress:
+    configureCertmanager: false  # cert-manager non configuré
+    tls:
+      enabled: false        # TLS désactivé
+  gatewayApi:
+    configureCertmanager: false
+  kas:
+    enabled: false          # KAS non activé
+  prometheus:
+    install: false         # prometheus non installé (top-level aussi)
+  registry:
+    enabled: false         # registry non activé
+
+# cert-manager : désactivé
+installCertmanager: false
+prometheus:
+  install: false
+registry:
+  enabled: false
+
+# GitLab Runner : installé séparément (chart gitlab-runner)
+gitlab-runner:
+  install: false
+
+# nginx-ingress exposé sur le nœud kind (hostPort 80 selon kind.yaml)
+nginx-ingress:
+  enabled: true
+  controller:
+    hostPort:
+      enabled: true
+      ports:
+        http: 80
+        https: 443
+    replicaCount: 1
+    minAvailable: 0
+    service:
+      type: NodePort
+
+# Réplicas à 1 et ressources réduites
+gitlab:
+  webservice:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+  sidekiq:
+    resources:
+      requests:
+        cpu: 250m
+        memory: 256Mi
+  gitaly:
+    resources:
+      requests:
+        cpu: 250m
+        memory: 256Mi
+  gitlab-shell:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+
+certmanager-issuer: {}

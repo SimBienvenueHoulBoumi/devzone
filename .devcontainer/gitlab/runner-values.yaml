@@ -1,0 +1,26 @@
+# Valeurs du chart GitLab Runner gitlab/gitlab-runner (version figée dans
+# gitlab.sh). Jeton du runner passé par --set runnerToken à l'installation.
+gitlabUrl: http://gitlab-webservice-default.gitlab.svc:8181  # service interne
+
+runners:
+  executor: kubernetes
+  # Image auxiliaire du runner à l'architecture du nœud : sans ce réglage,
+  # l'exécuteur Kubernetes prend x86_64 et les jobs échouent sur un poste
+  # arm64 (Mac Apple Silicon : « no match for platform in manifest »)
+  # clone_url : dans le pod d'un job, gitlab.localhost désigne le pod
+  # lui-même ; le dépôt est cloné par le service interne au cluster
+  config: |
+    [[runners]]
+      clone_url = "http://gitlab-webservice-default.gitlab.svc:8181"
+      [runners.kubernetes]
+        namespace = "{{.Release.Namespace}}"
+        image = "alpine"
+        helper_image_autoset_arch_and_os = true
+
+rbac:
+  create: true
+
+serviceAccount:
+  create: true
+
+concurrent: 2

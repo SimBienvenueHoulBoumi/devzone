@@ -1,0 +1,14 @@
+# Configuration CI GitLab pour le projet de démo Python.
+# Lance ruff (lint) et pytest (tests) sur chaque push/MR.
+
+image: python:3.12-slim
+
+stages:
+  - test
+
+test:
+  stage: test
+  script:
+    - pip install ruff pytest
+    - ruff check .
+    - pytest -q
