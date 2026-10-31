@@ -1,16 +1,18 @@
 [build-system]
 requires = ["setuptools>=61.0"]
-build-backend = "setuptools.backends._legacy:_Backend"
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "calc"
 version = "0.1.0"
-description = "Module de calcul minimal pour démo GitLab"
+description = "Module de calcul minimal pour la démo GitLab de devzone"
 requires-python = ">=3.12"
 
-[tool.pytest]
+# Le paquet calc vit dans src/ sans être installé : pytest l'y trouve, en CI
+# GitLab comme dans les hooks repowarden
+[tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["src"]
 
-[tool.ruff]
+[tool.ruff.lint]
 extend-select = ["E", "F", "I", "W"]
-exclude = ["*.pyc", "__pycache__", ".git", ".ruff_cache"]
