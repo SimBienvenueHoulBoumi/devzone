@@ -17,7 +17,7 @@ VERSIONS="$ICI/../core/scripts/versions.sh"
 RACINE="${DEVZONE_RACINE:-$(dirname "$ICI")}"
 # État par défaut de l'instance ; DEVZONE_ETAT garde la priorité (tests, CI)
 ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
-MODULES=(ia kubernetes)
+MODULES=(ia kubernetes gitlab)
 
 # Assistants IA, versions figées : mettre à jour ici, puis devzone appliquer
 # (ou Rebuild Container). Une ligne par paquet, séparées par une ligne qui ne
@@ -34,6 +34,7 @@ description() {
     case "$1" in
         ia) echo "assistants IA : Claude Code, opencode" ;;
         kubernetes) echo "connexion au cluster de l'hôte et metrics-server au démarrage" ;;
+        gitlab) echo "GitLab de test dans un cluster kind" ;;
     esac
 }
 
@@ -201,6 +202,14 @@ appliquer_kubernetes() {
     else
         rm -f "$HOME/.kube/hote.config"
         echo "devzone : kubernetes désactivé (metrics-server reste installé sur les clusters où il l'a été)"
+    fi
+}
+
+appliquer_gitlab() {
+    if [ "$1" = on ]; then
+        echo "devzone : gitlab activé (installation via devzone gitlab installer au besoin)"
+    else
+        echo "devzone : gitlab désactivé"
     fi
 }
 

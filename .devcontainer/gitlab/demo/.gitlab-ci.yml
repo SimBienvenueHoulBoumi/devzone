@@ -1,0 +1,23 @@
+# Configuration CI GitLab pour le projet de démo Python.
+# Lance ruff (lint) et pytest (tests) sur chaque push/MR.
+
+stages:
+  - lint
+  - test
+
+lint_ruff:
+  stage: lint
+  script:
+    - ruff check src/calc/
+    - ruff check tests/test_calc/
+  only:
+    - push
+    - merge_request
+
+test_pytest:
+  stage: test
+  script:
+    - pytest tests/test_calc.py
+  only:
+    - push
+    - merge_request

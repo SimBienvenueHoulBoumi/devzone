@@ -1,0 +1,72 @@
+# valeurs minimales pour le chart GitLab gitlab/gitlab (fixé à la v16.4.0)
+# À adapter selon les besoins réels ; ces valeurs permettent un démarrage rapide
+# en cluster kind pour tests.
+
+global:
+  edition: gitlab-free
+  # édition communautaire (Free) ; pour GitLab Enterprise replacez par gitlab-enterprise
+
+gitlab-runner:
+  # GitLab Runner non installé par défaut via ce module ; à activer séparément
+  # install : false
+
+# Activer les composants minimaux nécessaires
+core:
+  # Déployer seulement ce qui est indispensable pour un GitLab de base
+  # cookbook-gitaly-replicas : 0 (pas de Gitaly en test)
+  # ingress : activé via le valeurs ci-dessous
+
+nginx-ingress:
+  enabled: true
+  # Class d'ingress par défaut pour kind ; à adapter selon votre configuration
+  # controller : nginx
+
+# Cert-manager : déjà configuré via le module (voir gitlab.sh)
+certmanager-issuer: gitlab-issuer
+
+# PostgreSQL et Redis : externalisés par défaut (utilisés par kind + volumes)
+postgresql:
+  enabled: false
+redis:
+  enabled: false
+
+# S3 / artifact storage : désactivé pour le test (utilise le filesystem du pod)
+# objstorage:
+#   enabled: false
+#   config:
+#     bucket: my-bucket
+#     region: us-east-1
+
+# Global hosts configuration
+global:
+  # Hosts par défaut pour le développement local ; en kind, on utilise ingress
+  # mais il faut quand même définir un hostname pour le chart
+  hosts:
+    # Aucun hostname global par défaut ; le hostname est défini par l'ingress
+    # ci-dev.example.com sera généré par l'ingress ci-dessous
+
+# Pipeline settings
+pipeline:
+  # Runner executor : Kubernetes (nécessite gitlab-runner configuré séparément)
+  executor: "kubernetes"
+
+# GitLab Runner configuration (installed separately or via runner-values.yaml)
+runner:
+  # kubernetes executor paramètes
+  kubernetes:
+    # image par défaut pour les runners Kubernetes
+    image: "docker:latest"
+    # namespace par défaut pour les pods de runner
+    namespace: "default"
+
+# Enable promoted jobs
+prometheus:
+  enabled: false
+
+# Registry : disabled for test cluster
+registry:
+  enabled: false
+
+# GitLab Runner install : laissé à false ; on gère le runner séparément
+gitlab-runner:
+  install: false

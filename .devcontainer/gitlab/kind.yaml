@@ -1,0 +1,16 @@
+# Configuration kind pour le cluster de test GitLab.
+# Utilisé par le module gitlab installer et par kube-config.sh au démarrage.
+# Voir aussi .devcontainer/kube-config.sh et .devcontainer/metrics-server.sh.
+
+kind-cluster: devzone
+
+nodes:
+  - role: control-plane
+    extraPortMappings:
+      - containerPort: 80
+        hostPort: 8080
+        protocol: TCP
+      - containerPort: 443
+        hostPort: 8443
+        protocol: TCP
+  - role: worker

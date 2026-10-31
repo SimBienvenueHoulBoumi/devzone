@@ -68,6 +68,7 @@ devzone desactiver <module>    # désactive et applique tout de suite
 |---|---|---|
 | `ia` | Claude Code et opencode installés (versions figées), réinstallés à chaque rebuild, avec le [garde-fou repowarden](#garde-fou-des-assistants-ia) et une [configuration opencode par défaut](#configuration-dopencode) ; se connecter : `claude` (puis `/login`), `opencode auth login` | désinstallés ; les connexions restent dans leurs volumes, le garde-fou aussi (sans effet sans les assistants) |
 | `kubernetes` | à chaque démarrage : connexion au cluster de ta machine et metrics-server sur les clusters locaux (CPU et RAM dans k9s) | aucune connexion au cluster de ta machine ; kubectl, helm, k9s et kind restent installés, un cluster kind créé à la main reste utilisable ; metrics-server n'est pas retiré des clusters où il a été installé |
+| `gitlab` | GitLab de test dans un cluster kind ; accessible via l'ingress HTTP/HTTPS ; projets de démo, CI/CD avec exécuteur Kubernetes | aucune instance GitLab ; le cluster kind reste utilisable sans GitLab |
 
 Le choix est **propre à chaque devzone** (instance) et gardé dans le dossier `$RACINE/.devzone.modules` (monté de l'hôte, il survit aux rebuilds). Au premier démarrage d'une instance, si une connexion Claude Code ou opencode existe déjà dans les volumes, le module `ia` n'est pas activé : tout est désactivé par défaut et la connexion est signalée une seule fois (« devzone activer ia pour l'utiliser ici »), pas pour un état repris.
 
@@ -124,6 +125,47 @@ kubectl config use-context <nom>
 - **CPU et RAM dans k9s** (`kubectl top`) : module `kubernetes` actif, metrics-server est installé au démarrage sur les clusters **locaux** qui ne l'ont pas (Docker Desktop, kind…), jamais sur un cluster distant. Après un `kind create cluster` : `bash .devcontainer/metrics-server.sh` (ou `… metrics-server.sh <contexte>` pour un cluster précis).
 - **Cluster de l'hôte** : `~/.kube` est monté en lecture seule, jamais modifié ; sa copie adaptée est `~/.kube/hote.config` (`127.0.0.1` remplacé par `host.docker.internal`). Après un changement de cluster sur l'hôte : `make stop && make up`.
 - **Messages de démarrage** (`kube-config : …`, `metrics-server : …`, récapitulatif) : dans le terminal de création, ou en relançant `bash .devcontainer/demarrage.sh`.
+
+Le cluster de l'hôte n'est pas joignable dans deux cas (kind fonctionne quand même) :
+- **Codespaces, machine distante** : pas de `~/.kube` local ;
+- **Linux avec Docker Engine** : un cluster kind ou minikube de l'hôte écoute sur `127.0.0.1`, invisible du conteneur. Un cluster qui écoute sur toutes les interfaces (k3s, kubeadm) est joignable.
+
+## GitLab
+
+Le module `gitlab` fournit une instance GitLab de test dans un cluster kind.
+
+```bash
+devzone                        # état : identité git, GitHub, outils, modules
+devzone activer gitlab         # active et installe GitLab dans kind
+devzone desactiver gitlab      # désinstalle GitLab
+devzone appliquer              # ne retire que ce que devzone a installé
+devzone actif gitlab           # code 0 si GitLab est actif
+```
+
+- **Exigences** : au moins 8 Go de RAM libre (vérifié via `/proc/meminfo`) ; le module refuse le démarrage si la condition n'est pas remplie.
+- **Cluster kind** : un cluster `devzone` est créé (ou réutilisé) avec la configuration `.devcontainer/gitlab/kind.yaml`. Les ports 80/443 sont mappés sur l'hôte (8080/8443).
+- **Ingress** : nginx-ingress est déployé avec le chart GitLab (édition gratuite). L'accès se fait via `https://gitlab-devzone.local` (via l'ingress).
+- **Cert-manager** : un `ClusterIssuer gitlab-issuer` est créé pour les certificats Let's Encrypt (développement).
+- **PostgreSQL et Redis** : externalisés (désactivés par défaut ; utilisés via le filesystem du pod en mode test).
+- **GitLab Runner** : exécuteur Kubernetes configuré séparément (voir `runner-values.yaml`). Le runner se connecte à l'instance GitLab locale via un token stocké dans `$RACINE/workspace/.gitlab/` (mode 600, jamais affiché en clair).
+- **Seed** : `devzone gitlab seed` crée un projet de démonstration `calc` avec des tests unitaires.
+- **Désinstallation** : `devzone desactiver gitlab` retire le chart GitLab via Helm, laisse le cluster kind en place.
+
+- **PostgreSQL et Redis** : externalisés par défaut (utilisés par le filesystem du pod)
+- **Registry** : désactivé pour le test cluster
+- **GitLab Runner** : exécuteur Kubernetes ; à configurer séparément
+
+### Seed de données
+
+```bash
+devzone gitlab seed
+```
+
+Crée un projet de démonstration `calc` avec des tests unitaires dans GitLab.
+
+### Gestion des secrets
+
+Les secrets (token GitLab runner, certificats) sont stockés dans `$RACINE/workspace/.gitlab/` (permissions 600). Ils ne sont jamais affichés en clair dans les logs ou l'état du module.
 
 Le cluster de l'hôte n'est pas joignable dans deux cas (kind fonctionne quand même) :
 - **Codespaces, machine distante** : pas de `~/.kube` local ;
