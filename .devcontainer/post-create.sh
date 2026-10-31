@@ -47,7 +47,7 @@ git config --global url.https://github.com/.insteadOf git@github.com:
 # repowarden, version figée (il installe des hooks git globaux) ; mettre à jour
 # en changeant la version ici, puis Rebuild Container
 echo "devzone : installation de repowarden…"
-npm install -g repowarden@4.13.1
+npm install -g repowarden@4.14.0
 repowarden install --global --lang fr
 
 # Modules facultatifs (assistants IA, Kubernetes) : commande devzone, état
