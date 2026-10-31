@@ -90,6 +90,22 @@ Avec le module `ia`, devzone écrit une configuration opencode prête à l'emplo
 - **Fournisseur payant** : `opencode auth login` (la connexion reste dans le volume `devzone-opencode-data`).
 - **Lancer opencode en tâche de fond** : `opencode run --auto "…" < /dev/null`. Sans `--auto`, toute demande de permission est refusée d'office et l'agent s'arrête ; sans `< /dev/null`, il attend son entrée et reste muet.
 
+### Diriger opencode
+
+Claude Code est le **lead** (conception, consignes, relecture, essais, push, suivi CI) ; opencode est le **développeur** (code, tests, commit `repowarden cc`). Plusieurs sessions opencode tournent en parallèle, une par ticket et par worktree.
+
+```bash
+devzone agent <dossier> <fichier-consigne>    # au premier plan
+devzone agent <dossier> <fichier-consigne> &  # plusieurs en parallèle (ou nohup)
+devzone agent etat                            # sessions, modèles écartés
+```
+
+- **Lancement** : `opencode run --auto -m opencode/<modèle> "<consigne>" < /dev/null` dans le dossier. Le journal est `workspace/.agents/<nom du dossier>.log` (état de devzone, hors dépôt, ignoré par git). `--auto` évite l'attente d'une permission ; `< /dev/null` évite une session muette.
+- **Rotation des modèles gratuits** : `opencode models opencode` fournit la liste (`*-free`, `big-pickle`), avec une liste figée de secours. Un rang partagé et verrouillé fait commencer chaque lancement au modèle suivant : deux sessions simultanées partent sur deux modèles différents.
+- **Bascule** : au message de quota (`Free usage limit`), filtre de contenu, modèle indisponible, erreur, ou silence au départ (rien écrit en 45 s). Un modèle muet est écarté une heure. Une session figée (rien écrit depuis 10 min) est arrêtée et reprise sur une session neuve, modèle suivant, avec une consigne de reprise (`git status`, `git diff`, `git log`). Tous les modèles écartés : « aucun modèle gratuit disponible », code 3.
+- **Permissions** : `.devcontainer/opencode/agent.json` est la configuration par défaut, fusionnée avec `OPENCODE_CONFIG_CONTENT` s'il est défini ; devzone refuse de démarrer si `git push` n'y est pas interdit et protège `~/bash32` (le bash 3.2 du conteneur). `webfetch` est permis ; les écritures GitHub, `gh api`, `curl`, `sudo`, `rm -rf` (sauf `./.essai`) et la gestion des tickets/PR par repowarden sont interdites ; `git commit` reste permis pour `repowarden cc`.
+- **Quota des modèles gratuits** : ces modèles sont limités ; la rotation et l'écart d'une heure évitent de bloquer un ticket quand l'un est épuisé. Pour un fournisseur payant : `opencode auth login`.
+
 
 
 ## Plusieurs devzone sur une machine
