@@ -260,8 +260,28 @@ tickets_ouverts() {
     [ -z "$output" ]
 }
 
+@test "--ticket-existant : ticket déjà ouvert par l'App est mis à jour" {
+    tickets_ouverts 42 "repowarden 9.9.9 dans le conteneur" "app/repowarden-devzone"
+    run bash "$VERSIONS" --ticket-existant repowarden "app/repowarden-devzone"
+    [ "$status" -eq 0 ]
+    [ "$output" = $'42	repowarden 9.9.9 dans le conteneur' ]
+}
+
 @test "workflow versions : conception proposée, jamais retenue (le mainteneur la reprend)" {
     workflow="$RACINE/.github/workflows/versions.yml"
     grep -q '^ *## Conception proposée$' "$workflow"
     ! grep -q '^ *## Conception retenue' "$workflow" || false
+}
+
+@test "workflow versions : cron horaire et installation de repowarden conditionnée" {
+    workflow="$RACINE/.github/workflows/versions.yml"
+    grep -Eq 'cron: *"17 \* \* \* \*"' "$workflow"
+    run awk '
+        /- name: Repowarden même version figée que le conteneur/ { dans = 1; next }
+        dans && /^      - / { exit }
+        dans { print }
+    ' "$workflow"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"if: steps.retards.outputs.present == 'true'"* ]] || false
+    [[ "$output" == *"npm install -g \"repowarden@\$version\""* ]] || false
 }
