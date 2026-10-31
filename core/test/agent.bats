@@ -12,6 +12,22 @@ setup() {
     export GIT_CONFIG_NOSYSTEM=1
     export DEVZONE_RACINE="$BATS_TEST_TMPDIR/racine"
     mkdir -p "$DEVZONE_RACINE/workspace"
+    # npm simulé minimal pour l'activation du module ia (assistant requis par devzone agent)
+    export NPM_LOG="$BATS_TEST_TMPDIR/npm.log"
+    : >"$NPM_LOG"
+    cat >"$BATS_TEST_TMPDIR/bin/npm" <<'NPM'
+#!/usr/bin/env bash
+echo "npm $*" >>"$NPM_LOG"
+if [ "${1:-}" = install ]; then
+    printf '#!/usr/bin/env bash\necho 1.0.0\n' >"$BATS_TEST_TMPDIR/bin/claude"
+    printf '#!/usr/bin/env bash\necho 1.0.0\n' >"$BATS_TEST_TMPDIR/bin/opencode"
+    chmod +x "$BATS_TEST_TMPDIR/bin/claude" "$BATS_TEST_TMPDIR/bin/opencode"
+fi
+NPM
+    chmod +x "$BATS_TEST_TMPDIR/bin/npm"
+    export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
+    DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
+    bash "$DEVZONE" activer ia >/dev/null 2>&1 || true
     export FAKE_OP_LOG="$BATS_TEST_TMPDIR/opencode.log"
     export FAKE_OP_CONSIGNE_LOG="$BATS_TEST_TMPDIR/consignes.log"
     export FAKE_OP_CONFIG_LOG="$BATS_TEST_TMPDIR/config.log"
@@ -210,4 +226,22 @@ consigne() {
     [[ "$output" == *"projet.log"* ]] || false
     [[ "$output" == *"opencode/big-pickle"* ]] || false
     [[ "$output" == *"modèle glm-5.3-flash-free écarté jusqu'à"* ]] || false
+}
+
+@test "agent : ia désactivé → refuse de lancer, code 2, message pour l'activer" {
+    bash "$DEVZONE" desactiver ia
+    run bash "$DEVZONE" agent "$DEVZONE_RACINE/workspace/projet" "$DEVZONE_RACINE/workspace/consigne.txt"
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"devzone activer ia"* ]] || false
+}
+
+@test "agent : etat n'affiche que les écarts en cours, avec leur heure de fin" {
+    mkdir -p "$HOME/.local/state/oc-lancer"
+    maintenant="$(date +%s)"
+    echo $(( maintenant - 600 )) >"$HOME/.local/state/oc-lancer/muet-big-pickle"
+    echo $(( maintenant - 7200 )) >"$HOME/.local/state/oc-lancer/muet-deepseek-v4.1-flash-free"
+    run bash "$DEVZONE" agent etat
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"modèle big-pickle écarté jusqu'à"* ]] || false
+    [[ "$output" != *"deepseek-v4.1-flash-free"* ]] || false
 }
