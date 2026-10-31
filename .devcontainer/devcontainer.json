@@ -46,7 +46,8 @@
     // config globale) : le conteneur reconstruit peut commiter et pousser
     "source=${localEnv:DEVZONE_VOLUMES:devzone}-gh,target=/home/vscode/.config/gh,type=volume",
     "source=${localEnv:DEVZONE_VOLUMES:devzone}-git,target=/home/vscode/.config/git,type=volume",
-    // Modules activés (devzone activer|desactiver), propres à chaque utilisateur
+    // Modules activés (devzone activer|desactiver) : état par instance
+    // ($RACINE/.devzone.modules) ; ce volume garde l'ancien état utilisateur
     "source=${localEnv:DEVZONE_VOLUMES:devzone}-config,target=/home/vscode/.config/devzone,type=volume"
   ],
 

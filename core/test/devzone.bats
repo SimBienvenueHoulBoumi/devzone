@@ -269,24 +269,78 @@ GH
     [ "$status" -eq 1 ]
 }
 
-@test "migration : connexion Claude existante → ia activé et signalé" {
+@test "état neuf : tout désactivé, même avec une connexion partagée" {
     mkdir -p "$HOME/.claude" && echo '{}' >"$HOME/.claude/.credentials.json"
-    run bash "$DEVZONE" actif ia
+    run bash "$DEVZONE"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"module ia activé"* ]] || false
+    [[ "$output" == *"○ module ia"*"devzone activer ia"* ]] || false
+    [[ "$output" == *"○ module kubernetes"* ]] || false
+    [[ "$output" != *"✔ module ia"* ]] || false
 }
 
-@test "migration : connexion opencode existante → ia activé" {
-    mkdir -p "$HOME/.local/share/opencode" && echo '{}' >"$HOME/.local/share/opencode/auth.json"
+@test "actif : code 0 ou 1, sans rien écrire (test de scripts de démarrage)" {
+    run bash "$DEVZONE" actif ia
+    [ "$status" -ne 0 ]
+    [ -z "$output" ]
+    bash "$DEVZONE" activer ia >/dev/null
     run bash "$DEVZONE" actif ia
     [ "$status" -eq 0 ]
+    [ -z "$output" ]
+    run bash "$DEVZONE" actif kubernetes
+    [ "$status" -ne 0 ]
+    [ -z "$output" ]
 }
 
-@test "migration seulement au premier démarrage : un choix fait est respecté" {
-    bash "$DEVZONE" desactiver ia
+@test "connexion Claude partagée : signalée à la création de l'état, une seule fois" {
     mkdir -p "$HOME/.claude" && echo '{}' >"$HOME/.claude/.credentials.json"
     run bash "$DEVZONE" actif ia
     [ "$status" -ne 0 ]
+    [[ "$output" == *"connexion Claude Code/opencode partagée trouvée : devzone activer ia pour l'utiliser ici"* ]] || false
+    run bash "$DEVZONE" actif ia
+    [ "$status" -ne 0 ]
+    [ -z "$output" ]
+}
+
+@test "connexion opencode partagée : signalée à la création de l'état, une seule fois" {
+    mkdir -p "$HOME/.local/share/opencode" && echo '{}' >"$HOME/.local/share/opencode/auth.json"
+    run bash "$DEVZONE" actif ia
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"connexion Claude Code/opencode partagée trouvée"* ]] || false
+    run bash "$DEVZONE" actif ia
+    [ "$status" -ne 0 ]
+    [ -z "$output" ]
+}
+
+@test "connexion partagée : jamais signalée quand l'état est repris (migration)" {
+    mkdir -p "$HOME/.config/devzone" "$HOME/.claude"
+    printf 'ia=on\nkubernetes=on\n' >"$HOME/.config/devzone/modules"
+    echo '{}' >"$HOME/.claude/.credentials.json"
+    run bash "$DEVZONE" actif ia
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+}
+
+@test "migration : ancien état global repris une fois, source supprimée" {
+    mkdir -p "$HOME/.config/devzone"
+    printf 'ia=on\nkubernetes=on\n' >"$HOME/.config/devzone/modules"
+    run bash "$DEVZONE" actif ia
+    [ "$status" -eq 0 ]
+    [ -f "$DEVZONE_RACINE/.devzone.modules" ]
+    [ ! -e "$HOME/.config/devzone/modules" ]
+    grep -qx 'ia=on' "$DEVZONE_RACINE/.devzone.modules"
+}
+
+@test "migration : second devzone (source déjà déplacée) → valeurs par défaut" {
+    mkdir -p "$HOME/.config/devzone"
+    printf 'ia=on\nkubernetes=on\n' >"$HOME/.config/devzone/modules"
+    bash "$DEVZONE" actif ia
+    export DEVZONE_RACINE="$BATS_TEST_TMPDIR/racine2"
+    mkdir -p "$DEVZONE_RACINE/workspace"
+    run bash "$DEVZONE" actif ia
+    [ "$status" -ne 0 ]
+    [ -f "$DEVZONE_RACINE/.devzone.modules" ]
+    grep -qx 'ia=off' "$DEVZONE_RACINE/.devzone.modules"
+    grep -qx 'kubernetes=off' "$DEVZONE_RACINE/.devzone.modules"
 }
 
 @test "appliquer : installe ia seulement s'il est actif" {
