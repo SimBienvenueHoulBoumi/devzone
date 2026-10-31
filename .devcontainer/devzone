@@ -29,7 +29,7 @@ VERSIONS="$ICI/../core/scripts/versions.sh"
 RACINE="${DEVZONE_RACINE:-$(dirname "$ICI")}"
 # État par défaut de l'instance ; DEVZONE_ETAT garde la priorité (tests, CI)
 ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
-MODULES=(ia kubernetes)
+MODULES=(ia kubernetes gitlab)
 
 # Assistants IA, versions figées : mettre à jour ici, puis devzone appliquer
 # (ou Rebuild Container). Une ligne par paquet, séparées par une ligne qui ne
@@ -46,6 +46,7 @@ description() {
     case "$1" in
         ia) echo "assistants IA : Claude Code, opencode" ;;
         kubernetes) echo "connexion au cluster de l'hôte et metrics-server au démarrage" ;;
+        gitlab) echo "GitLab de test dans un cluster kind" ;;
     esac
 }
 
@@ -68,7 +69,7 @@ initialiser() {
 
     [ -f "$ETAT" ] && return 0
     mkdir -p "$(dirname "$ETAT")"
-    printf 'ia=off\nkubernetes=off\n' >"$ETAT"
+    printf 'ia=off\nkubernetes=off\ngitlab=off\n' >"$ETAT"
     # Connexion déjà établie par une autre devzone (volumes partagés) :
     # signalée une seule fois, à la création de l'état de cette instance ;
     # stderr : initialiser est aussi appelé dans $(valeur …). Rien pour un
@@ -278,6 +279,32 @@ appliquer_kubernetes() {
     fi
 }
 
+appliquer_gitlab() {
+    local etat_courant
+    if [ "$1" = on ]; then
+        # Activer gitlab seulement si l'état ne dit pas « prêt »
+        etat_courant="$(bash "$ICI/gitlab/gitlab.sh" etat)"
+        if [[ "$etat_courant" == *"prêt"* ]]; then
+            echo "devzone : gitlab déjà actif, rien à faire."
+        else
+            echo "devzone : gitlab activation via installer…"
+            if ! bash "$ICI/gitlab/gitlab.sh" installer; then
+                echo "gitlab" > "$(fichier_echec gitlab)"
+                return 1
+            fi
+            rm -f "$(fichier_echec gitlab)"
+        fi
+    else
+        # Désactiver gitlab seulement si un cluster gitlab existe
+        if kind get clusters 2>/dev/null | grep -qx 'gitlab'; then
+            echo "devzone : gitlab désactivation…"
+            bash "$ICI/gitlab/gitlab.sh" desinstaller
+        else
+            echo "devzone : gitlab déjà désactivé (aucun cluster gitlab)."
+        fi
+    fi
+}
+
 # Lignes « paquet figée installée » des outils en retard ; échoue si le script
 # versions.sh est absent ou ne peut pas répondre (l'état omet alors la ligne)
 outils_retard() {
@@ -356,6 +383,9 @@ etat() {
     for m in "${MODULES[@]}"; do
         if [ "$(valeur "$m")" = on ] && [ -f "$(fichier_echec "$m")" ]; then
             printf '  ✖ module %-10s en échec : installation incomplète (%s) : devzone appliquer\n' "$m" "$(cat "$(fichier_echec "$m")")"
+        elif [ "$(valeur "$m")" = on ] && [ "$m" = gitlab ]; then
+            # GitLab actif : son état réel (prêt, runner, en échec)
+            printf '  ✔ module %-10s %s\n' "$m" "$(bash "$ICI/gitlab/gitlab.sh" etat)"
         elif [ "$(valeur "$m")" = on ]; then
             printf '  ✔ module %-10s actif : %s\n' "$m" "$(description "$m")"
         else

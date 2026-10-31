@@ -68,6 +68,7 @@ devzone desactiver <module>    # désactive et applique tout de suite
 |---|---|---|
 | `ia` | Claude Code et opencode installés (versions figées), réinstallés à chaque rebuild, avec le [garde-fou repowarden](#garde-fou-des-assistants-ia) et une [configuration opencode par défaut](#configuration-dopencode) ; se connecter : `claude` (puis `/login`), `opencode auth login` | désinstallés ; le garde-fou (hook et plugin), la configuration opencode par défaut et l'état de `devzone agent` sont retirés ; les journaux `workspace/.agents/` et les connexions restent |
 | `kubernetes` | à chaque démarrage : connexion au cluster de ta machine et metrics-server sur les clusters locaux (CPU et RAM dans k9s) | aucune connexion au cluster de ta machine ; kubectl, helm, k9s et kind restent installés, un cluster kind créé à la main reste utilisable ; metrics-server est retiré des clusters où devzone l'a installé |
+| `gitlab` | GitLab CE de test dans un cluster kind `gitlab` (chart figé), runner Kubernetes, projet `devzone/demo` avec pipeline ; http://gitlab.localhost:8929 ; au moins 8 Go de RAM libre (voir [GitLab](#gitlab)) | cluster `gitlab`, contexte `kind-gitlab` et secrets `workspace/.gitlab/` retirés ; rien d'autre touché |
 
 Le choix est **propre à chaque devzone** (instance) et gardé dans le dossier `$RACINE/.devzone.modules` (monté de l'hôte, il survit aux rebuilds). Au premier démarrage d'une instance, si une connexion Claude Code ou opencode existe déjà dans les volumes, le module `ia` n'est pas activé : tout est désactivé par défaut et la connexion est signalée une seule fois (« devzone activer ia pour l'utiliser ici »), pas pour un état repris.
 
@@ -145,6 +146,26 @@ Le cluster de l'hôte n'est pas joignable dans deux cas (kind fonctionne quand m
 - **Codespaces, machine distante** : pas de `~/.kube` local ;
 - **Linux avec Docker Engine** : un cluster kind ou minikube de l'hôte écoute sur `127.0.0.1`, invisible du conteneur. Un cluster qui écoute sur toutes les interfaces (k3s, kubeadm) est joignable.
 
+## GitLab
+
+Le module `gitlab` fournit une instance GitLab de test dans un cluster kind dédié (`gitlab`).
+
+```bash
+devzone                        # état : identité git, GitHub, outils, modules
+devzone activer gitlab         # active et installe GitLab dans kind
+devzone desactiver gitlab      # désinstalle GitLab et supprime le cluster
+devzone appliquer              # applique les modules actifs
+devzone actif gitlab           # code 0 si GitLab est actif
+```
+
+- **Ressources** : au moins 8 Go de RAM libre avant la création du cluster (refus sinon) ; environ 8 Go occupés dans le conteneur une fois GitLab installé. Trop lourd pour la CI GitHub : testé à la main (essai réel du 31/10).
+- **Durée** (mesurée) : installation complète environ 7 min (dont le chart GitLab, attendu jusqu'à `GITLAB_ATTENTE`, 1200 s par défaut) ; une relance sur une instance prête environ 35 s (rien n'est réinstallé ni re-poussé).
+- **Ce qui est installé** : cluster kind `gitlab` (un nœud, `.devcontainer/gitlab/kind.yaml`, ports 8929 HTTP et 2224 SSH vers le conteneur) ; chart `gitlab/gitlab` 9.11.16 (GitLab 18.11 CE) sans cert-manager, Prometheus, registry ni KAS, nginx en une réplique et service NodePort ; chart `gitlab/gitlab-runner` 0.88.2, exécuteur Kubernetes, image auxiliaire à l'architecture du nœud (arm64 compris).
+- **Données de test** : groupe `devzone`, projet `devzone/demo` (Python, pipeline ruff et pytest), utilisateur `dev`, runner enregistré. Sur une relance, rien n'est recréé.
+- **Accès dans le conteneur** : http://gitlab.localhost:8929, utilisateur `root`.
+- **Accès depuis le poste** : le port 8929 n'est pas publié hors du conteneur. Relais temporaire, lancé sur le poste : `docker run -d --name devzone-gitlab-relais -p 127.0.0.1:8929:8929 alpine/socat:1.8.0.3 TCP-LISTEN:8929,fork,reuseaddr TCP:<IP du conteneur devzone>:8929` (IP : `docker inspect <conteneur> --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}'`), puis http://gitlab.localhost:8929 ; à retirer : `docker rm -f devzone-gitlab-relais`.
+- **Secrets** : mot de passe root, jeton root, mot de passe de `dev` et jeton du runner dans `workspace/.gitlab/` (droits 600, ignorés par git, jamais affichés). Mot de passe root : `cat workspace/.gitlab/root-password`.
+- **Désactivation** : `devzone desactiver gitlab` supprime le cluster `gitlab`, retire `kind-gitlab` de `~/.kube/config`, remet le contexte courant d'avant et supprime `workspace/.gitlab/`. Rien d'autre n'est touché.
 
 
 ## Données conservées
