@@ -51,7 +51,8 @@ npm install -g repowarden@4.13.1
 repowarden install --global --lang fr
 
 # Modules facultatifs (assistants IA, Kubernetes) : commande devzone, état
-# gardé dans le volume devzone-config ; installe ce qui est actif. Un module
+# gardé dans le dossier de l'instance ($RACINE/.devzone.modules) ; installe
+# ce qui est actif. Un module
 # en échec n'arrête pas la création : le conteneur reste utilisable et l'état
 # (devzone, à chaque démarrage) le montre « en échec »
 sudo ln -sf /workspaces/devzone/.devcontainer/devzone /usr/local/bin/devzone

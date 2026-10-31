@@ -14,7 +14,7 @@ Une identité déjà définie n'est jamais remplacée. Pour un autre email : `gi
 
 **Assistants IA** (module `ia`, voir [Modules](#modules)) : `devzone activer ia`, puis `claude` (puis `/login`), `opencode auth login`.
 
-Chaque connexion est **propre à l'utilisateur** : elle vit dans les volumes Docker de sa machine (voir [Données conservées](#données-conservées)). Le dépôt ne contient aucun identifiant.
+Les connexions (**GitHub**, **git**, **Claude Code**, **opencode**) et les caches (**Maven**, **pnpm**) sont **partagés volontairement** entre les devzone d'une machine : elles vivent dans les volumes Docker (voir [Données conservées](#données-conservées)). Le dépôt ne contient aucun identifiant.
 
 
 
@@ -69,7 +69,7 @@ devzone desactiver <module>    # désactive et applique tout de suite
 | `ia` | Claude Code et opencode installés (versions figées), réinstallés à chaque rebuild, avec le [garde-fou repowarden](#garde-fou-des-assistants-ia) et une [configuration opencode par défaut](#configuration-dopencode) ; se connecter : `claude` (puis `/login`), `opencode auth login` | désinstallés ; les connexions restent dans leurs volumes, le garde-fou aussi (sans effet sans les assistants) |
 | `kubernetes` | à chaque démarrage : connexion au cluster de ta machine et metrics-server sur les clusters locaux (CPU et RAM dans k9s) | aucune connexion au cluster de ta machine ; kubectl, helm, k9s et kind restent installés, un cluster kind créé à la main reste utilisable ; metrics-server n'est pas retiré des clusters où il a été installé |
 
-Le choix est **propre à chaque utilisateur** et gardé dans le volume `devzone-config` (il survit aux rebuilds). Au premier démarrage, si une connexion Claude Code ou opencode existe déjà dans les volumes, le module `ia` est activé (et signalé) : rien ne disparaît pour qui s'en servait.
+Le choix est **propre à chaque devzone** (instance) et gardé dans le dossier `$RACINE/.devzone.modules` (monté de l'hôte, il survit aux rebuilds). Au premier démarrage d'une instance, si une connexion Claude Code ou opencode existe déjà dans les volumes, le module `ia` n'est pas activé : tout est désactivé par défaut et la connexion est signalée (« devzone activer ia pour l'utiliser ici »).
 
 ### Garde-fou des assistants IA
 
@@ -90,6 +90,15 @@ Avec le module `ia`, devzone écrit une configuration opencode prête à l'emplo
 - **Fournisseur payant** : `opencode auth login` (la connexion reste dans le volume `devzone-opencode-data`).
 - **Lancer opencode en tâche de fond** : `opencode run --auto "…" < /dev/null`. Sans `--auto`, toute demande de permission est refusée d'office et l'agent s'arrête ; sans `< /dev/null`, il attend son entrée et reste muet.
 
+
+
+## Plusieurs devzone sur une machine
+
+Plusieurs devzone peuvent cohabiter sur une même machine (un par projet, un par usage) : chaque instance est un dossier du workspace, avec son propre état et ses propres modules.
+
+- **Modules** : **propres à chaque devzone**. L'état vit dans le dossier de l'instance (`$RACINE/.devzone.modules`), monté de l'hôte : un second devzone démarre avec des valeurs par défaut, sans hériter de ceux du premier (un ancien état global, au premier devzone démarré après la mise à jour, est repris une fois, par déplacement).
+- **Connexions** (**GitHub**, **git**, **Claude Code**, **opencode**) et **caches** (**Maven**, **pnpm**) : **partagés volontairement** entre les devzone d'une machine, dans les volumes `devzone-*`.
+- **Isolation complète** : `DEVZONE_VOLUMES=<préfixe>` (comme pour les tests) donne à chaque devzone ses propres volumes.
 
 
 ## Travailler sur un projet
@@ -132,7 +141,7 @@ Le conteneur est jetable ; ce qui compte vit dans des volumes Docker, sur ta mac
 | `devzone-git` | identité git (`~/.config/git/config`) | gardé | gardé | gardé |
 | `devzone-claude` | connexion et réglages de Claude Code | gardé | gardé | gardé |
 | `devzone-opencode-config`, `devzone-opencode-data` | connexion et réglages d'opencode | gardé | gardé | gardé |
-| `devzone-config` | modules activés (`devzone activer`) | gardé | gardé | gardé |
+| `devzone-config` | modules activés (`devzone activer`) : ancien état utilisateur, repris une fois | gardé | gardé | gardé |
 | `devzone-m2`, `devzone-pnpm` | caches Maven (`~/.m2`) et pnpm | gardé | gardé | gardé |
 | volume du Docker interne | images Docker et clusters kind du conteneur | gardé | gardé | gardé |
 | `workspace/` (dossier de l'hôte) | tes projets | gardé | gardé | gardé |

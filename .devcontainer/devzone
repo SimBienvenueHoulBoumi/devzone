@@ -6,15 +6,17 @@
 #   devzone appliquer                installe ce qui est actif (post-create.sh)
 #   devzone actif <module>           code 0 si actif (scripts de démarrage)
 #   devzone test-bash32             lance les tests bats sous bash 3.2 (conteneur Docker)
-# État propre à chaque utilisateur : ~/.config/devzone/modules (volume
-# devzone-config, survit aux rebuilds), une ligne « module=on|off ».
+# État propre à chaque instance : $RACINE/.devzone.modules (dossier monté
+# de l'hôte, survit aux rebuilds), une ligne « module=on|off » ; l'ancien état
+# global (~/.config/devzone/modules) est repris une fois
 set -euo pipefail
 
-ETAT="${DEVZONE_ETAT:-$HOME/.config/devzone/modules}"
 ICI="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
 VERSIONS="$ICI/../core/scripts/versions.sh"
 # Dossier de devzone (/workspaces/devzone) ; DEVZONE_RACINE pour les tests
 RACINE="${DEVZONE_RACINE:-$(dirname "$ICI")}"
+# État par défaut de l'instance ; DEVZONE_ETAT garde la priorité (tests, CI)
+ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
 MODULES=(ia kubernetes)
 
 # Assistants IA, versions figées : mettre à jour ici, puis devzone appliquer
@@ -41,18 +43,20 @@ connu() {
     return 1
 }
 
-# Premier démarrage (aucun état) : tout désactivé, sauf ia si une connexion
-# existe déjà dans les volumes (pas de régression pour qui s'en servait)
+# Premier démarrage (aucun état) : tout désactivé ; l'ancien état global
+# (version précédente) est repris une fois, par déplacement
 initialiser() {
+    # Migration : ancien état global (~/.config/devzone/modules) vers l'état
+    # de l'instance ($RACINE/.devzone.modules) ; déplacé, pas copié : le
+    # premier devzone démarré après la mise à jour garde ses choix
+    if [ ! -f "$ETAT" ] && [ -f "$HOME/.config/devzone/modules" ]; then
+        mkdir -p "$(dirname "$ETAT")"
+        mv "$HOME/.config/devzone/modules" "$ETAT"
+    fi
+
     [ -f "$ETAT" ] && return 0
     mkdir -p "$(dirname "$ETAT")"
-    local ia=off
-    if [ -f "$HOME/.claude/.credentials.json" ] || [ -f "$HOME/.local/share/opencode/auth.json" ]; then
-        ia=on
-        # stderr : initialiser est aussi appelé dans $(valeur …)
-        echo "devzone : connexion d'un assistant IA trouvée, module ia activé (devzone desactiver ia pour le retirer)" >&2
-    fi
-    printf 'ia=%s\nkubernetes=off\n' "$ia" >"$ETAT"
+    printf 'ia=off\nkubernetes=off\n' >"$ETAT"
 }
 
 valeur() {
@@ -299,7 +303,15 @@ case "${1:-}" in
         ;;
     actif)
         connu "${2:-}" || { echo "devzone : module inconnu : ${2:-(aucun)}" >&2; exit 2; }
-        [ "$(valeur "$2")" = on ]
+        if [ "$(valeur "$2")" = on ]; then
+            printf '✔ module %-10s actif : %s\n' "$2" "$(description "$2")"
+        elif [ -f "$HOME/.claude/.credentials.json" ] || [ -f "$HOME/.local/share/opencode/auth.json" ]; then
+            echo "devzone : connexion Claude Code/opencode partagée trouvée : devzone activer ia pour l'utiliser ici"
+            exit 1
+        else
+            printf '○ module %-10s facultatif, %s : devzone activer %s\n' "$2" "$(description "$2")" "$2"
+            exit 1
+        fi
         ;;
     -h | --help | aide) sed -n '2,9p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' ;;
     test-bash32) bash "$RACINE/core/test/bash32.sh" ;;
