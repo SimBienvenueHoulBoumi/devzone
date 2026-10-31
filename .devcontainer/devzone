@@ -130,6 +130,28 @@ config_opencode() {
     fi
 }
 
+# Retire la configuration opencode écrite par devzone si elle porte encore son
+# repère et n'a pas été modifiée ; une config personnalisée (sans repère ou
+# modifiée) est gardée. Symétrique de config_opencode.
+retirer_config_opencode() {
+    local repere modele cible
+    repere='// devzone : configuration opencode par défaut'
+    modele="$ICI/opencode.jsonc"
+    if [ -f "$HOME/.config/opencode/opencode.jsonc" ]; then
+        cible="$HOME/.config/opencode/opencode.jsonc"
+    elif [ -f "$HOME/.config/opencode/opencode.json" ]; then
+        cible="$HOME/.config/opencode/opencode.json"
+    else
+        return 0
+    fi
+    if grep -qF "$repere" "$cible" && cmp -s "$modele" "$cible"; then
+        rm -f "$cible"
+        echo "opencode : configuration par défaut retirée"
+    else
+        echo "opencode : configuration personnalisée, gardée"
+    fi
+}
+
 # Lance une commande longue en écrivant « toujours en cours » toutes les
 # DEVZONE_PROGRESSION s sur stderr : une installation muette semble bloquée (#195)
 avec_progression() {
@@ -178,7 +200,7 @@ installer_ia() {
 }
 
 appliquer_ia() {
-    local journal
+    local journal tmp
     if [ "$1" = on ]; then
         echo "devzone : installation de Claude Code et opencode (quelques minutes)…"
         if ! installer_ia; then
@@ -203,7 +225,44 @@ appliquer_ia() {
     else
         npm uninstall -g "${IA_NOMS[@]}" >/dev/null 2>&1 || true
         rm -f "$(fichier_echec ia)"
-        echo "devzone : ia désactivé (connexions gardées dans leurs volumes)"
+        # Garde-fou repowarden : retiré à la désactivation (symétrique de
+        # l'activation). repowarden le fait lui-même s'il est présent ; sinon
+        # retrait par jq de la seule entrée PreToolUse qui appelle
+        # « repowarden garde », le reste de settings.json intact.
+        if command -v repowarden >/dev/null 2>&1; then
+            repowarden agents retirer --global >/dev/null 2>&1 || true
+        elif [ -f "$HOME/.claude/settings.json" ]; then
+            tmp="$(mktemp)"
+            if jq '
+                if (.hooks.PreToolUse // null) != null then
+                    .hooks.PreToolUse = [
+                        .hooks.PreToolUse[] |
+                        if (.hooks // null) != null then
+                            .hooks = [ .hooks[] | select(((.command // "") | contains("repowarden garde")) | not) ] |
+                            select((.hooks | length) > 0)
+                        else
+                            select(((.command // "") | contains("repowarden garde")) | not)
+                        end
+                    ] |
+                    if (.hooks.PreToolUse | length) == 0 then del(.hooks.PreToolUse) else . end |
+                    if ((.hooks // {}) | keys | length) == 0 then del(.hooks) else . end
+                else . end
+            ' "$HOME/.claude/settings.json" >"$tmp" 2>/dev/null; then
+                mv "$tmp" "$HOME/.claude/settings.json"
+            else
+                rm -f "$tmp"
+            fi
+        fi
+        # Plugin opencode du garde-fou (retiré aussi par repowarden ci-dessus)
+        rm -f "$HOME/.config/opencode/plugins/repowarden-garde.js" \
+              "$HOME/.config/opencode/plugins/repowarden-garde-v2.js"
+        # Configuration opencode : retirée seulement si elle porte le repère devzone
+        # et n'a pas été modifiée ; personnalisée → gardée.
+        retirer_config_opencode
+        # État de devzone agent : retiré (les journaux workspace/.agents/ sont des
+        # données et restent, voir le message).
+        rm -rf "${DEVZONE_AGENT_ETAT:-$HOME/.local/state/oc-lancer}"
+        echo "devzone : ia désactivé (connexions gardées dans leurs volumes ; journaux workspace/.agents/ gardés)"
     fi
 }
 
@@ -212,7 +271,10 @@ appliquer_kubernetes() {
         bash "$ICI/kube-config.sh"
     else
         rm -f "$HOME/.kube/hote.config"
-        echo "devzone : kubernetes désactivé (metrics-server reste installé sur les clusters où il l'a été)"
+        # metrics-server retiré des clusters où devzone l'a installé (marqueur
+        # devzone=installe posé par metrics-server.sh) ; via sa sous-commande
+        bash "$ICI/metrics-server.sh" retirer || true
+        echo "devzone : kubernetes désactivé"
     fi
 }
 

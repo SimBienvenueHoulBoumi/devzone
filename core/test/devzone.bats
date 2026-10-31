@@ -2,6 +2,65 @@
 # Commande devzone : état des modules, activation, désactivation, migration.
 # HOME temporaire ; npm et kubectl simulés (aucune installation réelle).
 
+install_faux_repowarden() {
+    cat >"$BATS_TEST_TMPDIR/bin/repowarden" <<'REP'
+#!/usr/bin/env bash
+echo "repowarden $*" >>"$BATS_TEST_TMPDIR/repowarden.log"
+case "$*" in
+    *"agents init"*)
+        mkdir -p "$HOME/.claude" "$HOME/.config/opencode/plugins" "$HOME/.claude/skills/repowarden" "$HOME/.config/opencode/skills/repowarden"
+        printf '{\n  "hooks": {\n    "PreToolUse": [\n      {\n        "matcher": "Bash",\n        "hooks": [\n          {\n            "type": "command",\n            "command": "repowarden garde"\n          }\n        ]\n      }\n    ]\n  }\n}\n' >"$HOME/.claude/settings.json"
+        printf '#!/usr/bin/env bash\necho garde\n' >"$HOME/.config/opencode/plugins/repowarden-garde.js"
+        printf '# repowarden\n' >"$HOME/.claude/skills/repowarden/SKILL.md"
+        printf '# repowarden\n' >"$HOME/.config/opencode/skills/repowarden/SKILL.md"
+        ;;
+    *"agents retirer"*)
+        tmp="$(mktemp)"
+        jq '
+            if (.hooks.PreToolUse // null) != null then
+                .hooks.PreToolUse = [
+                    .hooks.PreToolUse[] |
+                    .hooks = [ (.hooks // [])[] | select(((.command // "") | contains("repowarden garde")) | not) ] |
+                    select((.hooks | length) > 0)
+                ] |
+                if (.hooks.PreToolUse | length) == 0 then del(.hooks.PreToolUse) else . end |
+                if ((.hooks // {}) | keys | length) == 0 then del(.hooks) else . end
+            else . end
+        ' "$HOME/.claude/settings.json" >"$tmp"
+        if [ "$(cat "$tmp")" = "{}" ]; then
+            rm -f "$tmp" "$HOME/.claude/settings.json"
+        else
+            mv "$tmp" "$HOME/.claude/settings.json"
+        fi
+        rm -f "$HOME/.config/opencode/plugins/repowarden-garde.js" "$HOME/.config/opencode/plugins/repowarden-garde-v2.js"
+        rm -f "$HOME/.claude/skills/repowarden/SKILL.md" "$HOME/.config/opencode/skills/repowarden/SKILL.md"
+        ;;
+esac
+REP
+    chmod +x "$BATS_TEST_TMPDIR/bin/repowarden"
+}
+
+# Empreinte des fichiers du HOME d'un module (fichiers + sommes, tres tries) :
+# pour comparer l'état avant et après un cycle activer/désactiver (#242)
+empreinte() {
+    local dossier f
+    for dossier in .claude .config/opencode .local/state; do
+        if [ -e "$HOME/$dossier" ]; then
+            find "$HOME/$dossier" -type f -print | sort | while IFS= read -r f; do
+                sha256sum "$f"
+            done
+        fi
+    done | sha256sum | awk '{print $1}'
+}
+
+# ~/.kube/cache/ est le cache de kubectl lui-même, pas une configuration
+# posée par devzone : hors de l'empreinte
+kube_empreinte() {
+    find "$HOME/.kube" -path "$HOME/.kube/cache" -prune -o -type f -print 2>/dev/null | sort | while IFS= read -r f; do
+        sha256sum "$f"
+    done | sha256sum | awk '{print $1}'
+}
+
 setup() {
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
     # Versions figées lues dans les fichiers : une montée automatique (workflow
@@ -251,7 +310,119 @@ GH
     run bash "$DEVZONE" desactiver kubernetes
     [ "$status" -eq 0 ]
     [ ! -e "$HOME/.kube/hote.config" ]
-    [[ "$output" == *"metrics-server reste installé"* ]] || false
+    [[ "$output" == *"kubernetes désactivé"* ]] || false
+}
+
+@test "désactiver ia : cycle activer + désactiver → empreinte des fichiers identique" {
+    install_faux_repowarden
+    empreinte_avant="$(empreinte)"
+    run bash "$DEVZONE" activer ia
+    [ "$status" -eq 0 ]
+    run bash "$DEVZONE" desactiver ia
+    [ "$status" -eq 0 ]
+    [ "$(empreinte)" = "$empreinte_avant" ]
+}
+
+@test "désactiver ia : hook repowarden retiré, réglages utilisateur et config personnalisée gardés" {
+    install_faux_repowarden
+    mkdir -p "$HOME/.claude" "$HOME/.config/opencode"
+    cat >"$HOME/.claude/settings.json" <<'JSON'
+{
+  "model": "claude-personnel",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "repowarden garde"
+          }
+        ]
+      }
+    ]
+  }
+}
+JSON
+    printf '{"model":"mon-modele"}' >"$HOME/.config/opencode/opencode.jsonc"
+    run bash "$DEVZONE" desactiver ia
+    [ "$status" -eq 0 ]
+    [ -f "$HOME/.claude/settings.json" ]
+    grep -q "claude-personnel" "$HOME/.claude/settings.json"
+    ! grep -q "repowarden" "$HOME/.claude/settings.json" || false
+    [ -f "$HOME/.config/opencode/opencode.jsonc" ]
+    [ "$(cat "$HOME/.config/opencode/opencode.jsonc")" = '{"model":"mon-modele"}' ]
+}
+
+@test "désactiver kubernetes : metrics-server retiré seulement du contexte marqué, les autres laissés" {
+    cat >"$BATS_TEST_TMPDIR/kube-contexts" <<'CTX'
+kind-dev
+kind-staging
+CTX
+    cat >"$BATS_TEST_TMPDIR/kube-marcus" <<'CTX'
+kind-dev
+CTX
+    cat >"$BATS_TEST_TMPDIR/bin/kubectl" <<'KUBE'
+#!/usr/bin/env bash
+args="$*"
+case "$args" in
+    *"get-contexts"*)
+        cat "$KUBE_CONTEXTS_FILE"
+        ;;
+    *"get deployment metrics-server"*)
+        contexte=""
+        prev=""
+        for a in "$@"; do
+            if [ "$prev" = "--context" ]; then contexte="$a"; fi
+            prev="$a"
+        done
+        # metrics-server présent sur tous les contextes ; marqué devzone
+        # seulement sur ceux de KUBE_MARKED_FILE
+        if [[ "$args" == *"-l devzone=installe"* ]]; then
+            grep -qxF "$contexte" "$KUBE_MARKED_FILE" && exit 0
+            exit 1
+        fi
+        exit 0
+        ;;
+    *"delete -f"*)
+        contexte=""
+        prev=""
+        for a in "$@"; do
+            if [ "$prev" = "--context" ]; then contexte="$a"; fi
+            prev="$a"
+        done
+        echo "delete -f $contexte" >>"${KUBE_DELETE_LOG}"
+        exit 0
+        ;;
+    *)
+        exit 1
+        ;;
+esac
+KUBE
+    chmod +x "$BATS_TEST_TMPDIR/bin/kubectl"
+    export KUBE_CONTEXTS_FILE="$BATS_TEST_TMPDIR/kube-contexts"
+    export KUBE_MARKED_FILE="$BATS_TEST_TMPDIR/kube-marcus"
+    export KUBE_DELETE_LOG="$BATS_TEST_TMPDIR/kube-delete.log"
+    : >"$KUBE_DELETE_LOG"
+    run bash "$DEVZONE" desactiver kubernetes
+    [ "$status" -eq 0 ]
+    [ "$(cat "$KUBE_DELETE_LOG")" = "delete -f kind-dev" ]
+    [[ "$output" == *"metrics-server présent sans repère devzone, laissé : kind-staging"* ]] || false
+}
+
+@test "désactiver kubernetes : cycle activer + désactiver → ~/.kube identique" {
+    mkdir -p "$HOME/.kube"
+    touch "$HOME/.kube/config"
+    # Ni cluster kind ni cluster de l'hôte : seul ce que devzone pose compte
+    printf '#!/usr/bin/env bash\nexit 0\n' >"$BATS_TEST_TMPDIR/bin/kind"
+    printf '#!/usr/bin/env bash\nexit 0\n' >"$BATS_TEST_TMPDIR/bin/kubectl"
+    chmod +x "$BATS_TEST_TMPDIR/bin/kind" "$BATS_TEST_TMPDIR/bin/kubectl"
+    kube_empreinte_avant="$(kube_empreinte)"
+    run bash "$DEVZONE" activer kubernetes
+    [ "$status" -eq 0 ]
+    run bash "$DEVZONE" desactiver kubernetes
+    [ "$status" -eq 0 ]
+    [ "$(kube_empreinte)" = "$kube_empreinte_avant" ]
 }
 
 @test "module inconnu : message et erreur, état intact" {
@@ -376,6 +547,8 @@ GH
     grep -qx "repowarden agents init --global" "$BATS_TEST_TMPDIR/repowarden.log"
     rm -f "$BATS_TEST_TMPDIR/repowarden.log"
     bash "$DEVZONE" desactiver ia
+    grep -qx "repowarden agents retirer --global" "$BATS_TEST_TMPDIR/repowarden.log"
+    rm -f "$BATS_TEST_TMPDIR/repowarden.log"
     bash "$DEVZONE" appliquer
     [ ! -e "$BATS_TEST_TMPDIR/repowarden.log" ]
 }
