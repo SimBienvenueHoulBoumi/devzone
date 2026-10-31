@@ -1,37 +1,10 @@
-# valeurs pour le runner GitLab Kubernetes (exécuteur Kubernetes).
-# Le runner himself est installé séparément (via `gitlab-runner install` ou le chart).
-# Ce fichier configure le runner pour qu'il se connecte à l'instance GitLab locale.
+# valeurs pour le chart GitLab Runner gitlab/gitlab-runner (figé)
+gitlabUrl: http://gitlab-webservice-default.gitlab.svc:8181  # service interne
 
-gitlab-runner:
-  install: true
-  # Nom du runner enregistré dans GitLab
-  name: "devzone-runner-$(hostname --short | tr '[:upper:]' '[:lower:]')"
-  # Tags pour assigner les jobs
-  tags: "devzone,test"
-  # Exécuteur Kubernetes
-  executor: "kubernetes"
-  # Image du pod du runner (docker:dind pour kind)
-  kubernetes:
-    image: "docker:latest"
-    # Service account pour accéder au docker daemon du kind
-    serviceAccount: {}
-    # Volumes pour accéder au docker daemon du kind
-    volumes:
-      - name: docker
-        hostPath:
-          path: "/var/run/docker.sock"
-    # privileged nécessaire pour docker dans kind
-    privileged: true
-    # namespace où les pods de runner seront créés
-    namespace: "gitlab-runner"
-  # Token du runner : lu depuis le secret ou fourni via variable d'environnement
-  # gitlabUrl : https://gitlab-devzone.example.com (ou l'ingress)
-  # token : lu depuis $RACINE/workspace/.gitlab/token (600, jamais affiché)
-  token: "{{ .Get .gitlab.secret.token }}"
+runners:
+  executor: kubernetes
 
-# Variables d'environnement pour le runner
-env:
-  - name: CI
-    value: "true"
-  - name: GITLAB_CI
-    value: "true"
+rbac:
+  create: true
+
+concurrent: 2

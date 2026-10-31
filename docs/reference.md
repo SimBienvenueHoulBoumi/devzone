@@ -132,28 +132,26 @@ Le cluster de l'hôte n'est pas joignable dans deux cas (kind fonctionne quand m
 
 ## GitLab
 
-Le module `gitlab` fournit une instance GitLab de test dans un cluster kind.
+Le module `gitlab` fournit une instance GitLab de test dans un cluster kind dédié (`gitlab`).
 
 ```bash
 devzone                        # état : identité git, GitHub, outils, modules
 devzone activer gitlab         # active et installe GitLab dans kind
-devzone desactiver gitlab      # désinstalle GitLab
-devzone appliquer              # ne retire que ce que devzone a installé
+devzone desactiver gitlab      # désinstalle GitLab et supprime le cluster
+devzone appliquer              # applique les modules actifs
 devzone actif gitlab           # code 0 si GitLab est actif
 ```
 
-- **Exigences** : au moins 8 Go de RAM libre (vérifié via `/proc/meminfo`) ; le module refuse le démarrage si la condition n'est pas remplie.
-- **Cluster kind** : un cluster `devzone` est créé (ou réutilisé) avec la configuration `.devcontainer/gitlab/kind.yaml`. Les ports 80/443 sont mappés sur l'hôte (8080/8443).
-- **Ingress** : nginx-ingress est déployé avec le chart GitLab (édition gratuite). L'accès se fait via `https://gitlab-devzone.local` (via l'ingress).
-- **Cert-manager** : un `ClusterIssuer gitlab-issuer` est créé pour les certificats Let's Encrypt (développement).
-- **PostgreSQL et Redis** : externalisés (désactivés par défaut ; utilisés via le filesystem du pod en mode test).
-- **GitLab Runner** : exécuteur Kubernetes configuré séparément (voir `runner-values.yaml`). Le runner se connecte à l'instance GitLab locale via un token stocké dans `$RACINE/workspace/.gitlab/` (mode 600, jamais affiché en clair).
-- **Seed** : `devzone gitlab seed` crée un projet de démonstration `calc` avec des tests unitaires.
-- **Désinstallation** : `devzone desactiver gitlab` retire le chart GitLab via Helm, laisse le cluster kind en place.
-
-- **PostgreSQL et Redis** : externalisés par défaut (utilisés par le filesystem du pod)
-- **Registry** : désactivé pour le test cluster
-- **GitLab Runner** : exécuteur Kubernetes ; à configurer séparément
+- **Exigences** : au moins 8 Go de RAM libre (vérifié via `/proc/meminfo`, `MemAvailable`) ; le module refuse le démarrage si la condition n'est pas remplie. Non exécuté en CI.
+- **Cluster kind** : un cluster `gitlab` est créé avec la configuration `.devcontainer/gitlab/kind.yaml` (un seul nœud control-plane, label `ingress-ready=true`). Les ports sont mappés : containerPort 80 → hostPort 8929, containerPort 22 → hostPort 2224.
+- **Ingress** : nginx-ingress est exposé sur le nœud kind (hostPort 80). L'accès se fait via `http://gitlab.localhost:8929`.
+- **Chart GitLab** : `gitlab/gitlab` figé à la version 9.11.16 (GitLab 18, édition CE). cert-manager, Let's Encrypt, Prometheus, Registry et KAS sont désactivés.
+- **Ressources** : réplicas à 1 et requêtes réduites pour webservice, sidekiq, gitaly et gitlab-shell.
+- **Durée** : installation complète environ 10 à 20 minutes (à confirmer par l'essai réel) ; délai configurable via `GITLAB_ATTENTE` (défaut 1200 s).
+- **GitLab Runner** : chart `gitlab/gitlab-runner` figé (version compatible GitLab 18, exécuteur Kubernetes, rbac, concurrent 2), connecté au service interne `http://gitlab-webservice-default.gitlab.svc:8181`.
+- **Seed** : `devzone gitlab seed` (idempotent) crée le groupe `devzone`, le projet `devzone/demo`, l'utilisateur `dev`, un jeton de runner ; pousse le contenu de `demo/` sur la branche `main`.
+- **Secrets** : mot de passe root, jeton root et jeton runner dans `$RACINE/workspace/.gitlab/` (fichiers mode 600, jamais affichés).
+- **Désinstallation** : `devzone desactiver gitlab` supprime le cluster kind `gitlab`, retire le contexte/cluster/utilisateur `kind-gitlab` de `~/.kube/config`, restaure le `current-context` précédent et supprime `$RACINE/workspace/.gitlab/`. Rien d'autre n'est touché.
 
 ### Seed de données
 
@@ -161,16 +159,11 @@ devzone actif gitlab           # code 0 si GitLab est actif
 devzone gitlab seed
 ```
 
-Crée un projet de démonstration `calc` avec des tests unitaires dans GitLab.
+Crée un groupe `devzone`, un projet `devzone/demo`, un utilisateur `dev` et un jeton de runner dans GitLab.
 
 ### Gestion des secrets
 
-Les secrets (token GitLab runner, certificats) sont stockés dans `$RACINE/workspace/.gitlab/` (permissions 600). Ils ne sont jamais affichés en clair dans les logs ou l'état du module.
-
-Le cluster de l'hôte n'est pas joignable dans deux cas (kind fonctionne quand même) :
-- **Codespaces, machine distante** : pas de `~/.kube` local ;
-- **Linux avec Docker Engine** : un cluster kind ou minikube de l'hôte écoute sur `127.0.0.1`, invisible du conteneur. Un cluster qui écoute sur toutes les interfaces (k3s, kubeadm) est joignable.
-
+Les secrets (mot de passe root, jeton root, jeton runner) sont stockés dans `$RACINE/workspace/.gitlab/` (permissions 600). Ils ne sont jamais affichés en clair dans les logs ou l'état du module.
 
 
 ## Données conservées
