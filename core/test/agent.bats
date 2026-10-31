@@ -18,6 +18,8 @@ setup() {
     export FAKE_OP_ECHEC_MODELS=""
     export FAKE_OP_MUET_MODELS=""
     export FAKE_OP_FIGEE_MODELS=""
+    export FAKE_OP_TEXTE_MODELS=""
+    export FAKE_OP_ANCIEN_ERREUR_MODELS=""
     export FAKE_OP_DUREE=30
     export DEVZONE_AGENT_SILENCE=1
     export DEVZONE_AGENT_FIGEE=2
@@ -44,9 +46,16 @@ case "${1:-}" in
         echo "$modele" >>"${FAKE_OP_LOG:?}"
         printf '%s\n---\n' "$consigne" >>"${FAKE_OP_CONSIGNE_LOG:?}"
         printf '%s\n' "${OPENCODE_CONFIG_CONTENT:-}" >"${FAKE_OP_CONFIG_LOG:?}"
+        case " ${FAKE_OP_ANCIEN_ERREUR_MODELS:-} " in
+            *" $modele "*)
+                echo "Free usage limit"
+                for _ in $(seq 1 40); do echo "ligne de sortie sans erreur"; done
+                exit 1
+                ;;
+        esac
         case " ${FAKE_OP_ECHEC_MODELS:-} " in
             *" $modele "*)
-                echo "Free usage limit" >&2
+                echo "Error: Free usage limit" >&2
                 exit 1
                 ;;
         esac
@@ -55,6 +64,9 @@ case "${1:-}" in
                 sleep "${FAKE_OP_DUREE:-30}"
                 exit 0
                 ;;
+        esac
+        case " ${FAKE_OP_TEXTE_MODELS:-} " in
+            *" $modele "*) echo "extrait de code : Free usage limit (exemple)" ;;
         esac
         echo "session $modele : consigne lue, travail commence"
         echo "le modele $modele a traite la consigne, les tests correspondants passent"
@@ -75,13 +87,25 @@ consigne() {
     mkdir -p "$DEVZONE_RACINE/workspace/projet"
 }
 
-@test "agent : sans git push interdit dans la configuration -> refuse de lancer" {
+@test "agent : appelant sans git push -> accepté, deny fourni par devzone" {
     consigne
     export OPENCODE_CONFIG_CONTENT='{"permission":{"bash":{"*":"ask"}}}'
     run bash "$DEVZONE" agent "$DEVZONE_RACINE/workspace/projet" "$DEVZONE_RACINE/workspace/consigne.txt"
-    [ "$status" -eq 2 ]
-    [[ "$output" == *"git push non interdit"* ]] || false
-    [ ! -s "$FAKE_OP_LOG" ]
+    [ "$status" -eq 0 ]
+    [ -s "$FAKE_OP_LOG" ]
+    jq -e '.permission.bash["git push*"] == "deny"' "$FAKE_OP_CONFIG_LOG"
+}
+
+@test "agent : appelant avec * allow -> les deny de devzone restent et gagnent" {
+    consigne
+    export OPENCODE_CONFIG_CONTENT='{"permission":{"bash":{"*":"allow"}}}'
+    run bash "$DEVZONE" agent "$DEVZONE_RACINE/workspace/projet" "$DEVZONE_RACINE/workspace/consigne.txt"
+    [ "$status" -eq 0 ]
+    for r in 'git push*' 'gh api*' 'repowarden ticket nouveau*' 'git checkout*' 'git reset*' 'git restore*' 'git stash*' 'git clean*' 'git branch -D*' 'repowarden proteger*' 'repowarden run*'; do
+        jq -e --arg r "$r" '.permission.bash[$r] == "deny"' "$FAKE_OP_CONFIG_LOG" || { echo "deny perdu : $r"; false; }
+    done
+    jq -e '.permission.bash["*"] == "allow"' "$FAKE_OP_CONFIG_LOG"
+    jq -e '(.permission.bash | keys_unsorted | index("*")) < (.permission.bash | keys_unsorted | index("git push*"))' "$FAKE_OP_CONFIG_LOG"
 }
 
 @test "agent : lance opencode sur la consigne, journal ecrit, fin de session" {
@@ -106,6 +130,26 @@ consigne() {
     grep -q "Free usage limit" "$DEVZONE_RACINE/workspace/.agents/projet.log" || false
 }
 
+@test "agent : Free usage limit dans le code affiche, fin normale -> fin avec" {
+    consigne
+    export FAKE_OP_TEXTE_MODELS="big-pickle"
+    run bash "$DEVZONE" agent "$DEVZONE_RACINE/workspace/projet" "$DEVZONE_RACINE/workspace/consigne.txt"
+    [ "$status" -eq 0 ]
+    [ "$(grep -c . "$FAKE_OP_LOG")" -eq 1 ]
+    grep -q "fin avec opencode/big-pickle" "$DEVZONE_RACINE/workspace/.agents/projet.log" || false
+    ! grep -q "refusé" "$DEVZONE_RACINE/workspace/.agents/projet.log" || false
+}
+
+@test "agent : erreur ancienne hors des 30 dernieres lignes -> arrete en erreur, pas refus" {
+    consigne
+    export FAKE_OP_ANCIEN_ERREUR_MODELS="big-pickle"
+    run bash "$DEVZONE" agent "$DEVZONE_RACINE/workspace/projet" "$DEVZONE_RACINE/workspace/consigne.txt"
+    [ "$status" -eq 0 ]
+    [ "$(grep -c . "$FAKE_OP_LOG")" -eq 2 ]
+    grep -q "arrêté en erreur (code 1)" "$DEVZONE_RACINE/workspace/.agents/projet.log" || false
+    ! grep -q "refusé" "$DEVZONE_RACINE/workspace/.agents/projet.log" || false
+}
+
 @test "agent : silence au depart -> modele ecarte une heure, modele suivant" {
     consigne
     export FAKE_OP_MUET_MODELS="big-pickle"
@@ -113,7 +157,7 @@ consigne() {
     [ "$status" -eq 0 ]
     [ "$(grep -c . "$FAKE_OP_LOG")" -eq 2 ]
     [ -f "$HOME/.local/state/oc-lancer/muet-big-pickle" ]
-    grep -q "muet au depart" "$DEVZONE_RACINE/workspace/.agents/projet.log" || false
+    grep -q "muet au départ" "$DEVZONE_RACINE/workspace/.agents/projet.log" || false
 }
 
 @test "agent : session figee -> relancee, consigne de reprise" {
@@ -125,7 +169,7 @@ consigne() {
     [ "$(sed -n '2p' "$FAKE_OP_LOG")" = "deepseek-v4.1-flash-free" ]
     grep -q "REPRISE" "$FAKE_OP_CONSIGNE_LOG" || false
     grep -q "git log" "$FAKE_OP_CONSIGNE_LOG" || false
-    grep -q "fige" "$DEVZONE_RACINE/workspace/.agents/projet.log" || false
+    grep -q "figé" "$DEVZONE_RACINE/workspace/.agents/projet.log" || false
 }
 
 @test "agent : tous les modeles ecartes -> code 3" {
@@ -133,7 +177,7 @@ consigne() {
     export FAKE_OP_ECHEC_MODELS="big-pickle deepseek-v4.1-flash-free glm-5.3-flash-free nemotron-3.5-super-vl-free nemotron-3.5-lightning-free mimo-v2.6-flash-free beam-free flint-40b-free nemotron-3-ultra-free"
     run bash "$DEVZONE" agent "$DEVZONE_RACINE/workspace/projet" "$DEVZONE_RACINE/workspace/consigne.txt"
     [ "$status" -eq 3 ]
-    grep -q "aucun modele gratuit disponible" "$DEVZONE_RACINE/workspace/.agents/projet.log" || false
+    grep -q "aucun modèle gratuit disponible" "$DEVZONE_RACINE/workspace/.agents/projet.log" || false
 }
 
 @test "agent : deux lancements -> deux modeles differents" {
@@ -165,5 +209,5 @@ consigne() {
     [ "$status" -eq 0 ]
     [[ "$output" == *"projet.log"* ]] || false
     [[ "$output" == *"opencode/big-pickle"* ]] || false
-    [[ "$output" == *"modele glm-5.3-flash-free ecarte jusqu a"* ]] || false
+    [[ "$output" == *"modèle glm-5.3-flash-free écarté jusqu'à"* ]] || false
 }

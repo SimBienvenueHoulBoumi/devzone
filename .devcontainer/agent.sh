@@ -27,6 +27,9 @@ RACINE="${DEVZONE_RACINE:-$(dirname "$ICI")}"
 FREE_MODELS=(big-pickle deepseek-v4.1-flash-free glm-5.3-flash-free nemotron-3.5-super-vl-free
     nemotron-3.5-lightning-free mimo-v2.6-flash-free beam-free flint-40b-free nemotron-3-ultra-free)
 ERREURS='Free usage limit|content filter|Model is unavailable|Upstream request failed|ProviderHeaderTimeout|ENOTFOUND'
+# Ligne d'erreur écrite par opencode lui-même : seule une sortie qui la porte
+# (ou un code de sortie non nul) peut être un échec, pas du code affiché.
+LIGNE_ERREUR='(^|[[:space:]])(Error|ERROR|Erreur):'
 SILENCE="${DEVZONE_AGENT_SILENCE:-45}"
 FIGEE="${DEVZONE_AGENT_FIGEE:-600}"
 AGENT_ETAT="${DEVZONE_AGENT_ETAT:-$HOME/.local/state/oc-lancer}"
@@ -34,22 +37,29 @@ AGENT_ETAT="${DEVZONE_AGENT_ETAT:-$HOME/.local/state/oc-lancer}"
 refuse() { echo "devzone agent : $*" >&2; exit 2; }
 
 # Configuration sûre : agent.json par défaut, complétée par
-# OPENCODE_CONFIG_CONTENT s'il est défini (l'appelant peut ajouter des règles,
-# pas retirer git push). ~/bash32 est toujours protégé : le bash 3.2 du
-# conteneur a déjà été remplacé par un lien (#210).
+# OPENCODE_CONFIG_CONTENT s'il est défini. opencode applique la dernière règle
+# qui correspond : les deny de devzone sont donc retirés de la fusion puis
+# ré-ajoutés à la fin (l'ordre des clés d'un objet jq est l'ordre d'insertion),
+# si bien que l'appelant peut ajouter des permissions, jamais retirer un interdit
+# de devzone. ~/bash32 est toujours protégé : le bash 3.2 du conteneur a déjà
+# été remplacé par un lien (#210).
 configurer() {
     local def config
     def="$ICI/opencode/agent.json"
-    [ -r "$def" ] || refuse "configuration par defaut absente : $def"
+    [ -r "$def" ] || refuse "configuration par défaut absente : $def"
     if [ -n "${OPENCODE_CONFIG_CONTENT:-}" ]; then
         config="$(jq -ce -s '
             .[0] as $def | .[1] as $env |
-            ($def * $env)
-            | .permission.bash = ((($def.permission.bash // {}) | del(."git push*")) + ($env.permission.bash // {}))
+            ($def.permission.bash // {}) as $bashdef |
+            ($env.permission.bash // {}) as $bashenv |
+            ([ $bashdef | to_entries[] | select(.value == "deny") | .key ]) as $deny |
+            (($def * $env)
+             | .permission.bash = (($bashdef + $bashenv) | delpaths($deny | map([.])))
+             | reduce $deny[] as $k (. ; .permission.bash[$k] = "deny"))
         ' "$def" <(printf '%s' "$OPENCODE_CONFIG_CONTENT"))" ||
-            refuse "configuration opencode illisible : rien lance"
+            refuse "configuration opencode illisible : rien lancé"
     else
-        config="$(jq -ce . "$def")" || refuse "configuration opencode illisible : rien lance"
+        config="$(jq -ce . "$def")" || refuse "configuration opencode illisible : rien lancé"
     fi
     config="$(jq -ce '.permission.bash = ((.permission.bash // {}) + {
         "git commit*": "allow",
@@ -59,8 +69,8 @@ configurer() {
         "rm *bash32*": "deny",
         "chmod *bash32*": "deny",
         "install *bash32*": "deny"
-    })' <<<"$config")" || refuse "configuration opencode illisible : rien lance"
-    grep -q '"git push\*":"deny"' <<<"$config" || refuse "git push non interdit : rien lance"
+    })' <<<"$config")" || refuse "configuration opencode illisible : rien lancé"
+    grep -q '"git push\*":"deny"' <<<"$config" || refuse "git push non interdit : rien lancé"
     export OPENCODE_CONFIG_CONTENT="$config"
 }
 
@@ -138,8 +148,8 @@ agent_lancer() {
     while IFS= read -r m; do
         if [ -n "$m" ]; then FREE_MODELS+=("$m"); fi
     done < <(liste_modeles)
-    [ "${#FREE_MODELS[@]}" -gt 0 ] || refuse "aucun modele gratuit disponible"
-    verrou_prendre || refuse "rang des modeles verrouille : reessayer"
+    [ "${#FREE_MODELS[@]}" -gt 0 ] || refuse "aucun modèle gratuit disponible"
+    verrou_prendre || refuse "rang des modèles verrouillé : réessayer"
     debut=$(( $(cat "$etat/rang" 2>/dev/null || echo 0) % ${#FREE_MODELS[@]} ))
     echo $(( debut + 1 )) >"$etat/rang"
     verrou_lacher
@@ -162,7 +172,7 @@ agent_lancer() {
         if [ -f "$etat/muet-$m" ] && [ $(( $(date +%s) - $(cat "$etat/muet-$m") )) -lt 3600 ]; then
             continue
         fi
-        echo "=== modele opencode/$m debut $(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$journal"
+        echo "=== modèle opencode/$m début $(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$journal"
         offset="$(wc -c <"$journal")"
         (cd "$dossier" && opencode run --auto -m "opencode/$m" "$(cat "$consigne_courante")" </dev/null >>"$journal" 2>&1) &
         pid=$!
@@ -180,7 +190,7 @@ agent_lancer() {
             pkill -P "$pid" 2>/dev/null || true
             kill "$pid" 2>/dev/null || true
             wait "$pid" 2>/dev/null || true
-            echo "=== opencode/$m muet au depart : ecarte 1 h, modele suivant" >>"$journal"
+            echo "=== opencode/$m muet au départ : écarté 1 h, modèle suivant" >>"$journal"
             date +%s >"$etat/muet-$m"
             reprise
             continue
@@ -208,29 +218,35 @@ agent_lancer() {
             done
         fi
         if [ "$freeze" = 1 ]; then
-            echo "=== opencode/$m fige ($FIGEE s sans ecrire) : session neuve, modele suivant" >>"$journal"
+            echo "=== opencode/$m figé ($FIGEE s sans écrire) : session neuve, modèle suivant" >>"$journal"
             reprise
             continue
         fi
         code=0
         wait "$pid" || code=$?
         # Seule la sortie de cette tentative compte : une erreur d'un modèle
-        # précédent ne doit pas condamner le suivant.
+        # précédent ne doit pas condamner le suivant. On ne lit que ses 30
+        # dernières lignes, et seulement si le code de sortie est non nul ou si
+        # opencode a écrit sa propre ligne d'erreur : du code affiché contenant
+        # « Free usage limit » qui finit normalement n'est pas un échec.
         sortie="$(tail -c "+$(( offset + 1 ))" "$journal" 2>/dev/null || true)"
-        if grep -qE "$ERREURS" <<<"$sortie"; then
-            echo "=== opencode/$m refuse ($(printf '%s\n' "$sortie" | grep -oE "$ERREURS" | tail -1)) : modele suivant" >>"$journal"
-            reprise
-            continue
+        recent="$(printf '%s\n' "$sortie" | tail -n 30)"
+        if [ "$code" -ne 0 ] || printf '%s\n' "$recent" | grep -qE "$LIGNE_ERREUR"; then
+            if printf '%s\n' "$recent" | grep -qE "$ERREURS"; then
+                echo "=== opencode/$m refusé ($(printf '%s\n' "$recent" | grep -oE "$ERREURS" | tail -1)) : modèle suivant" >>"$journal"
+                reprise
+                continue
+            fi
         fi
         if [ "$code" -ne 0 ]; then
-            echo "=== opencode/$m arrete en erreur (code $code) : modele suivant" >>"$journal"
+            echo "=== opencode/$m arrêté en erreur (code $code) : modèle suivant" >>"$journal"
             reprise
             continue
         fi
         echo "=== fin avec opencode/$m (code $code)" >>"$journal"
         exit "$code"
     done
-    echo "=== aucun modele gratuit disponible" >>"$journal"
+    echo "=== aucun modèle gratuit disponible" >>"$journal"
     exit 3
 }
 
@@ -238,22 +254,22 @@ agent_lancer() {
 # écartés par le superviseur, avec l'heure de fin d'écart.
 agent_etat() {
     local f m debut dernier e vu=0
-    echo "devzone agent : etat"
+    echo "devzone agent : état"
     for f in "$RACINE"/workspace/.agents/*.log; do
         [ -e "$f" ] || continue
         vu=1
         m="$(grep -oE 'opencode/[A-Za-z0-9._-]+' "$f" 2>/dev/null | tail -1 || true)"
-        debut="$(grep '^=== modele ' "$f" 2>/dev/null | tail -1 |
-            sed -E 's/.* debut ([^ ]+).*/\1/' || true)"
+        debut="$(grep '^=== modèle ' "$f" 2>/dev/null | tail -1 |
+            sed -E 's/.* début ([^ ]+).*/\1/' || true)"
         dernier="$(heure "$(mtime "$f")")"
-        echo "  session $(basename "$f") : modele ${m:-inconnu}, depuis ${debut:-inconnu}, dernier ecrit $dernier"
+        echo "  session $(basename "$f") : modèle ${m:-inconnu}, depuis ${debut:-inconnu}, dernier écrit $dernier"
     done
     [ "$vu" = 1 ] || echo "  aucune session"
     for f in "$AGENT_ETAT"/muet-*; do
         [ -e "$f" ] || continue
         m="${f##*/muet-}"
         e="$(cat "$f" 2>/dev/null || true)"
-        echo "  modele $m ecarte jusqu a $(heure "${e:-0}")"
+        echo "  modèle $m écarté jusqu'à $(heure "${e:-0}")"
     done
 }
 
