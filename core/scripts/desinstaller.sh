@@ -125,6 +125,10 @@ else
 fi
 rm -f "$ICI/.devzone.log" "$ETAT"
 
+# État des modules d'une instance (une ligne « module=on|off ») : supprimé,
+# les modules repartent à leurs valeurs par défaut au prochain démarrage
+rm -f "$ICI/.devzone.modules"
+
 # --- Ce qui reste ------------------------------------------------------------
 echo
 echo "Non touché (à retirer toi-même si tu le souhaites) :"
