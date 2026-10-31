@@ -272,3 +272,16 @@ tickets_ouverts() {
     grep -q '^ *## Conception proposée$' "$workflow"
     ! grep -q '^ *## Conception retenue' "$workflow" || false
 }
+
+@test "workflow versions : cron horaire et installation de repowarden conditionnée" {
+    workflow="$RACINE/.github/workflows/versions.yml"
+    grep -Eq 'cron: *"17 \* \* \* \*"' "$workflow"
+    run awk '
+        /- name: Repowarden même version figée que le conteneur/ { dans = 1; next }
+        dans && /^      - / { exit }
+        dans { print }
+    ' "$workflow"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"if: steps.retards.outputs.present == 'true'"* ]]
+    [[ "$output" == *"npm install -g \"repowarden@\$version\""* ]]
+}
