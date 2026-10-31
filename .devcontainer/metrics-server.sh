@@ -28,7 +28,11 @@ if [ "${1:-}" = retirer ]; then
     fi
     code=0
     for contexte in "$@"; do
-        if kubectl --context "$contexte" -n kube-system get deployment metrics-server -l devzone=installe >/dev/null 2>&1; then
+        # Marqueur lu sur le deployment par son nom : kubectl refuse un nom
+        # avec un sélecteur (-l), le test serait toujours faux (#255)
+        marque="$(kubectl --context "$contexte" -n kube-system get deployment metrics-server \
+            -o jsonpath='{.metadata.labels.devzone}' 2>/dev/null || true)"
+        if [ "$marque" = installe ]; then
             if kubectl --context "$contexte" delete -f "$MANIFESTE" --ignore-not-found >/dev/null 2>&1; then
                 echo "metrics-server retiré ($VERSION) : $contexte"
             else
