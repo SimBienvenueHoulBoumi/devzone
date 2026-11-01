@@ -19,6 +19,8 @@ global:
     install: false         # prometheus non installé (top-level aussi)
   registry:
     enabled: false         # registry non activé
+  shell:
+    port: 2224             # port SSH annoncé par GitLab pour le clone (ssh://git@gitlab.localhost:2224/...)
 
 # cert-manager : désactivé
 installCertmanager: false
@@ -44,6 +46,8 @@ nginx-ingress:
     minAvailable: 0
     service:
       type: NodePort
+      nodePorts:
+        gitlab-shell: 32022  # nodePort fixe (plage 30000-32767) pour le clone SSH, port annoncé : 2224
 
 # Réplicas à 1 et ressources réduites
 gitlab:

@@ -17,6 +17,7 @@ nodes:
       - containerPort: 80
         hostPort: 8929
         protocol: TCP
-      - containerPort: 22
+      # Clone SSH : nodePort kind fixe 32022 → hostPort 2224 (port annoncé par GitLab)
+      - containerPort: 32022
         hostPort: 2224
         protocol: TCP
