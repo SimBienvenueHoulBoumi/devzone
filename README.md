@@ -98,7 +98,7 @@ Pour en savoir plus : [Mettre en route un projet](https://github.com/SimBienvenu
 |---|---|
 | Langages | Java 21 + Maven, Node LTS + pnpm, Python 3.12 + uv |
 | Conteneurs, Kubernetes | Docker (Docker-in-Docker), kubectl, helm, k9s, kind ; connexion au cluster de l'hôte (module `kubernetes`) |
-| GitHub, qualité | gh, repowarden (hooks git globaux), shellcheck, bats, actionlint, gitleaks, ruff, vulture, pytest |
+| GitHub (ou GitLab), qualité | gh, ou glab connecté à une instance GitLab (`devzone plateforme`, [docs/reference.md](docs/reference.md#plateforme-github-ou-gitlab)) ; repowarden (hooks git globaux), shellcheck, bats, actionlint, gitleaks, ruff, vulture, pytest |
 | Assistants IA | Claude Code, opencode (module `ia`, désactivé par défaut) |
 
 ## Au quotidien
@@ -118,6 +118,8 @@ Pour en savoir plus : [Mettre en route un projet](https://github.com/SimBienvenu
 **Module `ia`** : active Claude Code et opencode (versions figées), avec le garde-fou repowarden qui les arrête avant de modifier `main` ou `develop` ou de commiter sans `repowarden cc` (voir [docs/reference.md](docs/reference.md#garde-fou-des-assistants-ia)). Pour l'activer : `devzone activer ia`. Ils sont désinstallés quand le module est désactivé, mais tes connexions restent dans leurs volumes.
 
 **Module `kubernetes`** : active à chaque démarrage la connexion au cluster de l'hôte et l'installation de metrics-server sur les clusters locaux (pour voir le CPU et la RAM dans k9s). Pour l'activer : `devzone activer kubernetes`. Sans ce module, kubectl, helm, k9s et kind restent installés.
+
+**Plateforme GitHub ou GitLab** : GitHub par défaut (comportement actuel). Pour servir une équipe sur GitLab : `devzone plateforme gitlab --url URL` (ou sans `--url` quand le module `gitlab` est activé, pour l'instance de test) : glab est installé (version figée, somme vérifiée) et connecté à l'instance, et `devzone` l'affiche à la place des contrôles `gh`. `devzone plateforme github` revient en arrière (glab retiré). Détails dans [docs/reference.md](docs/reference.md#plateforme-github-ou-gitlab).
 
 Ces modules sont désactivés par défaut, activables à la demande depuis le conteneur (sans rebuild), et leur choix est conservé d'un démarrage à l'autre.
 
