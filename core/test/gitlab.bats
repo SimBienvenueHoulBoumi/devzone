@@ -226,17 +226,26 @@ NPM
     [ ! -e "$BATS_TEST_TMPDIR/kind.log" ]
 }
 
+@test "gitlab : valeurs — host avec port 8929, ingress sans port, SSH" {
+    local values="$BATS_TEST_DIRNAME/../../.devcontainer/gitlab/values.yaml"
+    grep -q "name: gitlab.localhost:8929" "$values"
+    grep -Eq 'hostnameOverride: gitlab\.localhost([[:space:]]|$)' "$values"
+    grep -q "ssh: gitlab.localhost" "$values"
+    ! grep -q "port: 2224" "$values" || false
+}
+
 @test "gitlab : valeurs helm — host avec port 8929, ingress sans port, SSH" {
+    [ -n "${DEVZONE_GITLAB_CHART:-}" ] || skip "DEVZONE_GITLAB_CHART absent"
     local helm_bin
     helm_bin="$(PATH=/usr/local/bin:/usr/bin:/bin command -v helm 2>/dev/null || true)"
     [ -n "$helm_bin" ] || skip "helm absent"
-    local chart="$BATS_TEST_DIRNAME/../../.essai/gitlab"
+    local chart="$DEVZONE_GITLAB_CHART"
     [ -d "$chart" ] || skip "chart absent"
     local values="$BATS_TEST_DIRNAME/../../.devcontainer/gitlab/values.yaml"
     run "$helm_bin" template gitlab "$chart" -f "$values" --namespace gitlab
     [ "$status" -eq 0 ]
     printf '%s\n' "$output" | grep -q "host: gitlab.localhost:8929"
-    printf '%s\n' "$output" | grep -q -- "- host: gitlab.localhost"
+    printf '%s\n' "$output" | grep -qE '^[[:space:]]*- host: gitlab\.localhost$' || false
     printf '%s\n' "$output" | grep -q 'ssh_host: "gitlab.localhost"'
-    printf '%s\n' "$output" | grep -q "ssh_port: 2224"
+    ! printf '%s\n' "$output" | grep -q "nodePort: 2224" || false
 }
