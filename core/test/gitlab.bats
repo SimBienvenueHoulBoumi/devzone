@@ -226,15 +226,15 @@ NPM
     [ ! -e "$BATS_TEST_TMPDIR/kind.log" ]
 }
 
-@test "gitlab : valeurs — host avec port 8929, ingress sans port, SSH" {
+@test "gitlab : valeurs — host sans port, port externe par GITLAB_PORT" {
     local values="$BATS_TEST_DIRNAME/../../.devcontainer/gitlab/values.yaml"
-    grep -q "name: gitlab.localhost:8929" "$values"
-    grep -Eq 'hostnameOverride: gitlab\.localhost([[:space:]]|$)' "$values"
-    grep -q "ssh: gitlab.localhost" "$values"
+    grep -Eq 'name: gitlab\.localhost([[:space:]]|$)' "$values"
+    grep -q 'GITLAB_PORT: "8929"' "$values"
+    ! grep -q "hostnameOverride" "$values" || false
     ! grep -q "port: 2224" "$values" || false
 }
 
-@test "gitlab : valeurs helm — host avec port 8929, ingress sans port, SSH" {
+@test "gitlab : valeurs helm — host sans port, port externe par GITLAB_PORT" {
     [ -n "${DEVZONE_GITLAB_CHART:-}" ] || skip "DEVZONE_GITLAB_CHART absent"
     local helm_bin
     helm_bin="$(PATH=/usr/local/bin:/usr/bin:/bin command -v helm 2>/dev/null || true)"
@@ -244,8 +244,17 @@ NPM
     local values="$BATS_TEST_DIRNAME/../../.devcontainer/gitlab/values.yaml"
     run "$helm_bin" template gitlab "$chart" -f "$values" --namespace gitlab
     [ "$status" -eq 0 ]
-    printf '%s\n' "$output" | grep -q "host: gitlab.localhost:8929"
-    printf '%s\n' "$output" | grep -qE '^[[:space:]]*- host: gitlab\.localhost$' || false
-    printf '%s\n' "$output" | grep -q 'ssh_host: "gitlab.localhost"'
-    ! printf '%s\n' "$output" | grep -q "nodePort: 2224" || false
+    local rendu="$output"
+    printf '%s\n' "$rendu" | grep -qE '^[[:space:]]*host: gitlab\.localhost$' || false
+    local webservice
+    webservice="$(printf '%s\n' "$rendu" | awk '
+        /^kind: Deployment$/ { dans = 1; nom = 0; bloc = "" }
+        dans { bloc = bloc $0 "\n" }
+        dans && /^  name: gitlab-webservice-default$/ { nom = 1 }
+        dans && /^---$/ { if (nom) printf "%s", bloc; dans = 0; nom = 0 }
+        END { if (dans && nom) printf "%s", bloc }
+    ')"
+    [[ "$webservice" == *"name: GITLAB_PORT"* ]] || false
+    [[ "$webservice" == *'value: "8929"'* ]] || false
+    ! printf '%s\n' "$rendu" | grep -q "nodePort: 2224" || false
 }
