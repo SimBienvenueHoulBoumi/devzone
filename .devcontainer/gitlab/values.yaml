@@ -6,7 +6,11 @@ global:
     domain: localhost       # domaine de base
     https: false            # HTTPS désactivé pour le test
     gitlab:
-      name: gitlab.localhost  # hostname GitLab
+      name: gitlab.localhost:8929  # nom annoncé par GitLab (port réel)
+      hostnameOverride: gitlab.localhost  # règle d'ingress (sans port)
+    ssh: gitlab.localhost  # hôte pour le clone SSH
+  shell:
+    port: 2224  # port SSH externe
   ingress:
     configureCertmanager: false  # cert-manager non configuré
     tls:

@@ -225,3 +225,18 @@ NPM
     [ ! -e "$BATS_TEST_TMPDIR/helm.log" ]
     [ ! -e "$BATS_TEST_TMPDIR/kind.log" ]
 }
+
+@test "gitlab : valeurs helm — host avec port 8929, ingress sans port, SSH" {
+    local helm_bin
+    helm_bin="$(PATH=/usr/local/bin:/usr/bin:/bin command -v helm 2>/dev/null || true)"
+    [ -n "$helm_bin" ] || skip "helm absent"
+    local chart="$BATS_TEST_DIRNAME/../../.essai/gitlab"
+    [ -d "$chart" ] || skip "chart absent"
+    local values="$BATS_TEST_DIRNAME/../../.devcontainer/gitlab/values.yaml"
+    run "$helm_bin" template gitlab "$chart" -f "$values" --namespace gitlab
+    [ "$status" -eq 0 ]
+    printf '%s\n' "$output" | grep -q "host: gitlab.localhost:8929"
+    printf '%s\n' "$output" | grep -q -- "- host: gitlab.localhost"
+    printf '%s\n' "$output" | grep -q 'ssh_host: "gitlab.localhost"'
+    printf '%s\n' "$output" | grep -q "ssh_port: 2224"
+}
