@@ -376,11 +376,15 @@ case "$args" in
             if [ "$prev" = "--context" ]; then contexte="$a"; fi
             prev="$a"
         done
-        # metrics-server présent sur tous les contextes ; marqué devzone
-        # seulement sur ceux de KUBE_MARKED_FILE
-        if [[ "$args" == *"-l devzone=installe"* ]]; then
-            grep -qxF "$contexte" "$KUBE_MARKED_FILE" && exit 0
+        # Comme le vrai kubectl : un nom avec un sélecteur est refusé (#255)
+        if [[ "$args" == *" -l "* ]]; then
+            echo "error: name cannot be provided when a selector is specified" >&2
             exit 1
+        fi
+        # metrics-server présent sur tous les contextes ; marqué devzone
+        # seulement sur ceux de KUBE_MARKED_FILE (label lu par jsonpath)
+        if [[ "$args" == *"jsonpath"* ]] && grep -qxF "$contexte" "$KUBE_MARKED_FILE"; then
+            printf 'installe'
         fi
         exit 0
         ;;
