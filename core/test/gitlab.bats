@@ -46,7 +46,10 @@ KUBE
 #!/usr/bin/env bash
 echo "helm $*" >>"$BATS_TEST_TMPDIR/helm.log"
 HELM
-    # docker : mapping SSH du cluster kind (nodePort 32022) ; FAUX_DOCKER_PORT l'active
+    # docker : deux usages — (1) mapping SSH du cluster kind (nodePort 32022)
+    # si FAUX_DOCKER_PORT : « 0.0.0.0:2224 -> 32022/tcp », code 0, sinon
+    # code 1 ; (2) daemon présent, tout le reste immédiat (kube-config,
+    # démarrage) : journalisé, code 0.
     cat >"$BATS_TEST_TMPDIR/bin/docker" <<'DOCKER'
 #!/usr/bin/env bash
 echo "docker $*" >>"$BATS_TEST_TMPDIR/docker.log"
@@ -91,12 +94,6 @@ GIT
 #!/usr/bin/env bash
 if [ "${1:-}" = ls ]; then printf '{"dependencies":{}}\n'; fi
 NPM
-    # docker : daemon présent mais immédiat (kube-config, démarrage)
-    cat >"$BATS_TEST_TMPDIR/bin/docker" <<'DOCKER'
-#!/usr/bin/env bash
-echo "docker $*" >>"$BATS_TEST_TMPDIR/docker.log"
-exit 0
-DOCKER
     # gh : jamais connecté (git-identite, état devzone) : aucun appel réseau
     cat >"$BATS_TEST_TMPDIR/bin/gh" <<'GH'
 #!/usr/bin/env bash
