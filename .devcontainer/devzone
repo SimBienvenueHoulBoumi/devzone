@@ -312,6 +312,8 @@ appliquer_gitlab() {
         etat_courant="$(bash "$ICI/gitlab/gitlab.sh" etat)"
         if [[ "$etat_courant" == *"prêt"* && "$etat_courant" == *"runner en ligne"* ]]; then
             echo "devzone : gitlab déjà actif, rien à faire."
+            # /etc/hosts régénéré par Docker : gitlab.localhost re-pose ici aussi
+            bash "$ICI/gitlab/gitlab.sh" hote-poser
         else
             echo "devzone : gitlab activation via installer…"
             if ! bash "$ICI/gitlab/gitlab.sh" installer; then
