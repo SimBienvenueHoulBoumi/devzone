@@ -104,8 +104,11 @@ for modele in $modeles; do
     fi
 done
 # Modèle gratuit : répond si le réseau le permet ; sinon test sauté (pas un échec)
-sortie_opencode="$(dz "opencode run --model opencode/big-pickle 'Réponds OK' < /dev/null")" || true
-if grep -q 'OK' <<<"$sortie_opencode"; then
+sortie_opencode="$(dz "timeout 120 opencode run --model opencode/big-pickle 'Réponds OK' < /dev/null")" || true
+# Code 124 = timeout du timeout inside dz ; détecté par sortie vide
+if [ -z "$sortie_opencode" ]; then
+    echo "  ↷ ia : opencode timeout (délai dépassé)"
+elif grep -q 'OK' <<<"$sortie_opencode"; then
     ok "ia : opencode répond avec le modèle par défaut"
 else
     echo "  ↷ ia : opencode sans réponse (réseau ou fournisseur indisponible) : $(printf '%s' "$sortie_opencode" | tail -1)"
