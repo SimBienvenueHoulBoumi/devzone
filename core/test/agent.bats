@@ -37,8 +37,8 @@ NPM
     export FAKE_OP_TEXTE_MODELS=""
     export FAKE_OP_ANCIEN_ERREUR_MODELS=""
     export FAKE_OP_DUREE=30
-    export DEVZONE_AGENT_SILENCE=1
-    export DEVZONE_AGENT_FIGEE=2
+    export DEVZONE_AGENT_SILENCE=3
+    export DEVZONE_AGENT_FIGEE=5
     : >"$FAKE_OP_LOG"
     : >"$FAKE_OP_CONSIGNE_LOG"
     cat >"$BATS_TEST_TMPDIR/bin/opencode" <<'OPCODEFAKE'
