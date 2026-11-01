@@ -18,6 +18,26 @@ Les connexions (**GitHub**, **git**, **Claude Code**, **opencode**) et les cache
 
 
 
+## Plateforme : GitHub ou GitLab
+
+devzone est pensé pour GitHub ; `devzone plateforme` choisit celle à laquelle la CLI se connecte (`github` par défaut, comportement actuel, rien ne change) :
+
+```bash
+devzone plateforme                  # affiche la plateforme et son état
+devzone plateforme github           # retour à GitHub : glab et sa configuration retirés
+devzone plateforme gitlab --url https://gitlab.example.com:3443
+devzone plateforme gitlab           # sans --url : l'instance du module gitlab (http://gitlab.localhost:8929)
+```
+
+- **Choix par instance** : gardé aux rebuilds dans le fichier d'état (`$RACINE/.devzone.modules`, lignes `plateforme=` et `gitlab_url=`), comme les [modules](#modules).
+- **glab** (CLI GitLab), installé **seulement** quand GitLab est choisi : binaire de la release officielle de gitlab.org (chart de gitlab-org/cli), version figée et somme SHA-256 vérifiées, dans `~/.local/bin` ; au retour à `github`, le binaire et sa configuration (`~/.config/glab-cli/`) sont retirés — la configuration d'un service n'existe que pendant qu'il est choisi.
+- **Connexion** : instance du module `gitlab` → automatique, avec le jeton root du module (`workspace/.gitlab/`, protocole http, jamais affiché) ; autre instance (gitlab.com ou auto-hébergée) → `glab auth login --hostname <hôte>`, interactif (code de connexion à saisir).
+- **État** : la ligne `plateforme` affiche l'instance et « glab connecté », ou « non connecté » avec la commande à lancer. Avec `gitlab`, les lignes propres à GitHub signalent qu'elles ne s'appliquent pas : repowarden (bots, tickets, workflows du dépôt devzone) reste uniquement sur GitHub en attendant son support GitLab ([simdevWarden/repowarden#531](https://github.com/simdevWarden/repowarden/issues/531)). `gh` connecté reste utile pour ces tickets.
+- **Instance de test** : le [module gitlab](#gitlab) fournit l'instance locale du conteneur (utilisateur `root`, secrets dans `workspace/.gitlab/`) ; dès qu'il est actif, `devzone plateforme gitlab` (sans `--url`) la cible d'office.
+- **Mise à jour de glab** : dans `.devcontainer/devzone`, `GLAB_VERSION` et les deux sommes `GLAB_SOMME_ARM64` / `GLAB_SOMME_AMD64` (checksums.txt de la release), puis `devzone plateforme gitlab --url URL` (glab est re-téléchargé seulement s'il est absent ou cassé : le retirer d'abord, `rm ~/.local/bin/glab`).
+
+
+
 ## Mettre en route un projet
 
 Tes projets vont dans `workspace/` (`/workspaces/devzone/workspace` dans le conteneur), chacun avec son propre dépôt git. Les hooks repowarden y sont actifs d'office.
@@ -114,6 +134,7 @@ devzone agent etat                            # sessions, modèles écartés
 Plusieurs devzone peuvent cohabiter sur une même machine (un par projet, un par usage) : chaque instance est un dossier du workspace, avec son propre état et ses propres modules.
 
 - **Modules** : **propres à chaque devzone**. L'état vit dans le dossier de l'instance (`$RACINE/.devzone.modules`), monté de l'hôte : un second devzone démarre avec des valeurs par défaut, sans hériter de ceux du premier (un ancien état global, au premier devzone démarré après la mise à jour, est repris une fois, par déplacement).
+- **Plateforme** (GitHub ou GitLab, [voir plus haut](#plateforme-github-ou-gitlab)) : propre à chaque devzone aussi, dans le même fichier d'état, avec l'URL de son instance GitLab.
 - **Connexions** (**GitHub**, **git**, **Claude Code**, **opencode**) et **caches** (**Maven**, **pnpm**) : **partagés volontairement** entre les devzone d'une machine, dans les volumes `devzone-*`.
 - **Isolation complète** : `DEVZONE_VOLUMES=<préfixe>` (comme pour les tests) donne à chaque devzone ses propres volumes.
 
@@ -195,6 +216,7 @@ Tout le reste du conteneur (paquets installés à la main, fichiers hors de ces 
 | uv, ruff, vulture, pytest | `.devcontainer/Dockerfile` : `ARG …_VERSION` | `make rebuild` |
 | repowarden | `.devcontainer/post-create.sh` : `repowarden@x.y.z` | `devzone appliquer` (ou `make rebuild`) |
 | Claude Code, opencode | `.devcontainer/devzone` : une ligne par paquet, `IA_CLAUDE=@anthropic-ai/claude-code@x.y.z` et `IA_OPENCODE=opencode-ai@x.y.z` | `devzone activer ia` (ou `make rebuild`) |
+| glab (plateforme gitlab) | `.devcontainer/devzone` : `GLAB_VERSION` et les sommes `GLAB_SOMME_ARM64` / `GLAB_SOMME_AMD64` | `rm ~/.local/bin/glab` puis `devzone plateforme gitlab --url URL` |
 | metrics-server | `.devcontainer/metrics-server.sh` : `VERSION` | `bash .devcontainer/metrics-server.sh` sur un nouveau cluster |
 | Java, Node, Python, Docker, kubectl, helm, gh | `.devcontainer/devcontainer.json` (features), versions figées dans `devcontainer-lock.json` | `npx @devcontainers/cli upgrade --workspace-folder .` puis `make rebuild` |
 

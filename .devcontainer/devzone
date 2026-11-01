@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # Modules facultatifs de devzone, activés à la demande, sans rebuild :
 #   devzone                          état des modules
+#   devzone plateforme               GitHub (défaut) ou GitLab
+#   devzone plateforme github        retour à GitHub : glab et config retirés
+#   devzone plateforme gitlab        GitLab, [--url URL] (défaut : module gitlab)
 #   devzone activer <module>         active et applique tout de suite
 #   devzone desactiver <module>      désactive et applique tout de suite
 #   devzone appliquer                installe ce qui est actif (post-create.sh)
@@ -8,7 +11,8 @@
 #   devzone test-bash32             lance les tests bats sous bash 3.2 (conteneur Docker)
 #   devzone agent <dossier> <fichier-consigne>  dirige opencode sur une consigne
 # État propre à chaque instance : $RACINE/.devzone.modules (dossier monté
-# de l'hôte, survit aux rebuilds), une ligne « module=on|off » ; l'ancien état
+# de l'hôte, survit aux rebuilds), une ligne « module=on|off » ; la plateforme
+# choisie y est gardée aussi (plateforme=, gitlab_url=) ; l'ancien état
 # global (~/.config/devzone/modules) est repris une fois
 set -euo pipefail
 
@@ -41,6 +45,18 @@ IA_CLAUDE=@anthropic-ai/claude-code@2.1.316
 IA_OPENCODE=opencode-ai@1.19.5
 IA_PAQUETS=("$IA_CLAUDE" "$IA_OPENCODE")
 IA_NOMS=("${IA_CLAUDE%@*}" "${IA_OPENCODE%@*}")
+
+# glab (CLI GitLab), installé seulement quand la plateforme gitlab est
+# choisie : binaire de la release officielle (gitlab.com/gitlab-org/cli)
+# dans ~/.local/bin, somme SHA-256 de son archive vérifiée ; retiré au
+# retour à github. Tous ses appels passent par ce chemin (jamais le PATH :
+# ~/.local/bin n'y est pas forcément) ; l'état et la connexion aussi.
+GLAB="$HOME/.local/bin/glab"
+GLAB_VERSION=v1.126.0
+GLAB_SOMME_ARM64=de5e92c9c8b306eeebb19daa854d48101b78328850e7b9cd677ecd6f98cd4391
+GLAB_SOMME_AMD64=f386519ba83e9482979992ee7f60eeebee4d95b950f95f4fe7289e0a1b1ea74c
+# Instance du module gitlab : son URL d'office et le jeton root de son seed
+GITLAB_URL_MODULE=http://gitlab.localhost:8929
 
 description() {
     case "$1" in
@@ -92,6 +108,16 @@ ecrire() {
     tmp="$(mktemp)"
     grep -vE "^$1=" "$ETAT" >"$tmp" || true
     echo "$1=$2" >>"$tmp"
+    mv "$tmp" "$ETAT"
+}
+
+# Retire une clé du fichier d'état : la configuration d'un service n'existe
+# que pendant qu'il est choisi (#242)
+retirer_cle() {
+    initialiser
+    local tmp
+    tmp="$(mktemp)"
+    grep -vE "^$1=" "$ETAT" 2>/dev/null >"$tmp" || true
     mv "$tmp" "$ETAT"
 }
 
@@ -305,6 +331,181 @@ appliquer_gitlab() {
     fi
 }
 
+# ---- Plateforme : GitHub (défaut) ou GitLab (#240) ----
+# Choix gardé dans le fichier d'état (plateforme=, gitlab_url=), propre à
+# chaque instance ; la configuration d'un service n'existe que pendant qu'il
+# est choisi (#242) : glab et l'URL disparaissent au retour à github.
+
+# Plateforme courante : github en l'absence de ligne (défaut)
+plateforme_lue() {
+    local v
+    v="$(grep -E '^plateforme=' "$ETAT" 2>/dev/null | tail -1 | cut -d= -f2 || true)"
+    [ "$v" = gitlab ] && echo gitlab || echo github
+}
+
+# URL de l'instance GitLab, rien si absente
+url_gitlab_lue() {
+    grep -E '^gitlab_url=' "$ETAT" 2>/dev/null | tail -1 | cut -d= -f2- || true
+}
+
+# Hôte d'une URL, sans son protocole (glab --hostname)
+hote_de() {
+    echo "$1" | sed -E 's#^[a-z]+://##; s#/$##'
+}
+
+# Retire glab et sa configuration (retour à github)
+retirer_glab() {
+    rm -f "$GLAB"
+    rm -rf "$HOME/.config/glab-cli"
+}
+
+# Ligne de l'état pour la plateforme : github par défaut, ou l'instance GitLab
+# avec son instance connectée (glab) sur la commande de connexion sinon
+ligne_plateforme() {
+    local url hote
+    if [ "$(plateforme_lue)" = gitlab ]; then
+        url="$(url_gitlab_lue)"
+        hote="$(hote_de "$url")"
+        if [ -x "$GLAB" ] && "$GLAB" auth status --hostname "$hote" >/dev/null 2>&1; then
+            printf '  ✔ plateforme     gitlab : %s, glab connecté\n' "$url"
+        else
+            printf '  ⚠ plateforme     gitlab : %s, glab non connecté : glab auth login --hostname %s\n' "$url" "$hote"
+        fi
+    else
+        echo "  ✔ plateforme     github"
+    fi
+}
+
+# Affichage simple de la plateforme (devzone plateforme)
+resume_plateforme() {
+    local url hote
+    if [ "$(plateforme_lue)" = gitlab ]; then
+        url="$(url_gitlab_lue)"
+        hote="$(hote_de "$url")"
+        if [ -x "$GLAB" ] && "$GLAB" auth status --hostname "$hote" >/dev/null 2>&1; then
+            echo "devzone : plateforme gitlab : $url, glab connecté"
+        else
+            echo "devzone : plateforme gitlab : $url, glab non connecté : glab auth login --hostname $hote"
+        fi
+    else
+        echo "devzone : plateforme github (défaut)"
+    fi
+}
+
+# Installe glab (release officielle, somme SHA-256 vérifiée), rien s'il est
+# déjà là ; le binaire finit dans ~/.local/bin (retirer_glab l'enlève)
+installer_glab() {
+    local arch="" somme archive dossier glab_tmp
+    if [ -x "$GLAB" ] && "$GLAB" --version >/dev/null 2>&1; then
+        return 0
+    fi
+    case "$(uname -m)" in
+        arm64 | aarch64) arch=arm64 somme="$GLAB_SOMME_ARM64" ;;
+        *) arch=amd64 somme="$GLAB_SOMME_AMD64" ;;
+    esac
+    echo "devzone : téléchargement de glab $GLAB_VERSION (somme SHA-256 vérifiée)…"
+    archive="$(mktemp)"
+    if ! curl -fsSL -o "$archive" "https://gitlab.com/gitlab-org/cli/-/releases/$GLAB_VERSION/downloads/glab_${GLAB_VERSION#v}_linux_${arch}.tar.gz"; then
+        rm -f "$archive"
+        echo "devzone : téléchargement de glab impossible (release officielle de gitlab.com) ; réessayer : devzone plateforme gitlab --url URL" >&2
+        return 1
+    fi
+    if [ "$(sha256sum "$archive" | cut -d' ' -f1)" != "$somme" ]; then
+        rm -f "$archive"
+        echo "devzone : somme SHA-256 de glab inattendue, abandon ; archive refusée" >&2
+        return 1
+    fi
+    dossier="$(mktemp -d)"
+    glab_tmp="$dossier/bin/glab"
+    if ! tar -xzf "$archive" -C "$dossier" || [ ! -f "$glab_tmp" ]; then
+        glab_tmp="$dossier/glab"
+    fi
+    if [ ! -f "$glab_tmp" ]; then
+        rm -rf "$dossier" "$archive"
+        echo "devzone : binaire glab absent de l'archive, abandon" >&2
+        return 1
+    fi
+    mkdir -p "$HOME/.local/bin"
+    mv "$glab_tmp" "$GLAB"
+    chmod +x "$GLAB"
+    rm -rf "$dossier" "$archive"
+}
+
+# Connexion à l'instance GitLab : instance du module gitlab → jeton root du
+# module (protocole http, jamais affiché) ; autre instance → interactive, un
+# navigateur demandant le code de connexion. Vérifie : code de sortie de
+# l'auth login, puis auth status --hostname ; sans contrôle, pas « connecté ».
+connexion_glab() {
+    local hote="$1" url="$2" jeton
+    if [ "$url" = "$GITLAB_URL_MODULE" ]; then
+        if [ ! -f "$RACINE/workspace/.gitlab/root-token" ]; then
+            echo "devzone : jeton root du module gitlab introuvable ($RACINE/workspace/.gitlab/root-token) : devzone activer gitlab, ou à la main : glab auth login --hostname $hote" >&2
+            return 1
+        fi
+        jeton="$(cat "$RACINE/workspace/.gitlab/root-token")"
+        if ! "$GLAB" auth login --hostname "$hote" --api-protocol http --git-protocol http --token "$jeton"; then
+            echo "devzone : connexion à l'instance gitlab impossible : devzone activer gitlab, ou à la main : glab auth login --hostname $hote" >&2
+            return 1
+        fi
+    elif ! "$GLAB" auth login --hostname "$hote"; then
+        echo "devzone : connexion à l'instance gitlab impossible : glab auth login --hostname $hote" >&2
+        return 1
+    fi
+    if ! "$GLAB" auth status --hostname "$hote" >/dev/null 2>&1; then
+        echo "devzone : verification de la connexion impossible : glab auth status --hostname $hote" >&2
+        return 1
+    fi
+}
+
+# Change la plateforme : github (par défaut, comportement actuel) ou gitlab
+changer_plateforme() {
+    local cible="${1:-}" url="" attendre="" arg hote
+    case "$cible" in
+        github)
+            retirer_glab
+            retirer_cle plateforme
+            retirer_cle gitlab_url
+            echo "devzone : plateforme github (défaut) : contrôles gh ; glab et sa configuration retirés s'ils étaient installés"
+            ;;
+        gitlab)
+            for arg in "${@:2}"; do
+                if [ -n "$attendre" ]; then url="$arg"; attendre=""; continue; fi
+                case "$arg" in
+                    --url) attendre=1 ;;
+                    *) echo "devzone : argument inconnu : $arg (devzone plateforme gitlab --url URL)" >&2; return 1 ;;
+                esac
+            done
+            if [ -n "$attendre" ]; then
+                echo "devzone : --url attend une URL" >&2
+                return 1
+            fi
+            if [ -z "$url" ]; then
+                if [ "$(valeur gitlab)" = on ]; then
+                    url="$GITLAB_URL_MODULE"
+                else
+                    echo "devzone : URL manquante : devzone plateforme gitlab --url URL (ou un module gitlab actif pour l'instance locale)" >&2
+                    return 1
+                fi
+            fi
+            hote="$(hote_de "$url")"
+            if ! installer_glab; then
+                return 1
+            fi
+            if ! connexion_glab "$hote" "$url"; then
+                echo "devzone : connexion à refaire : glab auth login --hostname $hote" >&2
+                return 1
+            fi
+            ecrire plateforme gitlab
+            ecrire gitlab_url "$url"
+            echo "devzone : plateforme gitlab : $url, glab connecté"
+            ;;
+        *)
+            echo "devzone : plateforme inconnue : ${cible:-(aucune)} ; choix : github (défaut) ou gitlab [--url URL]" >&2
+            return 1
+            ;;
+    esac
+}
+
 # Lignes « paquet figée installée » des outils en retard ; échoue si le script
 # versions.sh est absent ou ne peut pas répondre (l'état omet alors la ligne)
 outils_retard() {
@@ -359,12 +560,22 @@ etat() {
         echo "  ✖ identité git    nécessaire pour commiter : gh auth login -s workflow (automatique),"
         echo "                    ou git config --file ~/.config/git/config user.name \"<nom>\" et user.email \"<email>\""
     fi
-    if ! statut="$(gh auth status 2>&1)"; then
-        echo "  ○ GitHub          facultatif (push et PR, tickets repowarden) : gh auth login -s workflow"
-    elif grep -q "Token scopes:" <<<"$statut" && ! grep -q "'workflow'" <<<"$statut"; then
-        echo "  ⚠ GitHub          connecté, sans permission workflow (push de .github/workflows/ refusé) : gh auth refresh -h github.com -s workflow"
+    if [ "$(plateforme_lue)" = gitlab ]; then
+        # Plateforme gitlab : l'instance et glab, puis les lignes propres à
+        # GitHub (contrôles gh) signalées comme non applicables ici, en
+        # attendant le support GitLab de repowarden (#531)
+        ligne_plateforme
+        echo "  ○ GitHub          inutile ici (plateforme gitlab choisie)"
+        echo "  ⚠ repowarden      reste sur GitHub (bots et tickets) : support GitLab à venir (simdevWarden/repowarden#531)"
     else
-        echo "  ✔ GitHub          connecté"
+        ligne_plateforme
+        if ! statut="$(gh auth status 2>&1)"; then
+            echo "  ○ GitHub          facultatif (push et PR, tickets repowarden) : gh auth login -s workflow"
+        elif grep -q "Token scopes:" <<<"$statut" && ! grep -q "'workflow'" <<<"$statut"; then
+            echo "  ⚠ GitHub          connecté, sans permission workflow (push de .github/workflows/ refusé) : gh auth refresh -h github.com -s workflow"
+        else
+            echo "  ✔ GitHub          connecté"
+        fi
     fi
     if retards="$(outils_retard)"; then
         if [ -z "$retards" ]; then
@@ -422,8 +633,15 @@ case "${1:-}" in
     agent)
         bash "$ICI/agent.sh" "${@:2}"
         ;;
-    -h | --help | aide) sed -n '2,9p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' ;;
+    -h | --help | aide) sed -n '2,12p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' ;;
     test-bash32) bash "$RACINE/core/test/bash32.sh" ;;
+    plateforme)
+        if [ -n "${2:-}" ]; then
+            changer_plateforme "${@:2}"
+        else
+            resume_plateforme
+        fi
+        ;;
     *)
         echo "devzone : commande inconnue : $1 (devzone --help)" >&2
         exit 1
