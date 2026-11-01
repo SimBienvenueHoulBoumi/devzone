@@ -282,9 +282,9 @@ appliquer_kubernetes() {
 appliquer_gitlab() {
     local etat_courant
     if [ "$1" = on ]; then
-        # Activer gitlab seulement si l'état ne dit pas « prêt »
+        # Saut si l'état est prêt et le runner en ligne ; sinon installer reprend
         etat_courant="$(bash "$ICI/gitlab/gitlab.sh" etat)"
-        if [[ "$etat_courant" == *"prêt"* ]]; then
+        if [[ "$etat_courant" == *"prêt"* && "$etat_courant" == *"runner en ligne"* ]]; then
             echo "devzone : gitlab déjà actif, rien à faire."
         else
             echo "devzone : gitlab activation via installer…"

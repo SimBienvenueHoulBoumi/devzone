@@ -175,3 +175,21 @@ GIT
     FAUX_GITLAB_KO=1 run bash "$GITLAB" etat
     [ "$output" = "en échec : devzone appliquer" ]
 }
+
+@test "devzone : activer gitlab saute l'installation si prêt et runner en ligne" {
+    echo "gitlab" >"$KIND_CLUSTERS"
+    mkdir -p "$SECRETS" && echo jeton >"$SECRETS/root-token"
+    FAUX_RUNNERS='[{"id":1}]' run bash "$DEVZONE" activer gitlab
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"déjà actif, rien à faire"* ]] || false
+    ! grep -q "upgrade --install" "$BATS_TEST_TMPDIR/helm.log" || false
+}
+
+@test "devzone : activer gitlab : prêt sans runner en ligne → installer (seed, runner)" {
+    echo "gitlab" >"$KIND_CLUSTERS"
+    mkdir -p "$SECRETS" && echo jeton >"$SECRETS/root-token"
+    run bash "$DEVZONE" activer gitlab
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"déjà actif, rien à faire"* ]] || false
+    grep -q -- "--kube-context kind-gitlab upgrade --install gitlab gitlab/gitlab --version 9.11.16" "$BATS_TEST_TMPDIR/helm.log"
+}

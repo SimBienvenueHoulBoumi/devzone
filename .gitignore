@@ -5,4 +5,4 @@ workspace/*
 .DS_Store
 .devzone.log
 .devzone.etat
-.devzone.modules
+.devzone.modules*
