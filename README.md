@@ -98,7 +98,7 @@ Pour en savoir plus : [Mettre en route un projet](https://github.com/SimBienvenu
 |---|---|
 | Langages | Java 21 + Maven, Node LTS + pnpm, Python 3.12 + uv |
 | Conteneurs, Kubernetes | Docker (Docker-in-Docker), kubectl, helm, k9s, kind ; connexion au cluster de l'hôte (module `kubernetes`) |
-| GitHub (ou GitLab), qualité | gh, ou glab connecté à une instance GitLab (`devzone plateforme`, [docs/reference.md](docs/reference.md#plateforme-github-ou-gitlab)) ; repowarden (hooks git globaux), shellcheck, bats, actionlint, gitleaks, ruff, vulture, pytest |
+| GitHub (ou GitLab), qualité | gh, ou glab connecté à une instance GitLab (`devzone plateforme gitlab` dans le conteneur, [docs/reference.md](docs/reference.md#plateforme-github-ou-gitlab)) ; repowarden (hooks git globaux), shellcheck, bats, actionlint, gitleaks, ruff, vulture, pytest |
 | Assistants IA | Claude Code, opencode (module `ia`, désactivé par défaut) |
 
 ## Au quotidien
