@@ -41,6 +41,21 @@ KUBE
 #!/usr/bin/env bash
 echo "helm $*" >>"$BATS_TEST_TMPDIR/helm.log"
 HELM
+    # docker : mapping SSH du cluster kind (nodePort 32022) ; FAUX_DOCKER_PORT l'active
+    cat >"$BATS_TEST_TMPDIR/bin/docker" <<'DOCKER'
+#!/usr/bin/env bash
+echo "docker $*" >>"$BATS_TEST_TMPDIR/docker.log"
+case "$*" in
+    *"port gitlab-control-plane 32022"*)
+        if [ -n "${FAUX_DOCKER_PORT:-}" ]; then
+            echo "0.0.0.0:2224 -> 32022/tcp"
+            exit 0
+        fi
+        exit 1
+        ;;
+esac
+exit 0
+DOCKER
     # curl : API GitLab simulée ; FAUX_GROUPE_KO=1 fait échouer le groupe
     cat >"$BATS_TEST_TMPDIR/bin/curl" <<'CURL'
 #!/usr/bin/env bash
@@ -72,6 +87,7 @@ GIT
 if [ "${1:-}" = ls ]; then printf '{"dependencies":{}}\n'; fi
 NPM
     chmod +x "$BATS_TEST_TMPDIR"/bin/*
+    HELM_BIN="$(command -v helm)"
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
 }
 
@@ -104,6 +120,43 @@ NPM
     run bash "$GITLAB" installer
     [ "$status" -eq 0 ]
     ! grep -q "kind create" "$BATS_TEST_TMPDIR/kind.log" || false
+}
+
+@test "gitlab : values.yaml configure le clone SSH (port 2224, nodePort gitlab-shell 32022)" {
+    grep -q "port: 2224" "$BATS_TEST_DIRNAME/../../.devcontainer/gitlab/values.yaml" || false
+    grep -q "gitlab-shell: 32022" "$BATS_TEST_DIRNAME/../../.devcontainer/gitlab/values.yaml" || false
+}
+
+@test "gitlab : kind.yaml mappe le nodePort gitlab-shell 32022 sur le hostPort 2224" {
+    grep -q "containerPort: 32022" "$BATS_TEST_DIRNAME/../../.devcontainer/gitlab/kind.yaml" || false
+    ! grep -q "containerPort: 22" "$BATS_TEST_DIRNAME/../../.devcontainer/gitlab/kind.yaml" || false
+}
+
+@test "gitlab : helm template : ssh_port 2224 et nodePort gitlab-shell 32022" {
+    if [ -z "${DEVZONE_GITLAB_CHART:-}" ] || ! command -v helm >/dev/null 2>&1; then
+        skip "helm indisponible (DEVZONE_GITLAB_CHART ou helm)"
+    fi
+    local helm_bin="${HELM_BIN:-$(command -v helm)}"
+    [ -x "$helm_bin" ] || skip "helm indisponible (DEVZONE_GITLAB_CHART ou helm)"
+    local sortie
+    sortie="$("$helm_bin" template gitlab "${DEVZONE_GITLAB_CHART:-/tmp/gl/gitlab}" --version 9.11.16 -f "$BATS_TEST_DIRNAME/../../.devcontainer/gitlab/values.yaml" 2>&1)"
+    [[ "$sortie" == *"ssh_port: 2224"* ]] || false
+    [[ "$sortie" == *"nodePort: 32022"* ]] || false
+    [[ "$sortie" != *"nodePort: 2224"* ]] || false
+}
+
+@test "gitlab : cluster existant sans mapping SSH → avertissement, installation continue" {
+    echo "gitlab" >"$KIND_CLUSTERS"
+    run bash "$GITLAB" installer
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"clone SSH (port 2224) indisponible"* ]] || false
+}
+
+@test "gitlab : cluster existant avec mapping SSH → pas d'avertissement" {
+    echo "gitlab" >"$KIND_CLUSTERS"
+    FAUX_DOCKER_PORT=1 run bash "$GITLAB" installer
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"clone SSH (port 2224) indisponible"* ]] || false
 }
 
 @test "gitlab : charts figés, contexte kind-gitlab explicite" {
@@ -231,7 +284,7 @@ NPM
     grep -Eq 'name: gitlab\.localhost([[:space:]]|$)' "$values"
     grep -q 'GITLAB_PORT: "8929"' "$values"
     ! grep -q "hostnameOverride" "$values" || false
-    ! grep -q "port: 2224" "$values" || false
+    ! grep -Eq 'gitlab-shell:[[:space:]]*2224' "$values" || false
 }
 
 @test "gitlab : valeurs helm — host sans port, port externe par GITLAB_PORT" {
