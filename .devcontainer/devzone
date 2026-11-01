@@ -9,6 +9,7 @@
 #   devzone appliquer                installe ce qui est actif (post-create.sh)
 #   devzone actif <module>           code 0 si actif (scripts de démarrage)
 #   devzone test-bash32             lance les tests bats sous bash 3.2 (conteneur Docker)
+#   devzone test-gitlab             essai de bout en bout du module et de la plateforme GitLab
 #   devzone agent <dossier> <fichier-consigne>  dirige opencode sur une consigne
 # État propre à chaque instance : $RACINE/.devzone.modules (dossier monté
 # de l'hôte, survit aux rebuilds), une ligne « module=on|off » ; la plateforme
@@ -635,8 +636,9 @@ case "${1:-}" in
     agent)
         bash "$ICI/agent.sh" "${@:2}"
         ;;
-    -h | --help | aide) sed -n '2,12p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' ;;
+    -h | --help | aide) sed -n '2,13p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' ;;
     test-bash32) bash "$RACINE/core/test/bash32.sh" ;;
+    test-gitlab) bash "$ICI/gitlab/test-gitlab.sh" "${@:2}" ;;
     plateforme)
         if [ -n "${2:-}" ]; then
             changer_plateforme "${@:2}"
