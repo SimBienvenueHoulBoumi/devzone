@@ -2,6 +2,9 @@
 # Éditions et configuration globale
 global:
   edition: ce               # édition communautaire (Free)
+  extraEnv:
+    # GitLab refuse un host avec port ; il lit son port externe ici (URL web, clone HTTP, API)
+    GITLAB_PORT: "8929"
   hosts:
     domain: localhost       # domaine de base
     https: false            # HTTPS désactivé pour le test
