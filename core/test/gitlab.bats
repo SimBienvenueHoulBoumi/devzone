@@ -1,20 +1,25 @@
 #!/usr/bin/env bats
-# Module gitlab (#239) : installer, désinstaller, état, seed. Faux kind,
-# kubectl, helm, curl et git dans le PATH : aucun cluster n'est créé. Chaque
-# faux binaire journalise ses arguments dans $BATS_TEST_TMPDIR/<outil>.log.
+# Module gitlab (#239, #273) : installer, désinstaller, état, seed, hôte
+# gitlab.localhost dans /etc/hosts (DEVZONE_HOSTS) et démarrage. Faux kind,
+# kubectl, helm, curl, git, docker et gh dans le PATH : aucun cluster n'est
+# créé. Chaque faux binaire journalise ses arguments dans
+# $BATS_TEST_TMPDIR/<outil>.log.
 
 setup() {
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
     GITLAB="$BATS_TEST_DIRNAME/../../.devcontainer/gitlab/gitlab.sh"
+    DEMARRAGE="$BATS_TEST_DIRNAME/../../.devcontainer/demarrage.sh"
     export HOME="$BATS_TEST_TMPDIR/home"
     export DEVZONE_RACINE="$BATS_TEST_TMPDIR/racine"
     export DEVZONE_ETAT="$BATS_TEST_TMPDIR/modules"
     export DEVZONE_MEMINFO="$BATS_TEST_TMPDIR/meminfo"
+    export DEVZONE_HOSTS="$BATS_TEST_TMPDIR/hosts"
     export KIND_CLUSTERS="$BATS_TEST_TMPDIR/clusters"
     SECRETS="$DEVZONE_RACINE/workspace/.gitlab"
     mkdir -p "$HOME" "$DEVZONE_RACINE/workspace" "$BATS_TEST_TMPDIR/bin"
     printf 'MemAvailable: 16000000 kB\n' >"$DEVZONE_MEMINFO"
     : >"$KIND_CLUSTERS"
+    printf '127.0.0.1 localhost\n' >"$DEVZONE_HOSTS"
 
     # kind : clusters tenus dans $KIND_CLUSTERS
     cat >"$BATS_TEST_TMPDIR/bin/kind" <<'KIND'
@@ -41,7 +46,10 @@ KUBE
 #!/usr/bin/env bash
 echo "helm $*" >>"$BATS_TEST_TMPDIR/helm.log"
 HELM
-    # docker : mapping SSH du cluster kind (nodePort 32022) ; FAUX_DOCKER_PORT l'active
+    # docker : deux usages — (1) mapping SSH du cluster kind (nodePort 32022)
+    # si FAUX_DOCKER_PORT : « 0.0.0.0:2224 -> 32022/tcp », code 0, sinon
+    # code 1 ; (2) daemon présent, tout le reste immédiat (kube-config,
+    # démarrage) : journalisé, code 0.
     cat >"$BATS_TEST_TMPDIR/bin/docker" <<'DOCKER'
 #!/usr/bin/env bash
 echo "docker $*" >>"$BATS_TEST_TMPDIR/docker.log"
@@ -86,6 +94,12 @@ GIT
 #!/usr/bin/env bash
 if [ "${1:-}" = ls ]; then printf '{"dependencies":{}}\n'; fi
 NPM
+    # gh : jamais connecté (git-identite, état devzone) : aucun appel réseau
+    cat >"$BATS_TEST_TMPDIR/bin/gh" <<'GH'
+#!/usr/bin/env bash
+echo "gh $*" >>"$BATS_TEST_TMPDIR/gh.log"
+exit 1
+GH
     chmod +x "$BATS_TEST_TMPDIR"/bin/*
     HELM_BIN="$(command -v helm)"
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
@@ -277,6 +291,83 @@ NPM
     [ "$status" -eq 0 ]
     [ ! -e "$BATS_TEST_TMPDIR/helm.log" ]
     [ ! -e "$BATS_TEST_TMPDIR/kind.log" ]
+}
+
+@test "gitlab : hote-poser pose gitlab.localhost une seule fois, localhost gardé" {
+    run bash "$GITLAB" hote-poser
+    [ "$status" -eq 0 ]
+    run bash "$GITLAB" hote-poser
+    [ "$status" -eq 0 ]
+    [ "$(grep -c 'devzone:gitlab' "$DEVZONE_HOSTS")" -eq 1 ]
+    grep -q '^127\.0\.0\.1 localhost$' "$DEVZONE_HOSTS"
+    grep -q $'^127.0.0.1\tgitlab.localhost # devzone:gitlab$' "$DEVZONE_HOSTS"
+}
+
+@test "gitlab : hote-retirer retire la ligne, garde localhost ; sans ligne → rien, code 0" {
+    run bash "$GITLAB" hote-poser
+    [ "$status" -eq 0 ]
+    run bash "$GITLAB" hote-retirer
+    [ "$status" -eq 0 ]
+    ! grep -q 'devzone:gitlab' "$DEVZONE_HOSTS" || false
+    grep -q '^127\.0\.0\.1 localhost$' "$DEVZONE_HOSTS"
+    # Sans ligne à retirer : fichier inchangé, code 0
+    local avant
+    avant="$(cat "$DEVZONE_HOSTS")"
+    run bash "$GITLAB" hote-retirer
+    [ "$status" -eq 0 ]
+    [ "$(cat "$DEVZONE_HOSTS")" = "$avant" ]
+}
+
+@test "gitlab : hote-poser sans droits ni sudo utilisable → avertissement, code 0" {
+    chmod 444 "$DEVZONE_HOSTS"
+    cat >"$BATS_TEST_TMPDIR/bin/sudo" <<'SUDO'
+#!/usr/bin/env bash
+echo "sudo $*" >>"$BATS_TEST_TMPDIR/sudo.log"
+exit 1
+SUDO
+    chmod +x "$BATS_TEST_TMPDIR/bin/sudo"
+    run bash "$GITLAB" hote-poser
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"nom gitlab.localhost non posé"* ]] || false
+    ! grep -q 'devzone:gitlab' "$DEVZONE_HOSTS" || false
+    # Relance : même échec, même code 0 (ne casse jamais l'installation)
+    run bash "$GITLAB" hote-poser
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"nom gitlab.localhost non posé"* ]] || false
+}
+
+@test "gitlab : installer pose la ligne, desinstaller la retire" {
+    run bash "$GITLAB" installer
+    [ "$status" -eq 0 ]
+    grep -q 'devzone:gitlab' "$DEVZONE_HOSTS"
+    run bash "$GITLAB" desinstaller
+    [ "$status" -eq 0 ]
+    ! grep -q 'devzone:gitlab' "$DEVZONE_HOSTS" || false
+    grep -q '^127\.0\.0\.1 localhost$' "$DEVZONE_HOSTS"
+}
+
+@test "devzone appliquer : gitlab actif, prêt → ligne gitlab.localhost posée" {
+    printf 'gitlab=on\n' >"$DEVZONE_ETAT"
+    echo "gitlab" >"$KIND_CLUSTERS"
+    mkdir -p "$SECRETS" && echo jeton >"$SECRETS/root-token"
+    FAUX_RUNNERS='[{"id":1}]' run bash "$DEVZONE" appliquer
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"déjà actif, rien à faire"* ]] || false
+    grep -q 'devzone:gitlab' "$DEVZONE_HOSTS"
+}
+
+@test "demarrage : gitlab actif → ligne posée, inactif → rien" {
+    # Module inactif : rien n'est posé
+    printf 'gitlab=off\n' >"$DEVZONE_ETAT"
+    run bash "$DEMARRAGE"
+    [ "$status" -eq 0 ]
+    ! grep -q 'devzone:gitlab' "$DEVZONE_HOSTS" || false
+    # Module actif : le nom est posé au démarrage
+    printf 'gitlab=on\n' >"$DEVZONE_ETAT"
+    run bash "$DEMARRAGE"
+    [ "$status" -eq 0 ]
+    grep -q 'devzone:gitlab' "$DEVZONE_HOSTS"
+    grep -q $'^127.0.0.1\tgitlab.localhost # devzone:gitlab$' "$DEVZONE_HOSTS"
 }
 
 @test "gitlab : valeurs — host sans port, port externe par GITLAB_PORT" {
