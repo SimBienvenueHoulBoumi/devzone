@@ -47,6 +47,10 @@ nginx-ingress:
 
 # Réplicas à 1 et ressources réduites
 gitlab:
+  # Metriques pour Prometheus : exporter desactive (inutile pour un test de
+  # GitLab, pouvait provoquer un echec de helm --wait)
+  gitlab-exporter:
+    enabled: false
   webservice:
     resources:
       requests:
