@@ -284,7 +284,7 @@ NPM
     grep -Eq 'name: gitlab\.localhost([[:space:]]|$)' "$values"
     grep -q 'GITLAB_PORT: "8929"' "$values"
     ! grep -q "hostnameOverride" "$values" || false
-    ! grep -q "port: 2224" "$values" || false
+    ! grep -Eq 'gitlab-shell:[[:space:]]*2224' "$values" || false
 }
 
 @test "gitlab : valeurs helm — host sans port, port externe par GITLAB_PORT" {
