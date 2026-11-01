@@ -49,7 +49,9 @@ IA_NOMS=("${IA_CLAUDE%@*}" "${IA_OPENCODE%@*}")
 # glab (CLI GitLab), installé seulement quand la plateforme gitlab est
 # choisie : binaire de la release officielle (gitlab.com/gitlab-org/cli)
 # dans ~/.local/bin, somme SHA-256 de son archive vérifiée ; retiré au
-# retour à github.
+# retour à github. Tous ses appels passent par ce chemin (jamais le PATH :
+# ~/.local/bin n'y est pas forcément) ; l'état et la connexion aussi.
+GLAB="$HOME/.local/bin/glab"
 GLAB_VERSION=v1.126.0
 GLAB_SOMME_ARM64=de5e92c9c8b306eeebb19daa854d48101b78328850e7b9cd677ecd6f98cd4391
 GLAB_SOMME_AMD64=f386519ba83e9482979992ee7f60eeebee4d95b950f95f4fe7289e0a1b1ea74c
@@ -353,7 +355,7 @@ hote_de() {
 
 # Retire glab et sa configuration (retour à github)
 retirer_glab() {
-    rm -f "$HOME/.local/bin/glab"
+    rm -f "$GLAB"
     rm -rf "$HOME/.config/glab-cli"
 }
 
@@ -364,7 +366,7 @@ ligne_plateforme() {
     if [ "$(plateforme_lue)" = gitlab ]; then
         url="$(url_gitlab_lue)"
         hote="$(hote_de "$url")"
-        if command -v glab >/dev/null 2>&1 && glab auth status --hostname "$hote" >/dev/null 2>&1; then
+        if [ -x "$GLAB" ] && "$GLAB" auth status --hostname "$hote" >/dev/null 2>&1; then
             printf '  ✔ plateforme     gitlab : %s, glab connecté\n' "$url"
         else
             printf '  ⚠ plateforme     gitlab : %s, glab non connecté : glab auth login --hostname %s\n' "$url" "$hote"
@@ -380,7 +382,7 @@ resume_plateforme() {
     if [ "$(plateforme_lue)" = gitlab ]; then
         url="$(url_gitlab_lue)"
         hote="$(hote_de "$url")"
-        if command -v glab >/dev/null 2>&1 && glab auth status --hostname "$hote" >/dev/null 2>&1; then
+        if [ -x "$GLAB" ] && "$GLAB" auth status --hostname "$hote" >/dev/null 2>&1; then
             echo "devzone : plateforme gitlab : $url, glab connecté"
         else
             echo "devzone : plateforme gitlab : $url, glab non connecté : glab auth login --hostname $hote"
@@ -394,7 +396,7 @@ resume_plateforme() {
 # déjà là ; le binaire finit dans ~/.local/bin (retirer_glab l'enlève)
 installer_glab() {
     local arch="" somme archive dossier glab_tmp
-    if [ -x "$HOME/.local/bin/glab" ] && "$HOME/.local/bin/glab" --version >/dev/null 2>&1; then
+    if [ -x "$GLAB" ] && "$GLAB" --version >/dev/null 2>&1; then
         return 0
     fi
     case "$(uname -m)" in
@@ -424,14 +426,15 @@ installer_glab() {
         return 1
     fi
     mkdir -p "$HOME/.local/bin"
-    mv "$glab_tmp" "$HOME/.local/bin/glab"
-    chmod +x "$HOME/.local/bin/glab"
+    mv "$glab_tmp" "$GLAB"
+    chmod +x "$GLAB"
     rm -rf "$dossier" "$archive"
 }
 
 # Connexion à l'instance GitLab : instance du module gitlab → jeton root du
 # module (protocole http, jamais affiché) ; autre instance → interactive, un
-# navigateur demandant le code de connexion
+# navigateur demandant le code de connexion. Vérifie : code de sortie de
+# l'auth login, puis auth status --hostname ; sans contrôle, pas « connecté ».
 connexion_glab() {
     local hote="$1" url="$2" jeton
     if [ "$url" = "$GITLAB_URL_MODULE" ]; then
@@ -440,10 +443,18 @@ connexion_glab() {
             return 1
         fi
         jeton="$(cat "$RACINE/workspace/.gitlab/root-token")"
-        glab auth login --hostname "$hote" --git-protocol http --token "$jeton"
-        return 0
+        if ! "$GLAB" auth login --hostname "$hote" --api-protocol http --git-protocol http --token "$jeton"; then
+            echo "devzone : connexion à l'instance gitlab impossible : devzone activer gitlab, ou à la main : glab auth login --hostname $hote" >&2
+            return 1
+        fi
+    elif ! "$GLAB" auth login --hostname "$hote"; then
+        echo "devzone : connexion à l'instance gitlab impossible : glab auth login --hostname $hote" >&2
+        return 1
     fi
-    glab auth login --hostname "$hote"
+    if ! "$GLAB" auth status --hostname "$hote" >/dev/null 2>&1; then
+        echo "devzone : verification de la connexion impossible : glab auth status --hostname $hote" >&2
+        return 1
+    fi
 }
 
 # Change la plateforme : github (par défaut, comportement actuel) ou gitlab
