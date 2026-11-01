@@ -17,6 +17,11 @@ GITLAB_ATTENTE="${GITLAB_ATTENTE:-1200}"
 # Secrets stockés dans $RACINE/workspace/.gitlab/ (chmod 600), jamais affichés.
 GITLAB_SECRETS_DIR="$RACINE/workspace/.gitlab"
 
+# ---- /etc/hosts du conteneur ----
+# DEVZONE_HOSTS pour les tests (jamais le /etc/hosts réel)
+HOSTS="${DEVZONE_HOSTS:-/etc/hosts}"
+GITLAB_HOTE_MARQUE="# devzone:gitlab"
+
 # ---- Helper : vérifier la RAM libre (refus < 8 Go) ----
 gitlab_verifier_ram() {
     local ram_kb
@@ -174,6 +179,48 @@ gitlab_seed() {
     echo "✔ Seed GitLab terminé."
 }
 
+# ---- hote-poser / hote-retirer : gitlab.localhost dans /etc/hosts ----
+# Pourquoi : ssh (clone ssh://git@gitlab.localhost:2224/…), glab et getent
+# passent par le résolveur système, qui ne connaît pas gitlab.localhost ;
+# seul curl résout les noms en .localhost lui-même. /etc/hosts est un
+# montage Docker que Docker régénère au démarrage du conteneur, d'où le
+# re-pose à chaque démarrage (demarrage.sh) et à chaque activation.
+# Jamais de sed -i ni de mv : le montage ne peut pas être renommé
+# (l'écriture en place seulement) ; directe si le fichier est inscriptible,
+# sinon sudo -n. Un échec n'échoue jamais : avertissement sur stderr et
+# code 0, pour ne pas faire échouer l'installation pour un nom d'hôte.
+gitlab_hote_poser() {
+    # Déjà posée : rien (idempotent)
+    if grep -q "$GITLAB_HOTE_MARQUE" "$HOSTS" 2>/dev/null; then
+        return 0
+    fi
+    if [ -w "$HOSTS" ]; then
+        printf '127.0.0.1\tgitlab.localhost %s\n' "$GITLAB_HOTE_MARQUE" >>"$HOSTS" 2>/dev/null ||
+            echo "devzone : gitlab : nom gitlab.localhost non posé dans $HOSTS (droits d'écriture insuffisants)" >&2
+    elif ! printf '127.0.0.1\tgitlab.localhost %s\n' "$GITLAB_HOTE_MARQUE" | sudo -n tee -a "$HOSTS" >/dev/null 2>&1; then
+        echo "devzone : gitlab : nom gitlab.localhost non posé dans $HOSTS (sudo -n indisponible ou refusé)" >&2
+    fi
+    return 0
+}
+
+gitlab_hote_retirer() {
+    # Aucune ligne repérée : rien (y compris fichier illisible)
+    if ! grep -q "$GITLAB_HOTE_MARQUE" "$HOSTS" 2>/dev/null; then
+        return 0
+    fi
+    local tmp
+    tmp="$(mktemp)"
+    grep -v "$GITLAB_HOTE_MARQUE" "$HOSTS" >"$tmp" 2>/dev/null || true
+    if [ -w "$HOSTS" ]; then
+        cp "$tmp" "$HOSTS" 2>/dev/null ||
+            echo "devzone : gitlab : ligne gitlab.localhost non retirée de $HOSTS (droits d'écriture insuffisants)" >&2
+    elif ! sudo -n cp "$tmp" "$HOSTS" >/dev/null 2>&1; then
+        echo "devzone : gitlab : ligne gitlab.localhost non retirée de $HOSTS (sudo -n indisponible ou refusé)" >&2
+    fi
+    rm -f "$tmp"
+    return 0
+}
+
 # ---- installer : installer GitLab dans kind ----
 gitlab_installer() {
     # RAM libre (refus < 8 Go) : seulement avant de créer le cluster ; une
@@ -214,6 +261,10 @@ gitlab_installer() {
         -f "$ICI/values.yaml" \
         --timeout "${GITLAB_ATTENTE}s" \
         --wait
+
+    # Nom gitlab.localhost dans /etc/hosts avant l'attente : ssh, glab et
+    # getent en ont besoin dès que le service monte (curl, lui, résout seul)
+    gitlab_hote_poser
 
     # Attendre que GitLab soit prêt
     gitlab_attendre_pret
@@ -269,6 +320,9 @@ gitlab_desinstaller() {
     # Supprimer $RACINE/workspace/.gitlab/
     rm -rf "$GITLAB_SECRETS_DIR"
 
+    # Nom gitlab.localhost retiré : la configuration suit le service
+    gitlab_hote_retirer
+
     echo "✔ GitLab désinstallé."
 }
 
@@ -302,11 +356,13 @@ gitlab_etat() {
 
 # Gestion des sous-commandes
 case "${1:-}" in
-    installer)   gitlab_installer ;;
+    installer)    gitlab_installer ;;
     desinstaller) gitlab_desinstaller ;;
-    etat)        gitlab_etat ;;
-    seed)        gitlab_seed ;;
-    *)           echo "devzone : commande inconnue : ${1:-} (devzone gitlab --help)" >&2
-                 exit 1
-                 ;;
+    etat)         gitlab_etat ;;
+    seed)         gitlab_seed ;;
+    hote-poser)   gitlab_hote_poser ;;
+    hote-retirer) gitlab_hote_retirer ;;
+    *)            echo "devzone : commande inconnue : ${1:-} (devzone gitlab --help)" >&2
+                  exit 1
+                  ;;
 esac
