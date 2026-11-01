@@ -66,6 +66,11 @@ CURL
 echo "git $*" >>"$BATS_TEST_TMPDIR/git.log"
 case "$*" in *" push "*) touch "$BATS_TEST_TMPDIR/pousse" ;; esac
 GIT
+    # npm : rien d'installé globalement (devzone appliquer vérifie repowarden)
+    cat >"$BATS_TEST_TMPDIR/bin/npm" <<'NPM'
+#!/usr/bin/env bash
+if [ "${1:-}" = ls ]; then printf '{"dependencies":{}}\n'; fi
+NPM
     chmod +x "$BATS_TEST_TMPDIR"/bin/*
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
 }
@@ -174,4 +179,49 @@ GIT
     [ "$output" = "prêt : http://gitlab.localhost:8929, runner en ligne" ]
     FAUX_GITLAB_KO=1 run bash "$GITLAB" etat
     [ "$output" = "en échec : devzone appliquer" ]
+}
+
+@test "devzone : activer gitlab saute l'installation si prêt et runner en ligne" {
+    echo "gitlab" >"$KIND_CLUSTERS"
+    mkdir -p "$SECRETS" && echo jeton >"$SECRETS/root-token"
+    FAUX_RUNNERS='[{"id":1}]' run bash "$DEVZONE" activer gitlab
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"déjà actif, rien à faire"* ]] || false
+    ! grep -q "upgrade --install" "$BATS_TEST_TMPDIR/helm.log" || false
+}
+
+@test "devzone : activer gitlab : prêt sans runner en ligne → installer (seed, runner)" {
+    echo "gitlab" >"$KIND_CLUSTERS"
+    mkdir -p "$SECRETS" && echo jeton >"$SECRETS/root-token"
+    run bash "$DEVZONE" activer gitlab
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"déjà actif, rien à faire"* ]] || false
+    grep -q -- "--kube-context kind-gitlab upgrade --install gitlab gitlab/gitlab --version 9.11.16" "$BATS_TEST_TMPDIR/helm.log"
+}
+
+@test "devzone appliquer : gitlab actif, prêt sans runner en ligne → installer" {
+    printf 'gitlab=on\n' >"$DEVZONE_ETAT"
+    echo "gitlab" >"$KIND_CLUSTERS"
+    mkdir -p "$SECRETS" && echo jeton >"$SECRETS/root-token"
+    run bash "$DEVZONE" appliquer
+    [ "$status" -eq 0 ]
+    grep -q -- "--kube-context kind-gitlab upgrade --install gitlab gitlab/gitlab --version 9.11.16" "$BATS_TEST_TMPDIR/helm.log"
+}
+
+@test "devzone appliquer : gitlab actif, prêt runner en ligne → pas d'installer" {
+    printf 'gitlab=on\n' >"$DEVZONE_ETAT"
+    echo "gitlab" >"$KIND_CLUSTERS"
+    mkdir -p "$SECRETS" && echo jeton >"$SECRETS/root-token"
+    FAUX_RUNNERS='[{"id":1}]' run bash "$DEVZONE" appliquer
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"déjà actif, rien à faire"* ]] || false
+    [ ! -e "$BATS_TEST_TMPDIR/helm.log" ]
+}
+
+@test "devzone appliquer : gitlab désactivé → rien" {
+    printf 'gitlab=off\n' >"$DEVZONE_ETAT"
+    run bash "$DEVZONE" appliquer
+    [ "$status" -eq 0 ]
+    [ ! -e "$BATS_TEST_TMPDIR/helm.log" ]
+    [ ! -e "$BATS_TEST_TMPDIR/kind.log" ]
 }
