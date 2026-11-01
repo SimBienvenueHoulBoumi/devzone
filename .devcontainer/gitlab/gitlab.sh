@@ -195,9 +195,22 @@ gitlab_installer() {
 
     # S'assurer que le cluster kind gitlab existe
     echo "▶ Vérification/création du cluster kind gitlab…"
+    local cree=false
     if ! kind get clusters 2>/dev/null | grep -qx 'gitlab'; then
         echo "▶ Création du cluster kind gitlab…"
         kind create cluster --name gitlab --config "$ICI/kind.yaml" --wait 120s
+        cree=true
+    fi
+
+    # SSH : un cluster gitlab préexistant (créé avant ce réglage) n'a pas le
+    # mapping nodePort 32022 → hostPort 2224 : le clone SSH (port 2224) est
+    # alors impossible. Avertissement seulement, l'installation continue.
+    if [ "$cree" = false ]; then
+        local sortie_ssh
+        sortie_ssh="$(docker port gitlab-control-plane 32022/tcp 2>/dev/null || true)"
+        if [ -z "$sortie_ssh" ]; then
+            echo "devzone : gitlab : clone SSH (port 2224) indisponible sur ce cluster, créé avant ce réglage ; pour l'activer : devzone desactiver gitlab puis devzone activer gitlab (données GitLab recréées)" >&2
+        fi
     fi
 
     # Ajouter le dépôt GitLab Helm (idempotent)
