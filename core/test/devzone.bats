@@ -632,3 +632,15 @@ KUBE
     run bash "$DEVZONE" --help
     [[ "$output" == *"test-bash32"* ]] || false
 }
+
+@test ".gitignore : état et échec invisibles par git status" {
+    dossier="$BATS_TEST_TMPDIR/git"
+    mkdir -p "$dossier" && cd "$dossier" || return 1
+    git init -q
+    cp "$BATS_TEST_DIRNAME/../../.gitignore" ./.gitignore
+    printf "ia=on\nkubernetes=on\n" >.devzone.modules
+    printf "gitlab\n" >.devzone.modules-echec-gitlab
+    run git status --porcelain
+    [ "$status" -eq 0 ]
+    [ -z "$(grep "\.devzone\.modules" <<<"$output")" ]
+}
