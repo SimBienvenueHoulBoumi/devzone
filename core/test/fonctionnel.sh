@@ -95,7 +95,7 @@ reussit "ia : garde-fou repowarden branché (Claude Code, opencode)" "grep -q 'r
 reussit "ia : configuration opencode par défaut en place" "grep -q '^// devzone : configuration opencode par défaut' ~/.config/opencode/opencode.jsonc && grep -q '\"model\": \"opencode/big-pickle\"' ~/.config/opencode/opencode.jsonc"
 # Chaque modèle de la configuration doit être proposé par la version installée
 modeles="$(dz "grep -oE '\"opencode/[^\"]+\"' ~/.config/opencode/opencode.jsonc | tr -d '\"' | sort -u")"
-modeles_dispo="$(dz "opencode models opencode")"
+modeles_dispo="$(dz "timeout 60 opencode models opencode")"
 for modele in $modeles; do
     if grep -qxF "$modele" <<<"$modeles_dispo"; then
         ok "ia : modèle disponible : $modele"
@@ -104,8 +104,12 @@ for modele in $modeles; do
     fi
 done
 # Modèle gratuit : répond si le réseau le permet ; sinon test sauté (pas un échec)
-sortie_opencode="$(dz "opencode run --model opencode/big-pickle 'Réponds OK' < /dev/null")" || true
-if grep -q 'OK' <<<"$sortie_opencode"; then
+code_opencode=0
+sortie_opencode="$(dz "timeout 120 opencode run --model opencode/big-pickle 'Réponds OK' < /dev/null")" || code_opencode=$?
+# Code 124 = délai dépassé : lu sur le vrai code de sortie de dz, pas déduit d'une sortie vide
+if [ "$code_opencode" = 124 ]; then
+    echo "  ↷ ia : opencode sans réponse en 120 s (délai dépassé)"
+elif grep -q 'OK' <<<"$sortie_opencode"; then
     ok "ia : opencode répond avec le modèle par défaut"
 else
     echo "  ↷ ia : opencode sans réponse (réseau ou fournisseur indisponible) : $(printf '%s' "$sortie_opencode" | tail -1)"
