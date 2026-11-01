@@ -411,6 +411,7 @@ case "${1:-}" in
     appliquer)
         appliquer_repowarden
         [ "$(valeur ia)" = off ] || appliquer_ia on
+        [ "$(valeur gitlab)" = off ] || appliquer_gitlab on
         ;;
     actif)
         connu "${2:-}" || { echo "devzone : module inconnu : ${2:-(aucun)}" >&2; exit 2; }
