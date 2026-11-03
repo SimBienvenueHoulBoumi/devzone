@@ -148,7 +148,14 @@ cluster_preparer() {
             # Sur le Docker de l'hôte, l'API écoute sur 127.0.0.1 du poste :
             # kube_joignable_depuis_conteneur la rend joignable du conteneur
             # (host.docker.internal), sans l'exposer sur le réseau local.
-            kind create cluster --name "devzone${INSTANCE_SUFFIX}" --wait 120s
+            # Docker de l'hôte chargé (son Kubernetes, d'autres clusters) : l'API du
+            # nœud peut redémarrer pendant l'initialisation et kind abandonne à
+            # quelques secondes près. Une seconde tentative, sur un cluster neuf.
+            if ! kind create cluster --name "devzone${INSTANCE_SUFFIX}" --wait 120s; then
+                echo "▶ Nouvelle tentative de création du cluster kind…"
+                kind delete cluster --name "devzone${INSTANCE_SUFFIX}" >/dev/null 2>&1 || true
+                kind create cluster --name "devzone${INSTANCE_SUFFIX}" --wait 120s || return 1
+            fi
             kube_joignable_depuis_conteneur "$HOME/.kube/config"
         fi
     elif ! cluster_joignable "$ctx"; then

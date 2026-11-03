@@ -231,3 +231,26 @@ DOCKER
     ! grep -qE "docker (rm|rmi|volume rm|network rm)" "$BATS_TEST_TMPDIR/docker.log" || false
 }
 
+
+@test "cluster_preparer : kind create échoue une fois -> supprimé puis recréé" {
+    setup_kubectl_view
+    cat >"$BATS_TEST_TMPDIR/bin/kind" <<'KIND'
+#!/usr/bin/env bash
+echo "kind $*" >>"$BATS_TEST_TMPDIR/kind.log"
+case "$*" in
+    "get clusters") exit 0 ;;
+    create*)
+        # premier essai en échec, le suivant réussit
+        if [ -f "$BATS_TEST_TMPDIR/deja" ]; then exit 0; fi
+        : >"$BATS_TEST_TMPDIR/deja"; exit 1 ;;
+esac
+exit 0
+KIND
+    chmod +x "$BATS_TEST_TMPDIR/bin/kind"
+    : >"$BATS_TEST_TMPDIR/kind.log"
+    source "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
+    run cluster_preparer kind-devzone
+    [ "$status" -eq 0 ]
+    [ "$(grep -c '^kind create cluster' "$BATS_TEST_TMPDIR/kind.log")" -eq 2 ]
+    grep -q "^kind delete cluster --name devzone" "$BATS_TEST_TMPDIR/kind.log"
+}

@@ -137,7 +137,16 @@ if ! dz "docker info" >/dev/null 2>&1; then
     dz "uname -r; iptables --version; if command -v update-alternatives >/dev/null 2>&1; then update-alternatives --display iptables; fi; cat /proc/self/cgroup; if [ -f /tmp/dockerd.log ]; then tail -n 80 /tmp/dockerd.log; else echo 'dockerd.log introuvable'; fi" 2>&1 | sed "s/^/      /"
 fi
 reussit "Docker répond dans le conteneur" "docker info"
-reussit "kind create cluster (sur le Docker de l'hôte)" "kind create cluster --name $KIND_TEST"
+# Une seconde tentative si l'API du nœud redémarre pendant l'initialisation
+# (Docker de l'hôte chargé), comme cluster_preparer ; --retain garde le nœud
+# pour le diagnostic en cas de second échec
+reussit "kind create cluster (sur le Docker de l'hôte)" "kind create cluster --name $KIND_TEST --wait 120s || { kind delete cluster --name $KIND_TEST; kind create cluster --name $KIND_TEST --wait 120s --retain; }"
+# Échec : journaux du nœud (gardé par --retain, supprimé par nettoyer) pour le diagnostic
+if ! dz "kind get clusters" | grep -qx "$KIND_TEST" || ! dz "kubectl --context kind-$KIND_TEST get nodes" >/dev/null 2>&1; then
+    noeud="$KIND_TEST-control-plane"
+    echo "↳ diagnostic du nœud $noeud"
+    docker exec "$noeud" sh -c 'crictl ps -a 2>&1 | head -20; echo "--- kubelet"; journalctl -u kubelet --no-pager 2>&1 | tail -25; echo "--- apiserver"; for c in $(crictl ps -a --name kube-apiserver -q 2>/dev/null | head -1); do crictl logs "$c" 2>&1 | tail -25; done; echo "--- etcd"; for c in $(crictl ps -a --name etcd -q 2>/dev/null | head -1); do crictl logs "$c" 2>&1 | tail -15; done; echo "--- limites"; cat /proc/sys/fs/inotify/max_user_instances /proc/sys/fs/inotify/max_user_watches; free -m' 2>&1 | sed 's/^/      /'
+fi
 # Enveloppe kind (#291) : l'adresse de l'API est rendue joignable du conteneur
 reussit "cluster créé à la main joignable (host.docker.internal)" "kubectl config view -o jsonpath='{.clusters[?(@.name==\"kind-$KIND_TEST\")].cluster.server}'" "host.docker.internal"
 reussit "activer kubernetes : metrics-server sur kind" "devzone activer kubernetes" "metrics-server : installé .*kind-$KIND_TEST"
