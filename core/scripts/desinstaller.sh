@@ -5,7 +5,8 @@
 #                                         Claude Code, opencode, modules)
 # Supprime : conteneur, image, volume du Docker interne (images et clusters
 # kind), volumes devzone-*, metrics-server installé par devzone sur les
-# clusters locaux de l'hôte. Ne touche jamais : workspace/ (tes projets),
+# clusters locaux de l'hôte, namespace des services de devzone (module
+# postgres) sur le cluster de l'hôte choisi. Ne touche jamais : workspace/ (tes projets),
 # l'image de base, un metrics-server que devzone n'a pas installé.
 # Sans terminal : CONFIRMER=oui.
 set -euo pipefail
@@ -83,6 +84,17 @@ if command -v kubectl >/dev/null 2>&1; then
     done
 fi
 
+# Services de devzone (module postgres, #280) sur un cluster de l'hôte : le
+# namespace qu'il a créé (étiquette managed-by=devzone). Sur le kind dédié,
+# ils partent avec le Docker interne. Lu, jamais exécuté.
+services=()
+CLUSTER="$(sed -n 's/^cluster=//p' "$ICI/.devzone.modules" 2>/dev/null | tail -1)"
+if [ -n "$CLUSTER" ] && [[ "$CLUSTER" != kind-* ]] && command -v kubectl >/dev/null 2>&1; then
+    for ns in $(kubectl --context "$CLUSTER" --request-timeout=5s get namespaces -l app.kubernetes.io/managed-by=devzone -o name 2>/dev/null || true); do
+        services+=("${ns#namespace/}")
+    done
+fi
+
 # --- Confirmation ------------------------------------------------------------
 afficher() { if [ "$#" -eq 0 ]; then echo "  (rien)"; else printf '  %s\n' "$@"; fi; }
 echo "À supprimer :"
@@ -91,13 +103,14 @@ echo " image(s) :"; afficher ${images[@]+"${images[@]}"}
 echo " Docker interne (images et clusters kind) :"; afficher ${dind[@]+"${dind[@]}"}
 echo " volumes :"; afficher ${volumes[@]+"${volumes[@]}"}
 echo " metrics-server installé par devzone, sur :"; afficher ${metrics[@]+"${metrics[@]}"}
+echo " services de devzone (bases postgres comprises) sur ${CLUSTER:-aucun cluster} :"; afficher ${services[@]+"${services[@]}"}
 [ "${#gardes[@]}" -eq 0 ] || { echo "Gardés (GARDER=connexions) :"; printf '  %s\n' "${gardes[@]}"; }
 if [ "${#conteneurs[@]}" -eq 0 ] && [ ! -f "$ETAT" ] && [ "${#images[@]}" -eq 0 ]; then
     echo "ℹ Aucun conteneur ni trace de l'image : si un make down d'une version antérieure les a laissés,"
     echo "  les retrouver avec : docker images 'vsc-$(basename "$ICI")-*' ; docker volume ls -q -f name=dind-var-lib-docker"
 fi
 
-total=$((${#conteneurs[@]} + ${#images[@]} + ${#dind[@]} + ${#volumes[@]} + ${#metrics[@]}))
+total=$((${#conteneurs[@]} + ${#images[@]} + ${#dind[@]} + ${#volumes[@]} + ${#metrics[@]} + ${#services[@]}))
 if [ "$total" -eq 0 ]; then
     echo "✔ Rien à supprimer."
 else
@@ -122,6 +135,10 @@ else
                 echo "✔ metrics-server retiré : $ctx"
         done
     fi
+    for ns in ${services[@]+"${services[@]}"}; do
+        kubectl --context "$CLUSTER" delete namespace "$ns" --wait=true >/dev/null &&
+            echo "✔ namespace supprimé : $ns ($CLUSTER)"
+    done
 fi
 rm -f "$ICI/.devzone.log" "$ETAT"
 
