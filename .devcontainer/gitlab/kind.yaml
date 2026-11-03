@@ -5,6 +5,9 @@
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 
+networking:
+  apiServerAddress: "host.docker.internal"
+
 nodes:
   - role: control-plane
     kubeadmConfigPatches:
@@ -17,7 +20,10 @@ nodes:
       - containerPort: 80
         hostPort: 8929
         protocol: TCP
+        address: 127.0.0.1
       # Clone SSH : nodePort kind fixe 32022 → hostPort 2224 (port annoncé par GitLab)
       - containerPort: 32022
         hostPort: 2224
         protocol: TCP
+        address: 127.0.0.1
+```

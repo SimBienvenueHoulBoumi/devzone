@@ -300,7 +300,7 @@ GH
     [ "$status" -eq 0 ]
     [ "$(grep -c 'devzone:gitlab' "$DEVZONE_HOSTS")" -eq 1 ]
     grep -q '^127\.0\.0\.1 localhost$' "$DEVZONE_HOSTS"
-    grep -q $'^127.0.0.1\tgitlab.localhost # devzone:gitlab$' "$DEVZONE_HOSTS"
+    grep -q $'^host\.docker\.internal\tgitlab\.localhost # devzone:gitlab$' "$DEVZONE_HOSTS"
 }
 
 @test "gitlab : hote-retirer retire la ligne, garde localhost ; sans ligne → rien, code 0" {
@@ -367,7 +367,7 @@ SUDO
     run bash "$DEMARRAGE"
     [ "$status" -eq 0 ]
     grep -q 'devzone:gitlab' "$DEVZONE_HOSTS"
-    grep -q $'^127.0.0.1\tgitlab.localhost # devzone:gitlab$' "$DEVZONE_HOSTS"
+    grep -q $'^host\.docker\.internal\tgitlab\.localhost # devzone:gitlab$' "$DEVZONE_HOSTS"
 }
 
 @test "gitlab : valeurs — host sans port, port externe par GITLAB_PORT" {

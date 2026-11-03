@@ -41,6 +41,23 @@ if [ "$module" = on ] && [ -f "$SOURCE" ]; then
         done
 fi
 
+# Réécriture de 127.0.0.1 → host.docker.internal pour les clusters kind,
+# qui ont leur API server à 127.0.0.1:<port> mais injoignables depuis le
+# conteneur. Le même mécanisme que pour les clusters de l'hôte ci-dessus.
+KUBECONFIG="$HOME/.kube/config" kubectl config view -o jsonpath \
+    '{range .clusters[*]}{.name}{"\t"}{.cluster.server}{"\n"}{end}' 2>/dev/null |
+    while IFS=$'\t' read -r nom serveur; do
+        case "$serveur" in
+            https://127.0.0.1:* | https://localhost:*) ;;
+            *) continue ;;
+        esac
+        hote="${serveur#https://}"
+        hote="${hote%%:*}"
+        KUBECONFIG="$HOME/.kube/config" kubectl config set-cluster "$nom" \
+            --server="https://host.docker.internal:${serveur##*:}" \
+            --tls-server-name="$hote" >/dev/null
+    done
+
 # Clusters kind qui ont survécu au redémarrage : contexte remis dans ~/.kube/config
 # (le Docker interne peut mettre quelques secondes à démarrer)
 for _ in 1 2 3 4 5 6 7 8 9 10; do docker info >/dev/null 2>&1 && break; sleep 1; done

@@ -189,15 +189,18 @@ gitlab_seed() {
 # (l'écriture en place seulement) ; directe si le fichier est inscriptible,
 # sinon sudo -n. Un échec n'échoue jamais : avertissement sur stderr et
 # code 0, pour ne pas faire échouer l'installation pour un nom d'hôte.
+# Auparavant gitlab.localhost était résolu à 127.0.0.1 (injoignable depuis
+# le conteneur) ; désormais on utilise host.docker.internal qui résout vers
+# la machine hôte depuis le conteneur (--add-host dans devcontainer.json).
 gitlab_hote_poser() {
     # Déjà posée : rien (idempotent)
     if grep -q "$GITLAB_HOTE_MARQUE" "$HOSTS" 2>/dev/null; then
         return 0
     fi
     if [ -w "$HOSTS" ]; then
-        printf '127.0.0.1\tgitlab.localhost %s\n' "$GITLAB_HOTE_MARQUE" >>"$HOSTS" 2>/dev/null ||
+        printf 'host.docker.internal\tgitlab.localhost %s\n' "$GITLAB_HOTE_MARQUE" >>"$HOSTS" 2>/dev/null ||
             echo "devzone : gitlab : nom gitlab.localhost non posé dans $HOSTS (droits d'écriture insuffisants)" >&2
-    elif ! printf '127.0.0.1\tgitlab.localhost %s\n' "$GITLAB_HOTE_MARQUE" | sudo -n tee -a "$HOSTS" >/dev/null 2>&1; then
+    elif ! printf 'host.docker.internal\tgitlab.localhost %s\n' "$GITLAB_HOTE_MARQUE" | sudo -n tee -a "$HOSTS" >/dev/null 2>&1; then
         echo "devzone : gitlab : nom gitlab.localhost non posé dans $HOSTS (sudo -n indisponible ou refusé)" >&2
     fi
     return 0

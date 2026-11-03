@@ -30,13 +30,32 @@ esac
 . "$(dirname "${BASH_SOURCE[0]}")/docker.sh"
 docker_pret "${DEVZONE_COMMANDE:-make desinstaller}" || exit 1
 
+# Déterminer le nom d'instance pour le filtrage par étiquette
+: "${DEVZONE_INSTANCE:=}"
+if [ -z "$DEVZONE_INSTANCE" ] && [ -n "${DEVZONE_VOLUMES:-}" ]; then
+    DEVZONE_INSTANCE="$(echo "$DEVZONE_VOLUMES" | cut -d'-' -f1)"
+fi
+if [ -z "$DEVZONE_INSTANCE" ]; then
+    DEVZONE_INSTANCE="$(basename "$ICI")"
+fi
+
 # --- Inventaire --------------------------------------------------------------
 echo "▶ Inventaire (dossier $ICI)"
 conteneurs=() images=() dind=()
 # Étiquette posée avec le chemin tel qu'ouvert (VS Code, make) : chemin
 # logique ou physique selon les liens symboliques ; les deux sont cherchés
-ids="$(for chemin in "$ICI" "$(cd "$ICI" && pwd -P)"; do docker ps -aq --filter "label=devcontainer.local_folder=$chemin"; done | sort -u)"
+ids="$(for chemin in "$ICI" "$(cd "$ICI" && pwd -P)"; do docker ps -aq --filter "label=devcontainer.local_folder=$chemin" 2>/dev/null || true; done | sort -u)"
+# Filtrer par étiquette d'instance pour ne garder que les ressources de l'instance courante
+ids_filtres=()
 for id in $ids; do
+    label="$(docker inspect "$id" --format '{{index .Config.Labels "devzone.instance"}}' 2>/dev/null || true)"
+    [ "$label" = "$DEVZONE_INSTANCE" ] && ids_filtres+=("$id")
+done
+# Si aucun label correspond, garder tous les conteneurs (compatibilité)
+if [ ${#ids_filtres[@]} -eq 0 ]; then
+    ids_filtres=($ids)
+fi
+for id in ${ids_filtres[@]+"${ids_filtres[@]}"}; do
     conteneurs+=("$id")
     images+=("$(docker inspect "$id" --format '{{.Config.Image}}')")
     v="$(docker inspect "$id" --format '{{range .Mounts}}{{if eq .Destination "/var/lib/docker"}}{{.Name}}{{end}}{{end}}')"
