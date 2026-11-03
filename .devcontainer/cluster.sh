@@ -22,6 +22,9 @@
 : "${KUBECONFIG:=$HOME/.kube/config:$HOME/.kube/hote.config}"
 export KUBECONFIG
 
+# État des modules : défini par l'appelant ; valeur par défaut pour les tests
+: "${ETAT:=${DEVZONE_ETAT:-$HOME/.devzone.modules}}"
+
 # Nom d'instance : vide ou « devzone » = instance par défaut (pas de suffixe)
 : "${DEVZONE_INSTANCE:=}"
 INSTANCE_SUFFIX=""
@@ -144,8 +147,8 @@ cluster_choisir() {
     else
         # Défaut : cluster de l'hôte s'il répond, sinon kind dédié
         local hote_choix=""
-        if [ -f "$HOME/.kube/hote.config" ]; then
-            hote_choix="$(KUBECONFIG="$HOME/.kube/hote.config" kubectl config current-context 2>/dev/null || true)"
+        if [ -f "${DEVZONE_KUBE_HOTE:-$HOME/.kube/hote.config}" ]; then
+            hote_choix="$(KUBECONFIG="${DEVZONE_KUBE_HOTE:-$HOME/.kube/hote.config}" kubectl config current-context 2>/dev/null || true)"
         fi
         if [ -n "$hote_choix" ] && cluster_joignable "$hote_choix"; then
             echo "$hote_choix"
@@ -160,6 +163,9 @@ cluster_preparer() {
     if [ "$ctx" = "$CLUSTER_DEDIE" ]; then
         if ! kind get clusters 2>/dev/null | grep -qx "devzone${INSTANCE_SUFFIX}"; then
             echo "▶ Création du cluster kind devzone (environ 1 min)…"
+            # Sur le Docker de l'hôte, l'API écoute sur 127.0.0.1 du poste :
+            # kube_joignable_depuis_conteneur la rend joignable du conteneur
+            # (host.docker.internal), sans l'exposer sur le réseau local.
             kind create cluster --name "devzone${INSTANCE_SUFFIX}" --wait 120s
             kube_joignable_depuis_conteneur "$HOME/.kube/config"
         fi

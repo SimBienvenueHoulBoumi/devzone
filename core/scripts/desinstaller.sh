@@ -30,12 +30,9 @@ esac
 . "$(dirname "${BASH_SOURCE[0]}")/docker.sh"
 docker_pret "${DEVZONE_COMMANDE:-make desinstaller}" || exit 1
 
-# Nom d'instance : clusters kind et conteneurs étiquetés en dépendent
-: "${DEVZONE_INSTANCE:=}"
-if [ -z "$DEVZONE_INSTANCE" ] && [ -n "${DEVZONE_VOLUMES:-}" ]; then
-    DEVZONE_INSTANCE="$(echo "$DEVZONE_VOLUMES" | cut -d'-' -f1)"
-fi
-[ -n "$DEVZONE_INSTANCE" ] || DEVZONE_INSTANCE="devzone"
+# Nom d'instance : un nom d'instance peut contenir un tiret (mon-devzone),
+# on ne coupe donc jamais DEVZONE_VOLUMES
+DEVZONE_INSTANCE="${DEVZONE_VOLUMES:-devzone}"
 INSTANCE_SUFFIX=""
 if [ "$DEVZONE_INSTANCE" != "devzone" ]; then
     INSTANCE_SUFFIX="-${DEVZONE_INSTANCE}"
@@ -62,14 +59,13 @@ if [ "${#conteneurs[@]}" -eq 0 ] && [ -f "$ETAT" ]; then
     [ -z "${DIND:-}" ] || ! docker volume inspect "$DIND" >/dev/null 2>&1 || dind+=("$DIND")
 fi
 
-# Clusters kind de l'instance sur le Docker de l'hôte (noms suffixés)
-clusters_hote=""
-for nom in "devzone${INSTANCE_SUFFIX}" "gitlab${INSTANCE_SUFFIX}"; do
-    if kind get clusters 2>/dev/null | grep -qx "$nom"; then
-        clusters_hote="$clusters_hote $nom"
-    fi
-done
-clusters_hote="${clusters_hote# }"
+# Conteneurs des clusters kind de l'instance sur le Docker de l'hôte : un cluster
+# kind n'est rien d'autre que des conteneurs portant cette étiquette
+conteneurs_kind_devzone="$(docker ps -aq --filter "label=io.x-k8s.kind.cluster=devzone${INSTANCE_SUFFIX}" 2>/dev/null | sort -u)"
+conteneurs_kind_gitlab="$(docker ps -aq --filter "label=io.x-k8s.kind.cluster=gitlab${INSTANCE_SUFFIX}" 2>/dev/null | sort -u)"
+conteneurs_kind="${conteneurs_kind_devzone} ${conteneurs_kind_gitlab}"
+conteneurs_kind="${conteneurs_kind# }"
+conteneurs_kind="${conteneurs_kind% }"
 
 # Conteneurs portant l'étiquette devzone.instance=<instance>
 conteneurs_etiquette="$(docker ps -aq --filter "label=devzone.instance=$DEVZONE_INSTANCE" 2>/dev/null | sort -u)"
@@ -111,7 +107,7 @@ fi
 # namespace qu'il a créé (étiquette managed-by=devzone). Sur le kind dédié,
 # ils partent avec le Docker interne. Lu, jamais exécuté.
 services=()
-CLUSTER="$(sed -n 's/^cluster=//p' "$ICI/.devzone.modules" 2>/dev/null | tail -1)"
+CLUSTER="$(sed -n 's/^cluster=//p' "$ICI/.devzone.modules" 2>/dev/null | tail -1 || true)"
 if [ -n "$CLUSTER" ] && [[ "$CLUSTER" != kind-* ]] && command -v kubectl >/dev/null 2>&1; then
     for ns in $(kubectl --context "$CLUSTER" --request-timeout=5s get namespaces -l app.kubernetes.io/managed-by=devzone -o name 2>/dev/null || true); do
         services+=("${ns#namespace/}")
@@ -129,7 +125,7 @@ echo " metrics-server installé par devzone, sur :"; afficher ${metrics[@]+"${me
 echo " services de devzone (bases postgres comprises) sur ${CLUSTER:-aucun cluster} :"; afficher ${services[@]+"${services[@]}"}
 echo " clusters kind de l'instance sur le Docker de l'hôte :"
 # shellcheck disable=SC2086
-afficher ${clusters_hote}
+afficher ${conteneurs_kind}
 echo " conteneurs étiquetés devzone.instance=$DEVZONE_INSTANCE :"
 # shellcheck disable=SC2086
 afficher ${conteneurs_etiquette}
@@ -139,9 +135,9 @@ if [ "${#conteneurs[@]}" -eq 0 ] && [ ! -f "$ETAT" ] && [ "${#images[@]}" -eq 0 
     echo "  les retrouver avec : docker images 'vsc-$(basename "$ICI")-*' ; docker volume ls -q -f name=dind-var-lib-docker"
 fi
 
-nb_ch=0; for _ in ${clusters_hote}; do nb_ch=$((nb_ch + 1)); done
+nb_ck=0; for _ in ${conteneurs_kind}; do nb_ck=$((nb_ck + 1)); done
 nb_ce=0; for _ in ${conteneurs_etiquette}; do nb_ce=$((nb_ce + 1)); done
-total=$((${#conteneurs[@]} + ${#images[@]} + ${#dind[@]} + ${#volumes[@]} + ${#metrics[@]} + ${#services[@]} + nb_ch + nb_ce))
+total=$((${#conteneurs[@]} + ${#images[@]} + ${#dind[@]} + ${#volumes[@]} + ${#metrics[@]} + ${#services[@]} + nb_ck + nb_ce))
 if [ "$total" -eq 0 ]; then
     echo "✔ Rien à supprimer."
 else
@@ -170,9 +166,16 @@ else
         kubectl --context "$CLUSTER" delete namespace "$ns" --wait=true >/dev/null &&
             echo "✔ namespace supprimé : $ns ($CLUSTER)"
     done
-    for nom in ${clusters_hote}; do
-        kind delete cluster --name "$nom" >/dev/null 2>&1 && echo "✔ cluster kind supprimé : $nom"
+    for id in ${conteneurs_kind}; do
+        docker rm -f "$id" >/dev/null 2>&1 && echo "✔ conteneur cluster kind supprimé : $id"
     done
+    # Réseau Docker kind : retiré seulement s'il ne sert plus à aucun conteneur
+    reseau_kind="$(docker network inspect kind 2>/dev/null || true)"
+    if [ -n "$reseau_kind" ] && printf '%s\n' "$reseau_kind" | grep -q '"Containers": {}'; then
+        if docker network rm kind >/dev/null 2>&1; then
+            echo "✔ réseau Docker kind supprimé"
+        fi
+    fi
     for id in ${conteneurs_etiquette}; do
         docker rm -f "$id" >/dev/null 2>&1 && echo "✔ conteneur étiqueté supprimé : $id"
     done
