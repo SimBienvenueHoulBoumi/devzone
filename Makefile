@@ -7,8 +7,8 @@ FILTRE := --filter "label=devcontainer.local_folder=$(CURDIR)"
 .PHONY: help hors-conteneur up shell stop down rebuild status test-fonctionnel test-cli desinstaller
 
 # Ces commandes pilotent le conteneur depuis la machine : lancées dans le
-# conteneur, elles créeraient un devzone dans son Docker interne, sans rien
-# réparer. Dans le conteneur : /.dockerenv, ou dossier /workspaces/devzone
+# conteneur (qui utilise le Docker de l'hôte, #291), elles créeraient un
+# second devzone à côté du premier, sans rien réparer. Dans le conteneur : /.dockerenv, ou dossier /workspaces/devzone
 hors-conteneur:
 	@if [ -f /.dockerenv ] || [ "$(CURDIR)" = /workspaces/devzone ]; then \
 		echo "✖ make $(MAKECMDGOALS) : à lancer sur ta machine (terminal du Mac ou du PC), pas dans le conteneur devzone." >&2; \
@@ -29,7 +29,7 @@ shell: hors-conteneur up ## Ouvre un shell dans le conteneur
 stop: hors-conteneur ## Arrête le conteneur (état conservé)
 	@ids=$$(docker ps -q $(FILTRE)); if [ -z "$$ids" ]; then echo "déjà arrêté"; else docker stop $$ids >/dev/null && echo "devzone arrêté"; fi
 
-down: hors-conteneur ## Supprime le conteneur (volumes, image et Docker interne conservés)
+down: hors-conteneur ## Supprime le conteneur (volumes et image conservés)
 	@ids=$$(docker ps -aq $(FILTRE)); if [ -z "$$ids" ]; then echo "aucun conteneur"; else \
 		docker inspect $$ids --format 'IMAGE={{.Config.Image}}{{range .Mounts}}{{if eq .Destination "/var/lib/docker"}} DIND={{.Name}}{{end}}{{end}}' | head -1 | tr ' ' '\n' > .devzone.etat; \
 		docker rm -f $$ids >/dev/null && echo "devzone supprimé (désinstallation complète : make desinstaller)"; fi

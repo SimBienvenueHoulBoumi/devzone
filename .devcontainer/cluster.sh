@@ -38,28 +38,10 @@ CLUSTER_DEDIE=kind-devzone${INSTANCE_SUFFIX}
 # namespace étiqueté n'a plus d'usage et peut être supprimé
 CLUSTER_ETIQUETTE=app.kubernetes.io/managed-by=devzone
 
-# Réécrit, dans le kubeconfig donné, les serveurs https://127.0.0.1:<p> et
-# https://localhost:<p> en https://host.docker.internal:<p>, en conservant
-# l'hôte d'origine dans tls-server-name (pour le certificat de l'API).
-# Idempotent : une adresse déjà réécrite n'est pas touchée.
-kube_joignable_depuis_conteneur() {
-    local fichier="${1:-}" nom serveur hote
-    [ -n "$fichier" ] || return 0
-    KUBECONFIG="$fichier" kubectl config view \
-        -o jsonpath='{range .clusters[*]}{.name}{"\t"}{.cluster.server}{"\n"}{end}' 2>/dev/null |
-        while IFS=$'\t' read -r nom serveur; do
-            case "$serveur" in
-                https://127.0.0.1:* | https://localhost:*) ;;
-                *) continue ;;
-            esac
-            hote="${serveur#https://}"
-            hote="${hote%%:*}"
-            KUBECONFIG="$fichier" kubectl config set-cluster "$nom" \
-                --server="https://host.docker.internal:${serveur##*:}" \
-                --tls-server-name="$hote" >/dev/null 2>&1 || true
-        done
-    return 0
-}
+# Réécriture 127.0.0.1 → host.docker.internal (#291) : partagée avec
+# l'enveloppe kind, qui l'applique aussi aux clusters créés à la main
+# shellcheck source=SCRIPTDIR/kube-joignable.sh
+. "$(dirname "${BASH_SOURCE[0]}")/kube-joignable.sh"
 
 cluster_lu() {
     grep -E '^cluster=' "$ETAT" 2>/dev/null | tail -1 | cut -d= -f2- || true

@@ -137,6 +137,7 @@ KUBE
 @test "desinstallation : filtre par instance, pas de kind" {
     export DEVZONE_VOLUMES="mon-devzone"
     export CONFIRMER=oui
+    export DEVZONE_DANS_CONTENEUR=non
     cat >"$BATS_TEST_TMPDIR/bin/docker" <<'DOCKER'
 #!/usr/bin/env bash
 echo "docker $*" >>"$BATS_TEST_TMPDIR/docker.log"
@@ -163,3 +164,70 @@ DOCKER
     ! grep -q "docker rm -f AUTRE_ID" "$BATS_TEST_TMPDIR/docker.log" || false
     [ ! -s "$BATS_TEST_TMPDIR/kind.log" ]
 }
+
+# --- Enveloppe kind : clusters créés à la main joignables -------------------
+setup_enveloppe() {
+    setup_kubectl_view
+    cat >"$BATS_TEST_TMPDIR/bin/kind-reel" <<'KIND'
+#!/usr/bin/env bash
+echo "kind-reel $*" >>"$BATS_TEST_TMPDIR/kind-reel.log"
+exit "${FAUX_KIND_CODE:-0}"
+KIND
+    chmod +x "$BATS_TEST_TMPDIR/bin/kind-reel"
+    : >"$BATS_TEST_TMPDIR/kind-reel.log"
+    export DEVZONE_KIND_REEL="$BATS_TEST_TMPDIR/bin/kind-reel"
+    ENVELOPPE="$BATS_TEST_DIRNAME/../../.devcontainer/kind-enveloppe.sh"
+}
+
+@test "enveloppe kind : create cluster -> kubeconfig rendu joignable" {
+    setup_enveloppe
+    export KUBECONFIG="$BATS_TEST_TMPDIR/k1:$BATS_TEST_TMPDIR/k2"
+    run bash "$ENVELOPPE" create cluster --name essai
+    [ "$status" -eq 0 ]
+    grep -q "kind-reel create cluster --name essai" "$BATS_TEST_TMPDIR/kind-reel.log"
+    grep -q -- "--server=https://host.docker.internal:6443" "$BATS_TEST_TMPDIR/kubectl.log"
+}
+
+@test "enveloppe kind : --kubeconfig respecté" {
+    setup_enveloppe
+    run bash "$ENVELOPPE" export kubeconfig --name essai --kubeconfig "$BATS_TEST_TMPDIR/autre"
+    [ "$status" -eq 0 ]
+    grep -q "config set-cluster" "$BATS_TEST_TMPDIR/kubectl.log"
+}
+
+@test "enveloppe kind : autre sous-commande -> rien n'est réécrit" {
+    setup_enveloppe
+    run bash "$ENVELOPPE" get clusters
+    [ "$status" -eq 0 ]
+    ! grep -q "set-cluster" "$BATS_TEST_TMPDIR/kubectl.log" || false
+}
+
+@test "enveloppe kind : échec de kind transmis, rien n'est réécrit" {
+    setup_enveloppe
+    export FAUX_KIND_CODE=3
+    run bash "$ENVELOPPE" create cluster --name essai
+    [ "$status" -eq 3 ]
+    ! grep -q "set-cluster" "$BATS_TEST_TMPDIR/kubectl.log" || false
+}
+
+@test "desinstallation dans le conteneur : aucune action Docker sur le poste" {
+    # docker y parle au Docker de l'hôte : les volumes vus seraient ceux du poste
+    export CONFIRMER=oui
+    export DEVZONE_DANS_CONTENEUR=oui
+    cat >"$BATS_TEST_TMPDIR/bin/docker" <<'DOCKER'
+#!/usr/bin/env bash
+echo "docker $*" >>"$BATS_TEST_TMPDIR/docker.log"
+case "$*" in
+    *"ps -aq"*) echo "UN_CONTENEUR" ;;
+    *"volume ls"*) echo "devzone-gh" ;;
+esac
+exit 0
+DOCKER
+    chmod +x "$BATS_TEST_TMPDIR/bin/docker"
+    : >"$BATS_TEST_TMPDIR/docker.log"
+    run bash "$BATS_TEST_DIRNAME/../../core/scripts/desinstaller.sh"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"make desinstaller sur ta machine"* ]] || false
+    ! grep -qE "docker (rm|rmi|volume rm|network rm)" "$BATS_TEST_TMPDIR/docker.log" || false
+}
+

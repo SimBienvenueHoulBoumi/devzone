@@ -3,8 +3,10 @@
 #   make desinstaller                     tout, après confirmation
 #   make desinstaller GARDER=connexions   tout sauf les connexions (gh, git,
 #                                         Claude Code, opencode, modules)
-# Supprime : conteneur, image, volume du Docker interne (images et clusters
-# kind), volumes devzone-*, metrics-server installé par devzone sur les
+# Supprime : conteneur, image, clusters kind de l'instance et conteneurs
+# étiquetés devzone.instance sur le Docker de l'hôte (#291), volume de
+# l'ancien Docker interne (installations d'avant #291), volumes devzone-*,
+# metrics-server installé par devzone sur les
 # clusters locaux de l'hôte, namespace des services de devzone (module
 # postgres) sur le cluster de l'hôte choisi. Ne touche jamais : workspace/ (tes projets),
 # l'image de base, un metrics-server que devzone n'a pas installé.
@@ -38,9 +40,27 @@ if [ "$DEVZONE_INSTANCE" != "devzone" ]; then
     INSTANCE_SUFFIX="-${DEVZONE_INSTANCE}"
 fi
 
+# Lancé DANS le conteneur, docker parle au Docker de l'hôte (#291) : les
+# volumes, images et conteneurs vus sont ceux du poste, et le nom d'instance
+# de l'hôte (DEVZONE_VOLUMES) n'est pas connu ici. Toucher à Docker depuis le
+# conteneur risquerait de supprimer ceux d'une autre instance (ou de
+# l'instance par défaut) : seule la partie Kubernetes est traitée.
+# DEVZONE_DANS_CONTENEUR=oui|non force le mode (tests, qui tournent eux-mêmes
+# dans un conteneur)
+case "${DEVZONE_DANS_CONTENEUR:-}" in
+    oui) DANS_CONTENEUR=true ;;
+    non) DANS_CONTENEUR=false ;;
+    *) DANS_CONTENEUR=false; [ ! -f /.dockerenv ] || DANS_CONTENEUR=true ;;
+esac
+
 # --- Inventaire --------------------------------------------------------------
 echo "▶ Inventaire (dossier $ICI)"
-conteneurs=() images=() dind=()
+conteneurs=() images=() dind=() volumes=() gardes=()
+conteneurs_kind="" conteneurs_etiquette=""
+if [ "$DANS_CONTENEUR" = true ]; then
+    echo "ℹ Dans le conteneur : seuls metrics-server et les services de devzone sont traités."
+    echo "  Conteneur, image, volumes et clusters kind : make desinstaller sur ta machine."
+else
 # Étiquette posée avec le chemin tel qu'ouvert (VS Code, make) : chemin
 # logique ou physique selon les liens symboliques ; les deux sont cherchés
 ids="$(for chemin in "$ICI" "$(cd "$ICI" && pwd -P)"; do docker ps -aq --filter "label=devcontainer.local_folder=$chemin" 2>/dev/null || true; done | sort -u)"
@@ -71,7 +91,6 @@ conteneurs_kind="${conteneurs_kind% }"
 conteneurs_etiquette="$(docker ps -aq --filter "label=devzone.instance=$DEVZONE_INSTANCE" 2>/dev/null | sort -u)"
 
 # Volumes : noms exacts de devcontainer.json (préfixe DEVZONE_VOLUMES compris)
-volumes=() gardes=()
 config="$(npx -y @devcontainers/cli read-configuration --workspace-folder "$ICI" 2>/dev/null)" || {
     echo "✖ lecture de .devcontainer/devcontainer.json impossible (npx @devcontainers/cli)" >&2
     exit 1
@@ -90,6 +109,7 @@ for nom in $(node -e '
     fi
     if [ "$garde" = true ]; then gardes+=("$nom"); else volumes+=("$nom"); fi
 done
+fi
 
 # metrics-server installé par devzone (étiquette devzone=installe), sur les
 # clusters locaux de l'hôte joignables ; jamais un autre
@@ -105,7 +125,7 @@ fi
 
 # Services de devzone (module postgres, #280) sur un cluster de l'hôte : le
 # namespace qu'il a créé (étiquette managed-by=devzone). Sur le kind dédié,
-# ils partent avec le Docker interne. Lu, jamais exécuté.
+# ils partent avec ce cluster (supprimé plus bas). Lu, jamais exécuté.
 services=()
 CLUSTER="$(sed -n 's/^cluster=//p' "$ICI/.devzone.modules" 2>/dev/null | tail -1 || true)"
 if [ -n "$CLUSTER" ] && [[ "$CLUSTER" != kind-* ]] && command -v kubectl >/dev/null 2>&1; then
@@ -119,7 +139,7 @@ afficher() { if [ "$#" -eq 0 ]; then echo "  (rien)"; else printf '  %s\n' "$@";
 echo "À supprimer :"
 echo " conteneur(s) :"; afficher ${conteneurs[@]+"${conteneurs[@]}"}
 echo " image(s) :"; afficher ${images[@]+"${images[@]}"}
-echo " Docker interne (images et clusters kind) :"; afficher ${dind[@]+"${dind[@]}"}
+echo " ancien Docker interne (installations d'avant #291) :"; afficher ${dind[@]+"${dind[@]}"}
 echo " volumes :"; afficher ${volumes[@]+"${volumes[@]}"}
 echo " metrics-server installé par devzone, sur :"; afficher ${metrics[@]+"${metrics[@]}"}
 echo " services de devzone (bases postgres comprises) sur ${CLUSTER:-aucun cluster} :"; afficher ${services[@]+"${services[@]}"}
@@ -130,7 +150,7 @@ echo " conteneurs étiquetés devzone.instance=$DEVZONE_INSTANCE :"
 # shellcheck disable=SC2086
 afficher ${conteneurs_etiquette}
 [ "${#gardes[@]}" -eq 0 ] || { echo "Gardés (GARDER=connexions) :"; printf '  %s\n' "${gardes[@]}"; }
-if [ "${#conteneurs[@]}" -eq 0 ] && [ ! -f "$ETAT" ] && [ "${#images[@]}" -eq 0 ]; then
+if [ "$DANS_CONTENEUR" = false ] && [ "${#conteneurs[@]}" -eq 0 ] && [ ! -f "$ETAT" ] && [ "${#images[@]}" -eq 0 ]; then
     echo "ℹ Aucun conteneur ni trace de l'image : si un make down d'une version antérieure les a laissés,"
     echo "  les retrouver avec : docker images 'vsc-$(basename "$ICI")-*' ; docker volume ls -q -f name=dind-var-lib-docker"
 fi
@@ -170,7 +190,8 @@ else
         docker rm -f "$id" >/dev/null 2>&1 && echo "✔ conteneur cluster kind supprimé : $id"
     done
     # Réseau Docker kind : retiré seulement s'il ne sert plus à aucun conteneur
-    reseau_kind="$(docker network inspect kind 2>/dev/null || true)"
+    reseau_kind=""
+    [ "$DANS_CONTENEUR" = true ] || reseau_kind="$(docker network inspect kind 2>/dev/null || true)"
     if [ -n "$reseau_kind" ] && printf '%s\n' "$reseau_kind" | grep -q '"Containers": {}'; then
         if docker network rm kind >/dev/null 2>&1; then
             echo "✔ réseau Docker kind supprimé"
