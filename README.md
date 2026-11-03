@@ -159,6 +159,46 @@ spring:
 
 Autres commandes : `devzone postgres liste`, `devzone postgres psql monprojet` (console), `devzone postgres supprimer monprojet`, `devzone cluster [CTX]` (voir ou changer de cluster). Détails dans [docs/reference.md](docs/reference.md#postgresql).
 
+### Voir le contenu de la base
+
+Dans le conteneur :
+
+```sh
+devzone postgres liste              # les bases et leur propriétaire
+devzone postgres psql monprojet     # console SQL connectée à la base « monprojet », avec son utilisateur
+```
+
+Dans la console (`\q` pour sortir) :
+
+| Commande | Affiche |
+|---|---|
+| `\conninfo` | la base et l'utilisateur de la connexion |
+| `\dt` | les tables de la base |
+| `\d task` | la structure d'une table : colonnes, types, index, clés |
+| `\dn` | les schémas |
+| `SELECT * FROM task LIMIT 10;` | les premières lignes d'une table |
+| `SELECT * FROM flyway_schema_history;` | les migrations Flyway appliquées (si le projet utilise Flyway) |
+
+`devzone postgres psql`, sans nom de projet, ouvre la console en superutilisateur `postgres` : toutes les bases (`\l`), tous les utilisateurs (`\du`). Réserve-la à l'administration, une erreur y touche les bases de tous les projets.
+
+### Se connecter depuis le poste (IntelliJ, DBeaver, psql)
+
+Le relais de devzone rend PostgreSQL joignable **dans le conteneur** seulement (en attendant [#292](https://github.com/SimBienvenueHoulBoumi/devzone/issues/292)). Pour un client installé sur le poste, ouvre un tunnel dans un terminal **du poste** (Terminal du Mac, pas celui du conteneur), et laisse-le ouvert :
+
+```sh
+kubectl --context docker-desktop -n devzone-postgres port-forward svc/postgres 5432:5432
+```
+
+(`docker-desktop` : le Kubernetes de l'hôte, celui de devzone par défaut ; `15432:5432` si un PostgreSQL local occupe déjà le port 5432 du poste.)
+
+Puis, dans le client, une connexion PostgreSQL : hôte `localhost`, port `5432`, base, utilisateur et mot de passe lus dans `workspace/.postgres/monprojet.env` (`DB_NAME`, `DB_USER`, `DB_PASSWORD`). Dans IntelliJ : *View → Tool Windows → Database → + → Data Source → PostgreSQL*, puis *Test Connection* (fenêtre Database : IntelliJ Ultimate ; plugin *Database Navigator* sinon).
+
+« Connection refused » : le tunnel ne tourne pas, ou il a été lancé dans le conteneur. Une base recréée (`devzone postgres supprimer` puis `creer`, ou `creer --nouveau-mdp`) a un nouveau mot de passe : à reporter dans le client.
+
+### Droits : un utilisateur par base
+
+L'utilisateur d'un projet possède **sa** base (il y crée tables, index, données) et rien d'autre : il ne peut ni créer une base, ni se connecter à celle d'un autre projet. D'où, dans un client, `[42501] ERROR: permission denied to create database`. C'est voulu (les projets ne se voient pas). Pour une nouvelle base : `devzone postgres creer <projet>`, qui donne son propre utilisateur et son fichier `.env`.
+
 > Le module `gitlab` a aussi son propre PostgreSQL (`gitlab-postgresql`) : il appartient à GitLab, n'y mets pas tes bases.
 
 ## Questions fréquentes
