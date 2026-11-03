@@ -17,15 +17,6 @@ sudo chown -R vscode:vscode /home/vscode/.m2 /home/vscode/.local /home/vscode/.c
     /home/vscode/.config/devzone
 sudo chown vscode:vscode /home/vscode/.config
 
-# Étiquette de l'instance courante sur le conteneur (pour désinstallation ciblée)
-# On identifie le conteneur via sa label devcontainer.local_folder et on y
-# ajoute devzone.instance=<instance> ; ceci permet à desinstaller.sh de ne
-# toucher que les ressources de cette instance.
-CONT_ID="$(docker ps -aq --filter "label=devcontainer.local_folder=$RACINE" 2>/dev/null | head -1 || true)"
-if [ -n "$CONT_ID" ]; then
-    docker update --label-add "devzone.instance=${DEVZONE_INSTANCE:-devzone}" "$CONT_ID" >/dev/null 2>&1 || true
-fi
-
 # Git : dépôts du conteneur déclarés sûrs (leur propriétaire peut différer de
 # l'utilisateur qui lance git : volumes, Docker Desktop, outils lancés à part),
 # et accès à GitHub par le jeton de gh, conservé dans son volume (https, même

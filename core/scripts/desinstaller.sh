@@ -30,13 +30,15 @@ esac
 . "$(dirname "${BASH_SOURCE[0]}")/docker.sh"
 docker_pret "${DEVZONE_COMMANDE:-make desinstaller}" || exit 1
 
-# Déterminer le nom d'instance pour le filtrage par étiquette
+# Nom d'instance : clusters kind et conteneurs étiquetés en dépendent
 : "${DEVZONE_INSTANCE:=}"
 if [ -z "$DEVZONE_INSTANCE" ] && [ -n "${DEVZONE_VOLUMES:-}" ]; then
     DEVZONE_INSTANCE="$(echo "$DEVZONE_VOLUMES" | cut -d'-' -f1)"
 fi
-if [ -z "$DEVZONE_INSTANCE" ]; then
-    DEVZONE_INSTANCE="$(basename "$ICI")"
+[ -n "$DEVZONE_INSTANCE" ] || DEVZONE_INSTANCE="devzone"
+INSTANCE_SUFFIX=""
+if [ "$DEVZONE_INSTANCE" != "devzone" ]; then
+    INSTANCE_SUFFIX="-${DEVZONE_INSTANCE}"
 fi
 
 # --- Inventaire --------------------------------------------------------------
@@ -45,17 +47,7 @@ conteneurs=() images=() dind=()
 # Étiquette posée avec le chemin tel qu'ouvert (VS Code, make) : chemin
 # logique ou physique selon les liens symboliques ; les deux sont cherchés
 ids="$(for chemin in "$ICI" "$(cd "$ICI" && pwd -P)"; do docker ps -aq --filter "label=devcontainer.local_folder=$chemin" 2>/dev/null || true; done | sort -u)"
-# Filtrer par étiquette d'instance pour ne garder que les ressources de l'instance courante
-ids_filtres=()
-for id in $ids; do
-    label="$(docker inspect "$id" --format '{{index .Config.Labels "devzone.instance"}}' 2>/dev/null || true)"
-    [ "$label" = "$DEVZONE_INSTANCE" ] && ids_filtres+=("$id")
-done
-# Si aucun label correspond, garder tous les conteneurs (compatibilité)
-if [ ${#ids_filtres[@]} -eq 0 ]; then
-    ids_filtres=($ids)
-fi
-for id in ${ids_filtres[@]+"${ids_filtres[@]}"}; do
+for id in ${ids}; do
     conteneurs+=("$id")
     images+=("$(docker inspect "$id" --format '{{.Config.Image}}')")
     v="$(docker inspect "$id" --format '{{range .Mounts}}{{if eq .Destination "/var/lib/docker"}}{{.Name}}{{end}}{{end}}')"
@@ -69,6 +61,18 @@ if [ "${#conteneurs[@]}" -eq 0 ] && [ -f "$ETAT" ]; then
     [ -z "${IMAGE:-}" ] || ! docker image inspect "$IMAGE" >/dev/null 2>&1 || images+=("$IMAGE")
     [ -z "${DIND:-}" ] || ! docker volume inspect "$DIND" >/dev/null 2>&1 || dind+=("$DIND")
 fi
+
+# Clusters kind de l'instance sur le Docker de l'hôte (noms suffixés)
+clusters_hote=""
+for nom in "devzone${INSTANCE_SUFFIX}" "gitlab${INSTANCE_SUFFIX}"; do
+    if kind get clusters 2>/dev/null | grep -qx "$nom"; then
+        clusters_hote="$clusters_hote $nom"
+    fi
+done
+clusters_hote="${clusters_hote# }"
+
+# Conteneurs portant l'étiquette devzone.instance=<instance>
+conteneurs_etiquette="$(docker ps -aq --filter "label=devzone.instance=$DEVZONE_INSTANCE" 2>/dev/null | sort -u)"
 
 # Volumes : noms exacts de devcontainer.json (préfixe DEVZONE_VOLUMES compris)
 volumes=() gardes=()
@@ -123,13 +127,21 @@ echo " Docker interne (images et clusters kind) :"; afficher ${dind[@]+"${dind[@
 echo " volumes :"; afficher ${volumes[@]+"${volumes[@]}"}
 echo " metrics-server installé par devzone, sur :"; afficher ${metrics[@]+"${metrics[@]}"}
 echo " services de devzone (bases postgres comprises) sur ${CLUSTER:-aucun cluster} :"; afficher ${services[@]+"${services[@]}"}
+echo " clusters kind de l'instance sur le Docker de l'hôte :"
+# shellcheck disable=SC2086
+afficher ${clusters_hote}
+echo " conteneurs étiquetés devzone.instance=$DEVZONE_INSTANCE :"
+# shellcheck disable=SC2086
+afficher ${conteneurs_etiquette}
 [ "${#gardes[@]}" -eq 0 ] || { echo "Gardés (GARDER=connexions) :"; printf '  %s\n' "${gardes[@]}"; }
 if [ "${#conteneurs[@]}" -eq 0 ] && [ ! -f "$ETAT" ] && [ "${#images[@]}" -eq 0 ]; then
     echo "ℹ Aucun conteneur ni trace de l'image : si un make down d'une version antérieure les a laissés,"
     echo "  les retrouver avec : docker images 'vsc-$(basename "$ICI")-*' ; docker volume ls -q -f name=dind-var-lib-docker"
 fi
 
-total=$((${#conteneurs[@]} + ${#images[@]} + ${#dind[@]} + ${#volumes[@]} + ${#metrics[@]} + ${#services[@]}))
+nb_ch=0; for _ in ${clusters_hote}; do nb_ch=$((nb_ch + 1)); done
+nb_ce=0; for _ in ${conteneurs_etiquette}; do nb_ce=$((nb_ce + 1)); done
+total=$((${#conteneurs[@]} + ${#images[@]} + ${#dind[@]} + ${#volumes[@]} + ${#metrics[@]} + ${#services[@]} + nb_ch + nb_ce))
 if [ "$total" -eq 0 ]; then
     echo "✔ Rien à supprimer."
 else
@@ -157,6 +169,12 @@ else
     for ns in ${services[@]+"${services[@]}"}; do
         kubectl --context "$CLUSTER" delete namespace "$ns" --wait=true >/dev/null &&
             echo "✔ namespace supprimé : $ns ($CLUSTER)"
+    done
+    for nom in ${clusters_hote}; do
+        kind delete cluster --name "$nom" >/dev/null 2>&1 && echo "✔ cluster kind supprimé : $nom"
+    done
+    for id in ${conteneurs_etiquette}; do
+        docker rm -f "$id" >/dev/null 2>&1 && echo "✔ conteneur étiqueté supprimé : $id"
     done
 fi
 rm -f "$ICI/.devzone.log" "$ETAT"
