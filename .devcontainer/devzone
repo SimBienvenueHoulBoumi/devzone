@@ -10,9 +10,13 @@
 #   devzone actif <module>           code 0 si actif (scripts de démarrage)
 #   devzone test-bash32             lance les tests bats sous bash 3.2 (conteneur Docker)
 #   devzone agent <dossier> <fichier-consigne>  dirige opencode sur une consigne
+#   devzone activer postgres [--contexte CTX]   PostgreSQL partagé, cluster au choix
+#   devzone postgres creer <projet>  base et utilisateur d'un projet (aussi : liste, psql, supprimer)
+#   devzone cluster [CTX] [--oui]    cluster des services de devzone, ou en changer
 # État propre à chaque instance : $RACINE/.devzone.modules (dossier monté
 # de l'hôte, survit aux rebuilds), une ligne « module=on|off » ; la plateforme
-# choisie y est gardée aussi (plateforme=, gitlab_url=) ; l'ancien état
+# choisie y est gardée aussi (plateforme=, gitlab_url=), et le cluster des
+# services (cluster=, voir cluster.sh) ; l'ancien état
 # global (~/.config/devzone/modules) est repris une fois
 set -euo pipefail
 
@@ -33,14 +37,16 @@ VERSIONS="$ICI/../core/scripts/versions.sh"
 RACINE="${DEVZONE_RACINE:-$(dirname "$ICI")}"
 # État par défaut de l'instance ; DEVZONE_ETAT garde la priorité (tests, CI)
 ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
-MODULES=(ia kubernetes gitlab)
+MODULES=(ia kubernetes gitlab postgres)
+# shellcheck source=SCRIPTDIR/cluster.sh
+. "$ICI/cluster.sh"
 
 # Assistants IA, versions figées : mettre à jour ici, puis devzone appliquer
 # (ou Rebuild Container). Une ligne par paquet, séparées par une ligne qui ne
 # change pas : deux montées simultanées (workflow versions) se fusionnent sans
 # conflit, git n'en signalant qu'entre lignes voisines modifiées.
 # Claude Code
-IA_CLAUDE=@anthropic-ai/claude-code@2.1.316
+IA_CLAUDE=@anthropic-ai/claude-code@2.1.317
 # opencode
 IA_OPENCODE=opencode-ai@1.19.5
 IA_PAQUETS=("$IA_CLAUDE" "$IA_OPENCODE")
@@ -63,6 +69,7 @@ description() {
         ia) echo "assistants IA : Claude Code, opencode" ;;
         kubernetes) echo "connexion au cluster de l'hôte et metrics-server au démarrage" ;;
         gitlab) echo "GitLab de test dans un cluster kind" ;;
+        postgres) echo "PostgreSQL partagé, une base par projet" ;;
     esac
 }
 
@@ -333,6 +340,113 @@ appliquer_gitlab() {
     fi
 }
 
+# PostgreSQL partagé (#280) : installé sur le cluster de devzone, choisi à la
+# première activation (--contexte, menu en terminal, kind dédié sinon)
+appliquer_postgres() {
+    local voulu="" attendre="" arg ctx actuel etat_courant
+    if [ "$1" = on ]; then
+        for arg in "${@:2}"; do
+            if [ -n "$attendre" ]; then voulu="$arg"; attendre=""; continue; fi
+            case "$arg" in
+                --contexte) attendre=1 ;;
+                *) echo "devzone : argument inconnu : $arg (devzone activer postgres --contexte CTX)" >&2; ecrire postgres off; return 2 ;;
+            esac
+        done
+        actuel="$(cluster_lu)"
+        if [ -n "$voulu" ] && [ -n "$actuel" ] && [ "$voulu" != "$actuel" ]; then
+            echo "devzone : les services de devzone sont sur $actuel ; pour en changer : devzone cluster $voulu" >&2
+            ecrire postgres off
+            return 2
+        fi
+        if ! ctx="$(cluster_choisir "$voulu")"; then
+            ecrire postgres off
+            return 2
+        fi
+        # Choix gardé avant l'installation : une reprise vise le même cluster
+        cluster_ecrire "$ctx"
+        etat_courant="$(bash "$ICI/postgres/postgres.sh" etat)"
+        # « relais arrêté » d'abord : cette ligne commence aussi par « prêt sur »
+        if [[ "$etat_courant" == *"relais arrêté"* ]]; then
+            bash "$ICI/postgres/postgres.sh" relais-lancer
+            echo "devzone : postgres : relais relancé"
+        elif [[ "$etat_courant" == "prêt sur"* ]]; then
+            echo "devzone : postgres déjà actif, rien à faire."
+        elif ! bash "$ICI/postgres/postgres.sh" installer; then
+            echo "postgres" >"$(fichier_echec postgres)"
+            return 1
+        fi
+        rm -f "$(fichier_echec postgres)"
+    else
+        bash "$ICI/postgres/postgres.sh" desinstaller
+        rm -f "$(fichier_echec postgres)"
+    fi
+}
+
+# Toutes les bases disparaissent : confirmation en terminal (sans terminal, la
+# commande est explicite)
+confirmer_suppression_postgres() {
+    local reponse
+    [ "$(valeur postgres)" = on ] || return 0
+    cluster_interactif || return 0
+    printf 'Désactiver postgres supprime toutes ses bases. Continuer ? [o/N] ' >&2
+    read -r reponse || reponse=""
+    case "$reponse" in
+        o | O | oui) return 0 ;;
+        *) echo "Abandon : rien n'a été supprimé."; return 1 ;;
+    esac
+}
+
+# devzone cluster [CTX] [--oui] : affiche le cluster des services, ou les y
+# déplace (désinstallés de l'ancien, installés sur le nouveau : données non
+# migrées, d'où la confirmation)
+changer_cluster() {
+    local voulu="" oui="" arg actuel nouveau reponse
+    for arg in "$@"; do
+        case "$arg" in
+            --oui) oui=1 ;;
+            -*) echo "devzone : argument inconnu : $arg (devzone cluster [CTX] [--oui])" >&2; return 2 ;;
+            *) voulu="$arg" ;;
+        esac
+    done
+    actuel="$(cluster_lu)"
+    if [ -z "$voulu" ]; then
+        if [ -z "$actuel" ]; then
+            echo "devzone : aucun cluster choisi (fixé à l'activation d'un module : devzone activer postgres)"
+        elif cluster_est_dedie "$actuel"; then
+            echo "devzone : cluster $actuel (kind dédié, dans le conteneur)"
+        else
+            echo "devzone : cluster $actuel (cluster de l'hôte)"
+        fi
+        echo "  possibles : $(cluster_candidats | tr '\n' ' ')"
+        return 0
+    fi
+    nouveau="$(cluster_choisir "$voulu")" || return 2
+    if [ "$nouveau" = "$actuel" ]; then
+        echo "devzone : déjà sur $nouveau, rien à faire."
+        return 0
+    fi
+    if [ "$(valeur postgres)" = on ]; then
+        if [ -z "$oui" ]; then
+            if ! cluster_interactif; then
+                echo "devzone : les bases postgres seront supprimées de $actuel (non migrées) : devzone cluster $nouveau --oui" >&2
+                return 1
+            fi
+            printf 'postgres sera réinstallé sur %s, ses bases supprimées de %s (non migrées). Continuer ? [o/N] ' "$nouveau" "$actuel" >&2
+            read -r reponse || reponse=""
+            case "$reponse" in
+                o | O | oui) ;;
+                *) echo "Abandon : rien n'a changé."; return 0 ;;
+            esac
+        fi
+        bash "$ICI/postgres/postgres.sh" desinstaller
+        cluster_ecrire "$nouveau"
+        appliquer_postgres on
+    else
+        cluster_ecrire "$nouveau"
+    fi
+    echo "devzone : cluster des services : $nouveau"
+}
+
 # ---- Plateforme : GitHub (défaut) ou GitLab (#240) ----
 # Choix gardé dans le fichier d'état (plateforme=, gitlab_url=), propre à
 # chaque instance ; la configuration d'un service n'existe que pendant qu'il
@@ -599,6 +713,8 @@ etat() {
         elif [ "$(valeur "$m")" = on ] && [ "$m" = gitlab ]; then
             # GitLab actif : son état réel (prêt, runner, en échec)
             printf '  ✔ module %-10s %s\n' "$m" "$(bash "$ICI/gitlab/gitlab.sh" etat)"
+        elif [ "$(valeur "$m")" = on ] && [ "$m" = postgres ]; then
+            printf '  ✔ module %-10s %s\n' "$m" "$(bash "$ICI/postgres/postgres.sh" etat)"
         elif [ "$(valeur "$m")" = on ]; then
             printf '  ✔ module %-10s actif : %s\n' "$m" "$(description "$m")"
         else
@@ -613,18 +729,22 @@ changer() {
         echo "devzone : module inconnu : ${m:-(aucun)} ; modules : ${MODULES[*]}" >&2
         exit 1
     fi
+    if [ "$1" = off ] && [ "$m" = postgres ]; then
+        confirmer_suppression_postgres || return 0
+    fi
     ecrire "$m" "$1"
-    "appliquer_$m" "$1"
+    "appliquer_$m" "$1" "${@:3}"
 }
 
 case "${1:-}" in
     "" | etat | modules) etat ;;
-    activer) changer on "${2:-}" ;;
+    activer) changer on "${2:-}" "${@:3}" ;;
     desactiver) changer off "${2:-}" ;;
     appliquer)
         appliquer_repowarden
         [ "$(valeur ia)" = off ] || appliquer_ia on
         [ "$(valeur gitlab)" = off ] || appliquer_gitlab on
+        [ "$(valeur postgres)" = off ] || appliquer_postgres on
         ;;
     actif)
         connu "${2:-}" || { echo "devzone : module inconnu : ${2:-(aucun)}" >&2; exit 2; }
@@ -635,7 +755,9 @@ case "${1:-}" in
     agent)
         bash "$ICI/agent.sh" "${@:2}"
         ;;
-    -h | --help | aide) sed -n '2,12p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' ;;
+    cluster) changer_cluster "${@:2}" ;;
+    postgres) bash "$ICI/postgres/postgres.sh" "${@:2}" ;;
+    -h | --help | aide) sed -n '2,15p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' ;;
     test-bash32) bash "$RACINE/core/test/bash32.sh" ;;
     plateforme)
         if [ -n "${2:-}" ]; then

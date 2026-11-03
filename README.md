@@ -121,7 +121,45 @@ Pour en savoir plus : [Mettre en route un projet](https://github.com/SimBienvenu
 
 **Plateforme GitHub ou GitLab** : GitHub par défaut (comportement actuel). Pour servir une équipe sur GitLab : `devzone plateforme gitlab --url URL` (ou sans `--url` quand le module `gitlab` est activé, pour l'instance de test) : glab est installé (version figée, somme vérifiée) et connecté à l'instance, et `devzone` l'affiche à la place des contrôles `gh`. `devzone plateforme github` revient en arrière (glab retiré). Détails dans [docs/reference.md](docs/reference.md#plateforme-github-ou-gitlab).
 
+**Module `postgres`** : un PostgreSQL partagé, une base par projet (voir [Accéder à PostgreSQL](#accéder-à-postgresql)). Pour l'activer : `devzone activer postgres`.
+
 Ces modules sont désactivés par défaut, activables à la demande depuis le conteneur (sans rebuild), et leur choix est conservé d'un démarrage à l'autre.
+
+## Accéder à PostgreSQL
+
+Le module `postgres` installe un PostgreSQL 16 partagé sur le cluster de devzone : une base et un utilisateur par projet. Toutes les commandes se lancent dans le conteneur (`make shell`).
+
+```sh
+devzone activer postgres          # la première fois : choix du cluster (kind dédié ou cluster de l'hôte)
+devzone postgres creer monprojet  # base et utilisateur « monprojet »
+```
+
+Les identifiants sont écrits dans `workspace/.postgres/monprojet.env` (lisible par toi seul, jamais commité) :
+
+```text
+DB_HOST=127.0.0.1
+DB_PORT=5432
+DB_NAME=monprojet
+DB_USER=monprojet
+DB_PASSWORD=…
+DB_URL=jdbc:postgresql://127.0.0.1:5432/monprojet
+```
+
+PostgreSQL est joignable sur `127.0.0.1:5432` depuis le conteneur. Exemple Spring Boot (`application.yaml` d'un projet rangé dans `workspace/<dossier>/<projet>/`) :
+
+```yaml
+spring:
+  config:
+    import: optional:file:../../.postgres/monprojet.env[.properties]
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+```
+
+Autres commandes : `devzone postgres liste`, `devzone postgres psql monprojet` (console), `devzone postgres supprimer monprojet`, `devzone cluster [CTX]` (voir ou changer de cluster). Détails dans [docs/reference.md](docs/reference.md#postgresql).
+
+> Le module `gitlab` a aussi son propre PostgreSQL (`gitlab-postgresql`) : il appartient à GitLab, n'y mets pas tes bases.
 
 ## Questions fréquentes
 
