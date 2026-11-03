@@ -148,7 +148,8 @@ if ! dz "kind get clusters" | grep -qx "$KIND_TEST" || ! dz "kubectl --context k
     docker exec "$noeud" sh -c 'crictl ps -a 2>&1 | head -20; echo "--- kubelet"; journalctl -u kubelet --no-pager 2>&1 | tail -25; echo "--- apiserver"; for c in $(crictl ps -a --name kube-apiserver -q 2>/dev/null | head -1); do crictl logs "$c" 2>&1 | tail -25; done; echo "--- etcd"; for c in $(crictl ps -a --name etcd -q 2>/dev/null | head -1); do crictl logs "$c" 2>&1 | tail -15; done; echo "--- limites"; cat /proc/sys/fs/inotify/max_user_instances /proc/sys/fs/inotify/max_user_watches; free -m' 2>&1 | sed 's/^/      /'
 fi
 # Enveloppe kind (#291) : l'adresse de l'API est rendue joignable du conteneur
-reussit "cluster créé à la main joignable (host.docker.internal)" "kubectl config view -o jsonpath='{.clusters[?(@.name==\"kind-$KIND_TEST\")].cluster.server}'" "host.docker.internal"
+reussit "cluster créé à la main : adresse joignable du conteneur" "kubectl config view -o jsonpath='{.clusters[?(@.name==\"kind-$KIND_TEST\")].cluster.server}'" "$KIND_TEST-control-plane:6443|host.docker.internal"
+reussit "cluster créé à la main : kubectl lui parle" "kubectl --context kind-$KIND_TEST get nodes" "Ready"
 reussit "activer kubernetes : metrics-server sur kind" "devzone activer kubernetes" "metrics-server : installé .*kind-$KIND_TEST"
 reussit "métriques disponibles" "for i in \$(seq 1 36); do kubectl --context kind-$KIND_TEST top nodes >/dev/null 2>&1 && exit 0; sleep 5; done; exit 1"
 reussit "metrics-server marqué comme installé par devzone" "kubectl --context kind-$KIND_TEST -n kube-system get deployment metrics-server -o jsonpath='{.metadata.labels.devzone}'" "^installe$"

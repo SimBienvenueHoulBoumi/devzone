@@ -13,7 +13,23 @@ setup() {
 }
 
 # --- kube_joignable_depuis_conteneur ---------------------------------------
+# docker : aucun nœud kind par défaut ; FAUX_NOEUD=<nom> pour en simuler un
+setup_docker_noeud() {
+    cat >"$BATS_TEST_TMPDIR/bin/docker" <<'DOCKER'
+#!/usr/bin/env bash
+echo "docker $*" >>"$BATS_TEST_TMPDIR/docker.log"
+case "$*" in
+    "ps --filter label=io.x-k8s.kind.role=control-plane --filter publish=6443"*) [ -z "${FAUX_NOEUD:-}" ] || echo "$FAUX_NOEUD" ;;
+    "inspect "*) echo "kind " ;;
+esac
+exit 0
+DOCKER
+    chmod +x "$BATS_TEST_TMPDIR/bin/docker"
+    : >"$BATS_TEST_TMPDIR/docker.log"
+}
+
 setup_kubectl_view() {
+    setup_docker_noeud
     cat >"$BATS_TEST_TMPDIR/bin/kubectl" <<'KUBE'
 #!/usr/bin/env bash
 echo "kubectl $*" >>"$BATS_TEST_TMPDIR/kubectl.log"
@@ -254,3 +270,14 @@ KIND
     [ "$(grep -c '^kind create cluster' "$BATS_TEST_TMPDIR/kind.log")" -eq 2 ]
     grep -q "^kind delete cluster --name devzone" "$BATS_TEST_TMPDIR/kind.log"
 }
+
+@test "kube_joignable_depuis_conteneur : nœud kind trouvé -> réseau rejoint, adresse du nœud" {
+    setup_kubectl_view
+    export FAUX_NOEUD=essai-control-plane
+    source "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
+    kube_joignable_depuis_conteneur "$BATS_TEST_TMPDIR/kubeconfig"
+    grep -q -- "--server=https://essai-control-plane:6443" "$BATS_TEST_TMPDIR/kubectl.log"
+    grep -q "docker network connect kind" "$BATS_TEST_TMPDIR/docker.log"
+    ! grep -q -- "--tls-server-name" "$BATS_TEST_TMPDIR/kubectl.log" || false
+}
+
