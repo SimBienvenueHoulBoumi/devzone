@@ -7,12 +7,13 @@
 #   ports.sh relancer       recrée les relais de l'état vers l'IP actuelle
 #   ports.sh resume         résumé d'une ligne pour le récapitulatif devzone
 # L'état est la ligne « ports=8080,3000 » de DEVZONE_ETAT (triée, sans doublon).
+# RACINE : un seul dirname depuis ICI (.devcontainer) → racine du dépôt devzone.
 set -euo pipefail
 
 SOCAT_IMAGE=alpine/socat:1.8.0.3
 
 ICI="$(cd "$(dirname "$0")" && pwd)"
-RACINE="${DEVZONE_RACINE:-$(dirname "$(dirname "$ICI")")}"
+RACINE="${DEVZONE_RACINE:-$(dirname "$ICI")}"
 ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
 INSTANCE="${DEVZONE_INSTANCE:-devzone}"
 
@@ -44,10 +45,10 @@ trier_ports() {
 ecrire_ports() {
     local valeur="${1:-}" tmp
     mkdir -p "$(dirname "$ETAT")"
-    tmp="$(mktemp)"
+    tmp="$(mktemp)" || { echo "devzone : port : état non enregistré : $ETAT" >&2; exit 1; }
     grep -vE '^ports=' "$ETAT" 2>/dev/null >"$tmp" || true
     echo "ports=$valeur" >>"$tmp"
-    mv "$tmp" "$ETAT"
+    mv "$tmp" "$ETAT" || { echo "devzone : port : état non enregistré : $ETAT" >&2; exit 1; }
 }
 
 ajouter_port() {
