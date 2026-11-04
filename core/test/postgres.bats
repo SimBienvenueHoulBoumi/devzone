@@ -82,6 +82,19 @@ actif_sur() {
     touch "$BATS_TEST_TMPDIR/ns" "$BATS_TEST_TMPDIR/secret"
 }
 
+attendre_nohup() {
+    local motif="$1" i=0
+    while [ "$i" -lt 50 ]; do
+        if grep -q -- "$motif" "$BATS_TEST_TMPDIR/nohup.log" 2>/dev/null; then
+            return 0
+        fi
+        i=$((i + 1))
+        sleep 0.1
+    done
+    echo "nohup.log : ligne absente après 5 s : $motif" >&2
+    return 1
+}
+
 @test "postgres : module connu, désactivé par défaut" {
     run bash "$DEVZONE"
     [[ "$output" == *"○ module postgres"*"devzone activer postgres"* ]] || false
@@ -95,7 +108,9 @@ actif_sur() {
     grep -q 'kubectl --context kind-devzone -n devzone-postgres create secret generic postgres-admin' "$BATS_TEST_TMPDIR/kubectl.log"
     grep -q 'image: postgres:16' "$BATS_TEST_TMPDIR/apply.log"
     grep -q 'storage: 5Gi' "$BATS_TEST_TMPDIR/apply.log"
+    attendre_nohup 'port-forward --address 127.0.0.1'
     grep -q 'port-forward --address 127.0.0.1' "$BATS_TEST_TMPDIR/nohup.log"
+    attendre_nohup 'kind-devzone devzone-postgres svc/postgres 5432:5432$'
     grep -q 'kind-devzone devzone-postgres svc/postgres 5432:5432$' "$BATS_TEST_TMPDIR/nohup.log"
     [[ "$output" == *"127.0.0.1:5432"* ]] || false
 }
@@ -127,17 +142,17 @@ actif_sur() {
     [ "$status" -eq 2 ]
 }
 
-@test "activer en terminal : menu, choix 2 = cluster de l'hôte" {
-    DEVZONE_INTERACTIF=1 run bash "$DEVZONE" activer postgres <<<"2"
+@test "activer en terminal : menu, choix 1 = cluster de l'hôte" {
+    DEVZONE_INTERACTIF=1 run bash "$DEVZONE" activer postgres <<<"1"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"1) kind-devzone"*"2) docker-desktop"* ]] || false
+    [[ "$output" == *"1) docker-desktop"*"2) kind-devzone"* ]] || false
     grep -qx 'cluster=docker-desktop' "$DEVZONE_ETAT"
 }
 
-@test "activer en terminal : Entrée = kind dédié ; choix hors liste refusé" {
+@test "activer en terminal : Entrée = cluster de l'hôte ; choix hors liste refusé" {
     DEVZONE_INTERACTIF=1 run bash "$DEVZONE" activer postgres <<<""
     [ "$status" -eq 0 ]
-    grep -qx 'cluster=kind-devzone' "$DEVZONE_ETAT"
+    grep -qx 'cluster=docker-desktop' "$DEVZONE_ETAT"
 
     rm -f "$DEVZONE_ETAT"
     DEVZONE_INTERACTIF=1 run bash "$DEVZONE" activer postgres <<<"9"
@@ -286,6 +301,7 @@ actif_sur() {
     actif_sur kind-devzone
     bash "$POSTGRES" relais-lancer
     bash "$POSTGRES" relais-lancer
+    attendre_nohup 'port-forward'
     [ "$(grep -c port-forward "$BATS_TEST_TMPDIR/nohup.log")" -eq 1 ]
     pid="$(cat "$SECRETS/relais.pid")"
     kill -0 "$pid"

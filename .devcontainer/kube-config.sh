@@ -12,6 +12,8 @@
 set -euo pipefail
 
 ICI="$(dirname "$0")"
+# shellcheck source=SCRIPTDIR/cluster.sh
+. "$ICI/cluster.sh"
 module=off
 bash "$ICI/devzone" actif kubernetes && module=on
 
@@ -26,20 +28,13 @@ rm -f "$HOTE"
 
 if [ "$module" = on ] && [ -f "$SOURCE" ]; then
     install -m 600 "$SOURCE" "$HOTE"
-    KUBECONFIG="$HOTE" kubectl config view \
-        -o jsonpath='{range .clusters[*]}{.name}{"\t"}{.cluster.server}{"\n"}{end}' |
-        while IFS=$'\t' read -r nom serveur; do
-            case "$serveur" in
-                https://127.0.0.1:* | https://localhost:*) ;;
-                *) continue ;;
-            esac
-            hote="${serveur#https://}"
-            hote="${hote%%:*}"
-            KUBECONFIG="$HOTE" kubectl config set-cluster "$nom" \
-                --server="https://host.docker.internal:${serveur##*:}" \
-                --tls-server-name="$hote" >/dev/null
-        done
+    kube_joignable_depuis_conteneur "$HOTE"
 fi
+
+# Réécriture de 127.0.0.1/localhost → host.docker.internal pour les clusters
+# kind, dont l'API server est à 127.0.0.1:<port> mais injoignable depuis le
+# conteneur. Idempotent.
+kube_joignable_depuis_conteneur "$HOME/.kube/config"
 
 # Clusters kind qui ont survécu au redémarrage : contexte remis dans ~/.kube/config
 # (le Docker interne peut mettre quelques secondes à démarrer)
@@ -48,6 +43,9 @@ choix="$(KUBECONFIG="$HOME/.kube/config" kubectl config current-context 2>/dev/n
 for cluster in $(kind get clusters 2>/dev/null); do
     kind export kubeconfig --name "$cluster" --kubeconfig "$HOME/.kube/config" >/dev/null 2>&1 || true
 done
+# Les kubeconfigs exportés par kind portent server: https://127.0.0.1:<port> ;
+# les rendre joignables depuis le conteneur.
+kube_joignable_depuis_conteneur "$HOME/.kube/config"
 
 # Cluster actif : celui choisi avant (kubectl config use-context), sinon celui
 # de l'hôte s'il en a un (current-context de hote.config), sinon kind

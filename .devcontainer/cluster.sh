@@ -7,11 +7,12 @@
 # Bibliothèque sourcée : l'appelant définit RACINE et ETAT.
 #   cluster_lu                       contexte choisi, rien s'il n'y en a pas
 #   cluster_ecrire CTX               garde le choix dans l'état
-#   cluster_candidats                kind dédié, puis contextes de l'hôte joignables
+#   cluster_candidats                clusters de l'hôte joignables, puis kind dédié
 #   cluster_choisir [CTX]            CTX validé, sinon choix gardé, sinon menu
-#                                    (terminal seulement), sinon kind dédié
+#                                    (terminal seulement), sinon défaut
 #   cluster_preparer CTX             crée le cluster kind dédié s'il manque
 #   cluster_liberer CTX              supprime le kind dédié devenu vide
+#   kube_joignable_depuis_conteneur FICHIER   réécrit 127.0.0.1/localhost
 #   relais_lancer NOM CTX NS CIBLE PORTS…   port-forward gardé en vie
 #   relais_actif NOM / relais_arreter NOM
 
@@ -21,12 +22,26 @@
 : "${KUBECONFIG:=$HOME/.kube/config:$HOME/.kube/hote.config}"
 export KUBECONFIG
 
-# Cluster kind dédié, dans le Docker interne : toujours disponible, même sans
-# cluster sur l'hôte (Codespaces, Linux avec Docker Engine)
-CLUSTER_DEDIE=kind-devzone
+# État des modules : défini par l'appelant ; valeur par défaut pour les tests
+: "${ETAT:=${DEVZONE_ETAT:-$HOME/.devzone.modules}}"
+
+# Nom d'instance : vide ou « devzone » = instance par défaut (pas de suffixe)
+: "${DEVZONE_INSTANCE:=}"
+INSTANCE_SUFFIX=""
+if [ -n "$DEVZONE_INSTANCE" ] && [ "$DEVZONE_INSTANCE" != "devzone" ]; then
+    INSTANCE_SUFFIX="-${DEVZONE_INSTANCE}"
+fi
+
+# Cluster kind dédié, créé sur le Docker de l'hôte ; nom suffixé par instance
+CLUSTER_DEDIE=kind-devzone${INSTANCE_SUFFIX}
 # Étiquette posée sur tout namespace créé par devzone : un kind dédié sans
 # namespace étiqueté n'a plus d'usage et peut être supprimé
 CLUSTER_ETIQUETTE=app.kubernetes.io/managed-by=devzone
+
+# Réécriture 127.0.0.1 → host.docker.internal (#291) : partagée avec
+# l'enveloppe kind, qui l'applique aussi aux clusters créés à la main
+# shellcheck source=SCRIPTDIR/kube-joignable.sh
+. "$(dirname "${BASH_SOURCE[0]}")/kube-joignable.sh"
 
 cluster_lu() {
     grep -E '^cluster=' "$ETAT" 2>/dev/null | tail -1 | cut -d= -f2- || true
@@ -42,32 +57,31 @@ cluster_ecrire() {
 }
 
 cluster_est_dedie() {
-    [ "$1" = "$CLUSTER_DEDIE" ]
+    [ "$1" = "${CLUSTER_DEDIE}" ]
 }
 
 cluster_joignable() {
     kubectl --context "$1" --request-timeout=3s get --raw /readyz >/dev/null 2>&1
 }
 
-# Contextes de l'hôte : ceux de ~/.kube/hote.config, posé par kube-config.sh
-# seulement quand le module kubernetes est actif. Joignables seulement : un
-# cluster arrêté ne peut rien recevoir.
+# Contextes de l'hôte d'abord (joignables), puis le kind dédié en dernier
 cluster_candidats() {
     local hote="${DEVZONE_KUBE_HOTE:-$HOME/.kube/hote.config}" c
+    if [ -f "$hote" ]; then
+        for c in $(KUBECONFIG="$hote" kubectl config get-contexts -o name 2>/dev/null); do
+            cluster_est_dedie "$c" && continue
+            cluster_joignable "$c" && echo "$c"
+        done
+    fi
     echo "$CLUSTER_DEDIE"
-    [ -f "$hote" ] || return 0
-    for c in $(KUBECONFIG="$hote" kubectl config get-contexts -o name 2>/dev/null); do
-        cluster_est_dedie "$c" && continue
-        cluster_joignable "$c" && echo "$c"
-    done
     return 0
 }
 
-# Menu sur stderr (stdout porte la réponse) ; Entrée = kind dédié
+# Menu sur stderr (stdout porte la réponse) ; Entrée = premier candidat
 cluster_menu() {
     local candidats=() c i=1 reponse
     while IFS= read -r c; do candidats+=("$c"); done < <(cluster_candidats)
-    {
+{
         echo "devzone : sur quel cluster installer les services de devzone ?"
         for c in "${candidats[@]}"; do
             if cluster_est_dedie "$c"; then
@@ -113,17 +127,36 @@ cluster_choisir() {
     elif cluster_interactif; then
         cluster_menu
     else
-        # Sans terminal (post-create, démarrage) : jamais de question
-        echo "$CLUSTER_DEDIE"
+        # Défaut : cluster de l'hôte s'il répond, sinon kind dédié
+        local hote_choix=""
+        if [ -f "${DEVZONE_KUBE_HOTE:-$HOME/.kube/hote.config}" ]; then
+            hote_choix="$(KUBECONFIG="${DEVZONE_KUBE_HOTE:-$HOME/.kube/hote.config}" kubectl config current-context 2>/dev/null || true)"
+        fi
+        if [ -n "$hote_choix" ] && cluster_joignable "$hote_choix"; then
+            echo "$hote_choix"
+        else
+            echo "$CLUSTER_DEDIE"
+        fi
     fi
 }
 
 cluster_preparer() {
     local ctx="$1"
-    if cluster_est_dedie "$ctx"; then
-        if ! kind get clusters 2>/dev/null | grep -qx devzone; then
+    if [ "$ctx" = "$CLUSTER_DEDIE" ]; then
+        if ! kind get clusters 2>/dev/null | grep -qx "devzone${INSTANCE_SUFFIX}"; then
             echo "▶ Création du cluster kind devzone (environ 1 min)…"
-            kind create cluster --name devzone --wait 120s
+            # Sur le Docker de l'hôte, l'API écoute sur 127.0.0.1 du poste :
+            # kube_joignable_depuis_conteneur la rend joignable du conteneur
+            # (host.docker.internal), sans l'exposer sur le réseau local.
+            # Docker de l'hôte chargé (son Kubernetes, d'autres clusters) : l'API du
+            # nœud peut redémarrer pendant l'initialisation et kind abandonne à
+            # quelques secondes près. Une seconde tentative, sur un cluster neuf.
+            if ! kind create cluster --name "devzone${INSTANCE_SUFFIX}" --wait 120s; then
+                echo "▶ Nouvelle tentative de création du cluster kind…"
+                kind delete cluster --name "devzone${INSTANCE_SUFFIX}" >/dev/null 2>&1 || true
+                kind create cluster --name "devzone${INSTANCE_SUFFIX}" --wait 120s || return 1
+            fi
+            kube_joignable_depuis_conteneur "$HOME/.kube/config"
         fi
     elif ! cluster_joignable "$ctx"; then
         echo "devzone : cluster $ctx injoignable (module kubernetes actif ? cluster démarré ?)" >&2
@@ -136,10 +169,10 @@ cluster_preparer() {
 cluster_liberer() {
     local ctx="$1" reste
     cluster_est_dedie "$ctx" || return 0
-    kind get clusters 2>/dev/null | grep -qx devzone || return 0
+    kind get clusters 2>/dev/null | grep -qx "devzone${INSTANCE_SUFFIX}" || return 0
     reste="$(kubectl --context "$ctx" get namespaces -l "$CLUSTER_ETIQUETTE" -o name 2>/dev/null || true)"
     if [ -z "$reste" ]; then
-        kind delete cluster --name devzone >/dev/null 2>&1 || true
+        kind delete cluster --name "devzone${INSTANCE_SUFFIX}" >/dev/null 2>&1 || true
         echo "▶ Cluster kind devzone supprimé (plus aucun service)."
     fi
 }
