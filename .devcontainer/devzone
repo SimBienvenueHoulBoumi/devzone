@@ -765,11 +765,11 @@ case "${1:-}" in
         bash "$ICI/agent.sh" "${@:2}"
         ;;
     cluster) changer_cluster "${@:2}" ;;
-    postgres) bash "$ICI/postgres/postgres.sh" "${@:2}" ;;
-    port) bash "$ICI/ports.sh" "${@:2}" ;;
+    postgres) DEVZONE_ETAT="$ETAT" bash "$ICI/postgres/postgres.sh" "${@:2}" ;;
+    port) DEVZONE_ETAT="$ETAT" bash "$ICI/ports.sh" "${@:2}" ;;
     -h | --help | aide) awk 'NR==1{next} /^#$/{exit} /^#/{sub(/^# ?/,""); print; next} {exit}' "${BASH_SOURCE[0]}" ;;
     test-bash32) bash "$RACINE/manage/test/bash32.sh" ;;
-    test-gitlab) bash "$ICI/gitlab/test-gitlab.sh" "${@:2}" ;;
+    test-gitlab) DEVZONE_ETAT="$ETAT" bash "$ICI/gitlab/test-gitlab.sh" "${@:2}" ;;
     plateforme)
         if [ -n "${2:-}" ]; then
             changer_plateforme "${@:2}"
