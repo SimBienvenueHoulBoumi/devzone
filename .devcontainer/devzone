@@ -9,6 +9,7 @@
 #   devzone appliquer                installe ce qui est actif (post-create.sh)
 #   devzone actif <module>           code 0 si actif (scripts de démarrage)
 #   devzone test-bash32             lance les tests bats sous bash 3.2 (conteneur Docker)
+#   devzone test-gitlab             essai de bout en bout du module et de la plateforme GitLab
 #   devzone agent <dossier> <fichier-consigne>  dirige opencode sur une consigne
 #   devzone activer postgres [--contexte CTX]   PostgreSQL partagé, cluster au choix
 #   devzone postgres creer <projet>  base et utilisateur d'un projet (aussi : liste, psql, supprimer)
@@ -41,6 +42,7 @@ RACINE="${DEVZONE_RACINE:-$(dirname "$ICI")}"
 ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
 MODULES=(ia kubernetes gitlab postgres)
 # shellcheck source=SCRIPTDIR/cluster.sh
+# shellcheck disable=SC1091
 . "$ICI/cluster.sh"
 
 # Assistants IA, versions figées : mettre à jour ici, puis devzone appliquer
@@ -767,6 +769,7 @@ case "${1:-}" in
     port) bash "$ICI/ports.sh" "${@:2}" ;;
     -h | --help | aide) awk 'NR==1{next} /^#$/{exit} /^#/{sub(/^# ?/,""); print; next} {exit}' "${BASH_SOURCE[0]}" ;;
     test-bash32) bash "$RACINE/core/test/bash32.sh" ;;
+    test-gitlab) bash "$ICI/gitlab/test-gitlab.sh" "${@:2}" ;;
     plateforme)
         if [ -n "${2:-}" ]; then
             changer_plateforme "${@:2}"
