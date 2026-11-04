@@ -20,7 +20,7 @@
       // (ruff, vulture et pytest viennent du Dockerfile, par uv)
       "installTools": false
     },
-    "ghcr.io/devcontainers/features/docker-in-docker:4": {},
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {},
     "ghcr.io/devcontainers/features/kubectl-helm-minikube:1": {
       "minikube": "none"
     },
@@ -66,6 +66,17 @@
   // Clusters kind du conteneur (config) + cluster de l'hôte (hote.config,
   // refait à chaque démarrage par kube-config.sh)
   "remoteEnv": {
+    // Chemin du projet SUR L'HÔTE : nécessaire pour `docker run -v`, car les
+    // chemins du conteneur n'existent pas pour le Docker de l'hôte
+    "LOCAL_WORKSPACE_FOLDER": "${localWorkspaceFolder}",
+    // Les conteneurs de test sont publiés sur l'hôte, pas sur le localhost du
+    // conteneur ; host.docker.internal résout vers la machine hôte depuis
+    // le conteneur (fonctionne par défaut avec Docker Desktop).
+    "TESTCONTAINERS_HOST_OVERRIDE": "host.docker.internal",
+    // Nom d'instance de devzone, pour le étiquetage des conteneurs et des
+    // clusters kind. Permet à desinstalleur.sh de cibler uniquement les
+    // ressources de l'instance courante.
+    "DEVZONE_INSTANCE": "${localEnv:DEVZONE_VOLUMES:devzone}",
     "KUBECONFIG": "/home/vscode/.kube/config:/home/vscode/.kube/hote.config",
     // Claude Code range aussi .claude.json (connexion, réglages) dans ce
     // dossier, donc dans son volume, au lieu de ~/.claude.json

@@ -127,17 +127,17 @@ actif_sur() {
     [ "$status" -eq 2 ]
 }
 
-@test "activer en terminal : menu, choix 2 = cluster de l'hôte" {
-    DEVZONE_INTERACTIF=1 run bash "$DEVZONE" activer postgres <<<"2"
+@test "activer en terminal : menu, choix 1 = cluster de l'hôte" {
+    DEVZONE_INTERACTIF=1 run bash "$DEVZONE" activer postgres <<<"1"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"1) kind-devzone"*"2) docker-desktop"* ]] || false
+    [[ "$output" == *"1) docker-desktop"*"2) kind-devzone"* ]] || false
     grep -qx 'cluster=docker-desktop' "$DEVZONE_ETAT"
 }
 
-@test "activer en terminal : Entrée = kind dédié ; choix hors liste refusé" {
+@test "activer en terminal : Entrée = cluster de l'hôte ; choix hors liste refusé" {
     DEVZONE_INTERACTIF=1 run bash "$DEVZONE" activer postgres <<<""
     [ "$status" -eq 0 ]
-    grep -qx 'cluster=kind-devzone' "$DEVZONE_ETAT"
+    grep -qx 'cluster=docker-desktop' "$DEVZONE_ETAT"
 
     rm -f "$DEVZONE_ETAT"
     DEVZONE_INTERACTIF=1 run bash "$DEVZONE" activer postgres <<<"9"

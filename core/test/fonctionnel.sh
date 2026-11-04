@@ -3,14 +3,18 @@
 # scénarios d'un utilisateur, puis supprime tout, même en cas d'échec.
 #   make test-fonctionnel     (ou bash core/test/fonctionnel.sh)
 # Isolation : copie du dépôt dans un dossier temporaire (autre conteneur,
-# autre image, autre Docker interne) et volumes propres au test
-# (DEVZONE_VOLUMES). Le cluster de l'hôte n'est jamais touché : les commandes
+# autre image) et volumes propres au test (DEVZONE_VOLUMES). Le conteneur
+# utilise le Docker de l'hôte (#291) : le cluster kind du test porte un nom
+# propre au test et il est supprimé à la fin. Le cluster de l'hôte n'est jamais touché : les commandes
 # Kubernetes lisent DEVZONE_KUBE_SOURCE, orienté vers un fichier absent.
 # Prérequis : Docker, Node (npx). Durée : 5 à 10 min (plus sans cache).
 set -uo pipefail
 
 RACINE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 export DEVZONE_VOLUMES="devzone-test-$$"
+# Cluster kind du test, sur le Docker de l'hôte : nom unique, jamais celui
+# d'un autre devzone
+KIND_TEST="dz-test-$$"
 # Chemin physique : make (CURDIR) voit /private/var/… sous macOS, pas /var/…
 TMP="$(cd "$(mktemp -d)" && pwd -P)"
 # Nommée autrement que « devzone » : le conteneur doit fonctionner quel que soit
@@ -35,6 +39,10 @@ nettoyer() {
     local volume
     for volume in $(docker volume ls -q | grep "^${DEVZONE_VOLUMES}-" || true); do
         docker volume rm "$volume" >/dev/null 2>&1 || true
+    done
+    # Cluster kind du test : ses conteneurs (étiquette posée par kind)
+    for id in $(docker ps -aq --filter "label=io.x-k8s.kind.cluster=$KIND_TEST"); do
+        docker rm -f "$id" >/dev/null 2>&1 || true
     done
     rm -rf "$TMP"
 }
@@ -77,9 +85,11 @@ for outil in java mvn node pnpm python3 uv docker kubectl helm k9s kind gh repow
     reussit "$outil présent" "command -v $outil"
 done
 
-echo "▶ make dans le conteneur (refusé : il créerait un devzone imbriqué)"
+echo "▶ make dans le conteneur (refusé : il créerait un second devzone)"
 echoue "make rebuild dans le conteneur refusé" "cd /workspaces/devzone && make rebuild" "à lancer sur ta machine"
-reussit "aucun devzone imbriqué créé" "docker ps -a --format '{{.Image}}' | grep -c vsc- || true" "^0$"
+# #291 : le conteneur pilote le Docker de l'hôte (même démon, pas de Docker interne)
+ID_HOTE="$(docker info --format '{{.ID}}')"
+reussit "Docker du conteneur = Docker de l'hôte" "docker info --format '{{.ID}}'" "^${ID_HOTE}$"
 
 echo "▶ Premier démarrage (récapitulatif affiché au démarrage)"
 reussit "modules désactivés par défaut" "devzone" "○ module ia"
@@ -120,23 +130,35 @@ echoue "ia : garde-fou : modification sur main refusée" 'd="$(mktemp -d)" && cd
 reussit "désactiver ia" "devzone desactiver ia && ! command -v claude"
 echoue "module inconnu refusé" "devzone activer nexistepas" "module inconnu"
 
-echo "▶ Module kubernetes (cluster kind, jamais celui de l'hôte)"
+echo "▶ Module kubernetes (cluster kind du test, jamais un cluster de l'hôte)"
 # #230 : avant de tenter le cluster kind, le daemon docker du conteneur doit répondre
 if ! dz "docker info" >/dev/null 2>&1; then
     echo "↳ #230 : docker info échoué ; diagnostic du conteneur"
     dz "uname -r; iptables --version; if command -v update-alternatives >/dev/null 2>&1; then update-alternatives --display iptables; fi; cat /proc/self/cgroup; if [ -f /tmp/dockerd.log ]; then tail -n 80 /tmp/dockerd.log; else echo 'dockerd.log introuvable'; fi" 2>&1 | sed "s/^/      /"
 fi
 reussit "Docker répond dans le conteneur" "docker info"
-reussit "kind create cluster" "kind create cluster --name test"
-reussit "activer kubernetes : metrics-server sur kind" "devzone activer kubernetes" "metrics-server : installé .*kind-test"
-reussit "métriques disponibles" "for i in \$(seq 1 36); do kubectl --context kind-test top nodes >/dev/null 2>&1 && exit 0; sleep 5; done; exit 1"
-reussit "metrics-server marqué comme installé par devzone" "kubectl --context kind-test -n kube-system get deployment metrics-server -o jsonpath='{.metadata.labels.devzone}'" "^installe$"
-# Désinstallation lancée dans le conteneur : seul le cluster kind-test est vu
-reussit "désinstaller : retire le metrics-server de devzone" "CONFIRMER=oui bash core/scripts/desinstaller.sh" "metrics-server retiré : kind-test"
-echoue "metrics-server absent après désinstallation" "kubectl --context kind-test -n kube-system get deployment metrics-server"
+# Une seconde tentative si l'API du nœud redémarre pendant l'initialisation
+# (Docker de l'hôte chargé), comme cluster_preparer ; --retain garde le nœud
+# pour le diagnostic en cas de second échec
+reussit "kind create cluster (sur le Docker de l'hôte)" "kind create cluster --name $KIND_TEST --wait 120s || { kind delete cluster --name $KIND_TEST; kind create cluster --name $KIND_TEST --wait 120s --retain; }"
+# Échec : journaux du nœud (gardé par --retain, supprimé par nettoyer) pour le diagnostic
+if ! dz "kind get clusters" | grep -qx "$KIND_TEST" || ! dz "kubectl --context kind-$KIND_TEST get nodes" >/dev/null 2>&1; then
+    noeud="$KIND_TEST-control-plane"
+    echo "↳ diagnostic du nœud $noeud"
+    docker exec "$noeud" sh -c 'crictl ps -a 2>&1 | head -20; echo "--- kubelet"; journalctl -u kubelet --no-pager 2>&1 | tail -25; echo "--- apiserver"; for c in $(crictl ps -a --name kube-apiserver -q 2>/dev/null | head -1); do crictl logs "$c" 2>&1 | tail -25; done; echo "--- etcd"; for c in $(crictl ps -a --name etcd -q 2>/dev/null | head -1); do crictl logs "$c" 2>&1 | tail -15; done; echo "--- limites"; cat /proc/sys/fs/inotify/max_user_instances /proc/sys/fs/inotify/max_user_watches; free -m' 2>&1 | sed 's/^/      /'
+fi
+# Enveloppe kind (#291) : l'adresse de l'API est rendue joignable du conteneur
+reussit "cluster créé à la main : adresse joignable du conteneur" "kubectl config view -o jsonpath='{.clusters[?(@.name==\"kind-$KIND_TEST\")].cluster.server}'" "$KIND_TEST-control-plane:6443|host.docker.internal"
+reussit "cluster créé à la main : kubectl lui parle" "kubectl --context kind-$KIND_TEST get nodes" "Ready"
+reussit "activer kubernetes : metrics-server sur kind" "devzone activer kubernetes" "metrics-server : installé .*kind-$KIND_TEST"
+reussit "métriques disponibles" "for i in \$(seq 1 36); do kubectl --context kind-$KIND_TEST top nodes >/dev/null 2>&1 && exit 0; sleep 5; done; exit 1"
+reussit "metrics-server marqué comme installé par devzone" "kubectl --context kind-$KIND_TEST -n kube-system get deployment metrics-server -o jsonpath='{.metadata.labels.devzone}'" "^installe$"
+# Désinstallation lancée dans le conteneur : seul le cluster kind-$KIND_TEST est vu
+reussit "désinstaller : retire le metrics-server de devzone" "CONFIRMER=oui bash core/scripts/desinstaller.sh" "metrics-server retiré : kind-$KIND_TEST"
+echoue "metrics-server absent après désinstallation" "kubectl --context kind-$KIND_TEST -n kube-system get deployment metrics-server"
 echoue "metrics-server.sh : contexte inconnu" "bash .devcontainer/metrics-server.sh nexistepas" "contexte inconnu"
 reussit "désactiver kubernetes" "devzone desactiver kubernetes" "kubernetes désactivé"
-reussit "cluster kind toujours utilisable" "kubectl --context kind-test get nodes" "Ready"
+reussit "cluster kind toujours utilisable" "kubectl --context kind-$KIND_TEST get nodes" "Ready"
 
 echo "▶ Git et hooks repowarden"
 echoue "commit sans identité refusé" "cd /tmp && rm -rf t1 && git init -q t1 && cd t1 && echo x >f && git add f && git commit -qm 'feat: x'" "tell me who you are|unable to auto-detect"
@@ -158,7 +180,7 @@ demarrer --remove-existing-container
 reussit "rebuild : modules gardés" "devzone" "✔ module ia"
 reussit "rebuild : ia réinstallé" "claude --version" "Claude Code"
 reussit "rebuild : volume gardé" "cat ~/.config/git/temoin" "témoin"
-reussit "rebuild : cluster kind conservé" "kind get clusters" "^test$"
+reussit "rebuild : cluster kind conservé" "kind get clusters" "^${KIND_TEST}$"
 reussit "rebuild : identité conservée dans le volume" "git config --file ~/.config/git/config user.name" "^Test$"
 echoue "rebuild : volume sans réglages machine" "git config --file ~/.config/git/config --get-all credential.https://github.com.helper"
 reussit "rebuild : réglages machine dans ~/.gitconfig" "git config --file ~/.gitconfig --get-all credential.https://github.com.helper" "gh auth git-credential"
@@ -169,15 +191,14 @@ hote() { (cd "$COPIE" && KUBECONFIG=/nexiste/pas "$@") 2>&1; }
 restants() { docker volume ls -q | grep -c "^${DEVZONE_VOLUMES}-" || true; }
 id="$(docker ps -q --filter "label=devcontainer.local_folder=$COPIE")"
 IMAGE_TEST="$(docker inspect "$id" --format '{{.Config.Image}}')"
-DIND_TEST="$(docker inspect "$id" --format '{{range .Mounts}}{{if eq .Destination "/var/lib/docker"}}{{.Name}}{{end}}{{end}}')"
 (cd "$COPIE" && make down >/dev/null)
-if [ -f "$COPIE/.devzone.etat" ]; then ok "make down : image et Docker interne notés"; else ko "make down : image et Docker interne notés" "pas de .devzone.etat"; fi
+if [ -f "$COPIE/.devzone.etat" ]; then ok "make down : image notée"; else ko "make down : image notée" "pas de .devzone.etat"; fi
 avant="$(restants)"
 if ! sortie="$(hote bash core/scripts/desinstaller.sh </dev/null)" && [ "$(restants)" = "$avant" ]; then ok "sans confirmation : rien n'est supprimé"; else ko "sans confirmation : rien n'est supprimé" "$sortie"; fi
 sortie="$(hote env CONFIRMER=oui GARDER=connexions bash core/scripts/desinstaller.sh)"
 gardes="$(docker volume ls -q | grep "^${DEVZONE_VOLUMES}-" | sed "s/^${DEVZONE_VOLUMES}-//" | sort | tr '\n' ' ')"
 if [ "$gardes" = "claude config gh git opencode-config opencode-data " ]; then ok "GARDER=connexions : seules les connexions restent"; else ko "GARDER=connexions : seules les connexions restent" "restants : $gardes"$'\n'"$sortie"; fi
-if [ -n "$DIND_TEST" ] && ! docker volume inspect "$DIND_TEST" >/dev/null 2>&1 && ! docker image inspect "$IMAGE_TEST" >/dev/null 2>&1; then ok "après make down : image et Docker interne supprimés"; else ko "après make down : image et Docker interne supprimés" "$IMAGE_TEST $DIND_TEST"; fi
+if ! docker image inspect "$IMAGE_TEST" >/dev/null 2>&1; then ok "après make down : image supprimée"; else ko "après make down : image supprimée" "$IMAGE_TEST"; fi
 demarrer
 sortie="$(hote env CONFIRMER=oui bash core/scripts/desinstaller.sh)"
 if [ -z "$(docker ps -aq --filter "label=devcontainer.local_folder=$COPIE")" ] && [ "$(restants)" = 0 ] && ! docker image inspect "$IMAGE_TEST" >/dev/null 2>&1; then

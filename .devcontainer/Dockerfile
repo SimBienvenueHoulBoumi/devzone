@@ -58,8 +58,14 @@ RUN set -eu; \
     installer gitleaks "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_${gl_arch}.tar.gz" "$gl_sha"; \
     curl -fsSL "https://github.com/kubernetes-sigs/kind/releases/download/v${KIND_VERSION}/kind-linux-${arch}" -o /tmp/kind; \
     echo "$kind_sha  /tmp/kind" | sha256sum -c --quiet; \
-    install -m 0755 /tmp/kind /usr/local/bin/kind; \
+    install -m 0755 /tmp/kind /usr/local/bin/kind-reel; \
     rm -f /tmp/kind
+
+# kind passe par une enveloppe (#291) : avec le Docker de l'hôte, un cluster
+# créé à la main doit être rendu joignable depuis le conteneur (kube-joignable.sh)
+COPY kube-joignable.sh /usr/local/lib/devzone/kube-joignable.sh
+COPY kind-enveloppe.sh /usr/local/bin/kind
+RUN chmod 0644 /usr/local/lib/devzone/kube-joignable.sh && chmod 0755 /usr/local/bin/kind
 
 COPY --from=uv /uv /uvx /usr/local/bin/
 

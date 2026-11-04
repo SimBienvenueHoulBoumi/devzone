@@ -4,6 +4,8 @@
 
 devzone est un environnement de développement prêt en une commande : Java, Node, Python, Docker et Kubernetes dans un conteneur, identique sur Mac, Linux et Windows. Il s'adresse à toute personne qui souhaite développer sans installer d'outils sur sa machine, avec les mêmes versions pour toute l'équipe.
 
+**Sécurité** : par défaut, devzone utilise le Docker et le Kubernetes de votre machine hôte au lieu de son Docker interne (Docker-in-Docker). C'est un compromis de sécurité assumé : le socket Docker de l'hôte donne un accès administrateur à son Docker, y compris pour les agents IA. Cette configuration est documentée ci-dessous.
+
 ## Pourquoi devzone ?
 
 - **Rien à installer à part Docker** : tout le reste tourne dans un conteneur.
@@ -97,7 +99,7 @@ Pour en savoir plus : [Mettre en route un projet](https://github.com/SimBienvenu
 | Domaine | Outils |
 |---|---|
 | Langages | Java 21 + Maven, Node LTS + pnpm, Python 3.12 + uv |
-| Conteneurs, Kubernetes | Docker (Docker-in-Docker), kubectl, helm, k9s, kind ; connexion au cluster de l'hôte (module `kubernetes`) |
+| Conteneurs, Kubernetes | Docker de l'hôte (socket partagé), kubectl, helm, k9s, kind ; connexion au cluster de l'hôte (module `kubernetes`) ; Testcontainers (`TESTCONTAINERS_HOST_OVERRIDE`) ; montages (`$LOCAL_WORKSPACE_FOLDER`) |
 | GitHub (ou GitLab), qualité | gh, ou glab connecté à une instance GitLab (`devzone plateforme gitlab` dans le conteneur, [docs/reference.md](docs/reference.md#plateforme-github-ou-gitlab)) ; repowarden (hooks git globaux), shellcheck, bats, actionlint, gitleaks, ruff, vulture, pytest |
 | Assistants IA | Claude Code, opencode (module `ia`, désactivé par défaut) |
 
@@ -119,7 +121,7 @@ Pour en savoir plus : [Mettre en route un projet](https://github.com/SimBienvenu
 
 **Module `kubernetes`** : active à chaque démarrage la connexion au cluster de l'hôte et l'installation de metrics-server sur les clusters locaux (pour voir le CPU et la RAM dans k9s). Pour l'activer : `devzone activer kubernetes`. Sans ce module, kubectl, helm, k9s et kind restent installés.
 
-**Plateforme GitHub ou GitLab** : GitHub par défaut (comportement actuel). Pour servir une équipe sur GitLab : `devzone plateforme gitlab --url URL` (ou sans `--url` quand le module `gitlab` est activé, pour l'instance de test) : glab est installé (version figée, somme vérifiée) et connecté à l'instance, et `devzone` l'affiche à la place des contrôles `gh`. `devzone plateforme github` revient en arrière (glab retiré). Détails dans [docs/reference.md](docs/reference.md#plateforme-github-ou-gitlab).
+**Plateforme GitHub ou GitLab** : GitHub par défaut (nouvelle architecture). Pour servir une équipe sur GitLab : `devzone plateforme gitlab --url URL` (ou sans `--url` quand le module `gitlab` est activé, pour l'instance de test) : glab est installé (version figée, somme vérifiée) et connecté à l'instance, et `devzone` l'affiche à la place des contrôles `gh`. `devzone plateforme github` revient en arrière (glab retiré). GitLab est accessible directement depuis le poste sans relais temporaire. Détails dans [docs/reference.md](docs/reference.md#plateforme-github-ou-gitlab).
 
 **Module `postgres`** : un PostgreSQL partagé, une base par projet (voir [Accéder à PostgreSQL](#accéder-à-postgresql)). Pour l'activer : `devzone activer postgres`.
 
@@ -164,9 +166,10 @@ Autres commandes : `devzone postgres liste`, `devzone postgres psql monprojet` (
 ## Questions fréquentes
 
 - **Docker absent ou arrêté** : `npx devzone`, `make up`, `make rebuild` et `make desinstaller` vérifient Docker avant tout et disent quoi faire : l'installer (Docker Desktop, ou Docker Engine sous Linux), démarrer Docker Desktop, ou, sous Linux, ajouter ton compte au groupe `docker` (`sudo usermod -aG docker $USER`, puis une nouvelle session). Avec `npx devzone mon-devzone`, le dossier est créé quand même : une fois Docker démarré, `cd mon-devzone && make shell`.
+- **Accès au socket Docker de l'hôte** : le socket Docker de la machine hôte est monté dans le conteneur avec accès en lecture seule. Cela offre un accès administrateur au Docker de l'hôte, y compris pour les agents IA. C'est un compromis de sécurité assumé documenté dans la section Sécurité. Pour restreindre l'accès, utilisez les mécanismes propres à Docker Desktop/Linux.
 - **Le premier lancement est long** : c'est normal (construction de l'image, téléchargement des images de base). Il prend 4 à 5 min mesurées, plus le téléchargement des images de base sur une machine neuve.
 - **`make` est absent sous Windows** : tu peux utiliser `npx @devcontainers/cli` (voir le tableau « Au quotidien ») ou Git Bash. Les scripts sont compatibles (fins de ligne LF).
-- **Pas de cluster Kubernetes visible** : devzone ne crée jamais de cluster. Avec le module `kubernetes` actif, il tente de se connecter à celui de l'hôte. Sinon, crée un cluster local avec `kind create cluster`.
+- **Pas de cluster Kubernetes visible** : devzone ne crée jamais de cluster. Avec le module `kubernetes` actif, il tente de se connecter au cluster de l'hôte (via `host.docker.internal`). Sinon, crée un cluster local avec `kind create cluster`.
 - **Problème d'identité git pour commiter** : règle-la une seule fois. Avec GitHub : `gh auth login -s workflow` (l'identité est déduite automatiquement). Sans GitHub : `git config --file ~/.config/git/config user.name "<nom>"` et `git config --file ~/.config/git/config user.email "<email>"`.
 - **`make up` semble bloqué** : il affiche ses étapes et un signe de vie au moins toutes les 30 s ; le journal complet est dans `.devzone.log`.
 
@@ -176,7 +179,7 @@ Autres commandes : `devzone postgres liste`, `devzone postgres psql monprojet` (
 make desinstaller
 ```
 
-Cette commande supprime le conteneur, l'image `vsc-devzone-…`, les volumes `devzone-*`, le volume du Docker interne (images et clusters kind créés dans le conteneur) ainsi que les éventuels metrics-server installés par devzone sur les clusters locaux. Elle **ne touche jamais** à `workspace/` (tes projets). Pour garder tes connexions (GitHub, git, Claude Code, opencode et modules) : `make desinstaller GARDER=connexions`.
+Cette commande supprime le conteneur, l'image `vsc-devzone-…`, les volumes `devzone-*`, les events du Docker de l'hôte et les clusters kind créés sur l'hôte, les namespaces `devzone-postgres` et les étiquettes `app.kubernetes.io/managed-by=devzone` sur les clusters de l'hôte, ainsi que les éventuels metrics-server installés par devzone. Les ressources sont filtrées par l'étiquette `devzone.instance` pour ne cibler que l'instance courante. Elle **ne touche jamais** à `workspace/` (tes projets). Pour garder tes connexions (GitHub, git, Claude Code, opencode et modules) : `make desinstaller GARDER=connexions`.
 
 Avec la commande installée globalement (`npm install -g devzone`), tu peux aussi lancer, dans le dossier du devzone :
 
@@ -190,6 +193,7 @@ Même effet que `make desinstaller`. Ensuite seulement, pour retirer la commande
 npm uninstall -g devzone
 ```
 
+Même effet que `make desinstaller`.
 ## Pour aller plus loin
 
 - [Référence détaillée](https://github.com/SimBienvenueHoulBoumi/devzone/blob/main/docs/reference.md)
