@@ -2,13 +2,13 @@
 # Versions figées du conteneur : compare repowarden (post-create.sh) et les
 # assistants IA (lignes IA_…, devzone) à la dernière version npm, ou applique
 # une montée.
-#   bash core/scripts/versions.sh
+#   bash manage/scripts/versions.sh
 #       une ligne « paquet ancienne nouvelle » par paquet en retard, rien sinon
-#   bash core/scripts/versions.sh --installees
+#   bash manage/scripts/versions.sh --installees
 #       une ligne « paquet figée installée » par outil installé en retard
-#   bash core/scripts/versions.sh --appliquer <paquet> <version>
+#   bash manage/scripts/versions.sh --appliquer <paquet> <version>
 #       remplace cette version figée dans son fichier, rien d'autre
-#   bash core/scripts/versions.sh --ticket-existant <paquet> <auteur>
+#   bash manage/scripts/versions.sh --ticket-existant <paquet> <auteur>
 #       « numéro<TAB>titre » du ticket ouvert par <auteur>, rien sinon
 # Compatible bash 3.2 (macOS).
 set -euo pipefail
@@ -150,17 +150,17 @@ case "${1:-}" in
     --installees) comparer_installees ;;
     --appliquer)
         [ "$#" -eq 3 ] ||
-            { echo "usage : bash core/scripts/versions.sh [--installees | --appliquer <paquet> <version> | --ticket-existant <paquet> <auteur>]" >&2; exit 2; }
+            { echo "usage : bash manage/scripts/versions.sh [--installees | --appliquer <paquet> <version> | --ticket-existant <paquet> <auteur>]" >&2; exit 2; }
         appliquer "$2" "$3"
         ;;
     --ticket-existant)
         [ "$#" -eq 3 ] ||
-            { echo "usage : bash core/scripts/versions.sh [--installees | --appliquer <paquet> <version> | --ticket-existant <paquet> <auteur>]" >&2; exit 2; }
+            { echo "usage : bash manage/scripts/versions.sh [--installees | --appliquer <paquet> <version> | --ticket-existant <paquet> <auteur>]" >&2; exit 2; }
         ticket_existant "$2" "$3"
         ;;
     -h | --help) sed -n '2,17p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' ;;
     *)
-        echo "usage : bash core/scripts/versions.sh [--installees | --appliquer <paquet> <version> | --ticket-existant <paquet> <auteur>]" >&2
+        echo "usage : bash manage/scripts/versions.sh [--installees | --appliquer <paquet> <version> | --ticket-existant <paquet> <auteur>]" >&2
         exit 2
         ;;
 esac

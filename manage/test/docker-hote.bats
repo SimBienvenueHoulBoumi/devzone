@@ -172,7 +172,7 @@ DOCKER
     printf '#!/usr/bin/env bash\necho "kind $*" >>"$BATS_TEST_TMPDIR/kind.log"\n' >"$BATS_TEST_TMPDIR/bin/kind"
     chmod +x "$BATS_TEST_TMPDIR/bin/kind"
     : >"$BATS_TEST_TMPDIR/kind.log"
-    run bash "$BATS_TEST_DIRNAME/../../core/scripts/desinstaller.sh"
+    run bash "$BATS_TEST_DIRNAME/../../manage/scripts/desinstaller.sh"
     [ "$status" -eq 0 ]
     grep -q "docker rm -f KIND_DEVZONE_ID" "$BATS_TEST_TMPDIR/docker.log"
     grep -q "docker rm -f KIND_GITLAB_ID" "$BATS_TEST_TMPDIR/docker.log"
@@ -241,7 +241,7 @@ exit 0
 DOCKER
     chmod +x "$BATS_TEST_TMPDIR/bin/docker"
     : >"$BATS_TEST_TMPDIR/docker.log"
-    run bash "$BATS_TEST_DIRNAME/../../core/scripts/desinstaller.sh"
+    run bash "$BATS_TEST_DIRNAME/../../manage/scripts/desinstaller.sh"
     [ "$status" -eq 0 ]
     [[ "$output" == *"make desinstaller sur ta machine"* ]] || false
     ! grep -qE "docker (rm|rmi|volume rm|network rm)" "$BATS_TEST_TMPDIR/docker.log" || false

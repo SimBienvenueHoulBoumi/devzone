@@ -4,7 +4,7 @@
 # tapée dans un vrai terminal, chaque commande avec un délai maximal (make
 # test-cli). Job windows : fins de ligne, paquet npm (installé dans un préfixe
 # isolé, jamais le global de la machine) et commande devzone sous windows-latest
-# (core/test/windows.sh, jouable en local), puis même parcours via cmd avec une
+# (manage/test/windows.sh, jouable en local), puis même parcours via cmd avec une
 # installation réellement globale (raccourci .cmd de npm, le cas d'un utilisateur
 # Windows). Job ia-arm64 : assistants IA installés aux versions figées sur
 # arm64 (Mac Apple Silicon), claude et opencode vérifiés.
@@ -15,8 +15,8 @@
 # toujours exister) ; le job changements décide par chemin : fonctionnel, cli,
 # windows et ia-arm64 (une dizaine de minutes chacun, 15 pour windows) ne
 # tournent que si la PR touche le conteneur, les tests, la CLI, .gitattributes
-# ou package.json (core/test/ci-conteneur.sh) ; une PR de docs seule n'attend pas.
-# Job bats : bats core/test/ (tests unitaires) sur chaque PR, sans décision
+# ou package.json (manage/test/ci-conteneur.sh) ; une PR de docs seule n'attend pas.
+# Job bats : bats manage/test/ (tests unitaires) sur chaque PR, sans décision
 # par chemin (quelques secondes ; un test peut lire la doc ou un workflow),
 # sous ubuntu et sous macOS avec le bash 3.2 du système (scripts de l'hôte).
 # tests-conteneur réussit si bats a réussi et si les quatre autres ont réussi,
@@ -57,7 +57,7 @@ jobs:
             pull_request)
               git diff --name-only "$BASE...$TETE" >changes.txt
               cat changes.txt
-              tester="$(bash core/test/ci-conteneur.sh a-tester <changes.txt)"
+              tester="$(bash manage/test/ci-conteneur.sh a-tester <changes.txt)"
               ;;
             push) tester=false ;; # develop et main : déjà testés par la PR, bats seul
             *) tester=true ;;     # à la main : tout tourne
@@ -72,7 +72,7 @@ jobs:
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v7
-      - run: bash core/test/fonctionnel.sh
+      - run: bash manage/test/fonctionnel.sh
 
   cli:
     needs: changements
@@ -81,7 +81,7 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
-      - run: bash core/test/cli-terminal.sh
+      - run: bash manage/test/cli-terminal.sh
 
   windows:
     needs: changements
@@ -96,11 +96,11 @@ jobs:
           git config --global core.autocrlf true
           git config --global core.safecrlf false
       - uses: actions/checkout@v7
-      # Les fins de ligne sont vérifiées par core/test/windows.sh (même critère que la
-      # garde de core/test/cli.bats : tout fichier suivi commençant par #!, Makefile)
-      - name: Tests Windows sous Git Bash (core/test/windows.sh)
+      # Les fins de ligne sont vérifiées par manage/test/windows.sh (même critère que la
+      # garde de manage/test/cli.bats : tout fichier suivi commençant par #!, Makefile)
+      - name: Tests Windows sous Git Bash (manage/test/windows.sh)
         shell: bash
-        run: bash core/test/windows.sh
+        run: bash manage/test/windows.sh
       # Sous shell: cmd, une commande qui échoue n'arrête pas le script : chaque
       # commande qui doit réussir est suivie de || exit /b 1, et la fin du
       # script est explicite (sans elle, l'étape prend le code de la dernière
@@ -180,7 +180,7 @@ jobs:
           claude --version
           opencode --version
 
-  # Tests unitaires (bats core/test/) sur chaque PR et chaque push de develop
+  # Tests unitaires (bats manage/test/) sur chaque PR et chaque push de develop
   # et main (#192). ubuntu : toute la suite. macOS : /bin/bash (3.2, celui du
   # système) en tête du PATH, pour les scripts qui tournent sur l'hôte ou en
   # CI (commande npm, lancer.sh, docker.sh, desinstaller.sh, versions.sh,
@@ -200,15 +200,15 @@ jobs:
           mkdir -p "$RUNNER_TEMP/bash32"
           ln -s /bin/bash "$RUNNER_TEMP/bash32/bash"
           echo "$RUNNER_TEMP/bash32" >>"$GITHUB_PATH"
-      - name: bats core/test/ (ubuntu)
+      - name: bats manage/test/ (ubuntu)
         if: runner.os == 'Linux'
-        run: npx --yes bats@1.10.0 core/test/
+        run: npx --yes bats@1.10.0 manage/test/
       - name: bats des scripts de l'hôte sous bash 3.2 (macOS)
         if: runner.os == 'macOS'
         run: |
           bash --version | head -1
           bash -c '[ "${BASH_VERSINFO[0]}" = 3 ]'
-          npx --yes bats@1.10.0 core/test/cli.bats core/test/versions.bats core/test/ci-conteneur.bats core/test/agent.bats
+          npx --yes bats@1.10.0 manage/test/cli.bats manage/test/versions.bats manage/test/ci-conteneur.bats manage/test/agent.bats
 
   # Synthèse exigée pour merger (requiredChecks) : toujours lancée, jamais
   # « skipped » (GitHub compterait un job sauté comme réussi)
@@ -228,4 +228,4 @@ jobs:
           WINDOWS: ${{ needs.windows.result }}
           IA_ARM64: ${{ needs.ia-arm64.result }}
           BATS: ${{ needs.bats.result }}
-        run: bash core/test/ci-conteneur.sh synthese "$TESTER" "$CHANGEMENTS" "$FONCTIONNEL" "$CLI" "$WINDOWS" "$IA_ARM64" "$BATS"
+        run: bash manage/test/ci-conteneur.sh synthese "$TESTER" "$CHANGEMENTS" "$FONCTIONNEL" "$CLI" "$WINDOWS" "$IA_ARM64" "$BATS"
