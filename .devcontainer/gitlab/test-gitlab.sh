@@ -25,6 +25,8 @@ HOSTS="${DEVZONE_HOSTS:-/etc/hosts}"
 URL="${GITLAB_TEST_URL:-http://gitlab.localhost:8929}"
 # Délai d'attente du pipeline : 600 s par défaut, court dans les tests
 DELAI_PIPELINE="${GITLAB_TEST_PIPELINE:-600}"
+# Intervalle d'interrogation du pipeline : 5 s par défaut, court dans les tests
+INTERVALLE="${GITLAB_TEST_INTERVALLE:-5}"
 # Réf. de la suite d'intégration repowarden (#533)
 REF_REPOWARDEN="${REPOWARDEN_TEST_REF:-develop}"
 
@@ -82,7 +84,7 @@ api() {
 
 lire_jeton() {
     if [ ! -f "$FICHIER_JETON" ]; then
-        RAISON="jeton root absent ($FICHIER_JETON) : devzone activer gitlab"
+        RAISON="jeton root absent ($FICHIER_JETON) : lancer avec la commande devzone test-gitlab du PATH, ou régler DEVZONE_RACINE sur la racine du dépôt activé"
         return 1
     fi
     JETON="$(cat "$FICHIER_JETON")"
@@ -193,13 +195,16 @@ etape_pipeline() {
             RAISON="délai ${DELAI_PIPELINE} s dépassé (état ${etat:-inconnu}) : ${web_url:-$URL/devzone/demo/-/pipelines/$id}"
             return 1
         fi
-        sleep 1
+        sleep "$INTERVALLE"
     done
 }
 
 # 5. Clones HTTP et SSH : clé ed25519 jetable déposée sur root, puis retirée
-# par le trap. Le clone HTTP porte le jeton dans un en-tête git, jamais dans
-# l'URL ni dans .git/config.
+# par le trap. Le clone HTTP s'authentifie en Basic oauth2 + jeton, fournie
+# par un assistant d'identifiants qui lit le fichier (un en-tête git
+# http.extraHeader passerait le jeton en clair dans les arguments d'un
+# processus) : le jeton ne paraît ni dans ces arguments, ni dans l'URL, ni
+# dans .git/config.
 etape_clones() {
     local d pub reponse
     lire_jeton || return 1
@@ -229,8 +234,9 @@ etape_clones() {
         RAISON="clone SSH (ssh://git@gitlab.localhost:2224/devzone/demo.git) impossible"
         return 1
     fi
-    if ! git -c "http.extraHeader=PRIVATE-TOKEN: $JETON" clone -q \
-        "$URL/devzone/demo.git" "$d/http-demo" >/dev/null 2>&1; then
+    if ! git -c credential.helper= \
+        -c "credential.helper=!f() { echo username=oauth2; printf 'password='; cat \"$FICHIER_JETON\"; echo; }; f" \
+        clone -q "$URL/devzone/demo.git" "$d/http-demo" >/dev/null 2>&1; then
         RAISON="clone HTTP de devzone/demo impossible"
         return 1
     fi
@@ -277,13 +283,14 @@ etape_plateforme() {
 # module, avec l'URL et le jeton en variables d'environnement. Absente à la
 # réf choisie → étape sautée, pas en échec.
 etape_repowarden() {
-    local d
+    local d log bats_exit bats_output
     lire_jeton || return 1
     d="$(mktemp -d "${TMPDIR:-/tmp}/devzone-test-gitlab-repowarden.XXXXXX")" || {
         RAISON="dossier temporaire impossible"
         return 1
     }
     TMP_DIRS+=("$d")
+    log="${TMPDIR:-/tmp}/devzone-test-gitlab-repowarden.log"
     if ! git clone -q --depth 1 --branch "$REF_REPOWARDEN" \
         https://github.com/simdevWarden/repowarden.git "$d/repowarden" >/dev/null 2>&1; then
         RAISON="clone de repowarden (réf. $REF_REPOWARDEN) impossible"
@@ -297,9 +304,15 @@ etape_repowarden() {
         RAISON="bats introuvable"
         return 1
     fi
-    if ! REPOWARDEN_IT_GITLAB_URL="$URL" REPOWARDEN_IT_GITLAB_TOKEN="$JETON" \
-        bats "$d/repowarden/test/gitlab/" >/dev/null 2>&1; then
-        RAISON="la suite test/gitlab a échoué"
+    if bats_output="$(REPOWARDEN_IT_GITLAB_URL="$URL" REPOWARDEN_IT_GITLAB_TOKEN="$JETON" \
+        bats "$d/repowarden/test/gitlab/" 2>&1)"; then
+        bats_exit=0
+    else
+        bats_exit=$?
+    fi
+    printf '%s' "$bats_output" | sed "s/${JETON}/TOKEN_MASQUE/g" > "$log"
+    if [ "$bats_exit" -ne 0 ]; then
+        RAISON="la suite test/gitlab a échoué (journal : $log)"
         return 1
     fi
     return 0

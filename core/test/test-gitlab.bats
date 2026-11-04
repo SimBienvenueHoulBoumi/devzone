@@ -12,8 +12,11 @@ setup() {
     export DEVZONE_HOSTS="$BATS_TEST_TMPDIR/hosts"
     export KIND_CLUSTERS="$BATS_TEST_TMPDIR/clusters"
     export GITLAB_TEST_PIPELINE=2
+    export GITLAB_TEST_INTERVALLE=0
+    export TMPDIR="$BATS_TEST_TMPDIR/tmp"
     export DEVZONE_TEST_DEVZONE="$BATS_TEST_TMPDIR/bin/devzone"
-    mkdir -p "$HOME/.local/bin" "$DEVZONE_RACINE/workspace/.gitlab" "$BATS_TEST_TMPDIR/bin"
+    mkdir -p "$HOME/.local/bin" "$DEVZONE_RACINE/workspace/.gitlab" \
+        "$BATS_TEST_TMPDIR/bin" "$TMPDIR"
     printf 'jeton-root-secret' >"$DEVZONE_RACINE/workspace/.gitlab/root-token"
     printf 'gitlab\n' >"$KIND_CLUSTERS"
     printf 'kind-gitlab\nkind-dev\n' >"$BATS_TEST_TMPDIR/contextes"
@@ -104,6 +107,9 @@ exit 0
 KUBE
 
     # curl : API GitLab simulée (pipeline, clés, état du module)
+    export CURL_SETUP="$BATS_TEST_TMPDIR/curl_setup"
+    mkdir -p "$CURL_SETUP"
+    printf '0' >"$CURL_SETUP/pipeline_count"
     cat >"$BATS_TEST_TMPDIR/bin/curl" <<'CURL'
 #!/usr/bin/env bash
 echo "curl $*" >>"$BATS_TEST_TMPDIR/curl.log"
@@ -118,17 +124,29 @@ while [ $# -gt 0 ]; do
         *) url="$1"; shift ;;
     esac
 done
-case "$url" in
+pipeline_file="$CURL_SETUP/pipeline_count"
+    case "$url" in
     *"/api/v4/projects/devzone%2Fdemo/pipeline")
         [ -n "${FAUX_PIPELINE_CREATION_KO:-}" ] && exit 22
         printf '{"id":42,"web_url":"http://gitlab.localhost:8929/devzone/demo/-/pipelines/42"}\n'
         ;;
     *"/api/v4/projects/devzone%2Fdemo/pipelines/42")
-        case "${FAUX_PIPELINE_ETAT:-success}" in
-            success) printf '{"status":"success"}\n' ;;
-            failed) printf '{"status":"failed"}\n' ;;
-            *) printf '{"status":"running"}\n' ;;
-        esac
+        if [ -n "${FAUX_PIPELINE_ETAT:-}" ]; then
+            case "${FAUX_PIPELINE_ETAT}" in
+                success) printf '{"status":"success"}\n' ;;
+                failed) printf '{"status":"failed"}\n' ;;
+                *) printf '{"status":"running"}\n' ;;
+            esac
+        else
+            # Par défaut : transition running → success au prochain appel
+            pipeline_count="$(cat "$pipeline_file" 2>/dev/null || echo 0)"
+            if [ "$pipeline_count" -eq 0 ]; then
+                printf '{"status":"running"}\n'
+            else
+                printf '{"status":"success"}\n'
+            fi
+            printf '%d' $((pipeline_count + 1)) >"$pipeline_file"
+        fi
         ;;
     *"/api/v4/user/keys/7") exit 0 ;;
     *"/api/v4/user/keys")
@@ -227,11 +245,15 @@ esac
 exit 0
 GLAB
 
-    # bats : la suite d'intégration repowarden, simulée
+    # bats : la suite d'intégration repowarden, simulée ; en échec, elle
+    # affiche le jeton reçu pour vérifier qu'il est masqué dans le journal
     cat >"$BATS_TEST_TMPDIR/bin/bats" <<'BATS'
 #!/usr/bin/env bash
 echo "bats $*" >>"$BATS_TEST_TMPDIR/bats.log"
-[ -n "${FAUX_SUITE_KO:-}" ] && exit 1
+if [ -n "${FAUX_SUITE_KO:-}" ]; then
+    echo "échec de la suite avec le jeton ${REPOWARDEN_IT_GITLAB_TOKEN:-}"
+    exit 1
+fi
 exit 0
 BATS
 
@@ -329,6 +351,22 @@ GETENT
     [[ "$output" == *"délai 2 s dépassé"* ]] || false
 }
 
+@test "test-gitlab : étape 4, pipeline running puis success" {
+    run bash "$SCRIPT"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"✔ 4. pipeline"* ]] || false
+}
+
+@test "test-gitlab : étape 5, clone HTTP par assistant d'identifiants, jeton absent des arguments" {
+    run bash "$SCRIPT"
+    [ "$status" -eq 0 ]
+    grep -q 'credential.helper=!f()' "$BATS_TEST_TMPDIR/git.log" || false
+    grep -q 'username=oauth2' "$BATS_TEST_TMPDIR/git.log" || false
+    ! grep -q 'jeton-root-secret' "$BATS_TEST_TMPDIR/git.log" || false
+    # Le script refuse un clone dont .git/config contient le jeton : le
+    # succès de ce test prouve aussi que la doublure ne l'y a pas écrit.
+}
+
 @test "test-gitlab : étape 5, dépôt de la clé SSH impossible → ✖ avec la raison" {
     export FAUX_CLE_KO=1
     run bash "$SCRIPT"
@@ -398,6 +436,16 @@ GETENT
     [ "$status" -ne 0 ]
     [[ "$output" == *"✖ 7. intégration repowarden"* ]] || false
     [[ "$output" == *"suite test/gitlab a échoué"* ]] || false
+}
+
+@test "test-gitlab : étape 7, journal conservé avec le jeton masqué" {
+    export FAUX_SUITE_KO=1
+    run bash "$SCRIPT"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"devzone-test-gitlab-repowarden.log"* ]] || false
+    [ -f "$TMPDIR/devzone-test-gitlab-repowarden.log" ]
+    grep -q 'TOKEN_MASQUE' "$TMPDIR/devzone-test-gitlab-repowarden.log" || false
+    ! grep -q 'jeton-root-secret' "$TMPDIR/devzone-test-gitlab-repowarden.log" || false
 }
 
 @test "test-gitlab : étape 7, test/gitlab absent à la réf → sauté, code 0" {
