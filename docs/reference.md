@@ -232,6 +232,26 @@ devzone desactiver postgres                 # supprime PostgreSQL et TOUTES ses 
 - **Secrets** : mot de passe du superutilisateur `postgres` dans le secret `postgres-admin` et `workspace/.postgres/admin-password` (600) ; jamais régénéré tant que le secret existe ; jamais affiché.
 - **Désactivation** : namespace supprimé (volume compris), `workspace/.postgres/` supprimé, kind dédié supprimé s'il ne porte plus aucun service. `make desinstaller` supprime aussi le namespace d'un cluster de l'hôte.
 
+## Ports vers le poste
+
+`devzone port` rend accessibles depuis le poste les applications qui écoutent **dans** le conteneur devzone : un relais `alpine/socat` par port, sur le Docker de l'hôte (#290).
+
+```bash
+devzone port <n>              # ouvre 127.0.0.1:<n> du poste → <n> du conteneur
+devzone port                  # liste : port, ● actif ou ○ arrêté, application derrière
+devzone port --fermer <n>     # retire le relais et le port de l'état
+```
+
+- **Relais** : conteneur `devzone-<instance>-port-<n>`, étiqueté `devzone.instance=<instance>` et `devzone.port=<n>`, image figée `SOCAT_IMAGE=alpine/socat:1.8.0.3` (`.devcontainer/ports.sh`). Il publie `-p 127.0.0.1:<n>:<n>` seulement, avec `--restart unless-stopped`.
+- **Réseau et IP** : lus par `docker inspect "$(hostname)"` sur le Docker de l'hôte ; le relais rejoint le conteneur par son IP sur son réseau Docker. Conteneur devzone introuvable (Docker de l'hôte absent) : refus clair, code 1.
+- **État** : ligne `ports=8080,3000` dans `$RACINE/.devzone.modules`, triée et sans doublon ; `--fermer` retire le port. Le relais déjà ouvert est idempotent (message, code 0).
+- **Démarrage** : `demarrage.sh` appelle `ports.sh relancer`, qui supprime puis recrée chaque relais de l'état vers l'IP actuelle du conteneur (elle change à chaque redémarrage). Un échec affiche un avertissement sans bloquer le démarrage.
+- **Refus, code 1** : port non numérique ou hors 1-65535 ; Docker de l'hôte injoignable ; port déjà pris sur le poste (échec de `docker run`, « port is already allocated » ou « address already in use »), l'état restant inchangé.
+- **Plusieurs instances** : le nom du relais et l'étiquette portent `DEVZONE_INSTANCE` ; deux instances qui veulent le même port du poste : la seconde reçoit le refus « déjà utilisé ».
+- **Récapitulatif** : ligne `ports vers le poste` avec `8080 ●, 3000 ○`, ou `aucun (devzone port <n>)`.
+- **Désinstallation** : `make desinstaller` retire les conteneurs étiquetés `devzone.instance` (voir README, « Désinstaller »).
+- **Spring Boot** : l'application doit écouter sur `0.0.0.0` (défaut). Un `server.address=127.0.0.1` la rend injoignable depuis le relais.
+
 ## Cluster de devzone
 
 Les modules qui déploient un service (`postgres` ; `gitlab` avec #279) s'installent sur **un seul cluster**, choisi une fois et gardé dans l'état (`cluster=` dans `$RACINE/.devzone.modules`).
