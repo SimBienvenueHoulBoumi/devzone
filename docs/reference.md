@@ -194,6 +194,23 @@ devzone actif gitlab           # code 0 si GitLab est actif
 - **Secrets** : mot de passe root, jeton root, mot de passe de `dev` et jeton du runner dans `workspace/.gitlab/` (droits 600, ignorés par git, jamais affichés). Mot de passe root : `cat workspace/.gitlab/root-password`.
 - **Désactivation** : `devzone desactiver gitlab` supprime le cluster `gitlab`, retire `kind-gitlab` de `~/.kube/config`, remet le contexte courant d'avant et supprime `workspace/.gitlab/`. Rien d'autre n'est touché.
 
+### Essai de bout en bout : `devzone test-gitlab`
+
+`devzone test-gitlab` rejoue sur le poste l'essai réel du module et de la plateforme GitLab, que la CI GitHub ne peut pas lancer (8 Go de RAM). Le script est `.devcontainer/gitlab/test-gitlab.sh`.
+
+```bash
+devzone test-gitlab              # étapes 1 à 7
+devzone test-gitlab --complet    # désactive, contrôle qu'il ne reste rien, puis réinstalle
+devzone test-gitlab --statut     # publie aussi le statut gitlab-integration sur HEAD
+```
+
+- **Étapes**, chacune chronométrée : 1 module actif (sinon activé) ; 2 état « prêt » et runner en ligne ; 3 `gitlab.localhost` résolu vers l'IP de `host.docker.internal` (GitLab tourne sur le Docker de l'hôte, `gitlab.sh hote-poser`) ; 4 pipeline de `devzone/demo` relancé sur `main` et attendu jusqu'à `success` ; 5 clone SSH (clé ed25519 jetable) et clone HTTP authentifié par un assistant d'identifiants (Basic `oauth2` + jeton lu dans le fichier, jamais dans les arguments d'un processus, l'URL ni `.git/config`) ; 6 plateforme `gitlab` avec `glab repo clone`, puis retour à la plateforme d'avant ; 7 suite d'intégration `test/gitlab/` de repowarden ([#533](https://github.com/simdevWarden/repowarden/issues/533)), dossier absent à la réf → étape sautée avec la raison, échec → sortie gardée dans `${TMPDIR:-/tmp}/devzone-test-gitlab-repowarden.log` (jeton masqué) et citée dans la raison. Avec `--complet`, une étape 8 précède les autres : `devzone desactiver gitlab`, puis contrôle qu'il ne reste ni cluster `gitlab<instance>`, ni contexte `kind-gitlab<instance>` (noms calculés comme `gitlab.sh` et `cluster.sh`), ni conteneur étiqueté `devzone.instance=<instance>` du module sur le Docker de l'hôte, ni `workspace/.gitlab/`, ni ligne `# devzone:gitlab` de `/etc/hosts`.
+- **Résumé** : une ligne par étape (✔/✖/sauté, durée, raison) et un total ; le code de sortie n'est 0 que sans ✖ (une étape sautée n'échoue pas). Un jeton n'est jamais affiché.
+- **Nettoyage garanti** par `trap … EXIT` : clé SSH retirée de GitLab, dossiers temporaires supprimés, plateforme d'avant restaurée, même si une étape échoue.
+- **Variables** : `GITLAB_TEST_PIPELINE` (délai du pipeline, 600 s par défaut), `GITLAB_TEST_INTERVALLE` (intervalle d'interrogation du pipeline, 5 s par défaut), `REPOWARDEN_TEST_REF` (réf. de la suite d'intégration, `develop` par défaut), `DEVZONE_RACINE` (racine du dépôt, comme `gitlab.sh`).
+- **Durée indicative** : quelques dizaines de secondes sur une instance déjà prête ; plusieurs minutes si le module doit être installé (environ 7 min) et davantage avec `--complet`, qui réinstalle.
+- **`--statut`** : publie le résultat comme statut de commit `gitlab-integration` (`success`/`failure`, description = résumé court) sur `HEAD` du dépôt courant, par `gh api repos/<dépôt>/statuses/<sha>` avec le jeton du mainteneur. Refus clair si `gh` n'est pas connecté. Voir la règle dans [Contribuer](contribuer.md).
+
 
 ## PostgreSQL
 
