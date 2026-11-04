@@ -11,6 +11,7 @@ set -euo pipefail
 
 ICI="$(cd "$(dirname "$0")" && pwd)"
 RACINE="${DEVZONE_RACINE:-$(dirname "$(dirname "$ICI")")}"
+# shellcheck disable=SC2034 # lu par cluster.sh (bibliothèque sourcée)
 ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
 # shellcheck source=SCRIPTDIR/../cluster.sh
 . "$ICI/../cluster.sh"
