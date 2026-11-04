@@ -139,8 +139,8 @@ jobs:
           if not %SORTIE% equ 0 exit /b 1
           if not exist %RUNNER_TEMP%\dzcmd\Makefile exit /b 1
           if not exist %RUNNER_TEMP%\dzcmd\.devcontainer\devzone exit /b 1
-          if not exist %RUNNER_TEMP%\dzcmd\core\scripts\lancer.sh exit /b 1
-          if not exist %RUNNER_TEMP%\dzcmd\core\scripts\desinstaller.sh exit /b 1
+          if not exist %RUNNER_TEMP%\dzcmd\manage\scripts\lancer.sh exit /b 1
+          if not exist %RUNNER_TEMP%\dzcmd\manage\scripts\desinstaller.sh exit /b 1
           mkdir %RUNNER_TEMP%\plein || exit /b 1
           echo important > %RUNNER_TEMP%\plein\fichier
           call devzone %RUNNER_TEMP%\plein > %RUNNER_TEMP%\sortie.txt 2>&1
