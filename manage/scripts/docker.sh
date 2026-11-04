@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Vérification de Docker sur l'hôte, avant tout appel (sourcé par lancer.sh,
-# desinstaller.sh et la commande npm core/devzone) : sans elle, l'utilisateur
+# desinstaller.sh et la commande npm manage/devzone) : sans elle, l'utilisateur
 # ne voit que l'erreur brute du CLI devcontainers ou de docker.
 # DEVZONE_DOCKER : nom de la commande docker (tests : simuler son absence).
 # Compatible bash 3.2 (macOS).

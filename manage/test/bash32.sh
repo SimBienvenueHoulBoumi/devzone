@@ -2,7 +2,7 @@
 # Tests bats sous bash 3.2 (#211) : le job macOS du workflow les lance dans le
 # conteneur bash:3.2, bats installé ; ce script le fait à la main, ou via la
 # commande devzone test-bash32, avec la même liste que le job macOS.
-#   bash core/test/bash32.sh
+#   bash manage/test/bash32.sh
 #       les tests bats du job macOS, tels que le job macOS les lance
 #   devzone test-bash32
 #       même lancement, par la commande devzone
@@ -22,7 +22,7 @@ WORKFLOW="$RACINE/.github/workflows/fonctionnel.yml"
 MACOS_LINE=""
 BATS_VERSION=""
 while IFS= read -r line; do
-    if [[ "$line" == *"npx --yes bats@"* && "$line" == *"core/test/cli.bats"* ]]; then
+    if [[ "$line" == *"npx --yes bats@"* && "$line" == *"manage/test/cli.bats"* ]]; then
         MACOS_LINE="$line"
         BATS_VERSION="$(grep -oE 'bats@[0-9]+\.[0-9]+\.[0-9]+' <<<"$MACOS_LINE")"
         BATS_VERSION="${BATS_VERSION#bats@}"
@@ -30,7 +30,7 @@ while IFS= read -r line; do
     fi
 done < "$WORKFLOW"
 
-MATCHES="$(grep -oE 'core/test/[A-Za-z0-9_.-]+\.bats' <<<"$MACOS_LINE")"
+MATCHES="$(grep -oE 'manage/test/[A-Za-z0-9_.-]+\.bats' <<<"$MACOS_LINE")"
 LISTE="${MATCHES//$'\n'/ }"
 LISTE="${LISTE% }"
 

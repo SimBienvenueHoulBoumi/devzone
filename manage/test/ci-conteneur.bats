@@ -1,16 +1,16 @@
 #!/usr/bin/env bats
 # Tests du conteneur exigés pour merger : décision par chemin (lancer ou non
 # fonctionnel, cli, windows) et vérification de synthèse tests-conteneur
-# (core/test/ci-conteneur.sh, workflow fonctionnel.yml, .repowarden.conf).
+# (manage/test/ci-conteneur.sh, workflow fonctionnel.yml, .repowarden.conf).
 
 setup() {
     RACINE="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
-    SCRIPT="$RACINE/core/test/ci-conteneur.sh"
+    SCRIPT="$RACINE/manage/test/ci-conteneur.sh"
     WORKFLOW="$RACINE/.github/workflows/fonctionnel.yml"
 }
 
 @test "a-tester : documentation seule → false" {
-    run bash "$SCRIPT" a-tester <<<$'README.md\ndocs/reference.md\n.github/workflows/release.yml'
+    run bash "$SCRIPT" a-tester <<<$'README.md\nmanage/docs/reference.md\n.github/workflows/release.yml'
     [ "$status" -eq 0 ]
     [ "$output" = false ]
 }
@@ -22,15 +22,15 @@ setup() {
 }
 
 @test "a-tester : conteneur, tests, CLI, .gitattributes, package.json, workflow → true" {
-    for f in .devcontainer/devzone core/scripts/lancer.sh core/test/cli.bats core/devzone Makefile .gitattributes package.json .github/workflows/fonctionnel.yml; do
+    for f in .devcontainer/devzone manage/scripts/lancer.sh manage/test/cli.bats manage/devzone Makefile .gitattributes package.json .github/workflows/fonctionnel.yml; do
         run bash "$SCRIPT" a-tester <<<$'README.md\n'"$f"
         [ "$status" -eq 0 ]
         [ "$output" = true ] || { echo "non détecté : $f"; false; }
     done
 }
 
-@test "a-tester : nom proche d'un chemin suivi (docs/Makefile.md, package.json.bak) → false" {
-    run bash "$SCRIPT" a-tester <<<$'docs/Makefile.md\npackage.json.bak\nautre/core/x'
+@test "a-tester : nom proche d'un chemin suivi (manage/docs/Makefile.md, package.json.bak) → false" {
+    run bash "$SCRIPT" a-tester <<<$'manage/docs/Makefile.md\npackage.json.bak\nautre/manage/x'
     [ "$status" -eq 0 ]
     [ "$output" = false ]
 }
@@ -131,11 +131,11 @@ setup() {
     [[ "$bloc" != *"needs.changements"* ]] || { echo "bats doit tourner sur chaque PR"; false; }
     [[ "$bloc" == *"bats@"* ]] || false
     # ubuntu : toute la suite ; macOS : /bin/bash (3.2) en tête du PATH, vérifié
-    [[ "$bloc" == *"bats core/test/"* ]] || false
+    [[ "$bloc" == *"bats manage/test/"* ]] || false
     [[ "$bloc" == *"ln -s /bin/bash"* ]] || false
     [[ "$bloc" == *'BASH_VERSINFO[0]}" = 3'* ]] || false
     for f in cli.bats versions.bats ci-conteneur.bats agent.bats; do
-        [[ "$bloc" == *"core/test/$f"* ]] || { echo "non lancé sous macOS : $f"; false; }
+        [[ "$bloc" == *"manage/test/$f"* ]] || { echo "non lancé sous macOS : $f"; false; }
     done
 }
 
@@ -151,7 +151,7 @@ setup() {
     [ -n "$bloc" ]
     [[ "$bloc" == *"if: always()"* ]] || false
     [[ "$bloc" == *"needs: [changements, fonctionnel, cli, windows, ia-arm64, bats]"* ]] || false
-    [[ "$bloc" == *"bash core/test/ci-conteneur.sh synthese"* ]] || false
+    [[ "$bloc" == *"bash manage/test/ci-conteneur.sh synthese"* ]] || false
     [[ "$bloc" == *'"$WINDOWS" "$IA_ARM64" "$BATS"'* ]] || false
     [[ "$bloc" == *'BATS: ${{ needs.bats.result }}'* ]] || false
     for job in fonctionnel cli windows ia-arm64; do
@@ -164,16 +164,16 @@ setup() {
 # pas échouer (errexit ignoré avant bash 4.1), et « ! commande » jamais, quel
 # que soit bash : chaque condition de ce genre finit par || false
 @test "tests bats : aucune condition [[ … ]] ni ! commande sans || false (bash 3.2)" {
-    run grep -nE '^[[:space:]]*\[\[.*\]\][[:space:]]*$' "$RACINE"/core/test/*.bats
+    run grep -nE '^[[:space:]]*\[\[.*\]\][[:space:]]*$' "$RACINE"/manage/test/*.bats
     [ "$status" -ne 0 ] || { echo "$output"; false; }
-    run grep -nE '^[[:space:]]*! ' "$RACINE"/core/test/*.bats
+    run grep -nE '^[[:space:]]*! ' "$RACINE"/manage/test/*.bats
     [ -z "$(grep -v '|| false[[:space:]]*$' <<<"$output")" ] || { echo "$output"; false; }
 }
 
 # bash 3.2 lit l'apostrophe d'un commentaire placé dans un $( … ) multiligne
 # comme une chaîne ouverte : le fichier .bats entier ne se charge plus (#210)
 @test "tests bats : aucune apostrophe dans un commentaire à l'intérieur d'un \$( … ) multiligne" {
-    run awk '/\$\($/ { dans = 1; next } dans && /^[[:space:]]*\)/ { dans = 0 } dans && /^[[:space:]]*#.*'\''/ { print FILENAME ":" FNR }' "$RACINE"/core/test/*.bats
+    run awk '/\$\($/ { dans = 1; next } dans && /^[[:space:]]*\)/ { dans = 0 } dans && /^[[:space:]]*#.*'\''/ { print FILENAME ":" FNR }' "$RACINE"/manage/test/*.bats
     [ -z "$output" ] || { echo "apostrophe dans un commentaire de \$( … ) : $output"; false; }
 }
 
@@ -184,7 +184,7 @@ setup() {
 }
 
 @test "bash32.sh : liste passée à docker = job macOS" {
-    SCRIPT="$RACINE/core/test/bash32.sh"
+    SCRIPT="$RACINE/manage/test/bash32.sh"
     mkdir -p "$BATS_TEST_TMPDIR/bin"
     cat > "$BATS_TEST_TMPDIR/bin/docker" <<'DOCKER'
 #!/usr/bin/env bash
@@ -199,11 +199,11 @@ DOCKER
     run bash "$SCRIPT"
     [ "$status" -eq 0 ]
     grep -q "bash:3.2" "$BATS_TEST_TMPDIR/docker.log"
-    grep -q "core/test/cli.bats core/test/versions.bats core/test/ci-conteneur.bats core/test/agent.bats" "$BATS_TEST_TMPDIR/docker.log" || false
+    grep -q "manage/test/cli.bats manage/test/versions.bats manage/test/ci-conteneur.bats manage/test/agent.bats" "$BATS_TEST_TMPDIR/docker.log" || false
 }
 
 @test "bash32.sh : sans docker → code 2 et message" {
-    SCRIPT="$RACINE/core/test/bash32.sh"
+    SCRIPT="$RACINE/manage/test/bash32.sh"
     mkdir -p "$BATS_TEST_TMPDIR/bin"
     for c in bash grep tr head rm; do
         ln -sf "$(command -v "$c")" "$BATS_TEST_TMPDIR/bin/$c"
@@ -215,7 +215,7 @@ DOCKER
 }
 
 @test "bash32.sh : faux docker en échec → code 1" {
-    SCRIPT="$RACINE/core/test/bash32.sh"
+    SCRIPT="$RACINE/manage/test/bash32.sh"
     mkdir -p "$BATS_TEST_TMPDIR/bin"
     cat > "$BATS_TEST_TMPDIR/bin/docker" <<'DOCKER'
 #!/usr/bin/env bash
@@ -232,7 +232,7 @@ DOCKER
 }
 
 @test "bash32.sh : version bats du job macOS dans la liste docker" {
-    SCRIPT="$RACINE/core/test/bash32.sh"
+    SCRIPT="$RACINE/manage/test/bash32.sh"
     mkdir -p "$BATS_TEST_TMPDIR/bin"
     cat > "$BATS_TEST_TMPDIR/bin/docker" <<'DOCKER'
 #!/usr/bin/env bash
@@ -247,6 +247,6 @@ DOCKER
     run bash "$SCRIPT"
     [ "$status" -eq 0 ]
     grep -q "bash:3.2" "$BATS_TEST_TMPDIR/docker.log"
-    grep -q "core/test/cli.bats core/test/versions.bats core/test/ci-conteneur.bats core/test/agent.bats" "$BATS_TEST_TMPDIR/docker.log" || false
+    grep -q "manage/test/cli.bats manage/test/versions.bats manage/test/ci-conteneur.bats manage/test/agent.bats" "$BATS_TEST_TMPDIR/docker.log" || false
     grep -q "v1.10.0" "$BATS_TEST_TMPDIR/docker.log" || false
 }

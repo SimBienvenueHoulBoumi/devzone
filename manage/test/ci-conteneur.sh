@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Tests du conteneur exigés pour merger (workflow fonctionnel.yml) :
-#   bash core/test/ci-conteneur.sh a-tester < fichiers-changés
+#   bash manage/test/ci-conteneur.sh a-tester < fichiers-changés
 #       « true » si la PR touche le conteneur, les tests, la CLI,
 #       .gitattributes ou package.json (fonctionnel, cli, windows et ia-arm64 tournent),
 #       « false » sinon (une PR de docs seule n'attend pas 25 min)
-#   bash core/test/ci-conteneur.sh synthese <tester> <changements> <fonctionnel> <cli> <windows> <ia-arm64> <bats>
+#   bash manage/test/ci-conteneur.sh synthese <tester> <changements> <fonctionnel> <cli> <windows> <ia-arm64> <bats>
 #       vérification tests-conteneur (exigée pour merger) : code 0 si les
 #       tests bats ont réussi et si rien d'autre n'était à tester, ou si les
 #       quatre jobs du conteneur ont réussi ; 1 sinon (échec, annulation, job
@@ -12,12 +12,12 @@
 # Arguments de synthese : sortie tester du job changements, puis résultat
 # (needs.<job>.result) de changements, fonctionnel, cli, windows, ia-arm64
 # (assistants IA installés sur arm64, Mac Apple Silicon, #194) et bats
-# (bats core/test/, ubuntu et macOS, lancé sur chaque PR, #192).
+# (bats manage/test/, ubuntu et macOS, lancé sur chaque PR, #192).
 # Compatible bash 3.2 (macOS).
 set -euo pipefail
 
 # Chemins qui lancent les tests du conteneur : mêmes que l'ancien filtre paths
-CHEMINS='^(\.devcontainer/|core/|Makefile$|\.gitattributes$|package\.json$|\.github/workflows/fonctionnel\.yml$)'
+CHEMINS='^(\.devcontainer/|manage/(devzone|scripts|test)|Makefile$|\.gitattributes$|package\.json$|\.github/workflows/fonctionnel\.yml$)'
 
 # Lit les fichiers changés sur l'entrée : true si l'un d'eux touche un chemin
 # suivi, false sinon
@@ -57,7 +57,7 @@ synthese() {
 }
 
 usage() {
-    echo "usage : bash core/test/ci-conteneur.sh a-tester < fichiers | synthese <tester> <changements> <fonctionnel> <cli> <windows> <ia-arm64> <bats>" >&2
+    echo "usage : bash manage/test/ci-conteneur.sh a-tester < fichiers | synthese <tester> <changements> <fonctionnel> <cli> <windows> <ia-arm64> <bats>" >&2
     exit 2
 }
 
