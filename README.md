@@ -203,6 +203,20 @@ L'utilisateur d'un projet possède **sa** base (il y crée tables, index, donné
 
 > Le module `gitlab` a aussi son propre PostgreSQL (`gitlab-postgresql`) : il appartient à GitLab, n'y mets pas tes bases.
 
+## Accéder à une application depuis le poste
+
+Une application lancée **dans** le conteneur (par exemple un Spring Boot avec `./gradlew bootRun` sur le port 8080) n'est pas joignable depuis le poste : le conteneur devzone ne publie aucun port. `devzone port <n>` ouvre un relais `alpine/socat` (version figée) sur le Docker de l'hôte, de `127.0.0.1:<port>` du poste vers le port du conteneur.
+
+```sh
+devzone port 8080        # ouvre le relais du port 8080
+devzone port             # liste : port, ● actif ou ○ arrêté, application derrière
+devzone port --fermer 8080
+```
+
+Depuis le poste : `http://localhost:8080`. Le relais est recréé automatiquement au démarrage du conteneur, vers l'adresse actuelle du conteneur ; il est retiré par `make desinstaller` (étiquette `devzone.instance`).
+
+Spring Boot écoute sur `0.0.0.0` par défaut : ne fixe pas `server.address` à `127.0.0.1`, sinon le relais ne peut pas joindre l'application. Un port déjà pris sur le poste, un port invalide ou un Docker de l'hôte injoignable sont refusés avec un code non nul. Détails dans [docs/reference.md](docs/reference.md#ports-vers-le-poste).
+
 ## Questions fréquentes
 
 - **Docker absent ou arrêté** : `npx devzone`, `make up`, `make rebuild` et `make desinstaller` vérifient Docker avant tout et disent quoi faire : l'installer (Docker Desktop, ou Docker Engine sous Linux), démarrer Docker Desktop, ou, sous Linux, ajouter ton compte au groupe `docker` (`sudo usermod -aG docker $USER`, puis une nouvelle session). Avec `npx devzone mon-devzone`, le dossier est créé quand même : une fois Docker démarré, `cd mon-devzone && make shell`.
