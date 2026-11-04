@@ -205,7 +205,7 @@ L'utilisateur d'un projet possède **sa** base (il y crée tables, index, donné
 
 ## Accéder à une application depuis le poste
 
-Une application lancée **dans** le conteneur (par exemple un Spring Boot avec `./gradlew bootRun` sur le port 8080) n'est pas joignable depuis le poste : le conteneur devzone ne publie aucun port. `devzone port` ouvre un relais `alpine/socat` (version figée) sur le Docker de l'hôte, de `127.0.0.1:<port>` du poste vers le port du conteneur.
+Une application lancée **dans** le conteneur (par exemple un Spring Boot avec `./gradlew bootRun` sur le port 8080) n'est pas joignable depuis le poste : le conteneur devzone ne publie aucun port. `devzone port <n>` ouvre un relais `alpine/socat` (version figée) sur le Docker de l'hôte, de `127.0.0.1:<port>` du poste vers le port du conteneur.
 
 ```sh
 devzone port 8080        # ouvre le relais du port 8080
