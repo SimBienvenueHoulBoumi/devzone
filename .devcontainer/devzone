@@ -14,6 +14,7 @@
 #   devzone postgres creer <projet>  base et utilisateur d'un projet (aussi : liste, psql, supprimer)
 #   devzone cluster [CTX] [--oui]    cluster des services de devzone, ou en changer
 #   devzone port [<n>|--fermer <n>]  relais d'un port du conteneur vers le poste
+#
 # État propre à chaque instance : $RACINE/.devzone.modules (dossier monté
 # de l'hôte, survit aux rebuilds), une ligne « module=on|off » ; la plateforme
 # choisie y est gardée aussi (plateforme=, gitlab_url=), et le cluster des
@@ -764,7 +765,7 @@ case "${1:-}" in
     cluster) changer_cluster "${@:2}" ;;
     postgres) bash "$ICI/postgres/postgres.sh" "${@:2}" ;;
     port) bash "$ICI/ports.sh" "${@:2}" ;;
-    -h | --help | aide) sed -n '2,16p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' ;;
+    -h | --help | aide) awk 'NR==1{next} /^#$/{exit} /^#/{sub(/^# ?/,""); print; next} {exit}' "${BASH_SOURCE[0]}" ;;
     test-bash32) bash "$RACINE/core/test/bash32.sh" ;;
     plateforme)
         if [ -n "${2:-}" ]; then
