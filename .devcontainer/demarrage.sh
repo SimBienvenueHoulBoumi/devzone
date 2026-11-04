@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # À chaque démarrage, dans l'ordre : identité git (déduite du compte gh),
 # clusters Kubernetes, nom gitlab.localhost si le module gitlab est actif,
-# relais du module postgres s'il est actif,
+# relais du module postgres s'il est actif, relais de ports vers le poste,
 # puis récapitulatif de ce qui reste à faire (devzone).
 # Séquentiel : le récapitulatif voit l'identité tout juste posée ; l'échec
 # d'une étape n'empêche pas les suivantes.
@@ -22,5 +22,8 @@ fi
 if bash "$ICI/devzone" actif postgres; then
     bash "$ICI/postgres/postgres.sh" relais-lancer || echo "démarrage : relais postgres non lancé (devzone appliquer)"
 fi
+# Relais de ports vers le poste (#290) : l'IP du conteneur change à chaque
+# démarrage, chaque relais de l'état est recréé ; un échec n'empêche rien
+bash "$ICI/ports.sh" relancer || echo "démarrage : relais de ports non relancés (devzone port <n>)"
 echo
 bash "$ICI/devzone"
