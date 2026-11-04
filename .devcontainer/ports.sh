@@ -123,12 +123,13 @@ lancer() {
 ouvrir() {
     local port="${1:-}"
     valider_port "$port"
-    if relais_existe "$port"; then
+    if relais_actif "$port"; then
         ajouter_port "$port"
         echo "✔ relais déjà ouvert : 127.0.0.1:$port du poste → $port du conteneur"
         return 0
     fi
     reseau_ip || refuse "conteneur devzone introuvable : Docker de l'hôte injoignable ?"
+    docker rm -f "$(nom_relais "$port")" >/dev/null 2>&1 || true
     lancer "$port" "$RESEAU" "$IP" || exit 1
     ajouter_port "$port"
     echo "✔ 127.0.0.1:$port du poste → $port du conteneur (relais $(nom_relais "$port"))"

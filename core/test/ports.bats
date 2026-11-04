@@ -62,8 +62,9 @@ case "${1:-}" in
         echo "id-$nom"
         ;;
     ps)
-        motif=""; prec=""
+        motif=""; prec=""; show_all=0
         for a in "$@"; do
+            [ "$a" = "-a" ] && show_all=1
             [ "$prec" = --filter ] && motif="$a"
             prec="$a"
         done
@@ -73,8 +74,16 @@ case "${1:-}" in
             m="${motif#name=}"
             m="${m#^}"
             m="${m%$}"
-            [ "$nom" = "$m" ] && echo "$nom"
+            if [ "$nom" = "$m" ]; then
+                if [ "$show_all" = 1 ] || [ ! -s "$f" ]; then
+                    echo "$nom"
+                fi
+            fi
         done
+        ;;
+    stop)
+        nom="${2:-}"
+        [ -f "$T/relais/$nom" ] && echo stopped >"$T/relais/$nom"
         ;;
     rm)
         nom="${3:-${2:-}}"
@@ -117,6 +126,22 @@ CURL
     [ "$(grep -c 'docker run' "$BATS_TEST_TMPDIR/docker.log")" -eq 1 ]
     [[ "$output" == *"déjà ouvert"* ]] || false
     grep -qx 'ports=8080' "$DEVZONE_ETAT"
+}
+
+@test "ouvrir : relais arrêté → rm -f puis run vers l'IP actuelle" {
+    printf 'ports=8080\n' >"$DEVZONE_ETAT"
+    bash "$PORTS" 8080 >/dev/null
+    run "$BATS_TEST_TMPDIR/bin/docker" stop devzone-devzone-port-8080
+    [ "$status" -eq 0 ]
+    : >"$BATS_TEST_TMPDIR/docker.log"
+    run bash "$PORTS" 8080
+    [ "$status" -eq 0 ]
+    grep -q 'docker rm -f devzone-devzone-port-8080' "$BATS_TEST_TMPDIR/docker.log"
+    grep -q 'docker run -d --restart unless-stopped --name devzone-devzone-port-8080' "$BATS_TEST_TMPDIR/docker.log"
+    grep -q 'tcp-connect:172.18.0.5:8080' "$BATS_TEST_TMPDIR/docker.log"
+    [ "$(grep -c 'docker run' "$BATS_TEST_TMPDIR/docker.log")" -eq 1 ]
+    grep -qx 'ports=8080' "$DEVZONE_ETAT"
+    [[ "$output" == *"127.0.0.1:8080 du poste"*"8080 du conteneur"* ]] || false
 }
 
 @test "ouvrir : l'état garde les autres lignes et trie les ports" {
