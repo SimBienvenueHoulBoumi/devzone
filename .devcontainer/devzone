@@ -13,6 +13,7 @@
 #   devzone activer postgres [--contexte CTX]   PostgreSQL partagé, cluster au choix
 #   devzone postgres creer <projet>  base et utilisateur d'un projet (aussi : liste, psql, supprimer)
 #   devzone cluster [CTX] [--oui]    cluster des services de devzone, ou en changer
+#   devzone port [<n>|--fermer <n>]  relais d'un port du conteneur vers le poste
 # État propre à chaque instance : $RACINE/.devzone.modules (dossier monté
 # de l'hôte, survit aux rebuilds), une ligne « module=on|off » ; la plateforme
 # choisie y est gardée aussi (plateforme=, gitlab_url=), et le cluster des
@@ -666,7 +667,7 @@ worktrees_absents() {
 # État complet : ✔ prêt, ✖ nécessaire, ○ facultatif, ⚠ à corriger ; chaque
 # point à faire avec sa commande (affiché à chaque démarrage)
 etat() {
-    local nom email statut m retards chemin
+    local nom email statut m retards chemin ports_etat
     echo "devzone : état (devzone pour le réafficher)"
     nom="$(git config --get user.name || true)"
     email="$(git config --get user.email || true)"
@@ -721,6 +722,11 @@ etat() {
             printf '  ○ module %-10s facultatif, %s : devzone activer %s\n' "$m" "$(description "$m")" "$m"
         fi
     done
+    ports_etat="$(bash "$ICI/ports.sh" resume 2>/dev/null || true)"
+    case "$ports_etat" in
+        aucun*) printf '  ○ ports vers le poste %s\n' "$ports_etat" ;;
+        *) printf '  ✔ ports vers le poste %s\n' "$ports_etat" ;;
+    esac
 }
 
 changer() {
@@ -757,7 +763,8 @@ case "${1:-}" in
         ;;
     cluster) changer_cluster "${@:2}" ;;
     postgres) bash "$ICI/postgres/postgres.sh" "${@:2}" ;;
-    -h | --help | aide) sed -n '2,15p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' ;;
+    port) bash "$ICI/ports.sh" "${@:2}" ;;
+    -h | --help | aide) sed -n '2,16p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' ;;
     test-bash32) bash "$RACINE/core/test/bash32.sh" ;;
     plateforme)
         if [ -n "${2:-}" ]; then
