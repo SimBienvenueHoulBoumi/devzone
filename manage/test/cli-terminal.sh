@@ -2,9 +2,9 @@
 # Tests de la CLI de devzone dans un vrai terminal (pseudo-terminal), comme un
 # humain : chaque commande a un délai maximal ; une commande qui attend une
 # entrée au lieu de finir échoue (« attend une entrée »). Ticket #109.
-#   make test-cli     (ou bash core/test/cli-terminal.sh)
+#   make test-cli     (ou bash manage/test/cli-terminal.sh)
 # Couvre : cibles make (help, up, shell, status, stop, down, rebuild,
-# desinstaller), commande npm (core/devzone <dossier>, desinstaller, --version,
+# desinstaller), commande npm (manage/devzone <dossier>, desinstaller, --version,
 # --help), commande devzone du conteneur (état, modules, module inconnu),
 # scripts de démarrage (post-create.sh, demarrage.sh).
 # Isolation, comme fonctionnel.sh : devzone créé dans un dossier temporaire
@@ -24,7 +24,7 @@ export KUBECONFIG=/nexiste/pas
 TMP="$(cd "$(mktemp -d)" && pwd -P)"
 # Nommé autrement que « devzone » (npx devzone <dossier>)
 COPIE="$TMP/mon-devzone-cli"
-TERMINAL=(python3 -I "$RACINE/core/test/terminal.py")
+TERMINAL=(python3 -I "$RACINE/manage/test/terminal.py")
 DC=(npx -y @devcontainers/cli)
 reussis=0
 echecs=0
@@ -96,14 +96,14 @@ volumes() { docker volume ls -q | grep -c "^${DEVZONE_VOLUMES}-" || true; }
 
 echo "▶ Sans conteneur (volumes $DEVZONE_VOLUMES-*)"
 humain "make help" 30 0 "make up .*Lance le conteneur" -- make -C "$RACINE" help
-humain "devzone --version" 30 0 "^$(node -p "require('$RACINE/package.json').version")$" -- bash "$RACINE/core/devzone" --version
-humain "devzone --help" 30 0 "devzone <dossier>" -- bash "$RACINE/core/devzone" --help
+humain "devzone --version" 30 0 "^$(node -p "require('$RACINE/package.json').version")$" -- bash "$RACINE/manage/devzone" --version
+humain "devzone --help" 30 0 "devzone <dossier>" -- bash "$RACINE/manage/devzone" --help
 cd "$TMP" || exit 1
-humain "devzone desinstaller hors d'un dossier devzone : refusé" 30 1 "dossier devzone" -- bash "$RACINE/core/devzone" desinstaller
+humain "devzone desinstaller hors d'un dossier devzone : refusé" 30 1 "dossier devzone" -- bash "$RACINE/manage/devzone" desinstaller
 # Question posée pendant le lancement (CLI devcontainer simulé) : make up
 # doit la montrer et s'arrêter, pas attendre en silence
 FAUX="$TMP/faux-devzone"
-DEVZONE_SANS_DEMARRER=1 bash "$RACINE/core/devzone" "$FAUX" >/dev/null
+DEVZONE_SANS_DEMARRER=1 bash "$RACINE/manage/devzone" "$FAUX" >/dev/null
 mkdir -p "$TMP/faux-bin"
 printf '#!/usr/bin/env bash\nprintf "Running the postCreateCommand from devcontainer.json...\\r\\nConfigurer les bots de ce dépôt ? [o/N] "\nsleep 600\n' >"$TMP/faux-bin/npx"
 chmod +x "$TMP/faux-bin/npx"
@@ -112,7 +112,7 @@ humain "make up : question dans le conteneur signalée au lieu d'attendre" 90 2 
     -- env PATH="$TMP/faux-bin:$PATH" DEVZONE_ATTENTE_QUESTION=5 make -C "$FAUX" up
 
 echo "▶ Création et lancement : devzone <dossier> (npm)"
-humain "devzone <dossier> : créé et lancé, avancement affiché" 1800 0 "▶ Installation dans le conteneur" -- bash "$RACINE/core/devzone" "$COPIE"
+humain "devzone <dossier> : créé et lancé, avancement affiché" 1800 0 "▶ Installation dans le conteneur" -- bash "$RACINE/manage/devzone" "$COPIE"
 if ! grep -q "devzone lancé" <<<"$SORTIE" || [ -z "$(docker ps -q --filter "label=devcontainer.local_folder=$COPIE")" ]; then
     echo "✖ devzone non lancé : suite arrêtée"
     exit 1
@@ -159,7 +159,7 @@ mk desinstaller 300 0 "Abandon" --envoyer 'Taper oui' $'non\n'
 SORTIE="volumes : $avant → $(volumes)"
 verifier "réponse non : rien supprimé" test "$(volumes)" = "$avant" -a "$avant" -gt 0
 cd "$COPIE" || exit 1
-humain "devzone desinstaller : réponse oui" 300 0 "volume supprimé" --envoyer 'Taper oui' $'oui\n' -- bash "$RACINE/core/devzone" desinstaller
+humain "devzone desinstaller : réponse oui" 300 0 "volume supprimé" --envoyer 'Taper oui' $'oui\n' -- bash "$RACINE/manage/devzone" desinstaller
 cd "$RACINE" || exit 1
 SORTIE="volumes restants : $(volumes)"
 verifier "réponse oui : volumes supprimés" test "$(volumes)" = 0

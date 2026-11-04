@@ -13,7 +13,7 @@
 # Sans terminal : CONFIRMER=oui.
 set -euo pipefail
 
-# Dossier devzone : deux niveaux au-dessus du script (core/scripts/), pour que
+# Dossier devzone : deux niveaux au-dessus du script (manage/scripts/), pour que
 # la commande fonctionne lancée depuis n'importe quel dossier
 ICI="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 ETAT="$ICI/.devzone.etat"

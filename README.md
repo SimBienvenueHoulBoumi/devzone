@@ -92,7 +92,7 @@ git clone https://github.com/ton-compte/ton-projet.git
 mkdir mon-projet && cd mon-projet && git init -b main
 ```
 
-Pour en savoir plus : [Mettre en route un projet](https://github.com/SimBienvenueHoulBoumi/devzone/blob/main/docs/reference.md#mettre-en-route-un-projet).
+Pour en savoir plus : [Mettre en route un projet](https://github.com/SimBienvenueHoulBoumi/devzone/blob/main/manage/docs/reference.md#mettre-en-route-un-projet).
 
 ## Ce que contient devzone
 
@@ -100,7 +100,7 @@ Pour en savoir plus : [Mettre en route un projet](https://github.com/SimBienvenu
 |---|---|
 | Langages | Java 21 + Maven, Node LTS + pnpm, Python 3.12 + uv |
 | Conteneurs, Kubernetes | Docker de l'hôte (socket partagé), kubectl, helm, k9s, kind ; connexion au cluster de l'hôte (module `kubernetes`) ; Testcontainers (`TESTCONTAINERS_HOST_OVERRIDE`) ; montages (`$LOCAL_WORKSPACE_FOLDER`) |
-| GitHub (ou GitLab), qualité | gh, ou glab connecté à une instance GitLab (`devzone plateforme gitlab` dans le conteneur, [docs/reference.md](docs/reference.md#plateforme-github-ou-gitlab)) ; repowarden (hooks git globaux), shellcheck, bats, actionlint, gitleaks, ruff, vulture, pytest |
+| GitHub (ou GitLab), qualité | gh, ou glab connecté à une instance GitLab (`devzone plateforme gitlab` dans le conteneur, [manage/docs/reference.md](manage/docs/reference.md#plateforme-github-ou-gitlab)) ; repowarden (hooks git globaux), shellcheck, bats, actionlint, gitleaks, ruff, vulture, pytest |
 | Assistants IA | Claude Code, opencode (module `ia`, désactivé par défaut) |
 
 ## Au quotidien
@@ -113,15 +113,15 @@ Pour en savoir plus : [Mettre en route un projet](https://github.com/SimBienvenu
 | Supprimer le conteneur | — | `make down` | — |
 | Reconstruire (après une modification de `.devcontainer/`) | *Dev Containers: Rebuild Container* | `make rebuild` | `npx @devcontainers/cli up --workspace-folder . --remove-existing-container` |
 | État | — | `make status` | — |
-| **Désinstaller** (tout ce que devzone a créé, après confirmation) | — | `make desinstaller` | `bash core/scripts/desinstaller.sh` |
+| **Désinstaller** (tout ce que devzone a créé, après confirmation) | — | `make desinstaller` | `bash manage/scripts/desinstaller.sh` |
 
 ## Options
 
-**Module `ia`** : active Claude Code et opencode (versions figées), avec le garde-fou repowarden qui les arrête avant de modifier `main` ou `develop` ou de commiter sans `repowarden cc` (voir [docs/reference.md](docs/reference.md#garde-fou-des-assistants-ia)). Pour l'activer : `devzone activer ia`. Ils sont désinstallés quand le module est désactivé, mais tes connexions restent dans leurs volumes.
+**Module `ia`** : active Claude Code et opencode (versions figées), avec le garde-fou repowarden qui les arrête avant de modifier `main` ou `develop` ou de commiter sans `repowarden cc` (voir [manage/docs/reference.md](manage/docs/reference.md#garde-fou-des-assistants-ia)). Pour l'activer : `devzone activer ia`. Ils sont désinstallés quand le module est désactivé, mais tes connexions restent dans leurs volumes.
 
 **Module `kubernetes`** : active à chaque démarrage la connexion au cluster de l'hôte et l'installation de metrics-server sur les clusters locaux (pour voir le CPU et la RAM dans k9s). Pour l'activer : `devzone activer kubernetes`. Sans ce module, kubectl, helm, k9s et kind restent installés.
 
-**Plateforme GitHub ou GitLab** : GitHub par défaut (nouvelle architecture). Pour servir une équipe sur GitLab : `devzone plateforme gitlab --url URL` (ou sans `--url` quand le module `gitlab` est activé, pour l'instance de test) : glab est installé (version figée, somme vérifiée) et connecté à l'instance, et `devzone` l'affiche à la place des contrôles `gh`. `devzone plateforme github` revient en arrière (glab retiré). GitLab est accessible directement depuis le poste sans relais temporaire. Détails dans [docs/reference.md](docs/reference.md#plateforme-github-ou-gitlab).
+**Plateforme GitHub ou GitLab** : GitHub par défaut (nouvelle architecture). Pour servir une équipe sur GitLab : `devzone plateforme gitlab --url URL` (ou sans `--url` quand le module `gitlab` est activé, pour l'instance de test) : glab est installé (version figée, somme vérifiée) et connecté à l'instance, et `devzone` l'affiche à la place des contrôles `gh`. `devzone plateforme github` revient en arrière (glab retiré). GitLab est accessible directement depuis le poste sans relais temporaire. Détails dans [manage/docs/reference.md](manage/docs/reference.md#plateforme-github-ou-gitlab).
 
 **Module `postgres`** : un PostgreSQL partagé, une base par projet (voir [Accéder à PostgreSQL](#accéder-à-postgresql)). Pour l'activer : `devzone activer postgres`.
 
@@ -159,7 +159,7 @@ spring:
     password: ${DB_PASSWORD}
 ```
 
-Autres commandes : `devzone postgres liste`, `devzone postgres psql monprojet` (console), `devzone postgres supprimer monprojet`, `devzone cluster [CTX]` (voir ou changer de cluster). Détails dans [docs/reference.md](docs/reference.md#postgresql).
+Autres commandes : `devzone postgres liste`, `devzone postgres psql monprojet` (console), `devzone postgres supprimer monprojet`, `devzone cluster [CTX]` (voir ou changer de cluster). Détails dans [manage/docs/reference.md](manage/docs/reference.md#postgresql).
 
 ### Voir le contenu de la base
 
@@ -215,7 +215,7 @@ devzone port --fermer 8080
 
 Depuis le poste : `http://localhost:8080`. Le relais est recréé automatiquement au démarrage du conteneur, vers l'adresse actuelle du conteneur ; il est retiré par `make desinstaller` (étiquette `devzone.instance`).
 
-Spring Boot écoute sur `0.0.0.0` par défaut : ne fixe pas `server.address` à `127.0.0.1`, sinon le relais ne peut pas joindre l'application. Un port déjà pris sur le poste, un port invalide ou un Docker de l'hôte injoignable sont refusés avec un code non nul. Détails dans [docs/reference.md](docs/reference.md#ports-vers-le-poste).
+Spring Boot écoute sur `0.0.0.0` par défaut : ne fixe pas `server.address` à `127.0.0.1`, sinon le relais ne peut pas joindre l'application. Un port déjà pris sur le poste, un port invalide ou un Docker de l'hôte injoignable sont refusés avec un code non nul. Détails dans [manage/docs/reference.md](manage/docs/reference.md#ports-vers-le-poste).
 
 ## Questions fréquentes
 
@@ -250,8 +250,8 @@ npm uninstall -g devzone
 Même effet que `make desinstaller`.
 ## Pour aller plus loin
 
-- [Référence détaillée](https://github.com/SimBienvenueHoulBoumi/devzone/blob/main/docs/reference.md)
-- [Contribuer](https://github.com/SimBienvenueHoulBoumi/devzone/blob/main/docs/contribuer.md) : tests, processus de livraison et organisation
+- [Référence détaillée](https://github.com/SimBienvenueHoulBoumi/devzone/blob/main/manage/docs/reference.md)
+- [Contribuer](https://github.com/SimBienvenueHoulBoumi/devzone/blob/main/manage/docs/contribuer.md) : tests, processus de livraison et organisation
 
 ## Licence
 

@@ -18,7 +18,7 @@ case "$SCRIPT" in
 esac
 PAQUET="$(cd "$(dirname "$(readlink -f "$SCRIPT" 2>/dev/null || echo "$SCRIPT")")/.." && pwd)"
 # Fichiers d'un devzone (même liste que « files » de package.json, sans la
-# commande core/devzone) ; core/scripts copié à part, sous core/
+# commande manage/devzone) ; manage/scripts copié à part, sous manage/
 FICHIERS=(.devcontainer Makefile .gitattributes README.md LICENSE)
 
 version() {
@@ -45,9 +45,9 @@ creer() {
         echo "✖ $cible existe et n'est pas vide : rien n'est écrasé. Choisis un autre dossier." >&2
         exit 1
     fi
-    mkdir -p "$cible/workspace" "$cible/core"
+    mkdir -p "$cible/workspace" "$cible/manage"
     cp -R "${FICHIERS[@]/#/$PAQUET/}" "$cible/"
-    cp -R "$PAQUET/core/scripts" "$cible/core/"
+    cp -R "$PAQUET/manage/scripts" "$cible/manage/"
     touch "$cible/workspace/.gitkeep"
     # npm n'embarque jamais .gitignore : écrit ici
     cat >"$cible/.gitignore" <<'EOF'
@@ -59,7 +59,7 @@ workspace/*
 .devzone.log
 .devzone.etat
 EOF
-    chmod +x "$cible/core/scripts/desinstaller.sh" "$cible/core/scripts/lancer.sh"
+    chmod +x "$cible/manage/scripts/desinstaller.sh" "$cible/manage/scripts/lancer.sh"
     cible="$(cd "$cible" && pwd)"
     echo "✔ devzone $(version) créé dans $cible"
     if [ -n "${DEVZONE_SANS_DEMARRER:-}" ]; then
@@ -68,7 +68,7 @@ EOF
     fi
     # Docker d'abord : le dossier reste prêt, à lancer une fois Docker démarré
     # shellcheck source=SCRIPTDIR/scripts/docker.sh
-    . "$PAQUET/core/scripts/docker.sh"
+    . "$PAQUET/manage/scripts/docker.sh"
     if ! docker_pret "cd $cible && make shell"; then
         echo "  Le dossier est prêt : rien à refaire, sauf ce lancement." >&2
         exit 1
@@ -77,7 +77,7 @@ EOF
     if command -v make >/dev/null 2>&1; then
         make -C "$cible" up
     else
-        bash "$cible/core/scripts/lancer.sh" up "$cible"
+        bash "$cible/manage/scripts/lancer.sh" up "$cible"
     fi
     echo "Ensuite : cd $cible && make shell (ou ouvre le dossier dans VS Code : Reopen in Container)."
 }
@@ -87,10 +87,10 @@ case "${1:-}" in
     -v | --version) version ;;
     desinstaller)
         # Dossier devzone (.devcontainer/) ; un devzone plus ancien a son
-        # desinstaller.sh dans scripts/ (avant core/), ou à la racine (avant scripts/)
+        # desinstaller.sh dans manage/scripts/ (nouveau), core scripts ou scripts/ (anciens), ou à la racine
         desinstalleur=""
         if [ -d .devcontainer ]; then
-            for f in core/scripts/desinstaller.sh scripts/desinstaller.sh desinstaller.sh; do
+            for f in manage/scripts/desinstaller.sh core/scripts/desinstaller.sh scripts/desinstaller.sh desinstaller.sh; do
                 if [ -f "$f" ]; then desinstalleur="$f" && break; fi
             done
         fi

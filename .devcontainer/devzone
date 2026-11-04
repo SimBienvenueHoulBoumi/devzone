@@ -35,7 +35,7 @@ while [ -L "$SOURCE" ]; do
     esac
 done
 ICI="$(cd -P "$(dirname "$SOURCE")" && pwd)"
-VERSIONS="$ICI/../core/scripts/versions.sh"
+VERSIONS="$ICI/../manage/scripts/versions.sh"
 # Dossier de devzone (/workspaces/devzone) ; DEVZONE_RACINE pour les tests
 RACINE="${DEVZONE_RACINE:-$(dirname "$ICI")}"
 # État par défaut de l'instance ; DEVZONE_ETAT garde la priorité (tests, CI)
@@ -709,7 +709,7 @@ etat() {
     fi
     while IFS= read -r chemin; do
         [ -n "$chemin" ] || continue
-        echo "  ⚠ worktree        $chemin absent ici (créé hors du conteneur ?) : le gérer de ce côté-là, jamais git worktree prune ici (docs/reference.md, Worktrees git)"
+        echo "  ⚠ worktree        $chemin absent ici (créé hors du conteneur ?) : le gérer de ce côté-là, jamais git worktree prune ici (manage/docs/reference.md, Worktrees git)"
     done < <(worktrees_absents)
     for m in "${MODULES[@]}"; do
         if [ "$(valeur "$m")" = on ] && [ -f "$(fichier_echec "$m")" ]; then
@@ -768,7 +768,7 @@ case "${1:-}" in
     postgres) DEVZONE_ETAT="$ETAT" bash "$ICI/postgres/postgres.sh" "${@:2}" ;;
     port) DEVZONE_ETAT="$ETAT" bash "$ICI/ports.sh" "${@:2}" ;;
     -h | --help | aide) awk 'NR==1{next} /^#$/{exit} /^#/{sub(/^# ?/,""); print; next} {exit}' "${BASH_SOURCE[0]}" ;;
-    test-bash32) bash "$RACINE/core/test/bash32.sh" ;;
+    test-bash32) bash "$RACINE/manage/test/bash32.sh" ;;
     test-gitlab) DEVZONE_ETAT="$ETAT" bash "$ICI/gitlab/test-gitlab.sh" "${@:2}" ;;
     plateforme)
         if [ -n "${2:-}" ]; then

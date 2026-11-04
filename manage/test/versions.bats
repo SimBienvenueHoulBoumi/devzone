@@ -6,9 +6,9 @@ setup() {
     RACINE="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
     export HOME="$BATS_TEST_TMPDIR/home"
     mkdir -p "$HOME" "$BATS_TEST_TMPDIR/bin" \
-        "$BATS_TEST_TMPDIR/dz/core/scripts" "$BATS_TEST_TMPDIR/dz/.devcontainer"
-    cp "$RACINE/core/scripts/versions.sh" "$BATS_TEST_TMPDIR/dz/core/scripts/"
-    VERSIONS="$BATS_TEST_TMPDIR/dz/core/scripts/versions.sh"
+        "$BATS_TEST_TMPDIR/dz/manage/scripts" "$BATS_TEST_TMPDIR/dz/.devcontainer"
+    cp "$RACINE/manage/scripts/versions.sh" "$BATS_TEST_TMPDIR/dz/manage/scripts/"
+    VERSIONS="$BATS_TEST_TMPDIR/dz/manage/scripts/versions.sh"
     POST_CREATE="$BATS_TEST_TMPDIR/dz/.devcontainer/post-create.sh"
     DEVZONE="$BATS_TEST_TMPDIR/dz/.devcontainer/devzone"
     cat >"$POST_CREATE" <<'EOFPOST'
@@ -178,7 +178,7 @@ tickets_ouverts() {
 
 @test "vrai fichier devzone : les deux assistants IA sont lus par versions.sh" {
     npm_versions repowarden 999.0.0 @anthropic-ai/claude-code 999.0.0 opencode-ai 999.0.0
-    run bash "$RACINE/core/scripts/versions.sh"
+    run bash "$RACINE/manage/scripts/versions.sh"
     [ "$status" -eq 0 ]
     [[ "$output" == *"@anthropic-ai/claude-code "*" 999.0.0"* ]] || false
     [[ "$output" == *"opencode-ai "*" 999.0.0"* ]] || false
@@ -192,7 +192,7 @@ tickets_ouverts() {
     cd "$BATS_TEST_TMPDIR/dz"
     git init -q
     base="$(git branch --show-current)"
-    git add .devcontainer core
+    git add .devcontainer manage
     git commit -qm base
     git checkout -qb claude
     bash "$VERSIONS" --appliquer @anthropic-ai/claude-code 999.0.0
