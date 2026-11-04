@@ -296,3 +296,25 @@ CURL
     run bash "$DEVZONE" --help
     [[ "$output" == *"devzone port [<n>|--fermer <n>]"* ]] || false
 }
+
+@test "ouvrir sans DEVZONE_ETAT ni DEVZONE_RACINE" {
+    unset DEVZONE_ETAT DEVZONE_RACINE
+    mkdir -p "$BATS_TEST_TMPDIR/depot"
+    cp -r "$BATS_TEST_DIRNAME/../../.devcontainer" "$BATS_TEST_TMPDIR/depot/.devcontainer"
+    export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
+    run bash "$BATS_TEST_TMPDIR/depot/.devcontainer/ports.sh" 8080
+    [ "$status" -eq 0 ]
+    grep -qx 'ports=8080' "$BATS_TEST_TMPDIR/depot/.devzone.modules"
+    [[ "$output" == *"127.0.0.1:8080 du poste"*"8080 du conteneur"* ]] || false
+}
+
+@test "ecrire_ports : échec écriture sur stderr, code 1" {
+    unset DEVZONE_ETAT DEVZONE_RACINE
+    mkdir -p "$BATS_TEST_TMPDIR/depot"
+    cp -r "$BATS_TEST_DIRNAME/../../.devcontainer" "$BATS_TEST_TMPDIR/depot/.devcontainer"
+    export TMPDIR="/nonexistent"
+    export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
+    run bash "$BATS_TEST_TMPDIR/depot/.devcontainer/ports.sh" ouvrir 8080
+    [[ "$output" == *"devzone : port : état non enregistré"* ]] || false
+    [ "$status" -eq 1 ]
+}
