@@ -14,13 +14,15 @@ setup() {
     export GITLAB_TEST_PIPELINE=2
     export GITLAB_TEST_INTERVALLE=0
     export TMPDIR="$BATS_TEST_TMPDIR/tmp"
+    export DEVZONE_INSTANCE=mon-devzone
+    export INSTANCE_TEST=-mon-devzone
     export DEVZONE_TEST_DEVZONE="$BATS_TEST_TMPDIR/bin/devzone"
     mkdir -p "$HOME/.local/bin" "$DEVZONE_RACINE/workspace/.gitlab" \
         "$BATS_TEST_TMPDIR/bin" "$TMPDIR"
     printf 'jeton-root-secret' >"$DEVZONE_RACINE/workspace/.gitlab/root-token"
-    printf 'gitlab\n' >"$KIND_CLUSTERS"
-    printf 'kind-gitlab\nkind-dev\n' >"$BATS_TEST_TMPDIR/contextes"
-    printf '127.0.0.1 localhost\n127.0.0.1\tgitlab.localhost # devzone:gitlab\n' >"$DEVZONE_HOSTS"
+    printf 'gitlab%s\n' "$INSTANCE_TEST" >"$KIND_CLUSTERS"
+    printf 'kind-gitlab%s\nkind-dev\n' "$INSTANCE_TEST" >"$BATS_TEST_TMPDIR/contextes"
+    printf '127.0.0.1 localhost\n172.17.0.1\tgitlab.localhost # devzone:gitlab\n' >"$DEVZONE_HOSTS"
     : >"$DEVZONE_ETAT"
     touch "$BATS_TEST_TMPDIR/module_actif"
 
@@ -36,7 +38,8 @@ case "$1 $2" in
     "activer gitlab")
         [ -n "${FAUX_ACTIVER_KO:-}" ] && exit 1
         touch "$BATS_TEST_TMPDIR/module_actif"
-        grep -qx gitlab "$KIND_CLUSTERS" 2>/dev/null || echo gitlab >>"$KIND_CLUSTERS"
+        grep -qx "gitlab$INSTANCE_TEST" "$KIND_CLUSTERS" 2>/dev/null ||
+            echo "gitlab$INSTANCE_TEST" >>"$KIND_CLUSTERS"
         mkdir -p "$DEVZONE_RACINE/workspace/.gitlab"
         printf 'jeton-root-secret' >"$DEVZONE_RACINE/workspace/.gitlab/root-token"
         ;;
@@ -44,11 +47,11 @@ case "$1 $2" in
         [ -n "${FAUX_DESACTIVER_KO:-}" ] && exit 1
         rm -f "$BATS_TEST_TMPDIR/module_actif"
         if [ "${FAUX_DESACTIVER_LAISSE:-}" != cluster ]; then
-            grep -vx gitlab "$KIND_CLUSTERS" >"$KIND_CLUSTERS.tmp" 2>/dev/null || true
+            grep -vx "gitlab$INSTANCE_TEST" "$KIND_CLUSTERS" >"$KIND_CLUSTERS.tmp" 2>/dev/null || true
             mv "$KIND_CLUSTERS.tmp" "$KIND_CLUSTERS"
         fi
         if [ "${FAUX_DESACTIVER_LAISSE:-}" != contexte ]; then
-            grep -vx kind-gitlab "$BATS_TEST_TMPDIR/contextes" >"$BATS_TEST_TMPDIR/contextes.tmp" 2>/dev/null || true
+            grep -vx "kind-gitlab$INSTANCE_TEST" "$BATS_TEST_TMPDIR/contextes" >"$BATS_TEST_TMPDIR/contextes.tmp" 2>/dev/null || true
             mv "$BATS_TEST_TMPDIR/contextes.tmp" "$BATS_TEST_TMPDIR/contextes"
         fi
         if [ "${FAUX_DESACTIVER_LAISSE:-}" != secrets ]; then
@@ -105,6 +108,16 @@ case "$*" in
 esac
 exit 0
 KUBE
+
+    # docker : conteneurs de l'instance sur le Docker de l'hôte
+    cat >"$BATS_TEST_TMPDIR/bin/docker" <<'DOCKER'
+#!/usr/bin/env bash
+echo "docker $*" >>"$BATS_TEST_TMPDIR/docker.log"
+case "$*" in
+    "ps -aq"*) [ -z "${FAUX_CONTENEURS_ETIQUETES:-}" ] || echo "$FAUX_CONTENEURS_ETIQUETES" ;;
+esac
+exit 0
+DOCKER
 
     # curl : API GitLab simulée (pipeline, clés, état du module)
     export CURL_SETUP="$BATS_TEST_TMPDIR/curl_setup"
@@ -268,13 +281,23 @@ esac
 exit 0
 GH
 
-    # getent : gitlab.localhost résolu par défaut
+    # getent : gitlab.localhost résolu vers l'IP de host.docker.internal
     cat >"$BATS_TEST_TMPDIR/bin/getent" <<'GETENT'
 #!/usr/bin/env bash
 echo "getent $*" >>"$BATS_TEST_TMPDIR/getent.log"
 [ -n "${FAUX_GETENT_KO:-}" ] && exit 2
 case "$*" in
-    "hosts gitlab.localhost") echo "127.0.0.1 gitlab.localhost" ;;
+    "hosts host.docker.internal")
+        [ -n "${FAUX_GETENT_HOTE_KO:-}" ] && exit 2
+        echo "172.17.0.1 host.docker.internal"
+        ;;
+    "hosts gitlab.localhost")
+        if [ -n "${FAUX_GETENT_AUTRE:-}" ]; then
+            echo "127.0.0.1 gitlab.localhost"
+        else
+            echo "172.17.0.1 gitlab.localhost"
+        fi
+        ;;
 esac
 exit 0
 GETENT
@@ -323,7 +346,23 @@ GETENT
     run bash "$SCRIPT"
     [ "$status" -ne 0 ]
     [[ "$output" == *"✖ 3. nom d'hôte"* ]] || false
-    [[ "$output" == *"non résolu vers 127.0.0.1"* ]] || false
+    [[ "$output" == *"gitlab.localhost non résolu"* ]] || false
+}
+
+@test "test-gitlab : étape 3 en échec (nom vers 127.0.0.1) → ✖, IP de l'hôte attendue" {
+    export FAUX_GETENT_AUTRE=1
+    run bash "$SCRIPT"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"✖ 3. nom d'hôte"* ]] || false
+    [[ "$output" == *"résolu vers 127.0.0.1, attendu 172.17.0.1 (host.docker.internal)"* ]] || false
+}
+
+@test "test-gitlab : étape 3 en échec (host.docker.internal non résolu) → ✖" {
+    export FAUX_GETENT_HOTE_KO=1
+    run bash "$SCRIPT"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"✖ 3. nom d'hôte"* ]] || false
+    [[ "$output" == *"host.docker.internal non résolu"* ]] || false
 }
 
 @test "test-gitlab : étape 4, création du pipeline impossible → ✖ avec la raison" {
@@ -460,15 +499,26 @@ GETENT
     [ "$status" -eq 0 ]
     [[ "$output" == *"✔ 8. complet : désactivation"* ]] || false
     grep -q "devzone desactiver gitlab" "$BATS_TEST_TMPDIR/devzone.log" || false
+    grep -q "label=devzone.instance=mon-devzone" "$BATS_TEST_TMPDIR/docker.log" || false
+    grep -q "label=io.x-k8s.kind.cluster=gitlab-mon-devzone" "$BATS_TEST_TMPDIR/docker.log" || false
     [ -f "$BATS_TEST_TMPDIR/module_actif" ]
 }
 
-@test "test-gitlab : --complet, un reste (cluster) → ✖ avec la raison" {
+@test "test-gitlab : --complet, un reste (cluster de l'instance) → ✖ avec la raison" {
     export FAUX_DESACTIVER_LAISSE=cluster
     run bash "$SCRIPT" --complet
     [ "$status" -ne 0 ]
     [[ "$output" == *"✖ 8. complet : désactivation"* ]] || false
-    [[ "$output" == *"cluster kind gitlab"* ]] || false
+    [[ "$output" == *"cluster kind gitlab-mon-devzone"* ]] || false
+}
+
+@test "test-gitlab : --complet, un conteneur étiqueté de l'instance reste → ✖" {
+    export FAUX_CONTENEURS_ETIQUETES=abc123
+    run bash "$SCRIPT" --complet
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"✖ 8. complet : désactivation"* ]] || false
+    [[ "$output" == *"conteneur(s) étiqueté(s) devzone.instance=mon-devzone"* ]] || false
+    grep -q "label=devzone.instance=mon-devzone" "$BATS_TEST_TMPDIR/docker.log" || false
 }
 
 @test "test-gitlab : --statut publie gitlab-integration sur HEAD par gh api" {

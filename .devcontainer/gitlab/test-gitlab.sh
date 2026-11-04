@@ -22,6 +22,11 @@ SECRETS="$RACINE/workspace/.gitlab"
 FICHIER_JETON="$SECRETS/root-token"
 ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
 HOSTS="${DEVZONE_HOSTS:-/etc/hosts}"
+# Noms de l'instance : suffixe DEVZONE_INSTANCE calculé par cluster.sh, comme
+# gitlab.sh (cluster gitlab et contexte kind-gitlab suffixés).
+# shellcheck source=SCRIPTDIR/../cluster.sh
+# shellcheck disable=SC1091
+. "$ICI/../cluster.sh"
 URL="${GITLAB_TEST_URL:-http://gitlab.localhost:8929}"
 # Délai d'attente du pipeline : 600 s par défaut, court dans les tests
 DELAI_PIPELINE="${GITLAB_TEST_PIPELINE:-600}"
@@ -156,14 +161,26 @@ etape_etat() {
 
 # 3. Nom : ssh et glab passent par le résolveur système, pas par curl ; sans
 # gitlab.localhost dans /etc/hosts, le clone SSH et glab échouent (#273).
+# GitLab tourne sur le Docker de l'hôte (#291) : le nom doit pointer vers
+# l'IP de host.docker.internal, pas vers 127.0.0.1 (gitlab.sh hote-poser).
 etape_nom() {
-    local hote
+    local hote ip_nom ip_hote
     hote="$(getent hosts gitlab.localhost 2>/dev/null || true)"
-    case "$hote" in
-        *127.0.0.1*) return 0 ;;
-    esac
-    RAISON="gitlab.localhost non résolu vers 127.0.0.1 (getent hosts)"
-    return 1
+    ip_nom="$(printf '%s\n' "$hote" | awk '{print $1; exit}')"
+    if [ -z "$ip_nom" ]; then
+        RAISON="gitlab.localhost non résolu (getent hosts)"
+        return 1
+    fi
+    ip_hote="$(getent hosts host.docker.internal 2>/dev/null | awk '{print $1; exit}')"
+    if [ -z "$ip_hote" ]; then
+        RAISON="host.docker.internal non résolu (getent hosts)"
+        return 1
+    fi
+    if [ "$ip_nom" != "$ip_hote" ]; then
+        RAISON="gitlab.localhost résolu vers $ip_nom, attendu $ip_hote (host.docker.internal)"
+        return 1
+    fi
+    return 0
 }
 
 # 4. Pipeline : relance celui de devzone/demo sur main et attend success.
@@ -319,18 +336,29 @@ etape_repowarden() {
 }
 
 # 8. --complet : désactivation d'abord, puis contrôle qu'il ne reste ni
-# cluster, ni contexte, ni secrets, ni ligne /etc/hosts. Les étapes 1 à 7
-# réinstallent ensuite.
+# cluster, ni contexte, ni conteneur, ni secrets, ni ligne /etc/hosts. Les
+# étapes 1 à 7 réinstallent ensuite. Noms suffixés par instance, comme
+# gitlab.sh et cluster.sh (INSTANCE_SUFFIX).
 etape_complet() {
-    local restes=""
+    local restes="" instance cluster contexte conteneurs
+    instance="${DEVZONE_INSTANCE:-devzone}"
+    cluster="gitlab${INSTANCE_SUFFIX}"
+    contexte="kind-gitlab${INSTANCE_SUFFIX}"
     if ! "$DEVZONE_BIN" desactiver gitlab >/dev/null 2>&1; then
         restes="$restes désactivation en échec;"
     fi
-    if kind get clusters 2>/dev/null | grep -qx gitlab; then
-        restes="$restes cluster kind gitlab;"
+    if kind get clusters 2>/dev/null | grep -qx "$cluster"; then
+        restes="$restes cluster kind $cluster;"
     fi
-    if kubectl config get-contexts -o name 2>/dev/null | grep -qx kind-gitlab; then
-        restes="$restes contexte kind-gitlab;"
+    if kubectl config get-contexts -o name 2>/dev/null | grep -qx "$contexte"; then
+        restes="$restes contexte $contexte;"
+    fi
+    conteneurs="$(docker ps -aq \
+        --filter "label=devzone.instance=$instance" \
+        --filter "label=io.x-k8s.kind.cluster=$cluster" \
+        2>/dev/null || true)"
+    if [ -n "$conteneurs" ]; then
+        restes="$restes conteneur(s) étiqueté(s) devzone.instance=$instance;"
     fi
     if [ -e "$SECRETS" ]; then
         restes="$restes $SECRETS;"

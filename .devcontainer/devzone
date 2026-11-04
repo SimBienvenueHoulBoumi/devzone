@@ -40,6 +40,7 @@ RACINE="${DEVZONE_RACINE:-$(dirname "$ICI")}"
 ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
 MODULES=(ia kubernetes gitlab postgres)
 # shellcheck source=SCRIPTDIR/cluster.sh
+# shellcheck disable=SC1091
 . "$ICI/cluster.sh"
 
 # Assistants IA, versions figées : mettre à jour ici, puis devzone appliquer
