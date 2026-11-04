@@ -89,6 +89,7 @@ devzone desactiver <module>    # désactive et applique tout de suite
 | `ia` | Claude Code et opencode installés (versions figées), réinstallés à chaque rebuild, avec le [garde-fou repowarden](#garde-fou-des-assistants-ia) et une [configuration opencode par défaut](#configuration-dopencode) ; se connecter : `claude` (puis `/login`), `opencode auth login` | désinstallés ; le garde-fou (hook et plugin), la configuration opencode par défaut et l'état de `devzone agent` sont retirés ; les journaux `workspace/.agents/` et les connexions restent |
 | `kubernetes` | à chaque démarrage : connexion au cluster de ta machine et metrics-server sur les clusters locaux (CPU et RAM dans k9s) | aucune connexion au cluster de ta machine ; kubectl, helm, k9s et kind restent installés, un cluster kind créé à la main reste utilisable ; metrics-server est retiré des clusters où devzone l'a installé |
 | `gitlab` | GitLab CE de test dans un cluster kind `gitlab` (chart figé), runner Kubernetes, projet `devzone/demo` avec pipeline ; http://gitlab.localhost:8929 ; au moins 8 Go de RAM libre (voir [GitLab](#gitlab)) | cluster `gitlab`, contexte `kind-gitlab` et secrets `workspace/.gitlab/` retirés ; rien d'autre touché |
+| `postgres` | PostgreSQL 16 partagé sur le [cluster de devzone](#cluster-de-devzone), une base par projet (`devzone postgres creer <projet>`), joignable sur `127.0.0.1:5432` dans le conteneur (voir [PostgreSQL](#postgresql)) | namespace `devzone-postgres` (toutes les bases) et secrets `workspace/.postgres/` supprimés, après confirmation en terminal ; kind dédié supprimé s'il ne sert plus |
 
 Le choix est **propre à chaque devzone** (instance) et gardé dans le dossier `$RACINE/.devzone.modules` (monté de l'hôte, il survit aux rebuilds). Au premier démarrage d'une instance, si une connexion Claude Code ou opencode existe déjà dans les volumes, le module `ia` n'est pas activé : tout est désactivé par défaut et la connexion est signalée une seule fois (« devzone activer ia pour l'utiliser ici »), pas pour un état repris.
 
@@ -149,7 +150,7 @@ Plusieurs devzone peuvent cohabiter sur une même machine (un par projet, un par
 
 ## Kubernetes
 
-devzone fournit les outils, pas le cluster, et n'en crée jamais tout seul. Avec le module `kubernetes` actif (`devzone activer kubernetes`), il se connecte à chaque démarrage au cluster de l'hôte s'il existe et répond (Docker Desktop sur Mac, Windows ou Linux). Sinon, ou en plus, créer un cluster dans le conteneur :
+devzone fournit les outils, pas le cluster, et n'en crée jamais tout seul. Avec le module `kubernetes` actif (`devzone activer kubernetes`), il se connecte à chaque démarrage au cluster de l'hôte s'il existe et répond (en pratique `docker-desktop`) ; sinon, ou en plus, créer un cluster dans le conteneur :
 
 ```bash
 kind create cluster          # ~2 min la première fois
@@ -157,15 +158,18 @@ kubectl config get-contexts  # clusters de l'hôte + clusters kind
 kubectl config use-context <nom>
 ```
 
-- **Cluster actif** : celui de l'hôte par défaut ; un choix fait avec `use-context` est gardé aux redémarrages.
-- **Clusters kind** : tournent dans le Docker interne, redémarrent avec le conteneur, sont conservés par `make rebuild` et `make down` ; supprimés par `kind delete cluster` (ou `make desinstaller`).
+- **Cluster actif** : celui de l'hôte par défaut s'il répond (en pratique `docker-desktop`), sinon kind dédié `kind-devzone`. Un choix fait avec `use-context` est gardé aux redémarrages.
+- **Clusters kind** : tournent sur le Docker de l'hôte (socket partagé, #291). Leur API écoute sur 127.0.0.1 **du poste**, jamais sur le réseau local ; `kind` (enveloppe de devzone) réécrit l'adresse en `host.docker.internal` dans le kubeconfig du conteneur, en gardant la vérification TLS : un cluster créé à la main par `kind create cluster` est joignable tout de suite. Nom suffixé par instance quand ce n'est pas l'instance par défaut. Ils redémarrent avec Docker Desktop, sont conservés par `make rebuild` et `make down`, et supprimés par `kind delete cluster` (ou `make desinstaller`).
+- **Limite connue** ([#293](https://github.com/SimBienvenueHoulBoumi/devzone/issues/293)) : sur un Docker Desktop chargé, la création d'un cluster kind peut échouer (« failed to remove control plane taint … connection refused ») ; devzone retente une fois. Le kind dédié n'est qu'un secours : par défaut, les modules utilisent le Kubernetes de Docker Desktop.
 - **CPU et RAM dans k9s** (`kubectl top`) : module `kubernetes` actif, metrics-server est installé au démarrage sur les clusters **locaux** qui ne l'ont pas (Docker Desktop, kind…), jamais sur un cluster distant. Après un `kind create cluster` : `bash .devcontainer/metrics-server.sh` (ou `… metrics-server.sh <contexte>` pour un cluster précis).
 - **Cluster de l'hôte** : `~/.kube` est monté en lecture seule, jamais modifié ; sa copie adaptée est `~/.kube/hote.config` (`127.0.0.1` remplacé par `host.docker.internal`). Après un changement de cluster sur l'hôte : `make stop && make up`.
 - **Messages de démarrage** (`kube-config : …`, `metrics-server : …`, récapitulatif) : dans le terminal de création, ou en relançant `bash .devcontainer/demarrage.sh`.
 
+L'adresse `127.0.0.1` du cluster de l'hôte est réécrite en `host.docker.internal` par `kube-config.sh` au démarrage, rendant le cluster joignable depuis le conteneur. Le certificat de l'API inclut `host.docker.internal` dans ses SAN (configuré via `networking.apiServerAddress` et `kubeadmConfigPatches` dans la config kind).
+
 Le cluster de l'hôte n'est pas joignable dans deux cas (kind fonctionne quand même) :
 - **Codespaces, machine distante** : pas de `~/.kube` local ;
-- **Linux avec Docker Engine** : un cluster kind ou minikube de l'hôte écoute sur `127.0.0.1`, invisible du conteneur. Un cluster qui écoute sur toutes les interfaces (k3s, kubeadm) est joignable.
+- **Linux avec Docker Engine** : un cluster kind ou minikube de l'hôte écoute sur `127.0.0.1`, invisible du conteneur sans la réécriture `kube-config.sh`. Un cluster qui écoute sur toutes les interfaces (k3s, kubeadm) est joignable.
 
 ## GitLab
 
@@ -183,8 +187,10 @@ devzone actif gitlab           # code 0 si GitLab est actif
 - **Durée** (mesurée) : installation complète environ 7 min (dont le chart GitLab, attendu jusqu'à `GITLAB_ATTENTE`, 1200 s par défaut) ; une relance sur une instance prête environ 35 s (rien n'est réinstallé ni re-poussé).
 - **Ce qui est installé** : cluster kind `gitlab` (un nœud, `.devcontainer/gitlab/kind.yaml`, ports 8929 HTTP et 2224 SSH vers le conteneur) ; chart `gitlab/gitlab` 9.11.16 (GitLab 18.11 CE) sans cert-manager, Prometheus, registry ni KAS, nginx en une réplique et service NodePort ; chart `gitlab/gitlab-runner` 0.88.2, exécuteur Kubernetes, image auxiliaire à l'architecture du nœud (arm64 compris).
 - **Données de test** : groupe `devzone`, projet `devzone/demo` (Python, pipeline ruff et pytest), utilisateur `dev`, runner enregistré. Sur une relance, rien n'est recréé.
-- **Accès dans le conteneur** : http://gitlab.localhost:8929, utilisateur `root` ; le nom gitlab.localhost est résolu dans le conteneur (posé à l'activation, retiré à la désactivation).
-- **Accès depuis le poste** : le port 8929 n'est pas publié hors du conteneur. Relais temporaire, lancé sur le poste : `docker run -d --name devzone-gitlab-relais -p 127.0.0.1:8929:8929 alpine/socat:1.8.0.3 TCP-LISTEN:8929,fork,reuseaddr TCP:<IP du conteneur devzone>:8929` (IP : `docker inspect <conteneur> --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}'`), puis http://gitlab.localhost:8929 ; à retirer : `docker rm -f devzone-gitlab-relais`.
+- **Accès dans le conteneur** : http://gitlab.localhost:8929, utilisateur `root` ; le nom gitlab.localhost est résolu dans le conteneur (posé à l'activation, retiré à la désactivation) via l'entrée `/etc/hosts` `host.docker.internal	gitlab.localhost # devzone:gitlab`.
+
+- **Accès depuis le poste** : les ports 8929 (HTTP) et 2224 (SSH) sont publiés sur l'hôte via la configuration `extraPortMappings` du cluster kind `gitlab` ( `listenAddress: 127.0.0.1` ). Depuis le poste, `gitlab.localhost` pointe vers l'hôte (adresse `host.docker.internal`, ticket #273). Plus besoin de relais temporaire `docker run ... socat`.
+
 - **Secrets** : mot de passe root, jeton root, mot de passe de `dev` et jeton du runner dans `workspace/.gitlab/` (droits 600, ignorés par git, jamais affichés). Mot de passe root : `cat workspace/.gitlab/root-password`.
 - **Désactivation** : `devzone desactiver gitlab` supprime le cluster `gitlab`, retire `kind-gitlab` de `~/.kube/config`, remet le contexte courant d'avant et supprime `workspace/.gitlab/`. Rien d'autre n'est touché.
 
@@ -205,6 +211,34 @@ devzone test-gitlab --statut     # publie aussi le statut gitlab-integration sur
 - **Durée indicative** : quelques dizaines de secondes sur une instance déjà prête ; plusieurs minutes si le module doit être installé (environ 7 min) et davantage avec `--complet`, qui réinstalle.
 - **`--statut`** : publie le résultat comme statut de commit `gitlab-integration` (`success`/`failure`, description = résumé court) sur `HEAD` du dépôt courant, par `gh api repos/<dépôt>/statuses/<sha>` avec le jeton du mainteneur. Refus clair si `gh` n'est pas connecté. Voir la règle dans [Contribuer](contribuer.md).
 
+
+## PostgreSQL
+
+Le module `postgres` fournit un PostgreSQL partagé : une base et un utilisateur par projet, sur le [cluster de devzone](#cluster-de-devzone).
+
+```bash
+devzone activer postgres [--contexte CTX]   # installe (choix du cluster la première fois)
+devzone postgres creer <projet>             # base + utilisateur <projet>, identifiants dans workspace/.postgres/<projet>.env
+devzone postgres creer <projet> --nouveau-mdp
+devzone postgres liste                      # bases et propriétaires
+devzone postgres psql [<projet>]            # console psql dans le pod (superutilisateur sans projet)
+devzone postgres supprimer <projet> [--oui] # base, utilisateur et fichier .env
+devzone desactiver postgres                 # supprime PostgreSQL et TOUTES ses bases
+```
+
+- **Ce qui est installé** : `.devcontainer/postgres/postgres.yaml`, StatefulSet `postgres` (image `postgres:16.x-alpine` figée), volume persistant de 5 Gi (`POSTGRES_TAILLE`), Service `postgres:5432`, namespace `devzone-postgres` étiqueté `app.kubernetes.io/managed-by=devzone`. Pas de chart ni d'image Bitnami.
+- **Accès** : un relais `kubectl port-forward` rend le service joignable sur `127.0.0.1:5432` **dans le conteneur** (`POSTGRES_PORT` pour un autre port) ; relancé à chaque démarrage et par `devzone appliquer`. PID et journal : `workspace/.postgres/relais.*`.
+- **Bases par projet** : nom en minuscules, chiffres et `_`. `creer` est idempotent : le mot de passe est gardé (sauf `--nouveau-mdp`) ; `REVOKE CONNECT … FROM PUBLIC` : un projet ne se connecte pas à la base d'un autre. Le fichier `<projet>.env` (600) contient `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` et `DB_URL` (JDBC).
+- **Secrets** : mot de passe du superutilisateur `postgres` dans le secret `postgres-admin` et `workspace/.postgres/admin-password` (600) ; jamais régénéré tant que le secret existe ; jamais affiché.
+- **Désactivation** : namespace supprimé (volume compris), `workspace/.postgres/` supprimé, kind dédié supprimé s'il ne porte plus aucun service. `make desinstaller` supprime aussi le namespace d'un cluster de l'hôte.
+
+## Cluster de devzone
+
+Les modules qui déploient un service (`postgres` ; `gitlab` avec #279) s'installent sur **un seul cluster**, choisi une fois et gardé dans l'état (`cluster=` dans `$RACINE/.devzone.modules`).
+
+- **Choix** : à la première activation. `--contexte CTX` d'abord ; sinon, dans un terminal, un menu : le cluster par défaut est le contexte courant du kubeconfig de l'hôte s'il répond (en pratique `docker-desktop`), sinon kind dédié `kind-devzone`. Un choix fait avec `use-context` est gardé aux redémarrages. Le menu propose `kind-devzone` (cluster kind dédié, créé via le Docker de l'hôte, avec API server sur `host.docker.internal`) ou un cluster de l'hôte joignable (ex. `docker-desktop`) ; sans terminal : `kind-devzone`. Les clusters de l'hôte n'apparaissent qu'avec le [module `kubernetes`](#kubernetes) actif.
+- **Voir / changer** : `devzone cluster` affiche le cluster et les possibles ; `devzone cluster CTX` y déplace les services actifs (désinstallés de l'ancien, installés sur le nouveau). **Les données ne sont pas migrées** : confirmation en terminal, `--oui` sans terminal.
+- **Cluster de l'hôte** : devzone n'y crée que ses namespaces étiquetés `app.kubernetes.io/managed-by=devzone`, et les supprime à la désactivation. Désactiver le module `kubernetes` rend ce cluster injoignable pour les services.
 
 ## Données conservées
 

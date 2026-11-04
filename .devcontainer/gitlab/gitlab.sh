@@ -8,6 +8,8 @@ set -euo pipefail
 # Racine du dépôt devzone (deux niveaux au-dessus du module) ; DEVZONE_RACINE pour les tests
 ICI="$(cd "$(dirname "$0")" && pwd)"
 RACINE="${DEVZONE_RACINE:-$(dirname "$(dirname "$ICI")")}"
+# shellcheck source=SCRIPTDIR/../cluster.sh
+. "$ICI/../cluster.sh"
 
 # ---- Variables de délai (secondes) ----
 # GITLAB_ATTENTE : attente globale d'installation (défaut 1200)
@@ -59,7 +61,7 @@ gitlab_seed() {
 
     # Mot de passe root lu dans le secret gitlab-gitlab-initial-root-password
     local mot_de_passe
-    mot_de_passe="$(kubectl --context kind-gitlab get secret -n gitlab gitlab-gitlab-initial-root-password -o jsonpath='{.data.password}' 2>/dev/null | base64 -d 2>/dev/null || true)"
+    mot_de_passe="$(kubectl --context "kind-gitlab${INSTANCE_SUFFIX}" get secret -n gitlab gitlab-gitlab-initial-root-password -o jsonpath='{.data.password}' 2>/dev/null | base64 -d 2>/dev/null || true)"
     if [ -z "$mot_de_passe" ]; then
         echo "devzone : seed GitLab : secret root (gitlab-gitlab-initial-root-password) introuvable, arrêt du seed." >&2
         return 1
@@ -69,12 +71,12 @@ gitlab_seed() {
 
     # Token d'accès root créé par kubectl exec dans le pod toolbox avec gitlab-rails runner
     local toolbox_pod root_token
-    toolbox_pod="$(kubectl --context kind-gitlab get pod -n gitlab -l app=toolbox -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)"
+    toolbox_pod="$(kubectl --context "kind-gitlab${INSTANCE_SUFFIX}" get pod -n gitlab -l app=toolbox -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)"
     if [ -z "$toolbox_pod" ]; then
         echo "devzone : seed GitLab : pod toolbox (label app=toolbox) introuvable, arrêt du seed." >&2
         return 1
     fi
-    root_token="$(kubectl --context kind-gitlab exec -n gitlab "$toolbox_pod" -- gitlab-rails runner 'puts User.find_by_username("root").personal_access_tokens.create(name: "devzone", scopes: ["api", "write_repository"], expires_at: 30.days.from_now).token' 2>/dev/null | tail -n 1 || true)"
+    root_token="$(kubectl --context "kind-gitlab${INSTANCE_SUFFIX}" exec -n gitlab "$toolbox_pod" -- gitlab-rails runner 'puts User.find_by_username("root").personal_access_tokens.create(name: "devzone", scopes: ["api", "write_repository"], expires_at: 30.days.from_now).token' 2>/dev/null | tail -n 1 || true)"
     if [ -z "$root_token" ]; then
         echo "devzone : seed GitLab : création du jeton root (gitlab-rails runner) échouée, arrêt du seed." >&2
         return 1
@@ -189,15 +191,26 @@ gitlab_seed() {
 # (l'écriture en place seulement) ; directe si le fichier est inscriptible,
 # sinon sudo -n. Un échec n'échoue jamais : avertissement sur stderr et
 # code 0, pour ne pas faire échouer l'installation pour un nom d'hôte.
+# Auparavant gitlab.localhost était résolu à 127.0.0.1 (injoignable depuis
+# le conteneur) ; désormais on utilise host.docker.internal qui résout vers
+# la machine hôte depuis le conteneur (--add-host dans devcontainer.json).
 gitlab_hote_poser() {
     # Déjà posée : rien (idempotent)
     if grep -q "$GITLAB_HOTE_MARQUE" "$HOSTS" 2>/dev/null; then
         return 0
     fi
+    # /etc/hosts exige une IP : résoudre host.docker.internal (adresse de
+    # l'hôte vue du conteneur). Refus clair si la résolution échoue.
+    local ip
+    ip="$(getent hosts host.docker.internal | awk '{print $1; exit}')"
+    if [ -z "$ip" ]; then
+        echo "devzone : gitlab : host.docker.internal introuvable (getent), gitlab.localhost non posé" >&2
+        return 1
+    fi
     if [ -w "$HOSTS" ]; then
-        printf '127.0.0.1\tgitlab.localhost %s\n' "$GITLAB_HOTE_MARQUE" >>"$HOSTS" 2>/dev/null ||
+        printf '%s\tgitlab.localhost %s\n' "$ip" "$GITLAB_HOTE_MARQUE" >>"$HOSTS" 2>/dev/null ||
             echo "devzone : gitlab : nom gitlab.localhost non posé dans $HOSTS (droits d'écriture insuffisants)" >&2
-    elif ! printf '127.0.0.1\tgitlab.localhost %s\n' "$GITLAB_HOTE_MARQUE" | sudo -n tee -a "$HOSTS" >/dev/null 2>&1; then
+    elif ! printf '%s\tgitlab.localhost %s\n' "$ip" "$GITLAB_HOTE_MARQUE" | sudo -n tee -a "$HOSTS" >/dev/null 2>&1; then
         echo "devzone : gitlab : nom gitlab.localhost non posé dans $HOSTS (sudo -n indisponible ou refusé)" >&2
     fi
     return 0
@@ -225,7 +238,7 @@ gitlab_hote_retirer() {
 gitlab_installer() {
     # RAM libre (refus < 8 Go) : seulement avant de créer le cluster ; une
     # instance déjà installée occupe elle-même cette mémoire
-    if ! kind get clusters 2>/dev/null | grep -qx 'gitlab'; then
+    if ! kind get clusters 2>/dev/null | grep -qx "gitlab${INSTANCE_SUFFIX}"; then
         echo "▶ Vérification de la mémoire disponible…"
         gitlab_verifier_ram || return 2
     fi
@@ -235,7 +248,7 @@ gitlab_installer() {
     if [ ! -f "$GITLAB_SECRETS_DIR/contexte-precedent" ]; then
         local ctx
         ctx="$(kubectl config current-context 2>/dev/null || true)"
-        if [ -n "$ctx" ] && [ "$ctx" != "kind-gitlab" ]; then
+        if [ -n "$ctx" ] && [ "$ctx" != "kind-gitlab${INSTANCE_SUFFIX}" ]; then
             printf '%s' "$ctx" > "$GITLAB_SECRETS_DIR/contexte-precedent"
         fi
     fi
@@ -243,9 +256,10 @@ gitlab_installer() {
     # S'assurer que le cluster kind gitlab existe
     echo "▶ Vérification/création du cluster kind gitlab…"
     local cree=false
-    if ! kind get clusters 2>/dev/null | grep -qx 'gitlab'; then
+    if ! kind get clusters 2>/dev/null | grep -qx "gitlab${INSTANCE_SUFFIX}"; then
         echo "▶ Création du cluster kind gitlab…"
-        kind create cluster --name gitlab --config "$ICI/kind.yaml" --wait 120s
+        kind create cluster --name "gitlab${INSTANCE_SUFFIX}" --config "$ICI/kind.yaml" --wait 120s
+        kube_joignable_depuis_conteneur "$HOME/.kube/config"
         cree=true
     fi
 
@@ -254,7 +268,7 @@ gitlab_installer() {
     # alors impossible. Avertissement seulement, l'installation continue.
     if [ "$cree" = false ]; then
         local sortie_ssh
-        sortie_ssh="$(docker port gitlab-control-plane 32022/tcp 2>/dev/null || true)"
+        sortie_ssh="$(docker port "gitlab${INSTANCE_SUFFIX}-control-plane" 32022/tcp 2>/dev/null || true)"
         if [ -z "$sortie_ssh" ]; then
             echo "devzone : gitlab : clone SSH (port 2224) indisponible sur ce cluster, créé avant ce réglage ; pour l'activer : devzone desactiver gitlab puis devzone activer gitlab (données GitLab recréées)" >&2
         fi
@@ -267,7 +281,7 @@ gitlab_installer() {
 
     # Installer GitLab via Helm
     echo "▶ Installation du chart GitLab…"
-    helm --kube-context kind-gitlab upgrade --install gitlab gitlab/gitlab \
+    helm --kube-context "kind-gitlab${INSTANCE_SUFFIX}" upgrade --install gitlab gitlab/gitlab \
         --version 9.11.16 \
         --namespace gitlab \
         --create-namespace \
@@ -277,7 +291,7 @@ gitlab_installer() {
 
     # Nom gitlab.localhost dans /etc/hosts avant l'attente : ssh, glab et
     # getent en ont besoin dès que le service monte (curl, lui, résout seul)
-    gitlab_hote_poser
+    gitlab_hote_poser || true
 
     # Attendre que GitLab soit prêt
     gitlab_attendre_pret
@@ -295,7 +309,7 @@ gitlab_installer() {
         echo "devzone : seed GitLab : jeton de runner introuvable (seed incomplet), arrêt du seed." >&2
         return 1
     fi
-    helm --kube-context kind-gitlab upgrade --install gitlab-runner gitlab/gitlab-runner \
+    helm --kube-context "kind-gitlab${INSTANCE_SUFFIX}" upgrade --install gitlab-runner gitlab/gitlab-runner \
         --version 0.88.2 \
         --namespace gitlab \
         -f "$ICI/runner-values.yaml" \
@@ -313,14 +327,14 @@ gitlab_desinstaller() {
     echo "▶ Désinstallation de GitLab…"
 
     # Supprimer le cluster kind gitlab (tout part avec lui)
-    kind delete cluster --name gitlab 2>/dev/null || true
+    kind delete cluster --name "gitlab${INSTANCE_SUFFIX}" 2>/dev/null || true
 
-    # Retirer contexte, cluster et utilisateur kind-gitlab de ~/.kube/config s'ils restent
-    kubectl config delete-context kind-gitlab 2>/dev/null || true
-    kubectl config delete-cluster kind-gitlab 2>/dev/null || true
-    kubectl config delete-user kind-gitlab 2>/dev/null || true
+    # Retirer contexte, cluster et utilisateur kind-gitlab${INSTANCE_SUFFIX} de ~/.kube/config s'ils restent
+    kubectl config delete-context "kind-gitlab${INSTANCE_SUFFIX}" 2>/dev/null || true
+    kubectl config delete-cluster "kind-gitlab${INSTANCE_SUFFIX}" 2>/dev/null || true
+    kubectl config delete-user "kind-gitlab${INSTANCE_SUFFIX}" 2>/dev/null || true
 
-    # Remettre current-context à celui d'avant s'il valait kind-gitlab
+    # Remettre current-context à celui d'avant s'il valait kind-gitlab${INSTANCE_SUFFIX}
     if [ -f "$GITLAB_SECRETS_DIR/contexte-precedent" ]; then
         local ctx_prev
         ctx_prev="$(cat "$GITLAB_SECRETS_DIR/contexte-precedent" 2>/dev/null || true)"
@@ -342,7 +356,7 @@ gitlab_desinstaller() {
 # ---- etat : vérifier l'état de GitLab ----
 gitlab_etat() {
     # Désactivé s'il n'y a pas de cluster gitlab
-    if ! kind get clusters 2>/dev/null | grep -qx 'gitlab'; then
+    if ! kind get clusters 2>/dev/null | grep -qx "gitlab${INSTANCE_SUFFIX}"; then
         echo "désactivé"
         return 0
     fi

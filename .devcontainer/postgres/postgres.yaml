@@ -1,0 +1,80 @@
+# Module postgres (#280) : PostgreSQL partagé de devzone, une base par projet.
+# Manifestes simples (pas de chart ni d'image Bitnami) appliqués par
+# postgres.sh dans le namespace devzone-postgres, après le secret
+# postgres-admin (mot de passe du superutilisateur, jamais écrit ici).
+# __TAILLE__ : remplacé par POSTGRES_TAILLE (5Gi par défaut).
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: devzone-postgres
+  labels:
+    app: postgres
+    app.kubernetes.io/managed-by: devzone
+spec:
+  selector:
+    app: postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: devzone-postgres
+  labels:
+    app: postgres
+    app.kubernetes.io/managed-by: devzone
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+        app.kubernetes.io/managed-by: devzone
+    spec:
+      containers:
+        - name: postgres
+          # Version figée : mettre à jour ici (même majeure : données gardées)
+          image: postgres:16.15-alpine
+          env:
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-admin
+                  key: password
+            # Sous-dossier : la racine d'un volume peut contenir lost+found,
+            # qu'initdb refuse
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          ports:
+            - containerPort: 5432
+              name: postgres
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+          volumeMounts:
+            - name: donnees
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: donnees
+        labels:
+          app.kubernetes.io/managed-by: devzone
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: __TAILLE__

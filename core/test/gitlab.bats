@@ -100,6 +100,12 @@ NPM
 echo "gh $*" >>"$BATS_TEST_TMPDIR/gh.log"
 exit 1
 GH
+    # getent : résout host.docker.internal vers l'hôte (simulé)
+    cat >"$BATS_TEST_TMPDIR/bin/getent" <<'GETENT'
+#!/usr/bin/env bash
+echo "getent $*" >>"$BATS_TEST_TMPDIR/getent.log"
+echo "127.0.0.1 host.docker.internal"
+GETENT
     chmod +x "$BATS_TEST_TMPDIR"/bin/*
     HELM_BIN="$(command -v helm)"
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
@@ -300,7 +306,7 @@ GH
     [ "$status" -eq 0 ]
     [ "$(grep -c 'devzone:gitlab' "$DEVZONE_HOSTS")" -eq 1 ]
     grep -q '^127\.0\.0\.1 localhost$' "$DEVZONE_HOSTS"
-    grep -q $'^127.0.0.1\tgitlab.localhost # devzone:gitlab$' "$DEVZONE_HOSTS"
+    grep -q $'^127\.0\.0\.1\tgitlab\.localhost # devzone:gitlab$' "$DEVZONE_HOSTS"
 }
 
 @test "gitlab : hote-retirer retire la ligne, garde localhost ; sans ligne → rien, code 0" {
@@ -367,7 +373,7 @@ SUDO
     run bash "$DEMARRAGE"
     [ "$status" -eq 0 ]
     grep -q 'devzone:gitlab' "$DEVZONE_HOSTS"
-    grep -q $'^127.0.0.1\tgitlab.localhost # devzone:gitlab$' "$DEVZONE_HOSTS"
+    grep -q $'^127\.0\.0\.1\tgitlab\.localhost # devzone:gitlab$' "$DEVZONE_HOSTS"
 }
 
 @test "gitlab : valeurs — host sans port, port externe par GITLAB_PORT" {
