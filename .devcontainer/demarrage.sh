@@ -1,14 +1,18 @@
 #!/usr/bin/env bash
-# À chaque démarrage, dans l'ordre : identité git (déduite du compte gh),
-# clusters Kubernetes, nom gitlab.localhost et relais 8929/2224 si le module
-# gitlab est actif, relais du module postgres s'il est actif, relais de ports
-# vers le poste, puis récapitulatif de ce qui reste à faire (devzone).
+# À chaque démarrage, dans l'ordre : relais du socket Docker (#293), identité git
+# (déduite du compte gh), clusters Kubernetes, nom gitlab.localhost et relais
+# 8929/2224 du module gitlab s'il est actif, relais du module postgres s'il est
+# actif, relais de ports vers le poste, puis récapitulatif de ce qui reste à
+# faire (devzone).
 # Séquentiel : le récapitulatif voit l'identité tout juste posée ; l'échec
 # d'une étape n'empêche pas les suivantes.
 # Jamais de question (gh, kubectl et ses plugins d'authentification) : sortie
 # invisible derrière make, une attente bloquerait (voir post-create.sh)
 exec </dev/null
 ICI="$(dirname "$0")"
+# Relais du socket Docker d'abord (#293) : sans lui, les docker exec longs
+# (kind, modules) sont coupés au bout de 0,5 s sous Docker Desktop
+DEVZONE_RELAIS_REEL=oui bash "$ICI/docker-relais.sh" || echo "démarrage : relais Docker non corrigé (DEVZONE_RELAIS_REEL=oui bash $ICI/docker-relais.sh)"
 bash "$ICI/git-identite.sh" || echo "démarrage : identité git non traitée (bash $ICI/git-identite.sh)"
 bash "$ICI/kube-config.sh" || echo "démarrage : clusters non traités (bash $ICI/kube-config.sh)"
 # Module gitlab actif : /etc/hosts est un montage Docker régénéré à chaque
