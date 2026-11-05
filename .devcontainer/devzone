@@ -730,6 +730,16 @@ etat() {
     if [ -n "$cluster_actuel" ] && ! cluster_est_local "$cluster_actuel"; then
         printf '  ⚠ cluster        distant : %s — services sur un cluster distant\n' "$cluster_actuel"
     fi
+    # Cluster de travail interne (kind) : avertissement dans le recapitulatif
+    ctx_travail="$(kubectl config current-context 2>/dev/null || true)"
+    case "$ctx_travail" in
+        kind-gitlab* | kind-devzone*)
+            ctx_hote="$(KUBECONFIG="${DEVZONE_KUBE_HOTE:-$HOME/.kube/hote.config}" kubectl config current-context 2>/dev/null || true)"
+            if [ -n "$ctx_hote" ] && cluster_joignable "$ctx_hote"; then
+                printf '  ⚠ cluster de travail : %s (cluster interne de devzone) ; revenir : kubectl config use-context %s\n' "$ctx_travail" "$ctx_hote"
+            fi
+            ;;
+    esac
     ports_etat="$(bash "$ICI/ports.sh" resume 2>/dev/null || true)"
     case "$ports_etat" in
         aucun*) printf '  ○ ports vers le poste %s\n' "$ports_etat" ;;

@@ -390,7 +390,7 @@ gitlab_installer() {
     local cree=false
     if ! kind get clusters 2>/dev/null | grep -qx "gitlab${INSTANCE_SUFFIX}"; then
         echo "▶ Création du cluster kind gitlab…"
-        kind create cluster --name "gitlab${INSTANCE_SUFFIX}" --config "$ICI/kind.yaml" --wait 120s
+        kind_creer_sans_basculer --name "gitlab${INSTANCE_SUFFIX}" --config "$ICI/kind.yaml" --wait 120s
         kube_joignable_depuis_conteneur "$HOME/.kube/config"
         cree=true
     fi
