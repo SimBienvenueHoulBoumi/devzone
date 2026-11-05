@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 # Relais du socket Docker (#293) : le socat de la feature sans -t est remplacé
 # par le même avec -t 86400, puis un docker exec long est contrôlé. Faux ps,
-# kill, rm, setsid et docker dans le PATH, chemins sous $BATS_TEST_TMPDIR :
+# sudo, kill, setsid et docker dans le PATH, chemins sous $BATS_TEST_TMPDIR :
 # aucun vrai socat, sudo ni kill.
 
 setup() {
@@ -10,8 +10,9 @@ setup() {
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
     T="$BATS_TEST_TMPDIR"
     relais_docker_isole
+    export DEVZONE_RELAIS_SUDO=sudo
     export DEVZONE_RELAIS_ATTENTE=2
-    unset DEVZONE_RELAIS_REAL DEVZONE_RELAIS_DOCKER DEVZONE_RELAIS_UTILISATEUR
+    unset DEVZONE_RELAIS_REEL DEVZONE_RELAIS_DOCKER DEVZONE_RELAIS_UTILISATEUR
     mkdir -p "$T/bin"
     : >"$T/ps.txt"
     : >"$T/outils.log"
@@ -22,20 +23,18 @@ setup() {
 #!/usr/bin/env bash
 cat "$BATS_TEST_TMPDIR/ps.txt"
 OUTIL
+    # sudo : journalisé, puis exécuté sans privilège
+    cat >"$T/bin/sudo" <<'OUTIL'
+#!/usr/bin/env bash
+echo "sudo $*" >>"$BATS_TEST_TMPDIR/outils.log"
+exec "$@"
+OUTIL
     # kill : journalisé ; kill -0 → processus déjà terminé
     cat >"$T/bin/kill" <<'OUTIL'
 #!/usr/bin/env bash
 echo "kill $*" >>"$BATS_TEST_TMPDIR/outils.log"
 [ "${1:-}" = -0 ] && exit 1
 exit 0
-OUTIL
-
-    # rm : journalisé, puis exécuté
-    cat >"$T/bin/rm" <<'OUTIL'
-#!/usr/bin/env bash
-echo "rm $*" >>"$BATS_TEST_TMPDIR/outils.log"
-[ "${1:-}" = "-f" ] && shift
-/usr/bin/rm -f "$@"
 OUTIL
 
     # setsid -f socat … : journalisé ; le nouveau socat apparaît dans ps
@@ -78,8 +77,8 @@ relais_feature() {
     relais_feature
     run bash "$RELAIS"
     [ "$status" -eq 0 ]
-    grep -qx "kill 39" "$T/outils.log"
-    grep -qx "rm -f $DEVZONE_RELAIS_SOCKET" "$T/outils.log"
+    grep -qx "sudo kill 39" "$T/outils.log"
+    grep -qx "sudo rm -f $DEVZONE_RELAIS_SOCKET" "$T/outils.log"
     grep -qx "setsid -f socat -t 86400 -lf $DEVZONE_RELAIS_LOG UNIX-LISTEN:$DEVZONE_RELAIS_SOCKET,fork,mode=660,user=vscode,backlog=128 UNIX-CONNECT:$DEVZONE_RELAIS_SOURCE" "$T/outils.log"
     [ ! -e "$DEVZONE_RELAIS_SOCKET" ]
     [ "$(cat "$DEVZONE_RELAIS_PID")" = 4242 ]

@@ -643,11 +643,19 @@ SUDO
     grep -q 'devzone:gitlab' "$DEVZONE_HOSTS"
 }
 
+marque_reelle() {
+    stat -c %Y /tmp/devzone-relais-docker.echec 2>/dev/null ||
+        stat -f %m /tmp/devzone-relais-docker.echec 2>/dev/null ||
+        echo absente
+}
+
 @test "demarrage : gitlab actif → ligne posée, inactif → rien" {
     # Isolation (#346) : le relais Docker tourne sous $BATS_TEST_TMPDIR, la
-    # marque réelle du poste n'est jamais touchée
+    # marque réelle du poste n'est jamais touchée (inchangée, pas absente :
+    # elle peut exister si le relais du poste est réellement en échec)
     [[ "$DEVZONE_RELAIS_MARQUE" == "$BATS_TEST_TMPDIR"/* ]] || false
-    [ ! -e /tmp/devzone-relais-docker.echec ]
+    local avant
+    avant="$(marque_reelle)"
     # Module inactif : rien n'est posé
     printf 'gitlab=off\n' >"$DEVZONE_ETAT"
     run bash "$DEMARRAGE"
@@ -663,10 +671,10 @@ SUDO
     grep -q 'TCP-LISTEN:8929,bind=127.0.0.1' "$BATS_TEST_TMPDIR/socat.log"
     attendre_journal "$BATS_TEST_TMPDIR/socat.log" 'TCP-LISTEN:2224,bind=127.0.0.1'
     grep -q 'TCP-LISTEN:2224,bind=127.0.0.1' "$BATS_TEST_TMPDIR/socat.log"
-    # Isolation (#346) : le relais Docker tourne sous $BATS_TEST_TMPDIR, la
-    # marque réelle du poste n'est jamais touchée
+    # Isolation (#346) : la marque réelle du poste est inchangée après le
+    # démarrage (relevée avant le premier lancement de demarrage.sh)
     [[ "$DEVZONE_RELAIS_MARQUE" == "$BATS_TEST_TMPDIR"/* ]] || false
-    [ ! -e /tmp/devzone-relais-docker.echec ]
+    [ "$(marque_reelle)" = "$avant" ]
 }
 
 @test "gitlab : valeurs — host sans port, port externe par GITLAB_PORT" {
