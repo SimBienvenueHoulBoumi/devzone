@@ -16,8 +16,10 @@ nodes:
     extraPortMappings:
       - containerPort: 80
         hostPort: 8929
+        listenAddress: "127.0.0.1"
         protocol: TCP
       # Clone SSH : nodePort kind fixe 32022 → hostPort 2224 (port annoncé par GitLab)
       - containerPort: 32022
         hostPort: 2224
+        listenAddress: "127.0.0.1"
         protocol: TCP
