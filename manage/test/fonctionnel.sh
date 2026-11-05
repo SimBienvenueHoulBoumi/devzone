@@ -137,6 +137,9 @@ if ! dz "docker info" >/dev/null 2>&1; then
     dz "uname -r; iptables --version; if command -v update-alternatives >/dev/null 2>&1; then update-alternatives --display iptables; fi; cat /proc/self/cgroup; if [ -f /tmp/dockerd.log ]; then tail -n 80 /tmp/dockerd.log; else echo 'dockerd.log introuvable'; fi" 2>&1 | sed "s/^/      /"
 fi
 reussit "Docker répond dans le conteneur" "docker info"
+# #293 : relais du socket corrigé au démarrage (docker-relais.sh) ; sans lui,
+# un docker exec sans entrée standard est coupé à 0,5 s sous Docker Desktop
+reussit "docker exec long non coupé (relais du socket)" "docker exec \"\$(hostname)\" sh -c 'sleep 2; echo ok' </dev/null" "^ok$"
 # Une seconde tentative si l'API du nœud redémarre pendant l'initialisation
 # (Docker de l'hôte chargé), comme cluster_preparer ; --retain garde le nœud
 # pour le diagnostic en cas de second échec
