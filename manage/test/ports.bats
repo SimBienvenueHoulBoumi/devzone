@@ -4,6 +4,8 @@
 # et curl dans le PATH : aucun conteneur lancé, arguments journalisés.
 
 setup() {
+    load commun
+    kube_isole
     PORTS="$BATS_TEST_DIRNAME/../../.devcontainer/ports.sh"
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
     export HOME="$BATS_TEST_TMPDIR/home"

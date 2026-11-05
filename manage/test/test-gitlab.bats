@@ -5,6 +5,8 @@
 # Chaque faux binaire journalise ses arguments dans $BATS_TEST_TMPDIR/<outil>.log.
 
 setup() {
+    load commun
+    kube_isole
     SCRIPT="$BATS_TEST_DIRNAME/../../.devcontainer/gitlab/test-gitlab.sh"
     export HOME="$BATS_TEST_TMPDIR/home"
     export DEVZONE_RACINE="$BATS_TEST_TMPDIR/racine"

@@ -7,13 +7,17 @@
 #   devzone activer <module>         active et applique tout de suite
 #   devzone desactiver <module>      désactive et applique tout de suite
 #   devzone appliquer                installe ce qui est actif (post-create.sh)
+#   devzone reparer                  répare relais Docker, gitlab, postgres, ports, identifiants
+#   devzone demarrer                 démarrage complet (scripts de démarrage et récapitulatif)
+#   devzone metrics [contexte…]      installe metrics-server (kubectl top, k9s)
+#   devzone utiliser CTX [--confirmer CTX]  bascule le cluster de travail de kubectl
 #   devzone actif <module>           code 0 si actif (scripts de démarrage)
 #   devzone test-bash32             lance les tests bats sous bash 3.2 (conteneur Docker)
 #   devzone test-gitlab             essai de bout en bout du module et de la plateforme GitLab
 #   devzone agent <dossier> <fichier-consigne>  dirige opencode sur une consigne
-#   devzone activer postgres [--contexte CTX]   PostgreSQL partagé, cluster au choix
+#   devzone activer postgres [--contexte CTX] [--confirmer CTX]   PostgreSQL partagé, cluster au choix
 #   devzone postgres creer <projet>  base et utilisateur d'un projet (aussi : liste, psql, supprimer)
-#   devzone cluster [CTX] [--oui]    cluster des services de devzone, ou en changer
+#   devzone cluster [CTX] [--oui] [--confirmer CTX]  cluster des services de devzone, ou en changer
 #   devzone port [<n>|--fermer <n>]  relais d'un port du conteneur vers le poste
 #   devzone mots-de-passe           régénère .password et affiche son chemin
 #
@@ -348,24 +352,38 @@ appliquer_gitlab() {
 # PostgreSQL partagé (#280) : installé sur le cluster de devzone, choisi à la
 # première activation (--contexte, menu en terminal, kind dédié sinon)
 appliquer_postgres() {
-    local voulu="" attendre="" arg ctx actuel etat_courant
+    local voulu="" confirmer="" attendre="" arg ctx actuel etat_courant
     if [ "$1" = on ]; then
         for arg in "${@:2}"; do
-            if [ -n "$attendre" ]; then voulu="$arg"; attendre=""; continue; fi
+            if [ -n "$attendre" ]; then
+                case "$attendre" in
+                    contexte) voulu="$arg" ;;
+                    confirmer) confirmer="$arg" ;;
+                esac
+                attendre=""
+                continue
+            fi
             case "$arg" in
-                --contexte) attendre=1 ;;
-                *) echo "devzone : argument inconnu : $arg (devzone activer postgres --contexte CTX)" >&2; ecrire postgres off; return 2 ;;
+                --contexte) attendre=contexte ;;
+                --confirmer) attendre=confirmer ;;
+                *) echo "devzone : argument inconnu : $arg (devzone activer postgres --contexte CTX [--confirmer CTX])" >&2; ecrire postgres off; return 2 ;;
             esac
         done
+        if [ -n "$attendre" ]; then
+            echo "devzone : $attendre attend un contexte" >&2
+            ecrire postgres off
+            return 2
+        fi
         actuel="$(cluster_lu)"
         if [ -n "$voulu" ] && [ -n "$actuel" ] && [ "$voulu" != "$actuel" ]; then
             echo "devzone : les services de devzone sont sur $actuel ; pour en changer : devzone cluster $voulu" >&2
             ecrire postgres off
             return 2
         fi
-        if ! ctx="$(cluster_choisir "$voulu")"; then
-            ecrire postgres off
-            return 2
+        if [ -n "$confirmer" ]; then
+            ctx="$(cluster_choisir "$voulu" --confirmer "$confirmer")" || { ecrire postgres off; return 2; }
+        else
+            ctx="$(cluster_choisir "$voulu")" || { ecrire postgres off; return 2; }
         fi
         # Choix gardé avant l'installation : une reprise vise le même cluster
         cluster_ecrire "$ctx"
@@ -405,14 +423,24 @@ confirmer_suppression_postgres() {
 # déplace (désinstallés de l'ancien, installés sur le nouveau : données non
 # migrées, d'où la confirmation)
 changer_cluster() {
-    local voulu="" oui="" arg actuel nouveau reponse
+    local voulu="" oui="" confirmer="" attendre="" arg actuel nouveau reponse
     for arg in "$@"; do
+        if [ -n "$attendre" ]; then
+            confirmer="$arg"
+            attendre=""
+            continue
+        fi
         case "$arg" in
             --oui) oui=1 ;;
-            -*) echo "devzone : argument inconnu : $arg (devzone cluster [CTX] [--oui])" >&2; return 2 ;;
+            --confirmer) attendre=1 ;;
+            -*) echo "devzone : argument inconnu : $arg (devzone cluster [CTX] [--oui] [--confirmer CTX])" >&2; return 2 ;;
             *) voulu="$arg" ;;
         esac
     done
+    if [ -n "$attendre" ]; then
+        echo "devzone : --confirmer attend un contexte" >&2
+        return 2
+    fi
     actuel="$(cluster_lu)"
     if [ -z "$voulu" ]; then
         if [ -z "$actuel" ]; then
@@ -425,7 +453,11 @@ changer_cluster() {
         echo "  possibles : $(cluster_candidats | tr '\n' ' ')"
         return 0
     fi
-    nouveau="$(cluster_choisir "$voulu")" || return 2
+    if [ -n "$confirmer" ]; then
+        nouveau="$(cluster_choisir "$voulu" --confirmer "$confirmer")" || return 2
+    else
+        nouveau="$(cluster_choisir "$voulu")" || return 2
+    fi
     if [ "$nouveau" = "$actuel" ]; then
         echo "devzone : déjà sur $nouveau, rien à faire."
         return 0
@@ -668,6 +700,98 @@ worktrees_absents() {
     done || true
 }
 
+# Réparation (#341) : reprend la suite de demarrage.sh sans l'identité git ni
+# les clusters. Chaque élément est réparé pour de vrai ; ✔ ou ✖ avec la raison.
+reparer_element() {
+    local nom="$1" sortie code raison
+    shift
+    if sortie="$("$@" 2>&1)"; then
+        echo "✔ $nom"
+    else
+        code=$?
+        raison="$(printf '%s\n' "$sortie" | sed '/^[[:space:]]*$/d' | tail -1)"
+        [ -n "$raison" ] || raison="échec (code $code)"
+        echo "✖ $nom : $raison"
+        reparer_echec=1
+    fi
+}
+
+reparer() {
+    reparer_echec=0
+    reparer_element "relais Docker" env DEVZONE_RELAIS_REEL=oui bash "$ICI/docker-relais.sh"
+    if [ "$(valeur gitlab)" = on ]; then
+        reparer_element "nom gitlab" bash "$ICI/gitlab/gitlab.sh" hote-poser
+        reparer_element "relais gitlab" bash "$ICI/gitlab/gitlab.sh" relais-lancer
+    fi
+    if [ "$(valeur postgres)" = on ]; then
+        reparer_element "relais postgres" bash "$ICI/postgres/postgres.sh" relais-lancer
+    fi
+    reparer_element "relais de ports" bash "$ICI/ports.sh" relancer
+    reparer_element "identifiants" bash "$ICI/password.sh" regenerer
+    return "$reparer_echec"
+}
+
+# Bascule le cluster de travail de l'utilisateur (#341). Ne touche jamais au
+# cluster des services de devzone : aucun cluster_ecrire, aucune ligne
+# cluster= dans l'état.
+utiliser() {
+    local ctx="" confirmer="" reponse arg
+    while [ "$#" -gt 0 ]; do
+        arg="$1"
+        shift
+        case "$arg" in
+            --confirmer)
+                if [ "$#" -eq 0 ]; then
+                    echo "devzone : --confirmer attend un contexte" >&2
+                    return 2
+                fi
+                confirmer="$1"
+                shift
+                ;;
+            --confirmer=*) confirmer="${arg#*=}" ;;
+            -*)
+                echo "devzone : argument inconnu : $arg (devzone utiliser CTX [--confirmer CTX])" >&2
+                return 2
+                ;;
+            *)
+                if [ -n "$ctx" ]; then
+                    echo "devzone : argument inconnu : $arg (devzone utiliser CTX [--confirmer CTX])" >&2
+                    return 2
+                fi
+                ctx="$arg"
+                ;;
+        esac
+    done
+    if [ -z "$ctx" ]; then
+        echo "devzone : contexte manquant : devzone utiliser CTX" >&2
+        return 2
+    fi
+    if ! kubectl config get-contexts -o name 2>/dev/null | grep -qxF -- "$ctx"; then
+        echo "devzone : contexte inconnu : $ctx (voir kubectl config get-contexts)" >&2
+        return 2
+    fi
+    if ! cluster_est_local "$ctx"; then
+        if [ -n "$confirmer" ]; then
+            if [ "$confirmer" != "$ctx" ]; then
+                echo "devzone : cluster distant refusé : $ctx (--confirmer $ctx)" >&2
+                return 2
+            fi
+        elif cluster_interactif; then
+            printf 'cluster distant : %s ; tape son nom pour confirmer : ' "$ctx" >&2
+            read -r reponse || reponse=""
+            if [ "$reponse" != "$ctx" ]; then
+                echo "devzone : cluster distant refusé : $ctx (--confirmer $ctx)" >&2
+                return 2
+            fi
+        else
+            echo "devzone : cluster distant refusé : $ctx (--confirmer $ctx)" >&2
+            return 2
+        fi
+    fi
+    kubectl config use-context "$ctx" >/dev/null
+    echo "cluster de travail : $ctx"
+}
+
 # État complet : ✔ prêt, ✖ nécessaire, ○ facultatif, ⚠ à corriger ; chaque
 # point à faire avec sa commande (affiché à chaque démarrage)
 etat() {
@@ -737,7 +861,7 @@ etat() {
         kind-gitlab* | kind-devzone*)
             ctx_hote="$(KUBECONFIG="${DEVZONE_KUBE_HOTE:-$HOME/.kube/hote.config}" kubectl config current-context 2>/dev/null || true)"
             if [ -n "$ctx_hote" ] && cluster_joignable "$ctx_hote"; then
-                printf '  ⚠ cluster de travail : %s (cluster interne de devzone) ; revenir : kubectl config use-context %s\n' "$ctx_travail" "$ctx_hote"
+                printf '  ⚠ cluster de travail : %s (cluster interne de devzone) ; revenir : devzone utiliser %s\n' "$ctx_travail" "$ctx_hote"
             fi
             ;;
     esac
@@ -754,7 +878,7 @@ etat() {
     # longs coupés, kind et modules en échec
     relais_marque="${DEVZONE_RELAIS_MARQUE:-/tmp/devzone-relais-docker.echec}"
     if [ -f "$relais_marque" ]; then
-        printf '  ⚠ relais Docker     %s : DEVZONE_RELAIS_REEL=oui bash %s/docker-relais.sh\n' "$(head -1 "$relais_marque")" "$ICI"
+        printf '  ⚠ relais Docker     %s : devzone reparer\n' "$(head -1 "$relais_marque")"
     fi
 }
 
@@ -790,6 +914,10 @@ case "${1:-}" in
     agent)
         bash "$ICI/agent.sh" "${@:2}"
         ;;
+    reparer) reparer ;;
+    demarrer) bash "$ICI/demarrage.sh" ;;
+    metrics) bash "$ICI/metrics-server.sh" "${@:2}" ;;
+    utiliser) utiliser "${@:2}" ;;
     cluster) changer_cluster "${@:2}" ;;
     postgres) DEVZONE_ETAT="$ETAT" bash "$ICI/postgres/postgres.sh" "${@:2}" ;;
     port) DEVZONE_ETAT="$ETAT" bash "$ICI/ports.sh" "${@:2}" ;;

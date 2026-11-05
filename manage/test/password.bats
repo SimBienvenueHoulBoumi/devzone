@@ -8,6 +8,7 @@ setup() {
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
     PASSWORD="$BATS_TEST_DIRNAME/../../.devcontainer/password.sh"
     relais_docker_isole
+    kube_isole
     export HOME="$BATS_TEST_TMPDIR/home"
     export DEVZONE_RACINE="$BATS_TEST_TMPDIR/racine"
     RACINE="$DEVZONE_RACINE"
