@@ -43,6 +43,11 @@ else
     SUDO=sudo
 fi
 
+if [ -n "${BATS_TEST_TMPDIR:-}" ] && [ "$SOCKET" = /var/run/docker.sock ]; then
+    echo "docker-relais : refus sous bats (tests)" >&2
+    exit 2
+fi
+
 if [ "$SOCKET" = /var/run/docker.sock ] && [ "${DEVZONE_RELAIS_REEL:-}" != oui ]; then
     echo "docker-relais : refus de toucher au vrai socket ($SOCKET) sans DEVZONE_RELAIS_REEL=oui" >&2
     exit 2
