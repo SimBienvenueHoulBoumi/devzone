@@ -154,10 +154,12 @@ agent_consigne() {
     mkdir -p "$DEVZONE_RACINE/workspace/projet"
 }
 
+# Lance devzone agent sur la consigne de test ; le résultat est dans $status et $output (run).
 agent_lance() {
     run bash "$DEVZONE" agent "$DEVZONE_RACINE/workspace/projet" "$DEVZONE_RACINE/workspace/consigne.txt"
 }
 
+# Chemin du journal du projet de test, où devzone agent écrit ses lignes.
 agent_journal() {
     echo "$DEVZONE_RACINE/workspace/.agents/projet.log"
 }
