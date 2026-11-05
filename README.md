@@ -127,6 +127,27 @@ Pour en savoir plus : [Mettre en route un projet](https://github.com/SimBienvenu
 
 Ces modules sont désactivés par défaut, activables à la demande depuis le conteneur (sans rebuild), et leur choix est conservé d'un démarrage à l'autre.
 
+## Où sont mes identifiants ?
+
+Les comptes créés par devzone sont regroupés dans `.password`, à la racine de devzone (à côté de `.devzone.modules`). Une ligne par compte, colonnes séparées par des tabulations :
+
+```text
+# service	adresse	utilisateur	mot de passe
+gitlab	http://gitlab.localhost:8929	root	…
+postgres	127.0.0.1:5432	postgres	…
+postgres:monprojet	127.0.0.1:5432/monprojet	monprojet	…
+```
+
+Le fichier est lisible par toi seul (600) et ignoré par git : ne le copie ni ne le commit jamais. Il est régénéré à chaque création, suppression ou changement de compte (modules `gitlab` et `postgres`, seed GitLab, démarrage) :
+
+```sh
+devzone mots-de-passe                  # régénère le fichier et affiche seulement son chemin
+devzone postgres creer <projet>         # création, ou nouveau mot de passe avec --nouveau-mdp
+devzone postgres supprimer <projet>     # suppression du compte et de sa ligne
+```
+
+Les fichiers des modules restent la source : `workspace/.postgres/<projet>.env`, `workspace/.postgres/admin-password`, `workspace/.gitlab/root-password` et `workspace/.gitlab/dev-password`.
+
 ## Accéder à PostgreSQL
 
 Le module `postgres` installe un PostgreSQL 16 partagé sur le cluster de devzone : une base et un utilisateur par projet. Toutes les commandes se lancent dans le conteneur (`make shell`).

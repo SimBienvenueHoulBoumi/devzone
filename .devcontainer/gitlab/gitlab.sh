@@ -10,6 +10,9 @@ ICI="$(cd "$(dirname "$0")" && pwd)"
 RACINE="${DEVZONE_RACINE:-$(dirname "$(dirname "$ICI")")}"
 # shellcheck source=SCRIPTDIR/../cluster.sh
 . "$ICI/../cluster.sh"
+# shellcheck source=SCRIPTDIR/../password.sh
+# shellcheck disable=SC1091
+. "$ICI/../password.sh"
 
 # ---- Variables de délai (secondes) ----
 # GITLAB_ATTENTE : attente globale d'installation (défaut 1200)
@@ -18,6 +21,12 @@ GITLAB_ATTENTE="${GITLAB_ATTENTE:-1200}"
 # ---- Chemins secrets ----
 # Secrets stockés dans $RACINE/workspace/.gitlab/ (chmod 600), jamais affichés.
 GITLAB_SECRETS_DIR="$RACINE/workspace/.gitlab"
+
+# Vue regroupée des identifiants : un échec n'empêche jamais l'opération
+regenerer_identifiants() {
+    password_regenerer ||
+        echo "devzone : gitlab : identifiants regroupés non mis à jour (devzone mots-de-passe)" >&2
+}
 
 # ---- /etc/hosts du conteneur ----
 # DEVZONE_HOSTS pour les tests (jamais le /etc/hosts réel)
@@ -168,6 +177,7 @@ gitlab_seed() {
     # Déjà poussé (installation relancée) : rien à refaire
     if curl -sf --header "PRIVATE-TOKEN: $push_token" "http://gitlab.localhost:8929/api/v4/projects/devzone%2Fdemo/repository/branches/main" >/dev/null 2>&1; then
         echo "✔ Seed GitLab terminé (projet demo déjà poussé)."
+        regenerer_identifiants
         return 0
     fi
     if [ -d "$ICI/demo" ]; then
@@ -202,6 +212,7 @@ gitlab_seed() {
     fi
 
     echo "✔ Seed GitLab terminé."
+    regenerer_identifiants
 }
 
 # ---- relais TCP 127.0.0.1:8929/2224 vers le nœud kind ----
@@ -494,6 +505,7 @@ gitlab_desinstaller() {
     gitlab_hote_retirer
 
     echo "✔ GitLab désinstallé."
+    regenerer_identifiants
 }
 
 # ---- etat : vérifier l'état de GitLab ----

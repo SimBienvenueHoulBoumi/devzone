@@ -58,6 +58,7 @@ workspace/*
 .DS_Store
 .devzone.log
 .devzone.etat
+.password
 EOF
     chmod +x "$cible/manage/scripts/desinstaller.sh" "$cible/manage/scripts/lancer.sh"
     cible="$(cd "$cible" && pwd)"
