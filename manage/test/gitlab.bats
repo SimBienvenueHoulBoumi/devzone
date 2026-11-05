@@ -11,6 +11,7 @@ setup() {
     GITLAB="$BATS_TEST_DIRNAME/../../.devcontainer/gitlab/gitlab.sh"
     DEMARRAGE="$BATS_TEST_DIRNAME/../../.devcontainer/demarrage.sh"
     relais_docker_isole
+    kube_isole
     export HOME="$BATS_TEST_TMPDIR/home"
     export DEVZONE_RACINE="$BATS_TEST_TMPDIR/racine"
     export DEVZONE_ETAT="$BATS_TEST_TMPDIR/modules"

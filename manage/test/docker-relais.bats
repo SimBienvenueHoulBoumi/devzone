@@ -10,6 +10,7 @@ setup() {
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
     T="$BATS_TEST_TMPDIR"
     relais_docker_isole
+    kube_isole
     export DEVZONE_RELAIS_SUDO=sudo
     export DEVZONE_RELAIS_ATTENTE=2
     unset DEVZONE_RELAIS_REEL DEVZONE_RELAIS_DOCKER DEVZONE_RELAIS_UTILISATEUR
@@ -148,5 +149,5 @@ relais_feature() {
     [[ "$output" != *"relais Docker"* ]] || false
     echo "docker exec long coupé (sortie : vide)" >"$DEVZONE_RELAIS_MARQUE"
     run bash "$DEVZONE"
-    [[ "$output" == *"⚠ relais Docker     docker exec long coupé"*"docker-relais.sh"* ]] || false
+    [[ "$output" == *"⚠ relais Docker     docker exec long coupé"*"devzone reparer"* ]] || false
 }

@@ -62,6 +62,8 @@ kube_empreinte() {
 }
 
 setup() {
+    load commun
+    kube_isole
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
     # Versions figées lues dans les fichiers : une montée automatique (workflow
     # versions) ne casse pas ces tests
@@ -677,7 +679,7 @@ KUBE
     run bash "$DEVZONE"
     [ "$status" -eq 0 ] || false
     [[ "$output" == *"⚠ cluster de travail : kind-gitlab"* ]] || false
-    [[ "$output" == *"kubectl config use-context docker-desktop"* ]] || false
+    [[ "$output" == *"devzone utiliser docker-desktop"* ]] || false
 }
 
 @test "état : contexte docker-desktop → pas d'avertissement de cluster de travail" {

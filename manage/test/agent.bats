@@ -5,6 +5,8 @@
 # Les délais sont réduits par les variables DEVZONE_AGENT_*.
 
 setup() {
+    load commun
+    kube_isole
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
     export HOME="$BATS_TEST_TMPDIR/home"
     mkdir -p "$HOME" "$BATS_TEST_TMPDIR/bin"

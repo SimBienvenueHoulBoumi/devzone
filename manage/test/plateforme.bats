@@ -5,6 +5,8 @@
 # binaire), curl et sha256sum dans le PATH : aucun téléchargement réel.
 
 setup() {
+    load commun
+    kube_isole
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
     export HOME="$BATS_TEST_TMPDIR/home"
     mkdir -p "$HOME" "$BATS_TEST_TMPDIR/bin"

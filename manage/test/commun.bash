@@ -10,3 +10,12 @@ relais_docker_isole() {
     export DEVZONE_RELAIS_MARQUE="$BATS_TEST_TMPDIR/relais.echec"
     export DEVZONE_RELAIS_SUDO=""
 }
+
+# Aide commune de Kubernetes (#341) : le kubeconfig, le HOME et la copie du
+# kubeconfig de l'hôte restent sous $BATS_TEST_TMPDIR, jamais ceux du poste.
+kube_isole() {
+    export HOME="$BATS_TEST_TMPDIR/home"
+    export KUBECONFIG="$BATS_TEST_TMPDIR/kubeconfig"
+    export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
+    mkdir -p "$HOME" "$BATS_TEST_TMPDIR"
+}
