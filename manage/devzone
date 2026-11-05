@@ -341,7 +341,8 @@ mettre_a_jour() {
                 continue
             fi
             mkdir -p "$sauvegarde/$(dirname "$rel")"
-            cp -p "$dossier/$rel" "$sauvegarde/$rel"
+            # -P : un lien est sauvegardé tel quel, jamais sa cible
+            cp -P -p "$dossier/$rel" "$sauvegarde/$rel"
         done <"$travail/sauver"
         echo "Sauvegarde : $sauvegarde"
     fi
@@ -355,6 +356,11 @@ mettre_a_jour() {
             echo "devzone : manifeste : chemin refusé : $rel" >&2
             continue
         fi
+        # Jamais d'écriture à travers un lien : le lien (pas sa cible) est retiré
+        if [ -L "$dossier/$rel" ]; then
+            rm -f -- "$dossier/$rel"
+            echo "devzone : manifeste : lien remplacé : $rel" >&2
+        fi
         cp -p "$PAQUET/$rel" "$dossier/$rel"
         if [ -x "$PAQUET/$rel" ]; then
             chmod +x "$dossier/$rel"
@@ -367,6 +373,7 @@ mettre_a_jour() {
             echo "devzone : manifeste : chemin refusé : $rel" >&2
             continue
         fi
+        # rm ne suit pas les liens : seul le lien est retiré, jamais sa cible
         rm -f -- "$dossier/$rel"
     done <"$travail/supprimer"
     while IFS= read -r ancien; do

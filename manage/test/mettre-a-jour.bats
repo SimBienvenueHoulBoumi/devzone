@@ -342,6 +342,34 @@ echo moi' ]
     [[ "$output" == *"devzone : manifeste : chemin refusé : .devcontainer/lien/secret"* ]] || false
 }
 
+@test "lien symbolique sur le dernier élément : remplacé par un vrai fichier, cible intacte" {
+    creer_v1
+    mkdir -p "$T/dehors"
+    printf 'intact\n' >"$T/dehors/cible"
+    rm -f "$DZ/.devcontainer/devcontainer.json"
+    ln -s "$T/dehors/cible" "$DZ/.devcontainer/devcontainer.json"
+    cd "$DZ"
+    run bash "$MAJ" mettre-a-jour --oui --sans-reconstruire
+    [ "$status" -eq 0 ]
+    [ "$(cat "$T/dehors/cible")" = intact ]
+    [ ! -L "$DZ/.devcontainer/devcontainer.json" ] || false
+    [ "$(cat "$DZ/.devcontainer/devcontainer.json")" = '{"marque":"nouveau"}' ]
+    [[ "$output" == *"lien remplacé : .devcontainer/devcontainer.json"* ]] || false
+}
+
+@test "lien symbolique : la sauvegarde garde le lien, pas une copie de la cible" {
+    creer_v1
+    mkdir -p "$T/dehors"
+    printf 'intact\n' >"$T/dehors/cible"
+    rm -f "$DZ/.devcontainer/devcontainer.json"
+    ln -s "$T/dehors/cible" "$DZ/.devcontainer/devcontainer.json"
+    cd "$DZ"
+    run bash "$MAJ" mettre-a-jour --oui --sans-reconstruire
+    [ "$status" -eq 0 ]
+    [ -L "$(sauvegarde_de)/.devcontainer/devcontainer.json" ] || false
+    [ "$(cat "$T/dehors/cible")" = intact ]
+}
+
 @test "hors d'un dossier devzone et option inconnue → refus" {
     mkdir pas-devzone
     cd pas-devzone
