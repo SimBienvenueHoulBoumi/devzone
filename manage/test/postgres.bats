@@ -220,6 +220,25 @@ attendre_nohup() {
     grep -qx 'DB_PASSWORD=mdpsecret2' "$SECRETS/taskmanager.env"
 }
 
+@test "creer, --nouveau-mdp, supprimer : .password suit les comptes" {
+    actif_sur docker-desktop
+    bash "$POSTGRES" creer taskmanager
+    grep -q $'^postgres:taskmanager\t127.0.0.1:5432/taskmanager\ttaskmanager\tmdpsecret1$' "$DEVZONE_RACINE/.password"
+    bash "$POSTGRES" creer taskmanager --nouveau-mdp
+    grep -q $'^postgres:taskmanager\t127.0.0.1:5432/taskmanager\ttaskmanager\tmdpsecret2$' "$DEVZONE_RACINE/.password"
+    bash "$POSTGRES" supprimer taskmanager --oui
+    [ ! -e "$DEVZONE_RACINE/.password" ]
+}
+
+@test "installation, désinstallation : .password suit le compte admin" {
+    run bash "$DEVZONE" activer postgres --contexte docker-desktop </dev/null
+    [ "$status" -eq 0 ]
+    grep -q $'^postgres\t127.0.0.1:5432\tpostgres\t' "$DEVZONE_RACINE/.password"
+    run bash "$DEVZONE" desactiver postgres </dev/null
+    [ "$status" -eq 0 ]
+    [ ! -e "$DEVZONE_RACINE/.password" ]
+}
+
 @test "creer, liste, psql : module inactif → refus clair" {
     printf 'cluster=kind-devzone\n' >"$DEVZONE_ETAT"
     run bash "$POSTGRES" creer taskmanager

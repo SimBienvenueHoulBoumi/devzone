@@ -332,6 +332,16 @@ KUBE
     [[ "$output" != *"jeton-runner-secret"* ]] || false
 }
 
+@test "gitlab : seed et désinstallation régénèrent .password" {
+    run bash "$GITLAB" installer
+    [ "$status" -eq 0 ]
+    grep -q $'^gitlab\thttp://gitlab.localhost:8929\tdev\t' "$DEVZONE_RACINE/.password"
+    grep -q $'^gitlab\thttp://gitlab.localhost:8929\troot\tpassword123$' "$DEVZONE_RACINE/.password"
+    run bash "$GITLAB" desinstaller
+    [ "$status" -eq 0 ]
+    [ ! -e "$DEVZONE_RACINE/.password" ]
+}
+
 @test "gitlab : projet créé avec l'ID numérique du groupe, push avec le jeton root" {
     run bash "$GITLAB" installer
     [ "$status" -eq 0 ]

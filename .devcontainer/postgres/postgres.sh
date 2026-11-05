@@ -15,6 +15,9 @@ RACINE="${DEVZONE_RACINE:-$(dirname "$(dirname "$ICI")")}"
 ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
 # shellcheck source=SCRIPTDIR/../cluster.sh
 . "$ICI/../cluster.sh"
+# shellcheck source=SCRIPTDIR/../password.sh
+# shellcheck disable=SC1091
+. "$ICI/../password.sh"
 
 NS=devzone-postgres
 SECRETS="$RACINE/workspace/.postgres"
@@ -24,6 +27,12 @@ POSTGRES_ATTENTE="${POSTGRES_ATTENTE:-300}"
 POSTGRES_TAILLE="${POSTGRES_TAILLE:-5Gi}"
 
 refuse() { echo "devzone : postgres : $*" >&2; exit 2; }
+
+# Vue regroupée des identifiants : un échec n'empêche jamais l'opération
+regenerer_identifiants() {
+    password_regenerer ||
+        echo "devzone : postgres : identifiants regroupés non mis à jour (devzone mots-de-passe)" >&2
+}
 
 # Contexte du module : celui du cluster de devzone ; sans choix, rien n'est
 # installé (devzone activer postgres le fixe)
@@ -100,6 +109,7 @@ installer() {
     relais_lancer postgres "$CTX" "$NS" svc/postgres "$POSTGRES_PORT:5432"
     echo "✔ PostgreSQL prêt : 127.0.0.1:$POSTGRES_PORT dans le conteneur"
     echo "  Base d'un projet : devzone postgres creer <projet>"
+    regenerer_identifiants
 }
 
 desinstaller() {
@@ -112,6 +122,7 @@ desinstaller() {
     fi
     rm -rf "$SECRETS"
     echo "✔ PostgreSQL désinstallé."
+    regenerer_identifiants
 }
 
 nombre_bases() {
@@ -172,6 +183,7 @@ DB_URL=jdbc:postgresql://127.0.0.1:$POSTGRES_PORT/$projet
 ENV
     )
     echo "✔ base $projet prête ; identifiants : $fichier"
+    regenerer_identifiants
 }
 
 liste() {
@@ -220,6 +232,7 @@ DROP ROLE IF EXISTS $projet;
 SQL
     rm -f "$SECRETS/$projet.env"
     echo "✔ base $projet supprimée"
+    regenerer_identifiants
 }
 
 relais() {
