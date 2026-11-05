@@ -311,6 +311,27 @@ Tout le reste du conteneur (paquets installés à la main, fichiers hors de ces 
 
 
 
+## Mettre à jour devzone
+
+Un dossier devzone garde sa version dans `.devzone.version` : la version, puis une empreinte sha256 (calculée par node) par fichier copié depuis le paquet. La commande se lance **sur le poste**, dans le dossier :
+
+```bash
+cd mon-devzone
+devzone mettre-a-jour              # version du paquet installé
+npx devzone@latest mettre-a-jour   # dernière version publiée
+```
+
+- **Déjà à jour** : version du dossier égale à celle du paquet et aucun fichier du paquet manquant → `déjà à jour`, code 0. Le message rappelle `npx devzone@latest mettre-a-jour` pour la dernière version publiée.
+- **Fichiers modifiés localement** : leur empreinte diffère de celle du manifeste (sans manifeste, de celle du paquet). Ils sont listés et une confirmation est demandée. `--oui` répond oui pour un script ; sans terminal et sans `--oui`, la commande refuse (code 1) et ne touche à rien.
+- **Sauvegarde** : tout fichier remplacé ou supprimé est copié dans `.devzone.sauvegarde/<AAAAMMJJ-HHMMSS>/`, avec la même arborescence. Ce dossier est ajouté au `.gitignore` du devzone.
+- **Remplacement** : les fichiers du paquet sont recopiés, les fichiers de l'ancien manifeste qui n'existent plus sont supprimés, ainsi que les anciennes arborescences `core/` et `scripts/` à la racine. `.gitignore` est complété des lignes manquantes, jamais écrasé.
+- **Jamais touchés** : `workspace/`, `.devzone.modules`, `.devzone.paquets`, `.password`, `.app`, `.devzone.log`, les volumes Docker.
+- **Reconstruction** : le nouveau `.devzone.version` est écrit, puis `make rebuild` est proposé avec confirmation dans un terminal. `--sans-reconstruire` saute cette étape ; sans terminal, la reconstruction est indiquée mais jamais lancée.
+
+Un dossier créé avant ce manifeste a une version « inconnue » : tous les fichiers différents du paquet sont traités comme modifiés (sauvegarde, puis confirmation).
+
+Dans le conteneur, le récapitulatif `devzone` lit `$RACINE/.devzone.version` et la dernière version publiée (`npm view devzone version`, au plus une fois par jour, cache sous `~/.cache/devzone/`, délai de 5 s, silencieux hors ligne). Si elle est plus récente : `○ devzone X.Y.Z disponible : sur le poste, devzone mettre-a-jour`.
+
 ## Mettre à jour un outil
 
 | Outil | Où | Puis |
