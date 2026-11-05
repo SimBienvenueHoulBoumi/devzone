@@ -103,6 +103,24 @@ Pour en savoir plus : [Mettre en route un projet](https://github.com/SimBienvenu
 | GitHub (ou GitLab), qualité | gh, ou glab connecté à une instance GitLab (`devzone plateforme gitlab` dans le conteneur, [manage/docs/reference.md](manage/docs/reference.md#plateforme-github-ou-gitlab)) ; repowarden (hooks git globaux), shellcheck, bats, actionlint, gitleaks, ruff, vulture, pytest |
 | Assistants IA | Claude Code, opencode (module `ia`, désactivé par défaut) |
 
+## Installer un outil qui reste
+
+Un outil mis a la main (sudo apt install tree) ne survit pas a un make rebuild : l'image est reconstruite de zero. Pour un outil qui doit rester, devzone paquets garde la liste des paquets a reinstaller :
+
+```sh
+devzone paquets
+devzone paquets ajouter tree
+devzone paquets retirer tree
+devzone paquets appliquer
+```
+
+- devzone paquets affiche la liste : ✔ paquets installes, ○ paquets a installer ;
+- devzone paquets ajouter <nom>… valide chaque paquet (apt-cache), installe puis l'ajoute a la liste ;
+- devzone paquets retirer <nom> retire la liste et desinstalle ;
+- devzone paquets appliquer installe les paquets manquants apres un rebuild.
+
+La liste vit dans .devzone.paquets a la racine du dossier devzone, hors du depot. Un paquet en echec est signale dans le recap (⚠ paquets : …) ; devzone paquets appliquer peut alors etre relance.
+
 ## Au quotidien
 
 | Action | VS Code (`Cmd+Shift+P`) | `make` | Sans `make` (Windows) |
