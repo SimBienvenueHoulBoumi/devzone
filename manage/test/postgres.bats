@@ -7,6 +7,8 @@
 # (apply.log, sql.log).
 
 setup() {
+    load commun
+    kube_isole
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
     POSTGRES="$BATS_TEST_DIRNAME/../../.devcontainer/postgres/postgres.sh"
     export HOME="$BATS_TEST_TMPDIR/home"

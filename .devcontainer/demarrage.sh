@@ -12,28 +12,28 @@ exec </dev/null
 ICI="$(dirname "$0")"
 # Relais du socket Docker d'abord (#293) : sans lui, les docker exec longs
 # (kind, modules) sont coupés au bout de 0,5 s sous Docker Desktop
-DEVZONE_RELAIS_REEL=oui bash "$ICI/docker-relais.sh" || echo "démarrage : relais Docker non corrigé (DEVZONE_RELAIS_REEL=oui bash $ICI/docker-relais.sh)"
-bash "$ICI/git-identite.sh" || echo "démarrage : identité git non traitée (bash $ICI/git-identite.sh)"
-bash "$ICI/kube-config.sh" || echo "démarrage : clusters non traités (bash $ICI/kube-config.sh)"
+DEVZONE_RELAIS_REEL=oui bash "$ICI/docker-relais.sh" || echo "démarrage : relais Docker non corrigé (devzone reparer)"
+bash "$ICI/git-identite.sh" || echo "démarrage : identité git non traitée (devzone demarrer)"
+bash "$ICI/kube-config.sh" || echo "démarrage : clusters non traités (devzone demarrer)"
 # Module gitlab actif : /etc/hosts est un montage Docker régénéré à chaque
 # démarrage, gitlab.localhost doit être re-pose (ssh, glab et getent passent
 # par le résolveur système) ; hote-poser n'échoue jamais (avertissement seul)
 if bash "$ICI/devzone" actif gitlab; then
-    bash "$ICI/gitlab/gitlab.sh" hote-poser || echo "démarrage : nom gitlab.localhost non posé (bash $ICI/gitlab/gitlab.sh hote-poser)"
+    bash "$ICI/gitlab/gitlab.sh" hote-poser || echo "démarrage : nom gitlab.localhost non posé (devzone reparer)"
     # Relais TCP 8929/2224 : curl et git en HTTP passent par la boucle locale
     # pour *.localhost, le relais doit être relancé après chaque démarrage
-    bash "$ICI/gitlab/gitlab.sh" relais-lancer || echo "démarrage : relais gitlab non lancé (devzone appliquer)"
+    bash "$ICI/gitlab/gitlab.sh" relais-lancer || echo "démarrage : relais gitlab non lancé (devzone reparer)"
 fi
 # Module postgres actif : le relais (port-forward vers 127.0.0.1:5432) ne
 # survit pas à l'arrêt du conteneur, relancé ici après les clusters
 if bash "$ICI/devzone" actif postgres; then
-    bash "$ICI/postgres/postgres.sh" relais-lancer || echo "démarrage : relais postgres non lancé (devzone appliquer)"
+    bash "$ICI/postgres/postgres.sh" relais-lancer || echo "démarrage : relais postgres non lancé (devzone reparer)"
 fi
 # Relais de ports vers le poste (#290) : l'IP du conteneur change à chaque
 # démarrage, chaque relais de l'état est recréé ; un échec n'empêche rien
-bash "$ICI/ports.sh" relancer || echo "démarrage : relais de ports non relancés (devzone port <n>)"
+bash "$ICI/ports.sh" relancer || echo "démarrage : relais de ports non relancés (devzone reparer)"
 # Vue regroupée des identifiants (#332), regénérée à chaque démarrage ; un
 # échec n'empêche rien et le contenu n'est jamais affiché
-bash "$ICI/password.sh" regenerer || echo "démarrage : identifiants regroupés non mis à jour (devzone mots-de-passe)"
+bash "$ICI/password.sh" regenerer || echo "démarrage : identifiants regroupés non mis à jour (devzone reparer)"
 echo
 bash "$ICI/devzone"
