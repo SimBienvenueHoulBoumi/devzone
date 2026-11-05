@@ -404,6 +404,12 @@ gitlab_installer() {
         kind_creer_sans_basculer --name "gitlab${INSTANCE_SUFFIX}" --config "$ICI/kind.yaml" --wait 120s
         kube_joignable_depuis_conteneur "$HOME/.kube/config"
         cree=true
+    elif ! grep -qx "kind-gitlab${INSTANCE_SUFFIX}" <<<"$(KUBECONFIG="$HOME/.kube/config" kubectl config get-contexts -o name 2>/dev/null || true)"; then
+        # Cluster existant sans contexte dans ~/.kube/config (après un rebuild,
+        # le cluster vit sur le Docker du poste) : export sans basculer (#366)
+        kind_sans_basculer export kubeconfig --name "gitlab${INSTANCE_SUFFIX}" --kubeconfig "$HOME/.kube/config"
+        kube_joignable_depuis_conteneur "$HOME/.kube/config"
+        echo "▶ Contexte kind-gitlab remis (cluster existant)"
     fi
 
     # SSH : un cluster gitlab préexistant (créé avant ce réglage) n'a pas le
