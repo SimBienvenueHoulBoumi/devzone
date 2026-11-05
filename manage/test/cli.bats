@@ -2,6 +2,9 @@
 # Commande devzone de l'hôte (paquet npm, manage/devzone) et contenu du paquet.
 
 setup() {
+    load commun
+    relais_docker_isole
+    kube_isole
     RACINE="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
     CLI="$RACINE/manage/devzone"
     export DEVZONE_SANS_DEMARRER=1
@@ -12,7 +15,7 @@ setup() {
     run bash "$CLI" mon-devzone
     [ "$status" -eq 0 ]
     [[ "$output" == *"créé dans"* ]] || false
-    for f in .devcontainer/devcontainer.json .devcontainer/devzone Makefile .gitattributes manage/scripts/lancer.sh manage/scripts/desinstaller.sh README.md LICENSE workspace/.gitkeep .gitignore; do
+    for f in .devcontainer/devcontainer.json .devcontainer/devzone Makefile .gitattributes manage/scripts/lancer.sh manage/scripts/desinstaller.sh README.md LICENSE workspace/.gitkeep .gitignore .devzone.version; do
         [ -e "mon-devzone/$f" ] || { echo "manquant : $f"; return 1; }
     done
     [ -x mon-devzone/manage/scripts/desinstaller.sh ]
@@ -21,6 +24,19 @@ setup() {
     [ ! -e mon-devzone/manage/devzone ]
     [ ! -e mon-devzone/manage/test ]
     grep -q '^workspace/\*$' mon-devzone/.gitignore
+    grep -qx '.devzone.sauvegarde/' mon-devzone/.gitignore
+}
+
+@test "devzone <dossier> : .devzone.version porte la version et une empreinte par fichier copié" {
+    bash "$CLI" mon-devzone
+    [ "$(sed -n '1p' mon-devzone/.devzone.version)" = "version $(bash "$CLI" --version)" ]
+    for f in .devcontainer/devcontainer.json .devcontainer/devzone Makefile .gitattributes manage/scripts/lancer.sh manage/scripts/desinstaller.sh README.md LICENSE; do
+        attendue="$(node -e 'const fs = require("fs"), crypto = require("crypto"); const h = crypto.createHash("sha256"); h.update(fs.readFileSync(process.argv[1])); process.stdout.write(h.digest("hex"))' "mon-devzone/$f")"
+        grep -qxF "$attendue  $f" mon-devzone/.devzone.version || { echo "empreinte absente : $f"; return 1; }
+    done
+    # La commande npm et les fichiers écrits localement ne sont pas copiés
+    ! grep -q 'manage/devzone' mon-devzone/.devzone.version || false
+    ! grep -q '  .gitignore$' mon-devzone/.devzone.version || false
 }
 
 @test "devzone <dossier> : n'embarque ni bin/, ni tests, ni CI, ni réglages du dépôt" {
@@ -289,7 +305,10 @@ faux_docker() {
         attrs="${ligne%%$'\t'*}"
         nom="${ligne#*$'\t'}"
         if head -c 2 "$RACINE/$nom" 2>/dev/null | grep -q '^#!'; then
-            [[ "$attrs" == *"eol=lf"* ]] || { echo "sans eol=lf : $nom" >&2; false; }
+            if [[ "$attrs" != *"eol=lf"* ]]; then
+                echo "sans eol=lf : $nom" >&2
+                false
+            fi
         fi
     done <<<"$output"
 }

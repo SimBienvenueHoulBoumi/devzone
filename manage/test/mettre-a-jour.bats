@@ -1,0 +1,214 @@
+#!/usr/bin/env bats
+# Mise à jour d'un devzone existant (#349) : paquets factices v1 et v2 sous
+# $BATS_TEST_TMPDIR. Aucune reconstruction réelle, aucun script système.
+
+setup() {
+    load commun
+    relais_docker_isole
+    kube_isole
+    RACINE="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
+    CLI="$RACINE/manage/devzone"
+    T="$BATS_TEST_TMPDIR"
+    cd "$T"
+    export DEVZONE_SANS_DEMARRER=1
+    export DEVZONE_RECONSTRUIRE="$T/reconstruire"
+    printf '#!/usr/bin/env bash\necho "reconstruit" >>"%s/reconstruction.log"\n' "$T" >"$DEVZONE_RECONSTRUIRE"
+    chmod +x "$DEVZONE_RECONSTRUIRE"
+    fabriquer_paquet v1 0.0.1 ancien
+    fabriquer_paquet v2 0.0.2 nouveau
+    MAJ="$T/v2/manage/devzone"
+    MAJ1="$T/v1/manage/devzone"
+}
+
+fabriquer_paquet() {
+    local nom="$1" v="$2" marque="$3" dossier="$T/$1"
+    mkdir -p "$dossier/.devcontainer" "$dossier/manage/scripts"
+    cp "$CLI" "$dossier/manage/devzone"
+    chmod +x "$dossier/manage/devzone"
+    printf '{"name":"devzone","version":"%s"}\n' "$v" >"$dossier/package.json"
+    printf '# makefile %s\n' "$marque" >"$dossier/Makefile"
+    printf '*.sh text eol=lf\n' >"$dossier/.gitattributes"
+    printf '# devzone %s\n' "$marque" >"$dossier/README.md"
+    printf 'licence %s\n' "$marque" >"$dossier/LICENSE"
+    printf '{"marque":"%s"}\n' "$marque" >"$dossier/.devcontainer/devcontainer.json"
+    printf '{"marque":"%s"}\n' "$marque" >"$dossier/.devcontainer/devcontainer-lock.json"
+    printf '#!/usr/bin/env bash\necho %s\n' "$marque" >"$dossier/.devcontainer/devzone"
+    printf '#!/usr/bin/env bash\necho lancer-%s\n' "$marque" >"$dossier/manage/scripts/lancer.sh"
+    printf '#!/usr/bin/env bash\necho desinstaller-%s\n' "$marque" >"$dossier/manage/scripts/desinstaller.sh"
+    chmod +x "$dossier/.devcontainer/devzone" "$dossier/manage/scripts/lancer.sh" "$dossier/manage/scripts/desinstaller.sh"
+}
+
+creer_v1() {
+    DZ="$T/devzone"
+    bash "$T/v1/manage/devzone" "$DZ" >/dev/null
+}
+
+sauvegarde_de() {
+    find "$DZ/.devzone.sauvegarde" -mindepth 1 -maxdepth 1 -type d | head -1
+}
+
+@test "création : .devzone.version porte la version et une empreinte par fichier copié" {
+    creer_v1
+    [ "$(sed -n '1p' "$DZ/.devzone.version")" = "version 0.0.1" ]
+    for f in .devcontainer/devcontainer.json .devcontainer/devzone Makefile .gitattributes manage/scripts/lancer.sh manage/scripts/desinstaller.sh README.md LICENSE; do
+        attendue="$(node -e 'const fs = require("fs"), crypto = require("crypto"); const h = crypto.createHash("sha256"); h.update(fs.readFileSync(process.argv[1])); process.stdout.write(h.digest("hex"))' "$DZ/$f")"
+        grep -qxF "$attendue  $f" "$DZ/.devzone.version" || { echo "empreinte absente : $f"; return 1; }
+    done
+    ! grep -q 'manage/devzone' "$DZ/.devzone.version" || false
+}
+
+@test "déjà à jour : même version, fichiers présents → code 0, rien touché, npx conseillé" {
+    creer_v1
+    avant="$(cat "$DZ/.devzone.version")"
+    cd "$DZ"
+    run bash "$MAJ1" mettre-a-jour
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"déjà à jour"* ]] || false
+    [[ "$output" == *"npx devzone@latest mettre-a-jour"* ]] || false
+    [ "$(cat "$DZ/.devzone.version")" = "$avant" ]
+    [ ! -e "$DZ/.devzone.sauvegarde" ]
+    [ ! -e "$T/reconstruction.log" ]
+}
+
+@test "même version mais fichier du paquet manquant → le fichier est rétabli" {
+    creer_v1
+    rm "$DZ/Makefile"
+    cd "$DZ"
+    run bash "$MAJ1" mettre-a-jour
+    [ "$status" -eq 0 ]
+    grep -q '# makefile ancien' "$DZ/Makefile"
+    [ "$(sed -n '1p' "$DZ/.devzone.version")" = "version 0.0.1" ]
+    [ ! -e "$T/reconstruction.log" ]
+}
+
+@test "v1 → v2 : fichiers remplacés, ancien supprimé, sauvegarde, utilisateur intact" {
+    printf '#!/usr/bin/env bash\necho ancien\n' >"$T/v1/manage/scripts/ancien.sh"
+    printf 'nouveau\n' >"$T/v2/.devcontainer/nouveau.txt"
+    creer_v1
+    mkdir -p "$DZ/workspace/projet"
+    printf 'projet\n' >"$DZ/workspace/projet/fichier"
+    printf 'ia=on\n' >"$DZ/.devzone.modules"
+    printf 'secret\n' >"$DZ/.password"
+    printf 'app\n' >"$DZ/.app"
+    printf 'journal\n' >"$DZ/.devzone.log"
+    cd "$DZ"
+    run bash "$MAJ" mettre-a-jour --sans-reconstruire
+    [ "$status" -eq 0 ]
+    grep -q '# makefile nouveau' "$DZ/Makefile"
+    grep -qx 'nouveau' "$DZ/.devcontainer/nouveau.txt"
+    [ ! -e "$DZ/manage/scripts/ancien.sh" ]
+    [ "$(sed -n '1p' "$DZ/.devzone.version")" = "version 0.0.2" ]
+    sauvegarde="$(sauvegarde_de)"
+    [ -n "$sauvegarde" ]
+    grep -q '# makefile ancien' "$sauvegarde/Makefile"
+    grep -q 'echo ancien' "$sauvegarde/manage/scripts/ancien.sh"
+    [ "$(cat "$DZ/workspace/projet/fichier")" = projet ]
+    [ "$(cat "$DZ/.devzone.modules")" = 'ia=on' ]
+    [ "$(cat "$DZ/.password")" = secret ]
+    [ "$(cat "$DZ/.app")" = app ]
+    [ "$(cat "$DZ/.devzone.log")" = journal ]
+    [ ! -e "$T/reconstruction.log" ]
+}
+
+@test "fichier modifié sans --oui et sans terminal → refus code 1, rien touché" {
+    creer_v1
+    printf 'modifie a la main\n' >"$DZ/Makefile"
+    cd "$DZ"
+    run bash "$MAJ" mettre-a-jour
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Makefile"* ]] || false
+    [[ "$output" == *"--oui"* ]] || false
+    [ "$(cat "$DZ/Makefile")" = 'modifie a la main' ]
+    [ "$(sed -n '1p' "$DZ/.devzone.version")" = "version 0.0.1" ]
+    [ ! -e "$DZ/.devzone.sauvegarde" ]
+    [ ! -e "$T/reconstruction.log" ]
+}
+
+@test "fichier modifié avec --oui → sauvegardé puis remplacé" {
+    creer_v1
+    printf 'modifie a la main\n' >"$DZ/Makefile"
+    cd "$DZ"
+    run bash "$MAJ" mettre-a-jour --oui
+    [ "$status" -eq 0 ]
+    grep -q '# makefile nouveau' "$DZ/Makefile"
+    sauvegarde="$(sauvegarde_de)"
+    [ -n "$sauvegarde" ]
+    [ "$(cat "$sauvegarde/Makefile")" = 'modifie a la main' ]
+    [[ "$output" == *"Sauvegarde :"* ]] || false
+    [ ! -e "$T/reconstruction.log" ]
+}
+
+@test "ancien dossier sans manifeste avec core/ : inconnue, sauvegarde, arborescences retirées" {
+    creer_v1
+    rm "$DZ/.devzone.version"
+    mkdir -p "$DZ/core/scripts" "$DZ/scripts" "$DZ/workspace/projet"
+    printf 'vieux core\n' >"$DZ/core/scripts/desinstaller.sh"
+    printf 'vieux scripts\n' >"$DZ/scripts/ancien.sh"
+    printf 'projet\n' >"$DZ/workspace/projet/fichier"
+    cd "$DZ"
+    run bash "$MAJ" mettre-a-jour --oui
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"inconnue"* ]] || false
+    [ ! -e "$DZ/core" ]
+    [ ! -e "$DZ/scripts" ]
+    sauvegarde="$(sauvegarde_de)"
+    [ "$(cat "$sauvegarde/core/scripts/desinstaller.sh")" = 'vieux core' ]
+    [ "$(cat "$sauvegarde/scripts/ancien.sh")" = 'vieux scripts' ]
+    [ "$(cat "$DZ/workspace/projet/fichier")" = projet ]
+    [ "$(sed -n '1p' "$DZ/.devzone.version")" = "version 0.0.2" ]
+}
+
+@test "ancien dossier sans manifeste : tous les fichiers différents sont modifiés → --oui requis" {
+    creer_v1
+    rm "$DZ/.devzone.version"
+    cd "$DZ"
+    run bash "$MAJ" mettre-a-jour
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Makefile"* ]] || false
+    [ ! -e "$DZ/.devzone.sauvegarde" ]
+}
+
+@test ".gitignore complété sans écraser les lignes personnalisées" {
+    creer_v1
+    printf 'mon-regle-a-moi\n' >>"$DZ/.gitignore"
+    grep -v '^\.devzone\.sauvegarde/$' "$DZ/.gitignore" >"$T/gitignore.tmp"
+    mv "$T/gitignore.tmp" "$DZ/.gitignore"
+    cd "$DZ"
+    run bash "$MAJ" mettre-a-jour --sans-reconstruire
+    [ "$status" -eq 0 ]
+    grep -qx 'mon-regle-a-moi' "$DZ/.gitignore"
+    grep -qx '.devzone.sauvegarde/' "$DZ/.gitignore"
+    grep -qx 'workspace/\*' "$DZ/.gitignore"
+    [ "$(grep -c '^\.devzone\.sauvegarde/$' "$DZ/.gitignore")" -eq 1 ]
+}
+
+@test "sans terminal : reconstruction indiquée, jamais lancée" {
+    creer_v1
+    cd "$DZ"
+    run bash "$MAJ" mettre-a-jour --oui
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"make -C $DZ rebuild"* ]] || false
+    [ ! -e "$T/reconstruction.log" ]
+}
+
+@test "--sans-reconstruire : pas de reconstruction, même avec --oui" {
+    creer_v1
+    cd "$DZ"
+    run bash "$MAJ" mettre-a-jour --oui --sans-reconstruire
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Reconstruction non lancée (--sans-reconstruire)"* ]] || false
+    [ ! -e "$T/reconstruction.log" ]
+}
+
+@test "hors d'un dossier devzone et option inconnue → refus" {
+    mkdir pas-devzone
+    cd pas-devzone
+    run bash "$MAJ" mettre-a-jour
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"dossier devzone"* ]] || false
+    creer_v1
+    cd "$DZ"
+    run bash "$MAJ" mettre-a-jour --truc
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"option inconnue"* ]] || false
+}

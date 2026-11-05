@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Commande devzone sur ta machine (paquet npm) :
 #   devzone <dossier>        crée un devzone dans <dossier> puis le lance
+#   devzone mettre-a-jour    dans un dossier devzone : passe à la version du paquet
 #   devzone desinstaller     dans un dossier devzone : retire tout ce qu'il a créé
 #   devzone --version | --help
 # Dans le conteneur, « devzone » est une autre commande : les modules
@@ -20,6 +21,17 @@ PAQUET="$(cd "$(dirname "$(readlink -f "$SCRIPT" 2>/dev/null || echo "$SCRIPT")"
 # Fichiers d'un devzone (même liste que « files » de package.json, sans la
 # commande manage/devzone) ; manage/scripts copié à part, sous manage/
 FICHIERS=(.devcontainer Makefile .gitattributes README.md LICENSE)
+# Lignes d'office du .gitignore d'un devzone : complétées, jamais écrasées
+LIGNES_GITIGNORE=(
+    '# Chaque projet du workspace a son propre dépôt git'
+    'workspace/*'
+    '!workspace/.gitkeep'
+    '.DS_Store'
+    '.devzone.log'
+    '.devzone.etat'
+    '.password'
+    '.devzone.sauvegarde/'
+)
 
 version() {
     # Chemin passé en argument à node, jamais écrit dans le code JavaScript de -p :
@@ -28,11 +40,284 @@ version() {
     node -p 'require(process.argv[1]).version' "$PAQUET/package.json" 2>/dev/null || echo inconnue
 }
 
+# Empreinte sha256 d'un fichier, calculée par node (portable macOS, Linux,
+# Windows Git Bash) ; le chemin est passé en argument, comme pour version()
+empreinte() {
+    node -e 'const fs = require("fs"), crypto = require("crypto"); const h = crypto.createHash("sha256"); h.update(fs.readFileSync(process.argv[1])); process.stdout.write(h.digest("hex"))' "$1"
+}
+
+# Fichiers du paquet copiés dans un devzone, chemins absolus puis relatifs
+fichiers_paquet() {
+    local base
+    for base in "${FICHIERS[@]}"; do
+        if [ -d "$PAQUET/$base" ]; then
+            find "$PAQUET/$base" -type f -print
+        elif [ -f "$PAQUET/$base" ]; then
+            printf '%s\n' "$PAQUET/$base"
+        fi
+    done
+    if [ -d "$PAQUET/manage/scripts" ]; then
+        find "$PAQUET/manage/scripts" -type f -print
+    fi
+}
+
+fichiers_relatifs() {
+    local f
+    fichiers_paquet | while IFS= read -r f; do
+        printf '%s\n' "${f#"$PAQUET"/}"
+    done | LC_ALL=C sort
+}
+
+# .devzone.version : version du dossier, puis une empreinte par fichier copié
+ecrire_manifeste() {
+    local dossier="$1" rel
+    {
+        printf 'version %s\n' "$(version)"
+        fichiers_relatifs | while IFS= read -r rel; do
+            printf '%s  %s\n' "$(empreinte "$dossier/$rel")" "$rel"
+        done
+    } >"$dossier/.devzone.version"
+}
+
+version_dossier() {
+    local dossier="${1:-.}" v
+    if [ -f "$dossier/.devzone.version" ]; then
+        v="$(sed -n '1s/^version //p' "$dossier/.devzone.version" 2>/dev/null | head -1 || true)"
+        if [ -n "$v" ]; then
+            printf '%s\n' "$v"
+            return 0
+        fi
+    fi
+    printf 'inconnue\n'
+}
+
+empreinte_manifeste() {
+    local dossier="$1" cible="$2" ligne h p
+    [ -f "$dossier/.devzone.version" ] || return 1
+    while IFS= read -r ligne; do
+        case "$ligne" in
+            version\ * | '') continue ;;
+        esac
+        h="${ligne%%  *}"
+        p="${ligne#*  }"
+        if [ "$p" = "$cible" ]; then
+            printf '%s\n' "$h"
+            return 0
+        fi
+    done <"$dossier/.devzone.version"
+    return 1
+}
+
+fichiers_manifeste() {
+    local dossier="$1" ligne
+    [ -f "$dossier/.devzone.version" ] || return 0
+    while IFS= read -r ligne; do
+        case "$ligne" in
+            version\ * | '') continue ;;
+        esac
+        printf '%s\n' "${ligne#*  }"
+    done <"$dossier/.devzone.version"
+}
+
+# Jamais touchés par mettre-a-jour, même si un ancien manifeste les cite
+protege() {
+    case "$1" in
+        workspace | workspace/* | .devzone.version | .devzone.modules | .devzone.modules-* | \
+            .devzone.paquets | .password | .app | .devzone.log | .git | .git/*) return 0 ;;
+    esac
+    return 1
+}
+
+dans_liste() {
+    grep -Fqx -- "$2" "$1"
+}
+
+completer_gitignore() {
+    local dossier="$1" ligne
+    touch "$dossier/.gitignore"
+    for ligne in "${LIGNES_GITIGNORE[@]}"; do
+        grep -qxF -- "$ligne" "$dossier/.gitignore" || printf '%s\n' "$ligne" >>"$dossier/.gitignore"
+    done
+}
+
+# Six étapes de la conception (#349)
+mettre_a_jour() {
+    local oui="" sans="" arg dossier pkg vdossier liste_paquet liste_anciens
+    local manquants rel actuelle attendue reponse sauvegarde base n ancien f
+    for arg in "$@"; do
+        case "$arg" in
+            --oui) oui=1 ;;
+            --sans-reconstruire) sans=1 ;;
+            *)
+                echo "✖ option inconnue : $arg (devzone mettre-a-jour [--oui] [--sans-reconstruire])" >&2
+                exit 1
+                ;;
+        esac
+    done
+    if [ ! -d .devcontainer ]; then
+        echo "✖ À lancer dans un dossier devzone (.devcontainer introuvable ici)." >&2
+        exit 1
+    fi
+
+    dossier="$(pwd)"
+    pkg="$(version)"
+    vdossier="$(version_dossier "$dossier")"
+    travail="$(mktemp -d)"
+    trap 'rm -rf "$travail"' EXIT
+    liste_paquet="$travail/paquet"
+    liste_anciens="$travail/anciens"
+    fichiers_relatifs >"$liste_paquet"
+    fichiers_manifeste "$dossier" | LC_ALL=C sort >"$liste_anciens"
+
+    # 1. Versions et fichiers du paquet présents
+    manquants=""
+    while IFS= read -r rel; do
+        [ -f "$dossier/$rel" ] || manquants=1
+    done <"$liste_paquet"
+    if [ "$vdossier" = "$pkg" ] && [ -z "$manquants" ]; then
+        echo "✔ devzone $vdossier : déjà à jour."
+        echo "Pour la dernière version publiée : npx devzone@latest mettre-a-jour"
+        return 0
+    fi
+    echo "devzone : dossier $vdossier, paquet $pkg"
+
+    # 2. Fichiers modifiés localement (empreinte différente du manifeste ;
+    # sans manifeste, différente de celle du paquet)
+    : >"$travail/modifies"
+    : >"$travail/sauver"
+    : >"$travail/supprimer"
+    while IFS= read -r rel; do
+        [ -f "$dossier/$rel" ] || continue
+        printf '%s\n' "$rel" >>"$travail/sauver"
+        actuelle="$(empreinte "$dossier/$rel")"
+        if attendue="$(empreinte_manifeste "$dossier" "$rel")"; then
+            :
+        else
+            attendue="$(empreinte "$PAQUET/$rel")"
+        fi
+        [ "$actuelle" = "$attendue" ] || printf '%s\n' "$rel" >>"$travail/modifies"
+    done <"$liste_paquet"
+    while IFS= read -r rel; do
+        [ -n "$rel" ] || continue
+        dans_liste "$liste_paquet" "$rel" && continue
+        protege "$rel" && continue
+        printf '%s\n' "$rel" >>"$travail/supprimer"
+        [ -f "$dossier/$rel" ] || continue
+        printf '%s\n' "$rel" >>"$travail/sauver"
+        if attendue="$(empreinte_manifeste "$dossier" "$rel")"; then
+            [ "$(empreinte "$dossier/$rel")" = "$attendue" ] || printf '%s\n' "$rel" >>"$travail/modifies"
+        else
+            printf '%s\n' "$rel" >>"$travail/modifies"
+        fi
+    done <"$liste_anciens"
+    for ancien in core scripts; do
+        [ -d "$dossier/$ancien" ] || continue
+        while IFS= read -r f; do
+            rel="${f#"$dossier"/}"
+            protege "$rel" && continue
+            printf '%s\n' "$rel" >>"$travail/sauver"
+            [ -f "$dossier/.devzone.version" ] || printf '%s\n' "$rel" >>"$travail/modifies"
+        done < <(find "$dossier/$ancien" -type f -print)
+    done
+    LC_ALL=C sort -u "$travail/modifies" >"$travail/modifies.tri"
+    mv "$travail/modifies.tri" "$travail/modifies"
+    LC_ALL=C sort -u "$travail/sauver" >"$travail/sauver.tri"
+    mv "$travail/sauver.tri" "$travail/sauver"
+
+    if [ -s "$travail/modifies" ]; then
+        echo "Fichiers modifiés localement :"
+        while IFS= read -r rel; do
+            printf '  %s\n' "$rel"
+        done <"$travail/modifies"
+        if [ -z "$oui" ]; then
+            if [ ! -t 0 ]; then
+                echo "✖ Fichiers modifiés localement : relance avec --oui pour les remplacer (sauvegarde dans .devzone.sauvegarde/)." >&2
+                exit 1
+            fi
+            printf 'Remplacer ces fichiers (sauvegarde dans .devzone.sauvegarde/) ? [o/N] ' >&2
+            read -r reponse || reponse=""
+            case "$reponse" in
+                o | O | oui | Oui | OUI) ;;
+                *)
+                    echo "Abandon : rien n'a été modifié."
+                    return 1
+                    ;;
+            esac
+        fi
+    fi
+
+    # 3. Sauvegarde de tout fichier remplacé ou supprimé
+    if [ -s "$travail/sauver" ]; then
+        base="$dossier/.devzone.sauvegarde/$(date +%Y%m%d-%H%M%S)"
+        sauvegarde="$base"
+        n=1
+        while [ -e "$sauvegarde" ]; do
+            n=$((n + 1))
+            sauvegarde="$base-$n"
+        done
+        while IFS= read -r rel; do
+            [ -f "$dossier/$rel" ] || continue
+            mkdir -p "$sauvegarde/$(dirname "$rel")"
+            cp -p "$dossier/$rel" "$sauvegarde/$rel"
+        done <"$travail/sauver"
+        echo "Sauvegarde : $sauvegarde"
+    fi
+
+    # 4. Remplacement, suppression de l'ancien paquet et des anciennes
+    # arborescences, .gitignore complété sans être écrasé
+    completer_gitignore "$dossier"
+    while IFS= read -r rel; do
+        mkdir -p "$dossier/$(dirname "$rel")"
+        cp -p "$PAQUET/$rel" "$dossier/$rel"
+        if [ -x "$PAQUET/$rel" ]; then
+            chmod +x "$dossier/$rel"
+        fi
+    done <"$liste_paquet"
+    while IFS= read -r rel; do
+        [ -n "$rel" ] || continue
+        [ -f "$dossier/$rel" ] || continue
+        rm -f -- "$dossier/$rel"
+    done <"$travail/supprimer"
+    for ancien in core scripts; do
+        [ -e "$dossier/$ancien" ] || continue
+        rm -rf -- "${dossier:?}/$ancien"
+    done
+
+    # 6. Nouveau manifeste, puis reconstruction proposée
+    ecrire_manifeste "$dossier"
+    echo "✔ devzone $pkg : mis à jour."
+    if [ -n "$sans" ]; then
+        echo "Reconstruction non lancée (--sans-reconstruire)."
+        return 0
+    fi
+    if [ ! -t 0 ]; then
+        echo "Reconstruction : make -C $dossier rebuild (à lancer dans un terminal)"
+        return 0
+    fi
+    printf 'Reconstruire le conteneur maintenant (make rebuild) ? [o/N] ' >&2
+    read -r reponse || reponse=""
+    case "$reponse" in
+        o | O | oui | Oui | OUI) ;;
+        *)
+            echo "Reconstruction non lancée : make -C $dossier rebuild"
+            return 0
+            ;;
+    esac
+    if [ -n "${DEVZONE_RECONSTRUIRE:-}" ]; then
+        sh -c "$DEVZONE_RECONSTRUIRE"
+    else
+        make -C "$dossier" rebuild
+    fi
+}
+
 aide() {
     cat <<EOF
 devzone $(version) : environnement de développement conteneurisé
 
   devzone <dossier>        crée un devzone dans <dossier> puis le lance (make up)
+  devzone mettre-a-jour [--oui] [--sans-reconstruire]
+                           dans un dossier devzone : passe à la version du paquet
+                           (sauvegarde les fichiers remplacés, propose make rebuild)
   devzone desinstaller     dans un dossier devzone : retire conteneur, image, volumes
                            (à lancer avant npm uninstall -g devzone)
   devzone --version
@@ -50,18 +335,11 @@ creer() {
     cp -R "$PAQUET/manage/scripts" "$cible/manage/"
     touch "$cible/workspace/.gitkeep"
     # npm n'embarque jamais .gitignore : écrit ici
-    cat >"$cible/.gitignore" <<'EOF'
-# Chaque projet du workspace a son propre dépôt git
-workspace/*
-!workspace/.gitkeep
-
-.DS_Store
-.devzone.log
-.devzone.etat
-.password
-EOF
+    : >"$cible/.gitignore"
+    completer_gitignore "$cible"
     chmod +x "$cible/manage/scripts/desinstaller.sh" "$cible/manage/scripts/lancer.sh"
     cible="$(cd "$cible" && pwd)"
+    ecrire_manifeste "$cible"
     echo "✔ devzone $(version) créé dans $cible"
     if [ -n "${DEVZONE_SANS_DEMARRER:-}" ]; then
         echo "Pour le lancer : cd $cible && make up"
@@ -86,6 +364,7 @@ EOF
 case "${1:-}" in
     "" | -h | --help | aide) aide ;;
     -v | --version) version ;;
+    mettre-a-jour) mettre_a_jour "${@:2}" ;;
     desinstaller)
         # Dossier devzone (.devcontainer/) ; un devzone plus ancien a son
         # desinstaller.sh dans manage/scripts/ (nouveau), core scripts ou scripts/ (anciens), ou à la racine

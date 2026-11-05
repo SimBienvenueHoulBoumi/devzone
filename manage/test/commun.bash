@@ -10,3 +10,12 @@ relais_docker_isole() {
     export DEVZONE_RELAIS_MARQUE="$BATS_TEST_TMPDIR/relais.echec"
     export DEVZONE_RELAIS_SUDO=""
 }
+
+# Configuration kube de l'utilisateur et de l'hôte sous $BATS_TEST_TMPDIR :
+# aucun test ne lit ni n'écrit le vrai ~/.kube.
+kube_isole() {
+    export HOME="$BATS_TEST_TMPDIR/home"
+    export KUBECONFIG="$HOME/.kube/config"
+    export DEVZONE_KUBE_HOTE="$HOME/.kube/hote.config"
+    mkdir -p "$HOME/.kube"
+}

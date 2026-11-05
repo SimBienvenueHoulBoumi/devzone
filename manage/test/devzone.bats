@@ -62,6 +62,9 @@ kube_empreinte() {
 }
 
 setup() {
+    load commun
+    relais_docker_isole
+    kube_isole
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
     # Versions figées lues dans les fichiers : une montée automatique (workflow
     # versions) ne casse pas ces tests
@@ -90,6 +93,12 @@ setup() {
     cat >"$BATS_TEST_TMPDIR/bin/npm" <<'NPM'
 #!/usr/bin/env bash
 echo "npm $*" >>"$NPM_LOG"
+if [ "${1:-}" = view ]; then
+    sleep "${NPM_VIEW_DUREE:-0}"
+    [ "${NPM_VIEW_CODE:-0}" -eq 0 ] || exit "${NPM_VIEW_CODE:-0}"
+    [ -n "${NPM_PUBLIEE:-}" ] && printf '%s\n' "$NPM_PUBLIEE"
+    exit 0
+fi
 if [ "${1:-}" = install ] && [[ " $* " == *" opencode-ai@"* ]]; then
     sleep "${NPM_DUREE:-0}"
     n="$(grep -c "^npm install.* opencode-ai@" "$NPM_LOG")"
@@ -648,6 +657,56 @@ KUBE
     run git status --porcelain
     [ "$status" -eq 0 ]
     [ -z "$(grep "\.devzone\.modules" <<<"$output")" ]
+}
+
+@test "état : version publiée plus récente → ligne devzone mettre-a-jour" {
+    printf 'version 0.19.0\n' >"$DEVZONE_RACINE/.devzone.version"
+    NPM_PUBLIEE=0.20.0 run bash "$DEVZONE"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"○ devzone 0.20.0 disponible : sur le poste, devzone mettre-a-jour"* ]] || false
+}
+
+@test "état : version publiée identique ou plus ancienne → aucune ligne" {
+    printf 'version 0.19.0\n' >"$DEVZONE_RACINE/.devzone.version"
+    NPM_PUBLIEE=0.19.0 run bash "$DEVZONE"
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"disponible"* ]] || false
+    NPM_PUBLIEE=0.18.0 run bash "$DEVZONE"
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"disponible"* ]] || false
+}
+
+@test "état : version publiée vérifiée une seule fois par jour (cache)" {
+    printf 'version 0.19.0\n' >"$DEVZONE_RACINE/.devzone.version"
+    NPM_PUBLIEE=0.20.0 run bash "$DEVZONE"
+    [ "$(grep -c '^npm view devzone version' "$NPM_LOG")" -eq 1 ]
+    NPM_PUBLIEE=0.21.0 run bash "$DEVZONE"
+    [ "$(grep -c '^npm view devzone version' "$NPM_LOG")" -eq 1 ]
+    [[ "$output" == *"devzone 0.20.0 disponible"* ]] || false
+    [[ "$output" != *"devzone 0.21.0"* ]] || false
+}
+
+@test "état : hors ligne → silence, vérification mise en cache" {
+    printf 'version 0.19.0\n' >"$DEVZONE_RACINE/.devzone.version"
+    NPM_VIEW_CODE=1 run bash "$DEVZONE"
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"disponible"* ]] || false
+    [ -f "$HOME/.cache/devzone/version-publiee" ]
+}
+
+@test "état : npm lent → abandon après 5 s, sans bloquer le récapitulatif" {
+    printf 'version 0.19.0\n' >"$DEVZONE_RACINE/.devzone.version"
+    debut="$(date +%s)"
+    NPM_PUBLIEE=0.20.0 NPM_VIEW_DUREE=30 run bash "$DEVZONE"
+    [ "$status" -eq 0 ]
+    [ $(($(date +%s) - debut)) -lt 15 ]
+    [[ "$output" != *"devzone 0.20.0"* ]] || false
+}
+
+@test "état : sans .devzone.version → aucune vérification npm" {
+    run bash "$DEVZONE"
+    [ "$status" -eq 0 ]
+    ! grep -q '^npm view devzone version' "$NPM_LOG" || false
 }
 
 @test "état : contexte kind-gitlab et cluster de l'hôte joignable → avertissement" {
