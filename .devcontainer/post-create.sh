@@ -56,6 +56,8 @@ repowarden install --global --lang fr
 # reste utilisable et l'état (devzone, à chaque démarrage) le montre « en échec »
 sudo ln -sf /workspaces/devzone/.devcontainer/devzone /usr/local/bin/devzone
 devzone appliquer || echo "devzone : modules incomplets (détail ci-dessus), réessayer : devzone appliquer" >&2
+# Paquets systeme gardes (#351) : reinstallees a chaque creation ; un echec n arrete pas la creation
+devzone paquets appliquer || echo "devzone : paquets en echec, reessayer : devzone paquets" >&2
 
 # Ce qui reste à faire (identité git, GitHub, modules) : récapitulatif de
 # devzone, affiché à chaque démarrage (demarrage.sh)
