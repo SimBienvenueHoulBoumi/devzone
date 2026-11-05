@@ -6,3 +6,4 @@ workspace/*
 .devzone.log
 .devzone.etat
 .devzone.modules*
+.password

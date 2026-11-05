@@ -32,5 +32,8 @@ fi
 # Relais de ports vers le poste (#290) : l'IP du conteneur change à chaque
 # démarrage, chaque relais de l'état est recréé ; un échec n'empêche rien
 bash "$ICI/ports.sh" relancer || echo "démarrage : relais de ports non relancés (devzone port <n>)"
+# Vue regroupée des identifiants (#332), regénérée à chaque démarrage ; un
+# échec n'empêche rien et le contenu n'est jamais affiché
+bash "$ICI/password.sh" regenerer || echo "démarrage : identifiants regroupés non mis à jour (devzone mots-de-passe)"
 echo
 bash "$ICI/devzone"

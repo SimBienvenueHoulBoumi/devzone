@@ -15,6 +15,7 @@
 #   devzone postgres creer <projet>  base et utilisateur d'un projet (aussi : liste, psql, supprimer)
 #   devzone cluster [CTX] [--oui]    cluster des services de devzone, ou en changer
 #   devzone port [<n>|--fermer <n>]  relais d'un port du conteneur vers le poste
+#   devzone mots-de-passe           régénère .password et affiche son chemin
 #
 # État propre à chaque instance : $RACINE/.devzone.modules (dossier monté
 # de l'hôte, survit aux rebuilds), une ligne « module=on|off » ; la plateforme
@@ -735,6 +736,10 @@ etat() {
         aucun*) printf '  ○ ports vers le poste %s\n' "$ports_etat" ;;
         *) printf '  ✔ ports vers le poste %s\n' "$ports_etat" ;;
     esac
+    # Identifiants regroupés (#332) : le chemin seulement, jamais le contenu
+    if [ -f "$RACINE/.password" ]; then
+        printf '  ○ identifiants : %s\n' "$RACINE/.password"
+    fi
     # Marque posée par docker-relais.sh au démarrage (#293) : docker exec
     # longs coupés, kind et modules en échec
     relais_marque="${DEVZONE_RELAIS_MARQUE:-/tmp/devzone-relais-docker.echec}"
@@ -778,6 +783,11 @@ case "${1:-}" in
     cluster) changer_cluster "${@:2}" ;;
     postgres) DEVZONE_ETAT="$ETAT" bash "$ICI/postgres/postgres.sh" "${@:2}" ;;
     port) DEVZONE_ETAT="$ETAT" bash "$ICI/ports.sh" "${@:2}" ;;
+    mots-de-passe)
+        bash "$ICI/password.sh" regenerer ||
+            echo "devzone : identifiants regroupés non mis à jour" >&2
+        bash "$ICI/password.sh" chemin
+        ;;
     -h | --help | aide) awk 'NR==1{next} /^#$/{exit} /^#/{sub(/^# ?/,""); print; next} {exit}' "${BASH_SOURCE[0]}" ;;
     test-bash32) bash "$RACINE/manage/test/bash32.sh" ;;
     test-gitlab) DEVZONE_ETAT="$ETAT" bash "$ICI/gitlab/test-gitlab.sh" "${@:2}" ;;
