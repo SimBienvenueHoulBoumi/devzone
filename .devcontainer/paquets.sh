@@ -83,12 +83,12 @@ ajouter() {
         esac
     done
     [ "${#a[@]}" -gt 0 ] || refuse "ajouter attend au moins un nom : devzone paquets ajouter <nom>…"
+    maj_index || echo "index apt non mis à jour" >&2
     for nom in "${a[@]}"; do
         if ! "$APTCACHE" show "$nom" >/dev/null 2>&1; then
             refuse "paquet inconnu : $nom (liste inchangée)"
         fi
     done
-    maj_index
     if en_root DEBIAN_FRONTEND=noninteractive "$APT" install -y --no-install-recommends "${a[@]}"; then
         tmp="$(mktemp)"
         echo "$ENTETE" >"$tmp"
@@ -143,9 +143,10 @@ appliquer() {
         rm -f "$MARQUE"
         return 0
     fi
-    if en_root DEBIAN_FRONTEND=noninteractive "$APT" install -y --no-install-recommends "${manquants[@]}"; then
-        :
-    fi
+    maj_index || echo "index apt non mis à jour" >&2
+    for paquet in "${manquants[@]}"; do
+        en_root DEBIAN_FRONTEND=noninteractive "$APT" install -y --no-install-recommends "$paquet" || true
+    done
     local -a restants=()
     for paquet in "${manquants[@]}"; do
         if ! installe "$paquet"; then

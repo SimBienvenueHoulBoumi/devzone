@@ -19,12 +19,15 @@ setup() {
     : >"$BATS_TEST_TMPDIR/apt-cache.list"
     : >"$BATS_TEST_TMPDIR/apt-echoues"
     : >"$BATS_TEST_TMPDIR/installe"
-    printf 'tree\nhtop\n' >"$BATS_TEST_TMPDIR/apt-cache.list"
+    : >"$BATS_TEST_TMPDIR/apt-cache.list"
     cat >"$BATS_TEST_TMPDIR/bin/apt-get" <<'APT'
 #!/usr/bin/env bash
 echo "apt-get $*" >>"$BATS_TEST_TMPDIR/apt.log"
 case "${1:-}" in
-    update) exit 0 ;;
+    update)
+        printf 'tree\nhtop\n' >"$BATS_TEST_TMPDIR/apt-cache.list"
+        exit 0
+        ;;
     install)
         shift
         for arg in "$@"; do
@@ -167,4 +170,40 @@ NPM
     [ "$status" -eq 0 ]
     [[ "$output" == *"⚠ paquets"* ]] || false
     [[ "$output" == *"devzone paquets"* ]] || false
+}
+
+@test "paquets : ajouter valide fait apt-get update avant apt-get install" {
+    run bash "$DEVZONE" paquets ajouter tree
+    [ "$status" -eq 0 ]
+    grep -q -- "apt-get update" "$BATS_TEST_TMPDIR/apt.log"
+    grep -q -- "apt-get install -y --no-install-recommends tree" "$BATS_TEST_TMPDIR/apt.log"
+    ligne_update="$(grep -n "apt-get update" "$BATS_TEST_TMPDIR/apt.log" | head -1 | cut -d: -f1)"
+    ligne_install="$(grep -n "apt-get install" "$BATS_TEST_TMPDIR/apt.log" | head -1 | cut -d: -f1)"
+    [ "$ligne_update" -lt "$ligne_install" ] || false
+}
+
+@test "paquets : appliquer fait apt-get update avant apt-get install pour un paquet manquant" {
+    printf '# paquets ajoutes par devzone paquets ; reinstalle a chaque creation du conteneur\ntree\n' >"$DEVZONE_RACINE/.devzone.paquets"
+    : >"$BATS_TEST_TMPDIR/installe"
+    run bash "$DEVZONE" paquets appliquer
+    [ "$status" -eq 0 ]
+    grep -q -- "apt-get update" "$BATS_TEST_TMPDIR/apt.log"
+    grep -q -- "apt-get install -y --no-install-recommends tree" "$BATS_TEST_TMPDIR/apt.log"
+    ligne_update="$(grep -n "apt-get update" "$BATS_TEST_TMPDIR/apt.log" | head -1 | cut -d: -f1)"
+    ligne_install="$(grep -n "apt-get install" "$BATS_TEST_TMPDIR/apt.log" | head -1 | cut -d: -f1)"
+    [ "$ligne_update" -lt "$ligne_install" ] || false
+}
+
+@test "paquets : appliquer installe le valide et ne marque que l inconnu" {
+    printf '# paquets ajoutes par devzone paquets ; reinstalle a chaque creation du conteneur\ninconnu\ntree\n' >"$DEVZONE_RACINE/.devzone.paquets"
+    printf 'inconnu\n' >"$BATS_TEST_TMPDIR/apt-echoues"
+    : >"$BATS_TEST_TMPDIR/installe"
+    run bash "$DEVZONE" paquets appliquer
+    [ "$status" -ne 0 ]
+    grep -q -- "apt-get update" "$BATS_TEST_TMPDIR/apt.log"
+    grep -qx "tree" "$BATS_TEST_TMPDIR/installe"
+    [ -f "$DEVZONE_PAQUETS_MARQUE" ]
+    grep -qx "inconnu" "$DEVZONE_PAQUETS_MARQUE"
+    [ "$(wc -l < "$DEVZONE_PAQUETS_MARQUE")" -eq 1 ] || false
+    [[ "$(cat "$DEVZONE_PAQUETS_MARQUE")" == "inconnu" ]] || false
 }
