@@ -52,6 +52,21 @@ verrou_lacher() {
     rmdir "$AGENT_ETAT/verrou" 2>/dev/null || true
 }
 
+# Passe permission.edit en objet et ajoute en dernier un deny par fichier de droits
+# (#361) : la dernière règle qui correspond l'emporte, l'appelant ne peut pas le retirer.
+droits_edit_deny() {
+    local motifs f
+    motifs="[]"
+    for f in "${DROITS_AGENT[@]}"; do
+        motifs="$(jq -c --arg f "$f" '. + [$f, "**/" + $f]' <<<"$motifs")"
+    done
+    jq -ce --argjson m "$motifs" '
+        (.permission.edit // "allow") as $e |
+        (if ($e | type) == "object" then $e else {"*": $e} end) as $o |
+        .permission.edit = (reduce $m[] as $k ($o; del(.[$k])) + ($m | map({(.): "deny"}) | add))
+    ' <<<"$1"
+}
+
 # Configuration sûre : agent.json par défaut, complétée par
 # OPENCODE_CONFIG_CONTENT s'il est défini. opencode applique la dernière règle
 # qui correspond : les deny de devzone sont donc retirés de la fusion puis
@@ -86,6 +101,7 @@ configurer() {
         "chmod *bash32*": "deny",
         "install *bash32*": "deny"
     })' <<<"$config")" || refuse "configuration opencode illisible : rien lancé"
+    config="$(droits_edit_deny "$config")" || refuse "configuration opencode illisible : rien lancé"
     grep -q '"git push\*":"deny"' <<<"$config" || refuse "git push non interdit : rien lancé"
     export OPENCODE_CONFIG_CONTENT="$config"
 }
@@ -119,4 +135,5 @@ agent_etat() {
     done
     [ "$vu" = 1 ] || echo "  aucune session"
     agent_ecarts
+    droits_alertes
 }

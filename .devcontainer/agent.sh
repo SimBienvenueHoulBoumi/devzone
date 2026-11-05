@@ -28,6 +28,10 @@ RACINE="${DEVZONE_RACINE:-$(dirname "$ICI")}"
 # shellcheck source=agent-erreurs.sh
 # shellcheck disable=SC1091
 . "$ICI/agent-erreurs.sh"
+# Fichiers de droits des agents protégés (#361)
+# shellcheck source=agent-droits.sh
+# shellcheck disable=SC1091
+. "$ICI/agent-droits.sh"
 # Configuration, rang partagé, journal et état (#328)
 # shellcheck source=agent-session.sh
 # shellcheck disable=SC1091
@@ -61,6 +65,7 @@ agent_lancer() {
     export AGENT_JOURNAL="$journal"
     etat="$AGENT_ETAT"
     mkdir -p "$(dirname "$journal")" "$etat"
+    droits_photo "$dossier"
     FREE_MODELS=()
     while IFS= read -r m; do
         if [ -n "$m" ]; then FREE_MODELS+=("$m"); fi
@@ -94,7 +99,7 @@ agent_lancer() {
         fi
         echo "=== modèle opencode/$m début $(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$journal"
         offset="$(wc -c <"$journal")"
-        (cd "$dossier" && opencode run --auto -m "opencode/$m" "$(cat "$consigne_courante")" </dev/null >>"$journal" 2>&1) &
+        (cd "$dossier" && DEVZONE_AGENT_SESSION=1 opencode run --auto -m "opencode/$m" "$(cat "$consigne_courante")" </dev/null >>"$journal" 2>&1) &
         pid=$!
         demarre=0
         # Silence au départ : rien écrit pendant SILENCE secondes alors que le
@@ -110,6 +115,7 @@ agent_lancer() {
             pkill -P "$pid" 2>/dev/null || true
             kill "$pid" 2>/dev/null || true
             wait "$pid" 2>/dev/null || true
+            droits_verifier "$dossier"
             echo "=== opencode/$m muet au départ : écarté 1 h, modèle suivant" >>"$journal"
             modele_ecarter "$m" mute
             reprise
@@ -133,6 +139,7 @@ agent_lancer() {
                     pkill -P "$pid" 2>/dev/null || true
                     kill "$pid" 2>/dev/null || true
                     wait "$pid" 2>/dev/null || true
+                    droits_verifier "$dossier"
                     freeze=1
                     break
                 fi
@@ -146,6 +153,7 @@ agent_lancer() {
         fi
         code=0
         wait "$pid" || code=$?
+        droits_verifier "$dossier"
         # Seule la sortie de cette tentative compte : une erreur d'un modèle
         # précédent ne doit pas condamner le suivant. On ne lit que ses 30
         # dernières lignes, et seulement si le code de sortie est non nul ou si
