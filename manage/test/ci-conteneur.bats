@@ -134,7 +134,7 @@ setup() {
     [[ "$bloc" == *"bats manage/test/"* ]] || false
     [[ "$bloc" == *"ln -s /bin/bash"* ]] || false
     [[ "$bloc" == *'BASH_VERSINFO[0]}" = 3'* ]] || false
-    for f in cli.bats versions.bats ci-conteneur.bats agent.bats; do
+    for f in cli.bats versions.bats ci-conteneur.bats agent.bats agent-ecarts.bats; do
         [[ "$bloc" == *"manage/test/$f"* ]] || { echo "non lancé sous macOS : $f"; false; }
     done
 }
@@ -199,7 +199,7 @@ DOCKER
     run bash "$SCRIPT"
     [ "$status" -eq 0 ]
     grep -q "bash:3.2" "$BATS_TEST_TMPDIR/docker.log"
-    grep -q "manage/test/cli.bats manage/test/versions.bats manage/test/ci-conteneur.bats manage/test/agent.bats" "$BATS_TEST_TMPDIR/docker.log" || false
+    grep -q "manage/test/cli.bats manage/test/versions.bats manage/test/ci-conteneur.bats manage/test/agent.bats manage/test/agent-ecarts.bats" "$BATS_TEST_TMPDIR/docker.log" || false
 }
 
 @test "bash32.sh : sans docker → code 2 et message" {
@@ -247,6 +247,6 @@ DOCKER
     run bash "$SCRIPT"
     [ "$status" -eq 0 ]
     grep -q "bash:3.2" "$BATS_TEST_TMPDIR/docker.log"
-    grep -q "manage/test/cli.bats manage/test/versions.bats manage/test/ci-conteneur.bats manage/test/agent.bats" "$BATS_TEST_TMPDIR/docker.log" || false
+    grep -q "manage/test/cli.bats manage/test/versions.bats manage/test/ci-conteneur.bats manage/test/agent.bats manage/test/agent-ecarts.bats" "$BATS_TEST_TMPDIR/docker.log" || false
     grep -q "v1.10.0" "$BATS_TEST_TMPDIR/docker.log" || false
 }
