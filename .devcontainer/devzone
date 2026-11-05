@@ -670,7 +670,7 @@ worktrees_absents() {
 # État complet : ✔ prêt, ✖ nécessaire, ○ facultatif, ⚠ à corriger ; chaque
 # point à faire avec sa commande (affiché à chaque démarrage)
 etat() {
-    local nom email statut m retards chemin ports_etat
+    local nom email statut m retards chemin ports_etat relais_marque
     echo "devzone : état (devzone pour le réafficher)"
     nom="$(git config --get user.name || true)"
     email="$(git config --get user.email || true)"
@@ -730,6 +730,12 @@ etat() {
         aucun*) printf '  ○ ports vers le poste %s\n' "$ports_etat" ;;
         *) printf '  ✔ ports vers le poste %s\n' "$ports_etat" ;;
     esac
+    # Marque posée par docker-relais.sh au démarrage (#293) : docker exec
+    # longs coupés, kind et modules en échec
+    relais_marque="${DEVZONE_RELAIS_MARQUE:-/tmp/devzone-relais-docker.echec}"
+    if [ -f "$relais_marque" ]; then
+        printf '  ⚠ relais Docker     %s : DEVZONE_RELAIS_REEL=oui bash %s/docker-relais.sh\n' "$(head -1 "$relais_marque")" "$ICI"
+    fi
 }
 
 changer() {
