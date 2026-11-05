@@ -119,6 +119,36 @@ fichiers_manifeste() {
     done <"$dossier/.devzone.version"
 }
 
+# Un chemin lu dans le manifeste n'est accepté que s'il est relatif, simple
+# (ni « .. », « . », « // », retour à la ligne ou tabulation), et sous un
+# dossier géré par le paquet ou un fichier de sa racine. Sinon : refus.
+chemin_sur() {
+    local rel="$1"
+    case "$rel" in
+        '' | /* | *//* | *$'\n'* | *$'\t'*) return 1 ;;
+    esac
+    case "/$rel/" in
+        */../* | */./*) return 1 ;;
+    esac
+    case "$rel" in
+        .devcontainer/* | manage/* | core/* | scripts/* | \
+            Makefile | README.md | LICENSE | .gitattributes) return 0 ;;
+    esac
+    return 1
+}
+
+# Défense en profondeur : le dossier parent réel doit rester sous le dossier
+# devzone réel (pwd -P) ; un lien symbolique qui en sort est donc refusé.
+dans_dossier() {
+    local dossier="$1" rel="$2" racine parent
+    racine="$(cd "$dossier" && pwd -P)" || return 1
+    parent="$(cd "$dossier/$(dirname "$rel")" 2>/dev/null && pwd -P)" || return 1
+    case "$parent" in
+        "$racine" | "$racine"/*) return 0 ;;
+    esac
+    return 1
+}
+
 # Jamais touchés par mettre-a-jour, même si un ancien manifeste les cite
 protege() {
     case "$1" in
@@ -229,8 +259,16 @@ mettre_a_jour() {
     done <"$liste_paquet"
     while IFS= read -r rel; do
         [ -n "$rel" ] || continue
+        if ! chemin_sur "$rel"; then
+            echo "devzone : manifeste : chemin refusé : $rel" >&2
+            continue
+        fi
         dans_liste "$liste_paquet" "$rel" && continue
         protege "$rel" && continue
+        if ! dans_dossier "$dossier" "$rel"; then
+            echo "devzone : manifeste : chemin refusé : $rel" >&2
+            continue
+        fi
         printf '%s\n' "$rel" >>"$travail/supprimer"
         [ -f "$dossier/$rel" ] || continue
         printf '%s\n' "$rel" >>"$travail/sauver"
@@ -246,6 +284,10 @@ mettre_a_jour() {
         printf '%s\n' "$ancien" >>"$travail/arbres"
         while IFS= read -r f; do
             rel="${f#"$dossier"/}"
+            if ! chemin_sur "$rel"; then
+                echo "devzone : manifeste : chemin refusé : $rel" >&2
+                continue
+            fi
             protege "$rel" && continue
             # Un fichier inconnu de l'ancien paquet appartient à l'utilisateur
             fichier_ancien_connu "$rel" || continue
@@ -294,8 +336,13 @@ mettre_a_jour() {
         done
         while IFS= read -r rel; do
             [ -f "$dossier/$rel" ] || continue
+            if ! dans_dossier "$dossier" "$rel"; then
+                echo "devzone : manifeste : chemin refusé : $rel" >&2
+                continue
+            fi
             mkdir -p "$sauvegarde/$(dirname "$rel")"
-            cp -p "$dossier/$rel" "$sauvegarde/$rel"
+            # -P : un lien est sauvegardé tel quel, jamais sa cible
+            cp -P -p "$dossier/$rel" "$sauvegarde/$rel"
         done <"$travail/sauver"
         echo "Sauvegarde : $sauvegarde"
     fi
@@ -305,6 +352,15 @@ mettre_a_jour() {
     completer_gitignore "$dossier"
     while IFS= read -r rel; do
         mkdir -p "$dossier/$(dirname "$rel")"
+        if ! dans_dossier "$dossier" "$rel"; then
+            echo "devzone : manifeste : chemin refusé : $rel" >&2
+            continue
+        fi
+        # Jamais d'écriture à travers un lien : le lien (pas sa cible) est retiré
+        if [ -L "$dossier/$rel" ]; then
+            rm -f -- "$dossier/$rel"
+            echo "devzone : manifeste : lien remplacé : $rel" >&2
+        fi
         cp -p "$PAQUET/$rel" "$dossier/$rel"
         if [ -x "$PAQUET/$rel" ]; then
             chmod +x "$dossier/$rel"
@@ -313,6 +369,11 @@ mettre_a_jour() {
     while IFS= read -r rel; do
         [ -n "$rel" ] || continue
         [ -f "$dossier/$rel" ] || continue
+        if ! dans_dossier "$dossier" "$rel"; then
+            echo "devzone : manifeste : chemin refusé : $rel" >&2
+            continue
+        fi
+        # rm ne suit pas les liens : seul le lien est retiré, jamais sa cible
         rm -f -- "$dossier/$rel"
     done <"$travail/supprimer"
     while IFS= read -r ancien; do

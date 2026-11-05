@@ -352,6 +352,19 @@ Empreinte d'une archive : `curl -fsSL <url> | shasum -a 256`.
 
 
 
+## Garder des paquets systeme
+
+Un paquet installe a la main (`sudo apt install tree`) est perdu au prochain rebuild. `devzone paquets` maintient la liste des paquets a reinstaller apres un rebuild :
+
+| Action | Commande |
+|---|---|
+| Lister | `devzone paquets` : ✔ paquets installes, ○ paquets a installer |
+| Ajouter | `devzone paquets ajouter <nom>…` : valide (`apt-cache`), installe, ajoute a la liste |
+| Retirer | `devzone paquets retirer <nom>` : retire la liste et desinstalle |
+| Appliquer | `devzone paquets appliquer` : installe les paquets manquants |
+
+La liste est relue au post-create et affiche dans le recap (`⚠ paquets : …`) l'etat des paquets non installes. `devzone paquets appliquer` peut etre relance.
+
 ## Dépannage
 
 | Symptôme | Cause | Solution |
