@@ -2,6 +2,7 @@
 # Session du superviseur d'agent : configuration opencode, rang partagé, journal,
 # état (#328). Bibliothèque sourcée par agent.sh : aucune commande n'est lancée ici.
 
+# Chemin du journal d'un dossier dans workspace/.agents/ : hors dépôt, ignoré par git.
 journal_de() {
     echo "$RACINE/workspace/.agents/$(basename "$1").log"
 }
@@ -15,6 +16,7 @@ mtime() {
     fi
 }
 
+# Date UTC lisible d'une époque, GNU puis BSD date : affichée par devzone agent etat.
 heure() {
     if date -u -d "@$1" '+%Y-%m-%d %H:%M:%S' >/dev/null 2>&1; then
         date -u -d "@$1" '+%Y-%m-%d %H:%M:%S'
@@ -44,6 +46,7 @@ verrou_prendre() {
     echo "$$" >"$AGENT_ETAT/verrou/pid"
 }
 
+# Libère le rang partagé pris par verrou_prendre : retire le pid, puis le dossier.
 verrou_lacher() {
     rm -f "$AGENT_ETAT/verrou/pid"
     rmdir "$AGENT_ETAT/verrou" 2>/dev/null || true
