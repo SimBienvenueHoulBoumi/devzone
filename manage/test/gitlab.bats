@@ -46,20 +46,40 @@ KUBE
 #!/usr/bin/env bash
 echo "helm $*" >>"$BATS_TEST_TMPDIR/helm.log"
 HELM
-    # docker : deux usages — (1) mapping SSH du cluster kind (nodePort 32022)
-    # si FAUX_DOCKER_PORT : « 0.0.0.0:2224 -> 32022/tcp », code 0, sinon
-    # code 1 ; (2) daemon présent, tout le reste immédiat (kube-config,
-    # démarrage) : journalisé, code 0.
+    # docker : network connect (réseau kind), mapping SSH du cluster kind
+    # (nodePort 32022) et publications du nœud (docker port sans port).
+    # FAUX_DOCKER_RESEAU_KO : connect échoue ; FAUX_DOCKER_RESEAU_EXISTE :
+    # « already exists » (succès) ; FAUX_DOCKER_PORT : mapping SSH présent ;
+    # FAUX_DOCKER_PORT_EXPOSE / _LOCAL : nœud publié sur 0.0.0.0 / 127.0.0.1.
     cat >"$BATS_TEST_TMPDIR/bin/docker" <<'DOCKER'
 #!/usr/bin/env bash
 echo "docker $*" >>"$BATS_TEST_TMPDIR/docker.log"
 case "$*" in
+    *"network connect kind "*)
+        if [ -n "${FAUX_DOCKER_RESEAU_EXISTE:-}" ]; then
+            echo "Error response from daemon: endpoint with name $(hostname) already exists in network kind"
+            exit 1
+        fi
+        if [ -n "${FAUX_DOCKER_RESEAU_KO:-}" ]; then
+            echo "Error response from daemon: network kind not found"
+            exit 1
+        fi
+        exit 0
+        ;;
     *"port gitlab-control-plane 32022"*)
         if [ -n "${FAUX_DOCKER_PORT:-}" ]; then
             echo "0.0.0.0:2224 -> 32022/tcp"
             exit 0
         fi
         exit 1
+        ;;
+    *"port gitlab"*"control-plane"*)
+        if [ -n "${FAUX_DOCKER_PORT_EXPOSE:-}" ]; then
+            printf '80/tcp -> 0.0.0.0:8929\n32022/tcp -> 0.0.0.0:2224\n'
+        elif [ -n "${FAUX_DOCKER_PORT_LOCAL:-}" ]; then
+            printf '80/tcp -> 127.0.0.1:8929\n32022/tcp -> 127.0.0.1:2224\n'
+        fi
+        exit 0
         ;;
 esac
 exit 0
@@ -202,6 +222,13 @@ attendre_journal() {
 @test "gitlab : kind.yaml mappe le nodePort gitlab-shell 32022 sur le hostPort 2224" {
     grep -q "containerPort: 32022" "$BATS_TEST_DIRNAME/../../.devcontainer/gitlab/kind.yaml" || false
     ! grep -q "containerPort: 22" "$BATS_TEST_DIRNAME/../../.devcontainer/gitlab/kind.yaml" || false
+}
+
+@test "gitlab : kind.yaml limite les publications 8929 et 2224 à 127.0.0.1" {
+    local kind_yaml="$BATS_TEST_DIRNAME/../../.devcontainer/gitlab/kind.yaml"
+    [ "$(grep -c 'listenAddress: "127.0.0.1"' "$kind_yaml")" -eq 2 ]
+    grep -A3 "containerPort: 80$" "$kind_yaml" | grep -q 'listenAddress: "127.0.0.1"' || false
+    grep -A3 "containerPort: 32022$" "$kind_yaml" | grep -q 'listenAddress: "127.0.0.1"' || false
 }
 
 @test "gitlab : helm template : ssh_port 2224 et nodePort gitlab-shell 32022" {
@@ -355,6 +382,21 @@ attendre_journal() {
     [ "$output" = "en échec : devzone appliquer" ]
 }
 
+@test "gitlab : état signale un nœud publié sur 0.0.0.0" {
+    echo gitlab >"$KIND_CLUSTERS"
+    FAUX_DOCKER_PORT_EXPOSE=1 run bash "$GITLAB" etat
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"⚠ GitLab exposé au réseau local"* ]] || false
+    [[ "$output" == *"devzone desactiver gitlab puis devzone activer gitlab (données de test perdues)"* ]] || false
+}
+
+@test "gitlab : état sans avertissement pour un nœud publié sur 127.0.0.1" {
+    echo gitlab >"$KIND_CLUSTERS"
+    FAUX_DOCKER_PORT_LOCAL=1 run bash "$GITLAB" etat
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"GitLab exposé au réseau local"* ]] || false
+}
+
 @test "devzone : activer gitlab saute l'installation si prêt et runner en ligne" {
     echo "gitlab" >"$KIND_CLUSTERS"
     mkdir -p "$SECRETS" && echo jeton >"$SECRETS/root-token"
@@ -420,14 +462,52 @@ attendre_journal() {
     grep -q '^127\.0\.0\.1 localhost$' "$DEVZONE_HOSTS"
 }
 
-@test "gitlab : relais lancé vers l'IPv4 de l'hôte, pas l'IPv6" {
+@test "gitlab : relais vers le nœud kind après network connect" {
     run bash "$GITLAB" relais-lancer
     [ "$status" -eq 0 ]
+    grep -qF "docker network connect kind $(hostname)" "$BATS_TEST_TMPDIR/docker.log"
+    attendre_journal "$BATS_TEST_TMPDIR/socat.log" 'TCP-LISTEN:8929,bind=127.0.0.1,fork,reuseaddr TCP:gitlab-control-plane:80'
+    grep -q 'TCP-LISTEN:8929,bind=127.0.0.1,fork,reuseaddr TCP:gitlab-control-plane:80' "$BATS_TEST_TMPDIR/socat.log"
+    attendre_journal "$BATS_TEST_TMPDIR/socat.log" 'TCP-LISTEN:2224,bind=127.0.0.1,fork,reuseaddr TCP:gitlab-control-plane:32022'
+    grep -q 'TCP-LISTEN:2224,bind=127.0.0.1,fork,reuseaddr TCP:gitlab-control-plane:32022' "$BATS_TEST_TMPDIR/socat.log"
+    [ "$(cat "$DEVZONE_RACINE/workspace/.gitlab-8929/relais.cible")" = "TCP:gitlab-control-plane:80" ]
+    [ "$(cat "$DEVZONE_RACINE/workspace/.gitlab-2224/relais.cible")" = "TCP:gitlab-control-plane:32022" ]
+}
+
+@test "gitlab : network connect déjà existant → relais vers le nœud" {
+    FAUX_DOCKER_RESEAU_EXISTE=1 run bash "$GITLAB" relais-lancer
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"repli"* ]] || false
+    attendre_journal "$BATS_TEST_TMPDIR/socat.log" 'TCP:gitlab-control-plane:80'
+    attendre_journal "$BATS_TEST_TMPDIR/socat.log" 'TCP:gitlab-control-plane:32022'
+}
+
+@test "gitlab : network connect en échec → repli sur l'IPv4 de l'hôte, message stderr" {
+    FAUX_DOCKER_RESEAU_KO=1 run bash "$GITLAB" relais-lancer
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"repli sur l'IPv4 de host.docker.internal"* ]] || false
     attendre_journal "$BATS_TEST_TMPDIR/socat.log" 'TCP-LISTEN:8929,bind=127.0.0.1,fork,reuseaddr TCP:192.168.65.254:8929'
     grep -q 'TCP-LISTEN:8929,bind=127.0.0.1,fork,reuseaddr TCP:192.168.65.254:8929' "$BATS_TEST_TMPDIR/socat.log"
     attendre_journal "$BATS_TEST_TMPDIR/socat.log" 'TCP-LISTEN:2224,bind=127.0.0.1,fork,reuseaddr TCP:192.168.65.254:2224'
     grep -q 'TCP-LISTEN:2224,bind=127.0.0.1,fork,reuseaddr TCP:192.168.65.254:2224' "$BATS_TEST_TMPDIR/socat.log"
     ! grep -q 'fdc4:f303' "$BATS_TEST_TMPDIR/socat.log" || false
+    [ "$(cat "$DEVZONE_RACINE/workspace/.gitlab-8929/relais.cible")" = "TCP:192.168.65.254:8929" ]
+}
+
+@test "gitlab : cible changée → relais relancé vers la nouvelle cible" {
+    # Premier lancement : repli sur l'IPv4 de l'hôte (ancienne cible)
+    FAUX_DOCKER_RESEAU_KO=1 run bash "$GITLAB" relais-lancer
+    [ "$status" -eq 0 ]
+    [ "$(cat "$DEVZONE_RACINE/workspace/.gitlab-8929/relais.cible")" = "TCP:192.168.65.254:8929" ]
+    attendre_journal "$BATS_TEST_TMPDIR/socat.log" 'TCP-LISTEN:8929,bind=127.0.0.1,fork,reuseaddr TCP:192.168.65.254:8929'
+    # Réseau kind rejoignable : la cible change, le relais est relancé
+    run bash "$GITLAB" relais-lancer
+    [ "$status" -eq 0 ]
+    [ "$(cat "$DEVZONE_RACINE/workspace/.gitlab-8929/relais.cible")" = "TCP:gitlab-control-plane:80" ]
+    [ "$(cat "$DEVZONE_RACINE/workspace/.gitlab-2224/relais.cible")" = "TCP:gitlab-control-plane:32022" ]
+    attendre_journal "$BATS_TEST_TMPDIR/socat.log" 'TCP-LISTEN:8929,bind=127.0.0.1,fork,reuseaddr TCP:gitlab-control-plane:80'
+    attendre_journal "$BATS_TEST_TMPDIR/socat.log" 'TCP-LISTEN:2224,bind=127.0.0.1,fork,reuseaddr TCP:gitlab-control-plane:32022'
+    grep -q 'TCP-LISTEN:8929,bind=127.0.0.1,fork,reuseaddr TCP:192.168.65.254:8929' "$BATS_TEST_TMPDIR/socat.log"
 }
 
 @test "gitlab : desinstaller arrête les relais 8929 et 2224" {
