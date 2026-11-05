@@ -204,16 +204,19 @@ gitlab_seed() {
     echo "✔ Seed GitLab terminé."
 }
 
-# ---- relais TCP 127.0.0.1:8929/2224 vers l'IPv4 de l'hôte ----
+# ---- relais TCP 127.0.0.1:8929/2224 vers le nœud kind ----
 # Choix : un socat local détaché par setsid, PID et journal gardés dans
 # workspace/.gitlab-<port>/ comme le relais de cluster.sh. relais_lancer ne
 # convient pas : il fait un kubectl port-forward vers un service du cluster
-# choisi par devzone, alors GitLab est dans le cluster kind `gitlab` dont les
-# ports sont publiés sur le 127.0.0.1 du poste (Docker de l'hôte).
+# choisi par devzone, alors GitLab est dans le cluster kind `gitlab`.
+# Le conteneur rejoint le réseau Docker `kind` du nœud (#327) : le relais vise
+# alors <nœud>:80 et <nœud>:32022, indépendamment de la publication des ports
+# de l'hôte (127.0.0.1 seulement). Si le réseau ne peut pas être rejoint, repli
+# sur l'IPv4 de host.docker.internal, comme avant.
 # Pourquoi ce relais : libcurl (curl et git en HTTP) résout tout nom
 # *.localhost vers la boucle locale sans lire /etc/hosts (RFC 6761) ; depuis
 # le conteneur, http://gitlab.localhost:8929 part donc sur son propre
-# 127.0.0.1, où rien n'écoute. Le relais y ramène les ports de l'hôte.
+# 127.0.0.1, où rien n'écoute. Le relais y ramène GitLab.
 gitlab_hote_ipv4() {
     local ip
     # ahostsv4 seulement : sous Docker Desktop, getent hosts rend d'abord une
@@ -223,28 +226,62 @@ gitlab_hote_ipv4() {
     printf '%s\n' "$ip"
 }
 
+gitlab_noeud() {
+    printf 'gitlab%s-control-plane\n' "$INSTANCE_SUFFIX"
+}
+
+# Rejoint le réseau Docker du nœud kind ; « already exists » vaut un succès
+# (relance, démarrage). Échec : l'appelant passe par le repli.
+gitlab_reseau_rejoindre() {
+    local sortie
+    if sortie="$(docker network connect kind "$(hostname)" 2>&1)"; then
+        return 0
+    fi
+    [[ "$sortie" == *"already exists"* ]]
+}
+
 gitlab_relais_port() {
-    local port="$1" ip="$2" nom="gitlab-$1" dossier detache=()
+    local port="$1" hote="$2" distant="$3" nom="gitlab-$1" dossier cible detache=()
     dossier="$(relais_dossier "$nom")"
     mkdir -p "$dossier"
-    relais_actif "$nom" && return 0
+    cible="TCP:${hote}:${distant}"
+    # Cible inchangée et relais vivant : rien à faire. Cible changée (repli
+    # d'avant #327, nœud recréé…) : arrêter l'ancien relais et relancer.
+    if relais_actif "$nom" && [ "$(cat "$dossier/relais.cible" 2>/dev/null || true)" = "$cible" ]; then
+        return 0
+    fi
+    relais_arreter "$nom"
+    printf '%s\n' "$cible" >"$dossier/relais.cible"
     # setsid : session à part, le relais survit à la fin du script qui l'a
     # lancé ; absent sur macOS (tests bash 3.2), nohup suffit alors.
     command -v setsid >/dev/null 2>&1 && detache=(setsid)
     ${detache[@]+"${detache[@]}"} nohup socat \
         "TCP-LISTEN:${port},bind=127.0.0.1,fork,reuseaddr" \
-        "TCP:${ip}:${port}" >"$dossier/relais.log" 2>&1 &
+        "$cible" >"$dossier/relais.log" 2>&1 &
     echo "$!" >"$dossier/relais.pid"
 }
 
 gitlab_relais_lancer() {
-    local ip port
+    local noeud port distant ip
+    noeud="$(gitlab_noeud)"
+    if gitlab_reseau_rejoindre; then
+        for port in $GITLAB_PORTS; do
+            case "$port" in
+                8929) distant=80 ;;
+                2224) distant=32022 ;;
+                *) distant="$port" ;;
+            esac
+            gitlab_relais_port "$port" "$noeud" "$distant"
+        done
+        return 0
+    fi
     if ! ip="$(gitlab_hote_ipv4)"; then
-        echo "devzone : gitlab : host.docker.internal introuvable (getent ahostsv4), relais non lancé" >&2
+        echo "devzone : gitlab : réseau kind non rejoignable et host.docker.internal introuvable (getent ahostsv4), relais non lancé" >&2
         return 1
     fi
+    echo "devzone : gitlab : réseau kind non rejoignable, repli sur l'IPv4 de host.docker.internal (${ip})" >&2
     for port in $GITLAB_PORTS; do
-        gitlab_relais_port "$port" "$ip"
+        gitlab_relais_port "$port" "$ip" "$port"
     done
 }
 
@@ -460,6 +497,25 @@ gitlab_desinstaller() {
 }
 
 # ---- etat : vérifier l'état de GitLab ----
+# Nœud encore publié sur toutes les interfaces (cluster créé avant #327) :
+# seul docker port le dit ; la cible du relais, elle, ne dépend plus de la
+# publication des ports de l'hôte.
+gitlab_ports_exposes() {
+    local noeud sortie ligne
+    noeud="$(gitlab_noeud)"
+    sortie="$(docker port "$noeud" 2>/dev/null || true)"
+    while IFS= read -r ligne; do
+        case "$ligne" in
+            80/tcp* | 32022/tcp*)
+                case "$ligne" in
+                    *"0.0.0.0"* | *"::"*) return 0 ;;
+                esac
+                ;;
+        esac
+    done <<<"$sortie"
+    return 1
+}
+
 gitlab_etat() {
     # Désactivé s'il n'y a pas de cluster gitlab
     if ! kind get clusters 2>/dev/null | grep -qx "gitlab${INSTANCE_SUFFIX}"; then
@@ -480,10 +536,13 @@ gitlab_etat() {
             fi
         fi
         echo "prêt : http://gitlab.localhost:8929, runner ${runner_status}"
-        return 0
+    else
+        echo "en échec : devzone appliquer"
     fi
 
-    echo "en échec : devzone appliquer"
+    if gitlab_ports_exposes; then
+        echo "⚠ GitLab exposé au réseau local : devzone desactiver gitlab puis devzone activer gitlab (données de test perdues)"
+    fi
     return 0
 }
 
