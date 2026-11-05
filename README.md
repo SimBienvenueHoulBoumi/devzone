@@ -115,6 +115,28 @@ Pour en savoir plus : [Mettre en route un projet](https://github.com/SimBienvenu
 | État | — | `make status` | — |
 | **Désinstaller** (tout ce que devzone a créé, après confirmation) | — | `make desinstaller` | `bash manage/scripts/desinstaller.sh` |
 
+### Mettre à jour devzone
+
+À la création, le dossier garde sa version dans `.devzone.version` : la version, puis l'empreinte sha256 de chaque fichier copié depuis le paquet. Pour passer un dossier existant à la version du paquet :
+
+```bash
+cd mon-devzone
+devzone mettre-a-jour
+```
+
+Pour la dernière version publiée, sans installation globale :
+
+```bash
+cd mon-devzone
+npx devzone@latest mettre-a-jour
+```
+
+La commande affiche la version du dossier et celle du paquet, et ne fait rien si elles sont égales. Sinon, elle sauvegarde dans `.devzone.sauvegarde/<date>/` les fichiers remplacés ou supprimés, liste les fichiers modifiés localement et demande confirmation (`--oui` pour un script ; sans terminal, `--oui` est nécessaire), remplace les fichiers du paquet, retire les anciennes arborescences (`core/`, `scripts/`), complète `.gitignore` sans l'écraser, puis propose `make rebuild`. `--sans-reconstruire` saute cette proposition ; sans terminal, la reconstruction n'est jamais lancée.
+
+`workspace/`, `.devzone.modules`, `.devzone.paquets`, `.password`, `.app`, `.devzone.log` et les volumes Docker ne sont jamais touchés.
+
+Dans le conteneur, le récapitulatif `devzone` signale une version publiée plus récente (vérification npm au plus une fois par jour, sans bloquer hors ligne) : `○ devzone X.Y.Z disponible : sur le poste, devzone mettre-a-jour`.
+
 ## Options
 
 **Module `ia`** : active Claude Code et opencode (versions figées), avec le garde-fou repowarden qui les arrête avant de modifier `main` ou `develop` ou de commiter sans `repowarden cc` (voir [manage/docs/reference.md](manage/docs/reference.md#garde-fou-des-assistants-ia)). Pour l'activer : `devzone activer ia`. Ils sont désinstallés quand le module est désactivé, mais tes connexions restent dans leurs volumes.

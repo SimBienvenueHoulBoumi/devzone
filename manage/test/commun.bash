@@ -17,5 +17,5 @@ kube_isole() {
     export HOME="$BATS_TEST_TMPDIR/home"
     export KUBECONFIG="$BATS_TEST_TMPDIR/kubeconfig"
     export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
-    mkdir -p "$HOME" "$BATS_TEST_TMPDIR"
+    mkdir -p "$HOME" "$BATS_TEST_TMPDIR" "$HOME/.kube"
 }
