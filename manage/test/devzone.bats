@@ -388,6 +388,11 @@ case "$args" in
         fi
         exit 0
         ;;
+    *"config view"*)
+        ctx="$(printf '%s' "$args" | sed -n 's/.*name=="\([^"]*\)".*/\1/p')"
+        if [[ "$args" == *".cluster.server"* ]]; then echo "https://127.0.0.1:6443"; else echo "$ctx"; fi
+        exit 0
+        ;;
     *"delete -f"*)
         contexte=""
         prev=""

@@ -9,6 +9,9 @@
 # une installation échoue (kube-config.sh l'appelle avec || true).
 set -euo pipefail
 
+# shellcheck source=SCRIPTDIR/cluster.sh
+. "$(dirname "$0")/cluster.sh"
+
 VERSION=v0.9.0
 MANIFESTE="https://github.com/kubernetes-sigs/metrics-server/releases/download/${VERSION}/components.yaml"
 
@@ -23,7 +26,7 @@ if [ "${1:-}" = retirer ]; then
         # Clusters locaux seulement : un retrait sur un cluster distant n'a rien
         # à retirer (devzone n'y installe jamais)
         mapfile -t contextes < <(printf '%s\n' ${connus[@]+"${connus[@]}"} |
-            grep -E "^(kind-.*|docker-desktop|rancher-desktop|orbstack|minikube)$" || true)
+            while IFS= read -r c; do cluster_est_local "$c" && echo "$c"; done || true)
         set -- ${contextes[@]+"${contextes[@]}"}
     fi
     code=0
@@ -52,7 +55,7 @@ if [ "$demandes" -eq 0 ]; then
     # Clusters locaux seulement : jamais d'install automatique sur un cluster
     # distant de l'hôte (prod, staging…) ; pour un autre, le nommer en argument
     mapfile -t contextes < <(printf '%s\n' ${connus[@]+"${connus[@]}"} |
-        grep -E '^(kind-.*|docker-desktop|rancher-desktop|orbstack|minikube)$' || true)
+        while IFS= read -r c; do cluster_est_local "$c" && echo "$c"; done || true)
     set -- ${contextes[@]+"${contextes[@]}"}
 fi
 
