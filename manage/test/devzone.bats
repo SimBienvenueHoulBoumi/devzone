@@ -649,3 +649,50 @@ KUBE
     [ "$status" -eq 0 ]
     [ -z "$(grep "\.devzone\.modules" <<<"$output")" ]
 }
+
+@test "état : contexte kind-gitlab et cluster de l'hôte joignable → avertissement" {
+    mkdir -p "$HOME/.kube"
+    : >"$HOME/.kube/hote.config"
+    cat >"$BATS_TEST_TMPDIR/bin/kubectl" <<'KUBE'
+#!/usr/bin/env bash
+case "$*" in
+    *"config current-context"*)
+        case "${KUBECONFIG:-}" in
+            *:*) echo kind-gitlab ;;
+            */hote.config) echo docker-desktop ;;
+            *) echo kind-gitlab ;;
+        esac
+        ;;
+    *"get --raw /readyz"*)
+        case "$*" in
+            *"--context docker-desktop"*) exit 0 ;;
+        esac
+        exit 1
+        ;;
+esac
+exit 0
+KUBE
+    chmod +x "$BATS_TEST_TMPDIR/bin/kubectl"
+    unset KUBECONFIG
+    run bash "$DEVZONE"
+    [ "$status" -eq 0 ] || false
+    [[ "$output" == *"⚠ cluster de travail : kind-gitlab"* ]] || false
+    [[ "$output" == *"kubectl config use-context docker-desktop"* ]] || false
+}
+
+@test "état : contexte docker-desktop → pas d'avertissement de cluster de travail" {
+    mkdir -p "$HOME/.kube"
+    : >"$HOME/.kube/hote.config"
+    cat >"$BATS_TEST_TMPDIR/bin/kubectl" <<'KUBE'
+#!/usr/bin/env bash
+case "$*" in
+    *"config current-context"*) echo docker-desktop ;;
+esac
+exit 0
+KUBE
+    chmod +x "$BATS_TEST_TMPDIR/bin/kubectl"
+    unset KUBECONFIG
+    run bash "$DEVZONE"
+    [ "$status" -eq 0 ] || false
+    [[ "$output" != *"cluster de travail"* ]] || false
+}

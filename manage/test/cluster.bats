@@ -63,6 +63,63 @@ faux_kind() {
     : >"$BATS_TEST_TMPDIR/kind.log"
 }
 
+# kubectl factice limite au contexte courant : lit et écrit
+# $HOME/.kube/config, comme les commandes `kubectl config` utilisées par
+# kind_creer_sans_basculer. Les autres appels sont neutres.
+faux_kubectl_contexte() {
+    cat >"$BATS_TEST_TMPDIR/bin/kubectl" <<'KUBE'
+#!/usr/bin/env bash
+echo "kubectl $*" >>"$BATS_TEST_TMPDIR/kubectl.log"
+fichier="$HOME/.kube/config"
+mkdir -p "$HOME/.kube"
+case "$*" in
+    "config current-context")
+        sed -n 's/^current-context:[[:space:]]*//p' "$fichier" 2>/dev/null | head -1
+        ;;
+    "config use-context "*)
+        nouveau="${3:-}"
+        { grep -v '^current-context:' "$fichier" 2>/dev/null || true; printf 'current-context: %s\n' "$nouveau"; } >"$fichier.tmp"
+        mv "$fichier.tmp" "$fichier"
+        ;;
+    "config unset current-context")
+        { grep -v '^current-context:' "$fichier" 2>/dev/null || true; } >"$fichier.tmp"
+        mv "$fichier.tmp" "$fichier"
+        ;;
+esac
+exit 0
+KUBE
+    chmod +x "$BATS_TEST_TMPDIR/bin/kubectl"
+    : >"$BATS_TEST_TMPDIR/kubectl.log"
+}
+
+# kind factice : get clusters vide ; create écrit le contexte kind-<nom> comme
+# le vrai, puis échoue avec le code 1 si FAUX_KIND_ECHEC=1.
+faux_kind_contexte() {
+    cat >"$BATS_TEST_TMPDIR/bin/kind" <<'KIND'
+#!/usr/bin/env bash
+echo "kind $*" >>"$BATS_TEST_TMPDIR/kind.log"
+case "$1 $2" in
+    "get clusters") exit 0 ;;
+    "create cluster")
+        nom=""
+        while [ "$#" -gt 0 ]; do
+            case "$1" in
+                --name) nom="$2"; shift 2 ;;
+                *) shift ;;
+            esac
+        done
+        mkdir -p "$HOME/.kube"
+        printf 'current-context: kind-%s\n' "$nom" >"$HOME/.kube/config"
+        if [ "${FAUX_KIND_ECHEC:-0}" = 1 ]; then exit 1; fi
+        exit 0
+        ;;
+esac
+exit 0
+KIND
+    chmod +x "$BATS_TEST_TMPDIR/bin/kind"
+    : >"$BATS_TEST_TMPDIR/kind.log"
+}
+
 @test "cluster_est_local : kind dédié est local" {
     faux_kubectl
     faux_kind
@@ -397,4 +454,75 @@ faux_kind() {
         [ "$status" -eq 0 ]
         [ "$output" = "mon-choix" ]
     ) || false
+}
+
+@test "kind_creer_sans_basculer : succès, contexte docker-desktop restauré" {
+    faux_kubectl_contexte
+    faux_kind_contexte
+    mkdir -p "$HOME/.kube"
+    printf 'current-context: docker-desktop\n' >"$HOME/.kube/config"
+    (
+        set -e
+        export DEVZONE_INSTANCE=devzone
+        export ETAT="$BATS_TEST_TMPDIR/etat"
+        export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
+        source "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
+        kind_creer_sans_basculer --name devzone --wait 120s
+    ) || false
+    [ "$(sed -n 's/^current-context:[[:space:]]*//p' "$HOME/.kube/config")" = docker-desktop ] || false
+    grep -qx 'kind create cluster --name devzone --wait 120s' "$BATS_TEST_TMPDIR/kind.log" || false
+    grep -qx 'kubectl config use-context docker-desktop' "$BATS_TEST_TMPDIR/kubectl.log" || false
+}
+
+@test "kind_creer_sans_basculer : échec sous set -e, contexte restauré et code 1 rendu" {
+    faux_kubectl_contexte
+    faux_kind_contexte
+    mkdir -p "$HOME/.kube"
+    printf 'current-context: docker-desktop\n' >"$HOME/.kube/config"
+    FAUX_KIND_ECHEC=1 run bash -c '
+        set -e
+        export DEVZONE_INSTANCE=devzone
+        export ETAT="$1/etat"
+        export DEVZONE_KUBE_HOTE="$1/hote.config"
+        source "$2"
+        kind_creer_sans_basculer --name devzone --wait 120s
+    ' _ "$BATS_TEST_TMPDIR" "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
+    [ "$status" -eq 1 ] || false
+    [ "$(sed -n 's/^current-context:[[:space:]]*//p' "$HOME/.kube/config")" = docker-desktop ] || false
+    grep -qx 'kubectl config use-context docker-desktop' "$BATS_TEST_TMPDIR/kubectl.log" || false
+}
+
+@test "kind_creer_sans_basculer : aucun contexte avant, unset appelé" {
+    faux_kubectl_contexte
+    faux_kind_contexte
+    mkdir -p "$HOME/.kube"
+    : >"$HOME/.kube/config"
+    (
+        set -e
+        export DEVZONE_INSTANCE=devzone
+        export ETAT="$BATS_TEST_TMPDIR/etat"
+        export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
+        source "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
+        kind_creer_sans_basculer --name devzone --wait 120s
+    ) || false
+    grep -qx 'kubectl config unset current-context' "$BATS_TEST_TMPDIR/kubectl.log" || false
+    ! grep -q 'config use-context' "$BATS_TEST_TMPDIR/kubectl.log" || false
+    [ -z "$(sed -n 's/^current-context:[[:space:]]*//p' "$HOME/.kube/config")" ] || false
+}
+
+@test "cluster_preparer : le cluster kind est créé par kind_creer_sans_basculer" {
+    faux_kubectl_contexte
+    faux_kind_contexte
+    mkdir -p "$HOME/.kube"
+    printf 'current-context: docker-desktop\n' >"$HOME/.kube/config"
+    (
+        set -e
+        export DEVZONE_INSTANCE=devzone
+        export ETAT="$BATS_TEST_TMPDIR/etat"
+        export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
+        source "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
+        cluster_preparer kind-devzone
+    ) || false
+    grep -qx 'kind create cluster --name devzone --wait 120s' "$BATS_TEST_TMPDIR/kind.log" || false
+    [ "$(sed -n 's/^current-context:[[:space:]]*//p' "$HOME/.kube/config")" = docker-desktop ] || false
 }

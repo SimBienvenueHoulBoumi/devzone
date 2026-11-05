@@ -207,6 +207,59 @@ attendre_journal() {
     grep -q "kind create cluster --name gitlab" "$BATS_TEST_TMPDIR/kind.log"
 }
 
+@test "gitlab : cluster créé sans basculer le contexte, restauré ensuite" {
+    mkdir -p "$HOME/.kube"
+    printf 'current-context: docker-desktop\n' >"$HOME/.kube/config"
+    cat >"$BATS_TEST_TMPDIR/bin/kind" <<'KIND'
+#!/usr/bin/env bash
+echo "kind $*" >>"$BATS_TEST_TMPDIR/kind.log"
+case "$1 $2" in
+    "get clusters") cat "$KIND_CLUSTERS" ;;
+    "create cluster")
+        nom=""
+        while [ "$#" -gt 0 ]; do
+            case "$1" in
+                --name) nom="$2"; shift 2 ;;
+                *) shift ;;
+            esac
+        done
+        echo "$nom" >>"$KIND_CLUSTERS"
+        mkdir -p "$HOME/.kube"
+        printf 'current-context: kind-%s\n' "$nom" >"$HOME/.kube/config"
+        ;;
+    "delete cluster") grep -vx "${4:-}" "$KIND_CLUSTERS" >"$KIND_CLUSTERS.tmp" || true; mv "$KIND_CLUSTERS.tmp" "$KIND_CLUSTERS" ;;
+esac
+KIND
+    cat >"$BATS_TEST_TMPDIR/bin/kubectl" <<'KUBE'
+#!/usr/bin/env bash
+echo "kubectl $*" >>"$BATS_TEST_TMPDIR/kubectl.log"
+fichier="$HOME/.kube/config"
+mkdir -p "$HOME/.kube"
+case "$*" in
+    "config current-context") sed -n 's/^current-context:[[:space:]]*//p' "$fichier" 2>/dev/null | head -1 ;;
+    "config use-context "*)
+        nouveau="${3:-}"
+        { grep -v '^current-context:' "$fichier" 2>/dev/null || true; printf 'current-context: %s\n' "$nouveau"; } >"$fichier.tmp"
+        mv "$fichier.tmp" "$fichier"
+        ;;
+    "config unset current-context")
+        { grep -v '^current-context:' "$fichier" 2>/dev/null || true; } >"$fichier.tmp"
+        mv "$fichier.tmp" "$fichier"
+        ;;
+    *"get secret"*) echo "cGFzc3dvcmQxMjM=" ;;
+    *"get pod"*) echo "gitlab-toolbox-1" ;;
+    *"gitlab-rails runner"*) echo "jeton-root-secret" ;;
+esac
+exit 0
+KUBE
+    chmod +x "$BATS_TEST_TMPDIR/bin/kind" "$BATS_TEST_TMPDIR/bin/kubectl"
+    run bash "$GITLAB" installer
+    [ "$status" -eq 0 ] || false
+    grep -q "kind create cluster --name gitlab" "$BATS_TEST_TMPDIR/kind.log" || false
+    grep -qx 'kubectl config use-context docker-desktop' "$BATS_TEST_TMPDIR/kubectl.log" || false
+    [ "$(sed -n 's/^current-context:[[:space:]]*//p' "$HOME/.kube/config")" = docker-desktop ] || false
+}
+
 @test "gitlab : cluster gitlab déjà là → pas recréé" {
     echo "gitlab" >"$KIND_CLUSTERS"
     run bash "$GITLAB" installer

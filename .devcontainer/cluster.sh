@@ -211,6 +211,20 @@ cluster_choisir() {
     fi
 }
 
+# Cree un cluster kind sans basculer le contexte courant de kubectl.
+# Le code de kind est rendu meme sous set -e : la restauration a lieu avant.
+kind_creer_sans_basculer() {
+    local precedent code=0
+    precedent="$(kubectl config current-context 2>/dev/null || true)"
+    kind create cluster "$@" || code=$?
+    if [ -n "$precedent" ]; then
+        kubectl config use-context "$precedent" >/dev/null 2>&1 || true
+    else
+        KUBECONFIG="$HOME/.kube/config" kubectl config unset current-context >/dev/null 2>&1 || true
+    fi
+    return "$code"
+}
+
 cluster_preparer() {
     local ctx="$1"
     if [ "$ctx" = "$CLUSTER_DEDIE" ]; then
@@ -222,10 +236,10 @@ cluster_preparer() {
             # Docker de l'hôte chargé (son Kubernetes, d'autres clusters) : l'API du
             # nœud peut redémarrer pendant l'initialisation et kind abandonne à
             # quelques secondes près. Une seconde tentative, sur un cluster neuf.
-            if ! kind create cluster --name "devzone${INSTANCE_SUFFIX}" --wait 120s; then
+            if ! kind_creer_sans_basculer --name "devzone${INSTANCE_SUFFIX}" --wait 120s; then
                 echo "▶ Nouvelle tentative de création du cluster kind…"
                 kind delete cluster --name "devzone${INSTANCE_SUFFIX}" >/dev/null 2>&1 || true
-                kind create cluster --name "devzone${INSTANCE_SUFFIX}" --wait 120s || return 1
+                kind_creer_sans_basculer --name "devzone${INSTANCE_SUFFIX}" --wait 120s || return 1
             fi
             kube_joignable_depuis_conteneur "$HOME/.kube/config"
         fi
