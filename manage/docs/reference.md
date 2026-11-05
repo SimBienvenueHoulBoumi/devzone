@@ -262,6 +262,7 @@ Les modules qui déploient un service (`postgres` ; `gitlab` avec #279) s'instal
 - **Cluster distant** : choisir un cluster distant nécessite une confirmation en terminal, ou la variable `DEVZONE_CLUSTER_DISTANT=1` sans terminal. Sans confirmation, le choix est refusé. Quand le cluster de devzone est distant, le récapitulatif `devzone` affiche un avertissement `⚠ cluster distant : <contexte>`.
 - **Voir / changer** : `devzone cluster` affiche le cluster et les possibles ; `devzone cluster CTX` y déplace les services actifs (désinstallés de l'ancien, installés sur le nouveau). **Les données ne sont pas migrées** : confirmation en terminal, `--oui` sans terminal.
 - **Cluster de l'hôte** : devzone n'y crée que ses namespaces étiquetés `app.kubernetes.io/managed-by=devzone`, et les supprime à la désactivation. Désactiver le module `kubernetes` rend ce cluster injoignable pour les services.
+- **Contexte courant** : devzone ne change plus le contexte courant de kubectl : les clusters kind sont créés sans basculer dessus. Si tu te retrouves sur un cluster interne (kind-devzone ou kind-gitlab), reviens avec `kubectl config use-context <ton cluster>`.
 
 ## Données conservées
 
