@@ -100,15 +100,59 @@ NPM
 echo "gh $*" >>"$BATS_TEST_TMPDIR/gh.log"
 exit 1
 GH
-    # getent : résout host.docker.internal vers l'hôte (simulé)
+    # getent : hosts rend l'IPv6 de Docker Desktop, ahostsv4 l'IPv4 de l'hôte
     cat >"$BATS_TEST_TMPDIR/bin/getent" <<'GETENT'
 #!/usr/bin/env bash
 echo "getent $*" >>"$BATS_TEST_TMPDIR/getent.log"
-echo "127.0.0.1 host.docker.internal"
+case "$*" in
+    "hosts host.docker.internal") echo "fdc4:f303:9324::254 host.docker.internal" ;;
+    "ahostsv4 host.docker.internal") echo "192.168.65.254 STREAM host.docker.internal" ;;
+    "hosts gitlab.localhost") echo "127.0.0.1 gitlab.localhost" ;;
+esac
+exit 0
 GETENT
+    # socat/setsid : relais TCP journalisé, sans processus réel
+    cat >"$BATS_TEST_TMPDIR/bin/socat" <<'SOCAT'
+#!/usr/bin/env bash
+echo "socat $*" >>"$BATS_TEST_TMPDIR/socat.log"
+exit 0
+SOCAT
+    cat >"$BATS_TEST_TMPDIR/bin/setsid" <<'SETSID'
+#!/usr/bin/env bash
+echo "setsid $*" >>"$BATS_TEST_TMPDIR/setsid.log"
+exec "$@"
+SETSID
+    # kill : -0 laisse le test vivant, les autres signaux sont seulement journalisés
+    cat >"$BATS_TEST_TMPDIR/bin/kill" <<'KILL'
+#!/usr/bin/env bash
+if [ "${1:-}" = "-0" ]; then
+    builtin kill -0 "${2:-}" 2>/dev/null
+    exit $?
+fi
+echo "kill $*" >>"$BATS_TEST_TMPDIR/kill.log"
+exit 0
+KILL
+    cat >"$BATS_TEST_TMPDIR/bin/pgrep" <<'PGREP'
+#!/usr/bin/env bash
+echo "pgrep $*" >>"$BATS_TEST_TMPDIR/pgrep.log"
+exit 1
+PGREP
     chmod +x "$BATS_TEST_TMPDIR"/bin/*
     HELM_BIN="$(command -v helm)"
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
+}
+
+attendre_journal() {
+    local fichier="$1" motif="$2" i=0
+    while [ "$i" -lt 50 ]; do
+        if grep -q -- "$motif" "$fichier" 2>/dev/null; then
+            return 0
+        fi
+        i=$((i + 1))
+        sleep 0.1
+    done
+    echo "$fichier : ligne absente après 5 s : $motif" >&2
+    return 1
 }
 
 @test "gitlab : désactivé par défaut" {
@@ -309,6 +353,41 @@ GETENT
     grep -q $'^127\.0\.0\.1\tgitlab\.localhost # devzone:gitlab$' "$DEVZONE_HOSTS"
 }
 
+@test "gitlab : hote-poser remplace une ligne IPv6 déjà posée par 127.0.0.1" {
+    printf '127.0.0.1 localhost\nfdc4:f303:9324::254\tgitlab.localhost # devzone:gitlab\n' >"$DEVZONE_HOSTS"
+    run bash "$GITLAB" hote-poser
+    [ "$status" -eq 0 ]
+    [ "$(grep -c 'devzone:gitlab' "$DEVZONE_HOSTS")" -eq 1 ]
+    grep -q $'^127\.0\.0\.1\tgitlab\.localhost # devzone:gitlab$' "$DEVZONE_HOSTS"
+    ! grep -q 'fdc4:f303' "$DEVZONE_HOSTS" || false
+    grep -q '^127\.0\.0\.1 localhost$' "$DEVZONE_HOSTS"
+}
+
+@test "gitlab : relais lancé vers l'IPv4 de l'hôte, pas l'IPv6" {
+    run bash "$GITLAB" relais-lancer
+    [ "$status" -eq 0 ]
+    attendre_journal "$BATS_TEST_TMPDIR/socat.log" 'TCP-LISTEN:8929,bind=127.0.0.1,fork,reuseaddr TCP:192.168.65.254:8929'
+    grep -q 'TCP-LISTEN:8929,bind=127.0.0.1,fork,reuseaddr TCP:192.168.65.254:8929' "$BATS_TEST_TMPDIR/socat.log"
+    attendre_journal "$BATS_TEST_TMPDIR/socat.log" 'TCP-LISTEN:2224,bind=127.0.0.1,fork,reuseaddr TCP:192.168.65.254:2224'
+    grep -q 'TCP-LISTEN:2224,bind=127.0.0.1,fork,reuseaddr TCP:192.168.65.254:2224' "$BATS_TEST_TMPDIR/socat.log"
+    ! grep -q 'fdc4:f303' "$BATS_TEST_TMPDIR/socat.log" || false
+}
+
+@test "gitlab : desinstaller arrête les relais 8929 et 2224" {
+    local pid
+    { true; } &
+    pid=$!
+    wait "$pid" || true
+    mkdir -p "$DEVZONE_RACINE/workspace/.gitlab-8929" "$DEVZONE_RACINE/workspace/.gitlab-2224"
+    echo "$pid" >"$DEVZONE_RACINE/workspace/.gitlab-8929/relais.pid"
+    echo "$pid" >"$DEVZONE_RACINE/workspace/.gitlab-2224/relais.pid"
+    run bash "$GITLAB" desinstaller
+    [ "$status" -eq 0 ]
+    grep -q "pgrep -P $pid" "$BATS_TEST_TMPDIR/pgrep.log"
+    [ ! -e "$DEVZONE_RACINE/workspace/.gitlab-8929" ]
+    [ ! -e "$DEVZONE_RACINE/workspace/.gitlab-2224" ]
+}
+
 @test "gitlab : hote-retirer retire la ligne, garde localhost ; sans ligne → rien, code 0" {
     run bash "$GITLAB" hote-poser
     [ "$status" -eq 0 ]
@@ -374,6 +453,10 @@ SUDO
     [ "$status" -eq 0 ]
     grep -q 'devzone:gitlab' "$DEVZONE_HOSTS"
     grep -q $'^127\.0\.0\.1\tgitlab\.localhost # devzone:gitlab$' "$DEVZONE_HOSTS"
+    attendre_journal "$BATS_TEST_TMPDIR/socat.log" 'TCP-LISTEN:8929,bind=127.0.0.1'
+    grep -q 'TCP-LISTEN:8929,bind=127.0.0.1' "$BATS_TEST_TMPDIR/socat.log"
+    attendre_journal "$BATS_TEST_TMPDIR/socat.log" 'TCP-LISTEN:2224,bind=127.0.0.1'
+    grep -q 'TCP-LISTEN:2224,bind=127.0.0.1' "$BATS_TEST_TMPDIR/socat.log"
 }
 
 @test "gitlab : valeurs — host sans port, port externe par GITLAB_PORT" {

@@ -23,6 +23,8 @@ GITLAB_SECRETS_DIR="$RACINE/workspace/.gitlab"
 # DEVZONE_HOSTS pour les tests (jamais le /etc/hosts réel)
 HOSTS="${DEVZONE_HOSTS:-/etc/hosts}"
 GITLAB_HOTE_MARQUE="# devzone:gitlab"
+# Ports relayés dans le conteneur : HTTP et SSH annoncés par GitLab
+GITLAB_PORTS="${GITLAB_PORTS:-8929 2224}"
 
 # ---- Helper : vérifier la RAM libre (refus < 8 Go) ----
 gitlab_verifier_ram() {
@@ -181,36 +183,108 @@ gitlab_seed() {
     echo "✔ Seed GitLab terminé."
 }
 
-# ---- hote-poser / hote-retirer : gitlab.localhost dans /etc/hosts ----
-# Pourquoi : ssh (clone ssh://git@gitlab.localhost:2224/…), glab et getent
-# passent par le résolveur système, qui ne connaît pas gitlab.localhost ;
-# seul curl résout les noms en .localhost lui-même. /etc/hosts est un
-# montage Docker que Docker régénère au démarrage du conteneur, d'où le
-# re-pose à chaque démarrage (demarrage.sh) et à chaque activation.
-# Jamais de sed -i ni de mv : le montage ne peut pas être renommé
-# (l'écriture en place seulement) ; directe si le fichier est inscriptible,
-# sinon sudo -n. Un échec n'échoue jamais : avertissement sur stderr et
-# code 0, pour ne pas faire échouer l'installation pour un nom d'hôte.
-# Auparavant gitlab.localhost était résolu à 127.0.0.1 (injoignable depuis
-# le conteneur) ; désormais on utilise host.docker.internal qui résout vers
-# la machine hôte depuis le conteneur (--add-host dans devcontainer.json).
-gitlab_hote_poser() {
-    # Déjà posée : rien (idempotent)
-    if grep -q "$GITLAB_HOTE_MARQUE" "$HOSTS" 2>/dev/null; then
-        return 0
-    fi
-    # /etc/hosts exige une IP : résoudre host.docker.internal (adresse de
-    # l'hôte vue du conteneur). Refus clair si la résolution échoue.
+# ---- relais TCP 127.0.0.1:8929/2224 vers l'IPv4 de l'hôte ----
+# Choix : un socat local détaché par setsid, PID et journal gardés dans
+# workspace/.gitlab-<port>/ comme le relais de cluster.sh. relais_lancer ne
+# convient pas : il fait un kubectl port-forward vers un service du cluster
+# choisi par devzone, alors GitLab est dans le cluster kind `gitlab` dont les
+# ports sont publiés sur le 127.0.0.1 du poste (Docker de l'hôte).
+# Pourquoi ce relais : libcurl (curl et git en HTTP) résout tout nom
+# *.localhost vers la boucle locale sans lire /etc/hosts (RFC 6761) ; depuis
+# le conteneur, http://gitlab.localhost:8929 part donc sur son propre
+# 127.0.0.1, où rien n'écoute. Le relais y ramène les ports de l'hôte.
+gitlab_hote_ipv4() {
     local ip
-    ip="$(getent hosts host.docker.internal | awk '{print $1; exit}')"
-    if [ -z "$ip" ]; then
-        echo "devzone : gitlab : host.docker.internal introuvable (getent), gitlab.localhost non posé" >&2
+    # ahostsv4 seulement : sous Docker Desktop, getent hosts rend d'abord une
+    # IPv6 qui ne mène pas aux ports publiés de l'hôte (#320).
+    ip="$(getent ahostsv4 host.docker.internal 2>/dev/null | awk 'NR == 1 { print $1 }')"
+    [ -n "$ip" ] || return 1
+    printf '%s\n' "$ip"
+}
+
+gitlab_relais_port() {
+    local port="$1" ip="$2" nom="gitlab-$1" dossier detache=()
+    dossier="$(relais_dossier "$nom")"
+    mkdir -p "$dossier"
+    relais_actif "$nom" && return 0
+    # setsid : session à part, le relais survit à la fin du script qui l'a
+    # lancé ; absent sur macOS (tests bash 3.2), nohup suffit alors.
+    command -v setsid >/dev/null 2>&1 && detache=(setsid)
+    ${detache[@]+"${detache[@]}"} nohup socat \
+        "TCP-LISTEN:${port},bind=127.0.0.1,fork,reuseaddr" \
+        "TCP:${ip}:${port}" >"$dossier/relais.log" 2>&1 &
+    echo "$!" >"$dossier/relais.pid"
+}
+
+gitlab_relais_lancer() {
+    local ip port
+    if ! ip="$(gitlab_hote_ipv4)"; then
+        echo "devzone : gitlab : host.docker.internal introuvable (getent ahostsv4), relais non lancé" >&2
         return 1
     fi
+    for port in $GITLAB_PORTS; do
+        gitlab_relais_port "$port" "$ip"
+    done
+}
+
+gitlab_relais_arreter() {
+    local port
+    for port in $GITLAB_PORTS; do
+        relais_arreter "gitlab-$port"
+    done
+}
+
+gitlab_relais_etat() {
+    local port manquants=""
+    for port in $GITLAB_PORTS; do
+        relais_actif "gitlab-$port" || manquants="$manquants $port"
+    done
+    if [ -n "$manquants" ]; then
+        echo "relais gitlab arrêté sur${manquants}"
+        return 1
+    fi
+    return 0
+}
+
+# ---- hote-poser / hote-retirer : gitlab.localhost dans /etc/hosts ----
+# Pourquoi : ssh (clone ssh://git@gitlab.localhost:2224/…), glab et getent
+# passent par le résolveur système. curl et git (libcurl) ignorent /etc/hosts
+# pour les noms *.localhost (RFC 6761) et passent par le relais TCP ci-dessus,
+# qui écoute sur 127.0.0.1. Le nom pointe donc vers 127.0.0.1 pour que ssh et
+# glab empruntent le même chemin. /etc/hosts est un montage Docker que Docker
+# régénère au démarrage du conteneur, d'où le re-pose à chaque démarrage
+# (demarrage.sh) et à chaque activation. Jamais de sed -i ni de mv : le
+# montage ne peut pas être renommé (écriture en place seulement) ; directe si
+# le fichier est inscriptible, sinon sudo -n. Un échec n'échoue jamais :
+# avertissement sur stderr et code 0, pour ne pas faire échouer l'installation
+# pour un nom d'hôte.
+gitlab_hote_poser() {
+    local ligne tmp
+    ligne="$(printf '127.0.0.1\tgitlab.localhost %s' "$GITLAB_HOTE_MARQUE")"
+    # Déjà la bonne ligne, une seule fois : rien (idempotent)
+    if [ "$(grep -c "$GITLAB_HOTE_MARQUE" "$HOSTS" 2>/dev/null || true)" = 1 ] &&
+        grep -qxF "$ligne" "$HOSTS" 2>/dev/null; then
+        return 0
+    fi
+    if grep -q "$GITLAB_HOTE_MARQUE" "$HOSTS" 2>/dev/null; then
+        # Ligne marquée avec une autre adresse (IPv6 de #320) ou doublon :
+        # on la remplace par la bonne, en gardant le reste du fichier.
+        tmp="$(mktemp)"
+        grep -v "$GITLAB_HOTE_MARQUE" "$HOSTS" >"$tmp" 2>/dev/null || true
+        printf '%s\n' "$ligne" >>"$tmp"
+        if [ -w "$HOSTS" ]; then
+            cp "$tmp" "$HOSTS" 2>/dev/null ||
+                echo "devzone : gitlab : nom gitlab.localhost non posé dans $HOSTS (droits d'écriture insuffisants)" >&2
+        elif ! sudo -n cp "$tmp" "$HOSTS" >/dev/null 2>&1; then
+            echo "devzone : gitlab : nom gitlab.localhost non posé dans $HOSTS (sudo -n indisponible ou refusé)" >&2
+        fi
+        rm -f "$tmp"
+        return 0
+    fi
     if [ -w "$HOSTS" ]; then
-        printf '%s\tgitlab.localhost %s\n' "$ip" "$GITLAB_HOTE_MARQUE" >>"$HOSTS" 2>/dev/null ||
+        printf '%s\n' "$ligne" >>"$HOSTS" 2>/dev/null ||
             echo "devzone : gitlab : nom gitlab.localhost non posé dans $HOSTS (droits d'écriture insuffisants)" >&2
-    elif ! printf '%s\tgitlab.localhost %s\n' "$ip" "$GITLAB_HOTE_MARQUE" | sudo -n tee -a "$HOSTS" >/dev/null 2>&1; then
+    elif ! printf '%s\n' "$ligne" | sudo -n tee -a "$HOSTS" >/dev/null 2>&1; then
         echo "devzone : gitlab : nom gitlab.localhost non posé dans $HOSTS (sudo -n indisponible ou refusé)" >&2
     fi
     return 0
@@ -289,6 +363,10 @@ gitlab_installer() {
         --timeout "${GITLAB_ATTENTE}s" \
         --wait
 
+    # Relais TCP avant l'attente : curl et git en HTTP résolvent *.localhost
+    # vers la boucle locale et n'atteignent GitLab que par ce relais (#320).
+    gitlab_relais_lancer || return 1
+
     # Nom gitlab.localhost dans /etc/hosts avant l'attente : ssh, glab et
     # getent en ont besoin dès que le service monte (curl, lui, résout seul)
     gitlab_hote_poser || true
@@ -324,7 +402,14 @@ gitlab_installer() {
 
 # ---- desinstaller : retirer GitLab ----
 gitlab_desinstaller() {
+    local port
     echo "▶ Désinstallation de GitLab…"
+
+    # Arrêter les relais TCP avant de supprimer le cluster et les secrets
+    gitlab_relais_arreter
+    for port in $GITLAB_PORTS; do
+        rm -rf "$(relais_dossier "gitlab-$port")"
+    done
 
     # Supprimer le cluster kind gitlab (tout part avec lui)
     kind delete cluster --name "gitlab${INSTANCE_SUFFIX}" 2>/dev/null || true
@@ -387,6 +472,9 @@ case "${1:-}" in
     desinstaller) gitlab_desinstaller ;;
     etat)         gitlab_etat ;;
     seed)         gitlab_seed ;;
+    relais-lancer) gitlab_relais_lancer ;;
+    relais-arreter) gitlab_relais_arreter ;;
+    relais-etat)  gitlab_relais_etat ;;
     hote-poser)   gitlab_hote_poser ;;
     hote-retirer) gitlab_hote_retirer ;;
     *)            echo "devzone : commande inconnue : ${1:-} (devzone gitlab --help)" >&2

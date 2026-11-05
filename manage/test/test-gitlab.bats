@@ -20,9 +20,14 @@ setup() {
     mkdir -p "$HOME/.local/bin" "$DEVZONE_RACINE/workspace/.gitlab" \
         "$BATS_TEST_TMPDIR/bin" "$TMPDIR"
     printf 'jeton-root-secret' >"$DEVZONE_RACINE/workspace/.gitlab/root-token"
+    # Relais 8929/2224 actifs : PID vivant (celui du test) dans leur dossier
+    for port in 8929 2224; do
+        mkdir -p "$DEVZONE_RACINE/workspace/.gitlab-$port"
+        echo $$ >"$DEVZONE_RACINE/workspace/.gitlab-$port/relais.pid"
+    done
     printf 'gitlab%s\n' "$INSTANCE_TEST" >"$KIND_CLUSTERS"
     printf 'kind-gitlab%s\nkind-dev\n' "$INSTANCE_TEST" >"$BATS_TEST_TMPDIR/contextes"
-    printf '127.0.0.1 localhost\n172.17.0.1\tgitlab.localhost # devzone:gitlab\n' >"$DEVZONE_HOSTS"
+    printf '127.0.0.1 localhost\n127.0.0.1\tgitlab.localhost # devzone:gitlab\n' >"$DEVZONE_HOSTS"
     : >"$DEVZONE_ETAT"
     touch "$BATS_TEST_TMPDIR/module_actif"
 
@@ -281,22 +286,25 @@ esac
 exit 0
 GH
 
-    # getent : gitlab.localhost résolu vers l'IP de host.docker.internal
+    # getent : gitlab.localhost vers 127.0.0.1 (relais), hôte en IPv6 par
+    # « hosts » mais IPv4 par « ahostsv4 » (comme Docker Desktop, #320)
     cat >"$BATS_TEST_TMPDIR/bin/getent" <<'GETENT'
 #!/usr/bin/env bash
 echo "getent $*" >>"$BATS_TEST_TMPDIR/getent.log"
 [ -n "${FAUX_GETENT_KO:-}" ] && exit 2
 case "$*" in
-    "hosts host.docker.internal")
-        [ -n "${FAUX_GETENT_HOTE_KO:-}" ] && exit 2
-        echo "172.17.0.1 host.docker.internal"
-        ;;
     "hosts gitlab.localhost")
         if [ -n "${FAUX_GETENT_AUTRE:-}" ]; then
-            echo "127.0.0.1 gitlab.localhost"
-        else
             echo "172.17.0.1 gitlab.localhost"
+        else
+            echo "127.0.0.1 gitlab.localhost"
         fi
+        ;;
+    "ahostsv4 host.docker.internal")
+        echo "172.17.0.1 STREAM host.docker.internal"
+        ;;
+    "hosts host.docker.internal")
+        echo "fdc4:f303:9324::254 host.docker.internal"
         ;;
 esac
 exit 0
@@ -349,20 +357,29 @@ GETENT
     [[ "$output" == *"gitlab.localhost non résolu"* ]] || false
 }
 
-@test "test-gitlab : étape 3 en échec (nom vers 127.0.0.1) → ✖, IP de l'hôte attendue" {
+@test "test-gitlab : étape 3 en échec (nom vers une autre adresse) → ✖, 127.0.0.1 attendu" {
     export FAUX_GETENT_AUTRE=1
     run bash "$SCRIPT"
     [ "$status" -ne 0 ]
     [[ "$output" == *"✖ 3. nom d'hôte"* ]] || false
-    [[ "$output" == *"résolu vers 127.0.0.1, attendu 172.17.0.1 (host.docker.internal)"* ]] || false
+    [[ "$output" == *"résolu vers 172.17.0.1, attendu 127.0.0.1"* ]] || false
 }
 
-@test "test-gitlab : étape 3 en échec (host.docker.internal non résolu) → ✖" {
-    export FAUX_GETENT_HOTE_KO=1
+@test "test-gitlab : étape 3 en échec (relais 2224 arrêté) → ✖ avec la raison" {
+    rm -f "$DEVZONE_RACINE/workspace/.gitlab-2224/relais.pid"
     run bash "$SCRIPT"
     [ "$status" -ne 0 ]
     [[ "$output" == *"✖ 3. nom d'hôte"* ]] || false
-    [[ "$output" == *"host.docker.internal non résolu"* ]] || false
+    [[ "$output" == *"relais gitlab arrêté sur 2224"* ]] || false
+}
+
+@test "test-gitlab : étape 3 en échec (aucun relais) → ✖ avec les deux ports" {
+    rm -f "$DEVZONE_RACINE/workspace/.gitlab-8929/relais.pid"
+    rm -f "$DEVZONE_RACINE/workspace/.gitlab-2224/relais.pid"
+    run bash "$SCRIPT"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"✖ 3. nom d'hôte"* ]] || false
+    [[ "$output" == *"relais gitlab arrêté sur 8929 2224"* ]] || false
 }
 
 @test "test-gitlab : étape 4, création du pipeline impossible → ✖ avec la raison" {

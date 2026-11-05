@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# À chaque démarrage, dans l'ordre : relais du socket Docker (#293),
-# identité git (déduite du compte gh),
-# clusters Kubernetes, nom gitlab.localhost si le module gitlab est actif,
-# relais du module postgres s'il est actif, relais de ports vers le poste,
-# puis récapitulatif de ce qui reste à faire (devzone).
+# À chaque démarrage, dans l'ordre : relais du socket Docker (#293), identité git
+# (déduite du compte gh), clusters Kubernetes, nom gitlab.localhost et relais
+# 8929/2224 du module gitlab s'il est actif, relais du module postgres s'il est
+# actif, relais de ports vers le poste, puis récapitulatif de ce qui reste à
+# faire (devzone).
 # Séquentiel : le récapitulatif voit l'identité tout juste posée ; l'échec
 # d'une étape n'empêche pas les suivantes.
 # Jamais de question (gh, kubectl et ses plugins d'authentification) : sortie
@@ -20,6 +20,9 @@ bash "$ICI/kube-config.sh" || echo "démarrage : clusters non traités (bash $IC
 # par le résolveur système) ; hote-poser n'échoue jamais (avertissement seul)
 if bash "$ICI/devzone" actif gitlab; then
     bash "$ICI/gitlab/gitlab.sh" hote-poser || echo "démarrage : nom gitlab.localhost non posé (bash $ICI/gitlab/gitlab.sh hote-poser)"
+    # Relais TCP 8929/2224 : curl et git en HTTP passent par la boucle locale
+    # pour *.localhost, le relais doit être relancé après chaque démarrage
+    bash "$ICI/gitlab/gitlab.sh" relais-lancer || echo "démarrage : relais gitlab non lancé (devzone appliquer)"
 fi
 # Module postgres actif : le relais (port-forward vers 127.0.0.1:5432) ne
 # survit pas à l'arrêt du conteneur, relancé ici après les clusters
