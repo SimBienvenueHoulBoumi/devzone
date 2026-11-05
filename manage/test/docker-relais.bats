@@ -5,14 +5,11 @@
 # aucun vrai socat, sudo ni kill.
 
 setup() {
+    load commun
     RELAIS="$BATS_TEST_DIRNAME/../../.devcontainer/docker-relais.sh"
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
     T="$BATS_TEST_TMPDIR"
-    export DEVZONE_RELAIS_SOCKET="$T/docker.sock"
-    export DEVZONE_RELAIS_SOURCE="$T/docker-host.sock"
-    export DEVZONE_RELAIS_PID="$T/socat.pid"
-    export DEVZONE_RELAIS_LOG="$T/socat.log"
-    export DEVZONE_RELAIS_MARQUE="$T/relais.echec"
+    relais_docker_isole
     export DEVZONE_RELAIS_SUDO=sudo
     export DEVZONE_RELAIS_ATTENTE=2
     unset DEVZONE_RELAIS_REEL DEVZONE_RELAIS_DOCKER DEVZONE_RELAIS_UTILISATEUR
@@ -39,6 +36,7 @@ echo "kill $*" >>"$BATS_TEST_TMPDIR/outils.log"
 [ "${1:-}" = -0 ] && exit 1
 exit 0
 OUTIL
+
     # setsid -f socat … : journalisé ; le nouveau socat apparaît dans ps
     cat >"$T/bin/setsid" <<'OUTIL'
 #!/usr/bin/env bash
@@ -64,12 +62,13 @@ relais_feature() {
         "$DEVZONE_RELAIS_SOCKET" "$DEVZONE_RELAIS_SOURCE" >"$T/ps.txt"
 }
 
-@test "garde : vrai socket refusé sans DEVZONE_RELAIS_REEL (code 2, rien touché)" {
+@test "garde : vrai socket refusé sous bats même avec DEVZONE_RELAIS_REEL=oui (code 2, rien touché)" {
     export DEVZONE_RELAIS_SOCKET=/var/run/docker.sock
+    export DEVZONE_RELAIS_REEL=oui
     relais_feature
     run bash "$RELAIS"
     [ "$status" -eq 2 ]
-    [[ "$output" == *"DEVZONE_RELAIS_REEL=oui"* ]] || false
+    [[ "$output" == *"docker-relais : refus sous bats (tests)"* ]] || false
     [ ! -s "$T/outils.log" ]
     [ ! -e "$DEVZONE_RELAIS_MARQUE" ]
 }
