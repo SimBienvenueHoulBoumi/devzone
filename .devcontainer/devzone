@@ -670,7 +670,7 @@ worktrees_absents() {
 # État complet : ✔ prêt, ✖ nécessaire, ○ facultatif, ⚠ à corriger ; chaque
 # point à faire avec sa commande (affiché à chaque démarrage)
 etat() {
-    local nom email statut m retards chemin ports_etat relais_marque
+    local nom email statut m retards chemin ports_etat relais_marque ctx_travail ctx_hote
     echo "devzone : état (devzone pour le réafficher)"
     nom="$(git config --get user.name || true)"
     email="$(git config --get user.email || true)"
