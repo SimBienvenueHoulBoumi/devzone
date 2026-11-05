@@ -47,6 +47,21 @@ sauvegarde_de() {
     find "$DZ/.devzone.sauvegarde" -mindepth 1 -maxdepth 1 -type d | head -1
 }
 
+# Manifeste piégé : le chemin doit être ignoré avec un avertissement, et le
+# fichier hors du dossier devzone doit survivre à la mise à jour.
+pieger_manifeste() {
+    local rel="$1"
+    creer_v1
+    mkdir -p "$T/dehors"
+    printf 'secret\n' >"$T/dehors/secret"
+    printf '%064d  %s\n' 0 "$rel" >>"$DZ/.devzone.version"
+    cd "$DZ"
+    run bash "$MAJ" mettre-a-jour --oui --sans-reconstruire
+    [ "$status" -eq 0 ]
+    [ "$(cat "$T/dehors/secret")" = secret ]
+    [[ "$output" == *"devzone : manifeste : chemin refusé : $rel"* ]] || false
+}
+
 @test "création : .devzone.version porte la version et une empreinte par fichier copié" {
     creer_v1
     [ "$(sed -n '1p' "$DZ/.devzone.version")" = "version 0.0.1" ]
@@ -282,6 +297,49 @@ echo moi' ]
     [ "$status" -eq 0 ]
     [[ "$output" == *"Reconstruction non lancée (--sans-reconstruire)"* ]] || false
     [ ! -e "$T/reconstruction.log" ]
+}
+
+@test "manifeste piégé : ../dehors/secret refusé" {
+    pieger_manifeste '../dehors/secret'
+}
+
+@test "manifeste piégé : /etc/x refusé" {
+    pieger_manifeste '/etc/x'
+}
+
+@test "manifeste piégé : a/../../dehors/secret refusé" {
+    pieger_manifeste 'a/../../dehors/secret'
+}
+
+@test "manifeste piégé : .devcontainer/../../dehors/secret refusé" {
+    pieger_manifeste '.devcontainer/../../dehors/secret'
+}
+
+@test "manifeste piégé : workspace/x hors des dossiers gérés refusé" {
+    creer_v1
+    mkdir -p "$T/dehors" "$DZ/workspace"
+    printf 'secret\n' >"$T/dehors/secret"
+    printf 'a moi\n' >"$DZ/workspace/x"
+    printf '%064d  %s\n' 0 'workspace/x' >>"$DZ/.devzone.version"
+    cd "$DZ"
+    run bash "$MAJ" mettre-a-jour --oui --sans-reconstruire
+    [ "$status" -eq 0 ]
+    [ "$(cat "$T/dehors/secret")" = secret ]
+    [ "$(cat "$DZ/workspace/x")" = 'a moi' ]
+    [[ "$output" == *"devzone : manifeste : chemin refusé : workspace/x"* ]] || false
+}
+
+@test "manifeste piégé : lien symbolique sortant refusé" {
+    creer_v1
+    mkdir -p "$T/dehors"
+    printf 'secret\n' >"$T/dehors/secret"
+    ln -s "$T/dehors" "$DZ/.devcontainer/lien"
+    printf '%064d  %s\n' 0 '.devcontainer/lien/secret' >>"$DZ/.devzone.version"
+    cd "$DZ"
+    run bash "$MAJ" mettre-a-jour --oui --sans-reconstruire
+    [ "$status" -eq 0 ]
+    [ "$(cat "$T/dehors/secret")" = secret ]
+    [[ "$output" == *"devzone : manifeste : chemin refusé : .devcontainer/lien/secret"* ]] || false
 }
 
 @test "hors d'un dossier devzone et option inconnue → refus" {
