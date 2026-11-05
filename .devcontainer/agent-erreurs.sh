@@ -57,14 +57,19 @@ modele_ecarte() {
     [ "$(date +%s)" -lt $(( e + ${d:-3600} )) ]
 }
 
-# Attend le retour du réseau : résolution et HTTPS vers opencode.ai, essai toutes les
-# DEVZONE_AGENT_RESEAU_PAS s, pendant DEVZONE_AGENT_RESEAU_MAX s au plus. Rend 0 au retour.
+# Vaut 0 si opencode.ai se résout et répond en HTTPS : un seul essai, sans attente.
+reseau_joignable() {
+    getent hosts opencode.ai >/dev/null 2>&1 && curl -sI --max-time 5 https://opencode.ai >/dev/null 2>&1
+}
+
+# Attend le retour du réseau : essai toutes les DEVZONE_AGENT_RESEAU_PAS s, pendant
+# DEVZONE_AGENT_RESEAU_MAX s au plus. Rend 0 au retour.
 reseau_attendre() {
     local fin
     fin=$(( $(date +%s) + ${DEVZONE_AGENT_RESEAU_MAX:-1800} ))
     echo "=== réseau coupé, attente" >>"$AGENT_JOURNAL"
     while [ "$(date +%s)" -lt "$fin" ]; do
-        if getent hosts opencode.ai >/dev/null 2>&1 && curl -sI --max-time 5 https://opencode.ai >/dev/null 2>&1; then
+        if reseau_joignable; then
             echo "=== réseau revenu" >>"$AGENT_JOURNAL"
             return 0
         fi

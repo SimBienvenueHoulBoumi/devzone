@@ -141,7 +141,7 @@ devzone agent liberer <modèle>|--tous        # lève un écart de modèle
 - **Bascule** selon la cause de l'échec. Le message n'est cherché que dans les 30 dernières lignes de la tentative et seulement si le code de sortie est non nul ou si opencode a écrit sa ligne d'erreur : du code affiché qui contient « Free usage limit » et finit normalement n'est pas un échec.
   - **pays** (« not available in your country ») : modèle écarté 7 jours ;
   - **quota** (« Free usage limit »), **filtre** (« content filter ») et **muet** (rien écrit en 45 s au départ) : modèle écarté 1 h ;
-  - **réseau** (`ENOTFOUND`, `ECONNREFUSED`, `ETIMEDOUT`…) : aucun écart. devzone attend le retour du réseau (essai toutes les 30 s, 30 min au plus, journal « réseau coupé, attente »), puis relance le même modèle. Sans retour : arrêt, « réseau indisponible », code 4 ;
+  - **réseau** (`ENOTFOUND`, `ECONNREFUSED`, `ETIMEDOUT`…) : retenu seulement si le réseau est coupé au moment de l'erreur, sinon traité comme **autre**. Aucun écart. devzone attend le retour du réseau (essai toutes les 30 s, 30 min au plus, journal « réseau coupé, attente »), puis relance le même modèle, 3 fois au plus par modèle ; ensuite modèle suivant. Sans retour : arrêt, « réseau indisponible », code 4 ;
   - autre (« Model is unavailable », « Upstream request failed »…) : modèle suivant, sans écart.
 - **Écarts** : `devzone agent etat` affiche la cause et l'heure de fin de chaque écart ; `devzone agent liberer <modèle>` (ou `--tous`) le lève.
 - Une session figée (rien écrit depuis 10 min) est arrêtée et reprise sur une session neuve, modèle suivant, avec une consigne de reprise (`git status`, `git diff`, `git log`). Tous les modèles écartés : « aucun modèle gratuit disponible », code 3.
