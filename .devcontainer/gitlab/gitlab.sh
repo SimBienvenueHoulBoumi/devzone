@@ -111,7 +111,9 @@ gitlab_seed() {
         fi
     fi
 
-    # Utilisateur dev (testé avant création, mot de passe généré aléatoirement)
+    # Utilisateur dev (testé avant création, mot de passe généré aléatoirement) :
+    # un dev-password existant n'est réutilisé que si l'utilisateur dev existe
+    # encore (vérifié via l'API) ; sinon il est recréé avec un utilisateur nouveau.
     local users_json devpass
     users_json="$(curl -s --header "PRIVATE-TOKEN: $token" "http://gitlab.localhost:8929/api/v4/users?username=dev")"
     if [ "$(jq length <<<"$users_json")" -eq 0 ]; then
@@ -124,9 +126,28 @@ gitlab_seed() {
         chmod 600 "$GITLAB_SECRETS_DIR/dev-password"
     fi
 
-    # Token de runner par POST /api/v4/user/runners (runner_type=instance_type)
-    if [ ! -f "$GITLAB_SECRETS_DIR/runner-token" ]; then
-        local rt_token
+    # Token de runner : vérifié via POST /api/v4/runners/verify ; un jeton valide
+    # est gardé, un jeton refusé (403/404) est recréé, GitLab injoignable arrête le seed.
+    local rt_jeton rt_code rt_token
+    if [ -f "$GITLAB_SECRETS_DIR/runner-token" ]; then
+        rt_jeton="$(cat "$GITLAB_SECRETS_DIR/runner-token")"
+        rt_code="$(curl -s -o /dev/null -w '%{http_code}' --header "PRIVATE-TOKEN: $token" --request POST "http://gitlab.localhost:8929/api/v4/runners/verify" --data "token=${rt_jeton}" || true)"
+        if [ "$rt_code" = "200" ]; then
+            echo "✔ Jeton de runner valide : gardé."
+        elif [ "$rt_code" = "403" ] || [ "$rt_code" = "404" ]; then
+            echo "devzone : jeton de runner d'une installation précédente refusé : recréé."
+            rt_token="$(curl -s --header "PRIVATE-TOKEN: $token" --request POST "http://gitlab.localhost:8929/api/v4/user/runners" --data "runner_type=instance_type" 2>/dev/null | jq -r '.token // empty' || true)"
+            if [ -z "$rt_token" ]; then
+                echo "devzone : seed GitLab : création du jeton de runner (POST /api/v4/user/runners) échouée, arrêt du seed." >&2
+                return 1
+            fi
+            printf '%s' "$rt_token" > "$GITLAB_SECRETS_DIR/runner-token"
+            chmod 600 "$GITLAB_SECRETS_DIR/runner-token"
+        else
+            echo "devzone : seed GitLab : vérification du jeton de runner impossible (code ${rt_code}), arrêt du seed." >&2
+            return 1
+        fi
+    else
         rt_token="$(curl -s --header "PRIVATE-TOKEN: $token" --request POST "http://gitlab.localhost:8929/api/v4/user/runners" --data "runner_type=instance_type" 2>/dev/null | jq -r '.token // empty' || true)"
         if [ -z "$rt_token" ]; then
             echo "devzone : seed GitLab : création du jeton de runner (POST /api/v4/user/runners) échouée, arrêt du seed." >&2

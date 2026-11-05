@@ -64,12 +64,20 @@ case "$*" in
 esac
 exit 0
 DOCKER
-    # curl : API GitLab simulée ; FAUX_GROUPE_KO=1 fait échouer le groupe
+    # curl : API GitLab simulée ; FAUX_GROUPE_KO=1 fait échouer le groupe ;
+    # FAUX_RUNNER_VERIFY_CODE : code HTTP rendu pour /api/v4/runners/verify ;
+    # FAUX_RUNNER_INJOIGNABLE : la vérification du jeton est injoignable (exit 7)
     cat >"$BATS_TEST_TMPDIR/bin/curl" <<'CURL'
 #!/usr/bin/env bash
-echo "curl $*" >>"$BATS_TEST_TMPDIR/curl.log"
+echo "curl $*" | sed -e 's/token=[^ &]*/token=<masque>/g' -e 's/PRIVATE-TOKEN: [^ "]*/PRIVATE-TOKEN: <masque>/g' >>"$BATS_TEST_TMPDIR/curl.log"
 [ -n "${FAUX_GITLAB_KO:-}" ] && exit 7
 case "$*" in
+    *"api/v4/runners/verify"*)
+        if [ -n "${FAUX_RUNNER_INJOIGNABLE:-}" ]; then
+            exit 7
+        fi
+        echo "${FAUX_RUNNER_VERIFY_CODE:-200}"
+        ;;
     *"api/v4/groups/devzone"*)
         [ -n "${FAUX_GROUPE_KO:-}" ] && exit 22
         echo '{"id":42}' ;;
@@ -269,6 +277,55 @@ attendre_journal() {
     [ "$status" -ne 0 ]
     [[ "$output" == *"groupe devzone"* ]] || false
     ! grep -q "gitlab-runner" "$BATS_TEST_TMPDIR/helm.log" || false
+}
+
+@test "gitlab : seed : runner-token présent et vérifié 200 → jeton gardé, pas de création" {
+    mkdir -p "$SECRETS"
+    printf 'jeton-runner-secret' >"$SECRETS/runner-token"
+    export FAUX_RUNNER_VERIFY_CODE=200
+    run bash "$GITLAB" seed
+    [ "$status" -eq 0 ]
+    [ "$(cat "$SECRETS/runner-token")" = "jeton-runner-secret" ]
+    ! grep -q "api/v4/user/runners" "$BATS_TEST_TMPDIR/curl.log" || false
+    [[ "$output" != *"jeton-runner-secret"* ]] || false
+}
+
+@test "gitlab : seed : runner-token présent et refusé 403 → jeton recréé, fichier écrasé" {
+    mkdir -p "$SECRETS"
+    printf 'ancien-jeton-runner' >"$SECRETS/runner-token"
+    export FAUX_RUNNER_VERIFY_CODE=403
+    run bash "$GITLAB" seed
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"refusé : recréé"* ]] || false
+    grep -q "api/v4/user/runners" "$BATS_TEST_TMPDIR/curl.log"
+    [ "$(cat "$SECRETS/runner-token")" = "jeton-runner-secret" ]
+}
+
+@test "gitlab : seed : runner-token absent → jeton créé" {
+    rm -f "$SECRETS/runner-token"
+    run bash "$GITLAB" seed
+    [ "$status" -eq 0 ]
+    [ -f "$SECRETS/runner-token" ]
+    grep -q "api/v4/user/runners" "$BATS_TEST_TMPDIR/curl.log"
+}
+
+@test "gitlab : seed : vérification du jeton de runner injoignable → arrêt du seed" {
+    mkdir -p "$SECRETS"
+    printf 'jeton-runner-secret' >"$SECRETS/runner-token"
+    export FAUX_RUNNER_INJOIGNABLE=1
+    run bash "$GITLAB" seed
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"arrêt du seed"* ]] || false
+}
+
+@test "gitlab : seed : jeton de runner jamais affiché" {
+    mkdir -p "$SECRETS"
+    printf 'jeton-runner-secret' >"$SECRETS/runner-token"
+    export FAUX_RUNNER_VERIFY_CODE=200
+    run bash "$GITLAB" seed
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"jeton-runner-secret"* ]] || false
+    ! grep -q "jeton-runner-secret" "$BATS_TEST_TMPDIR/curl.log" || false
 }
 
 @test "gitlab : désinstaller retire cluster, contexte et secrets, restaure le contexte" {
