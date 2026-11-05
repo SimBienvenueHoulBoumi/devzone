@@ -716,6 +716,8 @@ reparer_element() {
     fi
 }
 
+# Réparations de l'application (#341) : relais Docker, services actifs, ports
+# et identifiants ; un échec n'empêche pas les suivants.
 reparer() {
     reparer_echec=0
     reparer_element "relais Docker" env DEVZONE_RELAIS_REEL=oui bash "$ICI/docker-relais.sh"
