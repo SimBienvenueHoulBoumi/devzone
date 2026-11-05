@@ -10,7 +10,7 @@
 - nom du profil GitHub (sinon le login) ;
 - email noreply `<id>+<login>@users.noreply.github.com` : les commits sont rattachés au compte, l'email personnel n'est pas exposé.
 
-Une identité déjà définie n'est jamais remplacée. Pour un autre email : `git config --file ~/.config/git/config user.email "<email>"`. Après un `gh auth login` en cours de session : `bash .devcontainer/git-identite.sh`.
+Une identité déjà définie n'est jamais remplacée. Pour un autre email : `git config --file ~/.config/git/config user.email "<email>"`. Après un `gh auth login` en cours de session : `devzone demarrer`.
 
 **Assistants IA** (module `ia`, voir [Modules](#modules)) : `devzone activer ia`, puis `claude` (puis `/login`), `opencode auth login`.
 
@@ -93,6 +93,19 @@ devzone desactiver <module>    # désactive et applique tout de suite
 
 Le choix est **propre à chaque devzone** (instance) et gardé dans le dossier `$RACINE/.devzone.modules` (monté de l'hôte, il survit aux rebuilds). Au premier démarrage d'une instance, si une connexion Claude Code ou opencode existe déjà dans les volumes, le module `ia` n'est pas activé : tout est désactivé par défaut et la connexion est signalée une seule fois (« devzone activer ia pour l'utiliser ici »), pas pour un état repris.
 
+### Commandes de l'application
+
+Les scripts internes de `.devcontainer/` ne sont pas des commandes utilisateur : `devzone` les enveloppe.
+
+```bash
+devzone reparer                 # relance relais Docker, gitlab, postgres, ports et identifiants
+devzone demarrer                # démarrage complet (identité git, clusters, relais, récapitulatif)
+devzone metrics [contexte…]     # installe metrics-server sur un cluster local
+devzone utiliser CTX [--confirmer CTX]  # bascule le cluster de travail de kubectl
+```
+
+`reparer` affiche `✔` ou `✖` par élément et rend le code 1 dès qu'un élément échoue. `utiliser` ne modifie jamais le [cluster des services](#cluster-de-devzone) (aucune ligne `cluster=`) : un cluster distant exige `--confirmer CTX` hors terminal.
+
 ### Garde-fou des assistants IA
 
 Avec le module `ia` actif, devzone branche le [garde-fou de repowarden](https://github.com/simdevWarden/repowarden/blob/main/docs/agents.md) pour Claude Code et opencode (`repowarden agents init --global`, à l'activation et à chaque démarrage ; relancé, rien ne change). Dans **tout dépôt** du conteneur, l'agent est arrêté **avant** son action, avec la commande repowarden à lancer à la place, quand il veut modifier `main` ou `develop`, commiter sans `repowarden cc` ou contourner les hooks (`--no-verify`).
@@ -152,7 +165,7 @@ Plusieurs devzone peuvent cohabiter sur une même machine (un par projet, un par
 - **Modules** : **propres à chaque devzone**. L'état vit dans le dossier de l'instance (`$RACINE/.devzone.modules`), monté de l'hôte : un second devzone démarre avec des valeurs par défaut, sans hériter de ceux du premier (un ancien état global, au premier devzone démarré après la mise à jour, est repris une fois, par déplacement).
 - **Plateforme** (GitHub ou GitLab, [voir plus haut](#plateforme-github-ou-gitlab)) : propre à chaque devzone aussi, dans le même fichier d'état, avec l'URL de son instance GitLab.
 - **Connexions** (**GitHub**, **git**, **Claude Code**, **opencode**) et **caches** (**Maven**, **pnpm**) : **partagés volontairement** entre les devzone d'une machine, dans les volumes `devzone-*`.
-- **Isolation complète** : `DEVZONE_VOLUMES=<préfixe>` (comme pour les tests) donne à chaque devzone ses propres volumes.
+- **Isolation complète** : un préfixe de volumes distinct (comme pour les tests) donne à chaque devzone ses propres volumes ; voir « Pour les contributeurs ».
 
 
 ## Travailler sur un projet
@@ -170,15 +183,15 @@ devzone fournit les outils, pas le cluster, et n'en crée jamais tout seul. Avec
 ```bash
 kind create cluster          # ~2 min la première fois
 kubectl config get-contexts  # clusters de l'hôte + clusters kind
-kubectl config use-context <nom>
+devzone utiliser <nom>       # bascule le cluster de travail de kubectl
 ```
 
-- **Cluster actif** : celui de l'hôte par défaut s'il répond (en pratique `docker-desktop`), sinon kind dédié `kind-devzone`. Un choix fait avec `use-context` est gardé aux redémarrages.
+- **Cluster actif** : celui de l'hôte par défaut s'il répond (en pratique `docker-desktop`), sinon kind dédié `kind-devzone`. Un choix fait avec `devzone utiliser` est gardé aux redémarrages.
 - **Clusters kind** : tournent sur le Docker de l'hôte (socket partagé, #291). Leur API écoute sur 127.0.0.1 **du poste**, jamais sur le réseau local ; `kind` (enveloppe de devzone) réécrit l'adresse en `host.docker.internal` dans le kubeconfig du conteneur, en gardant la vérification TLS : un cluster créé à la main par `kind create cluster` est joignable tout de suite. Nom suffixé par instance quand ce n'est pas l'instance par défaut. Ils redémarrent avec Docker Desktop, sont conservés par `make rebuild` et `make down`, et supprimés par `kind delete cluster` (ou `make desinstaller`).
-- **Relais du socket Docker** ([#293](https://github.com/SimBienvenueHoulBoumi/devzone/issues/293)) : sous Docker Desktop, la feature `docker-outside-of-docker` relaie le socket de l'hôte par `socat` sans option `-t`. Un `docker exec` sans entrée standard (kind lance ainsi `kubeadm init`) y est coupé au bout de 0,5 s, avec une sortie tronquée et un code 0 : kind croit l'init réussi (« failed to remove control plane taint … connection refused »). Au démarrage, `.devcontainer/docker-relais.sh` remplace ce relais par le même avec `-t 86400`, puis vérifie qu'un `docker exec` long va au bout. En cas d'échec, une ligne `⚠ relais Docker` apparaît dans le récapitulatif `devzone`, avec la commande à relancer : `DEVZONE_RELAIS_REEL=oui bash .devcontainer/docker-relais.sh`. Le script refuse de toucher au vrai socket sans cette variable. Sous Linux (socket par groupe, sans socat), seul le contrôle est fait.
-- **CPU et RAM dans k9s** (`kubectl top`) : module `kubernetes` actif, metrics-server est installé au démarrage sur les clusters **locaux** qui ne l'ont pas (Docker Desktop, kind…), jamais sur un cluster distant. Après un `kind create cluster` : `bash .devcontainer/metrics-server.sh` (ou `… metrics-server.sh <contexte>` pour un cluster précis).
+- **Relais du socket Docker** ([#293](https://github.com/SimBienvenueHoulBoumi/devzone/issues/293)) : sous Docker Desktop, la feature `docker-outside-of-docker` relaie le socket de l'hôte par `socat` sans option `-t`. Un `docker exec` sans entrée standard (kind lance ainsi `kubeadm init`) y est coupé au bout de 0,5 s, avec une sortie tronquée et un code 0 : kind croit l'init réussi (« failed to remove control plane taint … connection refused »). Au démarrage, devzone remplace ce relais par le même avec `-t 86400`, puis vérifie qu'un `docker exec` long va au bout. En cas d'échec, une ligne `⚠ relais Docker` apparaît dans le récapitulatif `devzone`, avec la commande à relancer : `devzone reparer`. Sous Linux (socket par groupe, sans socat), seul le contrôle est fait.
+- **CPU et RAM dans k9s** (`kubectl top`) : module `kubernetes` actif, metrics-server est installé au démarrage sur les clusters **locaux** qui ne l'ont pas (Docker Desktop, kind…), jamais sur un cluster distant. Après un `kind create cluster` : `devzone metrics` (ou `devzone metrics <contexte>` pour un cluster précis).
 - **Cluster de l'hôte** : `~/.kube` est monté en lecture seule, jamais modifié ; sa copie adaptée est `~/.kube/hote.config` (`127.0.0.1` remplacé par `host.docker.internal`). Après un changement de cluster sur l'hôte : `make stop && make up`.
-- **Messages de démarrage** (`kube-config : …`, `metrics-server : …`, récapitulatif) : dans le terminal de création, ou en relançant `bash .devcontainer/demarrage.sh`.
+- **Messages de démarrage** (`kube-config : …`, `metrics-server : …`, récapitulatif) : dans le terminal de création, ou en relançant `devzone demarrer`.
 
 L'adresse `127.0.0.1` du cluster de l'hôte est réécrite en `host.docker.internal` par `kube-config.sh` au démarrage, rendant le cluster joignable depuis le conteneur. Le certificat de l'API inclut `host.docker.internal` dans ses SAN (configuré via `networking.apiServerAddress` et `kubeadmConfigPatches` dans la config kind).
 
@@ -261,7 +274,7 @@ devzone port --fermer <n>     # retire le relais et le port de l'état
 - **Relais** : conteneur `devzone-<instance>-port-<n>`, étiqueté `devzone.instance=<instance>` et `devzone.port=<n>`, image figée `SOCAT_IMAGE=alpine/socat:1.8.0.3` (`.devcontainer/ports.sh`). Il publie `-p 127.0.0.1:<n>:<n>` seulement, avec `--restart unless-stopped`.
 - **Réseau et IP** : lus par `docker inspect "$(hostname)"` sur le Docker de l'hôte ; le relais rejoint le conteneur par son IP sur son réseau Docker. Conteneur devzone introuvable (Docker de l'hôte absent) : refus clair, code 1.
 - **État** : ligne `ports=8080,3000` dans `$RACINE/.devzone.modules`, triée et sans doublon ; `--fermer` retire le port. Le relais déjà ouvert est idempotent (message, code 0).
-- **Démarrage** : `demarrage.sh` appelle `ports.sh relancer`, qui supprime puis recrée chaque relais de l'état vers l'IP actuelle du conteneur (elle change à chaque redémarrage). Un échec affiche un avertissement sans bloquer le démarrage.
+- **Démarrage** : `devzone demarrer` relance chaque relais de l'état vers l'IP actuelle du conteneur (elle change à chaque redémarrage). Un échec affiche un avertissement sans bloquer le démarrage ; `devzone reparer` le reprend sans redémarrer.
 - **Refus, code 1** : port non numérique ou hors 1-65535 ; Docker de l'hôte injoignable ; port déjà pris sur le poste (échec de `docker run`, « port is already allocated » ou « address already in use »), l'état restant inchangé.
 - **Plusieurs instances** : le nom du relais et l'étiquette portent `DEVZONE_INSTANCE` ; deux instances qui veulent le même port du poste : la seconde reçoit le refus « déjà utilisé ».
 - **Récapitulatif** : ligne `ports vers le poste` avec `8080 ●, 3000 ○`, ou `aucun (devzone port <n>)`.
@@ -273,11 +286,11 @@ devzone port --fermer <n>     # retire le relais et le port de l'état
 Les modules qui déploient un service (`postgres` ; `gitlab` avec #279) s'installent sur **un seul cluster**, choisi une fois et gardé dans l'état (`cluster=` dans `$RACINE/.devzone.modules`).
 
 - **Cluster local vs distant** : un cluster est considéré comme **local** quand son serveur écoute sur une adresse de boucle (`127.0.0.1`, `localhost`, `::1`, `host.docker.internal`) — lu dans la configuration kubeconfig, sans appel réseau. Le cluster kind dédié (`kind-devzone`) est toujours local. Tout autre cluster (serveur sur une adresse distante) est **distant**.
-- **Choix** : à la première activation. `--contexte CTX` d'abord ; sinon, dans un terminal, un menu : le cluster par défaut est le contexte courant du kubeconfig de l'hôte s'il répond et est local (en pratique `docker-desktop`), sinon kind dédié `kind-devzone`. Un choix fait avec `use-context` est gardé aux redémarrages. Le menu propose les clusters **locaux** d'abord, puis le **cluster kind dédié**, enfin les clusters **distants** (marqués « distant ») ; sans terminal : `kind-devzone`. Les clusters de l'hôte n'apparaissent qu'avec le [module `kubernetes`](#kubernetes) actif.
-- **Cluster distant** : choisir un cluster distant nécessite une confirmation en terminal, ou la variable `DEVZONE_CLUSTER_DISTANT=1` sans terminal. Sans confirmation, le choix est refusé. Quand le cluster de devzone est distant, le récapitulatif `devzone` affiche un avertissement `⚠ cluster distant : <contexte>`.
-- **Voir / changer** : `devzone cluster` affiche le cluster et les possibles ; `devzone cluster CTX` y déplace les services actifs (désinstallés de l'ancien, installés sur le nouveau). **Les données ne sont pas migrées** : confirmation en terminal, `--oui` sans terminal.
+- **Choix** : à la première activation. `--contexte CTX` d'abord ; sinon, dans un terminal, un menu : le cluster par défaut est le contexte courant du kubeconfig de l'hôte s'il répond et est local (en pratique `docker-desktop`), sinon kind dédié `kind-devzone`. Le choix est gardé dans l'état et repris aux redémarrages. Le menu propose les clusters **locaux** d'abord, puis le **cluster kind dédié**, enfin les clusters **distants** (marqués « distant ») ; sans terminal : `kind-devzone`. Les clusters de l'hôte n'apparaissent qu'avec le [module `kubernetes`](#kubernetes) actif.
+- **Cluster distant** : choisir un cluster distant nécessite une confirmation en terminal, ou `--confirmer CTX` sans terminal. Sans confirmation exacte, le choix est refusé. Quand le cluster de devzone est distant, le récapitulatif `devzone` affiche un avertissement `⚠ cluster distant : <contexte>`.
+- **Voir / changer** : `devzone cluster` affiche le cluster et les possibles ; `devzone cluster CTX [--confirmer CTX]` y déplace les services actifs (désinstallés de l'ancien, installés sur le nouveau). **Les données ne sont pas migrées** : confirmation en terminal, `--oui` sans terminal.
 - **Cluster de l'hôte** : devzone n'y crée que ses namespaces étiquetés `app.kubernetes.io/managed-by=devzone`, et les supprime à la désactivation. Désactiver le module `kubernetes` rend ce cluster injoignable pour les services.
-- **Contexte courant** : devzone ne change plus le contexte courant de kubectl : les clusters kind sont créés sans basculer dessus. Si tu te retrouves sur un cluster interne (kind-devzone ou kind-gitlab), reviens avec `kubectl config use-context <ton cluster>`.
+- **Contexte courant** : les clusters kind sont créés sans basculer dessus ; `devzone utiliser CTX` bascule seulement le cluster de travail de kubectl, jamais le cluster des services de devzone. Si tu te retrouves sur un cluster interne (kind-devzone ou kind-gitlab), reviens avec `devzone utiliser <ton cluster>`.
 
 ## Données conservées
 
@@ -328,7 +341,7 @@ Dans le conteneur, le récapitulatif `devzone` lit `$RACINE/.devzone.version` et
 | repowarden | `.devcontainer/post-create.sh` : `repowarden@x.y.z` | `devzone appliquer` (ou `make rebuild`) |
 | Claude Code, opencode | `.devcontainer/devzone` : une ligne par paquet, `IA_CLAUDE=@anthropic-ai/claude-code@x.y.z` et `IA_OPENCODE=opencode-ai@x.y.z` | `devzone activer ia` (ou `make rebuild`) |
 | glab (plateforme gitlab) | `.devcontainer/devzone` : `GLAB_VERSION` et les sommes `GLAB_SOMME_ARM64` / `GLAB_SOMME_AMD64` | `rm ~/.local/bin/glab` puis `devzone plateforme gitlab --url URL` |
-| metrics-server | `.devcontainer/metrics-server.sh` : `VERSION` | `bash .devcontainer/metrics-server.sh` sur un nouveau cluster |
+| metrics-server | `.devcontainer/metrics-server.sh` : `VERSION` | `devzone metrics` sur un nouveau cluster |
 | Java, Node, Python, Docker, kubectl, helm, gh | `.devcontainer/devcontainer.json` (features), versions figées dans `devcontainer-lock.json` | `npx @devcontainers/cli upgrade --workspace-folder .` puis `make rebuild` |
 
 Empreinte d'une archive : `curl -fsSL <url> | shasum -a 256`.
@@ -354,14 +367,36 @@ Empreinte d'une archive : `curl -fsSL <url> | shasum -a 256`.
 | PR de livraison restée ouverte | une vérification rouge (voir la PR), `delivery-auto: false`, ou GitHub App absente ou désinstallée (avertissement dans le run `release`) | corriger la vérification ; installer l'App (`repowarden app init` sur ta machine) |
 | `repowarden app init` depuis `make shell` : la page `http://127.0.0.1:…` ne s'ouvre pas, ou GitHub ne revient pas | la page est servie dans le conteneur, injoignable depuis le navigateur de ta machine | lancer la commande **sur ta machine** : `npx -y repowarden app init --repo <compte>/<dépôt>` |
 | `repowarden app init` : « nom déjà utilisé » | un essai précédent a créé l'App sans en récupérer les identifiants | supprimer l'App orpheline (*GitHub → Settings → Developer settings → GitHub Apps*), ou `--nom <autre-nom>` |
-| `git commit` : « Please tell me who you are » | identité git absente | avec GitHub : `gh auth login -s workflow` puis `bash .devcontainer/git-identite.sh` ; sans GitHub : `git config --file ~/.config/git/config user.name "<nom>"` et `user.email "<email>"` |
+| `git commit` : « Please tell me who you are » | identité git absente | avec GitHub : `gh auth login -s workflow` puis `devzone demarrer` ; sans GitHub : `git config --file ~/.config/git/config user.name "<nom>"` et `user.email "<email>"` |
 | `gh auth login` : « Press Enter to open … in your browser », rien ne s'ouvre | pas de navigateur dans le conteneur (`make shell`) | ouvrir https://github.com/login/device à la main et saisir le code |
-| `k9s` : `Error: exit status 1` puis son aide ; `kubectl` : `localhost:8080` … `connection refused` | aucun cluster actif (module `kubernetes` désactivé, ou pas de cluster sur ta machine) | `devzone activer kubernetes` (cluster de ta machine), `kind create cluster`, ou `kubectl config use-context <nom>` |
+| `k9s` : `Error: exit status 1` puis son aide ; `kubectl` : `localhost:8080` … `connection refused` | aucun cluster actif (module `kubernetes` désactivé, ou pas de cluster sur ta machine) | `devzone activer kubernetes` (cluster de ta machine), `kind create cluster`, ou `devzone utiliser <nom>` |
 | `claude` ou `opencode` : « command not found » | module `ia` désactivé | `devzone activer ia` |
 | `devzone` affiche `✖ module ia         en échec : installation incomplète (journal npm : …)` | l'installation de Claude Code ou d'opencode a échoué (réseau, paquet) ; le message d'échec nomme les paquets et le journal npm | lire le journal cité, puis `devzone appliquer` pour réessayer (ou `devzone desactiver ia`) |
 | `devzone activer ia` ou `devzone appliquer` sans rien afficher de neuf pendant plusieurs minutes | installation de Claude Code et opencode (plusieurs centaines de Mo) : annoncée, puis une ligne `… toujours en cours (N s)` toutes les 30 s | attendre la ligne `Claude Code et opencode installés` ou le message d'échec |
-| CPU et RAM vides dans k9s | metrics-server absent du cluster | `bash .devcontainer/metrics-server.sh` |
+| CPU et RAM vides dans k9s | metrics-server absent du cluster | `devzone metrics` |
 | Deux conteneurs devzone | `make up` lancé pendant que VS Code ouvrait le conteneur | `make down`, puis un seul lancement |
 | Windows (Git Bash, MSYS) : `~/.kube` introuvable | `HOME` et `USERPROFILE` concaténés dans le chemin monté | lancer depuis VS Code ou PowerShell |
 | Pas de `~/.kube` sur l'hôte | Docker le crée vide au démarrage (sous Linux avec Docker Engine, il appartient à root) | rien à faire : le conteneur démarre quand même |
+
+## Pour les contributeurs
+
+Les commandes de l'application (`devzone reparer`, `demarrer`, `metrics`,
+`utiliser`) remplacent les scripts directs pour l'utilisateur. Les scripts
+internes restent appelables pendant le développement et par les tests :
+
+```bash
+bash .devcontainer/demarrage.sh
+bash .devcontainer/docker-relais.sh
+bash .devcontainer/metrics-server.sh
+```
+
+Les tests isolent le relais Docker (`DEVZONE_RELAIS_SOCKET=…`,
+`DEVZONE_RELAIS_SOURCE=…`, `DEVZONE_RELAIS_PID=…`, `DEVZONE_RELAIS_LOG=…`,
+`DEVZONE_RELAIS_MARQUE=…`, `DEVZONE_RELAIS_SUDO=`) et Kubernetes
+(`kube_isole` de `manage/test/commun.bash` : `HOME`, `KUBECONFIG` et
+`DEVZONE_KUBE_HOTE` sous le dossier temporaire du test). `cluster.sh` accepte
+`--confirmer CTX` et conserve `DEVZONE_CLUSTER_DISTANT=<contexte>` pour les
+tests et la CI. Un changement de contexte direct (`kubectl config
+use-context CTX`) ne doit être fait que dans un test isolé. L'isolation des
+volumes utilise `DEVZONE_VOLUMES=<préfixe>`.
 

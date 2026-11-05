@@ -736,7 +736,7 @@ KUBE
     run bash "$DEVZONE"
     [ "$status" -eq 0 ] || false
     [[ "$output" == *"⚠ cluster de travail : kind-gitlab"* ]] || false
-    [[ "$output" == *"kubectl config use-context docker-desktop"* ]] || false
+    [[ "$output" == *"devzone utiliser docker-desktop"* ]] || false
 }
 
 @test "état : contexte docker-desktop → pas d'avertissement de cluster de travail" {

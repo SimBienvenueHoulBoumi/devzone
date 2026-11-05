@@ -11,11 +11,11 @@ relais_docker_isole() {
     export DEVZONE_RELAIS_SUDO=""
 }
 
-# Configuration kube de l'utilisateur et de l'hôte sous $BATS_TEST_TMPDIR :
-# aucun test ne lit ni n'écrit le vrai ~/.kube.
+# Aide commune de Kubernetes (#341) : le kubeconfig, le HOME et la copie du
+# kubeconfig de l'hôte restent sous $BATS_TEST_TMPDIR, jamais ceux du poste.
 kube_isole() {
     export HOME="$BATS_TEST_TMPDIR/home"
-    export KUBECONFIG="$HOME/.kube/config"
-    export DEVZONE_KUBE_HOTE="$HOME/.kube/hote.config"
-    mkdir -p "$HOME/.kube"
+    export KUBECONFIG="$BATS_TEST_TMPDIR/kubeconfig"
+    export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
+    mkdir -p "$HOME" "$BATS_TEST_TMPDIR" "$HOME/.kube"
 }

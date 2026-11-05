@@ -18,7 +18,7 @@
 #
 # Sûr par construction : chemins et commandes réglables (tests : tout sous un
 # dossier temporaire), et refus de toucher au vrai socket sans
-# DEVZONE_RELAIS_REEL=oui, que seul demarrage.sh pose.
+# DEVZONE_RELAIS_REEL=oui, que seuls demarrage.sh et devzone reparer posent.
 # Code : 0 contrôle réussi, 1 contrôle en échec (marque écrite pour le
 # récapitulatif devzone), 2 refus de la garde. Compatible bash 3.2.
 set -euo pipefail
@@ -49,7 +49,7 @@ if [ -n "${BATS_TEST_TMPDIR:-}" ] && [ "$SOCKET" = /var/run/docker.sock ]; then
 fi
 
 if [ "$SOCKET" = /var/run/docker.sock ] && [ "${DEVZONE_RELAIS_REEL:-}" != oui ]; then
-    echo "docker-relais : refus de toucher au vrai socket ($SOCKET) sans DEVZONE_RELAIS_REEL=oui" >&2
+    echo "docker-relais : refus de toucher au vrai socket ($SOCKET) : lancer plutôt devzone reparer" >&2
     exit 2
 fi
 

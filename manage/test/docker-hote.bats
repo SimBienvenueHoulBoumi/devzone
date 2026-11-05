@@ -2,7 +2,9 @@
 # Tests du Docker de l'hôte (doublures dans $BATS_TEST_TMPDIR/bin).
 
 setup() {
+    load commun
     export BATS_TEST_TMPDIR="${BATS_TEST_TMPDIR:-/tmp/bats}"
+    kube_isole
     mkdir -p "$BATS_TEST_TMPDIR/bin"
     export HOME="$BATS_TEST_TMPDIR/home"
     mkdir -p "$HOME"
