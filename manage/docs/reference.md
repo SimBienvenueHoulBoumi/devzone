@@ -132,12 +132,19 @@ Claude Code est le **lead** (conception, consignes, relecture, essais, push, sui
 ```bash
 devzone agent <dossier> <fichier-consigne>    # au premier plan
 devzone agent <dossier> <fichier-consigne> &  # plusieurs en parallèle (ou nohup)
-devzone agent etat                            # sessions, modèles écartés
+devzone agent etat                            # sessions, modèles écartés et leur cause
+devzone agent liberer <modèle>|--tous        # lève un écart de modèle
 ```
 
 - **Lancement** : `opencode run --auto -m opencode/<modèle> "<consigne>" < /dev/null` dans le dossier. Le journal est `workspace/.agents/<nom du dossier>.log` (état de devzone, hors dépôt, ignoré par git). `--auto` évite l'attente d'une permission ; `< /dev/null` évite une session muette.
 - **Rotation des modèles gratuits** : `opencode models opencode` fournit la liste (`*-free`, `big-pickle`), avec une liste figée de secours. Un rang partagé et verrouillé fait commencer chaque lancement au modèle suivant : deux sessions simultanées partent sur deux modèles différents.
-- **Bascule** : au message de quota (`Free usage limit`), filtre de contenu, modèle indisponible ou erreur, ou silence au départ (rien écrit en 45 s). Le message n'est cherché que dans les 30 dernières lignes de la tentative et seulement si le code de sortie est non nul ou si opencode a écrit sa ligne d'erreur : du code affiché qui contient « Free usage limit » et finit normalement n'est pas un échec. Un modèle muet est écarté une heure. Une session figée (rien écrit depuis 10 min) est arrêtée et reprise sur une session neuve, modèle suivant, avec une consigne de reprise (`git status`, `git diff`, `git log`). Tous les modèles écartés : « aucun modèle gratuit disponible », code 3.
+- **Bascule** selon la cause de l'échec. Le message n'est cherché que dans les 30 dernières lignes de la tentative et seulement si le code de sortie est non nul ou si opencode a écrit sa ligne d'erreur : du code affiché qui contient « Free usage limit » et finit normalement n'est pas un échec.
+  - **pays** (« not available in your country ») : modèle écarté 7 jours ;
+  - **quota** (« Free usage limit »), **filtre** (« content filter ») et **muet** (rien écrit en 45 s au départ) : modèle écarté 1 h ;
+  - **réseau** (`ENOTFOUND`, `ECONNREFUSED`, `ETIMEDOUT`…) : aucun écart. devzone attend le retour du réseau (essai toutes les 30 s, 30 min au plus, journal « réseau coupé, attente »), puis relance le même modèle. Sans retour : arrêt, « réseau indisponible », code 4 ;
+  - autre (« Model is unavailable », « Upstream request failed »…) : modèle suivant, sans écart.
+- **Écarts** : `devzone agent etat` affiche la cause et l'heure de fin de chaque écart ; `devzone agent liberer <modèle>` (ou `--tous`) le lève.
+- Une session figée (rien écrit depuis 10 min) est arrêtée et reprise sur une session neuve, modèle suivant, avec une consigne de reprise (`git status`, `git diff`, `git log`). Tous les modèles écartés : « aucun modèle gratuit disponible », code 3.
 - **Permissions** : `.devcontainer/opencode/agent.json` est la configuration par défaut, fusionnée avec `OPENCODE_CONFIG_CONTENT` s'il est défini. opencode applique la dernière règle qui correspond : les `deny` de devzone sont ré-ajoutés en dernier après la fusion, donc l'appelant peut ajouter des permissions mais jamais retirer un interdit de devzone. `webfetch` est permis ; `git push`, `git checkout/reset/restore/stash/clean`, `git branch -D`, les écritures GitHub, `gh api`, `curl`, `sudo`, `rm -rf` (sauf `./.essai`) et la gestion des tickets/PR par repowarden (`repowarden ticket …`, `repowarden proteger`, `repowarden run`) sont interdits ; `git commit` reste permis pour `repowarden cc`. `~/bash32` est toujours protégé (le bash 3.2 du conteneur).
 - **Quota des modèles gratuits** : ces modèles sont limités ; la rotation et l'écart d'une heure évitent de bloquer un ticket quand l'un est épuisé. Pour un fournisseur payant : `opencode auth login`.
 

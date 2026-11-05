@@ -8,8 +8,6 @@
 # dossier (le journal et le rang des modèles sont partagés par instance).
 set -euo pipefail
 
-# Dossier du script, liens symboliques suivis à la main : readlink -f n'existe
-# pas sur macOS (tests sous bash 3.2).
 SOURCE="${BASH_SOURCE[0]}"
 while [ -L "$SOURCE" ]; do
     DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
@@ -22,14 +20,13 @@ done
 ICI="$(cd -P "$(dirname "$SOURCE")" && pwd)"
 RACINE="${DEVZONE_RACINE:-$(dirname "$ICI")}"
 
-# Liste de secours si « opencode models opencode » ne répond pas : même ordre
-# que la configuration opencode livrée par devzone.
+# Écarts de modèles et attente du réseau (#328)
+# shellcheck source=agent-erreurs.sh
+# shellcheck disable=SC1091
+. "$ICI/agent-erreurs.sh"
+
 FREE_MODELS=(big-pickle deepseek-v4.1-flash-free glm-5.3-flash-free nemotron-3.5-super-vl-free
     nemotron-3.5-lightning-free mimo-v2.6-flash-free beam-free flint-40b-free nemotron-3-ultra-free)
-ERREURS='Free usage limit|content filter|Model is unavailable|Upstream request failed|ProviderHeaderTimeout|ENOTFOUND'
-# Ligne d'erreur écrite par opencode lui-même : seule une sortie qui la porte
-# (ou un code de sortie non nul) peut être un échec, pas du code affiché.
-LIGNE_ERREUR='(^|[[:space:]])(Error|ERROR|Erreur):'
 SILENCE="${DEVZONE_AGENT_SILENCE:-45}"
 FIGEE="${DEVZONE_AGENT_FIGEE:-600}"
 AGENT_ETAT="${DEVZONE_AGENT_ETAT:-$HOME/.local/state/oc-lancer}"
@@ -74,8 +71,6 @@ configurer() {
     export OPENCODE_CONFIG_CONTENT="$config"
 }
 
-# Modèles gratuits de la version installée, préfixe « opencode/ » retiré :
-# « opencode models opencode » peut rendre « opencode/big-pickle ».
 liste_modeles() {
     local l
     l="$(opencode models opencode 2>/dev/null | sed 's#^opencode/##' |
@@ -91,7 +86,6 @@ journal_de() {
     echo "$RACINE/workspace/.agents/$(basename "$1").log"
 }
 
-# Époque de dernière écriture, GNU (stat -c) ou BSD/macOS (stat -f).
 mtime() {
     if stat -c %Y "$1" >/dev/null 2>&1; then
         stat -c %Y "$1"
@@ -108,9 +102,6 @@ heure() {
     fi
 }
 
-# Rang partagé : deux lancements simultanés ne doivent pas partir sur le même
-# modèle. mkdir est atomique et présent partout (flock manque sur macOS) ;
-# le pid permet de retirer un verrou laissé par un processus tué.
 verrou_prendre() {
     local fin p
     fin=$(( $(date +%s) + 10 ))
@@ -135,17 +126,17 @@ verrou_lacher() {
 }
 
 agent_lancer() {
-    # Module ia requis : sans assistants, rien à diriger.
     if ! bash "$ICI/devzone" actif ia >/dev/null 2>&1; then
         refuse "module ia désactivé : devzone activer ia"
     fi
     local dossier="$1" consigne="$2"
     local journal etat debut m i pid code offset taille demarre freeze
-    local consigne_courante repris=0 maintenant dernier sortie
+    local consigne_courante repris=0 maintenant dernier sortie cause
     [ -d "$dossier" ] || refuse "dossier introuvable : $dossier"
     [ -r "$consigne" ] || refuse "consigne illisible : $consigne"
     configurer
     journal="$(journal_de "$dossier")"
+    export AGENT_JOURNAL="$journal"
     etat="$AGENT_ETAT"
     mkdir -p "$(dirname "$journal")" "$etat"
     FREE_MODELS=()
@@ -159,8 +150,6 @@ agent_lancer() {
     verrou_lacher
 
     consigne_courante="$consigne"
-    # Reprise : une session neuve repart du travail déjà présent (git status,
-    # diff, log), sans historique de conversation.
     reprise() {
         if [ "$repris" = 1 ]; then return 0; fi
         repris=1
@@ -171,9 +160,11 @@ agent_lancer() {
         consigne_courante="$c"
     }
 
-    for i in $(seq 0 $(( ${#FREE_MODELS[@]} - 1 ))); do
+    i=0
+    while [ "$i" -lt "${#FREE_MODELS[@]}" ]; do
         m="${FREE_MODELS[$(( (debut + i) % ${#FREE_MODELS[@]} ))]}"
-        if [ -f "$etat/muet-$m" ] && [ $(( $(date +%s) - $(cat "$etat/muet-$m") )) -lt 3600 ]; then
+        if modele_ecarte "$m"; then
+            i=$(( i + 1 ))
             continue
         fi
         echo "=== modèle opencode/$m début $(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$journal"
@@ -181,8 +172,6 @@ agent_lancer() {
         (cd "$dossier" && opencode run --auto -m "opencode/$m" "$(cat "$consigne_courante")" </dev/null >>"$journal" 2>&1) &
         pid=$!
         demarre=0
-        # Silence au départ : rien écrit pendant SILENCE secondes alors que le
-        # processus vit encore (quota : opencode réessaie sans rien dire).
         local debut_t
         debut_t="$(date +%s)"
         while kill -0 "$pid" 2>/dev/null; do
@@ -195,12 +184,11 @@ agent_lancer() {
             kill "$pid" 2>/dev/null || true
             wait "$pid" 2>/dev/null || true
             echo "=== opencode/$m muet au départ : écarté 1 h, modèle suivant" >>"$journal"
-            date +%s >"$etat/muet-$m"
+            modele_ecarter "$m" mute
             reprise
+            i=$(( i + 1 ))
             continue
         fi
-        # Session figée : plus rien écrit depuis FIGEE secondes en cours de
-        # route → arrêtée, puis session neuve avec la consigne de reprise.
         freeze=0
         if kill -0 "$pid" 2>/dev/null && [ "$demarre" = 1 ]; then
             dernier="$(date +%s)"
@@ -224,6 +212,7 @@ agent_lancer() {
         if [ "$freeze" = 1 ]; then
             echo "=== opencode/$m figé ($FIGEE s sans écrire) : session neuve, modèle suivant" >>"$journal"
             reprise
+            i=$(( i + 1 ))
             continue
         fi
         code=0
@@ -237,14 +226,30 @@ agent_lancer() {
         recent="$(printf '%s\n' "$sortie" | tail -n 30)"
         if [ "$code" -ne 0 ] || printf '%s\n' "$recent" | grep -qE "$LIGNE_ERREUR"; then
             if printf '%s\n' "$recent" | grep -qE "$ERREURS"; then
-                echo "=== opencode/$m refusé ($(printf '%s\n' "$recent" | grep -oE "$ERREURS" | tail -1)) : modèle suivant" >>"$journal"
+                cause="$(erreur_cause "$(printf '%s\n' "$recent" | grep -oE "$ERREURS" | tail -1)")"
+                if [ "$cause" = reseau ]; then
+                    if reseau_attendre; then
+                        reprise
+                        continue
+                    fi
+                    echo "=== réseau indisponible" >>"$journal"
+                    exit 4
+                fi
+                if [ "$cause" = autre ]; then
+                    echo "=== opencode/$m erreur, sans écart : modèle suivant" >>"$journal"
+                else
+                    modele_ecarter "$m" "$cause"
+                    echo "=== opencode/$m écarté ($cause, $(ecart_libelle "$cause")) : modèle suivant" >>"$journal"
+                fi
                 reprise
+                i=$(( i + 1 ))
                 continue
             fi
         fi
         if [ "$code" -ne 0 ]; then
             echo "=== opencode/$m arrêté en erreur (code $code) : modèle suivant" >>"$journal"
             reprise
+            i=$(( i + 1 ))
             continue
         fi
         echo "=== fin avec opencode/$m (code $code)" >>"$journal"
@@ -254,10 +259,8 @@ agent_lancer() {
     exit 3
 }
 
-# Sessions connues (journal, dernier modèle, début, dernier écrit) et modèles
-# écartés par le superviseur, avec l'heure de fin d'écart.
 agent_etat() {
-    local f m debut dernier e vu=0 maintenant
+    local f m debut dernier vu=0
     echo "devzone agent : état"
     for f in "$RACINE"/workspace/.agents/*.log; do
         [ -e "$f" ] || continue
@@ -269,16 +272,7 @@ agent_etat() {
         echo "  session $(basename "$f") : modèle ${m:-inconnu}, depuis ${debut:-inconnu}, dernier écrit $dernier"
     done
     [ "$vu" = 1 ] || echo "  aucune session"
-    maintenant="$(date +%s)"
-    for f in "$AGENT_ETAT"/muet-*; do
-        [ -e "$f" ] || continue
-        m="${f##*/muet-}"
-        e="$(cat "$f" 2>/dev/null || true)"
-        [ -n "$e" ] || continue
-        # Seulement les écarts en cours : fin de l'écart = début + 3600 s
-        [ "$maintenant" -lt "$((e + 3600))" ] || continue
-        echo "  modèle $m écarté jusqu'à $(heure "$((e + 3600))")"
-    done
+    agent_ecarts
 }
 
 agent_aide() {
@@ -287,11 +281,17 @@ usage : devzone agent <dossier> <fichier-consigne>
         lance opencode sur la consigne, modèles gratuits en rotation
         devzone agent etat
         sessions connues et modèles écartés
+        devzone agent liberer [<modèle>|--tous]
+        lève un écart de modèle
 AGENTEOF2
 }
 
 case "${1:-}" in
     etat) agent_etat ;;
+    liberer)
+        [ -n "${2:-}" ] || { agent_aide >&2; exit 2; }
+        ecart_liberer "$2"
+        ;;
     -h | --help | aide) agent_aide ;;
     "")
         agent_aide
