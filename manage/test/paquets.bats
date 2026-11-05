@@ -207,3 +207,42 @@ NPM
     [ "$(wc -l < "$DEVZONE_PAQUETS_MARQUE")" -eq 1 ] || false
     [[ "$(cat "$DEVZONE_PAQUETS_MARQUE")" == "inconnu" ]] || false
 }
+
+@test "paquets : paquet deja installe avant ajouter est marque, retirer ne le desinstalle pas" {
+    printf 'tree\n' >"$BATS_TEST_TMPDIR/installe"
+    run bash "$DEVZONE" paquets ajouter tree
+    [ "$status" -eq 0 ]
+    grep -qxF -e "tree # déjà présent" "$DEVZONE_RACINE/.devzone.paquets"
+    : >"$BATS_TEST_TMPDIR/apt.log"
+    run bash "$DEVZONE" paquets retirer tree
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"laissé installé"* ]] || false
+    ! grep -q "apt-get remove" "$BATS_TEST_TMPDIR/apt.log" || false
+    grep -qx "tree" "$BATS_TEST_TMPDIR/installe"
+    run bash "$DEVZONE" paquets
+    [[ "$output" == *"aucun paquet"* ]] || false
+}
+
+@test "paquets : apres ajouter a, ajouter b, retirer a, un seul en-tete et seulement b" {
+    run bash "$DEVZONE" paquets ajouter tree
+    [ "$status" -eq 0 ]
+    run bash "$DEVZONE" paquets ajouter htop
+    [ "$status" -eq 0 ]
+    run bash "$DEVZONE" paquets retirer tree
+    [ "$status" -eq 0 ]
+    [ "$(grep -c '^#' "$DEVZONE_RACINE/.devzone.paquets")" -eq 1 ]
+    [ "$(grep -v '^#' "$DEVZONE_RACINE/.devzone.paquets")" = "htop" ]
+}
+
+@test "paquets : noms_liste ignore la marque deja present" {
+    printf '# paquets ajoutes par devzone paquets ; reinstalle a chaque creation du conteneur\ntree # déjà présent\nhtop\n' >"$DEVZONE_RACINE/.devzone.paquets"
+    printf 'tree\n' >"$BATS_TEST_TMPDIR/installe"
+    : >"$BATS_TEST_TMPDIR/apt.log"
+    run bash "$DEVZONE" paquets
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"✔ tree"* ]] || false
+    [[ "$output" != *"#"* ]] || false
+    run bash "$DEVZONE" paquets appliquer
+    [ "$status" -eq 0 ]
+    ! grep -q "tree #" "$BATS_TEST_TMPDIR/apt.log" || false
+}

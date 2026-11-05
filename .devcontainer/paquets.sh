@@ -6,7 +6,7 @@
 # s'il est dans cette liste.
 #   paquets.sh ou paquets.sh lister      liste avec l'état de chaque paquet
 #   paquets.sh ajouter <nom>…            valide, installe, ajoute à la liste
-#   paquets.sh retirer <nom>…            retire la liste et désinstalle
+#   paquets.sh retirer <nom>…            retire de la liste et désinstalle (sauf paquet de l'image)
 #   paquets.sh appliquer                 installe tout ce qui manque (post-create.sh)
 # L'état d'un paquet vient de dpkg-query -W -f='${Status}' ; les commandes
 # système passent par des variables surchargeables pour les tests (sudo, apt-get,
@@ -24,6 +24,7 @@ APTCACHE="${DEVZONE_PAQUETS_APTCACHE:-apt-cache}"
 DPKGQUERY="${DEVZONE_PAQUETS_DPKG_QUERY:-dpkg-query}"
 FORMAT="-f=\${Status}"
 ENTETE="# paquets ajoutés par devzone paquets ; réinstallés à chaque création du conteneur"
+PRESENT="# déjà présent"
 
 refuse() { echo "devzone : paquets : $*" >&2; exit 1; }
 
@@ -39,11 +40,41 @@ installe() {
     "$DPKGQUERY" -W "$FORMAT" "$1" 2>/dev/null | grep -q 'install ok installed'
 }
 
-noms_liste() {
+# Lignes de la liste telles quelles (nom, ou nom suivi de la marque PRESENT).
+lignes_liste() {
     [ -f "$LISTE" ] || return 0
     grep -vE '^[[:space:]]*(#|$)' "$LISTE" 2>/dev/null |
-        sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e '/^$/d' -e '/^#/d' |
-        sort -u || true
+        sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e '/^$/d' |
+        sort -k1,1 -u || true
+}
+
+# Noms seuls : la marque de fin de ligne est ignorée.
+noms_liste() {
+    lignes_liste | sed -e 's/[[:space:]]*#.*$//' | sort -u || true
+}
+
+nom_listee() {
+    local nom
+    while IFS= read -r nom; do
+        [ "$nom" = "$1" ] && return 0
+    done < <(noms_liste)
+    return 1
+}
+
+# Vrai si le paquet a été marqué comme déjà présent dans l'image.
+marque_presente() {
+    grep -qxF -e "$1 $PRESENT" "$LISTE" 2>/dev/null
+}
+
+# Réécrit la liste : un seul en-tête, puis les lignes données (triées par nom).
+ecrire_liste() {
+    local tmp
+    tmp="$(mktemp)"
+    {
+        echo "$ENTETE"
+        [ "$#" -eq 0 ] || printf '%s\n' "$@" | sort -k1,1 -u
+    } >"$tmp"
+    mv "$tmp" "$LISTE"
 }
 
 maj_index() {
@@ -75,7 +106,8 @@ lister() {
 
 ajouter() {
     local -a a=()
-    local arg nom tmp
+    local -a entrees=()
+    local arg nom ligne deja=""
     for arg in "$@"; do
         case "$arg" in
             -*) refuse "argument inconnu : $arg (devzone paquets ajouter <nom>…)" ;;
@@ -89,14 +121,29 @@ ajouter() {
             refuse "paquet inconnu : $nom (liste inchangée)"
         fi
     done
+    # Ce qui est déjà installé avant l'installation vient de l'image : marqué.
+    for nom in "${a[@]}"; do
+        if installe "$nom"; then
+            deja="$deja $nom"
+        fi
+    done
     if en_root DEBIAN_FRONTEND=noninteractive "$APT" install -y --no-install-recommends "${a[@]}"; then
-        tmp="$(mktemp)"
-        echo "$ENTETE" >"$tmp"
-        {
-            grep -vE '^[[:space:]]*(#|$)' "$LISTE" 2>/dev/null || true
-            printf '%s\n' "${a[@]}"
-        } | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e '/^$/d' -e '/^#/d' | sort -u >>"$tmp"
-        mv "$tmp" "$LISTE"
+        while IFS= read -r ligne; do
+            entrees+=("$ligne")
+        done < <(lignes_liste)
+        for nom in "${a[@]}"; do
+            if nom_listee "$nom"; then
+                continue
+            fi
+            case " $deja " in
+                *" $nom "*)
+                    entrees+=("$nom $PRESENT")
+                    echo "$nom : déjà présent avant devzone paquets (marqué ; retirer le laissera installé)"
+                    ;;
+                *) entrees+=("$nom") ;;
+            esac
+        done
+        ecrire_liste "${entrees[@]}"
     else
         refuse "installation impossible : ${a[*]} (liste inchangée)"
     fi
@@ -104,8 +151,9 @@ ajouter() {
 
 retirer() {
     local -a a=()
-    local -a pats=()
-    local arg nom n tmp
+    local -a desinstalles=()
+    local -a restantes=()
+    local arg nom ligne nom_ligne
     for arg in "$@"; do
         case "$arg" in
             -*) refuse "argument inconnu : $arg (devzone paquets retirer <nom>…)" ;;
@@ -114,20 +162,28 @@ retirer() {
     done
     [ "${#a[@]}" -gt 0 ] || refuse "retirer attend au moins un nom : devzone paquets retirer <nom>…"
     for nom in "${a[@]}"; do
-        grep -q -x -F -e "$nom" "$LISTE" 2>/dev/null ||
+        nom_listee "$nom" ||
             refuse "paquet non listé : $nom (fourni par l'image ?) : devzone paquets retirer n'ajoute pas les paquets de l'image"
+        if ! marque_presente "$nom"; then
+            desinstalles+=("$nom")
+        fi
     done
-    if en_root "$APT" remove -y "${a[@]}"; then
-        tmp="$(mktemp)"
-        echo "$ENTETE" >"$tmp"
-        for n in "${a[@]}"; do
-            pats+=(-e "$n")
-        done
-        grep -v -x -F "${pats[@]}" "$LISTE" >>"$tmp" || true
-        mv "$tmp" "$LISTE"
-    else
-        refuse "désinstallation impossible : ${a[*]}"
+    if [ "${#desinstalles[@]}" -gt 0 ] && ! en_root "$APT" remove -y "${desinstalles[@]}"; then
+        refuse "désinstallation impossible : ${desinstalles[*]} (liste inchangée)"
     fi
+    for nom in "${a[@]}"; do
+        if marque_presente "$nom"; then
+            echo "$nom : retiré de la liste, laissé installé (présent avant devzone paquets)"
+        fi
+    done
+    while IFS= read -r ligne; do
+        nom_ligne="${ligne%% *}"
+        case " ${a[*]} " in
+            *" $nom_ligne "*) ;;
+            *) restantes+=("$ligne") ;;
+        esac
+    done < <(lignes_liste)
+    ecrire_liste "${restantes[@]+"${restantes[@]}"}"
 }
 
 appliquer() {
