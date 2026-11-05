@@ -159,25 +159,24 @@ etape_etat() {
     return 0
 }
 
-# 3. Nom : ssh et glab passent par le résolveur système, pas par curl ; sans
-# gitlab.localhost dans /etc/hosts, le clone SSH et glab échouent (#273).
-# GitLab tourne sur le Docker de l'hôte (#291) : le nom doit pointer vers
-# l'IP de host.docker.internal, pas vers 127.0.0.1 (gitlab.sh hote-poser).
+# 3. Nom et relais : ssh et glab passent par le résolveur système ; curl et
+# git en HTTP résolvent *.localhost vers la boucle locale sans lire /etc/hosts.
+# gitlab.localhost doit donc pointer vers 127.0.0.1 ET les relais 8929/2224
+# doivent tourner dans le conteneur (gitlab.sh hote-poser, relais-lancer).
 etape_nom() {
-    local hote ip_nom ip_hote
+    local hote ip_nom relais
     hote="$(getent hosts gitlab.localhost 2>/dev/null || true)"
     ip_nom="$(printf '%s\n' "$hote" | awk '{print $1; exit}')"
     if [ -z "$ip_nom" ]; then
         RAISON="gitlab.localhost non résolu (getent hosts)"
         return 1
     fi
-    ip_hote="$(getent hosts host.docker.internal 2>/dev/null | awk '{print $1; exit}')"
-    if [ -z "$ip_hote" ]; then
-        RAISON="host.docker.internal non résolu (getent hosts)"
+    if [ "$ip_nom" != "127.0.0.1" ]; then
+        RAISON="gitlab.localhost résolu vers $ip_nom, attendu 127.0.0.1"
         return 1
     fi
-    if [ "$ip_nom" != "$ip_hote" ]; then
-        RAISON="gitlab.localhost résolu vers $ip_nom, attendu $ip_hote (host.docker.internal)"
+    if ! relais="$(bash "$GITLAB" relais-etat 2>&1)"; then
+        RAISON="gitlab.localhost pointe vers 127.0.0.1, mais ${relais:-relais gitlab arrêté}"
         return 1
     fi
     return 0
