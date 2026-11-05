@@ -138,24 +138,108 @@ sauvegarde_de() {
     [ ! -e "$T/reconstruction.log" ]
 }
 
-@test "ancien dossier sans manifeste avec core/ : inconnue, sauvegarde, arborescences retirées" {
+@test "scripts/ créé par l'utilisateur avec manifeste : gardé intact" {
+    creer_v1
+    mkdir -p "$DZ/scripts"
+    printf '#!/usr/bin/env bash\necho moi\n' >"$DZ/scripts/mon-outil.sh"
+    cd "$DZ"
+    run bash "$MAJ" mettre-a-jour --sans-reconstruire
+    [ "$status" -eq 0 ]
+    [ "$(cat "$DZ/scripts/mon-outil.sh")" = '#!/usr/bin/env bash
+echo moi' ]
+    sauvegarde="$(sauvegarde_de)"
+    [ ! -e "$sauvegarde/scripts/mon-outil.sh" ]
+    [ "$(sed -n '1p' "$DZ/.devzone.version")" = "version 0.0.2" ]
+}
+
+@test "scripts/ créé par l'utilisateur sans manifeste : gardé intact" {
     creer_v1
     rm "$DZ/.devzone.version"
-    mkdir -p "$DZ/core/scripts" "$DZ/scripts" "$DZ/workspace/projet"
-    printf 'vieux core\n' >"$DZ/core/scripts/desinstaller.sh"
-    printf 'vieux scripts\n' >"$DZ/scripts/ancien.sh"
+    mkdir -p "$DZ/scripts"
+    printf 'mon outil\n' >"$DZ/scripts/mon-outil.sh"
+    cd "$DZ"
+    run bash "$MAJ" mettre-a-jour --oui --sans-reconstruire
+    [ "$status" -eq 0 ]
+    [ "$(cat "$DZ/scripts/mon-outil.sh")" = 'mon outil' ]
+    [ "$(sed -n '1p' "$DZ/.devzone.version")" = "version 0.0.2" ]
+}
+
+@test "ancien scripts/ de devzone avec fichier utilisateur : seuls les fichiers de devzone partent" {
+    creer_v1
+    mkdir -p "$DZ/scripts"
+    printf 'vieux desinstaller\n' >"$DZ/scripts/desinstaller.sh"
+    printf 'vieux lancer\n' >"$DZ/scripts/lancer.sh"
+    printf 'mon outil\n' >"$DZ/scripts/mon-outil.sh"
+    cd "$DZ"
+    run bash "$MAJ" mettre-a-jour --oui --sans-reconstruire
+    [ "$status" -eq 0 ]
+    [ ! -e "$DZ/scripts/desinstaller.sh" ]
+    [ ! -e "$DZ/scripts/lancer.sh" ]
+    [ "$(cat "$DZ/scripts/mon-outil.sh")" = 'mon outil' ]
+    sauvegarde="$(sauvegarde_de)"
+    [ "$(cat "$sauvegarde/scripts/desinstaller.sh")" = 'vieux desinstaller' ]
+    [ "$(cat "$sauvegarde/scripts/lancer.sh")" = 'vieux lancer' ]
+    [ ! -e "$sauvegarde/scripts/mon-outil.sh" ]
+}
+
+@test "ancien core/ reconnu : fichiers connus sauvegardés puis arborescence retirée" {
+    creer_v1
+    mkdir -p "$DZ/core/scripts" "$DZ/core/test" "$DZ/core/docs"
+    printf 'vieux devzone\n' >"$DZ/core/devzone"
+    printf 'vieux desinstaller\n' >"$DZ/core/scripts/desinstaller.sh"
+    printf 'vieux test\n' >"$DZ/core/test/ancien.bats"
+    printf 'vieille doc\n' >"$DZ/core/docs/ancien.md"
+    cd "$DZ"
+    run bash "$MAJ" mettre-a-jour --oui --sans-reconstruire
+    [ "$status" -eq 0 ]
+    [ ! -e "$DZ/core" ]
+    sauvegarde="$(sauvegarde_de)"
+    [ "$(cat "$sauvegarde/core/devzone")" = 'vieux devzone' ]
+    [ "$(cat "$sauvegarde/core/scripts/desinstaller.sh")" = 'vieux desinstaller' ]
+    [ "$(cat "$sauvegarde/core/test/ancien.bats")" = 'vieux test' ]
+    [ "$(cat "$sauvegarde/core/docs/ancien.md")" = 'vieille doc' ]
+}
+
+@test "ancien core/ reconnu sans manifeste : inconnu gardé, connus sauvegardés" {
+    creer_v1
+    rm "$DZ/.devzone.version"
+    mkdir -p "$DZ/core/scripts" "$DZ/core/autre" "$DZ/workspace/projet"
+    printf 'vieux desinstaller\n' >"$DZ/core/scripts/desinstaller.sh"
+    printf 'fichier a moi\n' >"$DZ/core/autre/mon-fichier"
     printf 'projet\n' >"$DZ/workspace/projet/fichier"
     cd "$DZ"
-    run bash "$MAJ" mettre-a-jour --oui
+    run bash "$MAJ" mettre-a-jour --oui --sans-reconstruire
     [ "$status" -eq 0 ]
     [[ "$output" == *"inconnue"* ]] || false
-    [ ! -e "$DZ/core" ]
-    [ ! -e "$DZ/scripts" ]
+    [ ! -e "$DZ/core/scripts" ]
+    [ "$(cat "$DZ/core/autre/mon-fichier")" = 'fichier a moi' ]
     sauvegarde="$(sauvegarde_de)"
-    [ "$(cat "$sauvegarde/core/scripts/desinstaller.sh")" = 'vieux core' ]
-    [ "$(cat "$sauvegarde/scripts/ancien.sh")" = 'vieux scripts' ]
+    [ "$(cat "$sauvegarde/core/scripts/desinstaller.sh")" = 'vieux desinstaller' ]
+    [ ! -e "$sauvegarde/core/autre/mon-fichier" ]
     [ "$(cat "$DZ/workspace/projet/fichier")" = projet ]
     [ "$(sed -n '1p' "$DZ/.devzone.version")" = "version 0.0.2" ]
+}
+
+@test "anciennes arborescences sans terminal : refus, rien n'est touché" {
+    creer_v1
+    mkdir -p "$DZ/scripts" "$DZ/core/scripts"
+    printf 'vieux desinstaller\n' >"$DZ/scripts/desinstaller.sh"
+    printf 'vieux lancer\n' >"$DZ/scripts/lancer.sh"
+    printf 'mon outil\n' >"$DZ/scripts/mon-outil.sh"
+    printf 'vieux devzone\n' >"$DZ/core/devzone"
+    printf 'vieux core\n' >"$DZ/core/scripts/desinstaller.sh"
+    cd "$DZ"
+    run bash "$MAJ" mettre-a-jour
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"scripts/desinstaller.sh"* ]] || false
+    [[ "$output" == *"--oui"* ]] || false
+    [ "$(cat "$DZ/scripts/desinstaller.sh")" = 'vieux desinstaller' ]
+    [ "$(cat "$DZ/scripts/lancer.sh")" = 'vieux lancer' ]
+    [ "$(cat "$DZ/scripts/mon-outil.sh")" = 'mon outil' ]
+    [ "$(cat "$DZ/core/devzone")" = 'vieux devzone' ]
+    [ "$(cat "$DZ/core/scripts/desinstaller.sh")" = 'vieux core' ]
+    [ "$(sed -n '1p' "$DZ/.devzone.version")" = "version 0.0.1" ]
+    [ ! -e "$DZ/.devzone.sauvegarde" ]
 }
 
 @test "ancien dossier sans manifeste : tous les fichiers différents sont modifiés → --oui requis" {

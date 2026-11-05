@@ -132,6 +132,35 @@ dans_liste() {
     grep -Fqx -- "$2" "$1"
 }
 
+# Ancienne arborescence de devzone (d'avant manage/) : core/ n'est reconnu que
+# par ses fichiers marqueurs, scripts/ que par les deux siens. Sinon, c'est un
+# dossier de l'utilisateur : jamais touché.
+arbre_ancien() {
+    local dossier="$1" arbre="$2"
+    case "$arbre" in
+        core)
+            [ -f "$dossier/core/devzone" ] || [ -f "$dossier/core/scripts/desinstaller.sh" ]
+            ;;
+        scripts)
+            [ -f "$dossier/scripts/desinstaller.sh" ] && [ -f "$dossier/scripts/lancer.sh" ]
+            ;;
+        *) return 1 ;;
+    esac
+}
+
+# Fichier connu de l'ancien paquet : les noms de manage/scripts/ ramenés dans
+# core/scripts/ ou scripts/, core/devzone, et tout core/test/ et core/docs/.
+fichier_ancien_connu() {
+    local rel="$1" nom
+    case "$rel" in
+        core/devzone | core/test/* | core/docs/*) return 0 ;;
+        core/scripts/*) nom="${rel#core/scripts/}" ;;
+        scripts/*) nom="${rel#scripts/}" ;;
+        *) return 1 ;;
+    esac
+    [ -f "$PAQUET/manage/scripts/$nom" ]
+}
+
 completer_gitignore() {
     local dossier="$1" ligne
     touch "$dossier/.gitignore"
@@ -186,6 +215,7 @@ mettre_a_jour() {
     : >"$travail/modifies"
     : >"$travail/sauver"
     : >"$travail/supprimer"
+    : >"$travail/arbres"
     while IFS= read -r rel; do
         [ -f "$dossier/$rel" ] || continue
         printf '%s\n' "$rel" >>"$travail/sauver"
@@ -212,11 +242,18 @@ mettre_a_jour() {
     done <"$liste_anciens"
     for ancien in core scripts; do
         [ -d "$dossier/$ancien" ] || continue
+        arbre_ancien "$dossier" "$ancien" || continue
+        printf '%s\n' "$ancien" >>"$travail/arbres"
         while IFS= read -r f; do
             rel="${f#"$dossier"/}"
             protege "$rel" && continue
+            # Un fichier inconnu de l'ancien paquet appartient à l'utilisateur
+            fichier_ancien_connu "$rel" || continue
+            printf '%s\n' "$rel" >>"$travail/supprimer"
             printf '%s\n' "$rel" >>"$travail/sauver"
-            [ -f "$dossier/.devzone.version" ] || printf '%s\n' "$rel" >>"$travail/modifies"
+            # Toujours confirmé : la suppression d'un fichier de l'ancien paquet
+            # est un changement, même avec un manifeste
+            printf '%s\n' "$rel" >>"$travail/modifies"
         done < <(find "$dossier/$ancien" -type f -print)
     done
     LC_ALL=C sort -u "$travail/modifies" >"$travail/modifies.tri"
@@ -278,10 +315,12 @@ mettre_a_jour() {
         [ -f "$dossier/$rel" ] || continue
         rm -f -- "$dossier/$rel"
     done <"$travail/supprimer"
-    for ancien in core scripts; do
-        [ -e "$dossier/$ancien" ] || continue
-        rm -rf -- "${dossier:?}/$ancien"
-    done
+    while IFS= read -r ancien; do
+        [ -n "$ancien" ] || continue
+        [ -d "$dossier/$ancien" ] || continue
+        # Seuls les dossiers devenus vides sont retirés, jamais leur contenu
+        find "$dossier/$ancien" -depth -type d -empty -delete
+    done <"$travail/arbres"
 
     # 6. Nouveau manifeste, puis reconstruction proposée
     ecrire_manifeste "$dossier"
