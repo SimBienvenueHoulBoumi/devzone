@@ -6,9 +6,11 @@
 # $BATS_TEST_TMPDIR/<outil>.log.
 
 setup() {
+    load commun
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
     GITLAB="$BATS_TEST_DIRNAME/../../.devcontainer/gitlab/gitlab.sh"
     DEMARRAGE="$BATS_TEST_DIRNAME/../../.devcontainer/demarrage.sh"
+    relais_docker_isole
     export HOME="$BATS_TEST_TMPDIR/home"
     export DEVZONE_RACINE="$BATS_TEST_TMPDIR/racine"
     export DEVZONE_ETAT="$BATS_TEST_TMPDIR/modules"
@@ -642,6 +644,10 @@ SUDO
 }
 
 @test "demarrage : gitlab actif → ligne posée, inactif → rien" {
+    # Isolation (#346) : le relais Docker tourne sous $BATS_TEST_TMPDIR, la
+    # marque réelle du poste n'est jamais touchée
+    [[ "$DEVZONE_RELAIS_MARQUE" == "$BATS_TEST_TMPDIR"/* ]] || false
+    [ ! -e /tmp/devzone-relais-docker.echec ]
     # Module inactif : rien n'est posé
     printf 'gitlab=off\n' >"$DEVZONE_ETAT"
     run bash "$DEMARRAGE"
@@ -657,6 +663,10 @@ SUDO
     grep -q 'TCP-LISTEN:8929,bind=127.0.0.1' "$BATS_TEST_TMPDIR/socat.log"
     attendre_journal "$BATS_TEST_TMPDIR/socat.log" 'TCP-LISTEN:2224,bind=127.0.0.1'
     grep -q 'TCP-LISTEN:2224,bind=127.0.0.1' "$BATS_TEST_TMPDIR/socat.log"
+    # Isolation (#346) : le relais Docker tourne sous $BATS_TEST_TMPDIR, la
+    # marque réelle du poste n'est jamais touchée
+    [[ "$DEVZONE_RELAIS_MARQUE" == "$BATS_TEST_TMPDIR"/* ]] || false
+    [ ! -e /tmp/devzone-relais-docker.echec ]
 }
 
 @test "gitlab : valeurs — host sans port, port externe par GITLAB_PORT" {
