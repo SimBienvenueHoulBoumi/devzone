@@ -7,9 +7,11 @@
 # Bibliothèque sourcée : l'appelant définit RACINE et ETAT.
 #   cluster_lu                       contexte choisi, rien s'il n'y en a pas
 #   cluster_ecrire CTX               garde le choix dans l'état
-#   cluster_candidats                clusters de l'hôte joignables, puis kind dédié
-#   cluster_choisir [CTX]            CTX validé, sinon choix gardé, sinon menu
-#                                    (terminal seulement), sinon défaut
+#   cluster_est_local CTX            0 si cluster local (config, sans réseau)
+#   cluster_candidats                locaux, puis kind dédié, puis distants
+#   cluster_choisir [CTX]            CTX validé (distant : confirmation),
+#                                    sinon choix gardé, sinon menu
+#                                    (terminal seulement), sinon défaut local
 #   cluster_preparer CTX             crée le cluster kind dédié s'il manque
 #   cluster_liberer CTX              supprime le kind dédié devenu vide
 #   kube_joignable_depuis_conteneur FICHIER   réécrit 127.0.0.1/localhost
@@ -60,20 +62,53 @@ cluster_est_dedie() {
     [ "$1" = "${CLUSTER_DEDIE}" ]
 }
 
+# Cluster local : lu dans la configuration KUBECONFIG, sans appel réseau.
+# Le kind dédié est toujours local ; un cluster de l'hôte l'est si son
+# serveur écoute sur une adresse de boucle (127.0.0.1, localhost, ::1,
+# host.docker.internal).
+cluster_est_local() {
+    local ctx="$1" cluster serveur hote
+    cluster_est_dedie "$ctx" && return 0
+    cluster="$(kubectl config view -o jsonpath="{.contexts[?(@.name==\"$ctx\")].context.cluster}" 2>/dev/null || true)"
+    [ -n "$cluster" ] || return 0
+    serveur="$(kubectl config view -o jsonpath="{.clusters[?(@.name==\"$cluster\")].cluster.server}" 2>/dev/null || true)"
+    [ -n "$serveur" ] || return 0
+    hote="${serveur#https://}"
+    hote="${hote#http://}"
+    hote="${hote%%:*}"
+    case "$hote" in
+        127.0.0.1 | localhost | ::1 | host.docker.internal) return 0 ;;
+    esac
+    return 1
+}
+
 cluster_joignable() {
     kubectl --context "$1" --request-timeout=3s get --raw /readyz >/dev/null 2>&1
 }
 
-# Contextes de l'hôte d'abord (joignables), puis le kind dédié en dernier
+# Contextes de l'hôte : locaux d'abord, puis le kind dédié, enfin les distants
 cluster_candidats() {
     local hote="${DEVZONE_KUBE_HOTE:-$HOME/.kube/hote.config}" c
     if [ -f "$hote" ]; then
+        # 1. Clusters locaux de l'hôte (serveur sur une adresse de boucle)
         for c in $(KUBECONFIG="$hote" kubectl config get-contexts -o name 2>/dev/null); do
             cluster_est_dedie "$c" && continue
-            cluster_joignable "$c" && echo "$c"
+            if cluster_est_local "$c" && cluster_joignable "$c"; then
+                echo "$c"
+            fi
         done
     fi
+    # 2. Cluster kind dédié
     echo "$CLUSTER_DEDIE"
+    if [ -f "$hote" ]; then
+        # 3. Clusters distants de l'hôte
+        for c in $(KUBECONFIG="$hote" kubectl config get-contexts -o name 2>/dev/null); do
+            cluster_est_dedie "$c" && continue
+            if ! cluster_est_local "$c" && cluster_joignable "$c"; then
+                echo "$c"
+            fi
+        done
+    fi
     return 0
 }
 
@@ -86,8 +121,10 @@ cluster_menu() {
         for c in "${candidats[@]}"; do
             if cluster_est_dedie "$c"; then
                 echo "  $i) $c   cluster kind dédié, dans le conteneur (défaut)"
+            elif cluster_est_local "$c"; then
+                echo "  $i) $c   cluster local"
             else
-                echo "  $i) $c   cluster de l'hôte"
+                echo "  $i) $c   cluster distant"
             fi
             i=$((i + 1))
         done
@@ -113,13 +150,33 @@ cluster_interactif() {
 }
 
 cluster_choisir() {
-    local voulu="${1:-}" c
+    local voulu="${1:-}" c reponse
     if [ -n "$voulu" ]; then
         while IFS= read -r c; do
-            [ "$c" = "$voulu" ] && { echo "$voulu"; return 0; }
+            [ "$c" = "$voulu" ] && break
         done < <(cluster_candidats)
-        echo "devzone : cluster inconnu ou injoignable : $voulu ; possibles : $(cluster_candidats | tr '\n' ' ')" >&2
-        return 2
+        if [ "$c" != "$voulu" ]; then
+            echo "devzone : cluster inconnu ou injoignable : $voulu ; possibles : $(cluster_candidats | tr '\n' ' ')" >&2
+            return 2
+        fi
+        # Distant : confirmation requise (sauf DEVZONE_CLUSTER_DISTANT)
+        if ! cluster_est_local "$voulu"; then
+            if [ -z "${DEVZONE_CLUSTER_DISTANT:-}" ]; then
+                if cluster_interactif; then
+                    printf 'Utiliser le cluster distant %s ? [o/N] ' "$voulu" >&2
+                    read -r reponse || reponse=""
+                    case "$reponse" in
+                        o | O | oui) ;;
+                        *) echo "devzone : cluster distant refusé : $voulu" >&2; return 2 ;;
+                    esac
+                else
+                    echo "devzone : cluster distant refusé : $voulu (DEVZONE_CLUSTER_DISTANT pour confirmer)" >&2
+                    return 2
+                fi
+            fi
+        fi
+        echo "$voulu"
+        return 0
     fi
     c="$(cluster_lu)"
     if [ -n "$c" ]; then
@@ -127,12 +184,12 @@ cluster_choisir() {
     elif cluster_interactif; then
         cluster_menu
     else
-        # Défaut : cluster de l'hôte s'il répond, sinon kind dédié
+        # Défaut : local seulement (jamais distant par défaut)
         local hote_choix=""
         if [ -f "${DEVZONE_KUBE_HOTE:-$HOME/.kube/hote.config}" ]; then
             hote_choix="$(KUBECONFIG="${DEVZONE_KUBE_HOTE:-$HOME/.kube/hote.config}" kubectl config current-context 2>/dev/null || true)"
         fi
-        if [ -n "$hote_choix" ] && cluster_joignable "$hote_choix"; then
+        if [ -n "$hote_choix" ] && cluster_est_local "$hote_choix" && cluster_joignable "$hote_choix"; then
             echo "$hote_choix"
         else
             echo "$CLUSTER_DEDIE"
