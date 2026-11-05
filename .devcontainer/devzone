@@ -331,6 +331,8 @@ appliquer_gitlab() {
             echo "devzone : gitlab déjà actif, rien à faire."
             # /etc/hosts régénéré par Docker : gitlab.localhost re-pose ici aussi
             bash "$ICI/gitlab/gitlab.sh" hote-poser
+            # Échec d'un ancien passage effacé : gitlab est prêt (#366)
+            rm -f "$(fichier_echec gitlab)"
         else
             echo "devzone : gitlab activation via installer…"
             if ! bash "$ICI/gitlab/gitlab.sh" installer; then
