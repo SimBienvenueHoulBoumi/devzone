@@ -83,3 +83,13 @@ setup() {
     [ "$status" -eq 0 ]
     [ "$output" = ".password" ]
 }
+
+@test "demarrage : appelle password.sh regenerer avant le récapitulatif" {
+    local demarrage="$BATS_TEST_DIRNAME/../../.devcontainer/demarrage.sh"
+    local ligne_password ligne_recapitulatif
+    ligne_password="$(grep -n 'bash "$ICI/password.sh" regenerer' "$demarrage" | cut -d: -f1)"
+    ligne_recapitulatif="$(grep -n '^bash "$ICI/devzone"$' "$demarrage" | cut -d: -f1)"
+    [ -n "$ligne_password" ]
+    [ -n "$ligne_recapitulatif" ]
+    [ "$ligne_password" -lt "$ligne_recapitulatif" ]
+}
