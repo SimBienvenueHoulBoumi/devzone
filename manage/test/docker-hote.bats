@@ -94,6 +94,13 @@ echo "kubectl $*" >>"$BATS_TEST_TMPDIR/kubectl.log"
 case "$*" in
     *"config get-contexts -o name"*) echo "docker-desktop" ;;
     *"config current-context"*) echo "docker-desktop" ;;
+    *"config view"*)
+        nom=""
+        for c in docker-desktop; do
+            if [[ "$*" == *\"$c\"* ]]; then nom="$c"; break; fi
+        done
+        if [[ "$*" == *'.cluster.server'* ]]; then echo "https://127.0.0.1:6443"; else echo "$nom"; fi
+        ;;
     *"get --raw /readyz"*)
         if [ "${FAUX_HOTE_REPOND:-1}" = 1 ]; then exit 0; else exit 1; fi
         ;;

@@ -35,6 +35,13 @@ echo "kubectl $*" >>"$BATS_TEST_TMPDIR/kubectl.log"
 T="$BATS_TEST_TMPDIR"
 case "$*" in
     *"config get-contexts -o name"*) echo "docker-desktop" ;;
+    *"config view"*)
+        nom=""
+        for c in docker-desktop; do
+            if [[ "$*" == *\"$c\"* ]]; then nom="$c"; break; fi
+        done
+        if [[ "$*" == *'.cluster.server'* ]]; then echo "https://127.0.0.1:6443"; else echo "$nom"; fi
+        ;;
     *"get --raw /readyz"*)
         case "$*" in *"--context ${FAUX_INJOIGNABLE:-aucun} "*) exit 1 ;; esac ;;
     *"get namespace devzone-postgres"*) [ -f "$T/ns" ]; exit $? ;;
