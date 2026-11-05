@@ -35,6 +35,9 @@ case "$*" in
                 docker-desktop) echo "https://127.0.0.1:6443" ;;
                 cluster-prod) echo "https://example.org:6443" ;;
                 kind-devzone) echo "https://127.0.0.1:6443" ;;
+                kind-gitlab) echo "https://gitlab-control-plane:6443" ;;
+                cluster-ipv6) echo "https://[::1]:6443" ;;
+                sans-serveur) echo "" ;;
                 *) echo "https://127.0.0.1:6443" ;;
             esac
         else
@@ -117,7 +120,7 @@ faux_kind() {
     ) || false
 }
 
-@test "cluster_est_local : contexte inconnu est local (indéterminable)" {
+@test "cluster_est_local : contexte inconnu est distant" {
     faux_kubectl
     (
         export DEVZONE_INSTANCE=devzone
@@ -125,8 +128,73 @@ faux_kind() {
         export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
         source "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
         run cluster_est_local inconnu
-        [ "$status" -eq 0 ]
-    )
+        [ "$status" -ne 0 ] || false
+    ) || false
+}
+
+@test "cluster_est_local : sans serveur est distant" {
+    faux_kubectl
+    printf 'sans-serveur\n' >"$BATS_TEST_TMPDIR/hote.contexts"
+    (
+        export DEVZONE_INSTANCE=devzone
+        export ETAT="$BATS_TEST_TMPDIR/etat"
+        export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
+        source "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
+        run cluster_est_local sans-serveur
+        [ "$status" -ne 0 ] || false
+    ) || false
+}
+
+@test "cluster_est_local : kind-gitlab (gitlab-control-plane) est local" {
+    faux_kubectl
+    printf 'kind-gitlab\n' >"$BATS_TEST_TMPDIR/hote.contexts"
+    (
+        export DEVZONE_INSTANCE=devzone
+        export ETAT="$BATS_TEST_TMPDIR/etat"
+        export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
+        source "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
+        run cluster_est_local kind-gitlab
+        [ "$status" -eq 0 ] || false
+    ) || false
+}
+
+@test "cluster_est_local : docker-desktop local par le nom" {
+    faux_kubectl
+    printf 'docker-desktop\n' >"$BATS_TEST_TMPDIR/hote.contexts"
+    (
+        export DEVZONE_INSTANCE=devzone
+        export ETAT="$BATS_TEST_TMPDIR/etat"
+        export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
+        source "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
+        run cluster_est_local docker-desktop
+        [ "$status" -eq 0 ] || false
+    ) || false
+}
+
+@test "cluster_est_local : kind-x local par le nom" {
+    faux_kubectl
+    printf 'kind-x\n' >"$BATS_TEST_TMPDIR/hote.contexts"
+    (
+        export DEVZONE_INSTANCE=devzone
+        export ETAT="$BATS_TEST_TMPDIR/etat"
+        export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
+        source "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
+        run cluster_est_local kind-x
+        [ "$status" -eq 0 ] || false
+    ) || false
+}
+
+@test "cluster_est_local : serveur IPv6 bracket local" {
+    faux_kubectl
+    printf 'cluster-ipv6\n' >"$BATS_TEST_TMPDIR/hote.contexts"
+    (
+        export DEVZONE_INSTANCE=devzone
+        export ETAT="$BATS_TEST_TMPDIR/etat"
+        export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
+        source "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
+        run cluster_est_local cluster-ipv6
+        [ "$status" -eq 0 ] || false
+    ) || false
 }
 
 @test "cluster_candidats : ordre locaux, kind dédié, distants" {
@@ -242,11 +310,63 @@ faux_kind() {
         export DEVZONE_INSTANCE=devzone
         export ETAT="$BATS_TEST_TMPDIR/etat"
         export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
-        export DEVZONE_CLUSTER_DISTANT=1
+        export DEVZONE_CLUSTER_DISTANT=cluster-prod
         source "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
         run cluster_choisir cluster-prod </dev/null
-        [ "$status" -eq 0 ]
-        [ "$output" = "cluster-prod" ]
+        [ "$status" -eq 0 ] || false
+        [ "$output" = "cluster-prod" ] || false
+    ) || false
+}
+
+@test "cluster_choisir : DEVZONE_CLUSTER_DISTANT autre refusé" {
+    faux_kubectl
+    faux_kind
+    FAUX_INJOIGNABLE=aucun
+    printf 'cluster-prod\n' >"$BATS_TEST_TMPDIR/hote.contexts"
+    printf 'cluster-prod\thttps://example.org:6443\n' >"$BATS_TEST_TMPDIR/hote.servers"
+    (
+        export DEVZONE_INSTANCE=devzone
+        export ETAT="$BATS_TEST_TMPDIR/etat"
+        export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
+        export DEVZONE_CLUSTER_DISTANT=autre
+        source "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
+        run cluster_choisir cluster-prod </dev/null
+        [ "$status" -eq 2 ] || false
+        [[ "$output" == *"cluster distant refusé"* ]] || false
+    ) || false
+}
+
+@test "cluster_choisir : confirmation saisie exacte acceptée" {
+    faux_kubectl
+    faux_kind
+    FAUX_INJOIGNABLE=aucun
+    printf 'cluster-prod\n' >"$BATS_TEST_TMPDIR/hote.contexts"
+    printf 'cluster-prod\thttps://example.org:6443\n' >"$BATS_TEST_TMPDIR/hote.servers"
+    (
+        export DEVZONE_INTERACTIF=1
+        export DEVZONE_INSTANCE=devzone
+        export ETAT="$BATS_TEST_TMPDIR/etat"
+        export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
+        source "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
+        run cluster_choisir cluster-prod <<<"cluster-prod"
+        [ "$status" -eq 0 ] || false
+    ) || false
+}
+
+@test "cluster_choisir : confirmation o refusé" {
+    faux_kubectl
+    faux_kind
+    FAUX_INJOIGNABLE=aucun
+    printf 'cluster-prod\n' >"$BATS_TEST_TMPDIR/hote.contexts"
+    printf 'cluster-prod\thttps://example.org:6443\n' >"$BATS_TEST_TMPDIR/hote.servers"
+    (
+        export DEVZONE_INTERACTIF=1
+        export DEVZONE_INSTANCE=devzone
+        export ETAT="$BATS_TEST_TMPDIR/etat"
+        export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
+        source "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
+        run cluster_choisir cluster-prod <<<"o"
+        [ "$status" -eq 2 ] || false
     ) || false
 }
 

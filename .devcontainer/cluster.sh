@@ -70,14 +70,25 @@ cluster_est_local() {
     local ctx="$1" cluster serveur hote
     cluster_est_dedie "$ctx" && return 0
     cluster="$(kubectl config view -o jsonpath="{.contexts[?(@.name==\"$ctx\")].context.cluster}" 2>/dev/null || true)"
-    [ -n "$cluster" ] || return 0
+    [ -n "$cluster" ] || return 1
     serveur="$(kubectl config view -o jsonpath="{.clusters[?(@.name==\"$cluster\")].cluster.server}" 2>/dev/null || true)"
-    [ -n "$serveur" ] || return 0
-    hote="${serveur#https://}"
-    hote="${hote#http://}"
-    hote="${hote%%:*}"
+    [ -n "$serveur" ] || return 1
+    # Règle par le nom (ancienne règle de metrics-server.sh)
+    case "$ctx" in
+        kind-* | docker-desktop | rancher-desktop | orbstack | minikube) return 0 ;;
+    esac
+    # Extraction de l'hôte (adresses IPv6 entre crochets gérées)
+    hote="${serveur#*://}"
+    hote="${hote%%/*}"
+    if [[ "$hote" == \[* ]]; then
+        hote="${hote#[}"
+        hote="${hote%%]*}"
+    else
+        hote="${hote%%:*}"
+    fi
     case "$hote" in
         127.0.0.1 | localhost | ::1 | host.docker.internal) return 0 ;;
+        *-control-plane) return 0 ;;
     esac
     return 1
 }
@@ -159,20 +170,23 @@ cluster_choisir() {
             echo "devzone : cluster inconnu ou injoignable : $voulu ; possibles : $(cluster_candidats | tr '\n' ' ')" >&2
             return 2
         fi
-        # Distant : confirmation requise (sauf DEVZONE_CLUSTER_DISTANT)
+        # Distant : confirmation requise (sauf DEVZONE_CLUSTER_DISTANT exact)
         if ! cluster_est_local "$voulu"; then
-            if [ -z "${DEVZONE_CLUSTER_DISTANT:-}" ]; then
-                if cluster_interactif; then
-                    printf 'Utiliser le cluster distant %s ? [o/N] ' "$voulu" >&2
-                    read -r reponse || reponse=""
-                    case "$reponse" in
-                        o | O | oui) ;;
-                        *) echo "devzone : cluster distant refusé : $voulu" >&2; return 2 ;;
-                    esac
-                else
-                    echo "devzone : cluster distant refusé : $voulu (DEVZONE_CLUSTER_DISTANT pour confirmer)" >&2
+            if [ -n "${DEVZONE_CLUSTER_DISTANT:-}" ]; then
+                if [ "${DEVZONE_CLUSTER_DISTANT}" != "$voulu" ]; then
+                    echo "devzone : cluster distant refusé : $voulu (DEVZONE_CLUSTER_DISTANT doit valoir exactement $voulu)" >&2
                     return 2
                 fi
+            elif cluster_interactif; then
+                printf 'cluster distant : %s ; tape son nom pour confirmer : ' "$voulu" >&2
+                read -r reponse || reponse=""
+                if [ "$reponse" != "$voulu" ]; then
+                    echo "devzone : cluster distant refusé : $voulu" >&2
+                    return 2
+                fi
+            else
+                echo "devzone : cluster distant refusé : $voulu (DEVZONE_CLUSTER_DISTANT pour confirmer)" >&2
+                return 2
             fi
         fi
         echo "$voulu"
