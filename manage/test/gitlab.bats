@@ -142,6 +142,19 @@ PGREP
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
 }
 
+attendre_journal() {
+    local fichier="$1" motif="$2" i=0
+    while [ "$i" -lt 50 ]; do
+        if grep -q -- "$motif" "$fichier" 2>/dev/null; then
+            return 0
+        fi
+        i=$((i + 1))
+        sleep 0.1
+    done
+    echo "$fichier : ligne absente après 5 s : $motif" >&2
+    return 1
+}
+
 @test "gitlab : désactivé par défaut" {
     run bash "$DEVZONE"
     [ "$status" -eq 0 ]
@@ -353,7 +366,9 @@ PGREP
 @test "gitlab : relais lancé vers l'IPv4 de l'hôte, pas l'IPv6" {
     run bash "$GITLAB" relais-lancer
     [ "$status" -eq 0 ]
+    attendre_journal "$BATS_TEST_TMPDIR/socat.log" 'TCP-LISTEN:8929,bind=127.0.0.1,fork,reuseaddr TCP:192.168.65.254:8929'
     grep -q 'TCP-LISTEN:8929,bind=127.0.0.1,fork,reuseaddr TCP:192.168.65.254:8929' "$BATS_TEST_TMPDIR/socat.log"
+    attendre_journal "$BATS_TEST_TMPDIR/socat.log" 'TCP-LISTEN:2224,bind=127.0.0.1,fork,reuseaddr TCP:192.168.65.254:2224'
     grep -q 'TCP-LISTEN:2224,bind=127.0.0.1,fork,reuseaddr TCP:192.168.65.254:2224' "$BATS_TEST_TMPDIR/socat.log"
     ! grep -q 'fdc4:f303' "$BATS_TEST_TMPDIR/socat.log" || false
 }
@@ -438,7 +453,9 @@ SUDO
     [ "$status" -eq 0 ]
     grep -q 'devzone:gitlab' "$DEVZONE_HOSTS"
     grep -q $'^127\.0\.0\.1\tgitlab\.localhost # devzone:gitlab$' "$DEVZONE_HOSTS"
+    attendre_journal "$BATS_TEST_TMPDIR/socat.log" 'TCP-LISTEN:8929,bind=127.0.0.1'
     grep -q 'TCP-LISTEN:8929,bind=127.0.0.1' "$BATS_TEST_TMPDIR/socat.log"
+    attendre_journal "$BATS_TEST_TMPDIR/socat.log" 'TCP-LISTEN:2224,bind=127.0.0.1'
     grep -q 'TCP-LISTEN:2224,bind=127.0.0.1' "$BATS_TEST_TMPDIR/socat.log"
 }
 
