@@ -380,6 +380,64 @@ Un paquet installe a la main (`sudo apt install tree`) est perdu au prochain reb
 
 La liste est relue au post-create et affiche dans le recap (`⚠ paquets : …`) l'etat des paquets non installes. `devzone paquets appliquer` peut etre relance.
 
+## Sortie machine
+
+Deux commandes affichent leur état sous forme d'objet JSON, pour les extensions
+VS Code et les autres outils. La sortie texte n'est pas changée : ajoute
+`--json` à la commande de ton choix.
+
+- **Rien à faire, aucun secret** : chaque point à traiter a sa commande
+  `devzone` prête à lancer (champ `commande`, `null` si rien à faire) ; aucun
+  jeton, aucun mot de passe, jamais le contenu des identifiants (chemin seul,
+  via le champ `identifiants`).
+- **Robuste** : chaque rubrique est calculée à part. Si l'une échoue, sa valeur
+  est `null`, le champ `erreurs` explique pourquoi, le JSON reste valide et le
+  code de sortie vaut 0.
+- **Stable et versionné** : les noms de champs sont en français, sans accent ni
+  espace. Ajouter un champ reste dans `schema: 1` ; retirer ou renommer un champ
+  fait passer `schema` à 2 : fonde ta lecture dessus.
+
+`devzone etat --json` (le récapitulatif complet, rubrique par rubrique) :
+
+```json
+{
+  "schema": 1,
+  "devzone": { "version": "0.22.0", "disponible": "0.23.0" },
+  "identite_git": { "ok": true, "nom": "…", "email": "…", "commande": null },
+  "plateforme": { "nom": "github", "url": null,
+                  "github": { "connecte": true, "workflow": true, "commande": null } },
+  "outils": { "retards": [ { "paquet": "…", "figee": "…", "installee": "…" } ], "commande": "devzone appliquer" },
+  "modules": [ { "nom": "postgres", "actif": true, "description": "…", "etat": "prêt sur docker-desktop…",
+                 "echec": null, "commande": null } ],
+  "clusters": { "services": "docker-desktop", "services_distant": false,
+                "travail": "docker-desktop", "travail_interne": false, "commande": null },
+  "ports": [ { "port": 8080, "actif": true, "application": "…" } ],
+  "identifiants": "/workspaces/devzone/.password",
+  "alertes": [ { "code": "relais_docker", "message": "…", "commande": "devzone reparer" } ],
+  "erreurs": {}
+}
+```
+
+Les alertes possibles : `relais_docker`, `paquets`, `worktree`,
+`cluster_distant` (services sur un cluster distant), `cluster_interne`
+(cluster de travail de devzone, revenir avec `devzone utiliser <ton cluster>`).
+
+`devzone agent etat --json` (sessions, écarts, droits modifiés) :
+
+```json
+{
+  "schema": 1,
+  "sessions": [ { "journal": "dz-337.log", "modele": "beam-free", "debut": "2026-11-06T13:17:33Z",
+                  "dernier_ecrit": "2026-11-06 13:20:14", "en_cours": true } ],
+  "ecarts": [ { "modele": "crouton-alpha-free", "cause": "pays", "fin": "2026-11-13T13:24:50Z" } ],
+  "alertes_droits": [ "dz-361" ]
+}
+```
+
+`en_cours` vaut `true` quand une session d'agent travaille encore sur ce
+dossier. Un écart (`quota`, `pays`, `muet`…) prend fin à la date `fin` : un
+outil peut relancer la consigne ensuite avec `devzone agent`.
+
 ## Dépannage
 
 | Symptôme | Cause | Solution |
