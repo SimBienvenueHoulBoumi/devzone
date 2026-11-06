@@ -70,13 +70,13 @@ diagnostic() {
     wait "$p1" || s1=$?
     s2=0
     wait "$p2" || s2=$?
-    [ "$s1" -eq 0 ] || { diagnostic; false; }
-    [ "$s2" -eq 0 ] || { diagnostic; false; }
-    grep -q '^=== modèle opencode/' "$j1" || { diagnostic; false; }
-    grep -q '^=== modèle opencode/' "$j2" || { diagnostic; false; }
-    ! grep -q "aucun modèle gratuit disponible" "$j1" || { diagnostic; false; }
-    ! grep -q "aucun modèle gratuit disponible" "$j2" || { diagnostic; false; }
-    [ "$(premier_modele "$j1")" != "$(premier_modele "$j2")" ] || { diagnostic; false; }
+    [ "$s1" -eq 0 ]
+    [ "$s2" -eq 0 ]
+    grep -q '^=== modèle opencode/' "$j1" || false
+    grep -q '^=== modèle opencode/' "$j2" || false
+    ! grep -q "aucun modèle gratuit disponible" "$j1" || false
+    ! grep -q "aucun modèle gratuit disponible" "$j2" || false
+    [ "$(premier_modele "$j1")" != "$(premier_modele "$j2")" ]
 }
 
 @test "agent : trois lancements simultanes -> aucun ne s'arrete faute de modele" {
@@ -95,13 +95,13 @@ diagnostic() {
     wait "$p2" || s2=$?
     s3=0
     wait "$p3" || s3=$?
-    [ "$s1" -eq 0 ] || { diagnostic; false; }
-    [ "$s2" -eq 0 ] || { diagnostic; false; }
-    [ "$s3" -eq 0 ] || { diagnostic; false; }
+    [ "$s1" -eq 0 ]
+    [ "$s2" -eq 0 ]
+    [ "$s3" -eq 0 ]
     for j in projet-trois projet-quatre projet-cinq; do
         journal="$DEVZONE_RACINE/workspace/.agents/$j.log"
-        grep -q '^=== modèle opencode/' "$journal" || { diagnostic; false; }
-        ! grep -q "aucun modèle gratuit disponible" "$journal" || { diagnostic; false; }
+        grep -q '^=== modèle opencode/' "$journal" || false
+        ! grep -q "aucun modèle gratuit disponible" "$journal" || false
     done
 }
 
@@ -124,20 +124,20 @@ diagnostic() {
     wait "$p1" || s1=$?
     s2=0
     wait "$p2" || s2=$?
-    [ "$s1" -eq 0 ] || { diagnostic; false; }
-    [ "$s2" -eq 0 ] || { diagnostic; false; }
-    [ "$(premier_modele "$j1")" = "big-pickle" ] || { diagnostic; false; }
-    [ "$(premier_modele "$j2")" = "big-pickle" ] || { diagnostic; false; }
-    ! grep -q "aucun modèle gratuit disponible" "$j1" || { diagnostic; false; }
-    ! grep -q "aucun modèle gratuit disponible" "$j2" || { diagnostic; false; }
+    [ "$s1" -eq 0 ]
+    [ "$s2" -eq 0 ]
+    [ "$(premier_modele "$j1")" = "big-pickle" ]
+    [ "$(premier_modele "$j2")" = "big-pickle" ]
+    ! grep -q "aucun modèle gratuit disponible" "$j1" || false
+    ! grep -q "aucun modèle gratuit disponible" "$j2" || false
     echo "$(date +%s) quota 3600" >"$DEVZONE_AGENT_ETAT/ecart-big-pickle"
     j3="$DEVZONE_RACINE/workspace/.agents/projet-huit.log"
     lancer_fond "$DEVZONE_RACINE/workspace/projet-huit" "$BATS_TEST_TMPDIR/huit.out"
     p3="$AGENT_PID"
     s3=0
     wait "$p3" || s3=$?
-    [ "$s3" -eq 3 ] || { diagnostic; false; }
-    grep -q "aucun modèle gratuit disponible" "$j3" || { diagnostic; false; }
+    [ "$s3" -eq 3 ]
+    grep -q "aucun modèle gratuit disponible" "$j3" || false
 }
 
 @test "agent : journal trace la prise du rang (=== rang debut/total)" {
@@ -145,6 +145,12 @@ diagnostic() {
     mkdir -p "$DEVZONE_RACINE/workspace/projet-rang"
     journal="$DEVZONE_RACINE/workspace/.agents/projet-rang.log"
     bash "$DEVZONE" agent "$DEVZONE_RACINE/workspace/projet-rang" "$DEVZONE_RACINE/workspace/consigne.txt" >"$BATS_TEST_TMPDIR/rang.out" 2>&1
-    [ "$?" -eq 0 ] || { diagnostic; false; }
-    grep -qE '^=== rang [0-9]+/[0-9]+$' "$journal" || { diagnostic; false; }
+    [ "$?" -eq 0 ] || false
+    grep -qE '^=== rang [0-9]+/[0-9]+$' "$journal" || false
+}
+
+# Après un test en échec seulement (BATS_TEST_COMPLETED vide) : les faits
+# visibles en CI (#385), sans changer les assertions.
+teardown() {
+    [ -n "${BATS_TEST_COMPLETED:-}" ] || diagnostic
 }
