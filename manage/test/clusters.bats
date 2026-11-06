@@ -150,6 +150,32 @@ KUBE
     [ "$before" -eq "$after" ] || false
 }
 
+@test "invite : marqueurs non imprimables autour des couleurs" {
+    faux_kubectl
+    printf 'docker-desktop\n' >"$BATS_TEST_TMPDIR/contexts"
+    printf 'docker-desktop\n' >"$BATS_TEST_TMPDIR/current"
+    # shellcheck disable=SC1091
+    source "$BATS_TEST_DIRNAME/../../.devcontainer/invite-kube.sh"
+    run devzone_invite_kube
+    [ "$status" -eq 0 ]
+    [[ "$output" == *$'\001\033[36m\002'* ]] || false
+    [[ "$output" == *$'\001\033[0m\002'* ]] || false
+}
+
+@test "invite : aucun effet de bord sur le shell appelant" {
+    faux_kubectl
+    printf 'docker-desktop\n' >"$BATS_TEST_TMPDIR/contexts"
+    printf 'docker-desktop\n' >"$BATS_TEST_TMPDIR/current"
+    # shellcheck disable=SC1091
+    source "$BATS_TEST_DIRNAME/../../.devcontainer/invite-kube.sh"
+    run devzone_invite_kube
+    [ "$status" -eq 0 ]
+    [ -z "${ICI+x}" ] || false
+    [ -z "${ETAT+x}" ] || false
+    [ -z "${CLUSTER_DEDIE+x}" ] || false
+    ! declare -F cluster_est_local || false
+}
+
 @test "post-create : bloc invite une seule fois" {
     script="$BATS_TEST_DIRNAME/../../.devcontainer/post-create.sh"
     [ "$(grep -c '# >>> devzone invite >>>' "$script")" -eq 1 ] || false

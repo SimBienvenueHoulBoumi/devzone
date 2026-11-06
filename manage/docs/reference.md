@@ -300,6 +300,7 @@ Les modules qui déploient un service (`postgres` ; `gitlab` avec #279) s'instal
 - **Voir / changer** : `devzone cluster` affiche le cluster et les possibles ; `devzone cluster CTX [--confirmer CTX]` y déplace les services actifs (désinstallés de l'ancien, installés sur le nouveau). **Les données ne sont pas migrées** : confirmation en terminal, `--oui` sans terminal.
 - **Cluster de l'hôte** : devzone n'y crée que ses namespaces étiquetés `app.kubernetes.io/managed-by=devzone`, et les supprime à la désactivation. Désactiver le module `kubernetes` rend ce cluster injoignable pour les services.
 - **Contexte courant** : les clusters kind sont créés sans basculer dessus ; `devzone utiliser CTX` bascule seulement le cluster de travail de kubectl, jamais le cluster des services de devzone. Si tu te retrouves sur un cluster interne (kind-devzone ou kind-gitlab), reviens avec `devzone utiliser <ton cluster>`.
+- **Namespace** : pour un contexte du poste (ceux de `hote.config`, recopié depuis le poste à chaque démarrage), le namespace fixé par `devzone utiliser -n` ne survit pas à un redémarrage ; pour les clusters kind du conteneur, il est gardé jusqu'au rebuild.
 
 - **Deux notions** : `★` marque le cluster de travail de kubectl (kubectl, k9s, helm), `●` le cluster des services de devzone (`devzone cluster`). Un contexte peut porter les deux marques. `devzone clusters` affiche la vue.
 - **Rebuild** : `le choix de kubectl` écrit dans `~/.kube/config`, qui n'est pas dans un volume ; un rebuild repart sur le cluster de l'hôte.

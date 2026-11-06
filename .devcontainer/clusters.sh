@@ -4,7 +4,6 @@ ICI="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if ! declare -F cluster_est_local >/dev/null 2>&1; then
     # shellcheck source=SCRIPTDIR/cluster.sh
     # shellcheck disable=SC1091
-    # shellcheck disable=SC1091
     . "$ICI/cluster.sh"
 fi
 

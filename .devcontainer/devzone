@@ -11,7 +11,7 @@
 #   devzone demarrer                 démarrage complet (scripts de démarrage et récapitulatif)
 #   devzone metrics [contexte…]      installe metrics-server (kubectl top, k9s)
 #   devzone utiliser CTX [--confirmer CTX]  bascule le cluster de travail de kubectl
-#   devzone clusters                    vue des clusters connectes (travail et services)
+#   devzone clusters                 vue des clusters connectés (travail et services)
 #   devzone actif <module>           code 0 si actif (scripts de démarrage)
 #   devzone test-bash32             lance les tests bats sous bash 3.2 (conteneur Docker)
 #   devzone test-gitlab             essai de bout en bout du module et de la plateforme GitLab
