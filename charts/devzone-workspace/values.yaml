@@ -1,0 +1,33 @@
+replicaCount: 1
+
+image:
+  repository: ghcr.io/simbienvenuehoulboumi/devzone-workspace
+  tag: ""
+  pullPolicy: IfNotPresent
+
+sidecar:
+  image: docker:27-dind
+  privileged: true
+
+resources:
+  limits:
+    cpu: "2"
+    memory: "4Gi"
+  requests:
+    cpu: "500m"
+    memory: "1Gi"
+
+persistence:
+  workspace:
+    size: 20Gi
+    storageClass: ""
+  etat:
+    size: 10Gi
+    storageClass: ""
+
+serviceAccount:
+  name: devzone-workspace
+  create: true
+
+networkPolicy:
+  enabled: true
