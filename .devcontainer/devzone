@@ -426,7 +426,8 @@ confirmer_suppression_postgres() {
 # déplace (désinstallés de l'ancien, installés sur le nouveau : données non
 # migrées, d'où la confirmation)
 changer_cluster() {
-    local voulu="" oui="" confirmer="" attendre="" arg actuel nouveau reponse
+    local voulu="" oui="" confirmer="" attendre="" arg actuel nouveau reponse ctx_ancien ctx_new NS
+    NS=devzone-postgres
     for arg in "$@"; do
         if [ -n "$attendre" ]; then
             confirmer="$arg"
@@ -465,26 +466,45 @@ changer_cluster() {
         echo "devzone : déjà sur $nouveau, rien à faire."
         return 0
     fi
+    ctx_ancien="$actuel"
+    ctx_new="$nouveau"
     if [ "$(valeur postgres)" = on ]; then
         if [ -z "$oui" ]; then
             if ! cluster_interactif; then
-                echo "devzone : les bases postgres seront supprimées de $actuel (non migrées) : devzone cluster $nouveau --oui" >&2
+                echo "devzone : les bases postgres seront supprimées de $ctx_ancien (non migrées) : devzone cluster $ctx_new --oui" >&2
                 return 1
             fi
-            printf 'postgres sera réinstallé sur %s, ses bases supprimées de %s (non migrées). Continuer ? [o/N] ' "$nouveau" "$actuel" >&2
+            printf 'postgres sera réinstallé sur %s, ses bases supprimées de %s (non migrées). Continuer ? [o/N] ' "$ctx_new" "$ctx_ancien" >&2
             read -r reponse || reponse=""
             case "$reponse" in
                 o | O | oui) ;;
                 *) echo "Abandon : rien n'a changé."; return 0 ;;
             esac
         fi
-        bash "$ICI/postgres/postgres.sh" desinstaller
-        cluster_ecrire "$nouveau"
-        appliquer_postgres on
+        # Retire PostgreSQL de l'ancien cluster (contexte explicite)
+        export KUBECONFIG="$HOME/.kube/config:$HOME/.kube/hote.config"
+        kubectl --context "$ctx_ancien" delete namespace "$NS" --wait=true >/dev/null 2>&1 || true
+        cluster_liberer "$ctx_ancien"
+        # Le nouveau cluster devient le contexte devzone
+        cluster_ecrire "$ctx_new"
+        # Pose le contexte devzone sur le nouveau cluster (cluster + user :
+        # commande importante, échec affiché et rendu #396)
+        if ! contexte_devzone_poser "$ctx_new"; then
+            echo "devzone : impossible de poser le contexte devzone sur $ctx_new" >&2
+            return 1
+        fi
+        # Installe PostgreSQL sur le nouveau cluster (via --context devzone qui pointe maintenant dessus)
+        bash "$ICI/postgres/postgres.sh" installer
     else
-        cluster_ecrire "$nouveau"
+        cluster_ecrire "$ctx_new"
+        # Pose le contexte devzone sur le nouveau cluster (cluster + user :
+        # commande importante, échec affiché et rendu #396)
+        if ! contexte_devzone_poser "$ctx_new"; then
+            echo "devzone : impossible de poser le contexte devzone sur $ctx_new" >&2
+            return 1
+        fi
     fi
-    echo "devzone : cluster des services : $nouveau"
+    echo "devzone : cluster des services : $ctx_new"
 }
 
 # ---- Plateforme : GitHub (défaut) ou GitLab (#240) ----
@@ -968,6 +988,11 @@ etat() {
             fi
             ;;
     esac
+    # Contrôle RBAC : vérification d'accès aux secrets PostgreSQL
+    ctx_rbac="$(kubectl auth can-i --as=system:serviceaccount:default:default get secrets -n devzone-postgres 2>/dev/null || true)"
+    if [ "$ctx_rbac" = "yes" ]; then
+        printf '  ⚠ rbac          : accès aux secrets devzone-postgres non restreint\n'
+    fi
     ports_etat="$(bash "$ICI/ports.sh" resume 2>/dev/null || true)"
     case "$ports_etat" in
         aucun*) printf '  ○ ports vers le poste %s\n' "$ports_etat" ;;

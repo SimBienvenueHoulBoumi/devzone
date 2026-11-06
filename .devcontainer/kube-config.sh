@@ -29,6 +29,7 @@ rm -f "$HOTE"
 if [ "$module" = on ] && [ -f "$SOURCE" ]; then
     install -m 600 "$SOURCE" "$HOTE"
     kube_joignable_depuis_conteneur "$HOTE"
+    contexte_devzone_poser
 fi
 
 # Réécriture de 127.0.0.1/localhost → host.docker.internal pour les clusters

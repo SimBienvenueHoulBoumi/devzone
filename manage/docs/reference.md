@@ -305,6 +305,28 @@ Les modules qui déploient un service (`postgres` ; `gitlab` avec #279) s'instal
 - **Deux notions** : `★` marque le cluster de travail de kubectl (kubectl, k9s, helm), `●` le cluster des services de devzone (`devzone cluster`). Un contexte peut porter les deux marques. `devzone clusters` affiche la vue.
 - **Rebuild** : `le choix de kubectl` écrit dans `~/.kube/config`, qui n'est pas dans un volume ; un rebuild repart sur le cluster de l'hôte.
 
+### Cluster des services et contexte devzone
+
+- **Cluster unique** : tous les services (PostgreSQL, GitLab, etc.) vivent sur un seul cluster choisi via `devzone cluster CTX`. Le choix est gardé dans l'état (`cluster=` dans `$RACINE/.devzone.modules`) et survivre aux redémarrages.
+- **Contexte devzone** : le contexte `devzone` de kubectl est posé sur le cluster des services (cluster + user extraits du contexte courant). Il est restauré sur le nouveau cluster quand `devzone cluster` déplace les services. Voir `changer_cluster` dans `cluster.sh`.
+- **Déplacement de cluster** : `devzone cluster CTX [--oui]` déplace PostgreSQL : suppression dans l'ancien cluster, installation dans le nouveau. Les données ne sont pas migrées, d'où la confirmation requise.
+- **Contextes locaux vs distants** : un cluster est local quand son serveur écoute sur une adresse de boucle (`127.0.0.1`, `localhost`, `::1`, `host.docker.internal`) — lu dans la configuration kubeconfig, sans appel réseau. Le cluster kind dédié (`kind-devzone`) est toujours local. Tout autre cluster (serveur sur une adresse distante) est distant. Le choix par défaut est d'abord le contexte courant de l'hôte (en pratique `docker-desktop`), puis kind dédié `kind-devzone`.
+- **Cluster distant** : choisir un cluster distant nécessite une confirmation en terminal, ou `--confirmer CTX` sans terminal. Sans confirmation exacte, le choix est refusé. Quand le cluster de devzone est distant, le récapitulatif `devzone` affiche un avertissement `⚠ cluster distant : <contexte>`.
+- **Namespace** : pour un contexte du poste (ceux de `hote.config`, recopié depuis le poste à chaque démarrage), le namespace fixé par `devzone utiliser -n` ne survit pas à un redémarrage ; pour les clusters kind du conteneur, il est gardé jusqu'au rebuild.
+
+### Isolement
+
+- **NetworkPolicy `devzone-meme-namespace`** : pose une règle isolante dans un namespace : seuls les pods du même namespace peuvent joindre les services devzone (PostgreSQL, etc.). Cette règle est gérée par `devzone postgres autoriser <ns>` et `devzone postgres interdire <ns>`.
+- **Que couvre l'isolation** :
+  - Empêche qu'une application dans un namespace extérieur n'accède aux services PostgreSQL ou autres services devzone.
+  - Permet à une application dans le même namespace de joindre les services sans restriction.
+  - Les règles sont gérées via `kubectl --context devzone -n <ns> patch networkpolicy devzone-meme-namespace`.
+- **Limites de l'isolation** :
+  - Ne contrôle pas l'accès au niveau des bases de données PostgreSQL (c'est géré par les rôles et mots de passe PostgreSQL).
+  - Ne s'applique pas aux cluster de l'hôte sans configuration explicite.
+  - Les règles NetworkPolicy peuvent être retirées par `devzone postgres interdire <ns>`.
+- **Vérification** : `devzone clusters` montre « isolé (NetworkPolicy) » pour le cluster des services, ⚠ si la règle manque dans un `devzone-*`.
+
 ## Données conservées
 
 Le conteneur est jetable ; ce qui compte vit dans des volumes Docker, sur ta machine.

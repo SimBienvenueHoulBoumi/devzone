@@ -64,6 +64,15 @@ clusters_afficher() {
     rm -rf "$tmp"
     echo
     echo "★ cluster de travail (kubectl, k9s, helm) · ● cluster des services de devzone (devzone cluster)"
+    # Affichage de l'état d'isolation NetworkPolicy pour le cluster des services
+    if [ -n "$ctx_services" ] && cluster_est_local "$ctx_services"; then
+        if kubectl --context "$ctx_services" get networkpolicy devzone-meme-namespace -n devzone-postgres >/dev/null 2>&1; then
+            printf '  ✔ isolé (NetworkPolicy) → %s\n' "$ctx_services"
+        else
+            printf '  ⚠ isolé (NetworkPolicy manquant) → %s\n' "$ctx_services"
+        fi
+        printf '  devzone → %s\n' "$ctx_services"
+    fi
     return 0
 }
 

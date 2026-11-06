@@ -18,6 +18,10 @@ ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
 # shellcheck source=SCRIPTDIR/../password.sh
 # shellcheck disable=SC1091
 . "$ICI/../password.sh"
+# Isolation réseau : namespace_isoler, d'où viennent les NetworkPolicies
+# shellcheck source=SCRIPTDIR/../isolement.sh
+# shellcheck disable=SC1091
+. "$ICI/../isolement.sh"
 
 NS=devzone-postgres
 SECRETS="$RACINE/workspace/.postgres"
@@ -44,11 +48,11 @@ contexte() {
 }
 
 k() {
-    kubectl --context "$CTX" -n "$NS" "$@"
+    kubectl --context devzone -n "$NS" "$@"
 }
 
 installe() {
-    kubectl --context "$CTX" get namespace "$NS" >/dev/null 2>&1
+    kubectl --context devzone get namespace "$NS" >/dev/null 2>&1
 }
 
 # psql en superutilisateur dans le pod : connexion locale (socket), sans mot
@@ -93,13 +97,19 @@ secret_admin() {
 installer() {
     CTX="$(contexte)"
     cluster_preparer "$CTX"
+    # Sur une machine neuve, le contexte devzone doit viser le cluster choisi
+    # avant toute pose de ressource (#396) ; sinon, tout s'arrête : message et code
+    if ! contexte_devzone_poser "$CTX"; then
+        echo "devzone : postgres : impossible de poser le contexte devzone sur $CTX" >&2
+        return 1
+    fi
     echo "▶ PostgreSQL sur le cluster $CTX (namespace $NS)…"
-    kubectl --context "$CTX" create namespace "$NS" --dry-run=client -o yaml |
-        kubectl --context "$CTX" apply -f - >/dev/null
-    kubectl --context "$CTX" label namespace "$NS" "$CLUSTER_ETIQUETTE" --overwrite >/dev/null
+    kubectl --context devzone create namespace "$NS" --dry-run=client -o yaml |
+        kubectl --context devzone apply -f - >/dev/null
+    kubectl --context devzone label namespace "$NS" "$CLUSTER_ETIQUETTE" --overwrite >/dev/null
     secret_admin
     sed "s/__TAILLE__/$POSTGRES_TAILLE/" "$ICI/postgres.yaml" |
-        kubectl --context "$CTX" apply -f - >/dev/null
+        kubectl --context devzone apply -f - >/dev/null
     echo "▶ Attente de PostgreSQL (timeout ${POSTGRES_ATTENTE}s)…"
     if ! k rollout status statefulset/postgres --timeout="${POSTGRES_ATTENTE}s" >/dev/null; then
         echo "devzone : postgres : pas prêt après ${POSTGRES_ATTENTE}s : kubectl --context $CTX -n $NS describe pod postgres-0" >&2
@@ -115,9 +125,16 @@ installer() {
 desinstaller() {
     CTX="$(cluster_lu)"
     relais_arreter postgres
+    # Désinstallation sur une machine neuve : le contexte devzone est reposé sur
+    # le cluster choisi (sinon il vise l'ancien) ; sans lui, seulement le
+    # nettoyage local a lieu
+    if [ -n "$CTX" ]; then
+        contexte_devzone_poser "$CTX" ||
+            echo "devzone : postgres : contexte devzone non posé sur $CTX ; nettoyage local seulement" >&2
+    fi
     if [ -n "$CTX" ] && installe; then
         echo "▶ Suppression de PostgreSQL et de toutes ses bases sur $CTX…"
-        kubectl --context "$CTX" delete namespace "$NS" --wait=true >/dev/null
+        kubectl --context devzone delete namespace "$NS" --wait=true >/dev/null
         cluster_liberer "$CTX"
     fi
     rm -rf "$SECRETS"
@@ -242,6 +259,27 @@ relais() {
     fi
 }
 
+autoriser() {
+    local ns="${1:-}"
+    [ -n "$ns" ] || { echo "devzone postgres : namespace manquant" >&2; return 2; }
+    namespace_isoler "$ns"
+    echo "devzone postgres : accès autorisé depuis $ns vers le service PostgreSQL"
+}
+
+interdire() {
+    local ns="${1:-}" patch sortie
+    [ -n "$ns" ] || { echo "devzone postgres : namespace manquant" >&2; return 2; }
+    # JSON construit par jq, jamais assemblé à la main (le JSON invalide était
+    # rejeté en silence) ; l'échec du patch est affiché et rend un code (#396)
+    patch="$(jq -nc '{"spec":{"ingress":[{"from":[{"podSelector":{}}]}]}}')"
+    if ! sortie="$(kubectl --context devzone -n "$NS" patch networkpolicy devzone-meme-namespace \
+        -p "$patch" 2>&1)"; then
+        echo "devzone : postgres : impossible de retirer la règle d'accès de $ns : $sortie" >&2
+        return 1
+    fi
+    echo "devzone postgres : accès interdit depuis $ns vers le service PostgreSQL"
+}
+
 case "${1:-}" in
     installer) installer ;;
     desinstaller) desinstaller ;;
@@ -252,6 +290,8 @@ case "${1:-}" in
     supprimer) supprimer "${@:2}" ;;
     relais-lancer) relais ;;
     relais-arreter) relais_arreter postgres ;;
+    autoriser) autoriser "${@:2}" ;;
+    interdire) interdire "${@:2}" ;;
     *)
         echo "devzone postgres : creer <projet> [--nouveau-mdp] | liste | psql [<projet>] | supprimer <projet> [--oui]" >&2
         exit 1
