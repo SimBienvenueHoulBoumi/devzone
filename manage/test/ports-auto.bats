@@ -230,6 +230,27 @@ SS
     [[ "$output" == *"rc_rouille=0"* ]] || false
 }
 
+@test "isolement : un vrai veilleur dans un autre dossier n'est ni lu ni modifié" {
+    # Faux état d'un veilleur réel, posé hors du dossier du test (#394).
+    local vrai="$BATS_TEST_TMPDIR/vrai"
+    mkdir -p "$vrai/devzone/bridges" "$vrai/devzone/verrou"
+    echo $$ >"$vrai/devzone/verrou/pid"
+    printf '8081\n' >"$vrai/devzone/occupes"
+    printf 'LISTEN 0 511 127.0.0.1:8081 127.0.0.1:*\n' >"$vrai/devzone/actifs"
+    avant="$(find "$vrai" -printf '%p %s %T@\n' | sort; cat "$vrai/devzone/verrou/pid" "$vrai/devzone/occupes" "$vrai/devzone/actifs")"
+    printf 'LISTEN 0 511 127.0.0.1:8080 127.0.0.1:*\n' >"$BATS_TEST_TMPDIR/ss.listen"
+    # Le dossier des tests est bien celui du test, pas celui du veilleur réel.
+    run bash -c '. "$1"; echo "$BASE"' x "$PORTS_AUTO"
+    [ "$status" -eq 0 ]
+    [ "$output" = "$BATS_TEST_TMPDIR/ports-auto/devzone" ]
+    run bash "$PORTS_AUTO" tour
+    [ "$status" -eq 0 ]
+    grep -q 'docker run -d --restart unless-stopped --name devzone-devzone-auto-8080' "$BATS_TEST_TMPDIR/docker.log"
+    [ -d "$BATS_TEST_TMPDIR/ports-auto/devzone/bridges" ]
+    apres="$(find "$vrai" -printf '%p %s %T@\n' | sort; cat "$vrai/devzone/verrou/pid" "$vrai/devzone/occupes" "$vrai/devzone/actifs")"
+    [ "$avant" = "$apres" ]
+}
+
 teardown() {
     # Incident #394 : aucun veilleur lancé par un test ne doit survivre au test.
     if pgrep -f "bash +[^ ]*ports-auto[.]sh (boucle|demarrer)" >/dev/null 2>&1; then
