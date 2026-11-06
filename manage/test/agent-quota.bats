@@ -17,7 +17,7 @@ if [ "${1:-}" = run ]; then
     case " ${FAKE_OP_QUOTA_MODELS:-} " in
         *" $modele "*)
             echo "$modele" >>"${FAKE_OP_LOG:?}"
-            echo "Error: Free usage limit" >&2
+            echo "timestamp=$(date -u +%Y-%m-%dT%H:%M:%S.000Z) level=ERROR run=8b522c10 message=stream error providerID=opencode modelID=$modele error=AI_APICallError: Free usage limit" >&2
             sleep "${FAKE_OP_DUREE:-30}"
             exit 0
             ;;
@@ -25,7 +25,7 @@ if [ "${1:-}" = run ]; then
     case " ${FAKE_OP_PAYS_MODELS:-} " in
         *" $modele "*)
             echo "$modele" >>"${FAKE_OP_LOG:?}"
-            echo "Error: not available in your country" >&2
+            echo "timestamp=$(date -u +%Y-%m-%dT%H:%M:%S.000Z) level=ERROR run=8b522c10 message=process session.id=ses_8b522c10 error=This model is not available in your country stack=opencode" >&2
             sleep "${FAKE_OP_DUREE:-30}"
             exit 0
             ;;
@@ -64,4 +64,15 @@ FAKE
     export FAKE_OP_QUOTA_MODELS="big-pickle"
     agent_lance
     grep -q -- "--print-logs --log-level ERROR" "$FAKE_OP_ARGS_LOG" || false
+}
+
+@test "agent : texte ordinaire avec quota/pays affiche, fin normale -> fin avec" {
+    agent_consigne
+    export FAKE_OP_TEXTE_MODELS="big-pickle"
+    agent_lance
+    [ "$status" -eq 0 ]
+    [ "$(grep -c . "$FAKE_OP_LOG")" -eq 1 ]
+    grep -q "fin avec opencode/big-pickle" "$(agent_journal)" || false
+    ! grep -q "écarté" "$(agent_journal)" || false
+    [ ! -f "$DEVZONE_AGENT_ETAT/ecart-big-pickle" ]
 }

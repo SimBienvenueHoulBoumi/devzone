@@ -109,7 +109,7 @@ case "${1:-}" in
         esac
         case " ${FAKE_OP_ECHEC_MODELS:-} " in
             *" $modele "*)
-                echo "Error: ${FAKE_OP_MESSAGE:-Free usage limit}" >&2
+                echo "timestamp=$(date -u +%Y-%m-%dT%H:%M:%S.000Z) level=ERROR run=8b522c10 message=\"stream error\" providerID=opencode modelID=$modele error.error=\"AI_APICallError: ${FAKE_OP_MESSAGE:-Free usage limit}\"" >&2
                 exit 1
                 ;;
         esac
@@ -135,7 +135,7 @@ case "${1:-}" in
                 ;;
         esac
         case " ${FAKE_OP_TEXTE_MODELS:-} " in
-            *" $modele "*) echo "extrait de code : Free usage limit (exemple)" ;;
+            *" $modele "*) echo "extrait de code : Free usage limit et not available in your country" ;;
         esac
         echo "session $modele : consigne lue, travail commence"
         echo "le modele $modele a traite la consigne, les tests correspondants passent"

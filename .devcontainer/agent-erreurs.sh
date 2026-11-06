@@ -109,13 +109,20 @@ ecart_liberer() {
     esac
 }
 
+# Filtre le texte de session sur les lignes du journal opencode produites par
+# --print-logs : seules les lignes « timestamp=… level=ERROR … » d'un échec
+# déclarent un écart, pas le reste du texte lu ou écrit par le modèle.
+lignes_erreur() {
+    printf '%s\n' "$1" | sed -e $'s/\033\[[0-9;]*m//g' | grep -a -E '^timestamp=.* level=ERROR ' || true
+}
+
 # Arrête la session en cours si le journal contient quota, pays ou filtre depuis
 # son début : le modèle est écarté et la session est tuée (processus et enfants).
 session_erreur_fatale() {
     local pid="$1" journal="$2" offset="$3" m="$4" dossier="$5"
     local sortie cause
     sortie="$(tail -c "+$(( offset + 1 ))" "$journal" 2>/dev/null || true)"
-    cause="$(erreur_cause "$sortie")"
+    cause="$(erreur_cause "$(lignes_erreur "$sortie")")"
     case "$cause" in
         quota | pays | filtre) ;;
         *) return 1 ;;

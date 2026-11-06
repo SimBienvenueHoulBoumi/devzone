@@ -103,12 +103,13 @@ agent_lancer() {
         pid=$!
         demarre=0
         discard=0
+        local debut_t
         debut_t="$(date +%s)"
         while kill -0 "$pid" 2>/dev/null; do
             if session_erreur_fatale "$pid" "$journal" "$offset" "$m" "$dossier"; then discard=1; break; fi
             if [ "$(wc -c <"$journal")" -gt "$offset" ]; then
                 nouveau="$(tail -c "+$(( offset + 1 ))" "$journal" 2>/dev/null || true)"
-                if [ "$(erreur_cause "$nouveau")" != "quota" ]; then demarre=1; break; fi
+                if [ "$(erreur_cause "$(lignes_erreur "$nouveau")")" != "quota" ]; then demarre=1; break; fi
             fi
             if [ $(( $(date +%s) - debut_t )) -ge "$SILENCE" ]; then break; fi
             sleep "${DEVZONE_AGENT_PAS:-1}"
@@ -128,7 +129,6 @@ agent_lancer() {
         # Session figée : plus rien écrit depuis FIGEE secondes en cours de
         # route → arrêtée, puis session neuve avec la consigne de reprise.
         freeze=0
-        discard=0
         if kill -0 "$pid" 2>/dev/null && [ "$demarre" = 1 ]; then
             dernier="$(date +%s)"
             taille="$(wc -c <"$journal")"
