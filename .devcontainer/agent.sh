@@ -230,7 +230,7 @@ AGENTEOF2
 }
 
 case "${1:-}" in
-    etat) agent_etat ;;
+    etat) if [ "${2:-}" = "--json" ]; then exec bash "$ICI/agent-etat-json.sh"; else agent_etat; fi ;;
     liberer)
         [ -n "${2:-}" ] || { agent_aide >&2; exit 2; }
         ecart_liberer "$2"

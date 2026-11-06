@@ -123,6 +123,34 @@ liste_modeles() {
     fi
 }
 
+# Modèle et début d'une session (#308) : lus uniquement sur la dernière ligne
+# « === modèle opencode/? début » du superviseur ; le texte écrit par le
+# modèle dans le journal (un « opencode/agent.json » possible) n'est pas lu.
+session_modele_debut() {
+    local ligne
+    ligne="$(grep '^=== modèle opencode/' "$1" 2>/dev/null | tail -1 || true)"
+    MODELE_SESSION="$(sed -nE 's/^=== modèle opencode\/([^ ]+) début .*/\1/p' <<<"$ligne")"
+    DEBUT_SESSION="$(sed -nE 's/.* début ([^ ]+).*/\1/p' <<<"$ligne")"
+}
+
+# Une session est en cours (#308) si un processus agent.sh vivant a pour
+# premier argument (le dossier, absolu depuis #287) un chemin dont le nom est
+# exactement le journal sans « .log » ; un simple dossier contenant ce nom ne
+# suffit pas, ni un chemin qui ne serait pas le dossier d'un agent.
+session_en_cours() {
+    local ligne dossier
+    while IFS= read -r ligne; do
+        case "$ligne" in
+            *agent.sh\ *) dossier="${ligne#*agent.sh }" ;;
+            *) continue ;;
+        esac
+        dossier="${dossier%% *}"
+        [ -n "$dossier" ] || continue
+        if [ "$(basename "$dossier")" = "$1" ]; then return 0; fi
+    done < <(ps -eo args= 2>/dev/null || true)
+    return 1
+}
+
 # Sessions connues (journal, dernier modèle, début, dernier écrit) et modèles
 # écartés par le superviseur, avec l'heure de fin d'écart.
 agent_etat() {
@@ -131,9 +159,9 @@ agent_etat() {
     for f in "$RACINE"/workspace/.agents/*.log; do
         [ -e "$f" ] || continue
         vu=1
-        m="$(grep -oE 'opencode/[A-Za-z0-9._-]+' "$f" 2>/dev/null | tail -1 || true)"
-        debut="$(grep '^=== modèle ' "$f" 2>/dev/null | tail -1 |
-            sed -E 's/.* début ([^ ]+).*/\1/' || true)"
+        session_modele_debut "$f"
+        m="${MODELE_SESSION:+opencode/$MODELE_SESSION}"
+        debut="$DEBUT_SESSION"
         dernier="$(heure "$(mtime "$f")")"
         echo "  session $(basename "$f") : modèle ${m:-inconnu}, depuis ${debut:-inconnu}, dernier écrit $dernier"
     done
