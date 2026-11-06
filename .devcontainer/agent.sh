@@ -50,16 +50,20 @@ RELANCES_RESEAU=3
 refuse() { echo "devzone agent : $*" >&2; exit 2; }
 
 agent_lancer() {
-    # Module ia requis : sans assistants, rien à diriger.
-    if ! bash "$ICI/devzone" actif ia >/dev/null 2>&1; then
-        refuse "module ia désactivé : devzone activer ia"
-    fi
     local dossier="$1" consigne="$2"
     local journal etat debut m i pid code offset taille demarre freeze discard nouveau
     local consigne_courante repris=0 maintenant dernier sortie cause
     local reseau_pour="" reseau_n=0
-    [ -d "$dossier" ] || refuse "dossier introuvable : $dossier"
-    [ -r "$consigne" ] || refuse "consigne illisible : $consigne"
+    # Chemins relatifs au dossier d'appel : rendus absolus avant tout cd, verrou ou
+    # écriture d'état ; le nom de la consigne est conservé.
+    [ -d "$dossier" ] || refuse "dossier introuvable : $dossier (cherché depuis $(pwd))"
+    [ -r "$consigne" ] || refuse "consigne introuvable : $consigne (cherché depuis $(pwd))"
+    dossier="$(cd "$dossier" && pwd -P)"
+    consigne="$(cd "$(dirname "$consigne")" && pwd -P)/$(basename "$consigne")"
+    # Module ia requis : sans assistants, rien à diriger.
+    if ! bash "$ICI/devzone" actif ia >/dev/null 2>&1; then
+        refuse "module ia désactivé : devzone activer ia"
+    fi
     configurer
     journal="$(journal_de "$dossier")"
     export AGENT_JOURNAL="$journal"
