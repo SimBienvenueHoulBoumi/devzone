@@ -1,7 +1,7 @@
 {
   "name": "devzone",
   "version": "0.0.0",
-  "description": "Ton poste de d\u00e9veloppement Linux, pr\u00eat en une commande, identique sur Mac, Windows et Linux.",
+  "description": "Ton poste de développement Linux, prêt en une commande, identique sur Mac, Windows et Linux.",
   "license": "GPL-3.0-only",
   "repository": {
     "type": "git",
@@ -9,13 +9,7 @@
   },
   "homepage": "https://github.com/SimBienvenueHoulBoumi/devzone#readme",
   "bugs": "https://github.com/SimBienvenueHoulBoumi/devzone/issues",
-  "keywords": [
-    "devcontainer",
-    "docker",
-    "kubernetes",
-    "repowarden",
-    "environnement"
-  ],
+  "keywords": ["devcontainer", "docker", "kubernetes", "repowarden", "environnement"],
   "bin": {
     "devzone": "manage/devzone"
   },
