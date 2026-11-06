@@ -8,7 +8,7 @@
 #   ports.sh resume         résumé d'une ligne pour le récapitulatif devzone
 # L'état est la ligne « ports=8080,3000 » de DEVZONE_ETAT (triée, sans doublon).
 # RACINE : un seul dirname depuis ICI (.devcontainer) → racine du dépôt devzone.
-set -euo pipefail
+if [ "${BASH_SOURCE[0]}" = "$0" ]; then set -euo pipefail; fi
 
 SOCAT_IMAGE=alpine/socat:1.8.0.3
 
@@ -21,20 +21,11 @@ refuse() { echo "devzone : port : $*" >&2; exit 1; }
 
 nom_relais() { echo "devzone-$INSTANCE-port-$1"; }
 
-port_valide() {
-    case "${1:-}" in
-        '' | *[!0-9]*) return 1 ;;
-    esac
-    [ "$1" -ge 1 ] 2>/dev/null && [ "$1" -le 65535 ] 2>/dev/null
-}
+port_valide() { case "${1:-}" in '' | *[!0-9]*) return 1 ;; esac; [ "$1" -ge 1 ] 2>/dev/null && [ "$1" -le 65535 ] 2>/dev/null; }
 
-valider_port() {
-    port_valide "${1:-}" || refuse "port invalide : ${1:-(aucun)} (1-65535)"
-}
+valider_port() { port_valide "${1:-}" || refuse "port invalide : ${1:-(aucun)} (1-65535)"; }
 
-lire_ports() {
-    grep -E '^ports=' "$ETAT" 2>/dev/null | tail -1 | cut -d= -f2- || true
-}
+lire_ports() { grep -E '^ports=' "$ETAT" 2>/dev/null | tail -1 | cut -d= -f2- || true; }
 
 trier_ports() {
     printf '%s\n' "${1:-}" | tr ',' '\n' |
@@ -144,9 +135,7 @@ fermer() {
     echo "✔ relais fermé : $port"
 }
 
-application_repond() {
-    curl -s -o /dev/null --max-time 2 "http://127.0.0.1:$1" >/dev/null 2>&1
-}
+application_repond() { curl -s -o /dev/null --max-time 2 "http://127.0.0.1:$1" >/dev/null 2>&1; }
 
 liste() {
     local ports port marque app
@@ -169,6 +158,7 @@ liste() {
         fi
         printf '  %-5s %s  %s\n' "$port" "$marque" "$app"
     done
+    bash "$ICI/ports-auto.sh" liste_auto 2>/dev/null || true
 }
 
 resume() {
@@ -232,11 +222,16 @@ liste_json() {
             app="aucune application"
         fi
         json="$(jq -c --argjson port "$port" --argjson actif "$actif" --arg app "$app" \
-            '. + [{port:$port,actif:$actif,application:$app}]' <<<"$json")"
+            '. + [{port:$port,actif:$actif,application:$app,auto:false}]' <<<"$json")"
     done
+    auto_json="$(bash "$ICI/ports-auto.sh" liste_json_auto 2>/dev/null || echo '[]')"
+    if [ -n "$auto_json" ] && [ "$auto_json" != "[]" ]; then
+        json="$(jq -s 'add' <<<"$json"$'\n'"$auto_json")"
+    fi
     printf '%s\n' "$json"
 }
 
+if [ "${BASH_SOURCE[0]}" = "$0" ]; then
 case "${1:-}" in
     '' | liste)
         if [ "${2:-}" = "--json" ]; then liste_json; else liste; fi
@@ -245,6 +240,10 @@ case "${1:-}" in
     fermer | --fermer) fermer "${2:-}" ;;
     relancer) relancer ;;
     resume) resume ;;
+    auto) bash "$ICI/ports-auto.sh" auto "${2:-}" "${3:-}" ;;
+    exclure) bash "$ICI/ports-auto.sh" exclure "${2:-}" ;;
+    inclure) bash "$ICI/ports-auto.sh" inclure "${2:-}" ;;
     -h | --help | aide) sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//' ;;
     *) ouvrir "$1" ;;
 esac
+fi

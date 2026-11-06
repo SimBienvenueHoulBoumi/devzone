@@ -27,6 +27,10 @@ RELAIS
 #!/usr/bin/env bash
 printf 'ports %s\n' "$*" >>"$BATS_TEST_TMPDIR/actions.log"
 PORTS
+    cat >"$T/app/ports-auto.sh" <<'PORTS_AUTO'
+#!/usr/bin/env bash
+printf 'ports-auto %s\n' "$*" >>"$BATS_TEST_TMPDIR/actions.log"
+PORTS_AUTO
     cat >"$T/app/password.sh" <<'PASSWORD'
 #!/usr/bin/env bash
 printf 'password %s\n' "$*" >>"$BATS_TEST_TMPDIR/actions.log"
@@ -89,9 +93,11 @@ KUBE
     [ "$status" -eq 0 ]
     [[ "$output" == *"✔ relais Docker"* ]] || false
     [[ "$output" == *"✔ relais de ports"* ]] || false
+    [[ "$output" == *"✔ veilleur ports auto"* ]] || false
     [[ "$output" == *"✔ identifiants"* ]] || false
     [[ "$(cat "$T/actions.log")" == *"relais oui"* ]] || false
     [[ "$(cat "$T/actions.log")" == *"ports relancer"* ]] || false
+    [[ "$(cat "$T/actions.log")" == *"ports-auto demarrer"* ]] || false
     [[ "$(cat "$T/actions.log")" == *"password regenerer"* ]] || false
 }
 

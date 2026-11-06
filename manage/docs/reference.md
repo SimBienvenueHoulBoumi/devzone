@@ -293,9 +293,14 @@ devzone desactiver postgres                 # supprime PostgreSQL et TOUTES ses 
 devzone port <n>              # ouvre 127.0.0.1:<n> du poste → <n> du conteneur
 devzone port                  # liste : port, ● actif ou ○ arrêté, application derrière
 devzone port --fermer <n>     # retire le relais et le port de l'état
+devzone port auto on|off     # active ou coupe le veilleur automatique
+devzone port exclure <n>      # retire un port de la liste automatique
+devzone port inclure <n>      # réintègre un port à la liste automatique
 ```
 
 - **Relais** : conteneur `devzone-<instance>-port-<n>`, étiqueté `devzone.instance=<instance>` et `devzone.port=<n>`, image figée `SOCAT_IMAGE=alpine/socat:1.8.0.3` (`.devcontainer/ports.sh`). Il publie `-p 127.0.0.1:<n>:<n>` seulement, avec `--restart unless-stopped`.
+- **Veilleur automatique (#394)** : `.devcontainer/ports-auto.sh` surveille les ports écoutés dans le conteneur toutes les 2 s (`ss -ltnH`). Un port non déjà relayé, non exclu, pas un service de devzone (5432, 8929, 2224) et pas un pont du veilleur est relayé : pont interne sur l'IP du conteneur si l'application n'écoute que sur `127.0.0.1`/`::1`, puis relais poste `devzone-<instance>-auto-<n>`. Le port disparu depuis plus de 10 s retire le pont et le relais. Un port déjà pris sur le poste est marqué occupé et n'est plus réessayé. Un seul veilleur tourne (verrou `mkdir` dans `/tmp/devzone-ports-auto/`, rafraîchi à chaque tour ; une instance morte est remplacée). Le veilleur s'arrête seul si le dossier d'état disparaît. Il ne tourne qu'à la demande des scripts de démarrage : tout autre appel est refusé (code 2), affiche la commande à faire (`devzone reparer`).
+- **Désactivation** : `devzone port auto off` arrête le veilleur et retire les relais automatiques ; `devzone port auto on` le réactive : le veilleur repart au prochain démarrage du conteneur ou via `devzone reparer`. Au démarrage, les relais automatiques d'une session précédente sont retirés.
 - **Réseau et IP** : lus par `docker inspect "$(hostname)"` sur le Docker de l'hôte ; le relais rejoint le conteneur par son IP sur son réseau Docker. Conteneur devzone introuvable (Docker de l'hôte absent) : refus clair, code 1.
 - **État** : ligne `ports=8080,3000` dans `$RACINE/.devzone.modules`, triée et sans doublon ; `--fermer` retire le port. Le relais déjà ouvert est idempotent (message, code 0).
 - **Démarrage** : `devzone demarrer` relance chaque relais de l'état vers l'IP actuelle du conteneur (elle change à chaque redémarrage). Un échec affiche un avertissement sans bloquer le démarrage ; `devzone reparer` le reprend sans redémarrer.

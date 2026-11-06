@@ -18,6 +18,8 @@ setup() {
     export DEVZONE_MEMINFO="$BATS_TEST_TMPDIR/meminfo"
     export DEVZONE_HOSTS="$BATS_TEST_TMPDIR/hosts"
     export KIND_CLUSTERS="$BATS_TEST_TMPDIR/clusters"
+    # demarrage.sh lance le veilleur de ports auto : son dossier reste sous le test (#394)
+    export DEVZONE_PORTS_AUTO_DIR="$BATS_TEST_TMPDIR/ports-auto"
     SECRETS="$DEVZONE_RACINE/workspace/.gitlab"
     mkdir -p "$HOME" "$DEVZONE_RACINE/workspace" "$BATS_TEST_TMPDIR/bin"
     printf 'MemAvailable: 16000000 kB\n' >"$DEVZONE_MEMINFO"

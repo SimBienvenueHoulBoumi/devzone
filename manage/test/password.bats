@@ -11,6 +11,8 @@ setup() {
     kube_isole
     export HOME="$BATS_TEST_TMPDIR/home"
     export DEVZONE_RACINE="$BATS_TEST_TMPDIR/racine"
+    # demarrage.sh lance le veilleur de ports auto : son dossier reste sous le test (#394)
+    export DEVZONE_PORTS_AUTO_DIR="$BATS_TEST_TMPDIR/ports-auto"
     RACINE="$DEVZONE_RACINE"
     GL="$RACINE/workspace/.gitlab"
     PG="$RACINE/workspace/.postgres"
