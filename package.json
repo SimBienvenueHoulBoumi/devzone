@@ -1,7 +1,7 @@
 {
   "name": "devzone",
   "version": "0.0.0",
-  "description": "Zone de dev conteneurisée : Java, Node, Python, Docker, Kubernetes et outils repowarden, dans un devcontainer",
+  "description": "Ton poste de développement Linux, prêt en une commande, identique sur Mac, Windows et Linux.",
   "license": "GPL-3.0-only",
   "repository": {
     "type": "git",
