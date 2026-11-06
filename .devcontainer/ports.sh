@@ -211,8 +211,36 @@ relancer() {
     return "$rc"
 }
 
+# Sortie lisible par machine de liste : tableau JSON [{port,actif,application}], via jq seul.
+liste_json() {
+    local ports port actif app json='[]'
+    ports="$(trier_ports "$(lire_ports)")"
+    if [ -z "$ports" ]; then
+        printf '[]\n'
+        return 0
+    fi
+    # shellcheck disable=SC2046 # liste de ports séparés par des virgules
+    for port in $(printf '%s' "$ports" | tr ',' ' '); do
+        if relais_actif "$port"; then
+            actif=true
+        else
+            actif=false
+        fi
+        if application_repond "$port"; then
+            app="application répond"
+        else
+            app="aucune application"
+        fi
+        json="$(jq -c --argjson port "$port" --argjson actif "$actif" --arg app "$app" \
+            '. + [{port:$port,actif:$actif,application:$app}]' <<<"$json")"
+    done
+    printf '%s\n' "$json"
+}
+
 case "${1:-}" in
-    '' | liste) liste ;;
+    '' | liste)
+        if [ "${2:-}" = "--json" ]; then liste_json; else liste; fi
+        ;;
     ouvrir) ouvrir "${2:-}" ;;
     fermer | --fermer) fermer "${2:-}" ;;
     relancer) relancer ;;
