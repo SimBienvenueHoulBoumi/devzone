@@ -11,6 +11,7 @@
 #   devzone demarrer                 démarrage complet (scripts de démarrage et récapitulatif)
 #   devzone metrics [contexte…]      installe metrics-server (kubectl top, k9s)
 #   devzone utiliser CTX [--confirmer CTX]  bascule le cluster de travail de kubectl
+#   devzone clusters                 vue des clusters connectés (travail et services)
 #   devzone actif <module>           code 0 si actif (scripts de démarrage)
 #   devzone test-bash32             lance les tests bats sous bash 3.2 (conteneur Docker)
 #   devzone test-gitlab             essai de bout en bout du module et de la plateforme GitLab
@@ -813,11 +814,20 @@ reparer() {
 # cluster des services de devzone : aucun cluster_ecrire, aucune ligne
 # cluster= dans l'état.
 utiliser() {
-    local ctx="" confirmer="" reponse arg
+    local ctx="" confirmer="" namespace="" reponse arg courant
     while [ "$#" -gt 0 ]; do
         arg="$1"
         shift
         case "$arg" in
+            -n | --namespace)
+                if [ "$#" -eq 0 ]; then
+                    echo "devzone : -n attend un namespace" >&2
+                    return 2
+                fi
+                namespace="$1"
+                shift
+                ;;
+            --namespace=*) namespace="${arg#*=}" ;;
             --confirmer)
                 if [ "$#" -eq 0 ]; then
                     echo "devzone : --confirmer attend un contexte" >&2
@@ -828,12 +838,12 @@ utiliser() {
                 ;;
             --confirmer=*) confirmer="${arg#*=}" ;;
             -*)
-                echo "devzone : argument inconnu : $arg (devzone utiliser CTX [--confirmer CTX])" >&2
+                echo "devzone : argument inconnu : $arg (devzone utiliser CTX [-n NS] [--confirmer CTX])" >&2
                 return 2
                 ;;
             *)
                 if [ -n "$ctx" ]; then
-                    echo "devzone : argument inconnu : $arg (devzone utiliser CTX [--confirmer CTX])" >&2
+                    echo "devzone : argument inconnu : $arg (devzone utiliser CTX [-n NS] [--confirmer CTX])" >&2
                     return 2
                 fi
                 ctx="$arg"
@@ -841,33 +851,48 @@ utiliser() {
         esac
     done
     if [ -z "$ctx" ]; then
-        echo "devzone : contexte manquant : devzone utiliser CTX" >&2
-        return 2
+        if [ -z "$namespace" ]; then
+            echo "devzone : contexte manquant : devzone utiliser CTX" >&2
+            return 2
+        fi
+        courant="$(kubectl config current-context 2>/dev/null || true)"
+        if [ -z "$courant" ]; then
+            echo "devzone : aucun contexte courant" >&2
+            return 2
+        fi
+        ctx="$courant"
     fi
     if ! kubectl config get-contexts -o name 2>/dev/null | grep -qxF -- "$ctx"; then
         echo "devzone : contexte inconnu : $ctx (voir kubectl config get-contexts)" >&2
         return 2
     fi
-    if ! cluster_est_local "$ctx"; then
-        if [ -n "$confirmer" ]; then
-            if [ "$confirmer" != "$ctx" ]; then
+    courant="$(kubectl config current-context 2>/dev/null || true)"
+    if [ "$ctx" != "$courant" ]; then
+        if ! cluster_est_local "$ctx"; then
+            if [ -n "$confirmer" ]; then
+                if [ "$confirmer" != "$ctx" ]; then
+                    echo "devzone : cluster distant refusé : $ctx (--confirmer $ctx)" >&2
+                    return 2
+                fi
+            elif cluster_interactif; then
+                printf 'cluster distant : %s ; tape son nom pour confirmer : ' "$ctx" >&2
+                read -r reponse || reponse=""
+                if [ "$reponse" != "$ctx" ]; then
+                    echo "devzone : cluster distant refusé : $ctx (--confirmer $ctx)" >&2
+                    return 2
+                fi
+            else
                 echo "devzone : cluster distant refusé : $ctx (--confirmer $ctx)" >&2
                 return 2
             fi
-        elif cluster_interactif; then
-            printf 'cluster distant : %s ; tape son nom pour confirmer : ' "$ctx" >&2
-            read -r reponse || reponse=""
-            if [ "$reponse" != "$ctx" ]; then
-                echo "devzone : cluster distant refusé : $ctx (--confirmer $ctx)" >&2
-                return 2
-            fi
-        else
-            echo "devzone : cluster distant refusé : $ctx (--confirmer $ctx)" >&2
-            return 2
         fi
+        kubectl config use-context "$ctx" >/dev/null
     fi
-    kubectl config use-context "$ctx" >/dev/null
+    if [ -n "$namespace" ]; then
+        kubectl config set-context "$ctx" --namespace "$namespace" >/dev/null
+    fi
     echo "cluster de travail : $ctx"
+    [ -z "$namespace" ] || echo "namespace : $namespace"
 }
 
 # État complet : ✔ prêt, ✖ nécessaire, ○ facultatif, ⚠ à corriger ; chaque
@@ -1008,6 +1033,7 @@ case "${1:-}" in
     demarrer) bash "$ICI/demarrage.sh" ;;
     metrics) bash "$ICI/metrics-server.sh" "${@:2}" ;;
     utiliser) utiliser "${@:2}" ;;
+    clusters) DEVZONE_ETAT="$ETAT" bash "$ICI/clusters.sh" "${@:2}" ;;
     cluster) changer_cluster "${@:2}" ;;
     postgres) DEVZONE_ETAT="$ETAT" bash "$ICI/postgres/postgres.sh" "${@:2}" ;;
     port) DEVZONE_ETAT="$ETAT" bash "$ICI/ports.sh" "${@:2}" ;;

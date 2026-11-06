@@ -62,6 +62,17 @@ devzone appliquer || echo "devzone : modules incomplets (détail ci-dessus), ré
 # Paquets systeme gardes (#351) : reinstallees a chaque creation ; un echec n arrete pas la creation
 devzone paquets appliquer || echo "devzone : paquets en echec, reessayer : devzone paquets" >&2
 
+# Invite Kubernetes du shell (#337) : prefixe PS1, une seule fois
+if ! grep -qF 'invite-kube.sh' "$HOME/.bashrc" 2>/dev/null; then
+    cat >>"$HOME/.bashrc" <<'INVITE'
+# >>> devzone invite >>>
+# shellcheck source=/dev/null
+. /workspaces/devzone/.devcontainer/invite-kube.sh
+PS1='$(devzone_invite_kube) '"$PS1"
+# <<< devzone invite <<<
+INVITE
+fi
+
 # Ce qui reste à faire (identité git, GitHub, modules) : récapitulatif de
 # devzone, affiché à chaque démarrage (demarrage.sh)
 

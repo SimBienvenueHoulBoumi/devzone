@@ -326,6 +326,16 @@ npm uninstall -g devzone
 ```
 
 Même effet que `make desinstaller`.
+## Changer de cluster
+
+```sh
+devzone clusters                    # vue : contextes, type, etat, namespace
+devzone utiliser CTX [-n NS]        # bascule le cluster de travail de kubectl
+devzone utiliser -n NS              # change seulement le namespace du cluster courant
+```
+
+L invite du shell affiche `⎈ ctx/ns` (cyan si local, rouge gras avec distant sinon). Un rebuild repart sur le cluster de l hote : le choix de kubectl ecrit dans `~/.kube/config`, qui n est pas dans un volume.
+
 ## Pour aller plus loin
 
 - [Référence détaillée](https://github.com/SimBienvenueHoulBoumi/devzone/blob/main/manage/docs/reference.md)
