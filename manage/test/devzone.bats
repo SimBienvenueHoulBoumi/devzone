@@ -307,11 +307,13 @@ GH
 
 @test "désactiver ia : désinstalle, état gardé" {
     bash "$DEVZONE" activer ia
+    mkdir -p "${DEVZONE_AGENT_ETAT:-$HOME/.local/state/oc-lancer}"
     run bash "$DEVZONE" desactiver ia
     [ "$status" -eq 0 ]
     grep -qx "npm uninstall -g @anthropic-ai/claude-code opencode-ai" "$BATS_TEST_TMPDIR/npm.log"
     run bash "$DEVZONE" actif ia
     [ "$status" -ne 0 ]
+    [ -d "${DEVZONE_AGENT_ETAT:-$HOME/.local/state/oc-lancer}" ]
 }
 
 @test "désactiver kubernetes : retire hote.config, sans rien lancer" {

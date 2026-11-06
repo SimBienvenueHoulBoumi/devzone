@@ -105,3 +105,49 @@ setup() {
     [ "$status" -eq 2 ]
     [[ "$output" == *"devzone activer ia"* ]] || false
 }
+
+@test "agent : verrou recent sans pid -> pas repris, attente puis refus" {
+    # Un verrou sans pid n'est volé que si son âge dépasse 30 s (#377)
+    source "$BATS_TEST_DIRNAME/../../.devcontainer/agent-session.sh"
+    AGENT_ETAT="$DEVZONE_AGENT_ETAT"
+    export DEVZONE_AGENT_VERROU_MAX=2
+    mkdir -p "$AGENT_ETAT/verrou"
+    debut="$(date +%s)"
+    run verrou_prendre
+    [ "$status" -eq 1 ] || false
+    [ $(( $(date +%s) - debut )) -ge 1 ] || false
+    [ $(( $(date +%s) - debut )) -le 5 ] || false
+    [ -d "$AGENT_ETAT/verrou" ] || false
+    [ ! -e "$AGENT_ETAT/verrou/pid" ] || false
+}
+
+@test "agent : verrou recent avec pid inconnu (autre conteneur) -> pas repris" {
+    # Pid absent de cet espace de pids : seul l'âge du verrou décide (#377)
+    source "$BATS_TEST_DIRNAME/../../.devcontainer/agent-session.sh"
+    AGENT_ETAT="$DEVZONE_AGENT_ETAT"
+    export DEVZONE_AGENT_VERROU_MAX=2
+    mkdir -p "$AGENT_ETAT/verrou"
+    echo 999999 >"$AGENT_ETAT/verrou/pid"
+    debut="$(date +%s)"
+    run verrou_prendre
+    [ "$status" -eq 1 ] || false
+    [ $(( $(date +%s) - debut )) -ge 1 ] || false
+    grep -qx 999999 "$AGENT_ETAT/verrou/pid" || false
+}
+
+@test "agent : verrou de plus de 30 s -> repris aussitôt, verrou laché nettoyé" {
+    # Verrou abandonné par un arrêt : âge de plus de 30 s, repris sans attendre
+    # même si son pid est encore vivant, l'âge seul décide (#377)
+    source "$BATS_TEST_DIRNAME/../../.devcontainer/agent-session.sh"
+    AGENT_ETAT="$DEVZONE_AGENT_ETAT"
+    mkdir -p "$AGENT_ETAT/verrou"
+    echo "$$" >"$AGENT_ETAT/verrou/pid"
+    touch -d '-60 seconds' "$AGENT_ETAT/verrou" 2>/dev/null || touch -t 200001010000 "$AGENT_ETAT/verrou" || false
+    debut="$(date +%s)"
+    run verrou_prendre
+    [ "$status" -eq 0 ] || false
+    [ $(( $(date +%s) - debut )) -le 5 ] || false
+    [ -s "$AGENT_ETAT/verrou/pid" ] || false
+    verrou_lacher
+    [ ! -e "$AGENT_ETAT/verrou" ] || false
+}

@@ -45,6 +45,9 @@
     "source=${localEnv:DEVZONE_VOLUMES:devzone}-claude,target=/home/vscode/.claude,type=volume",
     "source=${localEnv:DEVZONE_VOLUMES:devzone}-opencode-config,target=/home/vscode/.config/opencode,type=volume",
     "source=${localEnv:DEVZONE_VOLUMES:devzone}-opencode-data,target=/home/vscode/.local/share/opencode,type=volume",
+    // devzone agent (#377) : état (modèles écartés, rang, verrou, photos des
+    // droits) au chemin où agent.sh l'écrit ; partagé comme les connexions
+    "source=${localEnv:DEVZONE_VOLUMES:devzone}-agent,target=/home/vscode/.local/state/oc-lancer,type=volume",
     // Connexion gh et identité git (~/.config/git/config, lu par git comme
     // config globale) : le conteneur reconstruit peut commiter et pousser
     "source=${localEnv:DEVZONE_VOLUMES:devzone}-gh,target=/home/vscode/.config/gh,type=volume",
