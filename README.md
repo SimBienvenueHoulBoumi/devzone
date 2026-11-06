@@ -2,16 +2,33 @@
 
 [![npm](https://img.shields.io/npm/v/devzone)](https://www.npmjs.com/package/devzone) [![Licence GPL-3.0-only](https://img.shields.io/badge/licence-GPL--3.0--only-blue)](https://github.com/SimBienvenueHoulBoumi/devzone/blob/main/LICENSE)
 
-devzone est un environnement de développement prêt en une commande : Java, Node, Python, Docker et Kubernetes dans un conteneur, identique sur Mac, Linux et Windows. Il s'adresse à toute personne qui souhaite développer sans installer d'outils sur sa machine, avec les mêmes versions pour toute l'équipe.
+Ton poste de développement Linux, prêt en une commande, identique sur Mac, Windows et Linux.
 
-**Sécurité** : par défaut, devzone utilise le Docker et le Kubernetes de votre machine hôte au lieu de son Docker interne (Docker-in-Docker). C'est un compromis de sécurité assumé : le socket Docker de l'hôte donne un accès administrateur à son Docker, y compris pour les agents IA. Cette configuration est documentée ci-dessous.
+- Un Ubuntu identique pour toute l'équipe.
+- Les outils et services prêts : Java, Node, Python, Docker, Kubernetes, PostgreSQL, GitLab au besoin.
+- Les agents IA encadrés par repowarden.
+- Local et gratuit : rien n'est hébergé.
+- Une mise à jour avec `devzone mettre-a-jour`, et des outils ajoutés qui survivent au rebuild (devzone paquets).
 
 ## Pourquoi devzone ?
 
-- **Rien à installer à part Docker** : tout le reste tourne dans un conteneur.
-- **Mêmes outils et mêmes versions** pour toute l'équipe, sur Mac, Linux et Windows.
-- **Prêt en quelques minutes** sur une machine neuve.
-- **Jetable** : ta machine reste propre.
+Les alternatives ont chacune leur limite :
+
+- **WSL** : Windows seulement, et propre à chaque poste.
+- **Machine virtuelle** : lourde, lente à démarrer.
+- **Environnements hébergés** (Codespaces, Gitpod…) : cloud, quotas, réseau.
+
+devzone les évite : le même environnement sur chaque poste, sur ta machine.
+
+## Limites
+
+- Pas de systemd : les services fournis par devzone démarrent avec devzone, pas avec `systemctl`.
+- Pas de bureau graphique : tout se passe en terminal ou dans VS Code.
+- Le socket Docker de l'hôte est partagé : c'est un compromis de sécurité assumé, qui donne un accès administrateur au Docker de l'hôte, y compris aux agents IA ([#291](https://github.com/SimBienvenueHoulBoumi/devzone/issues/291)).
+
+## Comment ça marche
+
+devzone prépare un devcontainer Ubuntu lancé par Docker, avec des versions d'outils figées. Rien n'est hébergé : tout tourne sur ta machine, et `workspace/` est conservé entre les rebuilds.
 
 ## Démarrage rapide
 
@@ -131,7 +148,7 @@ La liste vit dans .devzone.paquets a la racine du dossier devzone, hors du depot
 | Supprimer le conteneur | — | `make down` | — |
 | Reconstruire (après une modification de `.devcontainer/`) | *Dev Containers: Rebuild Container* | `make rebuild` | `npx @devcontainers/cli up --workspace-folder . --remove-existing-container` |
 | État | — | `make status` | — |
-| **Désinstaller** (tout ce que devzone a créé, après confirmation) | — | `make desinstaller` | `bash manage/scripts/desinstaller.sh` |
+| **Désinstaller** (tout ce que devzone a créé, après confirmation) | — | `make desinstaller` | `npx devzone desinstaller` |
 
 ### Mettre à jour devzone
 
@@ -281,7 +298,7 @@ Spring Boot écoute sur `0.0.0.0` par défaut : ne fixe pas `server.address` à 
 ## Questions fréquentes
 
 - **Docker absent ou arrêté** : `npx devzone`, `make up`, `make rebuild` et `make desinstaller` vérifient Docker avant tout et disent quoi faire : l'installer (Docker Desktop, ou Docker Engine sous Linux), démarrer Docker Desktop, ou, sous Linux, ajouter ton compte au groupe `docker` (`sudo usermod -aG docker $USER`, puis une nouvelle session). Avec `npx devzone mon-devzone`, le dossier est créé quand même : une fois Docker démarré, `cd mon-devzone && make shell`.
-- **Accès au socket Docker de l'hôte** : le socket Docker de la machine hôte est monté dans le conteneur avec accès en lecture seule. Cela offre un accès administrateur au Docker de l'hôte, y compris pour les agents IA. C'est un compromis de sécurité assumé documenté dans la section Sécurité. Pour restreindre l'accès, utilisez les mécanismes propres à Docker Desktop/Linux.
+- **Accès au socket Docker de l'hôte** : le socket Docker de la machine hôte est monté dans le conteneur. Cela offre un accès administrateur au Docker de l'hôte, y compris pour les agents IA. C'est un compromis de sécurité assumé documenté dans la section Limites. Pour restreindre l'accès, utilisez les mécanismes propres à Docker Desktop/Linux.
 - **Le premier lancement est long** : c'est normal (construction de l'image, téléchargement des images de base). Il prend 4 à 5 min mesurées, plus le téléchargement des images de base sur une machine neuve.
 - **`make` est absent sous Windows** : tu peux utiliser `npx @devcontainers/cli` (voir le tableau « Au quotidien ») ou Git Bash. Les scripts sont compatibles (fins de ligne LF).
 - **Pas de cluster Kubernetes visible** : devzone ne crée jamais de cluster. Avec le module `kubernetes` actif, il tente de se connecter au cluster de l'hôte (via `host.docker.internal`). Sinon, crée un cluster local avec `kind create cluster`.
