@@ -14,7 +14,7 @@ exec </dev/null
 # (et ~/.config, créé par Docker pour monter ~/.config/opencode)
 sudo chown -R vscode:vscode /home/vscode/.m2 /home/vscode/.gradle /home/vscode/.local /home/vscode/.claude \
     /home/vscode/.config/opencode /home/vscode/.config/gh /home/vscode/.config/git \
-    /home/vscode/.config/devzone
+    /home/vscode/.config/devzone /home/vscode/.local/state/oc-lancer
 sudo chown vscode:vscode /home/vscode/.config
 
 # Git : dépôts du conteneur déclarés sûrs (leur propriétaire peut différer de

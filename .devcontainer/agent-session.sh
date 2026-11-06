@@ -26,19 +26,23 @@ heure() {
 }
 
 # Rang partagé : deux lancements simultanés ne doivent pas partir sur le même
-# modèle. mkdir est atomique et présent partout (flock manque sur macOS) ;
-# le pid permet de retirer un verrou laissé par un processus tué.
+# modèle. mkdir est atomique et présent partout (flock manque sur macOS) ; seul
+# l'âge du verrou décide (#377), le pid écrit n'étant qu'un détail de
+# diagnostic : un pid lu dans un autre conteneur du volume n'existe pas ici.
 verrou_prendre() {
-    local fin p
-    fin=$(( $(date +%s) + 10 ))
+    local fin age
+    fin=$(( $(date +%s) + ${DEVZONE_AGENT_VERROU_MAX:-10} ))
     while ! mkdir "$AGENT_ETAT/verrou" 2>/dev/null; do
-        if [ -f "$AGENT_ETAT/verrou/pid" ]; then
-            p="$(cat "$AGENT_ETAT/verrou/pid" 2>/dev/null || true)"
-            if [ -n "$p" ] && ! kill -0 "$p" 2>/dev/null; then
-                rm -f "$AGENT_ETAT/verrou/pid"
-                rmdir "$AGENT_ETAT/verrou" 2>/dev/null || true
-                continue
-            fi
+        # Un verrou n'est orphelin que par son âge : le rang n'est tenu que
+        # quelques millisecondes, 30 s ne peut être qu'un arrêt à reprendre,
+        # sinon on attend puis on renonce (code 1).
+        age=""
+        if [ -d "$AGENT_ETAT/verrou" ]; then
+            age="$(mtime "$AGENT_ETAT/verrou" 2>/dev/null)" || age=""
+        fi
+        if [ -n "$age" ] && [ "$(( $(date +%s) - age ))" -gt 30 ]; then
+            rm -f "$AGENT_ETAT/verrou/pid"
+            if rmdir "$AGENT_ETAT/verrou" 2>/dev/null; then continue; fi
         fi
         if [ "$(date +%s)" -ge "$fin" ]; then return 1; fi
         sleep 1
