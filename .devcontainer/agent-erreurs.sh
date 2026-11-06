@@ -108,3 +108,23 @@ ecart_liberer() {
         *) rm -f "$AGENT_ETAT/ecart-$1" "$AGENT_ETAT/muet-$1" ;;
     esac
 }
+
+# Arrête la session en cours si le journal contient quota, pays ou filtre depuis
+# son début : le modèle est écarté et la session est tuée (processus et enfants).
+session_erreur_fatale() {
+    local pid="$1" journal="$2" offset="$3" m="$4" dossier="$5"
+    local sortie cause
+    sortie="$(tail -c "+$(( offset + 1 ))" "$journal" 2>/dev/null || true)"
+    cause="$(erreur_cause "$sortie")"
+    case "$cause" in
+        quota | pays | filtre) ;;
+        *) return 1 ;;
+    esac
+    pkill -P "$pid" 2>/dev/null || true
+    kill "$pid" 2>/dev/null || true
+    wait "$pid" 2>/dev/null || true
+    droits_verifier "$dossier"
+    modele_ecarter "$m" "$cause"
+    printf '%s\n' "=== opencode/$m écarté ($cause) : modèle suivant" >>"$journal"
+    return 0
+}

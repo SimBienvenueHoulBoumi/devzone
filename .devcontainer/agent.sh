@@ -55,7 +55,7 @@ agent_lancer() {
         refuse "module ia désactivé : devzone activer ia"
     fi
     local dossier="$1" consigne="$2"
-    local journal etat debut m i pid code offset taille demarre freeze
+    local journal etat debut m i pid code offset taille demarre freeze discard nouveau
     local consigne_courante repris=0 maintenant dernier sortie cause
     local reseau_pour="" reseau_n=0
     [ -d "$dossier" ] || refuse "dossier introuvable : $dossier"
@@ -99,18 +99,21 @@ agent_lancer() {
         fi
         echo "=== modèle opencode/$m début $(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$journal"
         offset="$(wc -c <"$journal")"
-        (cd "$dossier" && DEVZONE_AGENT_SESSION=1 opencode run --auto -m "opencode/$m" "$(cat "$consigne_courante")" </dev/null >>"$journal" 2>&1) &
+        (cd "$dossier" && DEVZONE_AGENT_SESSION=1 opencode run --print-logs --log-level ERROR --auto -m "opencode/$m" "$(cat "$consigne_courante")" </dev/null >>"$journal" 2>&1) &
         pid=$!
         demarre=0
-        # Silence au départ : rien écrit pendant SILENCE secondes alors que le
-        # processus vit encore (quota : opencode réessaie sans rien dire).
-        local debut_t
+        discard=0
         debut_t="$(date +%s)"
         while kill -0 "$pid" 2>/dev/null; do
-            if [ "$(wc -c <"$journal")" -gt "$offset" ]; then demarre=1; break; fi
+            if session_erreur_fatale "$pid" "$journal" "$offset" "$m" "$dossier"; then discard=1; break; fi
+            if [ "$(wc -c <"$journal")" -gt "$offset" ]; then
+                nouveau="$(tail -c "+$(( offset + 1 ))" "$journal" 2>/dev/null || true)"
+                if [ "$(erreur_cause "$nouveau")" != "quota" ]; then demarre=1; break; fi
+            fi
             if [ $(( $(date +%s) - debut_t )) -ge "$SILENCE" ]; then break; fi
             sleep "${DEVZONE_AGENT_PAS:-1}"
         done
+        if [ "$discard" = 1 ]; then reprise; i=$(( i + 1 )); continue; fi
         if kill -0 "$pid" 2>/dev/null && [ "$demarre" = 0 ]; then
             pkill -P "$pid" 2>/dev/null || true
             kill "$pid" 2>/dev/null || true
@@ -125,10 +128,12 @@ agent_lancer() {
         # Session figée : plus rien écrit depuis FIGEE secondes en cours de
         # route → arrêtée, puis session neuve avec la consigne de reprise.
         freeze=0
+        discard=0
         if kill -0 "$pid" 2>/dev/null && [ "$demarre" = 1 ]; then
             dernier="$(date +%s)"
             taille="$(wc -c <"$journal")"
             while kill -0 "$pid" 2>/dev/null; do
+                if session_erreur_fatale "$pid" "$journal" "$offset" "$m" "$dossier"; then discard=1; break; fi
                 sleep "${DEVZONE_AGENT_PAS:-1}"
                 maintenant="$(date +%s)"
                 if [ "$(wc -c <"$journal")" -gt "$taille" ]; then
@@ -145,6 +150,7 @@ agent_lancer() {
                 fi
             done
         fi
+        if [ "$discard" = 1 ]; then reprise; i=$(( i + 1 )); continue; fi
         if [ "$freeze" = 1 ]; then
             echo "=== opencode/$m figé ($FIGEE s sans écrire) : session neuve, modèle suivant" >>"$journal"
             reprise

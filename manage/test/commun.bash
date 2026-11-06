@@ -92,8 +92,11 @@ case "${1:-}" in
             'opencode/nemotron-3-ultra-free'
         ;;
     run)
-        modele="${4#opencode/}"
-        consigne="${5:-}"
+        modele=""
+        for a in "$@"; do
+            case "$a" in opencode/*) modele="${a#opencode/}" ;; esac
+        done
+        if [ "$#" -gt 0 ]; then consigne="${!#}"; else consigne=""; fi
         echo "$modele" >>"${FAKE_OP_LOG:?}"
         printf '%s\n---\n' "$consigne" >>"${FAKE_OP_CONSIGNE_LOG:?}"
         printf '%s\n' "${OPENCODE_CONFIG_CONTENT:-}" >"${FAKE_OP_CONFIG_LOG:?}"
