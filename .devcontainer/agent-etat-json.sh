@@ -39,23 +39,20 @@ iso() {
 # agent_ecarts et droits_alertes, sans recopier leur logique.
 agent_etat_json() {
     local sessions_json='[]' ecarts_json='[]' alertes_json='[]'
-    local f journal m modele debut dernier project en_cours
+    local f journal modele debut dernier project en_cours
     local e cause d fin fin_iso maintenant
 
     for f in "$RACINE"/workspace/.agents/*.log; do
         [ -e "$f" ] || continue
         journal="$(basename "$f")"
-        m="$(grep -oE 'opencode/[A-Za-z0-9._-]+' "$f" 2>/dev/null | tail -1 || true)"
-        modele="${m#opencode/}"
+        session_modele_debut "$f"
+        modele="$MODELE_SESSION"
         [ -n "$modele" ] || modele="inconnu"
-        debut="$(grep '^=== modèle ' "$f" 2>/dev/null | tail -1 | sed -E 's/.* début ([^ ]+).*/\1/' || true)"
+        debut="$DEBUT_SESSION"
         dernier="$(heure "$(mtime "$f")")"
         project="${journal%.log}"
         en_cours=false
-        # shellcheck disable=SC2009
-        if ps -eo args= 2>/dev/null | grep 'agent.sh' | grep -qF "$project"; then
-            en_cours=true
-        fi
+        if session_en_cours "$project"; then en_cours=true; fi
         sessions_json="$(jq -c \
             --arg journal "$journal" \
             --arg modele "$modele" \
