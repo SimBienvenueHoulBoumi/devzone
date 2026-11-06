@@ -10,6 +10,7 @@ if ! declare -F cluster_est_local >/dev/null 2>&1; then
     fi
 fi
 
+# Rend l invite Kubernetes (⎈ ctx/ns) avec cache par mtime.
 devzone_invite_kube() {
     local kubeconfig="${KUBECONFIG:-$HOME/.kube/config:$HOME/.kube/hote.config}"
     local files=() f sig="" cache mtime ctx ns result

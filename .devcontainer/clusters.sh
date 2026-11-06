@@ -8,6 +8,7 @@ if ! declare -F cluster_est_local >/dev/null 2>&1; then
     . "$ICI/cluster.sh"
 fi
 
+# Affiche la vue des clusters connectés.
 clusters_afficher() {
     local contextes=() ctx ctx_travail ctx_services tmp i ns type etat marque
     ctx_travail="$(kubectl config current-context 2>/dev/null || true)"
@@ -57,7 +58,9 @@ clusters_afficher() {
     return 0
 }
 
+# Alias de la commande devzone clusters.
 clusters() { clusters_afficher "$@"; }
+# Alias pour les tests et l appel direct.
 devzone_clusters() { clusters_afficher "$@"; }
 
 if [ "${BASH_SOURCE[0]}" = "$0" ]; then
