@@ -105,3 +105,37 @@ setup() {
     [ "$status" -eq 2 ]
     [[ "$output" == *"devzone activer ia"* ]] || false
 }
+
+@test "agent : verrou d'un conteneur arrêté en prise de rang (pid absent) -> repris sans attendre" {
+    # Verrou sans fichier pid : l'arrêt est tombé entre mkdir et l'écriture (#377)
+    source "$BATS_TEST_DIRNAME/../../.devcontainer/agent-session.sh"
+    AGENT_ETAT="$DEVZONE_AGENT_ETAT"
+    mkdir -p "$AGENT_ETAT/verrou"
+    debut="$(date +%s)"
+    run verrou_prendre
+    [ "$status" -eq 0 ] || false
+    [ $(( $(date +%s) - debut )) -le 5 ] || false
+    [ -s "$AGENT_ETAT/verrou/pid" ] || false
+}
+
+@test "agent : verrou d'un processus tué (pid mort) -> repris, verrou laché nettoyé" {
+    source "$BATS_TEST_DIRNAME/../../.devcontainer/agent-session.sh"
+    AGENT_ETAT="$DEVZONE_AGENT_ETAT"
+    mkdir -p "$AGENT_ETAT/verrou"
+    echo 999999 >"$AGENT_ETAT/verrou/pid"
+    run verrou_prendre
+    [ "$status" -eq 0 ] || false
+    [ -s "$AGENT_ETAT/verrou/pid" ] || false
+    verrou_lacher
+    [ ! -e "$AGENT_ETAT/verrou" ] || false
+}
+
+@test "agent : verrou d'un processus vivant -> attente puis refus, verrou conservé" {
+    source "$BATS_TEST_DIRNAME/../../.devcontainer/agent-session.sh"
+    AGENT_ETAT="$DEVZONE_AGENT_ETAT"
+    mkdir -p "$AGENT_ETAT/verrou"
+    echo "$$" >"$AGENT_ETAT/verrou/pid"
+    run verrou_prendre
+    [ "$status" -eq 1 ] || false
+    [ -f "$AGENT_ETAT/verrou/pid" ] || false
+}

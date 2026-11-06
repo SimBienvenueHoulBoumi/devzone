@@ -310,6 +310,7 @@ Le conteneur est jetable ; ce qui compte vit dans des volumes Docker, sur ta mac
 | `devzone-git` | identité git (`~/.config/git/config`) | gardé | gardé | gardé |
 | `devzone-claude` | connexion et réglages de Claude Code | gardé | gardé | gardé |
 | `devzone-opencode-config`, `devzone-opencode-data` | connexion et réglages d'opencode | gardé | gardé | gardé |
+| `devzone-agent` | état de `devzone agent` (modèles écartés, rang), partagé entre les devzone | gardé | gardé | gardé |
 | `devzone-config` | modules activés (`devzone activer`) : ancien état utilisateur, repris une fois | gardé | gardé | gardé |
 | `devzone-m2`, `devzone-pnpm` | caches Maven (`~/.m2`) et pnpm | gardé | gardé | gardé |
 | `devzone-gradle` | cache Gradle (`~/.gradle`) | gardé | gardé | gardé |

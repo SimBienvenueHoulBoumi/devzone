@@ -32,13 +32,13 @@ verrou_prendre() {
     local fin p
     fin=$(( $(date +%s) + 10 ))
     while ! mkdir "$AGENT_ETAT/verrou" 2>/dev/null; do
-        if [ -f "$AGENT_ETAT/verrou/pid" ]; then
-            p="$(cat "$AGENT_ETAT/verrou/pid" 2>/dev/null || true)"
-            if [ -n "$p" ] && ! kill -0 "$p" 2>/dev/null; then
-                rm -f "$AGENT_ETAT/verrou/pid"
-                rmdir "$AGENT_ETAT/verrou" 2>/dev/null || true
-                continue
-            fi
+        # Conteneur arrêté en prise de rang (#377) : verrou sans pid écrit
+        # (arrêt entre mkdir et echo) ou pid mort → repris, sinon attente.
+        p="$(cat "$AGENT_ETAT/verrou/pid" 2>/dev/null || true)"
+        if [ -z "$p" ] || ! kill -0 "$p" 2>/dev/null; then
+            rm -f "$AGENT_ETAT/verrou/pid"
+            rmdir "$AGENT_ETAT/verrou" 2>/dev/null || true
+            continue
         fi
         if [ "$(date +%s)" -ge "$fin" ]; then return 1; fi
         sleep 1
