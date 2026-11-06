@@ -28,7 +28,33 @@ lancer_fond() {
 
 # Premier modèle choisi dans le journal d'un dossier de lancement parallèle.
 premier_modele() {
-    grep -m1 -oE '^=== modèle opencode/[A-Za-z0-9._-]+' "$1" | sed 's#.*opencode/##'
+    grep -m1 -oE '^=== modèle opencode/[A-Za-z0-9._-]+' "$1" |     sed 's#.*opencode/##'
+}
+
+# Affiche, sur la sortie de bats, les faits visibles au moment d'un echec :
+# journaux complets des agents, rang et liste de l'etat, modeles du faux
+# opencode, sorties de chaque lancement (un.out, deux.out...).
+diagnostic() {
+    echo "===== diagnostic agent-parallele =====" >&2
+    echo "--- journaux des agents ---" >&2
+    for j in "$DEVZONE_RACINE"/workspace/.agents/*.log; do
+        [ -e "$j" ] || continue
+        echo "### $j" >&2
+        cat "$j" >&2
+    done
+    echo "--- rang ($DEVZONE_AGENT_ETAT/rang) ---" >&2
+    [ -r "$DEVZONE_AGENT_ETAT/rang" ] && cat "$DEVZONE_AGENT_ETAT/rang" >&2
+    echo "--- liste de $DEVZONE_AGENT_ETAT ---" >&2
+    ls -la "$DEVZONE_AGENT_ETAT" >&2
+    echo "--- modeles opencode ---" >&2
+    opencode models opencode >&2
+    echo "--- sorties des lancements ---" >&2
+    for o in "$BATS_TEST_TMPDIR"/*.out; do
+        [ -e "$o" ] || continue
+        echo "### $o" >&2
+        cat "$o" >&2
+    done
+    echo "===== fin diagnostic agent-parallele =====" >&2
 }
 
 @test "agent : deux lancements simultanes -> les deux demarrent sur deux modeles differents" {
@@ -44,13 +70,13 @@ premier_modele() {
     wait "$p1" || s1=$?
     s2=0
     wait "$p2" || s2=$?
-    [ "$s1" -eq 0 ]
-    [ "$s2" -eq 0 ]
-    grep -q '^=== modèle opencode/' "$j1" || false
-    grep -q '^=== modèle opencode/' "$j2" || false
-    ! grep -q "aucun modèle gratuit disponible" "$j1" || false
-    ! grep -q "aucun modèle gratuit disponible" "$j2" || false
-    [ "$(premier_modele "$j1")" != "$(premier_modele "$j2")" ]
+    [ "$s1" -eq 0 ] || { diagnostic; false; }
+    [ "$s2" -eq 0 ] || { diagnostic; false; }
+    grep -q '^=== modèle opencode/' "$j1" || { diagnostic; false; }
+    grep -q '^=== modèle opencode/' "$j2" || { diagnostic; false; }
+    ! grep -q "aucun modèle gratuit disponible" "$j1" || { diagnostic; false; }
+    ! grep -q "aucun modèle gratuit disponible" "$j2" || { diagnostic; false; }
+    [ "$(premier_modele "$j1")" != "$(premier_modele "$j2")" ] || { diagnostic; false; }
 }
 
 @test "agent : trois lancements simultanes -> aucun ne s'arrete faute de modele" {
@@ -69,13 +95,13 @@ premier_modele() {
     wait "$p2" || s2=$?
     s3=0
     wait "$p3" || s3=$?
-    [ "$s1" -eq 0 ]
-    [ "$s2" -eq 0 ]
-    [ "$s3" -eq 0 ]
+    [ "$s1" -eq 0 ] || { diagnostic; false; }
+    [ "$s2" -eq 0 ] || { diagnostic; false; }
+    [ "$s3" -eq 0 ] || { diagnostic; false; }
     for j in projet-trois projet-quatre projet-cinq; do
         journal="$DEVZONE_RACINE/workspace/.agents/$j.log"
-        grep -q '^=== modèle opencode/' "$journal" || false
-        ! grep -q "aucun modèle gratuit disponible" "$journal" || false
+        grep -q '^=== modèle opencode/' "$journal" || { diagnostic; false; }
+        ! grep -q "aucun modèle gratuit disponible" "$journal" || { diagnostic; false; }
     done
 }
 
@@ -98,18 +124,27 @@ premier_modele() {
     wait "$p1" || s1=$?
     s2=0
     wait "$p2" || s2=$?
-    [ "$s1" -eq 0 ]
-    [ "$s2" -eq 0 ]
-    [ "$(premier_modele "$j1")" = "big-pickle" ]
-    [ "$(premier_modele "$j2")" = "big-pickle" ]
-    ! grep -q "aucun modèle gratuit disponible" "$j1" || false
-    ! grep -q "aucun modèle gratuit disponible" "$j2" || false
+    [ "$s1" -eq 0 ] || { diagnostic; false; }
+    [ "$s2" -eq 0 ] || { diagnostic; false; }
+    [ "$(premier_modele "$j1")" = "big-pickle" ] || { diagnostic; false; }
+    [ "$(premier_modele "$j2")" = "big-pickle" ] || { diagnostic; false; }
+    ! grep -q "aucun modèle gratuit disponible" "$j1" || { diagnostic; false; }
+    ! grep -q "aucun modèle gratuit disponible" "$j2" || { diagnostic; false; }
     echo "$(date +%s) quota 3600" >"$DEVZONE_AGENT_ETAT/ecart-big-pickle"
     j3="$DEVZONE_RACINE/workspace/.agents/projet-huit.log"
     lancer_fond "$DEVZONE_RACINE/workspace/projet-huit" "$BATS_TEST_TMPDIR/huit.out"
     p3="$AGENT_PID"
     s3=0
     wait "$p3" || s3=$?
-    [ "$s3" -eq 3 ]
-    grep -q "aucun modèle gratuit disponible" "$j3" || false
+    [ "$s3" -eq 3 ] || { diagnostic; false; }
+    grep -q "aucun modèle gratuit disponible" "$j3" || { diagnostic; false; }
+}
+
+@test "agent : journal trace la prise du rang (=== rang debut/total)" {
+    printf 'construis la feature\n' >"$DEVZONE_RACINE/workspace/consigne.txt"
+    mkdir -p "$DEVZONE_RACINE/workspace/projet-rang"
+    journal="$DEVZONE_RACINE/workspace/.agents/projet-rang.log"
+    bash "$DEVZONE" agent "$DEVZONE_RACINE/workspace/projet-rang" "$DEVZONE_RACINE/workspace/consigne.txt" >"$BATS_TEST_TMPDIR/rang.out" 2>&1
+    [ "$?" -eq 0 ] || { diagnostic; false; }
+    grep -qE '^=== rang [0-9]+/[0-9]+$' "$journal" || { diagnostic; false; }
 }
