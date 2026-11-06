@@ -28,7 +28,7 @@ lancer_fond() {
 
 # Premier modèle choisi dans le journal d'un dossier de lancement parallèle.
 premier_modele() {
-    grep -m1 -oE '^=== modèle opencode/[A-Za-z0-9._-]+' "$1" |     sed 's#.*opencode/##'
+    grep -m1 -oE '^=== modèle opencode/[A-Za-z0-9._-]+' "$1" | sed 's#.*opencode/##'
 }
 
 # Affiche, sur la sortie de bats, les faits visibles au moment d'un echec :
