@@ -35,6 +35,20 @@ relais_auto_actif() { local nom; nom="$(nom_relais_auto "$1")"; command -v docke
 # Délai après disparition d'un port avant de retirer le pont et le relais.
 delai_disparition() { local v; for v in DEVZONE_PORTS_AUTO_DELAI_DISPARITION DEVZONE_PORTS_AUTO_DELAI DEVZONE_PORTS_AUTO_RETARD PORTS_AUTO_DELAI PORTS_AUTO_RETARD; do [ -n "${!v:-}" ] && { echo "${!v}"; return 0; }; done; echo 10; }
 
+# Garde-fou (règle docker-relais.sh #293) : la boucle et demarrer ne tournent
+# jamais sous bats, et hors du conteneur que si le contexte réel est posé.
+garde_veilleur() {
+    if [ -n "${BATS_TEST_TMPDIR:-}" ]; then
+        echo "devzone : port : veilleur automatique refusé sous bats (tests)" >&2
+        return 2
+    fi
+    if [ "${DEVZONE_PORTS_AUTO_REEL:-}" != oui ]; then
+        echo "devzone : port : veilleur automatique refusé ici : lancer plutôt devzone reparer" >&2
+        return 2
+    fi
+    return 0
+}
+
 # Lance le relais automatique ; échec → message et code 1 (port déjà pris marqué).
 lancer_auto() {
     local port="$1" reseau="$2" ip="$3" nom sortie
@@ -75,10 +89,15 @@ verrou_prendre() {
     done
 }
 
+# Marque le verrou comme vivant : date récente et pid du titulaire à jour,
+# sinon une instance voisine croit le verrou rouillé et le prend.
+verrou_rafraichir() { touch "$VERROU" 2>/dev/null || true; echo "$$" >"$VERROU/pid" 2>/dev/null || true; }
+
 # Un tour de veilleur : relaie les ports écoutés, retire les disparus.
 ports_auto_tour() {
     local port now delay sortie
     if [ "$(ports_auto_actif)" = off ]; then nettoyer_auto_tout; return 0; fi
+    if ! reseau_ip; then echo "devzone : ports-auto : conteneur devzone introuvable" >&2; return 1; fi
     : >"$COURANT"
     ss -ltnH 2>/dev/null | awk '{ if (NF >= 4) print $4; else if (NF >= 1) print $1 }' | while IFS= read -r local; do
         [ -n "$local" ] || continue
@@ -100,7 +119,6 @@ ports_auto_tour() {
     [ -f "$OCCUPES" ] && cat "$OCCUPES" >>"$BASE/managed"
     sort -n -u "$BASE/managed" -o "$BASE/managed" 2>/dev/null || true
 
-    if ! reseau_ip; then echo "devzone : ports-auto : conteneur devzone introuvable" >&2; return 1; fi
     now="$(date +%s)"; delay="$(delai_disparition)"
     while IFS= read -r port; do
         [ -n "$port" ] || continue
@@ -151,6 +169,9 @@ ports_auto_boucle() {
     nettoyer_precedents
     trap 'nettoyer_auto_tout; rm -rf "$VERROU"' EXIT INT TERM
     while true; do
+        # Dossier d'état disparu : le conteneur est parti, le veilleur s'arrête.
+        if [ ! -f "$ETAT" ]; then nettoyer_auto_tout; break; fi
+        verrou_rafraichir
         [ "$(ports_auto_actif)" = off ] && { nettoyer_auto_tout; break; }
         ports_auto_tour || true
         sleep "${DEVZONE_PORTS_AUTO_PAS:-2}"
@@ -203,9 +224,10 @@ ports_auto_liste_json() {
 
 if [ "${BASH_SOURCE[0]}" = "$0" ]; then
 case "${1:-}" in
-    ''|boucle|loop) ports_auto_boucle ;;
+    ''|boucle|loop) if ! garde_veilleur; then exit 2; fi; ports_auto_boucle ;;
     tour|one|un-tour) ports_auto_tour ;;
-    demarrer|start|lancer) if kill -0 "$(cat "$VERROU/pid" 2>/dev/null)" 2>/dev/null; then echo "déjà lancé"; else bash "$0" boucle >/dev/null 2>&1 & echo "lancé"; fi ;;
+    demarrer|start|lancer) if ! garde_veilleur; then exit 2; fi
+        if kill -0 "$(cat "$VERROU/pid" 2>/dev/null)" 2>/dev/null; then echo "déjà lancé"; else DEVZONE_PORTS_AUTO_REEL=oui bash "$0" boucle >/dev/null 2>&1 & echo "lancé"; fi ;;
     arreter|stop) arreter_veilleur; echo "arrêté" ;;
     nettoyer|clean) nettoyer_auto_tout ;;
     auto) case "${2:-}" in on) ecrire ports_auto on; echo "✔ ports auto activés" ;; off) ecrire ports_auto off; arreter_veilleur; echo "✔ ports auto désactivés" ;; *) echo "devzone : port : auto on|off" >&2; exit 2 ;; esac ;;

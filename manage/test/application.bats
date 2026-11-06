@@ -93,9 +93,11 @@ KUBE
     [ "$status" -eq 0 ]
     [[ "$output" == *"✔ relais Docker"* ]] || false
     [[ "$output" == *"✔ relais de ports"* ]] || false
+    [[ "$output" == *"✔ veilleur ports auto"* ]] || false
     [[ "$output" == *"✔ identifiants"* ]] || false
     [[ "$(cat "$T/actions.log")" == *"relais oui"* ]] || false
     [[ "$(cat "$T/actions.log")" == *"ports relancer"* ]] || false
+    [[ "$(cat "$T/actions.log")" == *"ports-auto demarrer"* ]] || false
     [[ "$(cat "$T/actions.log")" == *"password regenerer"* ]] || false
 }
 

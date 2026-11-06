@@ -805,7 +805,7 @@ reparer() {
         reparer_element "relais postgres" bash "$ICI/postgres/postgres.sh" relais-lancer
     fi
     reparer_element "relais de ports" bash "$ICI/ports.sh" relancer
-    reparer_element "veilleur ports auto" bash "$ICI/ports-auto.sh" demarrer
+    reparer_element "veilleur ports auto" env DEVZONE_PORTS_AUTO_REEL=oui bash "$ICI/ports-auto.sh" demarrer
     reparer_element "identifiants" bash "$ICI/password.sh" regenerer
     return "$reparer_echec"
 }

@@ -32,8 +32,9 @@ fi
 # Relais de ports vers le poste (#290) : l'IP du conteneur change à chaque
 # démarrage, chaque relais de l'état est recréé ; un échec n'empêche rien
 bash "$ICI/ports.sh" relancer || echo "démarrage : relais de ports non relancés (devzone reparer)"
-# Veilleur de ports automatiques vers le poste (#394) : une instance en arrière-plan
-bash "$ICI/ports-auto.sh" boucle >/dev/null 2>&1 &
+# Veilleur de ports automatiques vers le poste (#394, garde #293) : une seule
+# instance en arrière-plan, contexte réel posé pour cet appel seulement
+DEVZONE_PORTS_AUTO_REEL=oui bash "$ICI/ports-auto.sh" demarrer >/dev/null 2>&1 || echo "démarrage : veilleur de ports auto non lancé (devzone reparer)"
 
 # Vue regroupée des identifiants (#332), regénérée à chaque démarrage ; un
 # échec n'empêche rien et le contenu n'est jamais affiché

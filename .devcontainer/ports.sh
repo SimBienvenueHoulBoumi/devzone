@@ -21,20 +21,11 @@ refuse() { echo "devzone : port : $*" >&2; exit 1; }
 
 nom_relais() { echo "devzone-$INSTANCE-port-$1"; }
 
-port_valide() {
-    case "${1:-}" in
-        '' | *[!0-9]*) return 1 ;;
-    esac
-    [ "$1" -ge 1 ] 2>/dev/null && [ "$1" -le 65535 ] 2>/dev/null
-}
+port_valide() { case "${1:-}" in '' | *[!0-9]*) return 1 ;; esac; [ "$1" -ge 1 ] 2>/dev/null && [ "$1" -le 65535 ] 2>/dev/null; }
 
-valider_port() {
-    port_valide "${1:-}" || refuse "port invalide : ${1:-(aucun)} (1-65535)"
-}
+valider_port() { port_valide "${1:-}" || refuse "port invalide : ${1:-(aucun)} (1-65535)"; }
 
-lire_ports() {
-    grep -E '^ports=' "$ETAT" 2>/dev/null | tail -1 | cut -d= -f2- || true
-}
+lire_ports() { grep -E '^ports=' "$ETAT" 2>/dev/null | tail -1 | cut -d= -f2- || true; }
 
 trier_ports() {
     printf '%s\n' "${1:-}" | tr ',' '\n' |
@@ -144,9 +135,7 @@ fermer() {
     echo "✔ relais fermé : $port"
 }
 
-application_repond() {
-    curl -s -o /dev/null --max-time 2 "http://127.0.0.1:$1" >/dev/null 2>&1
-}
+application_repond() { curl -s -o /dev/null --max-time 2 "http://127.0.0.1:$1" >/dev/null 2>&1; }
 
 liste() {
     local ports port marque app

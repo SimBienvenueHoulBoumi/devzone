@@ -178,15 +178,63 @@ SS
     [ "$(grep -c 'docker run' "$BATS_TEST_TMPDIR/docker.log")" -eq 0 ]
 }
 
-@test "veilleur : deux instances lancées → une seule tourne" {
+@test "veilleur : boucle et demarrer refusent sous bats (code 2), rien lancé" {
+    run bash "$PORTS_AUTO" boucle
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"refus"* ]] || false
     run bash "$PORTS_AUTO" demarrer
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"refus"* ]] || false
+    # Le garde-fou agit avant tout : aucun verrou, aucun relais, aucun pont.
+    [ ! -e "$DEVZONE_PORTS_AUTO_DIR/devzone/verrou" ]
+    [ "$(grep -c 'docker run' "$BATS_TEST_TMPDIR/docker.log")" -eq 0 ]
+    [ ! -s "$BATS_TEST_TMPDIR/socat.log" ]
+}
+
+@test "veilleur : refus sans le contexte réel, message devzone reparer (code 2)" {
+    # bats posé aussi : garantit que le message de refus réel est atteignable
+    run env -u BATS_TEST_TMPDIR bash "$PORTS_AUTO" boucle
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"devzone reparer"* ]] || false
+    run env -u BATS_TEST_TMPDIR bash "$PORTS_AUTO" demarrer
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"devzone reparer"* ]] || false
+    [ ! -e "$DEVZONE_PORTS_AUTO_DIR/devzone/verrou" ]
+}
+
+@test "veilleur : refus même avec le contexte réel posé, sous bats (code 2)" {
+    DEVZONE_PORTS_AUTO_REEL=oui run bash "$PORTS_AUTO" boucle
+    [ "$status" -eq 2 ]
+    DEVZONE_PORTS_AUTO_REEL=oui run bash "$PORTS_AUTO" demarrer
+    [ "$status" -eq 2 ]
+    [ ! -e "$DEVZONE_PORTS_AUTO_DIR/devzone/verrou" ]
+    [ "$(grep -c 'docker run' "$BATS_TEST_TMPDIR/docker.log")" -eq 0 ]
+}
+
+@test "veilleur : verrou recyclé d'une instance morte, tenu par une vivante qui le rafraît, volé si rouillé" {
+    run bash -c '
+    . "$1"
+    mkdir -p "$VERROU"
+    echo 4194303 >"$VERROU/pid" # pid au-delà de la limite du noyau : titulaire mort
+    verrou_prendre; echo "rc_morte=$?"
+    echo $$ >"$VERROU/pid"      # titulaire vivant (ce shell), verrou vieux
+    touch -d "2 minutes ago" "$VERROU"
+    verrou_rafraichir
+    verrou_prendre; echo "rc_vivante=$?"
+    touch -d "2 minutes ago" "$VERROU"
+    verrou_prendre; echo "rc_rouille=$?"
+    ' x "$PORTS_AUTO"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"lancé"* ]] || false
-    sleep 2
-    run bash "$PORTS_AUTO" demarrer
-    [ "$status" -eq 0 ]
-    [[ "$output" == *"déjà lancé"* ]] || false
-    run bash "$PORTS_AUTO" arreter
-    [ "$status" -eq 0 ]
-    [[ "$output" == *"arrêté"* ]] || false
+    [[ "$output" == *"rc_morte=0"* ]] || false
+    [[ "$output" == *"rc_vivante=1"* ]] || false
+    [[ "$output" == *"rc_rouille=0"* ]] || false
+}
+
+teardown() {
+    # Incident #394 : aucun veilleur lancé par un test ne doit survivre au test.
+    if pgrep -f "bash +[^ ]*ports-auto[.]sh (boucle|demarrer)" >/dev/null 2>&1; then
+        pgrep -af "ports-auto[.]sh" >&2
+        return 1
+    fi
+    return 0
 }
