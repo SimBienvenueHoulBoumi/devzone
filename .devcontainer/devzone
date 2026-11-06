@@ -303,10 +303,9 @@ appliquer_ia() {
         # Configuration opencode : retirée seulement si elle porte le repère devzone
         # et n'a pas été modifiée ; personnalisée → gardée.
         retirer_config_opencode
-        # État de devzone agent : retiré (les journaux workspace/.agents/ sont des
-        # données et restent, voir le message).
-        rm -rf "${DEVZONE_AGENT_ETAT:-$HOME/.local/state/oc-lancer}"
-        echo "devzone : ia désactivé (connexions gardées dans leurs volumes ; journaux workspace/.agents/ gardés)"
+        # État de devzone agent : gardé dans le volume partagé (désactivation
+        # dans l'une des devzone ne supprime pas l'état des autres).
+        echo "devzone : ia désactivé (connexions et état de devzone agent gardés dans leurs volumes ; journaux workspace/.agents/ gardés)"
     fi
 }
 
