@@ -123,7 +123,7 @@ liste_modeles() {
     fi
 }
 
-# Modèle et début d'une session (#388) : lus uniquement sur la dernière ligne
+# Modèle et début d'une session (#308) : lus uniquement sur la dernière ligne
 # « === modèle opencode/? début » du superviseur ; le texte écrit par le
 # modèle dans le journal (un « opencode/agent.json » possible) n'est pas lu.
 session_modele_debut() {
@@ -133,7 +133,7 @@ session_modele_debut() {
     DEBUT_SESSION="$(sed -nE 's/.* début ([^ ]+).*/\1/p' <<<"$ligne")"
 }
 
-# Une session est en cours (#388) si un processus agent.sh vivant a pour
+# Une session est en cours (#308) si un processus agent.sh vivant a pour
 # premier argument (le dossier, absolu depuis #287) un chemin dont le nom est
 # exactement le journal sans « .log » ; un simple dossier contenant ce nom ne
 # suffit pas, ni un chemin qui ne serait pas le dossier d'un agent.
@@ -160,7 +160,7 @@ agent_etat() {
         [ -e "$f" ] || continue
         vu=1
         session_modele_debut "$f"
-        m="$MODELE_SESSION"
+        m="${MODELE_SESSION:+opencode/$MODELE_SESSION}"
         debut="$DEBUT_SESSION"
         dernier="$(heure "$(mtime "$f")")"
         echo "  session $(basename "$f") : modèle ${m:-inconnu}, depuis ${debut:-inconnu}, dernier écrit $dernier"
