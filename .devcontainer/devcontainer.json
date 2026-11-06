@@ -7,7 +7,9 @@
     "ghcr.io/devcontainers/features/java:1": {
       "version": "21",
       "jdkDistro": "tem",
-      "installMaven": true
+      "installMaven": true,
+      "installGradle": true,
+      "gradleVersion": "9.8.2"
     },
     "ghcr.io/devcontainers/features/node:1": {
       "version": "lts",
@@ -37,6 +39,7 @@
   // volumes : devzone, ou DEVZONE_VOLUMES (tests fonctionnels, isolés)
   "mounts": [
     "source=${localEnv:DEVZONE_VOLUMES:devzone}-m2,target=/home/vscode/.m2,type=volume",
+    "source=${localEnv:DEVZONE_VOLUMES:devzone}-gradle,target=/home/vscode/.gradle,type=volume",
     "source=${localEnv:DEVZONE_VOLUMES:devzone}-pnpm,target=/home/vscode/.local/share/pnpm,type=volume",
     // Assistants IA : connexion et réglages gardés d'un rebuild à l'autre
     "source=${localEnv:DEVZONE_VOLUMES:devzone}-claude,target=/home/vscode/.claude,type=volume",

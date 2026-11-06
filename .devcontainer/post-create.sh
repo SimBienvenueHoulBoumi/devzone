@@ -12,7 +12,7 @@ exec </dev/null
 
 # Volumes nommés créés en root → rendre au user vscode
 # (et ~/.config, créé par Docker pour monter ~/.config/opencode)
-sudo chown -R vscode:vscode /home/vscode/.m2 /home/vscode/.local /home/vscode/.claude \
+sudo chown -R vscode:vscode /home/vscode/.m2 /home/vscode/.gradle /home/vscode/.local /home/vscode/.claude \
     /home/vscode/.config/opencode /home/vscode/.config/gh /home/vscode/.config/git \
     /home/vscode/.config/devzone
 sudo chown vscode:vscode /home/vscode/.config
