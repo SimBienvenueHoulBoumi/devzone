@@ -4,9 +4,9 @@
 # Les aides de manage/test/commun.bash : relais_docker_isole, kube_isole.
 
 # Source des fonctions d'isolation
-source /workspaces/devzone/workspace/wt/dz-396/.devcontainer/isolement.sh
+source "$BATS_TEST_DIRNAME/../../.devcontainer/isolement.sh"
 
-source /workspaces/devzone/workspace/wt/dz-396/manage/test/commun.bash
+load commun
 
 setup() {
     relais_docker_isole

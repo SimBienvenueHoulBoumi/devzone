@@ -15,7 +15,7 @@ set -euo pipefail
 VERSION=v0.9.0
 MANIFESTE="https://github.com/kubernetes-sigs/metrics-server/releases/download/${VERSION}/components.yaml"
 
-mapfile -t connus < <(kubectl --context devzone config get-contexts -o name 2>/dev/null || true)
+mapfile -t connus < <(kubectl config get-contexts -o name 2>/dev/null || true)
 
 if [ "${1:-}" = retirer ]; then
     shift
@@ -67,7 +67,7 @@ for contexte in "$@"; do
         code=1
         continue
     fi
-    k=(kubectl --context devzone --request-timeout=5s)
+    k=(kubectl --context "$contexte" --request-timeout=5s)
     if ! "${k[@]}" get --raw /readyz >/dev/null 2>&1; then
         # Sans argument : kind peut être en cours de démarrage, ignoré
         if [ "$demandes" -gt 0 ]; then
