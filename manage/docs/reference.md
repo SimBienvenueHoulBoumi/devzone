@@ -208,6 +208,21 @@ Le cluster de l'hôte n'est pas joignable dans deux cas (kind fonctionne quand m
 - **Codespaces, machine distante** : pas de `~/.kube` local ;
 - **Linux avec Docker Engine** : un cluster kind ou minikube de l'hôte écoute sur `127.0.0.1`, invisible du conteneur sans la réécriture `kube-config.sh`. Un cluster qui écoute sur toutes les interfaces (k3s, kubeadm) est joignable.
 
+## Workspace Kubernetes (aperçu)
+
+Le poste de developpement peut tourner dans le cluster, avec Kubernetes comme prerequis minimal. Le chart charts/devzone-workspace/ deploie un StatefulSet (conteneur workspace sur l image ghcr.io/simbienvenuehoulboumi/devzone-workspace:<version>, sidecar docker:27-dind privilegie, DOCKER_HOST=tcp://localhost:2375), deux PVC (workspace, etat), un ServiceAccount devzone-workspace avec Role minimal et une NetworkPolicy meme namespace.
+
+Depuis le poste :
+
+```bash
+devzone workspace demarrer   # installe ou met a jour le workspace
+devzone workspace arreter    # desinstalle le workspace
+devzone workspace etat       # etat des pods
+devzone workspace shell      # shell dans le conteneur workspace
+```
+
+Les commandes utilisent helm et kubectl du poste, avec le contexte devzone s il existe, sinon le contexte courant. L image est construite par la CI a chaque PR et publiee sur ghcr.io a la livraison.
+
 ## GitLab
 
 Le module `gitlab` fournit une instance GitLab de test dans un cluster kind dédié (`gitlab`).

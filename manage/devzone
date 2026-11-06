@@ -420,6 +420,8 @@ devzone $(version) : environnement de développement conteneurisé
                            (sauvegarde les fichiers remplacés, propose make rebuild)
   devzone desinstaller     dans un dossier devzone : retire conteneur, image, volumes
                            (à lancer avant npm uninstall -g devzone)
+  devzone workspace demarrer|arreter|etat|shell
+                           poste Kubernetes : pilote le chart devzone-workspace
   devzone --version
 EOF
 }
@@ -479,6 +481,9 @@ case "${1:-}" in
             exit 1
         fi
         DEVZONE_COMMANDE="devzone desinstaller" bash "$desinstalleur"
+        ;;
+    workspace)
+        bash "$PAQUET/manage/workspace.sh" "${@:2}"
         ;;
     -*)
         echo "✖ option inconnue : $1 (devzone --help)" >&2
