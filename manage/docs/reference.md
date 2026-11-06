@@ -14,7 +14,7 @@ Une identité déjà définie n'est jamais remplacée. Pour un autre email : `gi
 
 **Assistants IA** (module `ia`, voir [Modules](#modules)) : `devzone activer ia`, puis `claude` (puis `/login`), `opencode auth login`.
 
-Les connexions (**GitHub**, **git**, **Claude Code**, **opencode**) et les caches (**Maven**, **pnpm**) sont **partagés volontairement** entre les devzone d'une machine : elles vivent dans les volumes Docker (voir [Données conservées](#données-conservées)). Le dépôt ne contient aucun identifiant.
+Les connexions (**GitHub**, **git**, **Claude Code**, **opencode**) et les caches (**Maven**, **Gradle**, **pnpm**) sont **partagés volontairement** entre les devzone d'une machine : elles vivent dans les volumes Docker (voir [Données conservées](#données-conservées)). Le dépôt ne contient aucun identifiant.
 
 
 
@@ -132,13 +132,21 @@ Claude Code est le **lead** (conception, consignes, relecture, essais, push, sui
 ```bash
 devzone agent <dossier> <fichier-consigne>    # au premier plan
 devzone agent <dossier> <fichier-consigne> &  # plusieurs en parallèle (ou nohup)
-devzone agent etat                            # sessions, modèles écartés
+devzone agent etat                            # sessions, modèles écartés et leur cause
+devzone agent liberer <modèle>|--tous        # lève un écart de modèle
 ```
 
 - **Lancement** : `opencode run --auto -m opencode/<modèle> "<consigne>" < /dev/null` dans le dossier. Le journal est `workspace/.agents/<nom du dossier>.log` (état de devzone, hors dépôt, ignoré par git). `--auto` évite l'attente d'une permission ; `< /dev/null` évite une session muette.
 - **Rotation des modèles gratuits** : `opencode models opencode` fournit la liste (`*-free`, `big-pickle`), avec une liste figée de secours. Un rang partagé et verrouillé fait commencer chaque lancement au modèle suivant : deux sessions simultanées partent sur deux modèles différents.
-- **Bascule** : au message de quota (`Free usage limit`), filtre de contenu, modèle indisponible ou erreur, ou silence au départ (rien écrit en 45 s). Le message n'est cherché que dans les 30 dernières lignes de la tentative et seulement si le code de sortie est non nul ou si opencode a écrit sa ligne d'erreur : du code affiché qui contient « Free usage limit » et finit normalement n'est pas un échec. Un modèle muet est écarté une heure. Une session figée (rien écrit depuis 10 min) est arrêtée et reprise sur une session neuve, modèle suivant, avec une consigne de reprise (`git status`, `git diff`, `git log`). Tous les modèles écartés : « aucun modèle gratuit disponible », code 3.
+- **Bascule** selon la cause de l'échec. Le message n'est cherché que dans les 30 dernières lignes de la tentative et seulement si le code de sortie est non nul ou si opencode a écrit sa ligne d'erreur : du code affiché qui contient « Free usage limit » et finit normalement n'est pas un échec.
+  - **pays** (« not available in your country ») : modèle écarté 7 jours ;
+  - **quota** (« Free usage limit »), **filtre** (« content filter ») et **muet** (rien écrit en 45 s au départ) : modèle écarté 1 h ;
+  - **réseau** (`ENOTFOUND`, `ECONNREFUSED`, `ETIMEDOUT`…) : retenu seulement si le réseau est coupé au moment de l'erreur, sinon traité comme **autre**. Aucun écart. devzone attend le retour du réseau (essai toutes les 30 s, 30 min au plus, journal « réseau coupé, attente »), puis relance le même modèle, 3 fois au plus par modèle ; ensuite modèle suivant. Sans retour : arrêt, « réseau indisponible », code 4 ;
+  - autre (« Model is unavailable », « Upstream request failed »…) : modèle suivant, sans écart.
+- **Écarts** : `devzone agent etat` affiche la cause et l'heure de fin de chaque écart ; `devzone agent liberer <modèle>` (ou `--tous`) le lève.
+- Une session figée (rien écrit depuis 10 min) est arrêtée et reprise sur une session neuve, modèle suivant, avec une consigne de reprise (`git status`, `git diff`, `git log`). Tous les modèles écartés : « aucun modèle gratuit disponible », code 3.
 - **Permissions** : `.devcontainer/opencode/agent.json` est la configuration par défaut, fusionnée avec `OPENCODE_CONFIG_CONTENT` s'il est défini. opencode applique la dernière règle qui correspond : les `deny` de devzone sont ré-ajoutés en dernier après la fusion, donc l'appelant peut ajouter des permissions mais jamais retirer un interdit de devzone. `webfetch` est permis ; `git push`, `git checkout/reset/restore/stash/clean`, `git branch -D`, les écritures GitHub, `gh api`, `curl`, `sudo`, `rm -rf` (sauf `./.essai`) et la gestion des tickets/PR par repowarden (`repowarden ticket …`, `repowarden proteger`, `repowarden run`) sont interdits ; `git commit` reste permis pour `repowarden cc`. `~/bash32` est toujours protégé (le bash 3.2 du conteneur).
+- **Fichiers de droits protégés** : pendant une session, `agent.json`, `.devcontainer/opencode.jsonc`, `.repowarden.conf` et `.devcontainer/agent-droits.sh` (liste fixe, qu'aucune variable ne change) sont interdits à l'écriture d'opencode (`permission.edit`, `deny` ajoutés en dernier). Comme un agent peut aussi écrire par le shell, `devzone agent` photographie ces fichiers au lancement et les compare après **chaque** session (fin normale, erreur, muet, figée) : tout changement est annulé dans l'arbre (jamais de `reset` ni de `rebase`), le journal reçoit `=== ⚠ droits modifiés : <fichier>` (avec le commit à retirer avant tout push si l'agent a commité) et `devzone agent etat` affiche `⚠ droits modifiés (<projet>)` jusqu'au prochain lancement sur ce projet. Le code de sortie ne change pas. opencode sait qu'il tourne dans une session d'agent, pour un futur réglage de repowarden qui refusera ces chemins au commit.
 - **Quota des modèles gratuits** : ces modèles sont limités ; la rotation et l'écart d'une heure évitent de bloquer un ticket quand l'un est épuisé. Pour un fournisseur payant : `opencode auth login`.
 
 
@@ -164,7 +172,7 @@ Plusieurs devzone peuvent cohabiter sur une même machine (un par projet, un par
 
 - **Modules** : **propres à chaque devzone**. L'état vit dans le dossier de l'instance (`$RACINE/.devzone.modules`), monté de l'hôte : un second devzone démarre avec des valeurs par défaut, sans hériter de ceux du premier (un ancien état global, au premier devzone démarré après la mise à jour, est repris une fois, par déplacement).
 - **Plateforme** (GitHub ou GitLab, [voir plus haut](#plateforme-github-ou-gitlab)) : propre à chaque devzone aussi, dans le même fichier d'état, avec l'URL de son instance GitLab.
-- **Connexions** (**GitHub**, **git**, **Claude Code**, **opencode**) et **caches** (**Maven**, **pnpm**) : **partagés volontairement** entre les devzone d'une machine, dans les volumes `devzone-*`.
+- **Connexions** (**GitHub**, **git**, **Claude Code**, **opencode**) et **caches** (**Maven**, **Gradle**, **pnpm**) : **partagés volontairement** entre les devzone d'une machine, dans les volumes `devzone-*`.
 - **Isolation complète** : un préfixe de volumes distinct (comme pour les tests) donne à chaque devzone ses propres volumes ; voir « Pour les contributeurs ».
 
 
@@ -304,6 +312,7 @@ Le conteneur est jetable ; ce qui compte vit dans des volumes Docker, sur ta mac
 | `devzone-opencode-config`, `devzone-opencode-data` | connexion et réglages d'opencode | gardé | gardé | gardé |
 | `devzone-config` | modules activés (`devzone activer`) : ancien état utilisateur, repris une fois | gardé | gardé | gardé |
 | `devzone-m2`, `devzone-pnpm` | caches Maven (`~/.m2`) et pnpm | gardé | gardé | gardé |
+| `devzone-gradle` | cache Gradle (`~/.gradle`) | gardé | gardé | gardé |
 | volume du Docker interne | images Docker et clusters kind du conteneur | gardé | gardé | gardé |
 | `workspace/` (dossier de l'hôte) | tes projets | gardé | gardé | gardé |
 

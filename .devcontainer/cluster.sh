@@ -245,18 +245,24 @@ cluster_choisir() {
     fi
 }
 
-# Cree un cluster kind sans basculer le contexte courant de kubectl.
-# Le code de kind est rendu meme sous set -e : la restauration a lieu avant.
-kind_creer_sans_basculer() {
+# Lance kind sans basculer le contexte courant de kubectl (#366) : le contexte
+# d'avant est remis, ou retiré s'il n'y en avait pas. Le code de kind est rendu
+# meme sous set -e : la restauration a lieu avant.
+kind_sans_basculer() {
     local precedent code=0
     precedent="$(kubectl config current-context 2>/dev/null || true)"
-    kind create cluster "$@" || code=$?
+    kind "$@" || code=$?
     if [ -n "$precedent" ]; then
         kubectl config use-context "$precedent" >/dev/null 2>&1 || true
     else
         KUBECONFIG="$HOME/.kube/config" kubectl config unset current-context >/dev/null 2>&1 || true
     fi
     return "$code"
+}
+
+# Cree un cluster kind sans basculer le contexte courant de kubectl.
+kind_creer_sans_basculer() {
+    kind_sans_basculer create cluster "$@"
 }
 
 cluster_preparer() {

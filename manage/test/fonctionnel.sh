@@ -81,7 +81,7 @@ mkdir -p "$COPIE/workspace"
 demarrer
 
 echo "▶ Outils"
-for outil in java mvn node pnpm python3 uv docker kubectl helm k9s kind gh repowarden shellcheck bats actionlint gitleaks ruff vulture pytest; do
+for outil in java mvn gradle node pnpm python3 uv docker kubectl helm k9s kind gh repowarden shellcheck bats actionlint gitleaks ruff vulture pytest; do
     reussit "$outil présent" "command -v $outil"
 done
 

@@ -12,7 +12,7 @@ exec </dev/null
 
 # Volumes nommés créés en root → rendre au user vscode
 # (et ~/.config, créé par Docker pour monter ~/.config/opencode)
-sudo chown -R vscode:vscode /home/vscode/.m2 /home/vscode/.local /home/vscode/.claude \
+sudo chown -R vscode:vscode /home/vscode/.m2 /home/vscode/.gradle /home/vscode/.local /home/vscode/.claude \
     /home/vscode/.config/opencode /home/vscode/.config/gh /home/vscode/.config/git \
     /home/vscode/.config/devzone
 sudo chown vscode:vscode /home/vscode/.config
@@ -55,6 +55,9 @@ repowarden install --global --lang fr
 # ce qui est actif. Un module en échec n'arrête pas la création : le conteneur
 # reste utilisable et l'état (devzone, à chaque démarrage) le montre « en échec »
 sudo ln -sf /workspaces/devzone/.devcontainer/devzone /usr/local/bin/devzone
+# Accès au cluster du poste (hote.config) avant les modules qui en dépendent
+# (#370) ; un échec n'arrête pas la création, le démarrage la relance
+bash /workspaces/devzone/.devcontainer/kube-config.sh || echo "devzone : configuration kube incomplète, réessayer : devzone demarrer" >&2
 devzone appliquer || echo "devzone : modules incomplets (détail ci-dessus), réessayer : devzone appliquer" >&2
 # Paquets systeme gardes (#351) : reinstallees a chaque creation ; un echec n arrete pas la creation
 devzone paquets appliquer || echo "devzone : paquets en echec, reessayer : devzone paquets" >&2
