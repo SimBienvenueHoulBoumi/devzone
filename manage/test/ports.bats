@@ -13,6 +13,8 @@ setup() {
     export DEVZONE_ETAT="$BATS_TEST_TMPDIR/etat"
     export DEVZONE_INSTANCE=devzone
     mkdir -p "$HOME" "$DEVZONE_RACINE/workspace" "$BATS_TEST_TMPDIR/bin" "$BATS_TEST_TMPDIR/relais"
+    # le veilleur de ports automatiques reste sous le dossier du test (#394)
+    export DEVZONE_PORTS_AUTO_DIR="$BATS_TEST_TMPDIR/ports-auto"
     : >"$DEVZONE_ETAT"
     : >"$BATS_TEST_TMPDIR/docker.log"
     : >"$BATS_TEST_TMPDIR/curl.log"

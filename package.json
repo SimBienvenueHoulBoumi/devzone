@@ -20,6 +20,8 @@
     ".gitattributes",
     "manage/scripts/",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "manage/workspace.sh",
+    "charts/"
   ]
 }

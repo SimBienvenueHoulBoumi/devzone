@@ -9,3 +9,6 @@ Makefile            text eol=lf
 # Scripts bash sans extension (lancés directement)
 manage/devzone            text eol=lf
 .devcontainer/devzone   text eol=lf
+*.yaml              text eol=lf
+*.yml               text eol=lf
+charts/**           text eol=lf

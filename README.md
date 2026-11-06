@@ -281,17 +281,19 @@ L'utilisateur d'un projet possède **sa** base (il y crée tables, index, donné
 
 > Le module `gitlab` a aussi son propre PostgreSQL (`gitlab-postgresql`) : il appartient à GitLab, n'y mets pas tes bases.
 
-## Accéder à une application depuis le poste
+## Voir mon application dans le navigateur
 
-Une application lancée **dans** le conteneur (par exemple un Spring Boot avec `./gradlew bootRun` sur le port 8080) n'est pas joignable depuis le poste : le conteneur devzone ne publie aucun port. `devzone port <n>` ouvre un relais `alpine/socat` (version figée) sur le Docker de l'hôte, de `127.0.0.1:<port>` du poste vers le port du conteneur.
+Une application lancée **dans** le conteneur (par exemple un Spring Boot avec `./gradlew bootRun` sur le port 8080) n'est pas joignable depuis le poste : le conteneur devzone ne publie aucun port. Dès qu'elle écoute dans le conteneur, le **veilleur de ports automatiques** (`.devcontainer/ports-auto.sh`) pose un relais `alpine/socat` (version figée) sur le Docker de l'hôte, de `127.0.0.1:<port>` du poste vers le port du conteneur : `http://localhost:<port>` **sans commande**. Le relais disparaît quand l'application s'arrête.
 
 ```sh
-devzone port 8080        # ouvre le relais du port 8080
-devzone port             # liste : port, ● actif ou ○ arrêté, application derrière
-devzone port --fermer 8080
+devzone port             # liste : relais manuels et automatiques, ● actif ou ○ arrêté
+devzone port auto off    # coupe le veilleur : plus de relais automatique
+devzone port --fermer <n> # retire un relais manuel et son port de l'état
 ```
 
-Depuis le poste : `http://localhost:8080`. Le relais est recréé automatiquement au démarrage du conteneur, vers l'adresse actuelle du conteneur ; il est retiré par `make desinstaller` (étiquette `devzone.instance`).
+`devzone port <n>` ouvre aussi un relais manuel : même mécanisme côté poste, conteneur `alpine/socat`, nom `devzone-<instance>-port-<n>`.
+
+Depuis le poste : `http://localhost:8080`. Le relais manuel est recréé automatiquement au démarrage du conteneur, vers l'adresse actuelle du conteneur ; il est retiré par `make desinstaller` (étiquette `devzone.instance`). Le relais automatique disparaît avec l'application.
 
 Spring Boot écoute sur `0.0.0.0` par défaut : ne fixe pas `server.address` à `127.0.0.1`, sinon le relais ne peut pas joindre l'application. Un port déjà pris sur le poste, un port invalide ou un Docker de l'hôte injoignable sont refusés avec un code non nul. Détails dans [manage/docs/reference.md](manage/docs/reference.md#ports-vers-le-poste).
 
