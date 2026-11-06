@@ -208,7 +208,7 @@ jobs:
         run: |
           bash --version | head -1
           bash -c '[ "${BASH_VERSINFO[0]}" = 3 ]'
-          npx --yes bats@1.10.0 manage/test/cli.bats manage/test/versions.bats manage/test/ci-conteneur.bats manage/test/agent.bats manage/test/agent-ecarts.bats manage/test/agent-droits.bats manage/test/agent-droits-gh.bats manage/test/agent-quota.bats
+          npx --yes bats@1.10.0 manage/test/cli.bats manage/test/versions.bats manage/test/ci-conteneur.bats manage/test/agent.bats manage/test/agent-ecarts.bats manage/test/agent-droits.bats manage/test/agent-droits-gh.bats manage/test/agent-quota.bats manage/test/agent-parallele.bats
 
   # Synthèse exigée pour merger (requiredChecks) : toujours lancée, jamais
   # « skipped » (GitHub compterait un job sauté comme réussi)
