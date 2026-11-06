@@ -55,6 +55,9 @@ repowarden install --global --lang fr
 # ce qui est actif. Un module en échec n'arrête pas la création : le conteneur
 # reste utilisable et l'état (devzone, à chaque démarrage) le montre « en échec »
 sudo ln -sf /workspaces/devzone/.devcontainer/devzone /usr/local/bin/devzone
+# Accès au cluster du poste (hote.config) avant les modules qui en dépendent
+# (#370) ; un échec n'arrête pas la création, le démarrage la relance
+bash /workspaces/devzone/.devcontainer/kube-config.sh || echo "devzone : configuration kube incomplète, réessayer : devzone demarrer" >&2
 devzone appliquer || echo "devzone : modules incomplets (détail ci-dessus), réessayer : devzone appliquer" >&2
 # Paquets systeme gardes (#351) : reinstallees a chaque creation ; un echec n arrete pas la creation
 devzone paquets appliquer || echo "devzone : paquets en echec, reessayer : devzone paquets" >&2
