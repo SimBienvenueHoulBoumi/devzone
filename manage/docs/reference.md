@@ -102,6 +102,7 @@ devzone reparer                 # relance relais Docker, gitlab, postgres, ports
 devzone demarrer                # démarrage complet (identité git, clusters, relais, récapitulatif)
 devzone metrics [contexte…]     # installe metrics-server sur un cluster local
 devzone utiliser CTX [--confirmer CTX]  # bascule le cluster de travail de kubectl
+devzone clusters                       # vue des clusters connectes (travail et services)
 ```
 
 `reparer` affiche `✔` ou `✖` par élément et rend le code 1 dès qu'un élément échoue. `utiliser` ne modifie jamais le [cluster des services](#cluster-de-devzone) (aucune ligne `cluster=`) : un cluster distant exige `--confirmer CTX` hors terminal.
@@ -299,6 +300,9 @@ Les modules qui déploient un service (`postgres` ; `gitlab` avec #279) s'instal
 - **Voir / changer** : `devzone cluster` affiche le cluster et les possibles ; `devzone cluster CTX [--confirmer CTX]` y déplace les services actifs (désinstallés de l'ancien, installés sur le nouveau). **Les données ne sont pas migrées** : confirmation en terminal, `--oui` sans terminal.
 - **Cluster de l'hôte** : devzone n'y crée que ses namespaces étiquetés `app.kubernetes.io/managed-by=devzone`, et les supprime à la désactivation. Désactiver le module `kubernetes` rend ce cluster injoignable pour les services.
 - **Contexte courant** : les clusters kind sont créés sans basculer dessus ; `devzone utiliser CTX` bascule seulement le cluster de travail de kubectl, jamais le cluster des services de devzone. Si tu te retrouves sur un cluster interne (kind-devzone ou kind-gitlab), reviens avec `devzone utiliser <ton cluster>`.
+
+- **Deux notions** : `★` marque le cluster de travail de kubectl (kubectl, k9s, helm), `●` le cluster des services de devzone (`devzone cluster`). Un contexte peut porter les deux marques. `devzone clusters` affiche la vue.
+- **Rebuild** : `le choix de kubectl` écrit dans `~/.kube/config`, qui n'est pas dans un volume ; un rebuild repart sur le cluster de l'hôte.
 
 ## Données conservées
 

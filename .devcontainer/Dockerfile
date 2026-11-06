@@ -14,6 +14,7 @@ ARG K9S_VERSION=0.51.0
 ARG ACTIONLINT_VERSION=1.7.12
 ARG GITLEAKS_VERSION=8.30.1
 ARG KIND_VERSION=0.33.0
+ARG KUBECTX_VERSION=0.11.0
 ARG RUFF_VERSION=0.17.0
 ARG VULTURE_VERSION=2.16
 # pytest : même version que la CI de repowarden (ci/requirements/e2e-python.in)
@@ -60,6 +61,26 @@ RUN set -eu; \
     echo "$kind_sha  /tmp/kind" | sha256sum -c --quiet; \
     install -m 0755 /tmp/kind /usr/local/bin/kind-reel; \
     rm -f /tmp/kind
+
+# kubectx et kubens : binaires officiels ahmetb/kubectx, versions figees avec
+# empreinte sha256 par architecture (comme k9s)
+RUN set -eu; \
+    arch="$(dpkg --print-architecture)"; \
+    case "$arch" in \
+        arm64) rel_arch=arm64; kctx_sha=1dac2072216689e773325cb7587b858ea7415706ebcf04e23bf80e7e70555340; kns_sha=37058abe82ef20c93b44f3dc8ca2382dbb95d416cec958fbf7b8f79f011be86c ;; \
+        amd64) rel_arch=x86_64; kctx_sha=08e031c54fbffb3f100e904e4eae94bba2730fedf4869921fda79e4d7a8f5d4c; kns_sha=326c021c7b35468ed9a187b361198d0f22ae32828139c65eb6670c0d8301cc09 ;; \
+        *) echo "Architecture non prise en charge : $arch" >&2; exit 1 ;; \
+    esac; \
+    installer() { \
+        tmp="$(mktemp -d)"; \
+        curl -fsSL "https://github.com/ahmetb/kubectx/releases/download/v${KUBECTX_VERSION}/$1_v${KUBECTX_VERSION}_linux_${rel_arch}.tar.gz" -o "$tmp/a.tar.gz"; \
+        echo "$2  $tmp/a.tar.gz" | sha256sum -c --quiet; \
+        tar -xzf "$tmp/a.tar.gz" -C "$tmp" "$1"; \
+        install -m 0755 "$tmp/$1" /usr/local/bin/"$1"; \
+        rm -rf "$tmp"; \
+    }; \
+    installer kubectx "$kctx_sha"; \
+    installer kubens "$kns_sha"
 
 # kind passe par une enveloppe (#291) : avec le Docker de l'hôte, un cluster
 # créé à la main doit être rendu joignable depuis le conteneur (kube-joignable.sh)
