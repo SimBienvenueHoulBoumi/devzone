@@ -119,5 +119,5 @@ agent_faux_stop() {
         >"$DEVZONE_RACINE/workspace/.agents/dz-328.log"
     run bash "$DEVZONE" agent etat
     [ "$status" -eq 0 ]
-    [[ "$output" == *"session dz-328.log : modèle beam-free, depuis 2026-11-06T00:00:00Z"* ]] || false
+    [[ "$output" == *"session dz-328.log : modèle opencode/beam-free, depuis 2026-11-06T00:00:00Z"* ]] || false
 }
