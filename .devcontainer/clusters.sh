@@ -9,7 +9,7 @@ fi
 
 # Affiche la vue des clusters connectés.
 clusters_afficher() {
-    local contextes=() ctx ctx_travail ctx_services tmp i ns type etat marque
+    local contextes=() ctx ctx_travail ctx_services tmp i ns type etat marque marques
     ctx_travail="$(kubectl config current-context 2>/dev/null || true)"
     ctx_services="$(cluster_lu 2>/dev/null || true)"
     while IFS= read -r ctx; do
@@ -46,9 +46,19 @@ clusters_afficher() {
         ns="$(kubectl config view -o jsonpath="{.contexts[?(@.name==\"$ctx\")].context.namespace}" 2>/dev/null || true)"
         [ -n "$ns" ] || ns=default
         marque=""
-        [ "$ctx" = "$ctx_travail" ] && marque+="★"
-        [ "$ctx" = "$ctx_services" ] && marque+="●"
-        while [ "${#marque}" -lt 2 ]; do marque+=" "; done
+        marques=0
+        if [ "$ctx" = "$ctx_travail" ]; then
+            marque+="★"
+            marques=$((marques + 1))
+        fi
+        if [ "$ctx" = "$ctx_services" ]; then
+            marque+="●"
+            marques=$((marques + 1))
+        fi
+        while [ "$marques" -lt 2 ]; do
+            marque+=" "
+            marques=$((marques + 1))
+        done
         printf '%s %-14s %-8s %-12s %s\n' "$marque" "$ctx" "$type" "$etat" "$ns"
     done
     rm -rf "$tmp"

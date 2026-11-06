@@ -1033,7 +1033,7 @@ case "${1:-}" in
     demarrer) bash "$ICI/demarrage.sh" ;;
     metrics) bash "$ICI/metrics-server.sh" "${@:2}" ;;
     utiliser) utiliser "${@:2}" ;;
-    clusters) bash "$ICI/clusters.sh" "${@:2}" ;;
+    clusters) DEVZONE_ETAT="$ETAT" bash "$ICI/clusters.sh" "${@:2}" ;;
     cluster) changer_cluster "${@:2}" ;;
     postgres) DEVZONE_ETAT="$ETAT" bash "$ICI/postgres/postgres.sh" "${@:2}" ;;
     port) DEVZONE_ETAT="$ETAT" bash "$ICI/ports.sh" "${@:2}" ;;

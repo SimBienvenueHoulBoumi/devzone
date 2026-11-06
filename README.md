@@ -328,7 +328,7 @@ npm uninstall -g devzone
 Même effet que `make desinstaller`.
 ## Changer de cluster
 
-```bash
+```sh
 devzone clusters                    # vue : contextes, type, etat, namespace
 devzone utiliser CTX [-n NS]        # bascule le cluster de travail de kubectl
 devzone utiliser -n NS              # change seulement le namespace du cluster courant

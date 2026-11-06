@@ -100,6 +100,33 @@ KUBE
     [[ "$output" == *"aucun cluster"* ]] || false
 }
 
+@test "clusters : cluster des services marqué, seul et avec le travail" {
+    faux_kubectl
+    printf 'docker-desktop\nkind-gitlab\n' >"$BATS_TEST_TMPDIR/contexts"
+    printf 'docker-desktop\n' >"$BATS_TEST_TMPDIR/current"
+    printf 'cluster=docker-desktop\n' >"$DEVZONE_ETAT"
+    run bash "$DEVZONE" clusters
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"★● docker-desktop"* ]] || false
+    printf 'kind-gitlab\n' >"$BATS_TEST_TMPDIR/current"
+    run bash "$DEVZONE" clusters
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"●  docker-desktop"* ]] || false
+    [[ "$output" == *"★  kind-gitlab"* ]] || false
+}
+
+@test "clusters : colonnes alignées sous LC_ALL=C" {
+    faux_kubectl
+    printf 'docker-desktop\nkind-gitlab\n' >"$BATS_TEST_TMPDIR/contexts"
+    printf 'docker-desktop\n' >"$BATS_TEST_TMPDIR/current"
+    printf 'cluster=kind-gitlab\n' >"$DEVZONE_ETAT"
+    run env LC_ALL=C bash "$DEVZONE" clusters
+    [ "$status" -eq 0 ]
+    printf '%s\n' "$output" | grep -q '^   CONTEXTE' || false
+    printf '%s\n' "$output" | grep -q '^★  docker-desktop' || false
+    printf '%s\n' "$output" | grep -q '^●  kind-gitlab' || false
+}
+
 @test "utiliser CTX -n NS : set-context avec namespace" {
     faux_kubectl
     printf 'docker-desktop\nprod\n' >"$BATS_TEST_TMPDIR/contexts"
