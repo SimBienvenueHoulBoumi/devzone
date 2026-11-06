@@ -31,6 +31,32 @@ premier_modele() {
     grep -m1 -oE '^=== modèle opencode/[A-Za-z0-9._-]+' "$1" | sed 's#.*opencode/##'
 }
 
+# Affiche, sur la sortie de bats, les faits visibles au moment d'un echec :
+# journaux complets des agents, rang et liste de l'etat, modeles du faux
+# opencode, sorties de chaque lancement (un.out, deux.out...).
+diagnostic() {
+    echo "===== diagnostic agent-parallele =====" >&2
+    echo "--- journaux des agents ---" >&2
+    for j in "$DEVZONE_RACINE"/workspace/.agents/*.log; do
+        [ -e "$j" ] || continue
+        echo "### $j" >&2
+        cat "$j" >&2
+    done
+    echo "--- rang ($DEVZONE_AGENT_ETAT/rang) ---" >&2
+    [ -r "$DEVZONE_AGENT_ETAT/rang" ] && cat "$DEVZONE_AGENT_ETAT/rang" >&2
+    echo "--- liste de $DEVZONE_AGENT_ETAT ---" >&2
+    ls -la "$DEVZONE_AGENT_ETAT" >&2
+    echo "--- modeles opencode ---" >&2
+    opencode models opencode >&2
+    echo "--- sorties des lancements ---" >&2
+    for o in "$BATS_TEST_TMPDIR"/*.out; do
+        [ -e "$o" ] || continue
+        echo "### $o" >&2
+        cat "$o" >&2
+    done
+    echo "===== fin diagnostic agent-parallele =====" >&2
+}
+
 @test "agent : deux lancements simultanes -> les deux demarrent sur deux modeles differents" {
     printf 'construis la feature\n' >"$DEVZONE_RACINE/workspace/consigne.txt"
     mkdir -p "$DEVZONE_RACINE/workspace/projet-un" "$DEVZONE_RACINE/workspace/projet-deux"
@@ -112,4 +138,19 @@ premier_modele() {
     wait "$p3" || s3=$?
     [ "$s3" -eq 3 ]
     grep -q "aucun modèle gratuit disponible" "$j3" || false
+}
+
+@test "agent : journal trace la prise du rang (=== rang debut/total)" {
+    printf 'construis la feature\n' >"$DEVZONE_RACINE/workspace/consigne.txt"
+    mkdir -p "$DEVZONE_RACINE/workspace/projet-rang"
+    journal="$DEVZONE_RACINE/workspace/.agents/projet-rang.log"
+    bash "$DEVZONE" agent "$DEVZONE_RACINE/workspace/projet-rang" "$DEVZONE_RACINE/workspace/consigne.txt" >"$BATS_TEST_TMPDIR/rang.out" 2>&1
+    [ "$?" -eq 0 ] || false
+    grep -qE '^=== rang [0-9]+/[0-9]+$' "$journal" || false
+}
+
+# Après un test en échec seulement (BATS_TEST_COMPLETED vide) : les faits
+# visibles en CI (#385), sans changer les assertions.
+teardown() {
+    [ -n "${BATS_TEST_COMPLETED:-}" ] || diagnostic
 }

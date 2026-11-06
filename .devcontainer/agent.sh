@@ -79,6 +79,7 @@ agent_lancer() {
     debut=$(( $(cat "$etat/rang" 2>/dev/null || echo 0) % ${#FREE_MODELS[@]} ))
     echo $(( debut + 1 )) >"$etat/rang"
     verrou_lacher
+    echo "=== rang $(( debut + 1 ))/${#FREE_MODELS[@]}" >>"$journal"
 
     consigne_courante="$consigne"
     # Reprise : une session neuve repart du travail déjà présent (git status,
