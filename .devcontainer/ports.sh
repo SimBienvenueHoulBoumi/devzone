@@ -211,6 +211,7 @@ relancer() {
     return "$rc"
 }
 
+# Sortie lisible par machine de liste : tableau JSON [{port,actif,application}], via jq seul.
 liste_json() {
     local ports port actif app json='[]'
     ports="$(trier_ports "$(lire_ports)")"
@@ -218,7 +219,6 @@ liste_json() {
         printf '[]\n'
         return 0
     fi
-    # Chaque objet passe par jq : guillemets et caractères spéciaux échappés, jamais de concaténation.
     # shellcheck disable=SC2046 # liste de ports séparés par des virgules
     for port in $(printf '%s' "$ports" | tr ',' ' '); do
         if relais_actif "$port"; then

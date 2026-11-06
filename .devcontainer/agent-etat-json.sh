@@ -26,6 +26,7 @@ RACINE="${DEVZONE_RACINE:-$(dirname "$ICI")}"
 
 AGENT_ETAT="${DEVZONE_AGENT_ETAT:-$HOME/.local/state/oc-lancer}"
 
+# Date UTC ISO-8601 d'une époque, GNU puis BSD date : champ `fin` des écarts.
 iso() {
     if date -u -d "@$1" '+%Y-%m-%dT%H:%M:%SZ' >/dev/null 2>&1; then
         date -u -d "@$1" '+%Y-%m-%dT%H:%M:%SZ'
@@ -34,6 +35,8 @@ iso() {
     fi
 }
 
+# État des sessions d'agent en JSON : réutilise les données d'agent_etat,
+# agent_ecarts et droits_alertes, sans recopier leur logique.
 agent_etat_json() {
     local sessions_json='[]' ecarts_json='[]' alertes_json='[]'
     local f journal m modele debut dernier project en_cours

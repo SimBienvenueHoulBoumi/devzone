@@ -3,10 +3,12 @@
 # Sourcé par devzone : réutilise ses fonctions (valeur, description, …), ne
 # réécrit pas etat(). Construit uniquement avec jq (échappement garanti).
 
+# Ajoute une entrée à $erreurs : la rubrique qui a échoué et pourquoi.
 ajouter_erreur() {
     erreurs="$(jq -c --arg k "$1" --arg v "$2" '. + {($k): $v}' <<<"$erreurs")"
 }
 
+# Ajoute une alerte (code, message, commande devzone à lancer) à $alertes_json.
 append_alerte() {
     local code="$1" message="$2" commande="${3:-}"
     alertes_json="$(jq -c \
@@ -17,6 +19,8 @@ append_alerte() {
         <<<"$alertes_json")"
 }
 
+# État complet du poste en JSON : reprend chaque rubrique de etat() avec les
+# mêmes commandes, en isolant chaque calcul (échec → valeur null et erreurs).
 etat_json() {
     local erreurs='{}'
     local alertes_json='[]'
