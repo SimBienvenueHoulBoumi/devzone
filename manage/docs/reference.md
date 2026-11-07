@@ -208,9 +208,14 @@ Le cluster de l'hôte n'est pas joignable dans deux cas (kind fonctionne quand m
 - **Codespaces, machine distante** : pas de `~/.kube` local ;
 - **Linux avec Docker Engine** : un cluster kind ou minikube de l'hôte écoute sur `127.0.0.1`, invisible du conteneur sans la réécriture `kube-config.sh`. Un cluster qui écoute sur toutes les interfaces (k3s, kubeadm) est joignable.
 
-## Workspace Kubernetes (aperçu)
+## Workspace Kubernetes
 
-Le poste de developpement peut tourner dans le cluster, avec Kubernetes comme prerequis minimal. Le chart charts/devzone-workspace/ deploie un StatefulSet (conteneur workspace sur l image ghcr.io/simbienvenuehoulboumi/devzone-workspace:<version>, sidecar docker:27-dind privilegie, DOCKER_HOST=tcp://localhost:2375), deux PVC (workspace, etat), un ServiceAccount devzone-workspace avec Role minimal et une NetworkPolicy meme namespace.
+Le poste de developpement peut tourner dans le cluster, avec Kubernetes 1.29 ou plus (sidecar natif) comme prerequis minimal. Le chart charts/devzone-workspace/ deploie un StatefulSet :
+
+- conteneur `workspace` (image ghcr.io/simbienvenuehoulboumi/devzone-workspace:<version>), avec `DOCKER_HOST=tcp://localhost:2375` et `TESTCONTAINERS_HOST_OVERRIDE=localhost` ;
+- sidecar natif `docker` (docker:27-dind, privilegie), demarre avant `workspace` ;
+- trois PVC : `workspace`, `etat`, et `docker` (`/var/lib/docker`, 30 Gi par defaut) ;
+- un ServiceAccount devzone-workspace avec Role minimal et une NetworkPolicy meme namespace.
 
 Depuis le poste :
 
@@ -222,6 +227,23 @@ devzone workspace shell      # shell dans le conteneur workspace
 ```
 
 Les commandes utilisent helm et kubectl du poste, avec le contexte devzone s il existe, sinon le contexte courant. L image est construite par la CI a chaque PR et publiee sur ghcr.io a la livraison.
+
+### Testcontainers et docker dans le workspace
+
+- `docker` et Testcontainers parlent au Docker du pod : rien a configurer, et le socket Docker du poste n'est pas monte.
+- Ryuk reste actif : il nettoie les conteneurs de test.
+- Les conteneurs lances par Testcontainers publient leurs ports sur le Docker du pod ; `TESTCONTAINERS_HOST_OVERRIDE=localhost` leur fait joindre ces ports par localhost.
+- Le conteneur `workspace` ne demarre qu'une fois `docker info` reussi (startupProbe, 60 s au plus) : un `./mvnw verify` lance tout de suite ne tombe pas sur « Cannot connect ». Si le Docker ne repond pas dans ce delai, le sidecar redemarre.
+- Les images restent sur le PVC `docker` entre deux redemarrages. Reglages du chart : `persistence.docker.size` et `persistence.docker.storageClass` (volume), `sidecar.resources` (limites, 2 CPU et 4 Gi par defaut).
+
+### Securite du sidecar Docker
+
+- **Privilegie** : le sidecar tourne avec `privileged: true`, qui est le prix de Docker dans un pod. Le privilege est confine au pod, mais ce n'est **pas** un bac a sable etanche : un conteneur privilegie peut atteindre le noeud. Ne pas y executer de code non fiable hors du poste de developpement.
+- **Pas de socket du poste** : c'est mieux que le partage du socket Docker de l'hote (#291), qui donnerait root sur la machine. Le sidecar ne voit que le Docker du pod.
+- **Ecoute** : le Docker ecoute seulement sur `127.0.0.1:2375` dans le pod (`--host=tcp://127.0.0.1:2375`), sans TLS. Aucun port n'est declare (ni `containerPort`, ni `hostPort`), et le Service n'expose que le HTTP du workspace : le 2375 n'est joignable que depuis le pod.
+- **Ports publies par Testcontainers** : ils sont ouverts sur le reseau du pod. Les autres pods du namespace peuvent les joindre (la NetworkPolicy l'autorise), les pods d'autres namespaces et l'exterieur non. Ne pas y mettre de secret.
+- **Cloisonnement** : le conteneur `workspace` voit tous les conteneurs du Docker du pod, y compris ceux lances par d'autres projets. Un projet ne doit pas compter sur une isolation entre ses conteneurs et ceux d'un autre.
+- **RBAC** : inchange. Le ServiceAccount ne peut que lire pods, services et configmaps du namespace ; il n'a aucun droit d'ecriture sur le cluster.
 
 ## GitLab
 

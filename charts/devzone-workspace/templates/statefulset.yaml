@@ -15,13 +15,65 @@ spec:
         app.kubernetes.io/name: {{ include "devzone-workspace.name" . }}
     spec:
       serviceAccountName: {{ include "devzone-workspace.serviceAccountName" . }}
+      # Sidecar natif (restartPolicy: Always, Kubernetes 1.29+) : il demarre avant
+      # le conteneur workspace, et son startupProbe bloque ce demarrage tant que le
+      # Docker du pod ne repond pas (60 s au plus). Le Docker n'ecoute que sur
+      # 127.0.0.1 du pod : aucun port expose par le Service.
+      initContainers:
+        - name: docker
+          image: {{ .Values.sidecar.image }}
+          restartPolicy: Always
+          {{- /*
+            dockerd doit etre le premier argument : l'entrypoint de docker:27-dind
+            ajoute lui-meme --host=tcp://0.0.0.0:2375 quand le premier argument
+            commence par "-" et que DOCKER_TLS_CERTDIR est vide, ce qui fait echouer
+            le sidecar avec "address already in use" sur 127.0.0.1:2375. Avec dockerd
+            en tete, l'entrypoint n'ajoute rien. --tls=false evite son attente de 15 s
+            (TLS desactive par DOCKER_TLS_CERTDIR vide). Commentaire Helm : il ne
+            figure pas dans le rendu.
+          */}}
+          args:
+            - dockerd
+            - --host=unix:///var/run/docker.sock
+            - --host=tcp://127.0.0.1:2375
+            - --tls=false
+          securityContext:
+            privileged: {{ .Values.sidecar.privileged }}
+          env:
+            - name: DOCKER_TLS_CERTDIR
+              value: ""
+          startupProbe:
+            exec:
+              command: ["docker", "-H", "tcp://127.0.0.1:2375", "info"]
+            periodSeconds: 1
+            timeoutSeconds: 5
+            failureThreshold: 60
+          resources:
+            {{- toYaml .Values.sidecar.resources | nindent 12 }}
+          volumeMounts:
+            - name: docker
+              mountPath: /var/lib/docker
       containers:
         - name: workspace
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- /*
+            Sans command, le conteneur lance l'entrypoint de l'image (bash pour un
+            devcontainer), qui se termine aussitot faute de terminal : le pod boucle
+            en redemarrages. sleep infinity le garde en vie, comme VS Code pour un
+            devcontainer ; le poste entre ensuite par kubectl exec. Commentaire Helm :
+            il ne figure pas dans le rendu.
+          */}}
+          {{- with .Values.workspace.command }}
+          command: {{ toJson . }}
+          {{- end }}
           env:
             - name: DOCKER_HOST
               value: tcp://localhost:2375
+            # Testcontainers publie les ports de ses conteneurs sur le Docker du pod,
+            # joignables par localhost dans le pod.
+            - name: TESTCONTAINERS_HOST_OVERRIDE
+              value: localhost
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
@@ -29,17 +81,6 @@ spec:
               mountPath: /workspace
             - name: etat
               mountPath: /etat
-        - name: docker
-          image: {{ .Values.sidecar.image }}
-          securityContext:
-            privileged: {{ .Values.sidecar.privileged }}
-          env:
-            - name: DOCKER_TLS_CERTDIR
-              value: ""
-          resources:
-            limits:
-              cpu: "1"
-              memory: "1Gi"
   volumeClaimTemplates:
     - metadata:
         name: workspace
@@ -61,3 +102,13 @@ spec:
         resources:
           requests:
             storage: {{ .Values.persistence.etat.size }}
+    - metadata:
+        name: docker
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        {{- if .Values.persistence.docker.storageClass }}
+        storageClassName: {{ .Values.persistence.docker.storageClass }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.persistence.docker.size }}
