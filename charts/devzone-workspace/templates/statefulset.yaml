@@ -23,8 +23,20 @@ spec:
         - name: docker
           image: {{ .Values.sidecar.image }}
           restartPolicy: Always
+          {{- /*
+            dockerd doit etre le premier argument : l'entrypoint de docker:27-dind
+            ajoute lui-meme --host=tcp://0.0.0.0:2375 quand le premier argument
+            commence par "-" et que DOCKER_TLS_CERTDIR est vide, ce qui fait echouer
+            le sidecar avec "address already in use" sur 127.0.0.1:2375. Avec dockerd
+            en tete, l'entrypoint n'ajoute rien. --tls=false evite son attente de 15 s
+            (TLS desactive par DOCKER_TLS_CERTDIR vide). Commentaire Helm : il ne
+            figure pas dans le rendu.
+          */}}
           args:
+            - dockerd
+            - --host=unix:///var/run/docker.sock
             - --host=tcp://127.0.0.1:2375
+            - --tls=false
           securityContext:
             privileged: {{ .Values.sidecar.privileged }}
           env:

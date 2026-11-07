@@ -59,6 +59,16 @@ bloc_init() {
     ! grep -q -- "0.0.0.0" <<<"$output" || false
 }
 
+@test "docker : sidecar lance dockerd en premier argument (sinon l'entrypoint ajoute 0.0.0.0:2375)" {
+    run rendu_de templates/statefulset.yaml
+    [ "$status" -eq 0 ]
+    local init premier
+    init="$(bloc_init "$output")"
+    premier="$(awk '/^          args:/{p=1;next} p && /^            - /{sub(/^            - /,""); print; exit}' <<<"$init")"
+    [ "$premier" = "dockerd" ]
+    ! grep -q -- "0.0.0.0:2375" <<<"$output" || false
+}
+
 @test "docker : le conteneur workspace attend le Docker (startupProbe docker info, 60 tentatives)" {
     run rendu_de templates/statefulset.yaml
     [ "$status" -eq 0 ]
