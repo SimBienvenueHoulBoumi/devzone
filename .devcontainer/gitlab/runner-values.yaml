@@ -1,6 +1,7 @@
 # Valeurs du chart GitLab Runner gitlab/gitlab-runner (version figée dans
-# gitlab.sh). Jeton du runner passé par --set runnerToken à l'installation.
-gitlabUrl: http://gitlab-webservice-default.gitlab.svc:8181  # service interne
+# installation.sh). Jeton du runner passé par --set runnerToken à l'installation.
+# __NAMESPACE__ est remplacé par le namespace de l'instance (devzone-gitlab…).
+gitlabUrl: http://gitlab-webservice-default.__NAMESPACE__.svc:8181  # service interne
 
 runners:
   executor: kubernetes
@@ -11,7 +12,7 @@ runners:
   # lui-même ; le dépôt est cloné par le service interne au cluster
   config: |
     [[runners]]
-      clone_url = "http://gitlab-webservice-default.gitlab.svc:8181"
+      clone_url = "http://gitlab-webservice-default.__NAMESPACE__.svc:8181"
       [runners.kubernetes]
         namespace = "{{.Release.Namespace}}"
         image = "alpine"

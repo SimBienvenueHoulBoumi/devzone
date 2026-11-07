@@ -8,10 +8,13 @@ spec:
   podSelector: {}
   policyTypes:
     - Ingress
+    {{- if .Values.networkPolicy.sortieRestreinte }}
     - Egress
+    {{- end }}
   ingress:
     - from:
         - podSelector: {}
+  {{- if .Values.networkPolicy.sortieRestreinte }}
   egress:
     - to:
         - podSelector: {}
@@ -24,4 +27,5 @@ spec:
           port: 53
         - protocol: TCP
           port: 53
+  {{- end }}
 {{- end -}}

@@ -5,9 +5,20 @@ image:
   tag: ""
   pullPolicy: IfNotPresent
 
+# Sidecar Docker du pod : le conteneur workspace s'en sert (docker, Testcontainers).
+# Privilegie, il ecoute sur 127.0.0.1:2375 du pod, jamais expose par le Service.
 sidecar:
   image: docker:27-dind
   privileged: true
+  resources:
+    limits:
+      cpu: "2"
+      memory: "4Gi"
+
+# Commande du conteneur workspace : il reste en vie (sleep infinity, comme VS Code
+# pour un devcontainer). Vide = commande par defaut de l'image.
+workspace:
+  command: ["sleep", "infinity"]
 
 resources:
   limits:
@@ -24,6 +35,10 @@ persistence:
   etat:
     size: 10Gi
     storageClass: ""
+  # Stockage du Docker du pod (/var/lib/docker) : images gardees entre deux redemarrages.
+  docker:
+    size: 30Gi
+    storageClass: ""
 
 serviceAccount:
   name: devzone-workspace
@@ -31,3 +46,7 @@ serviceAccount:
 
 networkPolicy:
   enabled: true
+  # Entree limitee au namespace. Sortie libre par defaut : un poste de dev a
+  # besoin d'Internet (Maven, npm, images Docker). Mettre true limite la sortie
+  # au namespace et au DNS (kube-system). La liste blanche de sortie est #220.
+  sortieRestreinte: false

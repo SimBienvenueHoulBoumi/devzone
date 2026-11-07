@@ -11,6 +11,7 @@ global:
     gitlab:
       name: gitlab.localhost  # hostname GitLab
   ingress:
+    enabled: false          # aucun Ingress : accès uniquement par relais port-forward
     configureCertmanager: false  # cert-manager non configuré
     tls:
       enabled: false        # TLS désactivé
@@ -36,21 +37,10 @@ registry:
 gitlab-runner:
   install: false
 
-# nginx-ingress exposé sur le nœud kind (hostPort 80 selon kind.yaml)
+# Aucun contrôleur d'Ingress ni port publié sur le nœud : les services
+# restent en ClusterIP dans devzone-gitlab, joignables par relais port-forward
 nginx-ingress:
-  enabled: true
-  controller:
-    hostPort:
-      enabled: true
-      ports:
-        http: 80
-        https: 443
-    replicaCount: 1
-    minAvailable: 0
-    service:
-      type: NodePort
-      nodePorts:
-        gitlab-shell: 32022  # nodePort fixe (plage 30000-32767) pour le clone SSH, port annoncé : 2224
+  enabled: false
 
 # Réplicas à 1 et ressources réduites
 gitlab:
@@ -59,6 +49,8 @@ gitlab:
   gitlab-exporter:
     enabled: false
   webservice:
+    service:
+      type: ClusterIP
     resources:
       requests:
         cpu: 100m
@@ -74,6 +66,8 @@ gitlab:
         cpu: 250m
         memory: 256Mi
   gitlab-shell:
+    service:
+      type: ClusterIP
     resources:
       requests:
         cpu: 50m

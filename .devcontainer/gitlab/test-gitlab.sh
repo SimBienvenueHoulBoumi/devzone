@@ -22,8 +22,8 @@ SECRETS="$RACINE/workspace/.gitlab"
 FICHIER_JETON="$SECRETS/root-token"
 ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
 HOSTS="${DEVZONE_HOSTS:-/etc/hosts}"
-# Noms de l'instance : suffixe DEVZONE_INSTANCE calculé par cluster.sh, comme
-# gitlab.sh (cluster gitlab et contexte kind-gitlab suffixés).
+# Nom de l'instance : suffixe DEVZONE_INSTANCE calculé par cluster.sh, comme
+# gitlab.sh (namespace devzone-gitlab suffixé).
 # shellcheck source=SCRIPTDIR/../cluster.sh
 # shellcheck disable=SC1091
 . "$ICI/../cluster.sh"
@@ -335,26 +335,20 @@ etape_repowarden() {
 }
 
 # 8. --complet : désactivation d'abord, puis contrôle qu'il ne reste ni
-# cluster, ni contexte, ni conteneur, ni secrets, ni ligne /etc/hosts. Les
-# étapes 1 à 7 réinstallent ensuite. Noms suffixés par instance, comme
-# gitlab.sh et cluster.sh (INSTANCE_SUFFIX).
+# namespace, ni conteneur, ni secrets, ni ligne /etc/hosts. Les étapes 1 à 7
+# réinstallent ensuite. Le namespace est suffixé par instance, comme gitlab.sh.
 etape_complet() {
-    local restes="" instance cluster contexte conteneurs
+    local restes="" instance namespace conteneurs
     instance="${DEVZONE_INSTANCE:-devzone}"
-    cluster="gitlab${INSTANCE_SUFFIX}"
-    contexte="kind-gitlab${INSTANCE_SUFFIX}"
+    namespace="devzone-gitlab${INSTANCE_SUFFIX}"
     if ! "$DEVZONE_BIN" desactiver gitlab >/dev/null 2>&1; then
         restes="$restes désactivation en échec;"
     fi
-    if kind get clusters 2>/dev/null | grep -qx "$cluster"; then
-        restes="$restes cluster kind $cluster;"
-    fi
-    if kubectl config get-contexts -o name 2>/dev/null | grep -qx "$contexte"; then
-        restes="$restes contexte $contexte;"
+    if kubectl --context devzone get namespace "$namespace" >/dev/null 2>&1; then
+        restes="$restes namespace $namespace;"
     fi
     conteneurs="$(docker ps -aq \
         --filter "label=devzone.instance=$instance" \
-        --filter "label=io.x-k8s.kind.cluster=$cluster" \
         2>/dev/null || true)"
     if [ -n "$conteneurs" ]; then
         restes="$restes conteneur(s) étiqueté(s) devzone.instance=$instance;"

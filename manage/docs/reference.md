@@ -88,7 +88,7 @@ devzone desactiver <module>    # désactive et applique tout de suite
 |---|---|---|
 | `ia` | Claude Code et opencode installés (versions figées), réinstallés à chaque rebuild, avec le [garde-fou repowarden](#garde-fou-des-assistants-ia) et une [configuration opencode par défaut](#configuration-dopencode) ; se connecter : `claude` (puis `/login`), `opencode auth login` | désinstallés ; le garde-fou (hook et plugin) et la configuration opencode par défaut sont retirés ; l'état de `devzone agent` (volume partagé), les journaux `workspace/.agents/` et les connexions restent |
 | `kubernetes` | à chaque démarrage : connexion au cluster de ta machine et metrics-server sur les clusters locaux (CPU et RAM dans k9s) | aucune connexion au cluster de ta machine ; kubectl, helm, k9s et kind restent installés, un cluster kind créé à la main reste utilisable ; metrics-server est retiré des clusters où devzone l'a installé |
-| `gitlab` | GitLab CE de test dans un cluster kind `gitlab` (chart figé), runner Kubernetes, projet `devzone/demo` avec pipeline ; http://gitlab.localhost:8929 ; au moins 8 Go de RAM libre (voir [GitLab](#gitlab)) | cluster `gitlab`, contexte `kind-gitlab` et secrets `workspace/.gitlab/` retirés ; rien d'autre touché |
+| `gitlab` | GitLab CE de test dans le [cluster des services](#cluster-de-devzone), namespace `devzone-gitlab` (chart figé), runner Kubernetes, projet `devzone/demo` avec pipeline ; http://gitlab.localhost:8929 ; au moins 8 Go de RAM allouable (voir [GitLab](#gitlab)) | releases Helm, namespace `devzone-gitlab` et secrets `workspace/.gitlab/` retirés ; rien d'autre touché |
 | `postgres` | PostgreSQL 16 partagé sur le [cluster de devzone](#cluster-de-devzone), une base par projet (`devzone postgres creer <projet>`), joignable sur `127.0.0.1:5432` dans le conteneur (voir [PostgreSQL](#postgresql)) | namespace `devzone-postgres` (toutes les bases) et secrets `workspace/.postgres/` supprimés, après confirmation en terminal ; kind dédié supprimé s'il ne sert plus |
 
 Le choix est **propre à chaque devzone** (instance) et gardé dans le dossier `$RACINE/.devzone.modules` (monté de l'hôte, il survit aux rebuilds). Au premier démarrage d'une instance, si une connexion Claude Code ou opencode existe déjà dans les volumes, le module `ia` n'est pas activé : tout est désactivé par défaut et la connexion est signalée une seule fois (« devzone activer ia pour l'utiliser ici »), pas pour un état repris.
@@ -208,9 +208,14 @@ Le cluster de l'hôte n'est pas joignable dans deux cas (kind fonctionne quand m
 - **Codespaces, machine distante** : pas de `~/.kube` local ;
 - **Linux avec Docker Engine** : un cluster kind ou minikube de l'hôte écoute sur `127.0.0.1`, invisible du conteneur sans la réécriture `kube-config.sh`. Un cluster qui écoute sur toutes les interfaces (k3s, kubeadm) est joignable.
 
-## Workspace Kubernetes (aperçu)
+## Workspace Kubernetes
 
-Le poste de developpement peut tourner dans le cluster, avec Kubernetes comme prerequis minimal. Le chart charts/devzone-workspace/ deploie un StatefulSet (conteneur workspace sur l image ghcr.io/simbienvenuehoulboumi/devzone-workspace:<version>, sidecar docker:27-dind privilegie, DOCKER_HOST=tcp://localhost:2375), deux PVC (workspace, etat), un ServiceAccount devzone-workspace avec Role minimal et une NetworkPolicy meme namespace.
+Le poste de developpement peut tourner dans le cluster, avec Kubernetes 1.29 ou plus (sidecar natif) comme prerequis minimal. Le chart charts/devzone-workspace/ deploie un StatefulSet :
+
+- conteneur `workspace` (image ghcr.io/simbienvenuehoulboumi/devzone-workspace:<version>), avec `DOCKER_HOST=tcp://localhost:2375` et `TESTCONTAINERS_HOST_OVERRIDE=localhost` ;
+- sidecar natif `docker` (docker:27-dind, privilegie), demarre avant `workspace` ;
+- trois PVC : `workspace`, `etat`, et `docker` (`/var/lib/docker`, 30 Gi par defaut) ;
+- un ServiceAccount devzone-workspace avec Role minimal et une NetworkPolicy meme namespace.
 
 Depuis le poste :
 
@@ -223,29 +228,46 @@ devzone workspace shell      # shell dans le conteneur workspace
 
 Les commandes utilisent helm et kubectl du poste, avec le contexte devzone s il existe, sinon le contexte courant. L image est construite par la CI a chaque PR et publiee sur ghcr.io a la livraison.
 
+### Testcontainers et docker dans le workspace
+
+- `docker` et Testcontainers parlent au Docker du pod : rien a configurer, et le socket Docker du poste n'est pas monte.
+- Ryuk reste actif : il nettoie les conteneurs de test.
+- Les conteneurs lances par Testcontainers publient leurs ports sur le Docker du pod ; `TESTCONTAINERS_HOST_OVERRIDE=localhost` leur fait joindre ces ports par localhost.
+- Le conteneur `workspace` ne demarre qu'une fois `docker info` reussi (startupProbe, 60 s au plus) : un `./mvnw verify` lance tout de suite ne tombe pas sur « Cannot connect ». Si le Docker ne repond pas dans ce delai, le sidecar redemarre.
+- Les images restent sur le PVC `docker` entre deux redemarrages. Reglages du chart : `persistence.docker.size` et `persistence.docker.storageClass` (volume), `sidecar.resources` (limites, 2 CPU et 4 Gi par defaut).
+
+### Securite du sidecar Docker
+
+- **Privilegie** : le sidecar tourne avec `privileged: true`, qui est le prix de Docker dans un pod. Le privilege est confine au pod, mais ce n'est **pas** un bac a sable etanche : un conteneur privilegie peut atteindre le noeud. Ne pas y executer de code non fiable hors du poste de developpement.
+- **Pas de socket du poste** : c'est mieux que le partage du socket Docker de l'hote (#291), qui donnerait root sur la machine. Le sidecar ne voit que le Docker du pod.
+- **Ecoute** : le Docker ecoute seulement sur `127.0.0.1:2375` dans le pod (`--host=tcp://127.0.0.1:2375`), sans TLS. Aucun port n'est declare (ni `containerPort`, ni `hostPort`), et le Service n'expose que le HTTP du workspace : le 2375 n'est joignable que depuis le pod.
+- **Ports publies par Testcontainers** : ils sont ouverts sur le reseau du pod. Les autres pods du namespace peuvent les joindre (la NetworkPolicy l'autorise), les pods d'autres namespaces et l'exterieur non. Ne pas y mettre de secret.
+- **Cloisonnement** : le conteneur `workspace` voit tous les conteneurs du Docker du pod, y compris ceux lances par d'autres projets. Un projet ne doit pas compter sur une isolation entre ses conteneurs et ceux d'un autre.
+- **RBAC** : inchange. Le ServiceAccount ne peut que lire pods, services et configmaps du namespace ; il n'a aucun droit d'ecriture sur le cluster.
+
 ## GitLab
 
-Le module `gitlab` fournit une instance GitLab de test dans un cluster kind dédié (`gitlab`).
+Le module `gitlab` fournit une instance GitLab de test dans le [cluster des services](#cluster-de-devzone), namespace `devzone-gitlab` (suffixé par instance).
 
 ```bash
 devzone                        # état : identité git, GitHub, outils, modules
-devzone activer gitlab         # active et installe GitLab dans kind
-devzone desactiver gitlab      # désinstalle GitLab et supprime le cluster
+devzone activer gitlab         # active et installe GitLab dans le cluster des services
+devzone desactiver gitlab      # désinstalle GitLab et supprime son namespace
+devzone gitlab migrer          # installe, puis propose de supprimer l'ancien cluster kind
+devzone gitlab migrer --oui    # idem sans confirmation
 devzone appliquer              # applique les modules actifs
 devzone actif gitlab           # code 0 si GitLab est actif
 ```
 
-- **Ressources** : au moins 8 Go de RAM libre avant la création du cluster (refus sinon) ; environ 8 Go occupés dans le conteneur une fois GitLab installé. Trop lourd pour la CI GitHub : testé à la main (essai réel du 31/10).
+- **Ressources** : au moins 8 Go de RAM **allouable dans le cluster des services** (somme des nœuds, refus sinon) ; environ 8 Go occupés une fois GitLab installé. Trop lourd pour la CI GitHub : testé à la main.
 - **Durée** (mesurée) : installation complète environ 7 min (dont le chart GitLab, attendu jusqu'à `GITLAB_ATTENTE`, 1200 s par défaut) ; une relance sur une instance prête environ 35 s (rien n'est réinstallé ni re-poussé).
-- **Ce qui est installé** : cluster kind `gitlab` (un nœud, `.devcontainer/gitlab/kind.yaml`, ports 8929 HTTP et 2224 SSH publiés sur `127.0.0.1` du poste) ; chart `gitlab/gitlab` 9.11.16 (GitLab 18.11 CE) sans cert-manager, Prometheus, registry ni KAS, nginx en une réplique et service NodePort ; chart `gitlab/gitlab-runner` 0.88.2, exécuteur Kubernetes, image auxiliaire à l'architecture du nœud (arm64 compris).
+- **Ce qui est installé** : namespace `devzone-gitlab<instance>` dans le cluster choisi pour les services, étiqueté et isolé par NetworkPolicy ; chart `gitlab/gitlab` 9.11.16 (GitLab 18.11 CE) sans cert-manager, Prometheus, registry ni KAS, nginx en une réplique et services en `ClusterIP` (ingress désactivé) ; chart `gitlab/gitlab-runner` 0.88.2, exécuteur Kubernetes, URL interne et clone des jobs dans le même namespace.
 - **Données de test** : groupe `devzone`, projet `devzone/demo` (Python, pipeline ruff et pytest), utilisateur `dev`, runner enregistré. Sur une relance, rien n'est recréé.
-- **Accès dans le conteneur** : http://gitlab.localhost:8929, utilisateur `root`. Le nom `gitlab.localhost` pointe vers `127.0.0.1` dans `/etc/hosts` (entrée `127.0.0.1	gitlab.localhost # devzone:gitlab`, posée à l'activation et à chaque démarrage, remplacée si son adresse diffère, retirée à la désactivation). Un relais TCP `socat` dans le conteneur écoute sur `127.0.0.1:8929` et `127.0.0.1:2224` et joint le **nœud kind** (`gitlab<instance>-control-plane`), sur `<nœud>:80` et `<nœud>:32022` (PID, journal et cible dans `workspace/.gitlab-<port>/`). Pour cela, le conteneur rejoint le réseau Docker `kind` du nœud (`docker network connect kind "$(hostname)"`, idempotent) ; si ce réseau ne peut pas être rejoint, repli sur l'**IPv4** de `host.docker.internal` sur les mêmes ports, avec un message sur stderr. La cible du relais est comparée à chaque lancement : si elle change, l'ancien relais est arrêté et relancé. Il est indispensable à curl et à git en HTTP : libcurl résout tout nom `*.localhost` vers la boucle locale sans lire `/etc/hosts` (RFC 6761), donc sans relais la requête part sur le `127.0.0.1` du conteneur, où rien n'écoute. ssh et glab, eux, lisent `/etc/hosts` et passent par le même relais.
-
-- **Accès depuis le poste** : les ports 8929 (HTTP) et 2224 (SSH) sont publiés sur la seule boucle locale du poste via `extraPortMappings` du cluster kind `gitlab` (`listenAddress: "127.0.0.1"` sur les deux mappings). Depuis le poste, `gitlab.localhost` pointe vers l'hôte ; depuis une autre machine du réseau local, GitLab est injoignable. Plus besoin de relais temporaire `docker run ... socat` côté poste : le relais vit dans le conteneur.
-- **Ancien cluster** : un cluster `gitlab` créé avant ce réglage garde ses publications sur `0.0.0.0` ; kind ne les modifie pas sur un nœud existant. Le récapitulatif `devzone` l'affiche alors (`docker port` du nœud sur `0.0.0.0` ou `::`) avec la marche à suivre : `devzone desactiver gitlab` puis `devzone activer gitlab`. Cette recréation perd les données de test de GitLab (acceptable pour cette instance).
-
+- **Accès dans le conteneur** : http://gitlab.localhost:8929, utilisateur `root`. Le nom `gitlab.localhost` pointe vers `127.0.0.1` dans `/etc/hosts` (entrée `127.0.0.1	gitlab.localhost # devzone:gitlab`, posée à l'activation et à chaque démarrage, remplacée si son adresse diffère, retirée à la désactivation). Deux relais `kubectl port-forward` écoutent sur `127.0.0.1:8929` et `127.0.0.1:2224` : `svc/gitlab-webservice-default` (8929→8181) et `svc/gitlab-gitlab-shell` (2224→22), dans le namespace de l'instance (PID et journal dans `workspace/.gitlab-web/` et `workspace/.gitlab-ssh/`). Ils sont indispensables à curl et à git en HTTP : libcurl résout tout nom `*.localhost` vers la boucle locale sans lire `/etc/hosts` (RFC 6761). ssh et glab lisent `/etc/hosts` et passent par le même relais.
+- **Accès depuis le poste** : GitLab n'est pas publié directement sur le réseau ; le port-forward écoute dans le conteneur. Depuis le poste, utiliser `devzone port 8929` (et `devzone port 2224` pour SSH) si nécessaire.
+- **Ancien cluster** : un cluster kind `gitlab<instance>` créé avant #396 n'est plus utilisé. Le récapitulatif `devzone` affiche `⚠ ancien cluster kind-gitlab<instance> : devzone gitlab migrer` tant qu'il existe. `devzone gitlab migrer` installe GitLab dans le cluster des services, puis supprime l'ancien cluster après confirmation (`--oui` sans terminal) ; sans terminal et sans `--oui`, l'installation se fait et l'ancien cluster est conservé (code 2). Les données de test de l'ancien cluster ne sont pas migrées.
 - **Secrets** : mot de passe root, jeton root, mot de passe de `dev` et jeton du runner dans `workspace/.gitlab/` (droits 600, ignorés par git, jamais affichés). Mot de passe root : `cat workspace/.gitlab/root-password`.
-- **Désactivation** : `devzone desactiver gitlab` arrête les relais TCP 8929/2224, supprime le cluster `gitlab`, retire `kind-gitlab` de `~/.kube/config`, remet le contexte courant d'avant et supprime `workspace/.gitlab/`. Rien d'autre n'est touché.
+- **Désactivation** : `devzone desactiver gitlab` arrête les deux relais, désinstalle les releases Helm `gitlab` et `gitlab-runner`, supprime le namespace `devzone-gitlab<instance>` et `workspace/.gitlab/`. Le cluster des services et son contexte courant ne sont pas touchés.
 
 ### Essai de bout en bout : `devzone test-gitlab`
 
@@ -257,7 +279,7 @@ devzone test-gitlab --complet    # désactive, contrôle qu'il ne reste rien, pu
 devzone test-gitlab --statut     # publie aussi le statut gitlab-integration sur HEAD
 ```
 
-- **Étapes**, chacune chronométrée : 1 module actif (sinon activé) ; 2 état « prêt » et runner en ligne ; 3 `gitlab.localhost` résolu vers `127.0.0.1` et relais TCP actifs sur 8929 et 2224 (`gitlab.sh hote-poser` et `relais-lancer`), sinon ✖ avec l'adresse ou le port manquant ; 4 pipeline de `devzone/demo` relancé sur `main` et attendu jusqu'à `success` ; 5 clone SSH (clé ed25519 jetable) et clone HTTP authentifié par un assistant d'identifiants (Basic `oauth2` + jeton lu dans le fichier, jamais dans les arguments d'un processus, l'URL ni `.git/config`) ; 6 plateforme `gitlab` avec `glab repo clone`, puis retour à la plateforme d'avant ; 7 suite d'intégration `test/gitlab/` de repowarden ([#533](https://github.com/simdevWarden/repowarden/issues/533)), dossier absent à la réf → étape sautée avec la raison, échec → sortie gardée dans `${TMPDIR:-/tmp}/devzone-test-gitlab-repowarden.log` (jeton masqué) et citée dans la raison. Avec `--complet`, une étape 8 précède les autres : `devzone desactiver gitlab`, puis contrôle qu'il ne reste ni cluster `gitlab<instance>`, ni contexte `kind-gitlab<instance>` (noms calculés comme `gitlab.sh` et `cluster.sh`), ni conteneur étiqueté `devzone.instance=<instance>` du module sur le Docker de l'hôte, ni `workspace/.gitlab/`, ni ligne `# devzone:gitlab` de `/etc/hosts`.
+- **Étapes**, chacune chronométrée : 1 module actif (sinon activé) ; 2 état « prêt » et runner en ligne ; 3 `gitlab.localhost` résolu vers `127.0.0.1` et relais TCP actifs sur 8929 et 2224 (`gitlab.sh hote-poser` et `relais-lancer`), sinon ✖ avec l'adresse ou le port manquant ; 4 pipeline de `devzone/demo` relancé sur `main` et attendu jusqu'à `success` ; 5 clone SSH (clé ed25519 jetable) et clone HTTP authentifié par un assistant d'identifiants (Basic `oauth2` + jeton lu dans le fichier, jamais dans les arguments d'un processus, l'URL ni `.git/config`) ; 6 plateforme `gitlab` avec `glab repo clone`, puis retour à la plateforme d'avant ; 7 suite d'intégration `test/gitlab/` de repowarden ([#533](https://github.com/simdevWarden/repowarden/issues/533)), dossier absent à la réf → étape sautée avec la raison, échec → sortie gardée dans `${TMPDIR:-/tmp}/devzone-test-gitlab-repowarden.log` (jeton masqué) et citée dans la raison. Avec `--complet`, une étape 8 précède les autres : `devzone desactiver gitlab`, puis contrôle qu'il ne reste ni namespace `devzone-gitlab<instance>` (nom calculé comme `gitlab.sh`), ni conteneur étiqueté `devzone.instance=<instance>` du module sur le Docker de l'hôte, ni `workspace/.gitlab/`, ni ligne `# devzone:gitlab` de `/etc/hosts`.
 - **Résumé** : une ligne par étape (✔/✖/sauté, durée, raison) et un total ; le code de sortie n'est 0 que sans ✖ (une étape sautée n'échoue pas). Un jeton n'est jamais affiché.
 - **Nettoyage garanti** par `trap … EXIT` : clé SSH retirée de GitLab, dossiers temporaires supprimés, plateforme d'avant restaurée, même si une étape échoue.
 - **Variables** : `GITLAB_TEST_PIPELINE` (délai du pipeline, 600 s par défaut), `GITLAB_TEST_INTERVALLE` (intervalle d'interrogation du pipeline, 5 s par défaut), `REPOWARDEN_TEST_REF` (réf. de la suite d'intégration, `develop` par défaut), `DEVZONE_RACINE` (racine du dépôt, comme `gitlab.sh`).
@@ -312,14 +334,14 @@ devzone port inclure <n>      # réintègre un port à la liste automatique
 
 ## Cluster de devzone
 
-Les modules qui déploient un service (`postgres` ; `gitlab` avec #279) s'installent sur **un seul cluster**, choisi une fois et gardé dans l'état (`cluster=` dans `$RACINE/.devzone.modules`).
+Les modules qui déploient un service (`postgres`, `gitlab`) s'installent sur **un seul cluster**, choisi une fois et gardé dans l'état (`cluster=` dans `$RACINE/.devzone.modules`).
 
 - **Cluster local vs distant** : un cluster est considéré comme **local** quand son serveur écoute sur une adresse de boucle (`127.0.0.1`, `localhost`, `::1`, `host.docker.internal`) — lu dans la configuration kubeconfig, sans appel réseau. Le cluster kind dédié (`kind-devzone`) est toujours local. Tout autre cluster (serveur sur une adresse distante) est **distant**.
 - **Choix** : à la première activation. `--contexte CTX` d'abord ; sinon, dans un terminal, un menu : le cluster par défaut est le contexte courant du kubeconfig de l'hôte s'il répond et est local (en pratique `docker-desktop`), sinon kind dédié `kind-devzone`. Le choix est gardé dans l'état et repris aux redémarrages. Le menu propose les clusters **locaux** d'abord, puis le **cluster kind dédié**, enfin les clusters **distants** (marqués « distant ») ; sans terminal : `kind-devzone`. Les clusters de l'hôte n'apparaissent qu'avec le [module `kubernetes`](#kubernetes) actif.
 - **Cluster distant** : choisir un cluster distant nécessite une confirmation en terminal, ou `--confirmer CTX` sans terminal. Sans confirmation exacte, le choix est refusé. Quand le cluster de devzone est distant, le récapitulatif `devzone` affiche un avertissement `⚠ cluster distant : <contexte>`.
 - **Voir / changer** : `devzone cluster` affiche le cluster et les possibles ; `devzone cluster CTX [--confirmer CTX]` y déplace les services actifs (désinstallés de l'ancien, installés sur le nouveau). **Les données ne sont pas migrées** : confirmation en terminal, `--oui` sans terminal.
 - **Cluster de l'hôte** : devzone n'y crée que ses namespaces étiquetés `app.kubernetes.io/managed-by=devzone`, et les supprime à la désactivation. Désactiver le module `kubernetes` rend ce cluster injoignable pour les services.
-- **Contexte courant** : les clusters kind sont créés sans basculer dessus ; `devzone utiliser CTX` bascule seulement le cluster de travail de kubectl, jamais le cluster des services de devzone. Si tu te retrouves sur un cluster interne (kind-devzone ou kind-gitlab), reviens avec `devzone utiliser <ton cluster>`.
+- **Contexte courant** : les clusters kind sont créés sans basculer dessus ; `devzone utiliser CTX` bascule seulement le cluster de travail de kubectl, jamais le cluster des services de devzone. Si tu te retrouves sur un cluster interne (kind-devzone), reviens avec `devzone utiliser <ton cluster>`.
 - **Namespace** : pour un contexte du poste (ceux de `hote.config`, recopié depuis le poste à chaque démarrage), le namespace fixé par `devzone utiliser -n` ne survit pas à un redémarrage ; pour les clusters kind du conteneur, il est gardé jusqu'au rebuild.
 
 - **Deux notions** : `★` marque le cluster de travail de kubectl (kubectl, k9s, helm), `●` le cluster des services de devzone (`devzone cluster`). Un contexte peut porter les deux marques. `devzone clusters` affiche la vue.
