@@ -6,6 +6,10 @@ metadata:
 spec:
   serviceName: {{ include "devzone-workspace.fullname" . }}
   replicas: {{ .Values.replicaCount }}
+  # Les PVC (projets, connexions) ne sont jamais supprimes avec le StatefulSet.
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
   selector:
     matchLabels:
       app.kubernetes.io/name: {{ include "devzone-workspace.name" . }}
@@ -15,11 +19,47 @@ spec:
         app.kubernetes.io/name: {{ include "devzone-workspace.name" . }}
     spec:
       serviceAccountName: {{ include "devzone-workspace.serviceAccountName" . }}
+      # Pod en utilisateur vscode (UID 1000), jamais root : le HOME du workspace est
+      # /home/vscode, ou sont montees les connexions. fsGroup 1000 rend le volume etat
+      # ecrit par vscode. Reglages dans values.yaml (securityContext).
+      securityContext:
+        {{- toYaml .Values.securityContext | nindent 8 }}
       # Sidecars natifs (restartPolicy: Always, Kubernetes 1.29+) : ils demarrent
       # avant le conteneur workspace, et leur startupProbe bloque ce demarrage tant
       # qu'ils ne repondent pas. Aucun n'est privilegie, et aucun ne declare de port :
       # ils n'ecoutent que sur 127.0.0.1 du pod.
       initContainers:
+        # etat-init : cree les dossiers du volume etat (identites, connexions,
+        # caches). Il tourne en vscode (UID 1000), sans privilege. Un lien symbolique
+        # ecrit ici ne survivrait pas : le conteneur workspace a son propre systeme
+        # de fichiers. Le workspace monte donc chaque dossier (subPath) a sa place.
+        - name: etat-init
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          {{- /*
+            Commentaire Helm : il ne figure pas dans le rendu. La liste $dirs vient
+            de persistence.etat.chemins, comme les montages du workspace.
+          */}}
+          {{- $dirs := list }}
+          {{- range .Values.persistence.etat.chemins }}
+          {{- $dirs = append $dirs (printf "/home/vscode/.devzone-etat/%s" .) }}
+          {{- end }}
+          command: ["sh", "-c", "mkdir -p {{ join " " $dirs }}"]
+          securityContext:
+            runAsUser: 1000
+            runAsGroup: 1000
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: etat
+              mountPath: /home/vscode/.devzone-etat
+          resources:
+            requests:
+              cpu: "10m"
+              memory: "16Mi"
+            limits:
+              cpu: "100m"
+              memory: "64Mi"
         # kubedock : API Docker du pod. Les conteneurs de test deviennent des pods du
         # namespace, crees avec le Role du chart (limite au namespace).
         - name: kubedock
@@ -98,6 +138,10 @@ spec:
           command: {{ toJson . }}
           {{- end }}
           env:
+            # HOME de vscode : gh, claude, opencode... ecrivent leurs connexions dans
+            # les chemins montes depuis le volume etat (et non dans le home de root).
+            - name: HOME
+              value: /home/vscode
             # Testcontainers et docker parlent a kubedock, et buildctl a BuildKit.
             # Ryuk est coupe : kubedock nettoie les conteneurs de test lui-meme.
             - name: DOCKER_HOST
@@ -114,7 +158,14 @@ spec:
             - name: workspace
               mountPath: /workspace
             - name: etat
-              mountPath: /etat
+              mountPath: /home/vscode/.devzone-etat
+            # Identites et caches : chaque chemin du volume etat est monte a son
+            # emplacement habituel (gh, git, Claude Code, opencode, devzone agent, caches).
+            {{- range .Values.persistence.etat.chemins }}
+            - name: etat
+              subPath: {{ . | quote }}
+              mountPath: {{ printf "/home/vscode/%s" . | quote }}
+            {{- end }}
   volumeClaimTemplates:
     - metadata:
         name: workspace
@@ -128,6 +179,10 @@ spec:
             storage: {{ .Values.persistence.workspace.size }}
     - metadata:
         name: etat
+        annotations:
+          # Le PVC survit a la desinstallation du chart (connexions gardees). La
+          # vraie protection est persistentVolumeClaimRetentionPolicy ci-dessous.
+          helm.sh/resource-policy: keep
       spec:
         accessModes: ["ReadWriteOnce"]
         {{- if .Values.persistence.etat.storageClass }}

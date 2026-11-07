@@ -1,5 +1,14 @@
 replicaCount: 1
 
+# Securite du pod : utilisateur vscode (UID 1000), jamais root. Les sidecars
+# heritent de runAsUser (kubedock inclus, qui n'en declare pas) ; buildkit le
+# redeclare, rootless en 1000.
+securityContext:
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  runAsNonRoot: true
+
 image:
   repository: ghcr.io/simbienvenuehoulboumi/devzone-workspace
   tag: ""
@@ -48,9 +57,22 @@ persistence:
   workspace:
     size: 20Gi
     storageClass: ""
+  # Identités, connexions et caches, gardés d'un redémarrage à l'autre. Chaque
+  # chemin (relatif au home de vscode) est monté depuis ce volume à son
+  # emplacement habituel ; l'initContainer etat-init crée les dossiers d'abord.
   etat:
     size: 10Gi
     storageClass: ""
+    chemins:
+      - .config/gh
+      - .config/git
+      - .claude
+      - .config/opencode
+      - .local/share/opencode
+      - .local/state/oc-lancer
+      - .m2
+      - .gradle
+      - .local/share/pnpm
 
 serviceAccount:
   name: devzone-workspace
