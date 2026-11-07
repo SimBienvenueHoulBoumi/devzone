@@ -46,3 +46,7 @@ serviceAccount:
 
 networkPolicy:
   enabled: true
+  # Entree limitee au namespace. Sortie libre par defaut : un poste de dev a
+  # besoin d'Internet (Maven, npm, images Docker). Mettre true limite la sortie
+  # au namespace et au DNS (kube-system). La liste blanche de sortie est #220.
+  sortieRestreinte: false

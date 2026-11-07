@@ -90,6 +90,23 @@ bloc_init() {
     ! grep -q -- "2375" <<<"$output" || false
 }
 
+@test "reseau : par defaut la NetworkPolicy ne limite que l'entree (pas de Egress)" {
+    run rendu_de templates/networkpolicy.yaml
+    [ "$status" -eq 0 ]
+    grep -q -- "- Ingress" <<<"$output" || false
+    ! grep -q -- "Egress" <<<"$output" || false
+    ! grep -q -- "egress:" <<<"$output" || false
+}
+
+@test "reseau : sortieRestreinte=true ajoute la regle Egress (namespace et DNS)" {
+    run rendu_de templates/networkpolicy.yaml --set networkPolicy.sortieRestreinte=true
+    [ "$status" -eq 0 ]
+    grep -q -- "- Egress" <<<"$output" || false
+    grep -q -- "egress:" <<<"$output" || false
+    grep -q -- "kubernetes.io/metadata.name: kube-system" <<<"$output" || false
+    grep -q -- "port: 53" <<<"$output" || false
+}
+
 @test "docker : PVC docker monte sur /var/lib/docker, taille par defaut 30Gi" {
     run rendu_de templates/statefulset.yaml
     [ "$status" -eq 0 ]
