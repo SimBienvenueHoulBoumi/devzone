@@ -15,6 +15,11 @@ sidecar:
       cpu: "2"
       memory: "4Gi"
 
+# Commande du conteneur workspace : il reste en vie (sleep infinity, comme VS Code
+# pour un devcontainer). Vide = commande par defaut de l'image.
+workspace:
+  command: ["sleep", "infinity"]
+
 resources:
   limits:
     cpu: "2"

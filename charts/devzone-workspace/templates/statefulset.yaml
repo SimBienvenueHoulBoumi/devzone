@@ -57,6 +57,16 @@ spec:
         - name: workspace
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- /*
+            Sans command, le conteneur lance l'entrypoint de l'image (bash pour un
+            devcontainer), qui se termine aussitot faute de terminal : le pod boucle
+            en redemarrages. sleep infinity le garde en vie, comme VS Code pour un
+            devcontainer ; le poste entre ensuite par kubectl exec. Commentaire Helm :
+            il ne figure pas dans le rendu.
+          */}}
+          {{- with .Values.workspace.command }}
+          command: {{ toJson . }}
+          {{- end }}
           env:
             - name: DOCKER_HOST
               value: tcp://localhost:2375

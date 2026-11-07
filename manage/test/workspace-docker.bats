@@ -117,3 +117,13 @@ bloc_init() {
     init="$(bloc_init "$output")"
     grep -q -- "memory: 8Gi" <<<"$init" || false
 }
+
+@test "workspace : le conteneur workspace a une commande qui ne se termine pas (sleep infinity par defaut)" {
+    run rendu_de templates/statefulset.yaml
+    [ "$status" -eq 0 ]
+    local principal
+    principal="$(awk '/^        - name: workspace$/{p=1} /^          resources:/{p=0} p' <<<"$output")"
+    grep -q -- 'command: \["sleep","infinity"\]' <<<"$principal" || false
+    # La commande est celle du conteneur workspace, pas celle du sidecar docker.
+    ! grep -q -- "sleep" <<<"$(bloc_init "$output")" || false
+}
