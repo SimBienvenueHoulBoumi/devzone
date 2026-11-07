@@ -48,9 +48,22 @@ persistence:
   workspace:
     size: 20Gi
     storageClass: ""
+  # Identités, connexions et caches, gardés d'un redémarrage à l'autre. Chaque
+  # chemin (relatif au home de vscode) est monté depuis ce volume à son
+  # emplacement habituel ; l'initContainer etat-init crée les dossiers d'abord.
   etat:
     size: 10Gi
     storageClass: ""
+    chemins:
+      - .config/gh
+      - .config/git
+      - .claude
+      - .config/opencode
+      - .local/share/opencode
+      - .local/state/oc-lancer
+      - .m2
+      - .gradle
+      - .local/share/pnpm
 
 serviceAccount:
   name: devzone-workspace
