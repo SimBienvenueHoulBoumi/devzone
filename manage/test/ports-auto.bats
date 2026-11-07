@@ -251,10 +251,41 @@ SS
     [ "$avant" = "$apres" ]
 }
 
+@test "teardown : seul un veilleur lancé par le test est orphelin, jamais le vrai" {
+    # Faux veilleur lancé par le test : même nom de commande, BATS_TEST_TMPDIR hérité.
+    bash -c 'exec -a "bash .devcontainer/ports-auto.sh boucle" sleep 60' >/dev/null 2>&1 &
+    faux=$!
+    # Faux veilleur sans BATS_TEST_TMPDIR : représente le vrai veilleur du conteneur.
+    env -u BATS_TEST_TMPDIR bash -c 'exec -a "bash .devcontainer/ports-auto.sh boucle" sleep 60' >/dev/null 2>&1 &
+    vrai=$!
+    run orphelins_du_test
+    [ "$status" -eq 0 ]
+    echo "$output" | grep -qx "$faux"
+    [ "$(echo "$output" | grep -cx "$vrai")" -eq 0 ]
+    kill "$faux" "$vrai"
+    wait "$faux" 2>/dev/null || true
+    wait "$vrai" 2>/dev/null || true
+    run orphelins_du_test
+    [ -z "$output" ]
+}
+
+# Pids des veilleurs ports-auto.sh (boucle ou demarrer) dont l'environnement
+# porte BATS_TEST_TMPDIR de ce test ; le vrai veilleur du conteneur n'en a pas.
+orphelins_du_test() {
+    local pid
+    for pid in $(pgrep -f "bash +[^ ]*ports-auto[.]sh (boucle|demarrer)" 2>/dev/null); do
+        if tr '\0' '\n' <"/proc/$pid/environ" 2>/dev/null | grep -qxF "BATS_TEST_TMPDIR=$BATS_TEST_TMPDIR"; then
+            echo "$pid"
+        fi
+    done
+}
+
 teardown() {
     # Incident #394 : aucun veilleur lancé par un test ne doit survivre au test.
-    if pgrep -f "bash +[^ ]*ports-auto[.]sh (boucle|demarrer)" >/dev/null 2>&1; then
-        pgrep -af "ports-auto[.]sh" >&2
+    local orphelins
+    orphelins="$(orphelins_du_test)"
+    if [ -n "$orphelins" ]; then
+        echo "veilleurs orphelins du test : $orphelins" >&2
         return 1
     fi
     return 0
