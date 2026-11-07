@@ -182,6 +182,8 @@ Dans le conteneur, le récapitulatif `devzone` signale une version publiée plus
 
 **Module `postgres`** : un PostgreSQL partagé, une base par projet (voir [Accéder à PostgreSQL](#accéder-à-postgresql)). Pour l'activer : `devzone activer postgres`.
 
+**Module `argocd`** : Argo CD sur le cluster de devzone, interface sur https://127.0.0.1:8443 dans le conteneur (voir [Argo CD](manage/docs/reference.md#argo-cd)). Pour l'activer : `devzone activer argocd`.
+
 Ces modules sont désactivés par défaut, activables à la demande depuis le conteneur (sans rebuild), et leur choix est conservé d'un démarrage à l'autre.
 
 ## Où sont mes identifiants ?
@@ -193,9 +195,10 @@ Les comptes créés par devzone sont regroupés dans `.password`, à la racine d
 gitlab	http://gitlab.localhost:8929	root	…
 postgres	127.0.0.1:5432	postgres	…
 postgres:monprojet	127.0.0.1:5432/monprojet	monprojet	…
+argocd	https://127.0.0.1:8443	admin	…
 ```
 
-Le fichier est lisible par toi seul (600) et ignoré par git : ne le copie ni ne le commit jamais. Il est régénéré à chaque création, suppression ou changement de compte (modules `gitlab` et `postgres`, seed GitLab, démarrage) :
+Le fichier est lisible par toi seul (600) et ignoré par git : ne le copie ni ne le commit jamais. Il est régénéré à chaque création, suppression ou changement de compte (modules `gitlab`, `postgres` et `argocd`, seed GitLab, démarrage) :
 
 ```sh
 devzone mots-de-passe                  # régénère le fichier et affiche seulement son chemin
@@ -203,7 +206,7 @@ devzone postgres creer <projet>         # création, ou nouveau mot de passe ave
 devzone postgres supprimer <projet>     # suppression du compte et de sa ligne
 ```
 
-Les fichiers des modules restent la source : `workspace/.postgres/<projet>.env`, `workspace/.postgres/admin-password`, `workspace/.gitlab/root-password` et `workspace/.gitlab/dev-password`.
+Les fichiers des modules restent la source : `workspace/.postgres/<projet>.env`, `workspace/.postgres/admin-password`, `workspace/.gitlab/root-password`, `workspace/.gitlab/dev-password` et `workspace/.argocd/admin.env`.
 
 ## Accéder à PostgreSQL
 
