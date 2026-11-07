@@ -17,6 +17,7 @@ password_regenerer() (
     umask 077
     local cible="$PASSWORD_CIBLE" racine="$PASSWORD_RACINE"
     local gl="$racine/workspace/.gitlab" pg="$racine/workspace/.postgres"
+    local ar="$racine/workspace/.argocd"
     local tab entrees tmp fichier nom service adresse utilisateur mdp
     tab="$(printf '\t')"
     entrees="$(mktemp "$racine/.password.entrees.XXXXXX")" || return 1
@@ -38,6 +39,13 @@ password_regenerer() (
         mdp="$(cat "$pg/admin-password")"
         if [ -n "$mdp" ]; then
             printf 'postgres\t%s\tpostgres\t%s\n' "127.0.0.1:5432" "$mdp" >>"$entrees"
+        fi
+    fi
+    if [ -s "$ar/admin.env" ]; then
+        utilisateur="$(sed -n 's/^ARGOCD_USER=//p' "$ar/admin.env" 2>/dev/null | tail -1 || true)"
+        mdp="$(sed -n 's/^ARGOCD_PASSWORD=//p' "$ar/admin.env" 2>/dev/null | tail -1 || true)"
+        if [ -n "$utilisateur" ] && [ -n "$mdp" ]; then
+            printf 'argocd\t%s\t%s\t%s\n' "https://127.0.0.1:8443" "$utilisateur" "$mdp" >>"$entrees"
         fi
     fi
     for fichier in "$pg"/*.env; do
