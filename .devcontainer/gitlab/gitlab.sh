@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Module gitlab : GitLab de test dans un cluster kind.
+# Module gitlab : GitLab de test dans le cluster des services (#396).
 # Pour l'activer : devzone activer gitlab
 # Pour le désactiver : devzone desactiver gitlab
 # set -euo pipefail pour ne rien lancer en erreur silencieuse.
@@ -13,6 +13,10 @@ RACINE="${DEVZONE_RACINE:-$(dirname "$(dirname "$ICI")")}"
 # shellcheck source=SCRIPTDIR/../password.sh
 # shellcheck disable=SC1091
 . "$ICI/../password.sh"
+# Isolation réseau : namespace_isoler, posée avec le namespace devzone-gitlab
+# shellcheck source=SCRIPTDIR/../isolement.sh
+# shellcheck disable=SC1091
+. "$ICI/../isolement.sh"
 
 # ---- Variables de délai (secondes) ----
 # GITLAB_ATTENTE : attente globale d'installation (défaut 1200)
@@ -32,21 +36,13 @@ regenerer_identifiants() {
 # DEVZONE_HOSTS pour les tests (jamais le /etc/hosts réel)
 HOSTS="${DEVZONE_HOSTS:-/etc/hosts}"
 GITLAB_HOTE_MARQUE="# devzone:gitlab"
-# Ports relayés dans le conteneur : HTTP et SSH annoncés par GitLab
-GITLAB_PORTS="${GITLAB_PORTS:-8929 2224}"
 
-# ---- Helper : vérifier la RAM libre (refus < 8 Go) ----
-gitlab_verifier_ram() {
-    local ram_kb
-    ram_kb="$(awk '/^MemAvailable:/ {print $2}' "${DEVZONE_MEMINFO:-/proc/meminfo}" 2>/dev/null || true)"
-    ram_kb="${ram_kb:-0}"
-    if [ "$ram_kb" -lt 8388608 ]; then
-        local ram_mb=$((ram_kb / 1024))
-        echo "devzone : gitlab nécessite au moins 8 Go de RAM libre (disponible : ${ram_mb} Mo)" >&2
-        return 1
-    fi
-    return 0
-}
+# ---- Installation, migration et relais du cluster des services ----
+# Nouvelle logique hors de ce fichier (#396) : namespace devzone-gitlab,
+# mémoire allouable, Helm contexte devzone, migration depuis kind-gitlab.
+# shellcheck source=SCRIPTDIR/installation.sh
+# shellcheck disable=SC1091
+. "$ICI/installation.sh"
 
 # ---- Helper : attendre que GitLab soit prêt ----
 gitlab_attendre_pret() {
@@ -72,7 +68,7 @@ gitlab_seed() {
 
     # Mot de passe root lu dans le secret gitlab-gitlab-initial-root-password
     local mot_de_passe
-    mot_de_passe="$(kubectl --context "kind-gitlab${INSTANCE_SUFFIX}" get secret -n gitlab gitlab-gitlab-initial-root-password -o jsonpath='{.data.password}' 2>/dev/null | base64 -d 2>/dev/null || true)"
+    mot_de_passe="$(kubectl --context devzone get secret -n "$GITLAB_NS" gitlab-gitlab-initial-root-password -o jsonpath='{.data.password}' 2>/dev/null | base64 -d 2>/dev/null || true)"
     if [ -z "$mot_de_passe" ]; then
         echo "devzone : seed GitLab : secret root (gitlab-gitlab-initial-root-password) introuvable, arrêt du seed." >&2
         return 1
@@ -82,12 +78,12 @@ gitlab_seed() {
 
     # Token d'accès root créé par kubectl exec dans le pod toolbox avec gitlab-rails runner
     local toolbox_pod root_token
-    toolbox_pod="$(kubectl --context "kind-gitlab${INSTANCE_SUFFIX}" get pod -n gitlab -l app=toolbox -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)"
+    toolbox_pod="$(kubectl --context devzone get pod -n "$GITLAB_NS" -l app=toolbox -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)"
     if [ -z "$toolbox_pod" ]; then
         echo "devzone : seed GitLab : pod toolbox (label app=toolbox) introuvable, arrêt du seed." >&2
         return 1
     fi
-    root_token="$(kubectl --context "kind-gitlab${INSTANCE_SUFFIX}" exec -n gitlab "$toolbox_pod" -- gitlab-rails runner 'puts User.find_by_username("root").personal_access_tokens.create(name: "devzone", scopes: ["api", "write_repository"], expires_at: 30.days.from_now).token' 2>/dev/null | tail -n 1 || true)"
+    root_token="$(kubectl --context devzone exec -n "$GITLAB_NS" "$toolbox_pod" -- gitlab-rails runner 'puts User.find_by_username("root").personal_access_tokens.create(name: "devzone", scopes: ["api", "write_repository"], expires_at: 30.days.from_now).token' 2>/dev/null | tail -n 1 || true)"
     if [ -z "$root_token" ]; then
         echo "devzone : seed GitLab : création du jeton root (gitlab-rails runner) échouée, arrêt du seed." >&2
         return 1
@@ -215,106 +211,6 @@ gitlab_seed() {
     regenerer_identifiants
 }
 
-# ---- relais TCP 127.0.0.1:8929/2224 vers le nœud kind ----
-# Choix : un socat local détaché par setsid, PID et journal gardés dans
-# workspace/.gitlab-<port>/ comme le relais de cluster.sh. relais_lancer ne
-# convient pas : il fait un kubectl port-forward vers un service du cluster
-# choisi par devzone, alors GitLab est dans le cluster kind `gitlab`.
-# Le conteneur rejoint le réseau Docker `kind` du nœud (#327) : le relais vise
-# alors <nœud>:80 et <nœud>:32022, indépendamment de la publication des ports
-# de l'hôte (127.0.0.1 seulement). Si le réseau ne peut pas être rejoint, repli
-# sur l'IPv4 de host.docker.internal, comme avant.
-# Pourquoi ce relais : libcurl (curl et git en HTTP) résout tout nom
-# *.localhost vers la boucle locale sans lire /etc/hosts (RFC 6761) ; depuis
-# le conteneur, http://gitlab.localhost:8929 part donc sur son propre
-# 127.0.0.1, où rien n'écoute. Le relais y ramène GitLab.
-gitlab_hote_ipv4() {
-    local ip
-    # ahostsv4 seulement : sous Docker Desktop, getent hosts rend d'abord une
-    # IPv6 qui ne mène pas aux ports publiés de l'hôte (#320).
-    ip="$(getent ahostsv4 host.docker.internal 2>/dev/null | awk 'NR == 1 { print $1 }')"
-    [ -n "$ip" ] || return 1
-    printf '%s\n' "$ip"
-}
-
-gitlab_noeud() {
-    printf 'gitlab%s-control-plane\n' "$INSTANCE_SUFFIX"
-}
-
-# Rejoint le réseau Docker du nœud kind ; « already exists » vaut un succès
-# (relance, démarrage). Échec : l'appelant passe par le repli.
-gitlab_reseau_rejoindre() {
-    local sortie
-    if sortie="$(docker network connect kind "$(hostname)" 2>&1)"; then
-        return 0
-    fi
-    [[ "$sortie" == *"already exists"* ]]
-}
-
-gitlab_relais_port() {
-    local port="$1" hote="$2" distant="$3" nom="gitlab-$1" dossier cible detache=()
-    dossier="$(relais_dossier "$nom")"
-    mkdir -p "$dossier"
-    cible="TCP:${hote}:${distant}"
-    # Cible inchangée et relais vivant : rien à faire. Cible changée (repli
-    # d'avant #327, nœud recréé…) : arrêter l'ancien relais et relancer.
-    if relais_actif "$nom" && [ "$(cat "$dossier/relais.cible" 2>/dev/null || true)" = "$cible" ]; then
-        return 0
-    fi
-    relais_arreter "$nom"
-    printf '%s\n' "$cible" >"$dossier/relais.cible"
-    # setsid : session à part, le relais survit à la fin du script qui l'a
-    # lancé ; absent sur macOS (tests bash 3.2), nohup suffit alors.
-    command -v setsid >/dev/null 2>&1 && detache=(setsid)
-    ${detache[@]+"${detache[@]}"} nohup socat \
-        "TCP-LISTEN:${port},bind=127.0.0.1,fork,reuseaddr" \
-        "$cible" >"$dossier/relais.log" 2>&1 &
-    echo "$!" >"$dossier/relais.pid"
-}
-
-gitlab_relais_lancer() {
-    local noeud port distant ip
-    noeud="$(gitlab_noeud)"
-    if gitlab_reseau_rejoindre; then
-        for port in $GITLAB_PORTS; do
-            case "$port" in
-                8929) distant=80 ;;
-                2224) distant=32022 ;;
-                *) distant="$port" ;;
-            esac
-            gitlab_relais_port "$port" "$noeud" "$distant"
-        done
-        return 0
-    fi
-    if ! ip="$(gitlab_hote_ipv4)"; then
-        echo "devzone : gitlab : réseau kind non rejoignable et host.docker.internal introuvable (getent ahostsv4), relais non lancé" >&2
-        return 1
-    fi
-    echo "devzone : gitlab : réseau kind non rejoignable, repli sur l'IPv4 de host.docker.internal (${ip})" >&2
-    for port in $GITLAB_PORTS; do
-        gitlab_relais_port "$port" "$ip" "$port"
-    done
-}
-
-gitlab_relais_arreter() {
-    local port
-    for port in $GITLAB_PORTS; do
-        relais_arreter "gitlab-$port"
-    done
-}
-
-gitlab_relais_etat() {
-    local port manquants=""
-    for port in $GITLAB_PORTS; do
-        relais_actif "gitlab-$port" || manquants="$manquants $port"
-    done
-    if [ -n "$manquants" ]; then
-        echo "relais gitlab arrêté sur${manquants}"
-        return 1
-    fi
-    return 0
-}
-
 # ---- hote-poser / hote-retirer : gitlab.localhost dans /etc/hosts ----
 # Pourquoi : ssh (clone ssh://git@gitlab.localhost:2224/…), glab et getent
 # passent par le résolveur système. curl et git (libcurl) ignorent /etc/hosts
@@ -377,166 +273,10 @@ gitlab_hote_retirer() {
     return 0
 }
 
-# ---- installer : installer GitLab dans kind ----
-gitlab_installer() {
-    # RAM libre (refus < 8 Go) : seulement avant de créer le cluster ; une
-    # instance déjà installée occupe elle-même cette mémoire
-    if ! kind get clusters 2>/dev/null | grep -qx "gitlab${INSTANCE_SUFFIX}"; then
-        echo "▶ Vérification de la mémoire disponible…"
-        gitlab_verifier_ram || return 2
-    fi
-
-    # Noter le contexte précédent (pour la désinstallation)
-    mkdir -p "$GITLAB_SECRETS_DIR"
-    if [ ! -f "$GITLAB_SECRETS_DIR/contexte-precedent" ]; then
-        local ctx
-        ctx="$(kubectl config current-context 2>/dev/null || true)"
-        if [ -n "$ctx" ] && [ "$ctx" != "kind-gitlab${INSTANCE_SUFFIX}" ]; then
-            printf '%s' "$ctx" > "$GITLAB_SECRETS_DIR/contexte-precedent"
-        fi
-    fi
-
-    # S'assurer que le cluster kind gitlab existe
-    echo "▶ Vérification/création du cluster kind gitlab…"
-    local cree=false
-    if ! kind get clusters 2>/dev/null | grep -qx "gitlab${INSTANCE_SUFFIX}"; then
-        echo "▶ Création du cluster kind gitlab…"
-        kind_creer_sans_basculer --name "gitlab${INSTANCE_SUFFIX}" --config "$ICI/kind.yaml" --wait 120s
-        kube_joignable_depuis_conteneur "$HOME/.kube/config"
-        cree=true
-    elif ! grep -qx "kind-gitlab${INSTANCE_SUFFIX}" <<<"$(KUBECONFIG="$HOME/.kube/config" kubectl config get-contexts -o name 2>/dev/null || true)"; then
-        # Cluster existant sans contexte dans ~/.kube/config (après un rebuild,
-        # le cluster vit sur le Docker du poste) : export sans basculer (#366)
-        kind_sans_basculer export kubeconfig --name "gitlab${INSTANCE_SUFFIX}" --kubeconfig "$HOME/.kube/config"
-        kube_joignable_depuis_conteneur "$HOME/.kube/config"
-        echo "▶ Contexte kind-gitlab remis (cluster existant)"
-    fi
-
-    # SSH : un cluster gitlab préexistant (créé avant ce réglage) n'a pas le
-    # mapping nodePort 32022 → hostPort 2224 : le clone SSH (port 2224) est
-    # alors impossible. Avertissement seulement, l'installation continue.
-    if [ "$cree" = false ]; then
-        local sortie_ssh
-        sortie_ssh="$(docker port "gitlab${INSTANCE_SUFFIX}-control-plane" 32022/tcp 2>/dev/null || true)"
-        if [ -z "$sortie_ssh" ]; then
-            echo "devzone : gitlab : clone SSH (port 2224) indisponible sur ce cluster, créé avant ce réglage ; pour l'activer : devzone desactiver gitlab puis devzone activer gitlab (données GitLab recréées)" >&2
-        fi
-    fi
-
-    # Ajouter le dépôt GitLab Helm (idempotent)
-    echo "▶ Ajout du dépôt Helm GitLab…"
-    helm repo add gitlab https://charts.gitlab.io 2>/dev/null || true
-    helm repo update >/dev/null 2>&1 || true
-
-    # Installer GitLab via Helm
-    echo "▶ Installation du chart GitLab…"
-    helm --kube-context "kind-gitlab${INSTANCE_SUFFIX}" upgrade --install gitlab gitlab/gitlab \
-        --version 9.11.16 \
-        --namespace gitlab \
-        --create-namespace \
-        -f "$ICI/values.yaml" \
-        --timeout "${GITLAB_ATTENTE}s" \
-        --wait
-
-    # Relais TCP avant l'attente : curl et git en HTTP résolvent *.localhost
-    # vers la boucle locale et n'atteignent GitLab que par ce relais (#320).
-    gitlab_relais_lancer || return 1
-
-    # Nom gitlab.localhost dans /etc/hosts avant l'attente : ssh, glab et
-    # getent en ont besoin dès que le service monte (curl, lui, résout seul)
-    gitlab_hote_poser || true
-
-    # Attendre que GitLab soit prêt
-    gitlab_attendre_pret
-
-    # Seed des données de base
-    gitlab_seed
-
-    # Installer le runner GitLab
-    echo "▶ Installation de l'exécuteur GitLab Runner…"
-    local runner_token=""
-    if [ -f "$GITLAB_SECRETS_DIR/runner-token" ]; then
-        runner_token="$(cat "$GITLAB_SECRETS_DIR/runner-token")"
-    fi
-    if [ -z "$runner_token" ]; then
-        echo "devzone : seed GitLab : jeton de runner introuvable (seed incomplet), arrêt du seed." >&2
-        return 1
-    fi
-    helm --kube-context "kind-gitlab${INSTANCE_SUFFIX}" upgrade --install gitlab-runner gitlab/gitlab-runner \
-        --version 0.88.2 \
-        --namespace gitlab \
-        -f "$ICI/runner-values.yaml" \
-        --set "runnerToken=${runner_token}"
-
-    # Résumé
-    echo "▶ Installation terminée."
-    echo "  URL : http://gitlab.localhost:8929"
-    echo "  Utilisateur : root"
-    echo "  Mot de passe root : $GITLAB_SECRETS_DIR/root-password (chmod 600)"
-}
-
-# ---- desinstaller : retirer GitLab ----
-gitlab_desinstaller() {
-    local port
-    echo "▶ Désinstallation de GitLab…"
-
-    # Arrêter les relais TCP avant de supprimer le cluster et les secrets
-    gitlab_relais_arreter
-    for port in $GITLAB_PORTS; do
-        rm -rf "$(relais_dossier "gitlab-$port")"
-    done
-
-    # Supprimer le cluster kind gitlab (tout part avec lui)
-    kind delete cluster --name "gitlab${INSTANCE_SUFFIX}" 2>/dev/null || true
-
-    # Retirer contexte, cluster et utilisateur kind-gitlab${INSTANCE_SUFFIX} de ~/.kube/config s'ils restent
-    kubectl config delete-context "kind-gitlab${INSTANCE_SUFFIX}" 2>/dev/null || true
-    kubectl config delete-cluster "kind-gitlab${INSTANCE_SUFFIX}" 2>/dev/null || true
-    kubectl config delete-user "kind-gitlab${INSTANCE_SUFFIX}" 2>/dev/null || true
-
-    # Remettre current-context à celui d'avant s'il valait kind-gitlab${INSTANCE_SUFFIX}
-    if [ -f "$GITLAB_SECRETS_DIR/contexte-precedent" ]; then
-        local ctx_prev
-        ctx_prev="$(cat "$GITLAB_SECRETS_DIR/contexte-precedent" 2>/dev/null || true)"
-        if [ -n "$ctx_prev" ]; then
-            kubectl config use-context "$ctx_prev" >/dev/null 2>&1 || true
-            echo "▶ current-context restauré : $ctx_prev"
-        fi
-    fi
-
-    # Supprimer $RACINE/workspace/.gitlab/
-    rm -rf "$GITLAB_SECRETS_DIR"
-
-    # Nom gitlab.localhost retiré : la configuration suit le service
-    gitlab_hote_retirer
-
-    echo "✔ GitLab désinstallé."
-    regenerer_identifiants
-}
-
 # ---- etat : vérifier l'état de GitLab ----
-# Nœud encore publié sur toutes les interfaces (cluster créé avant #327) :
-# seul docker port le dit ; la cible du relais, elle, ne dépend plus de la
-# publication des ports de l'hôte.
-gitlab_ports_exposes() {
-    local noeud sortie ligne
-    noeud="$(gitlab_noeud)"
-    sortie="$(docker port "$noeud" 2>/dev/null || true)"
-    while IFS= read -r ligne; do
-        case "$ligne" in
-            80/tcp* | 32022/tcp*)
-                case "$ligne" in
-                    *"0.0.0.0"* | *"::"*) return 0 ;;
-                esac
-                ;;
-        esac
-    done <<<"$sortie"
-    return 1
-}
-
 gitlab_etat() {
-    # Désactivé s'il n'y a pas de cluster gitlab
-    if ! kind get clusters 2>/dev/null | grep -qx "gitlab${INSTANCE_SUFFIX}"; then
+    # Désactivé si le namespace devzone-gitlab n'existe pas
+    if ! gitlab_installe; then
         echo "désactivé"
         return 0
     fi
@@ -557,10 +297,6 @@ gitlab_etat() {
     else
         echo "en échec : devzone appliquer"
     fi
-
-    if gitlab_ports_exposes; then
-        echo "⚠ GitLab exposé au réseau local : devzone desactiver gitlab puis devzone activer gitlab (données de test perdues)"
-    fi
     return 0
 }
 
@@ -568,6 +304,8 @@ gitlab_etat() {
 case "${1:-}" in
     installer)    gitlab_installer ;;
     desinstaller) gitlab_desinstaller ;;
+    migrer)       shift; gitlab_migrer "$@" ;;
+    installe)     gitlab_installe ;;
     etat)         gitlab_etat ;;
     seed)         gitlab_seed ;;
     relais-lancer) gitlab_relais_lancer ;;

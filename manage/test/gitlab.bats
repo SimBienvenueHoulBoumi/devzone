@@ -7,6 +7,7 @@
 
 setup() {
     load commun
+    kind_vide
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
     GITLAB="$BATS_TEST_DIRNAME/../../.devcontainer/gitlab/gitlab.sh"
     DEMARRAGE="$BATS_TEST_DIRNAME/../../.devcontainer/demarrage.sh"
@@ -36,20 +37,39 @@ case "$1 $2" in
     "delete cluster") grep -vx "${4:-}" "$KIND_CLUSTERS" >"$KIND_CLUSTERS.tmp" || true; mv "$KIND_CLUSTERS.tmp" "$KIND_CLUSTERS" ;;
 esac
 KIND
-    # kubectl : secret root « password123 » (base64), pod toolbox, jeton root
+    # kubectl : mémoire allouable des nœuds (FAUX_MEMOIRE_CLUSTER), namespace
+    # devzone-gitlab présent après création, secret root « password123 »
+    # (base64), pod toolbox et jeton root
     cat >"$BATS_TEST_TMPDIR/bin/kubectl" <<'KUBE'
 #!/usr/bin/env bash
 echo "kubectl $*" >>"$BATS_TEST_TMPDIR/kubectl.log"
+T="$BATS_TEST_TMPDIR"
 case "$*" in
     *"config current-context"*) echo "${FAUX_CONTEXTE:-}" ;;
+    *"get nodes -o jsonpath"*) printf '%s\n' "${FAUX_MEMOIRE_CLUSTER:-16777216Ki}" ;;
+    *"create namespace"*) printf 'kind: Namespace\nmetadata:\n  name: devzone-gitlab\n' ;;
+    *"apply -f -"*) tee -a "$T/apply.log" ;;
+    *"label namespace "*) touch "$T/namespace" ;;
+    *"get namespace "*) [ -f "$T/namespace" ] && exit 0 ; exit 1 ;;
+    *"delete namespace "*) rm -f "$T/namespace" ;;
     *"get secret"*) echo "cGFzc3dvcmQxMjM=" ;;
     *"get pod"*) echo "gitlab-toolbox-1" ;;
     *"gitlab-rails runner"*) echo "jeton-root-secret" ;;
 esac
+exit 0
 KUBE
+    # helm : journalise les appels et le contenu des fichiers de valeurs
     cat >"$BATS_TEST_TMPDIR/bin/helm" <<'HELM'
 #!/usr/bin/env bash
 echo "helm $*" >>"$BATS_TEST_TMPDIR/helm.log"
+precedent=""
+for a in "$@"; do
+    if [ "$precedent" = -f ] && [ -f "$a" ]; then
+        cat "$a" >>"$BATS_TEST_TMPDIR/helm.log"
+    fi
+    precedent="$a"
+done
+exit 0
 HELM
     # docker : network connect (réseau kind), mapping SSH du cluster kind
     # (nodePort 32022) et publications du nœud (docker port sans port).
@@ -150,10 +170,11 @@ GETENT
 echo "socat $*" >>"$BATS_TEST_TMPDIR/socat.log"
 exit 0
 SOCAT
+    # setsid : journalise le relais port-forward sans lancer de vrai processus
     cat >"$BATS_TEST_TMPDIR/bin/setsid" <<'SETSID'
 #!/usr/bin/env bash
 echo "setsid $*" >>"$BATS_TEST_TMPDIR/setsid.log"
-exec "$@"
+exit 0
 SETSID
     # kill : -0 laisse le test vivant, les autres signaux sont seulement journalisés
     cat >"$BATS_TEST_TMPDIR/bin/kill" <<'KILL'
@@ -196,100 +217,61 @@ attendre_journal() {
     [ "$status" -ne 0 ]
 }
 
-@test "gitlab : moins de 8 Go de RAM libre → refus, rien lancé" {
-    printf 'MemAvailable: 4000000 kB\n' >"$DEVZONE_MEMINFO"
-    run bash "$GITLAB" installer
-    [ "$status" -eq 2 ]
+@test "gitlab : moins de 8 Go de mémoire allouable dans le cluster → refus, rien lancé" {
+    FAUX_MEMOIRE_CLUSTER='4000000Ki' run bash "$GITLAB" installer
+    [ "$status" -eq 2 ] || false
     [[ "$output" == *"8 Go"* ]] || false
-    [ ! -e "$BATS_TEST_TMPDIR/kind.log" ] || ! grep -q "create" "$BATS_TEST_TMPDIR/kind.log" || false
-    [ ! -e "$BATS_TEST_TMPDIR/helm.log" ]
+    [ ! -e "$BATS_TEST_TMPDIR/helm.log" ] || false
+    [ ! -e "$BATS_TEST_TMPDIR/kind.log" ] || false
 }
 
-@test "gitlab : autre cluster présent, pas gitlab → cluster gitlab créé" {
+@test "gitlab : installation dans le cluster des services, aucun cluster kind créé" {
     echo "dev" >"$KIND_CLUSTERS"
     run bash "$GITLAB" installer
-    [ "$status" -eq 0 ]
-    grep -q "kind create cluster --name gitlab" "$BATS_TEST_TMPDIR/kind.log"
+    [ "$status" -eq 0 ] || false
+    grep -q -- "--kube-context devzone upgrade --install gitlab gitlab/gitlab --version 9.11.16 --namespace devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log" || false
+    ! grep -q "create cluster" "$BATS_TEST_TMPDIR/kind.log" || false
 }
 
-@test "gitlab : cluster créé sans basculer le contexte, restauré ensuite" {
+@test "gitlab : le contexte de travail kubectl n'est pas basculé" {
     mkdir -p "$HOME/.kube"
     printf 'current-context: docker-desktop\n' >"$HOME/.kube/config"
-    cat >"$BATS_TEST_TMPDIR/bin/kind" <<'KIND'
-#!/usr/bin/env bash
-echo "kind $*" >>"$BATS_TEST_TMPDIR/kind.log"
-case "$1 $2" in
-    "get clusters") cat "$KIND_CLUSTERS" ;;
-    "create cluster")
-        nom=""
-        while [ "$#" -gt 0 ]; do
-            case "$1" in
-                --name) nom="$2"; shift 2 ;;
-                *) shift ;;
-            esac
-        done
-        echo "$nom" >>"$KIND_CLUSTERS"
-        mkdir -p "$HOME/.kube"
-        printf 'current-context: kind-%s\n' "$nom" >"$HOME/.kube/config"
-        ;;
-    "delete cluster") grep -vx "${4:-}" "$KIND_CLUSTERS" >"$KIND_CLUSTERS.tmp" || true; mv "$KIND_CLUSTERS.tmp" "$KIND_CLUSTERS" ;;
-esac
-KIND
-    cat >"$BATS_TEST_TMPDIR/bin/kubectl" <<'KUBE'
-#!/usr/bin/env bash
-echo "kubectl $*" >>"$BATS_TEST_TMPDIR/kubectl.log"
-fichier="$HOME/.kube/config"
-mkdir -p "$HOME/.kube"
-case "$*" in
-    "config current-context") sed -n 's/^current-context:[[:space:]]*//p' "$fichier" 2>/dev/null | head -1 ;;
-    "config use-context "*)
-        nouveau="${3:-}"
-        { grep -v '^current-context:' "$fichier" 2>/dev/null || true; printf 'current-context: %s\n' "$nouveau"; } >"$fichier.tmp"
-        mv "$fichier.tmp" "$fichier"
-        ;;
-    "config unset current-context")
-        { grep -v '^current-context:' "$fichier" 2>/dev/null || true; } >"$fichier.tmp"
-        mv "$fichier.tmp" "$fichier"
-        ;;
-    *"get secret"*) echo "cGFzc3dvcmQxMjM=" ;;
-    *"get pod"*) echo "gitlab-toolbox-1" ;;
-    *"gitlab-rails runner"*) echo "jeton-root-secret" ;;
-esac
-exit 0
-KUBE
-    chmod +x "$BATS_TEST_TMPDIR/bin/kind" "$BATS_TEST_TMPDIR/bin/kubectl"
     run bash "$GITLAB" installer
     [ "$status" -eq 0 ] || false
-    grep -q "kind create cluster --name gitlab" "$BATS_TEST_TMPDIR/kind.log" || false
-    grep -qx 'kubectl config use-context docker-desktop' "$BATS_TEST_TMPDIR/kubectl.log" || false
+    ! grep -q "config use-context" "$BATS_TEST_TMPDIR/kubectl.log" || false
+    ! grep -q "config unset current-context" "$BATS_TEST_TMPDIR/kubectl.log" || false
     [ "$(sed -n 's/^current-context:[[:space:]]*//p' "$HOME/.kube/config")" = docker-desktop ] || false
 }
 
-@test "gitlab : cluster gitlab déjà là → pas recréé" {
+@test "gitlab : ancien cluster gitlab déjà là → aucun kind créé ni utilisé" {
     echo "gitlab" >"$KIND_CLUSTERS"
     run bash "$GITLAB" installer
-    [ "$status" -eq 0 ]
-    ! grep -q "kind create" "$BATS_TEST_TMPDIR/kind.log" || false
+    [ "$status" -eq 0 ] || false
+    ! grep -q "create cluster" "$BATS_TEST_TMPDIR/kind.log" || false
+    grep -q -- "--kube-context devzone upgrade --install gitlab gitlab/gitlab" "$BATS_TEST_TMPDIR/helm.log" || false
 }
 
-@test "gitlab : values.yaml configure le clone SSH (port 2224, nodePort gitlab-shell 32022)" {
-    grep -q "port: 2224" "$BATS_TEST_DIRNAME/../../.devcontainer/gitlab/values.yaml" || false
-    grep -q "gitlab-shell: 32022" "$BATS_TEST_DIRNAME/../../.devcontainer/gitlab/values.yaml" || false
+@test "gitlab : values.yaml configure le clone SSH (port 2224) et des services ClusterIP" {
+    local values="$BATS_TEST_DIRNAME/../../.devcontainer/gitlab/values.yaml"
+    grep -q "port: 2224" "$values" || false
+    grep -q "type: ClusterIP" "$values" || false
+    grep -q "nginx-ingress:" "$values" || false
+    grep -A1 "nginx-ingress:" "$values" | grep -q "enabled: false" || false
 }
 
-@test "gitlab : kind.yaml mappe le nodePort gitlab-shell 32022 sur le hostPort 2224" {
-    grep -q "containerPort: 32022" "$BATS_TEST_DIRNAME/../../.devcontainer/gitlab/kind.yaml" || false
-    ! grep -q "containerPort: 22" "$BATS_TEST_DIRNAME/../../.devcontainer/gitlab/kind.yaml" || false
+@test "gitlab : kind.yaml et le cluster kind-gitlab sont retirés" {
+    [ ! -e "$BATS_TEST_DIRNAME/../../.devcontainer/gitlab/kind.yaml" ] || false
+    ! grep -q "kind create cluster --name gitlab" "$BATS_TEST_DIRNAME/../../.devcontainer/gitlab/installation.sh" || false
 }
 
-@test "gitlab : kind.yaml limite les publications 8929 et 2224 à 127.0.0.1" {
-    local kind_yaml="$BATS_TEST_DIRNAME/../../.devcontainer/gitlab/kind.yaml"
-    [ "$(grep -c 'listenAddress: "127.0.0.1"' "$kind_yaml")" -eq 2 ]
-    grep -A3 "containerPort: 80$" "$kind_yaml" | grep -q 'listenAddress: "127.0.0.1"' || false
-    grep -A3 "containerPort: 32022$" "$kind_yaml" | grep -q 'listenAddress: "127.0.0.1"' || false
+@test "gitlab : valeurs sans NodePort, LoadBalancer ni hostPort" {
+    local values="$BATS_TEST_DIRNAME/../../.devcontainer/gitlab/values.yaml"
+    ! grep -q "NodePort" "$values" || false
+    ! grep -q "LoadBalancer" "$values" || false
+    ! grep -q "hostPort" "$values" || false
 }
 
-@test "gitlab : helm template : ssh_port 2224 et nodePort gitlab-shell 32022" {
+@test "gitlab : helm template : ssh_port 2224, aucun nodePort ni service exposé" {
     if [ -z "${DEVZONE_GITLAB_CHART:-}" ] || ! command -v helm >/dev/null 2>&1; then
         skip "helm indisponible (DEVZONE_GITLAB_CHART ou helm)"
     fi
@@ -298,29 +280,30 @@ KUBE
     local sortie
     sortie="$("$helm_bin" template gitlab "${DEVZONE_GITLAB_CHART:-/tmp/gl/gitlab}" --version 9.11.16 -f "$BATS_TEST_DIRNAME/../../.devcontainer/gitlab/values.yaml" 2>&1)"
     [[ "$sortie" == *"ssh_port: 2224"* ]] || false
-    [[ "$sortie" == *"nodePort: 32022"* ]] || false
+    [[ "$sortie" != *"nodePort: 32022"* ]] || false
     [[ "$sortie" != *"nodePort: 2224"* ]] || false
+    [[ "$sortie" != *"type: NodePort"* ]] || false
 }
 
-@test "gitlab : cluster existant sans mapping SSH → avertissement, installation continue" {
+@test "gitlab : installation sans avertissement de mapping SSH du nœud" {
     echo "gitlab" >"$KIND_CLUSTERS"
     run bash "$GITLAB" installer
-    [ "$status" -eq 0 ]
-    [[ "$output" == *"clone SSH (port 2224) indisponible"* ]] || false
-}
-
-@test "gitlab : cluster existant avec mapping SSH → pas d'avertissement" {
-    echo "gitlab" >"$KIND_CLUSTERS"
-    FAUX_DOCKER_PORT=1 run bash "$GITLAB" installer
-    [ "$status" -eq 0 ]
+    [ "$status" -eq 0 ] || false
     [[ "$output" != *"clone SSH (port 2224) indisponible"* ]] || false
 }
 
-@test "gitlab : charts figés, contexte kind-gitlab explicite" {
+@test "gitlab : ancien cluster présent → aucun avertissement d'exposition réseau" {
+    echo "gitlab" >"$KIND_CLUSTERS"
+    run bash "$GITLAB" installer
+    [ "$status" -eq 0 ] || false
+    [[ "$output" != *"exposé au réseau local"* ]] || false
+}
+
+@test "gitlab : charts figés, contexte devzone et namespace de l'instance" {
     run bash "$GITLAB" installer
     [ "$status" -eq 0 ]
-    grep -q -- "--kube-context kind-gitlab upgrade --install gitlab gitlab/gitlab --version 9.11.16" "$BATS_TEST_TMPDIR/helm.log"
-    grep -q -- "--kube-context kind-gitlab upgrade --install gitlab-runner gitlab/gitlab-runner --version 0.88.2" "$BATS_TEST_TMPDIR/helm.log"
+    grep -q -- "--kube-context devzone upgrade --install gitlab gitlab/gitlab --version 9.11.16 --namespace devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log"
+    grep -q -- "--kube-context devzone upgrade --install gitlab-runner gitlab/gitlab-runner --version 0.88.2 --namespace devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log"
 }
 
 @test "gitlab : secrets dans workspace/.gitlab (600), jamais dans le dépôt ni affichés" {
@@ -355,12 +338,10 @@ KUBE
     ! grep -q "jeton-runner-secret@" "$BATS_TEST_TMPDIR/git.log" || false
 }
 
-@test "gitlab : installation relancée → projet demo pas re-poussé, RAM non revérifiée" {
+@test "gitlab : installation relancée → projet demo pas re-poussé" {
     run bash "$GITLAB" installer
     [ "$status" -eq 0 ]
     [ "$(grep -c " push " "$BATS_TEST_TMPDIR/git.log")" -eq 1 ]
-    # GitLab installé occupe la mémoire : la relance ne la revérifie pas
-    printf 'MemAvailable: 4000000 kB\n' >"$DEVZONE_MEMINFO"
     run bash "$GITLAB" installer
     [ "$status" -eq 0 ]
     [ "$(grep -c " push " "$BATS_TEST_TMPDIR/git.log")" -eq 1 ]
@@ -371,7 +352,7 @@ KUBE
     run bash "$GITLAB" installer
     [ "$status" -ne 0 ]
     [[ "$output" == *"groupe devzone"* ]] || false
-    ! grep -q "gitlab-runner" "$BATS_TEST_TMPDIR/helm.log" || false
+    ! grep -q "upgrade --install gitlab-runner" "$BATS_TEST_TMPDIR/helm.log" || false
 }
 
 @test "gitlab : seed : runner-token présent et vérifié 200 → jeton gardé, pas de création" {
@@ -423,24 +404,22 @@ KUBE
     ! grep -q "jeton-runner-secret" "$BATS_TEST_TMPDIR/curl.log" || false
 }
 
-@test "gitlab : désinstaller retire cluster, contexte et secrets, restaure le contexte" {
-    export FAUX_CONTEXTE=kind-dev
+@test "gitlab : désinstaller retire les releases, le namespace et les secrets" {
     run bash "$GITLAB" installer
     [ "$status" -eq 0 ]
-    [ "$(cat "$SECRETS/contexte-precedent")" = kind-dev ]
     run bash "$GITLAB" desinstaller
     [ "$status" -eq 0 ]
-    grep -q "kind delete cluster --name gitlab" "$BATS_TEST_TMPDIR/kind.log"
-    grep -q "kubectl config delete-context kind-gitlab" "$BATS_TEST_TMPDIR/kubectl.log"
-    grep -q "kubectl config use-context kind-dev" "$BATS_TEST_TMPDIR/kubectl.log"
+    grep -q -- "helm --kube-context devzone uninstall gitlab --namespace devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log"
+    grep -q "kubectl --context devzone delete namespace devzone-gitlab --ignore-not-found" "$BATS_TEST_TMPDIR/kubectl.log"
     [ ! -e "$SECRETS" ]
-    [ ! -s "$KIND_CLUSTERS" ]
+    [ ! -f "$BATS_TEST_TMPDIR/namespace" ] || false
+    [ ! -s "$KIND_CLUSTERS" ] || false
 }
 
 @test "gitlab : état désactivé, prêt (runner en ligne ou non), en échec" {
     run bash "$GITLAB" etat
     [ "$output" = "désactivé" ]
-    echo gitlab >"$KIND_CLUSTERS"
+    touch "$BATS_TEST_TMPDIR/namespace"
     mkdir -p "$SECRETS" && echo jeton >"$SECRETS/root-token"
     run bash "$GITLAB" etat
     [ "$output" = "prêt : http://gitlab.localhost:8929, runner hors ligne" ]
@@ -450,23 +429,22 @@ KUBE
     [ "$output" = "en échec : devzone appliquer" ]
 }
 
-@test "gitlab : état signale un nœud publié sur 0.0.0.0" {
-    echo gitlab >"$KIND_CLUSTERS"
+@test "gitlab : état ne signale plus de nœud publié sur 0.0.0.0" {
+    touch "$BATS_TEST_TMPDIR/namespace"
     FAUX_DOCKER_PORT_EXPOSE=1 run bash "$GITLAB" etat
     [ "$status" -eq 0 ]
-    [[ "$output" == *"⚠ GitLab exposé au réseau local"* ]] || false
-    [[ "$output" == *"devzone desactiver gitlab puis devzone activer gitlab (données de test perdues)"* ]] || false
+    [[ "$output" != *"GitLab exposé au réseau local"* ]] || false
 }
 
-@test "gitlab : état sans avertissement pour un nœud publié sur 127.0.0.1" {
-    echo gitlab >"$KIND_CLUSTERS"
+@test "gitlab : état sans avertissement d'exposition pour un nœud local" {
+    touch "$BATS_TEST_TMPDIR/namespace"
     FAUX_DOCKER_PORT_LOCAL=1 run bash "$GITLAB" etat
     [ "$status" -eq 0 ]
     [[ "$output" != *"GitLab exposé au réseau local"* ]] || false
 }
 
 @test "devzone : activer gitlab saute l'installation si prêt et runner en ligne" {
-    echo "gitlab" >"$KIND_CLUSTERS"
+    touch "$BATS_TEST_TMPDIR/namespace"
     mkdir -p "$SECRETS" && echo jeton >"$SECRETS/root-token"
     FAUX_RUNNERS='[{"id":1}]' run bash "$DEVZONE" activer gitlab
     [ "$status" -eq 0 ]
@@ -475,26 +453,26 @@ KUBE
 }
 
 @test "devzone : activer gitlab : prêt sans runner en ligne → installer (seed, runner)" {
-    echo "gitlab" >"$KIND_CLUSTERS"
+    touch "$BATS_TEST_TMPDIR/namespace"
     mkdir -p "$SECRETS" && echo jeton >"$SECRETS/root-token"
     run bash "$DEVZONE" activer gitlab
     [ "$status" -eq 0 ]
     [[ "$output" != *"déjà actif, rien à faire"* ]] || false
-    grep -q -- "--kube-context kind-gitlab upgrade --install gitlab gitlab/gitlab --version 9.11.16" "$BATS_TEST_TMPDIR/helm.log"
+    grep -q -- "--kube-context devzone upgrade --install gitlab gitlab/gitlab --version 9.11.16 --namespace devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log"
 }
 
 @test "devzone appliquer : gitlab actif, prêt sans runner en ligne → installer" {
     printf 'gitlab=on\n' >"$DEVZONE_ETAT"
-    echo "gitlab" >"$KIND_CLUSTERS"
+    touch "$BATS_TEST_TMPDIR/namespace"
     mkdir -p "$SECRETS" && echo jeton >"$SECRETS/root-token"
     run bash "$DEVZONE" appliquer
     [ "$status" -eq 0 ]
-    grep -q -- "--kube-context kind-gitlab upgrade --install gitlab gitlab/gitlab --version 9.11.16" "$BATS_TEST_TMPDIR/helm.log"
+    grep -q -- "--kube-context devzone upgrade --install gitlab gitlab/gitlab --version 9.11.16 --namespace devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log"
 }
 
 @test "devzone appliquer : gitlab actif, prêt runner en ligne → pas d'installer" {
     printf 'gitlab=on\n' >"$DEVZONE_ETAT"
-    echo "gitlab" >"$KIND_CLUSTERS"
+    touch "$BATS_TEST_TMPDIR/namespace"
     mkdir -p "$SECRETS" && echo jeton >"$SECRETS/root-token"
     FAUX_RUNNERS='[{"id":1}]' run bash "$DEVZONE" appliquer
     [ "$status" -eq 0 ]
@@ -530,67 +508,53 @@ KUBE
     grep -q '^127\.0\.0\.1 localhost$' "$DEVZONE_HOSTS"
 }
 
-@test "gitlab : relais vers le nœud kind après network connect" {
+@test "gitlab : relais web et SSH en port-forward vers les services du namespace" {
     run bash "$GITLAB" relais-lancer
-    [ "$status" -eq 0 ]
-    grep -qF "docker network connect kind $(hostname)" "$BATS_TEST_TMPDIR/docker.log"
-    attendre_journal "$BATS_TEST_TMPDIR/socat.log" 'TCP-LISTEN:8929,bind=127.0.0.1,fork,reuseaddr TCP:gitlab-control-plane:80'
-    grep -q 'TCP-LISTEN:8929,bind=127.0.0.1,fork,reuseaddr TCP:gitlab-control-plane:80' "$BATS_TEST_TMPDIR/socat.log"
-    attendre_journal "$BATS_TEST_TMPDIR/socat.log" 'TCP-LISTEN:2224,bind=127.0.0.1,fork,reuseaddr TCP:gitlab-control-plane:32022'
-    grep -q 'TCP-LISTEN:2224,bind=127.0.0.1,fork,reuseaddr TCP:gitlab-control-plane:32022' "$BATS_TEST_TMPDIR/socat.log"
-    [ "$(cat "$DEVZONE_RACINE/workspace/.gitlab-8929/relais.cible")" = "TCP:gitlab-control-plane:80" ]
-    [ "$(cat "$DEVZONE_RACINE/workspace/.gitlab-2224/relais.cible")" = "TCP:gitlab-control-plane:32022" ]
+    [ "$status" -eq 0 ] || false
+    grep -q "devzone devzone-gitlab svc/gitlab-webservice-default 8929:8181" "$BATS_TEST_TMPDIR/setsid.log" || false
+    grep -q "devzone devzone-gitlab svc/gitlab-gitlab-shell 2224:22" "$BATS_TEST_TMPDIR/setsid.log" || false
+    ! grep -q "gitlab-control-plane" "$BATS_TEST_TMPDIR/setsid.log" || false
 }
 
-@test "gitlab : network connect déjà existant → relais vers le nœud" {
-    FAUX_DOCKER_RESEAU_EXISTE=1 run bash "$GITLAB" relais-lancer
-    [ "$status" -eq 0 ]
-    [[ "$output" != *"repli"* ]] || false
-    attendre_journal "$BATS_TEST_TMPDIR/socat.log" 'TCP:gitlab-control-plane:80'
-    attendre_journal "$BATS_TEST_TMPDIR/socat.log" 'TCP:gitlab-control-plane:32022'
-}
-
-@test "gitlab : network connect en échec → repli sur l'IPv4 de l'hôte, message stderr" {
-    FAUX_DOCKER_RESEAU_KO=1 run bash "$GITLAB" relais-lancer
-    [ "$status" -eq 0 ]
-    [[ "$output" == *"repli sur l'IPv4 de host.docker.internal"* ]] || false
-    attendre_journal "$BATS_TEST_TMPDIR/socat.log" 'TCP-LISTEN:8929,bind=127.0.0.1,fork,reuseaddr TCP:192.168.65.254:8929'
-    grep -q 'TCP-LISTEN:8929,bind=127.0.0.1,fork,reuseaddr TCP:192.168.65.254:8929' "$BATS_TEST_TMPDIR/socat.log"
-    attendre_journal "$BATS_TEST_TMPDIR/socat.log" 'TCP-LISTEN:2224,bind=127.0.0.1,fork,reuseaddr TCP:192.168.65.254:2224'
-    grep -q 'TCP-LISTEN:2224,bind=127.0.0.1,fork,reuseaddr TCP:192.168.65.254:2224' "$BATS_TEST_TMPDIR/socat.log"
-    ! grep -q 'fdc4:f303' "$BATS_TEST_TMPDIR/socat.log" || false
-    [ "$(cat "$DEVZONE_RACINE/workspace/.gitlab-8929/relais.cible")" = "TCP:192.168.65.254:8929" ]
-}
-
-@test "gitlab : cible changée → relais relancé vers la nouvelle cible" {
-    # Premier lancement : repli sur l'IPv4 de l'hôte (ancienne cible)
-    FAUX_DOCKER_RESEAU_KO=1 run bash "$GITLAB" relais-lancer
-    [ "$status" -eq 0 ]
-    [ "$(cat "$DEVZONE_RACINE/workspace/.gitlab-8929/relais.cible")" = "TCP:192.168.65.254:8929" ]
-    attendre_journal "$BATS_TEST_TMPDIR/socat.log" 'TCP-LISTEN:8929,bind=127.0.0.1,fork,reuseaddr TCP:192.168.65.254:8929'
-    # Réseau kind rejoignable : la cible change, le relais est relancé
+@test "gitlab : relais sans réseau kind ni socat" {
     run bash "$GITLAB" relais-lancer
-    [ "$status" -eq 0 ]
-    [ "$(cat "$DEVZONE_RACINE/workspace/.gitlab-8929/relais.cible")" = "TCP:gitlab-control-plane:80" ]
-    [ "$(cat "$DEVZONE_RACINE/workspace/.gitlab-2224/relais.cible")" = "TCP:gitlab-control-plane:32022" ]
-    attendre_journal "$BATS_TEST_TMPDIR/socat.log" 'TCP-LISTEN:8929,bind=127.0.0.1,fork,reuseaddr TCP:gitlab-control-plane:80'
-    attendre_journal "$BATS_TEST_TMPDIR/socat.log" 'TCP-LISTEN:2224,bind=127.0.0.1,fork,reuseaddr TCP:gitlab-control-plane:32022'
-    grep -q 'TCP-LISTEN:8929,bind=127.0.0.1,fork,reuseaddr TCP:192.168.65.254:8929' "$BATS_TEST_TMPDIR/socat.log"
+    [ "$status" -eq 0 ] || false
+    [ ! -e "$BATS_TEST_TMPDIR/docker.log" ] || false
+    [ ! -e "$BATS_TEST_TMPDIR/socat.log" ] || false
 }
 
-@test "gitlab : desinstaller arrête les relais 8929 et 2224" {
+@test "gitlab : ancienne cible kind 32022 n'est plus utilisée" {
+    run bash "$GITLAB" relais-lancer
+    [ "$status" -eq 0 ] || false
+    ! grep -q "32022" "$BATS_TEST_TMPDIR/setsid.log" || false
+    ! grep -q "TCP-LISTEN" "$BATS_TEST_TMPDIR/setsid.log" || false
+}
+
+@test "gitlab : relais-arreter arrête les deux relais" {
+    mkdir -p "$DEVZONE_RACINE/workspace/.gitlab-web" "$DEVZONE_RACINE/workspace/.gitlab-ssh"
+    echo "999999" >"$DEVZONE_RACINE/workspace/.gitlab-web/relais.pid"
+    echo "999998" >"$DEVZONE_RACINE/workspace/.gitlab-ssh/relais.pid"
+    run bash "$GITLAB" relais-arreter
+    [ "$status" -eq 0 ] || false
+    grep -q "pgrep -P 999999" "$BATS_TEST_TMPDIR/pgrep.log" || false
+    grep -q "pgrep -P 999998" "$BATS_TEST_TMPDIR/pgrep.log" || false
+    [ ! -e "$DEVZONE_RACINE/workspace/.gitlab-web/relais.pid" ] || false
+    [ ! -e "$DEVZONE_RACINE/workspace/.gitlab-ssh/relais.pid" ] || false
+}
+
+@test "gitlab : desinstaller arrête les relais web et SSH" {
     local pid
     { true; } &
     pid=$!
     wait "$pid" || true
-    mkdir -p "$DEVZONE_RACINE/workspace/.gitlab-8929" "$DEVZONE_RACINE/workspace/.gitlab-2224"
-    echo "$pid" >"$DEVZONE_RACINE/workspace/.gitlab-8929/relais.pid"
-    echo "$pid" >"$DEVZONE_RACINE/workspace/.gitlab-2224/relais.pid"
+    mkdir -p "$DEVZONE_RACINE/workspace/.gitlab-web" "$DEVZONE_RACINE/workspace/.gitlab-ssh"
+    echo "$pid" >"$DEVZONE_RACINE/workspace/.gitlab-web/relais.pid"
+    echo "$pid" >"$DEVZONE_RACINE/workspace/.gitlab-ssh/relais.pid"
     run bash "$GITLAB" desinstaller
     [ "$status" -eq 0 ]
     grep -q "pgrep -P $pid" "$BATS_TEST_TMPDIR/pgrep.log"
-    [ ! -e "$DEVZONE_RACINE/workspace/.gitlab-8929" ]
-    [ ! -e "$DEVZONE_RACINE/workspace/.gitlab-2224" ]
+    [ ! -e "$DEVZONE_RACINE/workspace/.gitlab-web" ]
+    [ ! -e "$DEVZONE_RACINE/workspace/.gitlab-ssh" ]
 }
 
 @test "gitlab : hote-retirer retire la ligne, garde localhost ; sans ligne → rien, code 0" {
@@ -638,7 +602,7 @@ SUDO
 
 @test "devzone appliquer : gitlab actif, prêt → ligne gitlab.localhost posée" {
     printf 'gitlab=on\n' >"$DEVZONE_ETAT"
-    echo "gitlab" >"$KIND_CLUSTERS"
+    touch "$BATS_TEST_TMPDIR/namespace"
     mkdir -p "$SECRETS" && echo jeton >"$SECRETS/root-token"
     FAUX_RUNNERS='[{"id":1}]' run bash "$DEVZONE" appliquer
     [ "$status" -eq 0 ]
@@ -670,10 +634,10 @@ marque_reelle() {
     [ "$status" -eq 0 ]
     grep -q 'devzone:gitlab' "$DEVZONE_HOSTS"
     grep -q $'^127\.0\.0\.1\tgitlab\.localhost # devzone:gitlab$' "$DEVZONE_HOSTS"
-    attendre_journal "$BATS_TEST_TMPDIR/socat.log" 'TCP-LISTEN:8929,bind=127.0.0.1'
-    grep -q 'TCP-LISTEN:8929,bind=127.0.0.1' "$BATS_TEST_TMPDIR/socat.log"
-    attendre_journal "$BATS_TEST_TMPDIR/socat.log" 'TCP-LISTEN:2224,bind=127.0.0.1'
-    grep -q 'TCP-LISTEN:2224,bind=127.0.0.1' "$BATS_TEST_TMPDIR/socat.log"
+    attendre_journal "$BATS_TEST_TMPDIR/setsid.log" 'devzone devzone-gitlab svc/gitlab-webservice-default 8929:8181'
+    grep -q 'devzone devzone-gitlab svc/gitlab-webservice-default 8929:8181' "$BATS_TEST_TMPDIR/setsid.log"
+    attendre_journal "$BATS_TEST_TMPDIR/setsid.log" 'devzone devzone-gitlab svc/gitlab-gitlab-shell 2224:22'
+    grep -q 'devzone devzone-gitlab svc/gitlab-gitlab-shell 2224:22' "$BATS_TEST_TMPDIR/setsid.log"
     # Isolation (#346) : la marque réelle du poste est inchangée après le
     # démarrage (relevée avant le premier lancement de demarrage.sh)
     [[ "$DEVZONE_RELAIS_MARQUE" == "$BATS_TEST_TMPDIR"/* ]] || false

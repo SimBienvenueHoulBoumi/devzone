@@ -20,6 +20,20 @@ kube_isole() {
     mkdir -p "$HOME" "$BATS_TEST_TMPDIR" "$HOME/.kube"
 }
 
+# Aide du récapitulatif devzone (#396) : faux kind sous $BATS_TEST_TMPDIR/bin qui
+# ne liste aucun cluster, pour qu'un vrai cluster kind-gitlab du poste ne fasse
+# pas apparaître l'avertissement d'ancien cluster dans les tests.
+kind_vide() {
+    mkdir -p "$BATS_TEST_TMPDIR/bin"
+    cat >"$BATS_TEST_TMPDIR/bin/kind" <<'KIND'
+#!/usr/bin/env bash
+echo "kind $*" >>"$BATS_TEST_TMPDIR/kind.log"
+exit 0
+KIND
+    chmod +x "$BATS_TEST_TMPDIR/bin/kind"
+    export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
+}
+
 # Aide de devzone agent (#328, tests agent.bats et agent-ecarts.bats) : faux
 # npm, getent, curl et opencode sous $BATS_TEST_TMPDIR/bin, état et réseau
 # isolés, délais réduits. Le faux opencode se pilote par FAKE_OP_* (voir ci-dessous).

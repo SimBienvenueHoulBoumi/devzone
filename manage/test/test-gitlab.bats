@@ -22,10 +22,11 @@ setup() {
     mkdir -p "$HOME/.local/bin" "$DEVZONE_RACINE/workspace/.gitlab" \
         "$BATS_TEST_TMPDIR/bin" "$TMPDIR"
     printf 'jeton-root-secret' >"$DEVZONE_RACINE/workspace/.gitlab/root-token"
-    # Relais 8929/2224 actifs : PID vivant (celui du test) dans leur dossier
-    for port in 8929 2224; do
-        mkdir -p "$DEVZONE_RACINE/workspace/.gitlab-$port"
-        echo $$ >"$DEVZONE_RACINE/workspace/.gitlab-$port/relais.pid"
+    touch "$BATS_TEST_TMPDIR/namespace"
+    # Relais web et SSH actifs : PID vivant (celui du test) dans leur dossier
+    for nom in web ssh; do
+        mkdir -p "$DEVZONE_RACINE/workspace/.gitlab-$nom"
+        echo $$ >"$DEVZONE_RACINE/workspace/.gitlab-$nom/relais.pid"
     done
     printf 'gitlab%s\n' "$INSTANCE_TEST" >"$KIND_CLUSTERS"
     printf 'kind-gitlab%s\nkind-dev\n' "$INSTANCE_TEST" >"$BATS_TEST_TMPDIR/contextes"
@@ -44,22 +45,15 @@ case "$1 $2" in
         ;;
     "activer gitlab")
         [ -n "${FAUX_ACTIVER_KO:-}" ] && exit 1
-        touch "$BATS_TEST_TMPDIR/module_actif"
-        grep -qx "gitlab$INSTANCE_TEST" "$KIND_CLUSTERS" 2>/dev/null ||
-            echo "gitlab$INSTANCE_TEST" >>"$KIND_CLUSTERS"
+        touch "$BATS_TEST_TMPDIR/module_actif" "$BATS_TEST_TMPDIR/namespace"
         mkdir -p "$DEVZONE_RACINE/workspace/.gitlab"
         printf 'jeton-root-secret' >"$DEVZONE_RACINE/workspace/.gitlab/root-token"
         ;;
     "desactiver gitlab")
         [ -n "${FAUX_DESACTIVER_KO:-}" ] && exit 1
         rm -f "$BATS_TEST_TMPDIR/module_actif"
-        if [ "${FAUX_DESACTIVER_LAISSE:-}" != cluster ]; then
-            grep -vx "gitlab$INSTANCE_TEST" "$KIND_CLUSTERS" >"$KIND_CLUSTERS.tmp" 2>/dev/null || true
-            mv "$KIND_CLUSTERS.tmp" "$KIND_CLUSTERS"
-        fi
-        if [ "${FAUX_DESACTIVER_LAISSE:-}" != contexte ]; then
-            grep -vx "kind-gitlab$INSTANCE_TEST" "$BATS_TEST_TMPDIR/contextes" >"$BATS_TEST_TMPDIR/contextes.tmp" 2>/dev/null || true
-            mv "$BATS_TEST_TMPDIR/contextes.tmp" "$BATS_TEST_TMPDIR/contextes"
+        if [ "${FAUX_DESACTIVER_LAISSE:-}" != namespace ]; then
+            rm -f "$BATS_TEST_TMPDIR/namespace"
         fi
         if [ "${FAUX_DESACTIVER_LAISSE:-}" != secrets ]; then
             rm -rf "$DEVZONE_RACINE/workspace/.gitlab"
@@ -112,6 +106,7 @@ echo "kubectl $*" >>"$BATS_TEST_TMPDIR/kubectl.log"
 case "$*" in
     *"config get-contexts"*) cat "$BATS_TEST_TMPDIR/contextes" 2>/dev/null || true ;;
     *"config current-context"*) echo "${FAUX_CONTEXTE:-kind-dev}" ;;
+    *"get namespace "*) [ -f "$BATS_TEST_TMPDIR/namespace" ] && exit 0 ; exit 1 ;;
 esac
 exit 0
 KUBE
@@ -368,7 +363,7 @@ GETENT
 }
 
 @test "test-gitlab : étape 3 en échec (relais 2224 arrêté) → ✖ avec la raison" {
-    rm -f "$DEVZONE_RACINE/workspace/.gitlab-2224/relais.pid"
+    rm -f "$DEVZONE_RACINE/workspace/.gitlab-ssh/relais.pid"
     run bash "$SCRIPT"
     [ "$status" -ne 0 ]
     [[ "$output" == *"✖ 3. nom d'hôte"* ]] || false
@@ -376,8 +371,8 @@ GETENT
 }
 
 @test "test-gitlab : étape 3 en échec (aucun relais) → ✖ avec les deux ports" {
-    rm -f "$DEVZONE_RACINE/workspace/.gitlab-8929/relais.pid"
-    rm -f "$DEVZONE_RACINE/workspace/.gitlab-2224/relais.pid"
+    rm -f "$DEVZONE_RACINE/workspace/.gitlab-web/relais.pid"
+    rm -f "$DEVZONE_RACINE/workspace/.gitlab-ssh/relais.pid"
     run bash "$SCRIPT"
     [ "$status" -ne 0 ]
     [[ "$output" == *"✖ 3. nom d'hôte"* ]] || false
@@ -519,16 +514,16 @@ GETENT
     [[ "$output" == *"✔ 8. complet : désactivation"* ]] || false
     grep -q "devzone desactiver gitlab" "$BATS_TEST_TMPDIR/devzone.log" || false
     grep -q "label=devzone.instance=mon-devzone" "$BATS_TEST_TMPDIR/docker.log" || false
-    grep -q "label=io.x-k8s.kind.cluster=gitlab-mon-devzone" "$BATS_TEST_TMPDIR/docker.log" || false
+    grep -q "kubectl --context devzone get namespace devzone-gitlab-mon-devzone" "$BATS_TEST_TMPDIR/kubectl.log" || false
     [ -f "$BATS_TEST_TMPDIR/module_actif" ]
 }
 
-@test "test-gitlab : --complet, un reste (cluster de l'instance) → ✖ avec la raison" {
-    export FAUX_DESACTIVER_LAISSE=cluster
+@test "test-gitlab : --complet, le namespace reste → ✖ avec la raison" {
+    export FAUX_DESACTIVER_LAISSE=namespace
     run bash "$SCRIPT" --complet
     [ "$status" -ne 0 ]
     [[ "$output" == *"✖ 8. complet : désactivation"* ]] || false
-    [[ "$output" == *"cluster kind gitlab-mon-devzone"* ]] || false
+    [[ "$output" == *"namespace devzone-gitlab-mon-devzone"* ]] || false
 }
 
 @test "test-gitlab : --complet, un conteneur étiqueté de l'instance reste → ✖" {
