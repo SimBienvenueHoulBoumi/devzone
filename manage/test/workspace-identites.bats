@@ -125,6 +125,36 @@ chemins_defaut() {
     grep -q -- 'fsGroup: 1000' <<<"$output" || false
 }
 
+@test "pod : runAsUser 1000, runAsGroup 1000, runAsNonRoot true (jamais root)" {
+    run rendu_ss
+    [ "$status" -eq 0 ]
+    local pod
+    pod="$(awk '/^      securityContext:$/{p=1} /^      # Sidecars/{p=0} p' <<<"$output")"
+    grep -q -- 'runAsUser: 1000' <<<"$pod" || false
+    grep -q -- 'runAsGroup: 1000' <<<"$pod" || false
+    grep -q -- 'runAsNonRoot: true' <<<"$pod" || false
+    grep -q -- 'fsGroup: 1000' <<<"$pod" || false
+    ! grep -q -- 'runAsUser: 0' <<<"$output" || false
+}
+
+@test "workspace : HOME=/home/vscode dans le conteneur workspace" {
+    run rendu_ss
+    [ "$status" -eq 0 ]
+    local principal
+    principal="$(bloc_workspace "$output")"
+    grep -q -- '- name: HOME' <<<"$principal" || false
+    grep -q -- 'value: /home/vscode$' <<<"$principal" || false
+    # Pas de HOME /root nulle part dans le rendu.
+    ! grep -q -- '/root' <<<"$output" || false
+}
+
+@test "privilege : aucun conteneur privileged, dans tout le rendu" {
+    run rendu
+    [ "$status" -eq 0 ]
+    ! grep -q -- 'privileged' <<<"$output" || false
+    ! grep -q -- 'privileged: true' <<<"$output" || false
+}
+
 @test "pvc : etat garde a la desinstallation (annotation keep et retention Retain)" {
     run rendu_ss
     [ "$status" -eq 0 ]

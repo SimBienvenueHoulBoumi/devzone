@@ -19,9 +19,11 @@ spec:
         app.kubernetes.io/name: {{ include "devzone-workspace.name" . }}
     spec:
       serviceAccountName: {{ include "devzone-workspace.serviceAccountName" . }}
-      # Le volume etat appartient au GID 1000 (vscode) : l'initContainer y ecrit.
+      # Pod en utilisateur vscode (UID 1000), jamais root : le HOME du workspace est
+      # /home/vscode, ou sont montees les connexions. fsGroup 1000 rend le volume etat
+      # ecrit par vscode. Reglages dans values.yaml (securityContext).
       securityContext:
-        fsGroup: 1000
+        {{- toYaml .Values.securityContext | nindent 8 }}
       # Sidecars natifs (restartPolicy: Always, Kubernetes 1.29+) : ils demarrent
       # avant le conteneur workspace, et leur startupProbe bloque ce demarrage tant
       # qu'ils ne repondent pas. Aucun n'est privilegie, et aucun ne declare de port :
@@ -136,6 +138,10 @@ spec:
           command: {{ toJson . }}
           {{- end }}
           env:
+            # HOME de vscode : gh, claude, opencode... ecrivent leurs connexions dans
+            # les chemins montes depuis le volume etat (et non dans le home de root).
+            - name: HOME
+              value: /home/vscode
             # Testcontainers et docker parlent a kubedock, et buildctl a BuildKit.
             # Ryuk est coupe : kubedock nettoie les conteneurs de test lui-meme.
             - name: DOCKER_HOST
