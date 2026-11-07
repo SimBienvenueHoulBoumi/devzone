@@ -296,6 +296,7 @@ devzone activer gitlab         # active et installe GitLab dans le cluster des s
 devzone desactiver gitlab      # désinstalle GitLab et supprime son namespace
 devzone gitlab migrer          # installe, puis propose de supprimer l'ancien cluster kind
 devzone gitlab migrer --oui    # idem sans confirmation
+devzone gitlab nouveau-mdp [root|dev]  # mot de passe aléatoire (root ou dev) régénéré
 devzone appliquer              # applique les modules actifs
 devzone actif gitlab           # code 0 si GitLab est actif
 ```
@@ -308,6 +309,9 @@ devzone actif gitlab           # code 0 si GitLab est actif
 - **Accès depuis le poste** : GitLab n'est pas publié directement sur le réseau ; le port-forward écoute dans le conteneur. Depuis le poste, utiliser `devzone port 8929` (et `devzone port 2224` pour SSH) si nécessaire.
 - **Ancien cluster** : un cluster kind `gitlab<instance>` créé avant #396 n'est plus utilisé. Le récapitulatif `devzone` affiche `⚠ ancien cluster kind-gitlab<instance> : devzone gitlab migrer` tant qu'il existe. `devzone gitlab migrer` installe GitLab dans le cluster des services, puis supprime l'ancien cluster après confirmation (`--oui` sans terminal) ; sans terminal et sans `--oui`, l'installation se fait et l'ancien cluster est conservé (code 2). Les données de test de l'ancien cluster ne sont pas migrées.
 - **Secrets** : mot de passe root, jeton root, mot de passe de `dev` et jeton du runner dans `workspace/.gitlab/` (droits 600, ignorés par git, jamais affichés). Mot de passe root : `cat workspace/.gitlab/root-password`.
+- **Secrets Rails** : le secret `gitlab-rails-secret` du namespace `devzone-gitlab` est conservé dans `workspace/.gitlab/rails-secret.yaml` (600, ignoré par git) à la première installation, puis réappliqué avant `helm upgrade --install` à une réinstallation : le chart le réutilise et les sessions du navigateur restent valides, sans 422.
+- **Réinstallation** : à défaut, si les secrets ont été perdus, la fin d'installation et le récapitulatif préviennent : « GitLab réinstallé : si le navigateur affiche 422, supprimez les données de site de gitlab.localhost ».
+- **Mot de passe régénérable** : `devzone gitlab nouveau-mdp [root|dev]` applique un mot de passe aléatoire par `gitlab-rails runner` dans le pod toolbox, puis met à jour le fichier source et le regroupé `.password` ; rien n'est affiché, seulement le chemin.
 - **Désactivation** : `devzone desactiver gitlab` arrête les deux relais, désinstalle les releases Helm `gitlab` et `gitlab-runner`, supprime le namespace `devzone-gitlab<instance>` et `workspace/.gitlab/`. Le cluster des services et son contexte courant ne sont pas touchés.
 
 ### Essai de bout en bout : `devzone test-gitlab`

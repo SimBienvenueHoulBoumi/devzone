@@ -37,6 +37,12 @@ regenerer_identifiants() {
 HOSTS="${DEVZONE_HOSTS:-/etc/hosts}"
 GITLAB_HOTE_MARQUE="# devzone:gitlab"
 
+# Secret Rails GitLab (#347) : conservation dans workspace/.gitlab, réapplication
+# avant helm upgrade --install et mot de passe régénérable
+# shellcheck source=SCRIPTDIR/secrets.sh
+# shellcheck disable=SC1091
+. "$ICI/secrets.sh"
+
 # ---- Installation, migration et relais du cluster des services ----
 # Nouvelle logique hors de ce fichier (#396) : namespace devzone-gitlab,
 # mémoire allouable, Helm contexte devzone, migration depuis kind-gitlab.
@@ -308,6 +314,7 @@ case "${1:-}" in
     installe)     gitlab_installe ;;
     etat)         gitlab_etat ;;
     seed)         gitlab_seed ;;
+    nouveau-mdp)  gitlab_nouveau_mdp "${@:2}" ;;
     relais-lancer) gitlab_relais_lancer ;;
     relais-arreter) gitlab_relais_arreter ;;
     relais-etat)  gitlab_relais_etat ;;

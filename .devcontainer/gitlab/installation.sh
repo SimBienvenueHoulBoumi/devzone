@@ -91,6 +91,9 @@ gitlab_installer() {
     # Installation des services en ClusterIP, sans exposition directe :
     # l'accès passe uniquement par le relais port-forward du conteneur
     echo "▶ Installation du chart GitLab dans $GITLAB_NS…"
+    # Secret Rails (#347) : réinstallation -> réappliquer le secret conservé avant
+    # le helm upgrade --install (le chart le réutilise, sessions navigateur valides)
+    gitlab_secrets_appliquer
     helm --kube-context devzone upgrade --install gitlab gitlab/gitlab \
         --version 9.11.16 \
         --namespace "$GITLAB_NS" \
@@ -98,6 +101,9 @@ gitlab_installer() {
         -f "$ICI/values.yaml" \
         --timeout "${GITLAB_ATTENTE}s" \
         --wait
+    if [ ! -f "$GITLAB_RAILS_FICHIER" ]; then
+        gitlab_secrets_copier
+    fi
 
     # Relais avant l'attente : curl et git en HTTP résolvent *.localhost vers
     # la boucle locale et n'atteignent GitLab que par ces port-forward (#320)
@@ -129,6 +135,8 @@ gitlab_installer() {
         -f "$valeurs_runner" \
         --set "runnerToken=${runner_token}"
     rm -f "$valeurs_runner"
+
+    gitlab_secrets_avertir
 
     echo "▶ Installation terminée."
     echo "  URL : http://gitlab.localhost:8929"
