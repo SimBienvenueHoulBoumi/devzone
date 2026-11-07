@@ -5,11 +5,22 @@ image:
   tag: ""
   pullPolicy: IfNotPresent
 
-# Sidecar Docker du pod : le conteneur workspace s'en sert (docker, Testcontainers).
-# Privilegie, il ecoute sur 127.0.0.1:2375 du pod, jamais expose par le Service.
-sidecar:
-  image: docker:27-dind
-  privileged: true
+# Docker sans privilege. kubedock (API Docker) : Testcontainers et docker lancent
+# leurs conteneurs comme des pods du namespace, ecoute sur 127.0.0.1:2475 du pod.
+kubedock:
+  image: joyrex2001/kubedock:0.23.0
+  resources:
+    limits:
+      cpu: "1"
+      memory: "1Gi"
+
+# BuildKit rootless : construit les images (buildctl, BUILDKIT_HOST), ecoute sur
+# 127.0.0.1:1234 du pod. Jamais privilegie.
+buildkit:
+  image: moby/buildkit:v0.34.2-rootless
+  # seccomp et AppArmor Unconfined : BuildKit a besoin de mount et unshare, que les
+  # profils par defaut bloquent (docs BuildKit, rootless). AppArmor : Kubernetes 1.30+.
+  unconfined: true
   resources:
     limits:
       cpu: "2"
@@ -34,10 +45,6 @@ persistence:
     storageClass: ""
   etat:
     size: 10Gi
-    storageClass: ""
-  # Stockage du Docker du pod (/var/lib/docker) : images gardees entre deux redemarrages.
-  docker:
-    size: 30Gi
     storageClass: ""
 
 serviceAccount:
