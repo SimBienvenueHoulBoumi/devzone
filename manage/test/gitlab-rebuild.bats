@@ -1,8 +1,9 @@
 #!/usr/bin/env bats
-# Rebuild et gitlab (#366) : kind_sans_basculer et kind_creer_sans_basculer
-# (cluster.sh), contexte kind-gitlab remis quand le cluster existe déjà
-# (gitlab.sh installer), échec effacé quand gitlab est prêt (devzone appliquer).
-# Faux kind, kubectl, helm, docker, curl et git dans $BATS_TEST_TMPDIR/bin :
+# Rebuild et gitlab (#366, #396) : kind_sans_basculer et
+# kind_creer_sans_basculer (cluster.sh), installation dans le cluster des
+# services sans kind ni bascule de contexte, migration depuis kind-gitlab,
+# échec effacé quand gitlab est prêt (devzone appliquer).
+# Faux kind, kubectl, helm, docker, curl, setsid et git dans $BATS_TEST_TMPDIR/bin :
 # aucun vrai cluster, aucun vrai kubeconfig. Chaque faux outil journalise ses
 # arguments dans $BATS_TEST_TMPDIR/<outil>.log.
 
@@ -66,6 +67,8 @@ case "$*" in
     "config unset current-context")
         { grep -v '^current-context:' "$fichier" 2>/dev/null || true; } >"$fichier.tmp"
         mv "$fichier.tmp" "$fichier" ;;
+    *"get nodes"*) echo "${FAUX_KUBE_MEMOIRE:-16Gi}" ;;
+    *"get namespace "*) [ -f "$BATS_TEST_TMPDIR/namespace" ] && exit 0 ; exit 1 ;;
     *"get secret"*) echo "cGFzc3dvcmQxMjM=" ;;
     *"get pod"*) echo "gitlab-toolbox-1" ;;
     *"gitlab-rails runner"*) echo "jeton-root-secret" ;;
@@ -110,6 +113,12 @@ CURL
 echo "git $*" >>"$BATS_TEST_TMPDIR/git.log"
 case "$*" in *" push "*) touch "$BATS_TEST_TMPDIR/pousse" ;; esac
 GIT
+
+    # setsid : journalise sans lancer le port-forward
+    cat >"$BATS_TEST_TMPDIR/bin/setsid" <<'SETSID'
+#!/usr/bin/env bash
+echo "setsid $*" >>"$BATS_TEST_TMPDIR/setsid.log"
+SETSID
 
     chmod +x "$BATS_TEST_TMPDIR"/bin/*
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
@@ -172,39 +181,39 @@ contexte_courant() {
     [ "$(contexte_courant)" = docker-desktop ] || false
 }
 
-@test "installer : cluster gitlab existant sans contexte → export, contexte courant gardé" {
+@test "installer : cluster des services, aucun kind, contexte courant gardé" {
     echo gitlab >"$KIND_CLUSTERS"
     poser_contexte_courant docker-desktop
     run bash "$GITLAB" installer
     [ "$status" -eq 0 ] || false
-    [[ "$output" == *"▶ Contexte kind-gitlab remis (cluster existant)"* ]] || false
-    grep -qxF "kind export kubeconfig --name gitlab --kubeconfig $HOME/.kube/config" "$BATS_TEST_TMPDIR/kind.log" || false
     ! grep -q 'kind create' "$BATS_TEST_TMPDIR/kind.log" || false
-    grep -qF -- "--kube-context kind-gitlab upgrade --install gitlab gitlab/gitlab" "$BATS_TEST_TMPDIR/helm.log" || false
+    ! grep -q 'export kubeconfig' "$BATS_TEST_TMPDIR/kind.log" || false
+    grep -qF -- "--kube-context devzone upgrade --install gitlab gitlab/gitlab --version 9.11.16 --namespace devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log" || false
     [ "$(contexte_courant)" = docker-desktop ] || false
 }
 
-@test "installer : contexte kind-gitlab déjà présent → aucun export" {
+@test "migrer sans terminal → ancien cluster conservé, contexte gardé" {
     echo gitlab >"$KIND_CLUSTERS"
-    printf 'ctx: kind-gitlab\ncurrent-context: docker-desktop\n' >"$HOME/.kube/config"
-    run bash "$GITLAB" installer
-    [ "$status" -eq 0 ] || false
-    ! grep -q 'export kubeconfig' "$BATS_TEST_TMPDIR/kind.log" || false
-    [[ "$output" != *"Contexte kind-gitlab remis"* ]] || false
+    poser_contexte_courant docker-desktop
+    run bash "$GITLAB" migrer
+    [ "$status" -eq 2 ] || false
+    [[ "$output" == *"confirmation impossible sans terminal"* ]] || false
+    [ "$(cat "$KIND_CLUSTERS")" = gitlab ] || false
+    ! grep -q 'delete cluster' "$BATS_TEST_TMPDIR/kind.log" || false
     [ "$(contexte_courant)" = docker-desktop ] || false
 }
 
-@test "installer : cluster absent → création sans basculer, contexte gardé" {
+@test "installer : mémoire du cluster des services insuffisante → refus, contexte gardé" {
     poser_contexte_courant docker-desktop
-    run bash "$GITLAB" installer
-    [ "$status" -eq 0 ] || false
-    grep -q 'kind create cluster --name gitlab --config .* --wait 120s' "$BATS_TEST_TMPDIR/kind.log" || false
-    ! grep -q 'export kubeconfig' "$BATS_TEST_TMPDIR/kind.log" || false
+    FAUX_KUBE_MEMOIRE=4Gi run bash "$GITLAB" installer
+    [ "$status" -eq 2 ] || false
+    [[ "$output" == *"au moins 8 Go"* ]] || false
+    [ ! -e "$BATS_TEST_TMPDIR/helm.log" ] || false
     [ "$(contexte_courant)" = docker-desktop ] || false
 }
 
 @test "appliquer : gitlab prêt, runner en ligne → marque d'échec effacée, récapitulatif à ✔" {
-    echo gitlab >"$KIND_CLUSTERS"
+    touch "$BATS_TEST_TMPDIR/namespace"
     printf 'gitlab=on\n' >"$DEVZONE_ETAT"
     mkdir -p "$SECRETS" && echo jeton >"$SECRETS/root-token"
     echo gitlab >"$DEVZONE_ETAT-echec-gitlab"

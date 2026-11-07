@@ -18,6 +18,7 @@
 #   devzone agent <dossier> <fichier-consigne>  dirige opencode sur une consigne
 #   devzone activer postgres [--contexte CTX] [--confirmer CTX]   PostgreSQL partagé, cluster au choix
 #   devzone postgres creer <projet>  base et utilisateur d'un projet (aussi : liste, psql, supprimer)
+#   devzone gitlab migrer [--oui]    GitLab dans le cluster des services, puis ancien cluster kind supprimé
 #   devzone cluster [CTX] [--oui] [--confirmer CTX]  cluster des services de devzone, ou en changer
 #   devzone port [<n>|--fermer <n>]  relais d'un port du conteneur vers le poste
 #   devzone mots-de-passe           régénère .password et affiche son chemin
@@ -79,7 +80,7 @@ description() {
     case "$1" in
         ia) echo "assistants IA : Claude Code, opencode" ;;
         kubernetes) echo "connexion au cluster de l'hôte et metrics-server au démarrage" ;;
-        gitlab) echo "GitLab de test dans un cluster kind" ;;
+        gitlab) echo "GitLab de test dans le cluster des services" ;;
         postgres) echo "PostgreSQL partagé, une base par projet" ;;
     esac
 }
@@ -342,12 +343,12 @@ appliquer_gitlab() {
             rm -f "$(fichier_echec gitlab)"
         fi
     else
-        # Désactiver gitlab seulement si un cluster gitlab existe
-        if kind get clusters 2>/dev/null | grep -qx 'gitlab'; then
+        # Désactiver gitlab seulement si son namespace existe encore
+        if bash "$ICI/gitlab/gitlab.sh" installe; then
             echo "devzone : gitlab désactivation…"
             bash "$ICI/gitlab/gitlab.sh" desinstaller
         else
-            echo "devzone : gitlab déjà désactivé (aucun cluster gitlab)."
+            echo "devzone : gitlab déjà désactivé (aucun namespace devzone-gitlab)."
         fi
     fi
 }
@@ -978,6 +979,10 @@ etat() {
     if [ -n "$cluster_actuel" ] && ! cluster_est_local "$cluster_actuel"; then
         printf '  ⚠ cluster        distant : %s — services sur un cluster distant\n' "$cluster_actuel"
     fi
+    # Ancien cluster kind-gitlab encore présent : inviter à migrer (#396)
+    if kind get clusters 2>/dev/null | grep -qx "gitlab${INSTANCE_SUFFIX}"; then
+        printf '  ⚠ ancien cluster kind-gitlab%s : devzone gitlab migrer\n' "$INSTANCE_SUFFIX"
+    fi
     # Cluster de travail interne (kind) : avertissement dans le recapitulatif
     ctx_travail="$(kubectl config current-context 2>/dev/null || true)"
     case "$ctx_travail" in
@@ -1066,6 +1071,7 @@ case "${1:-}" in
     clusters) DEVZONE_ETAT="$ETAT" bash "$ICI/clusters.sh" "${@:2}" ;;
     cluster) changer_cluster "${@:2}" ;;
     postgres) DEVZONE_ETAT="$ETAT" bash "$ICI/postgres/postgres.sh" "${@:2}" ;;
+    gitlab) DEVZONE_ETAT="$ETAT" bash "$ICI/gitlab/gitlab.sh" "${@:2}" ;;
     port) DEVZONE_ETAT="$ETAT" bash "$ICI/ports.sh" "${@:2}" ;;
     paquets) bash "$ICI/paquets.sh" "${@:2}" ;;
     mots-de-passe)
