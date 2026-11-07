@@ -3,11 +3,22 @@ kind: Role
 metadata:
   name: devzone-workspace
   namespace: {{ .Release.Namespace }}
-# Lecture seule du namespace, rien de plus. Le pod n'écrit pas sur le cluster :
-# les services s'installent depuis le poste (CLI devzone, kubectl de l'hôte).
-# Aucun accès aux mots de passe, jetons ni identités : ils restent hors de
-# portée du pod, qui exécute du code de projet.
+# Droits de kubedock (0.23.0, lus dans ses sources), limites au namespace :
+# pods (creer et supprimer les conteneurs de test, les lister et les suivre),
+# pods/log, pods/exec et pods/portforward (logs, commandes, ports), services et
+# configmaps (crees et supprimes avec les pods). Aucun droit sur les secrets ni
+# les deployments : kubedock 0.23.0 ne les utilise pas. Le pod execute du code de
+# projet : pas de droit sur les autres namespaces, ni sur le cluster.
 rules:
   - apiGroups: [""]
-    resources: ["pods", "services", "configmaps"]
-    verbs: ["get", "list", "watch"]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["pods/exec", "pods/portforward"]
+    verbs: ["create"]
+  - apiGroups: [""]
+    resources: ["services", "configmaps"]
+    verbs: ["list", "create", "delete"]
