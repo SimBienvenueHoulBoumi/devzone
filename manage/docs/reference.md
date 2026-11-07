@@ -210,12 +210,13 @@ Le cluster de l'hôte n'est pas joignable dans deux cas (kind fonctionne quand m
 
 ## Workspace Kubernetes
 
-Le poste de developpement peut tourner dans le cluster, avec Kubernetes 1.29 ou plus (sidecar natif) comme prerequis minimal. Le chart charts/devzone-workspace/ deploie un StatefulSet :
+Le poste de developpement peut tourner dans le cluster, avec Kubernetes 1.30 ou plus comme prerequis minimal (sidecars natifs, et profil AppArmor de BuildKit). Le chart charts/devzone-workspace/ deploie un StatefulSet, sans conteneur privilegie ni Docker du noeud :
 
-- conteneur `workspace` (image ghcr.io/simbienvenuehoulboumi/devzone-workspace:<version>), avec `DOCKER_HOST=tcp://localhost:2375` et `TESTCONTAINERS_HOST_OVERRIDE=localhost` ;
-- sidecar natif `docker` (docker:27-dind, privilegie), demarre avant `workspace` ;
-- trois PVC : `workspace`, `etat`, et `docker` (`/var/lib/docker`, 30 Gi par defaut) ;
-- un ServiceAccount devzone-workspace avec Role minimal et une NetworkPolicy meme namespace.
+- conteneur `workspace` (image ghcr.io/simbienvenuehoulboumi/devzone-workspace:<version>), avec `DOCKER_HOST=tcp://127.0.0.1:2475`, `BUILDKIT_HOST=tcp://127.0.0.1:1234`, `TESTCONTAINERS_RYUK_DISABLED=true` et `TESTCONTAINERS_CHECKS_DISABLE=true` ;
+- sidecar natif `kubedock` (joyrex2001/kubedock:0.23.0, sans privilege), demarre avant `workspace` : une API Docker dont les conteneurs deviennent des pods du namespace ;
+- sidecar natif `buildkitd` (moby/buildkit:v0.34.2-rootless, UID 1000, sans privilege), demarre avant `workspace` : construit les images ;
+- deux PVC : `workspace` et `etat` ;
+- un ServiceAccount devzone-workspace avec un Role limite au namespace et une NetworkPolicy meme namespace.
 
 Depuis le poste :
 
@@ -230,20 +231,22 @@ Les commandes utilisent helm et kubectl du poste, avec le contexte devzone s il 
 
 ### Testcontainers et docker dans le workspace
 
-- `docker` et Testcontainers parlent au Docker du pod : rien a configurer, et le socket Docker du poste n'est pas monte.
-- Ryuk reste actif : il nettoie les conteneurs de test.
-- Les conteneurs lances par Testcontainers publient leurs ports sur le Docker du pod ; `TESTCONTAINERS_HOST_OVERRIDE=localhost` leur fait joindre ces ports par localhost.
-- Le conteneur `workspace` ne demarre qu'une fois `docker info` reussi (startupProbe, 60 s au plus) : un `./mvnw verify` lance tout de suite ne tombe pas sur « Cannot connect ». Si le Docker ne repond pas dans ce delai, le sidecar redemarre.
-- Les images restent sur le PVC `docker` entre deux redemarrages. Reglages du chart : `persistence.docker.size` et `persistence.docker.storageClass` (volume), `sidecar.resources` (limites, 2 CPU et 4 Gi par defaut).
+- `docker` et Testcontainers parlent a kubedock (`DOCKER_HOST=tcp://127.0.0.1:2475`) : rien a configurer, et le socket Docker du poste n'est pas monte.
+- Chaque conteneur lance par Testcontainers devient un pod du namespace, cree et supprime par kubedock. Ryuk est desactive (`TESTCONTAINERS_RYUK_DISABLED=true`) : kubedock nettoie lui-meme.
+- Les ports des conteneurs sont relayes par kubedock (`--port-forward --reverse-proxy`) : rien a publier sur le pod.
+- Le conteneur `workspace` ne demarre qu'une fois kubedock et BuildKit joignables (startupProbe, 60 s au plus).
+- Fonctions de Testcontainers non prises en charge par kubedock 0.23.0 : reseaux, montages et compose ne sont pas essayes (#410).
+- Les images construites par BuildKit (`BUILDKIT_HOST=tcp://127.0.0.1:1234`, `buildctl`) restent dans le systeme de fichiers du sidecar `buildkitd` : le cache est perdu quand ce conteneur redemarre.
 
-### Securite du sidecar Docker
+### Securite : workspace sans Docker
 
-- **Privilegie** : le sidecar tourne avec `privileged: true`, qui est le prix de Docker dans un pod. Le privilege est confine au pod, mais ce n'est **pas** un bac a sable etanche : un conteneur privilegie peut atteindre le noeud. Ne pas y executer de code non fiable hors du poste de developpement.
-- **Pas de socket du poste** : c'est mieux que le partage du socket Docker de l'hote (#291), qui donnerait root sur la machine. Le sidecar ne voit que le Docker du pod.
-- **Ecoute** : le Docker ecoute seulement sur `127.0.0.1:2375` dans le pod (`--host=tcp://127.0.0.1:2375`), sans TLS. Aucun port n'est declare (ni `containerPort`, ni `hostPort`), et le Service n'expose que le HTTP du workspace : le 2375 n'est joignable que depuis le pod.
-- **Ports publies par Testcontainers** : ils sont ouverts sur le reseau du pod. Les autres pods du namespace peuvent les joindre (la NetworkPolicy l'autorise), les pods d'autres namespaces et l'exterieur non. Ne pas y mettre de secret.
-- **Cloisonnement** : le conteneur `workspace` voit tous les conteneurs du Docker du pod, y compris ceux lances par d'autres projets. Un projet ne doit pas compter sur une isolation entre ses conteneurs et ceux d'un autre.
-- **RBAC** : inchange. Le ServiceAccount ne peut que lire pods, services et configmaps du namespace ; il n'a aucun droit d'ecriture sur le cluster.
+- **Aucun conteneur privilegie** : ni kubedock, ni BuildKit, ni le workspace n'ont `privileged: true`. Un test `helm template` (`manage/test/workspace-sans-docker.bats`) echoue si un tel conteneur apparait.
+- **BuildKit rootless** : UID 1000, `--oci-worker-no-process-sandbox` (la doc BuildKit le recommande pour Kubernetes, avec ses caveats). seccomp et AppArmor sont `Unconfined` (`buildkit.unconfined`), sans quoi `mount` et `unshare` sont bloques. Le profil est le seul relache de securite du workspace : il ne donne pas de privilege.
+- **Pas de socket du poste** : le socket Docker de l'hote (#291) n'est pas monte, et aucun socket du noeud n'est partage.
+- **Ecoute** : kubedock et BuildKit n'ecoutent que sur `127.0.0.1` du pod, sans TLS. Aucun port n'est declare (ni `containerPort`, ni `hostPort`), et le Service n'expose que le HTTP du workspace.
+- **RBAC** : le ServiceAccount a un Role (pas un ClusterRole) limite au namespace, avec les droits que kubedock 0.23.0 utilise : pods (get, list, watch, create, delete), pods/log (get), pods/exec et pods/portforward (create), services et configmaps (list, create, delete). Aucun droit sur les secrets ni les deployments. Le pod peut donc lancer des conteneurs et les executer dans le namespace, sans rien ecrire hors de lui.
+- **Ports relayes** : les conteneurs de test sont joignables par les autres pods du namespace (la NetworkPolicy l'autorise). Ne pas y mettre de secret.
+- **Cloisonnement** : le workspace voit tous les conteneurs de test de son namespace, y compris ceux lances par d'autres projets. Un projet ne doit pas compter sur une isolation entre ses conteneurs et ceux d'un autre.
 
 ## GitLab
 
