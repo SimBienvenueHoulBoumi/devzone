@@ -7,6 +7,7 @@
 
 setup() {
     load commun
+    kind_vide
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
     GITLAB="$BATS_TEST_DIRNAME/../../.devcontainer/gitlab/gitlab.sh"
     DEMARRAGE="$BATS_TEST_DIRNAME/../../.devcontainer/demarrage.sh"

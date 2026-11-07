@@ -6,6 +6,7 @@
 
 setup() {
     load commun
+    kind_vide
     RELAIS="$BATS_TEST_DIRNAME/../../.devcontainer/docker-relais.sh"
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
     T="$BATS_TEST_TMPDIR"

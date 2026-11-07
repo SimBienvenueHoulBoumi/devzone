@@ -5,6 +5,7 @@
 
 setup() {
     load commun
+    kind_vide
     kube_isole
     PORTS="$BATS_TEST_DIRNAME/../../.devcontainer/ports.sh"
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"

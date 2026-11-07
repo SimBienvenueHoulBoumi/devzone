@@ -8,6 +8,7 @@
 
 setup() {
     load commun
+    kind_vide
     kube_isole
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
     POSTGRES="$BATS_TEST_DIRNAME/../../.devcontainer/postgres/postgres.sh"
