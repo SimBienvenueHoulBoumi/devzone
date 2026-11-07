@@ -208,6 +208,57 @@ retirer_config_opencode() {
     fi
 }
 
+# Repère de la skill devzone : posée si absente, mise à jour si elle porte le
+# repère et n'a pas été modifiée, gardée si personnalisée (#161, règle opencode).
+SKILL_REPERE='<!-- devzone : skill posée par devzone activer ia -->'
+
+# Dossiers de la skill devzone, dans les volumes de Claude Code et opencode.
+skill_dossiers() {
+    echo "$HOME/.claude/skills/devzone"
+    echo "$HOME/.config/opencode/skills/devzone"
+}
+
+# Pose la skill devzone (modèle versionné) : écrite si absente, mise à jour
+# tant qu'elle garde le repère devzone, personnalisée sinon.
+poser_skill_devzone() {
+    local modele="$ICI/skills/devzone/SKILL.md" repere cible d
+    repere="$SKILL_REPERE"
+    for d in $(skill_dossiers); do
+        mkdir -p "$d"
+        cible="$d/SKILL.md"
+        if [ ! -f "$cible" ]; then
+            cp "$modele" "$cible"
+            echo "devzone : skill devzone posée dans $d"
+        elif grep -qF "$repere" "$cible"; then
+            if ! cmp -s "$modele" "$cible"; then
+                cp "$modele" "$cible"
+                echo "devzone : skill devzone mise à jour dans $d"
+            fi
+        else
+            echo "devzone : skill devzone personnalisée dans $d, gardée"
+        fi
+    done
+}
+
+# Retire la skill devzone écrite par devzone si elle porte encore son repère
+# et n'a pas été modifiée ; une skill personnalisée est gardée. Symétrique de
+# poser_skill_devzone.
+retirer_skill_devzone() {
+    local repere modele cible d
+    repere="$SKILL_REPERE"
+    modele="$ICI/skills/devzone/SKILL.md"
+    for d in $(skill_dossiers); do
+        cible="$d/SKILL.md"
+        [ -f "$cible" ] || continue
+        if grep -qF "$repere" "$cible" && cmp -s "$modele" "$cible"; then
+            rm -f "$cible"
+            echo "devzone : skill devzone retirée de $d"
+        else
+            echo "devzone : skill devzone personnalisée dans $d, gardée"
+        fi
+    done
+}
+
 # Lance une commande longue en écrivant « toujours en cours » toutes les
 # DEVZONE_PROGRESSION s sur stderr : une installation muette semble bloquée (#195)
 avec_progression() {
@@ -277,6 +328,8 @@ appliquer_ia() {
             echo "devzone : garde-fou repowarden non branché (repowarden 4.10 ou plus requis) : repowarden agents init --global" >&2
         fi
         config_opencode
+        # Skill devzone : posée si absente, mise à jour si inchangée, gardée si personnalisée.
+        poser_skill_devzone
         echo "devzone : ia actif : claude (puis /login), opencode auth login"
     else
         npm uninstall -g "${IA_NOMS[@]}" >/dev/null 2>&1 || true
@@ -315,6 +368,8 @@ appliquer_ia() {
         # Configuration opencode : retirée seulement si elle porte le repère devzone
         # et n'a pas été modifiée ; personnalisée → gardée.
         retirer_config_opencode
+        # Skill devzone : retirée seulement si non modifiée ; personnalisée → gardée.
+        retirer_skill_devzone
         # État de devzone agent : gardé dans le volume partagé (désactivation
         # dans l'une des devzone ne supprime pas l'état des autres).
         echo "devzone : ia désactivé (connexions et état de devzone agent gardés dans leurs volumes ; journaux workspace/.agents/ gardés)"
