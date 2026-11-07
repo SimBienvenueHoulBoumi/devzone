@@ -39,7 +39,7 @@ case "$*" in
     *"config get-contexts -o name"*) echo "docker-desktop" ;;
     *"config view"*)
         nom=""
-        for c in docker-desktop; do
+        for c in docker-desktop kind-devzone; do
             if [[ "$*" == *\"$c\"* ]]; then nom="$c"; break; fi
         done
         if [[ "$*" == *'.cluster.server'* ]]; then echo "https://127.0.0.1:6443"; else echo "$nom"; fi
@@ -114,7 +114,8 @@ attendre_nohup() {
     [ "$status" -eq 0 ]
     grep -qx 'cluster=kind-devzone' "$DEVZONE_ETAT"
     grep -q 'kind create cluster --name devzone' "$BATS_TEST_TMPDIR/kind.log"
-    grep -q 'kubectl --context kind-devzone -n devzone-postgres create secret generic postgres-admin' "$BATS_TEST_TMPDIR/kubectl.log"
+    grep -q 'kubectl config set-context devzone --cluster=kind-devzone --user=kind-devzone' "$BATS_TEST_TMPDIR/kubectl.log"
+    grep -q 'kubectl --context devzone -n devzone-postgres create secret generic postgres-admin' "$BATS_TEST_TMPDIR/kubectl.log"
     grep -q 'image: postgres:16' "$BATS_TEST_TMPDIR/apply.log"
     grep -q 'storage: 5Gi' "$BATS_TEST_TMPDIR/apply.log"
     attendre_nohup 'port-forward --address 127.0.0.1'
@@ -129,7 +130,8 @@ attendre_nohup() {
     [ "$status" -eq 0 ]
     grep -qx 'cluster=docker-desktop' "$DEVZONE_ETAT"
     ! grep -q 'create cluster' "$BATS_TEST_TMPDIR/kind.log" 2>/dev/null || false
-    grep -q 'kubectl --context docker-desktop apply -f -' "$BATS_TEST_TMPDIR/kubectl.log"
+    grep -q 'kubectl config set-context devzone --cluster=docker-desktop --user=docker-desktop' "$BATS_TEST_TMPDIR/kubectl.log"
+    grep -q 'kubectl --context devzone apply -f -' "$BATS_TEST_TMPDIR/kubectl.log"
     ! grep -q 'kind-devzone' "$BATS_TEST_TMPDIR/kubectl.log" || false
 }
 
@@ -203,7 +205,7 @@ attendre_nohup() {
     grep -q "CREATE ROLE taskmanager LOGIN" "$BATS_TEST_TMPDIR/sql.log"
     grep -q "CREATE DATABASE taskmanager OWNER taskmanager" "$BATS_TEST_TMPDIR/sql.log"
     grep -q "REVOKE CONNECT ON DATABASE taskmanager FROM PUBLIC" "$BATS_TEST_TMPDIR/sql.log"
-    grep -q 'kubectl --context docker-desktop -n devzone-postgres exec -i postgres-0' "$BATS_TEST_TMPDIR/kubectl.log"
+    grep -q 'kubectl --context devzone -n devzone-postgres exec -i postgres-0' "$BATS_TEST_TMPDIR/kubectl.log"
     ! grep -q mdpsecret "$BATS_TEST_TMPDIR/kubectl.log" || false
     grep -qx 'DB_URL=jdbc:postgresql://127.0.0.1:5432/taskmanager' "$SECRETS/taskmanager.env"
     grep -qx 'DB_USER=taskmanager' "$SECRETS/taskmanager.env"
@@ -286,7 +288,8 @@ attendre_nohup() {
     mkdir -p "$SECRETS"
     run bash "$DEVZONE" desactiver postgres </dev/null
     [ "$status" -eq 0 ]
-    grep -q 'kubectl --context kind-devzone delete namespace devzone-postgres' "$BATS_TEST_TMPDIR/kubectl.log"
+    grep -q 'kubectl config set-context devzone --cluster=kind-devzone --user=kind-devzone' "$BATS_TEST_TMPDIR/kubectl.log"
+    grep -q 'kubectl --context devzone delete namespace devzone-postgres' "$BATS_TEST_TMPDIR/kubectl.log"
     grep -q 'kind delete cluster --name devzone' "$BATS_TEST_TMPDIR/kind.log"
     [ ! -d "$SECRETS" ]
     grep -qx 'postgres=off' "$DEVZONE_ETAT"
@@ -300,7 +303,8 @@ attendre_nohup() {
 
     actif_sur docker-desktop
     run bash "$DEVZONE" desactiver postgres </dev/null
-    grep -q 'kubectl --context docker-desktop delete namespace devzone-postgres' "$BATS_TEST_TMPDIR/kubectl.log"
+    grep -q 'kubectl config set-context devzone --cluster=docker-desktop --user=docker-desktop' "$BATS_TEST_TMPDIR/kubectl.log"
+    grep -q 'kubectl --context devzone delete namespace devzone-postgres' "$BATS_TEST_TMPDIR/kubectl.log"
     ! grep -q 'kind delete' "$BATS_TEST_TMPDIR/kind.log" || false
 }
 
@@ -355,7 +359,9 @@ attendre_nohup() {
     [ "$status" -eq 0 ]
     grep -qx 'cluster=docker-desktop' "$DEVZONE_ETAT"
     grep -q 'kubectl --context kind-devzone delete namespace devzone-postgres' "$BATS_TEST_TMPDIR/kubectl.log"
-    grep -q 'kubectl --context docker-desktop apply -f -' "$BATS_TEST_TMPDIR/kubectl.log"
+    # L'installation dans le nouveau cluster passe par le contexte devzone, relié à docker-desktop
+    grep -q 'kubectl config set-context devzone --cluster=docker-desktop --user=docker-desktop' "$BATS_TEST_TMPDIR/kubectl.log"
+    grep -q 'kubectl --context devzone apply -f -' "$BATS_TEST_TMPDIR/kubectl.log"
 }
 
 @test "cluster : module inactif → choix seulement enregistré ; même cluster → rien" {
