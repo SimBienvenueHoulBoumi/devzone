@@ -85,6 +85,85 @@ HELM
     grep -q -- "-c workspace" "$T/kubectl.log" || false
 }
 
+@test "workspace copier-vers : kubectl cp du poste vers /workspaces/projets du pod" {
+    export FAUX_CONTEXTES="devzone docker-desktop"
+    mkdir -p "$T/mon-projet"
+    : >"$T/kubectl.log"
+    run bash "$CLI" workspace copier-vers "$T/mon-projet"
+    [ "$status" -eq 0 ]
+    grep -q -- "cp $T/mon-projet devzone-workspace-0:/workspaces/projets/mon-projet" "$T/kubectl.log" || false
+    grep -q -- "--context devzone" "$T/kubectl.log" || false
+    grep -q -- "--namespace devzone-workspace" "$T/kubectl.log" || false
+    grep -q -- "-c workspace" "$T/kubectl.log" || false
+}
+
+@test "workspace copier-vers : sans dossier, usage et aucun kubectl" {
+    export FAUX_CONTEXTES="devzone docker-desktop"
+    : >"$T/kubectl.log"
+    run bash "$CLI" workspace copier-vers
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"devzone workspace copier-vers <dossier>"* ]] || false
+    [ ! -s "$T/kubectl.log" ]
+}
+
+@test "workspace copier-vers : dossier introuvable, aucun kubectl" {
+    export FAUX_CONTEXTES="devzone docker-desktop"
+    : >"$T/kubectl.log"
+    run bash "$CLI" workspace copier-vers "$T/absent"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"dossier introuvable"* ]] || false
+    [ ! -s "$T/kubectl.log" ]
+}
+
+@test "workspace copier-depuis : kubectl cp de /workspaces/projets vers le poste" {
+    export FAUX_CONTEXTES="devzone docker-desktop"
+    : >"$T/kubectl.log"
+    run bash "$CLI" workspace copier-depuis "$T/recup/mon-projet"
+    [ "$status" -eq 0 ]
+    grep -q -- "cp devzone-workspace-0:/workspaces/projets/mon-projet $T/recup/mon-projet" "$T/kubectl.log" || false
+    grep -q -- "--context devzone" "$T/kubectl.log" || false
+    grep -q -- "--namespace devzone-workspace" "$T/kubectl.log" || false
+    grep -q -- "-c workspace" "$T/kubectl.log" || false
+}
+
+@test "workspace copier-depuis . : le projet porte le nom du dossier courant" {
+    export FAUX_CONTEXTES="devzone docker-desktop"
+    mkdir -p "$T/cwd-projet"
+    cd "$T/cwd-projet"
+    : >"$T/kubectl.log"
+    run bash "$CLI" workspace copier-depuis .
+    [ "$status" -eq 0 ]
+    grep -q -- "cp devzone-workspace-0:/workspaces/projets/cwd-projet $T/cwd-projet" "$T/kubectl.log" || false
+    ! grep -q -- "projets/\.$" "$T/kubectl.log" || false
+}
+
+@test "workspace copier-depuis : sans dossier, usage et aucun kubectl" {
+    export FAUX_CONTEXTES="devzone docker-desktop"
+    : >"$T/kubectl.log"
+    run bash "$CLI" workspace copier-depuis
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"devzone workspace copier-depuis <dossier>"* ]] || false
+    [ ! -s "$T/kubectl.log" ]
+}
+
+@test "workspace vscode : marche à suivre (contexte, namespace, pod, dossier)" {
+    run bash "$CLI" workspace vscode
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Contexte kubectl : devzone"* ]] || false
+    [[ "$output" == *"pod devzone-workspace-0"* ]] || false
+    [[ "$output" == *"Attach to Running Kubernetes Container"* ]] || false
+    [[ "$output" == *"/workspaces/projets"* ]] || false
+    [[ "$output" == *"devzone workspace etat"* ]] || false
+    # Aucune variable devzone proposée à l'utilisateur (#341)
+    ! grep -q "DEVZONE_" <<<"$output" || false
+}
+
+@test "workspace aide : toutes les sous-commandes listées" {
+    run bash "$CLI" workspace
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"demarrer|arreter|etat|shell|vscode|copier-vers|copier-depuis"* ]] || false
+}
+
 @test "chart : helm lint et helm template" {
     command -v helm >/dev/null 2>&1 || skip "helm absent"
     run helm lint "$RACINE/charts/devzone-workspace"

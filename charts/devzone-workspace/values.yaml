@@ -31,10 +31,15 @@ buildkit:
       cpu: "2"
       memory: "4Gi"
 
-# Commande du conteneur workspace : il reste en vie (sleep infinity, comme VS Code
-# pour un devcontainer). Vide = commande par defaut de l'image.
+# Conteneur workspace et volume de ses projets (#399) : le PVC workspace est
+# monte sur /workspaces/projets, ou le conteneur demarre (workingDir).
 workspace:
+  # Commande : il reste en vie (sleep infinity, comme VS Code pour un
+  # devcontainer). Vide = commande par defaut de l'image.
   command: ["sleep", "infinity"]
+  # Taille du volume des projets.
+  taille: 20Gi
+  storageClass: ""
 
 resources:
   limits:
@@ -45,9 +50,6 @@ resources:
     memory: "1Gi"
 
 persistence:
-  workspace:
-    size: 20Gi
-    storageClass: ""
   etat:
     size: 10Gi
     storageClass: ""
