@@ -15,6 +15,32 @@ spec:
         app.kubernetes.io/name: {{ include "devzone-workspace.name" . }}
     spec:
       serviceAccountName: {{ include "devzone-workspace.serviceAccountName" . }}
+      # Sidecar natif (restartPolicy: Always, Kubernetes 1.29+) : il demarre avant
+      # le conteneur workspace, et son startupProbe bloque ce demarrage tant que le
+      # Docker du pod ne repond pas (60 s au plus). Le Docker n'ecoute que sur
+      # 127.0.0.1 du pod : aucun port expose par le Service.
+      initContainers:
+        - name: docker
+          image: {{ .Values.sidecar.image }}
+          restartPolicy: Always
+          args:
+            - --host=tcp://127.0.0.1:2375
+          securityContext:
+            privileged: {{ .Values.sidecar.privileged }}
+          env:
+            - name: DOCKER_TLS_CERTDIR
+              value: ""
+          startupProbe:
+            exec:
+              command: ["docker", "-H", "tcp://127.0.0.1:2375", "info"]
+            periodSeconds: 1
+            timeoutSeconds: 5
+            failureThreshold: 60
+          resources:
+            {{- toYaml .Values.sidecar.resources | nindent 12 }}
+          volumeMounts:
+            - name: docker
+              mountPath: /var/lib/docker
       containers:
         - name: workspace
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
@@ -22,6 +48,10 @@ spec:
           env:
             - name: DOCKER_HOST
               value: tcp://localhost:2375
+            # Testcontainers publie les ports de ses conteneurs sur le Docker du pod,
+            # joignables par localhost dans le pod.
+            - name: TESTCONTAINERS_HOST_OVERRIDE
+              value: localhost
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
@@ -29,17 +59,6 @@ spec:
               mountPath: /workspace
             - name: etat
               mountPath: /etat
-        - name: docker
-          image: {{ .Values.sidecar.image }}
-          securityContext:
-            privileged: {{ .Values.sidecar.privileged }}
-          env:
-            - name: DOCKER_TLS_CERTDIR
-              value: ""
-          resources:
-            limits:
-              cpu: "1"
-              memory: "1Gi"
   volumeClaimTemplates:
     - metadata:
         name: workspace
@@ -61,3 +80,13 @@ spec:
         resources:
           requests:
             storage: {{ .Values.persistence.etat.size }}
+    - metadata:
+        name: docker
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        {{- if .Values.persistence.docker.storageClass }}
+        storageClassName: {{ .Values.persistence.docker.storageClass }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.persistence.docker.size }}

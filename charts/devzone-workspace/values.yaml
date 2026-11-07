@@ -5,9 +5,15 @@ image:
   tag: ""
   pullPolicy: IfNotPresent
 
+# Sidecar Docker du pod : le conteneur workspace s'en sert (docker, Testcontainers).
+# Privilegie, il ecoute sur 127.0.0.1:2375 du pod, jamais expose par le Service.
 sidecar:
   image: docker:27-dind
   privileged: true
+  resources:
+    limits:
+      cpu: "2"
+      memory: "4Gi"
 
 resources:
   limits:
@@ -23,6 +29,10 @@ persistence:
     storageClass: ""
   etat:
     size: 10Gi
+    storageClass: ""
+  # Stockage du Docker du pod (/var/lib/docker) : images gardees entre deux redemarrages.
+  docker:
+    size: 30Gi
     storageClass: ""
 
 serviceAccount:
