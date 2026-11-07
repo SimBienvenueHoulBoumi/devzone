@@ -34,6 +34,8 @@ spec:
             - server
             - --port-forward
             - --reverse-proxy
+            - --timeout
+            - {{ .Values.kubedock.delai | quote }}
           env:
             - name: NAMESPACE
               valueFrom:

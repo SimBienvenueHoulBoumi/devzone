@@ -87,12 +87,23 @@ bloc_sidecar() {
     ! grep -q -- "- name: kubedock" <<<"$(bloc_containers "$output")" || false
 }
 
-@test "kubedock : arguments de l'essai (server --port-forward --reverse-proxy)" {
+@test "kubedock : arguments de l'essai (server --port-forward --reverse-proxy --timeout)" {
     run rendu_de templates/statefulset.yaml
     [ "$status" -eq 0 ]
     local args
     args="$(awk '/^          args:/{p=1;next} p && /^          [a-z]/{exit} p' <<<"$(bloc_sidecar "$(bloc_init "$output")" "        - name: kubedock")" | sed 's/^ *- //' | paste -sd' ' -)"
-    [ "$args" = "server --port-forward --reverse-proxy" ]
+    [ "$args" = 'server --port-forward --reverse-proxy --timeout "5m"' ]
+}
+
+@test "kubedock : --timeout depuis kubedock.delai (5m par defaut, premier tirage d'image)" {
+    run rendu_de templates/statefulset.yaml
+    [ "$status" -eq 0 ]
+    local args
+    args="$(awk '/^          args:/{p=1;next} p && /^          [a-z]/{exit} p' <<<"$(bloc_sidecar "$(bloc_init "$output")" "        - name: kubedock")" | sed 's/^ *- //' | paste -sd' ' -)"
+    [ "$args" = 'server --port-forward --reverse-proxy --timeout "5m"' ]
+    run rendu_de templates/statefulset.yaml --set kubedock.delai=10m
+    [ "$status" -eq 0 ]
+    grep -q -- '- "10m"' <<<"$(bloc_sidecar "$(bloc_init "$output")" "        - name: kubedock")" || false
 }
 
 @test "kubedock : NAMESPACE vient de metadata.namespace du pod" {

@@ -9,6 +9,11 @@ image:
 # leurs conteneurs comme des pods du namespace, ecoute sur 127.0.0.1:2475 du pod.
 kubedock:
   image: joyrex2001/kubedock:0.23.0
+  # Delai accorde a kubedock pour demarrer un conteneur de test (--timeout). Par
+  # defaut, kubedock n'attend qu'une minute : au premier lancement sur un noeud, le
+  # pod de test doit tirer son image, et ce tirage depasse souvent cette minute.
+  # Sans ce delai, kubedock abandonne (« timeout starting container »).
+  delai: 5m
   resources:
     limits:
       cpu: "1"
