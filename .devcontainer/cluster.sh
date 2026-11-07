@@ -94,6 +94,24 @@ cluster_est_local() {
     return 1
 }
 
+# Pose le contexte « devzone » (cluster + user) sur le contexte donné (défaut :
+# le courant) : après une installation sur une machine neuve, --context devzone
+# vise d'emblée le cluster des services choisi (#396)
+contexte_devzone_poser() {
+    local ctx cluster user
+    ctx="${1:-$(kubectl config current-context 2>/dev/null || true)}"
+    if [ -z "$ctx" ]; then
+        return 1
+    fi
+    cluster="$(kubectl config view -o jsonpath="{.contexts[?(@.name==\"$ctx\")].context.cluster}" 2>/dev/null || true)"
+    user="$(kubectl config view -o jsonpath="{.contexts[?(@.name==\"$ctx\")].context.user}" 2>/dev/null || true)"
+    if [ -n "$cluster" ]; then
+        kubectl config set-context devzone --cluster="$cluster" --user="$user" >/dev/null 2>&1
+    else
+        return 1
+    fi
+}
+
 cluster_joignable() {
     kubectl --context "$1" --request-timeout=3s get --raw /readyz >/dev/null 2>&1
 }
@@ -287,6 +305,9 @@ cluster_preparer() {
         echo "devzone : cluster $ctx injoignable (module kubernetes actif ? cluster démarré ?)" >&2
         return 1
     fi
+    # S'il vient d'être créé, le cluster des services doit tout de suite porter
+    # le contexte devzone, sans quoi l'installation vise l'ancien cluster (#396)
+    contexte_devzone_poser "$ctx" || echo "devzone : contexte devzone non posé sur $ctx" >&2
 }
 
 # Kind dédié sans plus aucun namespace de devzone : supprimé (il n'occupe
