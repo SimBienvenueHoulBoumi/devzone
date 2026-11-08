@@ -639,6 +639,10 @@ changer_plateforme() {
     local cible="${1:-}" url="" attendre="" arg hote
     case "$cible" in
         github)
+            # Retire le réglage credential du dernier hôte gitlab, s'il y en a un
+            if [ -n "$(url_gitlab_lue)" ]; then
+                git config --global --unset-all "credential.$(url_gitlab_lue).helper" 2>/dev/null || true
+            fi
             retirer_glab
             retirer_cle plateforme
             retirer_cle gitlab_url
@@ -670,6 +674,10 @@ changer_plateforme() {
             fi
             if ! connexion_glab "$hote" "$url"; then
                 echo "devzone : connexion à refaire : glab auth login --hostname $hote" >&2
+                return 1
+            fi
+            if ! git config --global "credential.$url.helper" "!$GLAB auth git-credential"; then
+                echo "devzone : réglage git credential impossible" >&2
                 return 1
             fi
             ecrire plateforme gitlab
@@ -935,6 +943,12 @@ etat() {
         # GitHub (contrôles gh) signalées comme non applicables ici, en
         # attendant le support GitLab de repowarden (#531)
         ligne_plateforme
+        url="$(url_gitlab_lue)"
+        if git config --global --get "credential.$url.helper" 2>/dev/null | grep -q 'glab auth git-credential'; then
+            echo "  ✔ git par glab"
+        else
+            echo "  ⚠ git par glab    à poser : devzone plateforme gitlab"
+        fi
         echo "  ○ GitHub          inutile ici (plateforme gitlab choisie)"
         echo "  ⚠ repowarden      reste sur GitHub (bots et tickets) : support GitLab à venir (simdevWarden/repowarden#531)"
     else
