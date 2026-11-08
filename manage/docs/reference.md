@@ -216,19 +216,39 @@ Le poste de developpement peut tourner dans le cluster, avec Kubernetes 1.30 ou 
 - conteneur `workspace` (image ghcr.io/simbienvenuehoulboumi/devzone-workspace:<version>), avec `DOCKER_HOST=tcp://127.0.0.1:2475`, `BUILDKIT_HOST=tcp://127.0.0.1:1234`, `TESTCONTAINERS_RYUK_DISABLED=true` et `TESTCONTAINERS_CHECKS_DISABLE=true` ;
 - sidecar natif `kubedock` (joyrex2001/kubedock:0.23.0, sans privilege), demarre avant `workspace` : une API Docker dont les conteneurs deviennent des pods du namespace ;
 - sidecar natif `buildkitd` (moby/buildkit:v0.34.2-rootless, UID 1000, sans privilege), demarre avant `workspace` : construit les images ;
-- deux PVC : `workspace` et `etat` ;
+- deux PVC : `workspace` (les projets, monte sur `/workspaces/projets`) et `etat` ;
 - un ServiceAccount devzone-workspace avec un Role limite au namespace et une NetworkPolicy meme namespace.
 
 Depuis le poste :
 
 ```bash
-devzone workspace demarrer   # installe ou met a jour le workspace
-devzone workspace arreter    # desinstalle le workspace
-devzone workspace etat       # etat des pods
-devzone workspace shell      # shell dans le conteneur workspace
+devzone workspace demarrer                # installe ou met a jour le workspace
+devzone workspace arreter                 # desinstalle le workspace
+devzone workspace etat                    # etat des pods
+devzone workspace shell                   # shell dans le conteneur workspace
+devzone workspace vscode                  # marche a suivre : attache VS Code au pod
+devzone workspace copier-vers <dossier>   # copie un dossier du poste vers les projets du pod
+devzone workspace copier-depuis <dossier> # copie un projet du pod vers le poste
 ```
 
 Les commandes utilisent helm et kubectl du poste, avec le contexte devzone s il existe, sinon le contexte courant. L image est construite par la CI a chaque PR et publiee sur ghcr.io a la livraison.
+
+### Projets dans un volume
+
+- **Montage** : le PVC `workspace` est monte sur `/workspaces/projets`, ou le conteneur demarre (`workingDir`). Sa taille se regle avec `workspace.taille` (20 Gi par defaut).
+- **Conservation** : le PVC porte l annotation `helm.sh/resource-policy: keep` et n est jamais supprime par `helm uninstall` : `devzone workspace arreter` retire le pod, pas les projets. Le perdre demande une suppression a la main dans le cluster.
+- **Copies** : `devzone workspace copier-vers <dossier>` copie le dossier du poste dans `/workspaces/projets/<nom du dossier>` ; `devzone workspace copier-depuis <dossier>` ramene `/workspaces/projets/<nom du dossier>` dans ce dossier du poste. Les deux passent par `kubectl cp` (tar est present dans l image).
+
+### Edition depuis le poste
+
+**VS Code** : `devzone workspace vscode` affiche la marche a suivre. Extensions « Kubernetes » et « Dev Containers » ; dans la vue Kubernetes, avec le contexte `devzone` : namespace `devzone-workspace`, pod `devzone-workspace-0`, conteneur `workspace` → « Attach to Running Kubernetes Container », puis ouvre le dossier `/workspaces/projets`.
+
+**IntelliJ (JetBrains Gateway)** : Gateway installe le backend de l IDE dans le pod et l ouvre dans un client leger sur le poste. La connexion se fait en SSH : elle demande le serveur SSH du pod et son transfert de port vers le poste, qui arrivent avec les ports du workspace (#401).
+
+1. Gateway → *Remote Development* → *New Connection* → *SSH* : hôte `127.0.0.1`, port transfere du pod, utilisateur `vscode`.
+2. Dossier ouvert par le backend : `/workspaces/projets/<projet>`.
+
+En attendant ces deux points, edite le projet sur le poste par les copies : `devzone workspace copier-vers <dossier>` avant, `devzone workspace copier-depuis <dossier>` apres.
 
 ### Testcontainers et docker dans le workspace
 

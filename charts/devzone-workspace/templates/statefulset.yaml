@@ -87,6 +87,8 @@ spec:
         - name: workspace
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          # Les projets vivent sur le PVC workspace : le conteneur y demarre.
+          workingDir: /workspaces/projets
           {{- /*
             Sans command, le conteneur lance l'entrypoint de l'image (bash pour un
             devcontainer), qui se termine aussitot faute de terminal : le pod boucle
@@ -112,20 +114,23 @@ spec:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
             - name: workspace
-              mountPath: /workspace
+              mountPath: /workspaces/projets
             - name: etat
               mountPath: /etat
   volumeClaimTemplates:
     - metadata:
         name: workspace
+        annotations:
+          # Les projets ne sont jamais supprimes par helm uninstall (#399).
+          helm.sh/resource-policy: keep
       spec:
         accessModes: ["ReadWriteOnce"]
-        {{- if .Values.persistence.workspace.storageClass }}
-        storageClassName: {{ .Values.persistence.workspace.storageClass }}
+        {{- if .Values.workspace.storageClass }}
+        storageClassName: {{ .Values.workspace.storageClass }}
         {{- end }}
         resources:
           requests:
-            storage: {{ .Values.persistence.workspace.size }}
+            storage: {{ .Values.workspace.taille }}
     - metadata:
         name: etat
       spec:
