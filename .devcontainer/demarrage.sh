@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # À chaque démarrage, dans l'ordre : relais du socket Docker (#293), identité git
 # (déduite du compte gh), clusters Kubernetes, nom gitlab.localhost et relais
-# 8929/2224 du module gitlab s'il est actif, relais du module postgres s'il est
-# actif, relais de ports vers le poste, identifiants regroupés (.password), puis
+# 8929/2224 du module gitlab s'il est actif, relais des modules postgres et
+# argocd s'ils sont actifs, relais de ports vers le poste, identifiants
+# regroupés (.password), puis
 # récapitulatif de ce qui reste à faire (devzone).
 # Séquentiel : le récapitulatif voit l'identité tout juste posée ; l'échec
 # d'une étape n'empêche pas les suivantes.
@@ -28,6 +29,11 @@ fi
 # survit pas à l'arrêt du conteneur, relancé ici après les clusters
 if bash "$ICI/devzone" actif postgres; then
     bash "$ICI/postgres/postgres.sh" relais-lancer || echo "démarrage : relais postgres non lancé (devzone reparer)"
+fi
+# Module argocd actif : relais (port-forward vers 127.0.0.1:8443), relancé
+# après les clusters comme celui de postgres
+if bash "$ICI/devzone" actif argocd; then
+    bash "$ICI/argocd/argocd.sh" relais-lancer || echo "démarrage : relais argocd non lancé (devzone reparer)"
 fi
 # Relais de ports vers le poste (#290) : l'IP du conteneur change à chaque
 # démarrage, chaque relais de l'état est recréé ; un échec n'empêche rien

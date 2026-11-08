@@ -90,6 +90,7 @@ devzone desactiver <module>    # désactive et applique tout de suite
 | `kubernetes` | à chaque démarrage : connexion au cluster de ta machine et metrics-server sur les clusters locaux (CPU et RAM dans k9s) | aucune connexion au cluster de ta machine ; kubectl, helm, k9s et kind restent installés, un cluster kind créé à la main reste utilisable ; metrics-server est retiré des clusters où devzone l'a installé |
 | `gitlab` | GitLab CE de test dans le [cluster des services](#cluster-de-devzone), namespace `devzone-gitlab` (chart figé), runner Kubernetes, projet `devzone/demo` avec pipeline ; http://gitlab.localhost:8929 ; au moins 8 Go de RAM allouable (voir [GitLab](#gitlab)) | releases Helm, namespace `devzone-gitlab` et secrets `workspace/.gitlab/` retirés ; rien d'autre touché |
 | `postgres` | PostgreSQL 16 partagé sur le [cluster de devzone](#cluster-de-devzone), une base par projet (`devzone postgres creer <projet>`), joignable sur `127.0.0.1:5432` dans le conteneur (voir [PostgreSQL](#postgresql)) | namespace `devzone-postgres` (toutes les bases) et secrets `workspace/.postgres/` supprimés, après confirmation en terminal ; kind dédié supprimé s'il ne sert plus |
+| `argocd` | Argo CD sur le [cluster de devzone](#cluster-de-devzone), namespace `devzone-argocd` (chart figé), serveur en `ClusterIP` ; https://127.0.0.1:8443 dans le conteneur ; au moins 1 Go de RAM allouable (voir [Argo CD](#argo-cd)) | release Helm et namespace `devzone-argocd` retirés, secret `workspace/.argocd/` supprimé ; les autres services restent, sous helm direct |
 
 Le choix est **propre à chaque devzone** (instance) et gardé dans le dossier `$RACINE/.devzone.modules` (monté de l'hôte, il survit aux rebuilds). Au premier démarrage d'une instance, si une connexion Claude Code ou opencode existe déjà dans les volumes, le module `ia` n'est pas activé : tout est désactivé par défaut et la connexion est signalée une seule fois (« devzone activer ia pour l'utiliser ici »), pas pour un état repris.
 
@@ -154,15 +155,15 @@ devzone agent liberer <modèle>|--tous        # lève un écart de modèle
 
 ## Identifiants regroupés
 
-Les comptes créés par devzone (modules `gitlab` et `postgres`) sont regroupés dans `$RACINE/.password`, à côté de `.devzone.modules`.
+Les comptes créés par devzone (modules `gitlab`, `postgres` et `argocd`) sont regroupés dans `$RACINE/.password`, à côté de `.devzone.modules`.
 
 ```bash
 devzone mots-de-passe          # régénère le fichier et affiche seulement son chemin
 ```
 
 - **Format** : en-tête en commentaire, puis une ligne par compte, colonnes séparées par des tabulations : `service`, `adresse`, `utilisateur`, `mot de passe`. Tri stable par service puis utilisateur ; aucune ligne vide.
-- **Source** : les fichiers des modules restent la référence (`workspace/.gitlab/root-password`, `workspace/.gitlab/dev-password`, `workspace/.postgres/admin-password`, `workspace/.postgres/<projet>.env`). `.password` est une vue régénérée, jamais une seconde copie à tenir à jour.
-- **Mise à jour** : `password_regenerer` (`.devcontainer/password.sh`) est appelée à la fin de chaque création, suppression ou changement de compte : installation, `creer`, `supprimer` et `--nouveau-mdp` de postgres ; seed et désinstallation de gitlab ; démarrage de devzone. Un échec n'empêche jamais l'opération, il affiche un avertissement.
+- **Source** : les fichiers des modules restent la référence (`workspace/.gitlab/root-password`, `workspace/.gitlab/dev-password`, `workspace/.postgres/admin-password`, `workspace/.postgres/<projet>.env`, `workspace/.argocd/admin.env`). `.password` est une vue régénérée, jamais une seconde copie à tenir à jour.
+- **Mise à jour** : `password_regenerer` (`.devcontainer/password.sh`) est appelée à la fin de chaque création, suppression ou changement de compte : installation, `creer`, `supprimer` et `--nouveau-mdp` de postgres ; seed et désinstallation de gitlab ; installation et désinstallation d'argocd ; démarrage de devzone. Un échec n'empêche jamais l'opération, il affiche un avertissement.
 - **Protection** : fichier ignoré par git (`.gitignore`) et droits **600** posés avant l'écriture (`umask 077`, fichier temporaire dans le même dossier puis `mv`). Aucune commande ne lit ni n'affiche son contenu ; le récapitulatif et `devzone mots-de-passe` citent seulement le chemin. Sans aucun compte, le fichier est supprimé.
 
 
@@ -215,19 +216,39 @@ Le poste de developpement peut tourner dans le cluster, avec Kubernetes 1.30 ou 
 - conteneur `workspace` (image ghcr.io/simbienvenuehoulboumi/devzone-workspace:<version>), avec `DOCKER_HOST=tcp://127.0.0.1:2475`, `BUILDKIT_HOST=tcp://127.0.0.1:1234`, `TESTCONTAINERS_RYUK_DISABLED=true` et `TESTCONTAINERS_CHECKS_DISABLE=true` ;
 - sidecar natif `kubedock` (joyrex2001/kubedock:0.23.0, sans privilege), demarre avant `workspace` : une API Docker dont les conteneurs deviennent des pods du namespace ;
 - sidecar natif `buildkitd` (moby/buildkit:v0.34.2-rootless, UID 1000, sans privilege), demarre avant `workspace` : construit les images ;
-- deux PVC : `workspace` et `etat` ;
+- deux PVC : `workspace` (les projets, monte sur `/workspaces/projets`) et `etat` ;
 - un ServiceAccount devzone-workspace avec un Role limite au namespace et une NetworkPolicy meme namespace.
 
 Depuis le poste :
 
 ```bash
-devzone workspace demarrer   # installe ou met a jour le workspace
-devzone workspace arreter    # desinstalle le workspace
-devzone workspace etat       # etat des pods
-devzone workspace shell      # shell dans le conteneur workspace
+devzone workspace demarrer                # installe ou met a jour le workspace
+devzone workspace arreter                 # desinstalle le workspace
+devzone workspace etat                    # etat des pods
+devzone workspace shell                   # shell dans le conteneur workspace
+devzone workspace vscode                  # marche a suivre : attache VS Code au pod
+devzone workspace copier-vers <dossier>   # copie un dossier du poste vers les projets du pod
+devzone workspace copier-depuis <dossier> # copie un projet du pod vers le poste
 ```
 
 Les commandes utilisent helm et kubectl du poste, avec le contexte devzone s il existe, sinon le contexte courant. L image est construite par la CI a chaque PR et publiee sur ghcr.io a la livraison.
+
+### Projets dans un volume
+
+- **Montage** : le PVC `workspace` est monte sur `/workspaces/projets`, ou le conteneur demarre (`workingDir`). Sa taille se regle avec `workspace.taille` (20 Gi par defaut).
+- **Conservation** : le PVC porte l annotation `helm.sh/resource-policy: keep` et n est jamais supprime par `helm uninstall` : `devzone workspace arreter` retire le pod, pas les projets. Le perdre demande une suppression a la main dans le cluster.
+- **Copies** : `devzone workspace copier-vers <dossier>` copie le dossier du poste dans `/workspaces/projets/<nom du dossier>` ; `devzone workspace copier-depuis <dossier>` ramene `/workspaces/projets/<nom du dossier>` dans ce dossier du poste. Les deux passent par `kubectl cp` (tar est present dans l image).
+
+### Edition depuis le poste
+
+**VS Code** : `devzone workspace vscode` affiche la marche a suivre. Extensions « Kubernetes » et « Dev Containers » ; dans la vue Kubernetes, avec le contexte `devzone` : namespace `devzone-workspace`, pod `devzone-workspace-0`, conteneur `workspace` → « Attach to Running Kubernetes Container », puis ouvre le dossier `/workspaces/projets`.
+
+**IntelliJ (JetBrains Gateway)** : Gateway installe le backend de l IDE dans le pod et l ouvre dans un client leger sur le poste. La connexion se fait en SSH : elle demande le serveur SSH du pod et son transfert de port vers le poste, qui arrivent avec les ports du workspace (#401).
+
+1. Gateway → *Remote Development* → *New Connection* → *SSH* : hôte `127.0.0.1`, port transfere du pod, utilisateur `vscode`.
+2. Dossier ouvert par le backend : `/workspaces/projets/<projet>`.
+
+En attendant ces deux points, edite le projet sur le poste par les copies : `devzone workspace copier-vers <dossier>` avant, `devzone workspace copier-depuis <dossier>` apres.
 
 ### Testcontainers et docker dans le workspace
 
@@ -309,6 +330,22 @@ devzone desactiver postgres                 # supprime PostgreSQL et TOUTES ses 
 - **Bases par projet** : nom en minuscules, chiffres et `_`. `creer` est idempotent : le mot de passe est gardé (sauf `--nouveau-mdp`) ; `REVOKE CONNECT … FROM PUBLIC` : un projet ne se connecte pas à la base d'un autre. Le fichier `<projet>.env` (600) contient `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` et `DB_URL` (JDBC).
 - **Secrets** : mot de passe du superutilisateur `postgres` dans le secret `postgres-admin` et `workspace/.postgres/admin-password` (600) ; jamais régénéré tant que le secret existe ; jamais affiché.
 - **Désactivation** : namespace supprimé (volume compris), `workspace/.postgres/` supprimé, kind dédié supprimé s'il ne porte plus aucun service. `make desinstaller` supprime aussi le namespace d'un cluster de l'hôte.
+
+## Argo CD
+
+Le module `argocd` fournit Argo CD sur le [cluster de devzone](#cluster-de-devzone). L'étape A installe le module ; les Applications (services et workspace) viendront après #401.
+
+```bash
+devzone activer argocd      # installe Argo CD dans le cluster des services
+devzone desactiver argocd   # désinstalle Argo CD, les autres services restent
+devzone argocd etat         # état du module
+```
+
+- **Ce qui est installé** : chart `argo/argo-cd` en version figée (`10.14.0`), namespace `devzone-argocd` étiqueté `app.kubernetes.io/managed-by=devzone` et isolé par NetworkPolicy. Valeurs minimales (`.devcontainer/argocd/values.yaml`) : un réplica par composant, sans Dex ni notifications, serveur en `ClusterIP`, sans Ingress ni LoadBalancer.
+- **Mémoire** : l'installation est refusée sous environ 1 Go de mémoire allouable dans le cluster, avec le message pour l'agrandir.
+- **Accès** : un relais `kubectl port-forward` rend l'interface joignable sur https://127.0.0.1:8443 **dans le conteneur** (`ARGOCD_PORT` pour un autre port) ; relancé à chaque démarrage et par `devzone appliquer`. Sur le poste, l'accès passera par #401. PID et journal : `workspace/.argocd/relais.*`.
+- **Mot de passe** : lu dans le Secret `argocd-initial-admin-secret`, rangé dans `workspace/.argocd/admin.env` (600) puis repris dans [`.password`](#identifiants-regroupés) ; utilisateur `admin`, jamais affiché.
+- **Désactivation** : `helm uninstall` de la release et suppression du namespace `devzone-argocd`, puis de `workspace/.argocd/` ; **les autres services restent**, sous helm direct.
 
 ## Ports vers le poste
 

@@ -19,6 +19,8 @@
 #   devzone activer postgres [--contexte CTX] [--confirmer CTX]   PostgreSQL partagé, cluster au choix
 #   devzone postgres creer <projet>  base et utilisateur d'un projet (aussi : liste, psql, supprimer)
 #   devzone gitlab migrer [--oui]    GitLab dans le cluster des services, puis ancien cluster kind supprimé
+#   devzone activer argocd           Argo CD dans le cluster des services, accès https://127.0.0.1:8443
+#   devzone argocd etat|relais-lancer|relais-arreter  Argo CD (module argocd)
 #   devzone cluster [CTX] [--oui] [--confirmer CTX]  cluster des services de devzone, ou en changer
 #   devzone port [<n>|--fermer <n>]  relais d'un port du conteneur vers le poste
 #   devzone mots-de-passe           régénère .password et affiche son chemin
@@ -48,7 +50,7 @@ VERSIONS="$ICI/../manage/scripts/versions.sh"
 RACINE="${DEVZONE_RACINE:-$(dirname "$ICI")}"
 # État par défaut de l'instance ; DEVZONE_ETAT garde la priorité (tests, CI)
 ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
-MODULES=(ia kubernetes gitlab postgres)
+MODULES=(ia kubernetes gitlab postgres argocd)
 # shellcheck source=SCRIPTDIR/cluster.sh
 # shellcheck disable=SC1091
 . "$ICI/cluster.sh"
@@ -82,6 +84,7 @@ description() {
         kubernetes) echo "connexion au cluster de l'hôte et metrics-server au démarrage" ;;
         gitlab) echo "GitLab de test dans le cluster des services" ;;
         postgres) echo "PostgreSQL partagé, une base par projet" ;;
+        argocd) echo "Argo CD, interface de déploiement du cluster des services" ;;
     esac
 }
 
@@ -104,7 +107,7 @@ initialiser() {
 
     [ -f "$ETAT" ] && return 0
     mkdir -p "$(dirname "$ETAT")"
-    printf 'ia=off\nkubernetes=off\ngitlab=off\n' >"$ETAT"
+    printf 'ia=off\nkubernetes=off\ngitlab=off\nargocd=off\n' >"$ETAT"
     # Connexion déjà établie par une autre devzone (volumes partagés) :
     # signalée une seule fois, à la création de l'état de cette instance ;
     # stderr : initialiser est aussi appelé dans $(valeur …). Rien pour un
@@ -409,6 +412,29 @@ appliquer_postgres() {
     fi
 }
 
+# Argo CD (#411) : installé dans le cluster des services, accès par le relais
+# 127.0.0.1:8443 ; un échec est marqué dans l'état et repris par devzone appliquer
+appliquer_argocd() {
+    local etat_courant
+    if [ "$1" = on ]; then
+        etat_courant="$(bash "$ICI/argocd/argocd.sh" etat)"
+        # « relais arrêté » d'abord : cette ligne commence aussi par « prêt »
+        if [[ "$etat_courant" == *"relais arrêté"* ]]; then
+            bash "$ICI/argocd/argocd.sh" relais-lancer
+            echo "devzone : argocd : relais relancé"
+        elif [[ "$etat_courant" == "prêt"* ]]; then
+            echo "devzone : argocd déjà actif, rien à faire."
+        elif ! bash "$ICI/argocd/argocd.sh" installer; then
+            echo "argocd" >"$(fichier_echec argocd)"
+            return 1
+        fi
+        rm -f "$(fichier_echec argocd)"
+    else
+        bash "$ICI/argocd/argocd.sh" desinstaller
+        rm -f "$(fichier_echec argocd)"
+    fi
+}
+
 # Toutes les bases disparaissent : confirmation en terminal (sans terminal, la
 # commande est explicite)
 confirmer_suppression_postgres() {
@@ -639,6 +665,10 @@ changer_plateforme() {
     local cible="${1:-}" url="" attendre="" arg hote
     case "$cible" in
         github)
+            # Retire le réglage credential du dernier hôte gitlab, s'il y en a un
+            if [ -n "$(url_gitlab_lue)" ]; then
+                git config --global --unset-all "credential.$(url_gitlab_lue).helper" 2>/dev/null || true
+            fi
             retirer_glab
             retirer_cle plateforme
             retirer_cle gitlab_url
@@ -670,6 +700,10 @@ changer_plateforme() {
             fi
             if ! connexion_glab "$hote" "$url"; then
                 echo "devzone : connexion à refaire : glab auth login --hostname $hote" >&2
+                return 1
+            fi
+            if ! git config --global "credential.$url.helper" "!$GLAB auth git-credential"; then
+                echo "devzone : réglage git credential impossible" >&2
                 return 1
             fi
             ecrire plateforme gitlab
@@ -825,6 +859,9 @@ reparer() {
     if [ "$(valeur postgres)" = on ]; then
         reparer_element "relais postgres" bash "$ICI/postgres/postgres.sh" relais-lancer
     fi
+    if [ "$(valeur argocd)" = on ]; then
+        reparer_element "relais argocd" bash "$ICI/argocd/argocd.sh" relais-lancer
+    fi
     reparer_element "relais de ports" bash "$ICI/ports.sh" relancer
     reparer_element "veilleur ports auto" env DEVZONE_PORTS_AUTO_REEL=oui bash "$ICI/ports-auto.sh" demarrer
     reparer_element "identifiants" bash "$ICI/password.sh" regenerer
@@ -935,6 +972,12 @@ etat() {
         # GitHub (contrôles gh) signalées comme non applicables ici, en
         # attendant le support GitLab de repowarden (#531)
         ligne_plateforme
+        url="$(url_gitlab_lue)"
+        if git config --global --get "credential.$url.helper" 2>/dev/null | grep -q 'glab auth git-credential'; then
+            echo "  ✔ git par glab"
+        else
+            echo "  ⚠ git par glab    à poser : devzone plateforme gitlab"
+        fi
         echo "  ○ GitHub          inutile ici (plateforme gitlab choisie)"
         echo "  ⚠ repowarden      reste sur GitHub (bots et tickets) : support GitLab à venir (simdevWarden/repowarden#531)"
     else
@@ -969,6 +1012,8 @@ etat() {
             printf '  ✔ module %-10s %s\n' "$m" "$(bash "$ICI/gitlab/gitlab.sh" etat)"
         elif [ "$(valeur "$m")" = on ] && [ "$m" = postgres ]; then
             printf '  ✔ module %-10s %s\n' "$m" "$(bash "$ICI/postgres/postgres.sh" etat)"
+        elif [ "$(valeur "$m")" = on ] && [ "$m" = argocd ]; then
+            printf '  ✔ module %-10s %s\n' "$m" "$(bash "$ICI/argocd/argocd.sh" etat)"
         elif [ "$(valeur "$m")" = on ]; then
             printf '  ✔ module %-10s actif : %s\n' "$m" "$(description "$m")"
         else
@@ -1055,6 +1100,7 @@ case "${1:-}" in
         [ "$(valeur ia)" = off ] || appliquer_ia on
         [ "$(valeur gitlab)" = off ] || appliquer_gitlab on
         [ "$(valeur postgres)" = off ] || appliquer_postgres on
+        [ "$(valeur argocd)" = off ] || appliquer_argocd on
         ;;
     actif)
         connu "${2:-}" || { echo "devzone : module inconnu : ${2:-(aucun)}" >&2; exit 2; }
@@ -1073,6 +1119,7 @@ case "${1:-}" in
     cluster) changer_cluster "${@:2}" ;;
     postgres) DEVZONE_ETAT="$ETAT" bash "$ICI/postgres/postgres.sh" "${@:2}" ;;
     gitlab) DEVZONE_ETAT="$ETAT" bash "$ICI/gitlab/gitlab.sh" "${@:2}" ;;
+    argocd) DEVZONE_ETAT="$ETAT" bash "$ICI/argocd/argocd.sh" "${@:2}" ;;
     port) DEVZONE_ETAT="$ETAT" bash "$ICI/ports.sh" "${@:2}" ;;
     paquets) bash "$ICI/paquets.sh" "${@:2}" ;;
     mots-de-passe)
