@@ -11,7 +11,7 @@ setup() {
     APP="$T/app/devzone"
     export DEVZONE_RACINE="$T/racine"
     export DEVZONE_ETAT="$T/modules"
-    mkdir -p "$T/app/gitlab" "$T/app/postgres" "$T/bin" "$DEVZONE_RACINE"
+    mkdir -p "$T/app/gitlab" "$T/app/postgres" "$T/app/catalogue/mysql" "$T/bin" "$DEVZONE_RACINE"
     cp "$RACINE_TEST/.devcontainer/devzone" "$APP"
     cp "$RACINE_TEST/.devcontainer/cluster.sh" "$T/app/cluster.sh"
     cp "$RACINE_TEST/.devcontainer/kube-joignable.sh" "$T/app/kube-joignable.sh"
@@ -44,6 +44,14 @@ GITLAB
 #!/usr/bin/env bash
 printf 'postgres %s\n' "$*" >>"$BATS_TEST_TMPDIR/actions.log"
 POSTGRES
+    cat >"$T/app/catalogue/catalogue-veilleur.sh" <<'VEILLEUR'
+#!/usr/bin/env bash
+printf 'catalogue-veilleur %s\n' "$*" >>"$BATS_TEST_TMPDIR/actions.log"
+VEILLEUR
+    cat >"$T/app/catalogue/mysql/mysql.sh" <<'MYSQL'
+#!/usr/bin/env bash
+printf 'mysql %s\n' "$*" >>"$BATS_TEST_TMPDIR/actions.log"
+MYSQL
     cat >"$T/app/demarrage.sh" <<'DEMARRAGE'
 #!/usr/bin/env bash
 printf 'demarrage %s\n' "$*" >>"$BATS_TEST_TMPDIR/actions.log"
@@ -52,7 +60,7 @@ DEMARRAGE
 #!/usr/bin/env bash
 printf 'metrics %s\n' "$*" >>"$BATS_TEST_TMPDIR/actions.log"
 METRICS
-    chmod +x "$T/app"/*.sh "$T/app/gitlab/gitlab.sh" "$T/app/postgres/postgres.sh"
+    chmod +x "$T/app"/*.sh "$T/app/gitlab/gitlab.sh" "$T/app/postgres/postgres.sh" "$T/app/catalogue/catalogue-veilleur.sh" "$T/app/catalogue/mysql/mysql.sh"
 }
 
 faux_kubectl() {
