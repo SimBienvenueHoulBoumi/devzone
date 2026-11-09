@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Opérations d'installation du catalogue (#414) : sourcé par catalogue.sh.
 
+ATTENTE="${DEVZONE_CATALOGUE_ATTENTE:-300}"
+
 # Secret de l'application : mot de passe généré une fois, miroir local
 # (workspace/.$app/admin-password, 600, jamais affiché). Reprise : le mot de
 # passe déjà là (secret cluster ou root.env) est conservé, jamais régénéré.

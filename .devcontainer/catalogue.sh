@@ -22,8 +22,6 @@ ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
 # shellcheck disable=SC1091
 . "$ICI/catalogue/app.sh"
 
-ATTENTE="${DEVZONE_CATALOGUE_ATTENTE:-300}"
-
 refuse() { echo "devzone : catalogue : $*" >&2; exit 2; }
 
 # Dossier du catalogue (surchargeable par les tests)
