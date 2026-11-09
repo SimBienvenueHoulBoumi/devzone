@@ -35,12 +35,22 @@ fi
 if bash "$ICI/devzone" actif argocd; then
     bash "$ICI/argocd/argocd.sh" relais-lancer || echo "démarrage : relais argocd non lancé (devzone reparer)"
 fi
+# Module mysql actif : le relais 127.0.0.1:3306, relancé comme celui de
+# postgres après chaque démarrage
+if bash "$ICI/devzone" actif mysql; then
+    bash "$ICI/catalogue/mysql/mysql.sh" relais-lancer || echo "démarrage : relais mysql non lancé (devzone reparer)"
+fi
 # Relais de ports vers le poste (#290) : l'IP du conteneur change à chaque
 # démarrage, chaque relais de l'état est recréé ; un échec n'empêche rien
 bash "$ICI/ports.sh" relancer || echo "démarrage : relais de ports non relancés (devzone reparer)"
 # Veilleur de ports automatiques vers le poste (#394, garde #293) : une seule
 # instance en arrière-plan, contexte réel posé pour cet appel seulement
 DEVZONE_PORTS_AUTO_REEL=oui bash "$ICI/ports-auto.sh" demarrer >/dev/null 2>&1 || echo "démarrage : veilleur de ports auto non lancé (devzone reparer)"
+# Catalogue d'applications : une ligne <app>=off par application absente,
+# écrite une fois, jamais une ligne existante modifiée (#414)
+bash "$ICI/catalogue.sh" synchroniser || echo "démarrage : catalogue non synchronisé (devzone reparer)"
+# Veilleur du catalogue : réapplique à chaud dès que .devzone.modules change
+DEVZONE_CATALOGUE_REEL=oui bash "$ICI/catalogue-veilleur.sh" demarrer >/dev/null 2>&1 || echo "démarrage : veilleur catalogue non lancé (devzone reparer)"
 
 # Vue regroupée des identifiants (#332), regénérée à chaque démarrage ; un
 # échec n'empêche rien et le contenu n'est jamais affiché

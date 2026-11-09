@@ -50,7 +50,7 @@ VERSIONS="$ICI/../manage/scripts/versions.sh"
 RACINE="${DEVZONE_RACINE:-$(dirname "$ICI")}"
 # État par défaut de l'instance ; DEVZONE_ETAT garde la priorité (tests, CI)
 ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
-MODULES=(ia kubernetes gitlab postgres argocd)
+MODULES=(ia kubernetes gitlab postgres argocd mysql)
 # shellcheck source=SCRIPTDIR/cluster.sh
 # shellcheck disable=SC1091
 . "$ICI/cluster.sh"
@@ -85,6 +85,7 @@ description() {
         gitlab) echo "GitLab de test dans le cluster des services" ;;
         postgres) echo "PostgreSQL partagé, une base par projet" ;;
         argocd) echo "Argo CD, interface de déploiement du cluster des services" ;;
+        mysql) echo "MySQL partagé, une base par projet" ;;
     esac
 }
 
@@ -432,6 +433,36 @@ appliquer_argocd() {
     else
         bash "$ICI/argocd/argocd.sh" desinstaller
         rm -f "$(fichier_echec argocd)"
+    fi
+}
+
+# MySQL du catalogue (#414) : même logique que postgres (relais relancé s'il
+# est arrêté), installation déléguée à mysql.sh
+appliquer_mysql() {
+    local etat_courant ctx
+    if [ "$1" = on ]; then
+        ctx="$(cluster_lu)"
+        if [ -z "$ctx" ]; then
+            echo "devzone : mysql : aucun cluster choisi : devzone activer mysql" >&2
+            ecrire mysql off
+            echo mysql >"$(fichier_echec mysql)"
+            return 2
+        fi
+        etat_courant="$(bash "$ICI/catalogue/mysql/mysql.sh" etat)"
+        # « relais arrêté » d'abord : cette ligne commence aussi par « prêt sur »
+        if [[ "$etat_courant" == *"relais arrêté"* ]]; then
+            bash "$ICI/catalogue/mysql/mysql.sh" relais-lancer
+            echo "devzone : mysql : relais relancé"
+        elif [[ "$etat_courant" == "prêt sur"* ]]; then
+            echo "devzone : mysql déjà actif, rien à faire."
+        elif ! bash "$ICI/catalogue/mysql/mysql.sh" installer; then
+            echo mysql >"$(fichier_echec mysql)"
+            return 1
+        fi
+        rm -f "$(fichier_echec mysql)"
+    else
+        bash "$ICI/catalogue/mysql/mysql.sh" desinstaller
+        rm -f "$(fichier_echec mysql)"
     fi
 }
 
@@ -862,6 +893,9 @@ reparer() {
     if [ "$(valeur argocd)" = on ]; then
         reparer_element "relais argocd" bash "$ICI/argocd/argocd.sh" relais-lancer
     fi
+    if [ "$(valeur mysql)" = on ]; then
+        reparer_element "relais mysql" bash "$ICI/catalogue/mysql/mysql.sh" relais-lancer
+    fi
     reparer_element "relais de ports" bash "$ICI/ports.sh" relancer
     reparer_element "veilleur ports auto" env DEVZONE_PORTS_AUTO_REEL=oui bash "$ICI/ports-auto.sh" demarrer
     reparer_element "identifiants" bash "$ICI/password.sh" regenerer
@@ -1014,12 +1048,18 @@ etat() {
             printf '  ✔ module %-10s %s\n' "$m" "$(bash "$ICI/postgres/postgres.sh" etat)"
         elif [ "$(valeur "$m")" = on ] && [ "$m" = argocd ]; then
             printf '  ✔ module %-10s %s\n' "$m" "$(bash "$ICI/argocd/argocd.sh" etat)"
+        elif [ "$(valeur "$m")" = on ] && [ "$m" = mysql ]; then
+            printf '  ✔ module %-10s %s\n' "$m" "$(bash "$ICI/catalogue/mysql/mysql.sh" etat)"
         elif [ "$(valeur "$m")" = on ]; then
             printf '  ✔ module %-10s actif : %s\n' "$m" "$(description "$m")"
         else
             printf '  ○ module %-10s facultatif, %s : devzone activer %s\n' "$m" "$(description "$m")" "$m"
         fi
     done
+    # Applications du catalogue (#414)
+    if [ -d "$ICI/catalogue" ]; then
+        bash "$ICI/catalogue.sh" resume
+    fi
     # Cluster de devzone distant : avertissement dans le récapitulatif
     cluster_actuel="$(cluster_lu)"
     if [ -n "$cluster_actuel" ] && ! cluster_est_local "$cluster_actuel"; then
@@ -1074,8 +1114,18 @@ etat() {
 
 changer() {
     local m="${2:-}"
-    if [ -z "$m" ] || ! connu "$m"; then
-        echo "devzone : module inconnu : ${m:-(aucun)} ; modules : ${MODULES[*]}" >&2
+    if [ -z "$m" ]; then
+        echo "devzone : module inconnu : (aucun) ; modules : ${MODULES[*]}" >&2
+        exit 1
+    fi
+    if ! connu "$m"; then
+        # Une application du catalogue : on écrit la ligne, on applique
+        if [ -f "$ICI/catalogue/$m/app.conf" ]; then
+            ecrire "$m" "$1"
+            bash "$ICI/catalogue.sh" appliquer
+            return
+        fi
+        echo "devzone : module inconnu : $m ; modules : ${MODULES[*]}" >&2
         exit 1
     fi
     if [ "$1" = off ] && [ "$m" = postgres ]; then
@@ -1100,6 +1150,7 @@ case "${1:-}" in
         [ "$(valeur ia)" = off ] || appliquer_ia on
         [ "$(valeur gitlab)" = off ] || appliquer_gitlab on
         [ "$(valeur postgres)" = off ] || appliquer_postgres on
+        [ "$(valeur mysql)" = off ] || appliquer_mysql on
         [ "$(valeur argocd)" = off ] || appliquer_argocd on
         ;;
     actif)
@@ -1118,7 +1169,9 @@ case "${1:-}" in
     clusters) DEVZONE_ETAT="$ETAT" bash "$ICI/clusters.sh" "${@:2}" ;;
     cluster) changer_cluster "${@:2}" ;;
     postgres) DEVZONE_ETAT="$ETAT" bash "$ICI/postgres/postgres.sh" "${@:2}" ;;
+    mysql) DEVZONE_ETAT="$ETAT" bash "$ICI/catalogue/mysql/mysql.sh" "${@:2}" ;;
     gitlab) DEVZONE_ETAT="$ETAT" bash "$ICI/gitlab/gitlab.sh" "${@:2}" ;;
+    catalogue) DEVZONE_ETAT="$ETAT" bash "$ICI/catalogue.sh" lister ;;
     argocd) DEVZONE_ETAT="$ETAT" bash "$ICI/argocd/argocd.sh" "${@:2}" ;;
     port) DEVZONE_ETAT="$ETAT" bash "$ICI/ports.sh" "${@:2}" ;;
     paquets) bash "$ICI/paquets.sh" "${@:2}" ;;

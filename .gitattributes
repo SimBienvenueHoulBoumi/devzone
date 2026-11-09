@@ -1,6 +1,7 @@
 # Scripts lancés par un interpréteur (bash, bats, Python) : fins de ligne LF
 # même sur un checkout Windows (l'interpréteur échoue sur les CRLF)
 *.sh                text eol=lf
+*.conf              text eol=lf
 *.bats              text eol=lf
 *.bash              text eol=lf
 *.py                text eol=lf

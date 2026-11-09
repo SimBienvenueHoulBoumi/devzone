@@ -62,6 +62,37 @@ password_regenerer() (
         adresse="127.0.0.1:5432/${adresse:-$nom}"
         printf '%s\t%s\t%s\t%s\n' "$service" "$adresse" "$utilisateur" "$mdp" >>"$entrees"
     done
+    # Chaque autre application du catalogue : workspace/.<app>/*.env, clés
+    # <APP>_HOST, <APP>_PORT, <APP>_USER, <APP>_PASSWORD (ou MYSQL_* pour mysql)
+    for repertoire in "$racine"/workspace/.*/; do
+        [ -d "$repertoire" ] || continue
+        app="${repertoire%/}"
+        app="${app##*/}"
+        case "$app" in . | .. | .gitlab | .postgres | .argocd) continue ;; esac
+        app="${app#.}"
+        appu="$(printf '%s' "$app" | tr '[:lower:]' '[:upper:]')"
+        for fichier in "$repertoire"*.env; do
+            [ -f "$fichier" ] || continue
+            base="${fichier##*/}"
+            base="${base%.env}"
+            utilisateur="$(sed -n "s/^${appu}_USER=//p" "$fichier" 2>/dev/null | tail -1 || true)"
+            [ -z "$utilisateur" ] && utilisateur="$(sed -n 's/^DB_USER=//p' "$fichier" 2>/dev/null | tail -1 || true)"
+            [ -z "$utilisateur" ] && utilisateur="$(sed -n 's/^MYSQL_USER=//p' "$fichier" 2>/dev/null | tail -1 || true)"
+            mdp="$(sed -n "s/^${appu}_PASSWORD=//p" "$fichier" 2>/dev/null | tail -1 || true)"
+            [ -z "$mdp" ] && mdp="$(sed -n 's/^DB_PASSWORD=//p' "$fichier" 2>/dev/null | tail -1 || true)"
+            [ -z "$mdp" ] && mdp="$(sed -n 's/^MYSQL_PASSWORD=//p' "$fichier" 2>/dev/null | tail -1 || true)"
+            [ -z "$utilisateur" ] || [ -z "$mdp" ] && continue
+            hote="$(sed -n "s/^${appu}_HOST=//p" "$fichier" 2>/dev/null | tail -1 || true)"
+            [ -z "$hote" ] && hote="$(sed -n 's/^DB_HOST=//p' "$fichier" 2>/dev/null | tail -1 || true)"
+            [ -z "$hote" ] && hote="$(sed -n 's/^MYSQL_HOST=//p' "$fichier" 2>/dev/null | tail -1 || true)"
+            [ -z "$hote" ] && hote=127.0.0.1
+            port="$(sed -n "s/^${appu}_PORT=//p" "$fichier" 2>/dev/null | tail -1 || true)"
+            [ -z "$port" ] && port="$(sed -n 's/^DB_PORT=//p' "$fichier" 2>/dev/null | tail -1 || true)"
+            [ -z "$port" ] && port="$(sed -n 's/^MYSQL_PORT=//p' "$fichier" 2>/dev/null | tail -1 || true)"
+            [ -z "$port" ] && port=3306
+            printf '%s\t%s\t%s\t%s\n' "$app:$base" "$hote:$port" "$utilisateur" "$mdp" >>"$entrees"
+        done
+    done
 
     if [ ! -s "$entrees" ]; then
         rm -f "$entrees" "$cible"
