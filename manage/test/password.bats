@@ -89,6 +89,17 @@ setup() {
     [ "$output" = ".password" ]
 }
 
+@test "password : workspace/.<app>/*.env represente chaque application (cles MYSQL_* pour mysql)" {
+    mkdir -p "$RACINE/workspace/.mysql"
+    printf 'MYSQL_HOST=127.0.0.1\nMYSQL_PORT=3306\nMYSQL_USER=datayer\nMYSQL_PASSWORD=mdp-datayer\n' >"$RACINE/workspace/.mysql/datayer.env"
+    printf 'MYSQL_HOST=127.0.0.1\nMYSQL_PORT=3306\nMYSQL_USER=root\nMYSQL_PASSWORD=mdproot\n' >"$RACINE/workspace/.mysql/root.env"
+    run bash "$PASSWORD" regenerer
+    [ "$status" -eq 0 ] || false
+    [ "$output" = "" ] || false
+    grep -q $'^mysql:datayer\t127.0.0.1:3306\tdatayer\tmdp-datayer$' "$RACINE/.password" || false
+    grep -q $'^mysql:root\t127.0.0.1:3306\troot\tmdproot$' "$RACINE/.password" || false
+}
+
 @test "demarrage : appelle password.sh regenerer avant le récapitulatif" {
     local demarrage="$BATS_TEST_DIRNAME/../../.devcontainer/demarrage.sh"
     local ligne_password ligne_recapitulatif

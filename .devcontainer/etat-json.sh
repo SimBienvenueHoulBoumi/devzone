@@ -33,6 +33,7 @@ etat_json() {
     local travail_ctx="" travail_interne=false ctx_hote=""
     local clusters_services_raw="" clusters_travail_raw="" clusters_commande=""
     local ports_json='[]' ports_out
+    local applications_json='[]'
     local identifiants_raw=""
     local retards_out paquet figee installee count
     local relais_marque paquets_marque paquets_noms n chemin wt_out
@@ -132,6 +133,13 @@ etat_json() {
                     etat_val=""
                     ajouter_erreur modules "argocd.sh etat indisponible"
                 fi
+            elif [ "$m" = mysql ]; then
+                if s="$(bash "$ICI/catalogue/mysql/mysql.sh" etat 2>/dev/null)"; then
+                    etat_val="$s"
+                else
+                    etat_val=""
+                    ajouter_erreur modules "mysql.sh etat indisponible"
+                fi
             else
                 etat_val="actif"
             fi
@@ -179,6 +187,12 @@ etat_json() {
     else
         ports_json="null"
         ajouter_erreur ports "ports.sh indisponible"
+    fi
+
+    applications_json="$(bash "$ICI/catalogue.sh" json 2>/dev/null || echo '[]')"
+    if ! printf '%s' "$applications_json" | jq -e . >/dev/null 2>&1; then
+        applications_json='[]'
+        ajouter_erreur modules "catalogue.sh json indisponible"
     fi
 
     if [ -f "$RACINE/.password" ]; then
@@ -231,6 +245,7 @@ etat_json() {
         --argjson travail_interne "$travail_interne" \
         --arg clusters_commande "$clusters_commande" \
         --argjson ports "$ports_json" \
+        --argjson applications "$applications_json" \
         --arg identifiants "$identifiants_raw" \
         --argjson alertes "$alertes_json" \
         --argjson erreurs "$erreurs" \
@@ -243,6 +258,7 @@ etat_json() {
             modules: $modules,
             clusters: { services: (if $clusters_services=="" then null else $clusters_services end), services_distant: $services_distant, travail: (if $clusters_travail=="" then null else $clusters_travail end), travail_interne: $travail_interne, commande: (if $clusters_commande=="" then null else $clusters_commande end) },
             ports: $ports,
+            applications: (if $applications=="" then null else $applications end),
             identifiants: (if $identifiants=="" then null else $identifiants end),
             alertes: $alertes,
             erreurs: $erreurs
