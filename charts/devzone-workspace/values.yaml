@@ -1,24 +1,54 @@
 replicaCount: 1
 
+# Securite du pod : utilisateur vscode (UID 1000), jamais root. Les sidecars
+# heritent de runAsUser (kubedock inclus, qui n'en declare pas) ; buildkit le
+# redeclare, rootless en 1000.
+securityContext:
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  runAsNonRoot: true
+
 image:
   repository: ghcr.io/simbienvenuehoulboumi/devzone-workspace
   tag: ""
   pullPolicy: IfNotPresent
 
-# Sidecar Docker du pod : le conteneur workspace s'en sert (docker, Testcontainers).
-# Privilegie, il ecoute sur 127.0.0.1:2375 du pod, jamais expose par le Service.
-sidecar:
-  image: docker:27-dind
-  privileged: true
+# Docker sans privilege. kubedock (API Docker) : Testcontainers et docker lancent
+# leurs conteneurs comme des pods du namespace, ecoute sur 127.0.0.1:2475 du pod.
+kubedock:
+  image: joyrex2001/kubedock:0.23.0
+  # Delai accorde a kubedock pour demarrer un conteneur de test (--timeout). Par
+  # defaut, kubedock n'attend qu'une minute : au premier lancement sur un noeud, le
+  # pod de test doit tirer son image, et ce tirage depasse souvent cette minute.
+  # Sans ce delai, kubedock abandonne (« timeout starting container »).
+  delai: 5m
+  resources:
+    limits:
+      cpu: "1"
+      memory: "1Gi"
+
+# BuildKit rootless : construit les images (buildctl, BUILDKIT_HOST), ecoute sur
+# 127.0.0.1:1234 du pod. Jamais privilegie.
+buildkit:
+  image: moby/buildkit:v0.34.2-rootless
+  # seccomp et AppArmor Unconfined : BuildKit a besoin de mount et unshare, que les
+  # profils par defaut bloquent (docs BuildKit, rootless). AppArmor : Kubernetes 1.30+.
+  unconfined: true
   resources:
     limits:
       cpu: "2"
       memory: "4Gi"
 
-# Commande du conteneur workspace : il reste en vie (sleep infinity, comme VS Code
-# pour un devcontainer). Vide = commande par defaut de l'image.
+# Conteneur workspace et volume de ses projets (#399) : le PVC workspace est
+# monte sur /workspaces/projets, ou le conteneur demarre (workingDir).
 workspace:
+  # Commande : il reste en vie (sleep infinity, comme VS Code pour un
+  # devcontainer). Vide = commande par defaut de l'image.
   command: ["sleep", "infinity"]
+  # Taille du volume des projets.
+  taille: 20Gi
+  storageClass: ""
 
 resources:
   limits:
@@ -29,16 +59,22 @@ resources:
     memory: "1Gi"
 
 persistence:
-  workspace:
-    size: 20Gi
-    storageClass: ""
+  # Identités, connexions et caches, gardés d'un redémarrage à l'autre. Chaque
+  # chemin (relatif au home de vscode) est monté depuis ce volume à son
+  # emplacement habituel ; l'initContainer etat-init crée les dossiers d'abord.
   etat:
     size: 10Gi
     storageClass: ""
-  # Stockage du Docker du pod (/var/lib/docker) : images gardees entre deux redemarrages.
-  docker:
-    size: 30Gi
-    storageClass: ""
+    chemins:
+      - .config/gh
+      - .config/git
+      - .claude
+      - .config/opencode
+      - .local/share/opencode
+      - .local/state/oc-lancer
+      - .m2
+      - .gradle
+      - .local/share/pnpm
 
 serviceAccount:
   name: devzone-workspace

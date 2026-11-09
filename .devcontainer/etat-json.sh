@@ -125,6 +125,13 @@ etat_json() {
                     etat_val=""
                     ajouter_erreur modules "postgres.sh etat indisponible"
                 fi
+            elif [ "$m" = argocd ]; then
+                if s="$(bash "$ICI/argocd/argocd.sh" etat 2>/dev/null)"; then
+                    etat_val="$s"
+                else
+                    etat_val=""
+                    ajouter_erreur modules "argocd.sh etat indisponible"
+                fi
             else
                 etat_val="actif"
             fi

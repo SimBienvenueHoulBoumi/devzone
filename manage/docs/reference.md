@@ -90,6 +90,7 @@ devzone desactiver <module>    # désactive et applique tout de suite
 | `kubernetes` | à chaque démarrage : connexion au cluster de ta machine et metrics-server sur les clusters locaux (CPU et RAM dans k9s) | aucune connexion au cluster de ta machine ; kubectl, helm, k9s et kind restent installés, un cluster kind créé à la main reste utilisable ; metrics-server est retiré des clusters où devzone l'a installé |
 | `gitlab` | GitLab CE de test dans le [cluster des services](#cluster-de-devzone), namespace `devzone-gitlab` (chart figé), runner Kubernetes, projet `devzone/demo` avec pipeline ; http://gitlab.localhost:8929 ; au moins 8 Go de RAM allouable (voir [GitLab](#gitlab)) | releases Helm, namespace `devzone-gitlab` et secrets `workspace/.gitlab/` retirés ; rien d'autre touché |
 | `postgres` | PostgreSQL 16 partagé sur le [cluster de devzone](#cluster-de-devzone), une base par projet (`devzone postgres creer <projet>`), joignable sur `127.0.0.1:5432` dans le conteneur (voir [PostgreSQL](#postgresql)) | namespace `devzone-postgres` (toutes les bases) et secrets `workspace/.postgres/` supprimés, après confirmation en terminal ; kind dédié supprimé s'il ne sert plus |
+| `argocd` | Argo CD sur le [cluster de devzone](#cluster-de-devzone), namespace `devzone-argocd` (chart figé), serveur en `ClusterIP` ; https://127.0.0.1:8443 dans le conteneur ; au moins 1 Go de RAM allouable (voir [Argo CD](#argo-cd)) | release Helm et namespace `devzone-argocd` retirés, secret `workspace/.argocd/` supprimé ; les autres services restent, sous helm direct |
 
 Le choix est **propre à chaque devzone** (instance) et gardé dans le dossier `$RACINE/.devzone.modules` (monté de l'hôte, il survit aux rebuilds). Au premier démarrage d'une instance, si une connexion Claude Code ou opencode existe déjà dans les volumes, le module `ia` n'est pas activé : tout est désactivé par défaut et la connexion est signalée une seule fois (« devzone activer ia pour l'utiliser ici »), pas pour un état repris.
 
@@ -154,15 +155,15 @@ devzone agent liberer <modèle>|--tous        # lève un écart de modèle
 
 ## Identifiants regroupés
 
-Les comptes créés par devzone (modules `gitlab` et `postgres`) sont regroupés dans `$RACINE/.password`, à côté de `.devzone.modules`.
+Les comptes créés par devzone (modules `gitlab`, `postgres` et `argocd`) sont regroupés dans `$RACINE/.password`, à côté de `.devzone.modules`.
 
 ```bash
 devzone mots-de-passe          # régénère le fichier et affiche seulement son chemin
 ```
 
 - **Format** : en-tête en commentaire, puis une ligne par compte, colonnes séparées par des tabulations : `service`, `adresse`, `utilisateur`, `mot de passe`. Tri stable par service puis utilisateur ; aucune ligne vide.
-- **Source** : les fichiers des modules restent la référence (`workspace/.gitlab/root-password`, `workspace/.gitlab/dev-password`, `workspace/.postgres/admin-password`, `workspace/.postgres/<projet>.env`). `.password` est une vue régénérée, jamais une seconde copie à tenir à jour.
-- **Mise à jour** : `password_regenerer` (`.devcontainer/password.sh`) est appelée à la fin de chaque création, suppression ou changement de compte : installation, `creer`, `supprimer` et `--nouveau-mdp` de postgres ; seed et désinstallation de gitlab ; démarrage de devzone. Un échec n'empêche jamais l'opération, il affiche un avertissement.
+- **Source** : les fichiers des modules restent la référence (`workspace/.gitlab/root-password`, `workspace/.gitlab/dev-password`, `workspace/.postgres/admin-password`, `workspace/.postgres/<projet>.env`, `workspace/.argocd/admin.env`). `.password` est une vue régénérée, jamais une seconde copie à tenir à jour.
+- **Mise à jour** : `password_regenerer` (`.devcontainer/password.sh`) est appelée à la fin de chaque création, suppression ou changement de compte : installation, `creer`, `supprimer` et `--nouveau-mdp` de postgres ; seed et désinstallation de gitlab ; installation et désinstallation d'argocd ; démarrage de devzone. Un échec n'empêche jamais l'opération, il affiche un avertissement.
 - **Protection** : fichier ignoré par git (`.gitignore`) et droits **600** posés avant l'écriture (`umask 077`, fichier temporaire dans le même dossier puis `mv`). Aucune commande ne lit ni n'affiche son contenu ; le récapitulatif et `devzone mots-de-passe` citent seulement le chemin. Sans aucun compte, le fichier est supprimé.
 
 
@@ -210,40 +211,63 @@ Le cluster de l'hôte n'est pas joignable dans deux cas (kind fonctionne quand m
 
 ## Workspace Kubernetes
 
-Le poste de developpement peut tourner dans le cluster, avec Kubernetes 1.29 ou plus (sidecar natif) comme prerequis minimal. Le chart charts/devzone-workspace/ deploie un StatefulSet :
+Le poste de developpement peut tourner dans le cluster, avec Kubernetes 1.30 ou plus comme prerequis minimal (sidecars natifs, et profil AppArmor de BuildKit). Le chart charts/devzone-workspace/ deploie un StatefulSet, sans conteneur privilegie ni Docker du noeud :
 
-- conteneur `workspace` (image ghcr.io/simbienvenuehoulboumi/devzone-workspace:<version>), avec `DOCKER_HOST=tcp://localhost:2375` et `TESTCONTAINERS_HOST_OVERRIDE=localhost` ;
-- sidecar natif `docker` (docker:27-dind, privilegie), demarre avant `workspace` ;
-- trois PVC : `workspace`, `etat`, et `docker` (`/var/lib/docker`, 30 Gi par defaut) ;
-- un ServiceAccount devzone-workspace avec Role minimal et une NetworkPolicy meme namespace.
+- conteneur `workspace` (image ghcr.io/simbienvenuehoulboumi/devzone-workspace:<version>), avec `DOCKER_HOST=tcp://127.0.0.1:2475`, `BUILDKIT_HOST=tcp://127.0.0.1:1234`, `TESTCONTAINERS_RYUK_DISABLED=true` et `TESTCONTAINERS_CHECKS_DISABLE=true` ;
+- sidecar natif `kubedock` (joyrex2001/kubedock:0.23.0, sans privilege), demarre avant `workspace` : une API Docker dont les conteneurs deviennent des pods du namespace ;
+- sidecar natif `buildkitd` (moby/buildkit:v0.34.2-rootless, UID 1000, sans privilege), demarre avant `workspace` : construit les images ;
+- deux PVC : `workspace` (les projets, monte sur `/workspaces/projets`) et `etat` ;
+- un ServiceAccount devzone-workspace avec un Role limite au namespace et une NetworkPolicy meme namespace.
 
 Depuis le poste :
 
 ```bash
-devzone workspace demarrer   # installe ou met a jour le workspace
-devzone workspace arreter    # desinstalle le workspace
-devzone workspace etat       # etat des pods
-devzone workspace shell      # shell dans le conteneur workspace
+devzone workspace demarrer                # installe ou met a jour le workspace
+devzone workspace arreter                 # desinstalle le workspace
+devzone workspace etat                    # etat des pods
+devzone workspace shell                   # shell dans le conteneur workspace
+devzone workspace vscode                  # marche a suivre : attache VS Code au pod
+devzone workspace copier-vers <dossier>   # copie un dossier du poste vers les projets du pod
+devzone workspace copier-depuis <dossier> # copie un projet du pod vers le poste
 ```
 
 Les commandes utilisent helm et kubectl du poste, avec le contexte devzone s il existe, sinon le contexte courant. L image est construite par la CI a chaque PR et publiee sur ghcr.io a la livraison.
 
+### Projets dans un volume
+
+- **Montage** : le PVC `workspace` est monte sur `/workspaces/projets`, ou le conteneur demarre (`workingDir`). Sa taille se regle avec `workspace.taille` (20 Gi par defaut).
+- **Conservation** : le PVC porte l annotation `helm.sh/resource-policy: keep` et n est jamais supprime par `helm uninstall` : `devzone workspace arreter` retire le pod, pas les projets. Le perdre demande une suppression a la main dans le cluster.
+- **Copies** : `devzone workspace copier-vers <dossier>` copie le dossier du poste dans `/workspaces/projets/<nom du dossier>` ; `devzone workspace copier-depuis <dossier>` ramene `/workspaces/projets/<nom du dossier>` dans ce dossier du poste. Les deux passent par `kubectl cp` (tar est present dans l image).
+
+### Edition depuis le poste
+
+**VS Code** : `devzone workspace vscode` affiche la marche a suivre. Extensions « Kubernetes » et « Dev Containers » ; dans la vue Kubernetes, avec le contexte `devzone` : namespace `devzone-workspace`, pod `devzone-workspace-0`, conteneur `workspace` → « Attach to Running Kubernetes Container », puis ouvre le dossier `/workspaces/projets`.
+
+**IntelliJ (JetBrains Gateway)** : Gateway installe le backend de l IDE dans le pod et l ouvre dans un client leger sur le poste. La connexion se fait en SSH : elle demande le serveur SSH du pod et son transfert de port vers le poste, qui arrivent avec les ports du workspace (#401).
+
+1. Gateway → *Remote Development* → *New Connection* → *SSH* : hôte `127.0.0.1`, port transfere du pod, utilisateur `vscode`.
+2. Dossier ouvert par le backend : `/workspaces/projets/<projet>`.
+
+En attendant ces deux points, edite le projet sur le poste par les copies : `devzone workspace copier-vers <dossier>` avant, `devzone workspace copier-depuis <dossier>` apres.
+
 ### Testcontainers et docker dans le workspace
 
-- `docker` et Testcontainers parlent au Docker du pod : rien a configurer, et le socket Docker du poste n'est pas monte.
-- Ryuk reste actif : il nettoie les conteneurs de test.
-- Les conteneurs lances par Testcontainers publient leurs ports sur le Docker du pod ; `TESTCONTAINERS_HOST_OVERRIDE=localhost` leur fait joindre ces ports par localhost.
-- Le conteneur `workspace` ne demarre qu'une fois `docker info` reussi (startupProbe, 60 s au plus) : un `./mvnw verify` lance tout de suite ne tombe pas sur « Cannot connect ». Si le Docker ne repond pas dans ce delai, le sidecar redemarre.
-- Les images restent sur le PVC `docker` entre deux redemarrages. Reglages du chart : `persistence.docker.size` et `persistence.docker.storageClass` (volume), `sidecar.resources` (limites, 2 CPU et 4 Gi par defaut).
+- `docker` et Testcontainers parlent a kubedock (`DOCKER_HOST=tcp://127.0.0.1:2475`) : rien a configurer, et le socket Docker du poste n'est pas monte.
+- Chaque conteneur lance par Testcontainers devient un pod du namespace, cree et supprime par kubedock. Ryuk est desactive (`TESTCONTAINERS_RYUK_DISABLED=true`) : kubedock nettoie lui-meme.
+- Les ports des conteneurs sont relayes par kubedock (`--port-forward --reverse-proxy`) : rien a publier sur le pod.
+- Le conteneur `workspace` ne demarre qu'une fois kubedock et BuildKit joignables (startupProbe, 60 s au plus).
+- Fonctions de Testcontainers non prises en charge par kubedock 0.23.0 : reseaux, montages et compose ne sont pas essayes (#410).
+- Les images construites par BuildKit (`BUILDKIT_HOST=tcp://127.0.0.1:1234`, `buildctl`) restent dans le systeme de fichiers du sidecar `buildkitd` : le cache est perdu quand ce conteneur redemarre.
 
-### Securite du sidecar Docker
+### Securite : workspace sans Docker
 
-- **Privilegie** : le sidecar tourne avec `privileged: true`, qui est le prix de Docker dans un pod. Le privilege est confine au pod, mais ce n'est **pas** un bac a sable etanche : un conteneur privilegie peut atteindre le noeud. Ne pas y executer de code non fiable hors du poste de developpement.
-- **Pas de socket du poste** : c'est mieux que le partage du socket Docker de l'hote (#291), qui donnerait root sur la machine. Le sidecar ne voit que le Docker du pod.
-- **Ecoute** : le Docker ecoute seulement sur `127.0.0.1:2375` dans le pod (`--host=tcp://127.0.0.1:2375`), sans TLS. Aucun port n'est declare (ni `containerPort`, ni `hostPort`), et le Service n'expose que le HTTP du workspace : le 2375 n'est joignable que depuis le pod.
-- **Ports publies par Testcontainers** : ils sont ouverts sur le reseau du pod. Les autres pods du namespace peuvent les joindre (la NetworkPolicy l'autorise), les pods d'autres namespaces et l'exterieur non. Ne pas y mettre de secret.
-- **Cloisonnement** : le conteneur `workspace` voit tous les conteneurs du Docker du pod, y compris ceux lances par d'autres projets. Un projet ne doit pas compter sur une isolation entre ses conteneurs et ceux d'un autre.
-- **RBAC** : inchange. Le ServiceAccount ne peut que lire pods, services et configmaps du namespace ; il n'a aucun droit d'ecriture sur le cluster.
+- **Aucun conteneur privilegie** : ni kubedock, ni BuildKit, ni le workspace n'ont `privileged: true`. Un test `helm template` (`manage/test/workspace-sans-docker.bats`) echoue si un tel conteneur apparait.
+- **BuildKit rootless** : UID 1000, `--oci-worker-no-process-sandbox` (la doc BuildKit le recommande pour Kubernetes, avec ses caveats). seccomp et AppArmor sont `Unconfined` (`buildkit.unconfined`), sans quoi `mount` et `unshare` sont bloques. Le profil est le seul relache de securite du workspace : il ne donne pas de privilege.
+- **Pas de socket du poste** : le socket Docker de l'hote (#291) n'est pas monte, et aucun socket du noeud n'est partage.
+- **Ecoute** : kubedock et BuildKit n'ecoutent que sur `127.0.0.1` du pod, sans TLS. Aucun port n'est declare (ni `containerPort`, ni `hostPort`), et le Service n'expose que le HTTP du workspace.
+- **RBAC** : le ServiceAccount a un Role (pas un ClusterRole) limite au namespace, avec les droits que kubedock 0.23.0 utilise : pods (get, list, watch, create, delete), pods/log (get), pods/exec et pods/portforward (create), services et configmaps (list, create, delete). Aucun droit sur les secrets ni les deployments. Le pod peut donc lancer des conteneurs et les executer dans le namespace, sans rien ecrire hors de lui.
+- **Ports relayes** : les conteneurs de test sont joignables par les autres pods du namespace (la NetworkPolicy l'autorise). Ne pas y mettre de secret.
+- **Cloisonnement** : le workspace voit tous les conteneurs de test de son namespace, y compris ceux lances par d'autres projets. Un projet ne doit pas compter sur une isolation entre ses conteneurs et ceux d'un autre.
 
 ## GitLab
 
@@ -306,6 +330,22 @@ devzone desactiver postgres                 # supprime PostgreSQL et TOUTES ses 
 - **Bases par projet** : nom en minuscules, chiffres et `_`. `creer` est idempotent : le mot de passe est gardé (sauf `--nouveau-mdp`) ; `REVOKE CONNECT … FROM PUBLIC` : un projet ne se connecte pas à la base d'un autre. Le fichier `<projet>.env` (600) contient `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` et `DB_URL` (JDBC).
 - **Secrets** : mot de passe du superutilisateur `postgres` dans le secret `postgres-admin` et `workspace/.postgres/admin-password` (600) ; jamais régénéré tant que le secret existe ; jamais affiché.
 - **Désactivation** : namespace supprimé (volume compris), `workspace/.postgres/` supprimé, kind dédié supprimé s'il ne porte plus aucun service. `make desinstaller` supprime aussi le namespace d'un cluster de l'hôte.
+
+## Argo CD
+
+Le module `argocd` fournit Argo CD sur le [cluster de devzone](#cluster-de-devzone). L'étape A installe le module ; les Applications (services et workspace) viendront après #401.
+
+```bash
+devzone activer argocd      # installe Argo CD dans le cluster des services
+devzone desactiver argocd   # désinstalle Argo CD, les autres services restent
+devzone argocd etat         # état du module
+```
+
+- **Ce qui est installé** : chart `argo/argo-cd` en version figée (`10.14.0`), namespace `devzone-argocd` étiqueté `app.kubernetes.io/managed-by=devzone` et isolé par NetworkPolicy. Valeurs minimales (`.devcontainer/argocd/values.yaml`) : un réplica par composant, sans Dex ni notifications, serveur en `ClusterIP`, sans Ingress ni LoadBalancer.
+- **Mémoire** : l'installation est refusée sous environ 1 Go de mémoire allouable dans le cluster, avec le message pour l'agrandir.
+- **Accès** : un relais `kubectl port-forward` rend l'interface joignable sur https://127.0.0.1:8443 **dans le conteneur** (`ARGOCD_PORT` pour un autre port) ; relancé à chaque démarrage et par `devzone appliquer`. Sur le poste, l'accès passera par #401. PID et journal : `workspace/.argocd/relais.*`.
+- **Mot de passe** : lu dans le Secret `argocd-initial-admin-secret`, rangé dans `workspace/.argocd/admin.env` (600) puis repris dans [`.password`](#identifiants-regroupés) ; utilisateur `admin`, jamais affiché.
+- **Désactivation** : `helm uninstall` de la release et suppression du namespace `devzone-argocd`, puis de `workspace/.argocd/` ; **les autres services restent**, sous helm direct.
 
 ## Ports vers le poste
 
