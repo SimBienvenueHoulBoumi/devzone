@@ -133,10 +133,9 @@ catalogue_lister() {
 app_relais_arrete() {
     local app="$1" script etat
     script="$ICI/catalogue/$app/$app.sh"
-    if [ -x "$script" ]; then
+    if [ -f "$script" ]; then
         etat="$(bash "$script" etat 2>/dev/null || true)"
         case "$etat" in *"relais arrêté"*) return 0 ;; esac
-        case "$etat" in *"relais arrete"*) return 0 ;; esac
     fi
     ! relais_actif "$app"
 }

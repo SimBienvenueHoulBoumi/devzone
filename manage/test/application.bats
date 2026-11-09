@@ -118,6 +118,13 @@ KUBE
     [[ "$(cat "$T/actions.log")" == *"postgres relais-lancer"* ]] || false
 }
 
+@test "reparer : lance le veilleur du catalogue" {
+    run bash "$APP" reparer
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"✔ veilleur catalogue"* ]] || false
+    [[ "$(cat "$T/actions.log")" == *"catalogue-veilleur demarrer"* ]] || false
+}
+
 @test "reparer : un élément en échec affiche sa raison et code 1" {
     : >"$T/echec-password"
     run bash "$APP" reparer
