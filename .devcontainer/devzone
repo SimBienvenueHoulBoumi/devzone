@@ -898,6 +898,7 @@ reparer() {
     fi
     reparer_element "relais de ports" bash "$ICI/ports.sh" relancer
     reparer_element "veilleur ports auto" env DEVZONE_PORTS_AUTO_REEL=oui bash "$ICI/ports-auto.sh" demarrer
+    reparer_element "veilleur catalogue" env DEVZONE_CATALOGUE_REEL=oui bash "$ICI/catalogue/catalogue-veilleur.sh" demarrer
     reparer_element "identifiants" bash "$ICI/password.sh" regenerer
     return "$reparer_echec"
 }

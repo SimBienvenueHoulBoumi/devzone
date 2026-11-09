@@ -162,6 +162,18 @@ attendre_nohup() {
     [[ "$output" == *"devzone appliquer"* ]] || false
 }
 
+@test "resume : application installée, relais arrêté, avertit et propose devzone reparer" {
+    touch "$BATS_TEST_TMPDIR/ns" "$BATS_TEST_TMPDIR/sts" "$BATS_TEST_TMPDIR/ready"
+    printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_ETAT"
+    run bash "$DEVZONE"
+    [ "$status" -eq 0 ] || false
+    ligne="$(printf '%s\n' "$output" | grep 'application mysql' || true)"
+    ligne="${ligne#"${ligne%%[![:space:]]*}"}"
+    [[ "$ligne" == "⚠ application mysql"* ]] || false
+    [[ "$ligne" == *"devzone reparer"* ]] || false
+    [[ "$ligne" != *"✔"* ]] || false
+}
+
 @test "desactiver mysql : donnees gardees sans terminal" {
     mkdir -p "$SECRETS"
     printf 'MYSQL_PASSWORD=mdproot\n' >"$SECRETS/root.env"

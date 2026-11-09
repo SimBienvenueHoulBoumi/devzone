@@ -129,6 +129,17 @@ catalogue_lister() {
     done <<<"$(catalogue_apps)"
 }
 
+# Relais de l application installee : etat de son script, sinon pid du relais
+app_relais_arrete() {
+    local app="$1" script etat
+    script="$ICI/catalogue/$app/$app.sh"
+    if [ -f "$script" ]; then
+        etat="$(bash "$script" etat 2>/dev/null || true)"
+        case "$etat" in *"relais arrêté"*) return 0 ;; esac
+    fi
+    ! relais_actif "$app"
+}
+
 # Lignes Applications du récapitulatif de devzone : ○ disponible, ✔ installée
 # (adresse du relais), ✖ en échec, ⚠ attendue
 catalogue_resume() {
@@ -138,8 +149,13 @@ catalogue_resume() {
         case "$(app_etat "$app")" in
             disponible) printf '  ○ application %-12s disponible, %s : devzone activer %s\n' \
                 "$app" "$(app_lire "$app" description)" "$app" ;;
-            installée) printf '  ✔ application %-12s installée : 127.0.0.1:%s\n' \
-                "$app" "$(app_lire "$app" port)" ;;
+            installée)
+                if app_relais_arrete "$app"; then
+                    printf '  ⚠ application %-12s installée, relais arrêté : devzone reparer\n' "$app"
+                else
+                    printf '  ✔ application %-12s installée : 127.0.0.1:%s\n' \
+                        "$app" "$(app_lire "$app" port)"
+                fi ;;
             attendue) printf '  ⚠ application %-12s attendue : devzone appliquer\n' "$app" ;;
             *) printf '  ✖ application %s en échec : %s : devzone appliquer\n' \
                 "$app" "$(head -1 "$(fichier_echec "$app")")" ;;

@@ -50,7 +50,7 @@ DEVZONE_PORTS_AUTO_REEL=oui bash "$ICI/ports-auto.sh" demarrer >/dev/null 2>&1 |
 # écrite une fois, jamais une ligne existante modifiée (#414)
 bash "$ICI/catalogue.sh" synchroniser || echo "démarrage : catalogue non synchronisé (devzone reparer)"
 # Veilleur du catalogue : réapplique à chaud dès que .devzone.modules change
-DEVZONE_CATALOGUE_REEL=oui bash "$ICI/catalogue-veilleur.sh" demarrer >/dev/null 2>&1 || echo "démarrage : veilleur catalogue non lancé (devzone reparer)"
+DEVZONE_CATALOGUE_REEL=oui bash "$ICI/catalogue/catalogue-veilleur.sh" demarrer >/dev/null 2>&1 || echo "démarrage : veilleur catalogue non lancé (devzone reparer)"
 
 # Vue regroupée des identifiants (#332), regénérée à chaque démarrage ; un
 # échec n'empêche rien et le contenu n'est jamais affiché
