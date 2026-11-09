@@ -673,10 +673,10 @@ KUBE
     printf 'version 0.19.0\n' >"$DEVZONE_RACINE/.devzone.version"
     NPM_PUBLIEE=0.19.0 run bash "$DEVZONE"
     [ "$status" -eq 0 ]
-    [[ "$output" != *"disponible"* ]] || false
+    [[ "$output" != *"○ devzone "*"disponible"* ]] || false
     NPM_PUBLIEE=0.18.0 run bash "$DEVZONE"
     [ "$status" -eq 0 ]
-    [[ "$output" != *"disponible"* ]] || false
+    [[ "$output" != *"○ devzone "*"disponible"* ]] || false
 }
 
 @test "état : version publiée vérifiée une seule fois par jour (cache)" {
@@ -693,7 +693,7 @@ KUBE
     printf 'version 0.19.0\n' >"$DEVZONE_RACINE/.devzone.version"
     NPM_VIEW_CODE=1 run bash "$DEVZONE"
     [ "$status" -eq 0 ]
-    [[ "$output" != *"disponible"* ]] || false
+    [[ "$output" != *"○ devzone "*"disponible"* ]] || false
     [ -f "$HOME/.cache/devzone/version-publiee" ]
 }
 

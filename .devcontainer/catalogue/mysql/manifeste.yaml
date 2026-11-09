@@ -1,0 +1,77 @@
+# namespace __NS__
+# Application MySQL du catalogue (#414) : manifeste simple (pas de chart,
+# kubectl apply suffit, comme postgres.yaml) appliqué par catalogue.sh avec
+# les variables suivantes remplacées :
+# __APP__ __NS__ __IMAGE__ __PORT__ __MEMOIRE__ __TAILLE__
+# Secret __APP__-admin créé avant (mot de passe root, jamais écrit ici).
+apiVersion: v1
+kind: Service
+metadata:
+  name: __APP__
+  namespace: __NS__
+  labels:
+    app: __APP__
+    app.kubernetes.io/managed-by: devzone
+spec:
+  selector:
+    app: __APP__
+  ports:
+    - name: __APP__
+      port: __PORT__
+      targetPort: 3306
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: __APP__
+  namespace: __NS__
+  labels:
+    app: __APP__
+    app.kubernetes.io/managed-by: devzone
+spec:
+  serviceName: __APP__
+  replicas: 1
+  selector:
+    matchLabels:
+      app: __APP__
+  template:
+    metadata:
+      labels:
+        app: __APP__
+        app.kubernetes.io/managed-by: devzone
+    spec:
+      containers:
+        - name: __APP__
+          # Version figée : mettre à jour ici (même majeure : données gardées)
+          image: __IMAGE__
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: __APP__-admin
+                  key: password
+          ports:
+            - containerPort: 3306
+              name: __APP__
+          readinessProbe:
+            exec:
+              command: ["/bin/sh", "-c", "mysql -uroot -p\"$MYSQL_ROOT_PASSWORD\" -e 'SELECT 1'"]
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: __MEMOIRE__
+          volumeMounts:
+            - name: donnees
+              mountPath: /var/lib/mysql
+  volumeClaimTemplates:
+    - metadata:
+        name: donnees
+        labels:
+          app.kubernetes.io/managed-by: devzone
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: __TAILLE__
