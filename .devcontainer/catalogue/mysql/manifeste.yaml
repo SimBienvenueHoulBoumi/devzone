@@ -63,11 +63,11 @@ spec:
               cpu: 100m
               memory: __MEMOIRE__
           volumeMounts:
-            - name: donnees
+            - name: __CLAIM__
               mountPath: /var/lib/mysql
   volumeClaimTemplates:
     - metadata:
-        name: donnees
+        name: __CLAIM__
         labels:
           app.kubernetes.io/managed-by: devzone
       spec:

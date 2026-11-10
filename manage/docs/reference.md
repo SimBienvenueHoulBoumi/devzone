@@ -348,6 +348,22 @@ devzone desactiver postgres                 # supprime PostgreSQL et TOUTES ses 
 - **Secrets** : mot de passe du superutilisateur `postgres` dans le secret `postgres-admin` et `workspace/.postgres/admin-password` (600) ; jamais régénéré tant que le secret existe ; jamais affiché.
 - **Désactivation** : namespace supprimé (volume compris), `workspace/.postgres/` supprimé, kind dédié supprimé s'il ne porte plus aucun service. `make desinstaller` supprime aussi le namespace d'un cluster de l'hôte.
 
+## MySQL
+
+Le catalogue `mysql` fournit un MySQL partagé (une base par projet), sur le [cluster de devzone](#cluster-de-devzone), namespace `devzone-mysql`, joignable sur `127.0.0.1:3306` dans le conteneur.
+
+```bash
+devzone activer mysql
+devzone mysql creer <projet> [--nouveau-mdp]
+devzone mysql liste
+devzone mysql supprimer <projet> [--oui]
+devzone mysql volume                 # liste les PVC *-mysql-0, marque le monté
+devzone mysql volume <nom>           # réapplique le StatefulSet sur ce volume (données gardées)
+devzone mysql volume --supprimer <nom> [--oui]
+```
+
+- **Volumes** : avant l'installation, si un seul PVC `*-mysql-0` existe dans le namespace, il est réutilisé ; aucun → claim `donnees` ; plusieurs → refus avec la liste et `devzone mysql volume <nom>`. `devzone mysql volume <nom>` réapplique le StatefulSet sur le PVC choisi sans supprimer les données. `--supprimer` demande confirmation `[o/N]` en terminal (`--oui` sans terminal) et refuse si le volume est monté. Le récapitulatif signale `⚠ volume <pvc> non utilisé : devzone mysql volume`.
+
 ## Argo CD
 
 Le module `argocd` fournit Argo CD sur le [cluster de devzone](#cluster-de-devzone). L'étape A installe le module ; les Applications (services et workspace) viendront après #401.

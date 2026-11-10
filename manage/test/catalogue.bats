@@ -38,11 +38,22 @@ case "$*" in
     *"get namespace devzone-mysql"*) [ -f "$T/ns" ]; exit $? ;;
     *"create namespace"*) touch "$T/ns" ;;
     *"label namespace"*) ;;
+    *"get pvc -o jsonpath"*)
+        if [[ "$*" == *"-n devzone-mysql"* ]] && [ -f "$T/pvcs" ]; then cat "$T/pvcs"; fi || false
+        ;;
     *"readyReplicas"*) [ -f "$T/ready" ] && echo 1 || echo 0 ;;
+    *"get statefulset mysql -o jsonpath"*)
+        if [ -f "$T/claim" ]; then cat "$T/claim"; else echo donnees; fi
+        ;;
     *"get statefulset mysql"*) [ -f "$T/sts" ]; exit $? ;;
     *"apply -f -"*)
         [ -f "$T/APPLY_ECHEC" ] && exit 1 || false
         data="$(cat)"
+        if printf '%s\n' "$data" | grep -q 'kind: StatefulSet'; then printf '%s\n' "$data" >>"$T/apply.log"; else printf '%s\n' "$data" >>"$T/np.log"; fi
+        touch "$T/ns" ;;
+    *"apply -f "*)
+        [ -f "$T/APPLY_ECHEC" ] && exit 1 || false
+        data="$(cat "${@: -1}")"
         if printf '%s\n' "$data" | grep -q 'kind: StatefulSet'; then printf '%s\n' "$data" >>"$T/apply.log"; else printf '%s\n' "$data" >>"$T/np.log"; fi
         touch "$T/ns" ;;
     *"get secret mysql-admin -o jsonpath"* ) printf 'bWRwY2F0YWxvZ3Vl' ;;
@@ -131,6 +142,35 @@ attendre_nohup() {
     [[ "$output" != *mdpcatalogue* ]] || false
 }
 
+@test "appliquer : mysql=on réutilise le PVC du namespace devzone-mysql" {
+    printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_ETAT"
+    printf 'data-mysql-0\n' >"$BATS_TEST_TMPDIR/pvcs"
+    run bash "$DEVZONE" appliquer
+    [ "$status" -eq 0 ] || false
+    grep -q 'name: data' "$BATS_TEST_TMPDIR/apply.log" || false
+    [[ "$(cat "$BATS_TEST_TMPDIR/apply.log")" != *"name: donnees"* ]] || false
+}
+
+@test "appliquer : deux PVC mysql, refus avec liste et commande" {
+    printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_ETAT"
+    printf 'data-mysql-0\ndonnees-mysql-0\n' >"$BATS_TEST_TMPDIR/pvcs"
+    run bash "$DEVZONE" appliquer
+    [ "$status" -ne 0 ] || false
+    [[ "$output" == *"data-mysql-0"* ]] || false
+    [[ "$output" == *"donnees-mysql-0"* ]] || false
+    [[ "$output" == *"devzone mysql volume"* ]] || false
+    [ ! -s "$BATS_TEST_TMPDIR/apply.log" ] || false
+}
+
+@test "catalogue appliquer : mysql=on réutilise le PVC du namespace" {
+    printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_ETAT"
+    printf 'data-mysql-0\n' >"$BATS_TEST_TMPDIR/pvcs"
+    run bash "$CATALOGUE" appliquer
+    [ "$status" -eq 0 ] || false
+    grep -q 'name: data' "$BATS_TEST_TMPDIR/apply.log" || false
+    [[ "$(cat "$BATS_TEST_TMPDIR/apply.log")" != *"name: donnees"* ]] || false
+}
+
 @test "appliquer : mysql deja present et present, pas de reinstallation, relais relance" {
     touch "$BATS_TEST_TMPDIR/ns" "$BATS_TEST_TMPDIR/sts" "$BATS_TEST_TMPDIR/ready" "$BATS_TEST_TMPDIR/secret"
     printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_ETAT"
@@ -207,4 +247,15 @@ attendre_nohup() {
     run bash "$DEVZONE" etat --json
     [ "$status" -eq 0 ] || false
     printf '%s' "$output" | jq -e '.applications | type == "array"' >/dev/null || false
+}
+
+@test "resume : avertit d'un volume mysql non utilisé" {
+    touch "$BATS_TEST_TMPDIR/ns" "$BATS_TEST_TMPDIR/sts" "$BATS_TEST_TMPDIR/ready"
+    printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_ETAT"
+    printf 'data' >"$BATS_TEST_TMPDIR/claim"
+    printf 'data-mysql-0\nancien-mysql-0\n' >"$BATS_TEST_TMPDIR/pvcs"
+    run bash "$DEVZONE"
+    [ "$status" -eq 0 ] || false
+    [[ "$output" == *"⚠ volume ancien-mysql-0 non utilisé : devzone mysql volume"* ]] || false
+    [[ "$output" != *"data-mysql-0 non utilisé"* ]] || false
 }

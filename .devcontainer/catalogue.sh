@@ -140,6 +140,21 @@ app_relais_arrete() {
     ! relais_actif "$app"
 }
 
+# Avertit des PVC mysql non montés par le StatefulSet (#440)
+catalogue_mysql_volumes_inutilises() {
+    local ns monte pvc liste
+    ns="$(app_ns mysql)"
+    kubectl --context devzone get namespace "$ns" >/dev/null 2>&1 || return 0
+    monte="$(kubectl --context devzone -n "$ns" get statefulset mysql -o jsonpath='{.spec.volumeClaimTemplates[0].metadata.name}' 2>/dev/null || true)"
+    [ -n "$monte" ] || return 0
+    liste="$(kubectl --context devzone -n "$ns" get pvc -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null | grep -E '\-mysql-0$' || true)"
+    while IFS= read -r pvc; do
+        [ -n "$pvc" ] || continue
+        [ "$pvc" != "${monte}-mysql-0" ] || continue
+        printf '  ⚠ volume %s non utilisé : devzone mysql volume\n' "$pvc"
+    done <<<"$liste"
+}
+
 # Lignes Applications du récapitulatif de devzone : ○ disponible, ✔ installée
 # (adresse du relais), ✖ en échec, ⚠ attendue
 catalogue_resume() {
@@ -161,6 +176,7 @@ catalogue_resume() {
                 "$app" "$(head -1 "$(fichier_echec "$app")")" ;;
         esac
     done <<<"$(catalogue_apps)"
+    catalogue_mysql_volumes_inutilises 2>/dev/null || true
 }
 
 # Rubrique applications de devzone etat --json : mêmes champs que modules
