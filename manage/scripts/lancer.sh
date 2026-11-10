@@ -21,6 +21,47 @@ case "$mode" in
         exit 2
         ;;
 esac
+
+# Socket Docker de l'hôte (#432) : ligne docker-hote de l'état de l'instance,
+# écrite par devzone dans le conteneur. Absente ou on : comportement historique.
+hote_off() {
+    local v
+    v="$(grep -E '^docker-hote=' "$DOSSIER/.devzone.modules" 2>/dev/null | tail -1 | cut -d= -f2 || true)"
+    [ "$v" = off ]
+}
+
+# Copie de devcontainer.json sans la feature docker-outside-of-docker, pour un
+# conteneur sans le socket de l'hôte. Le fichier vit un niveau plus bas : les
+# chemins de build remontent d'un cran (../). Écrit à chaque lancement, dans un
+# dossier ignoré par git ; les commentaires du JSON d'origine sont gardés.
+generer_config_sans_docker_hote() {
+    local dossier="$DOSSIER/.devcontainer/sans-docker-hote" contexte=non
+    grep -q '"context"' "$DOSSIER/.devcontainer/devcontainer.json" && contexte=oui
+    mkdir -p "$dossier"
+    awk -v contexte="$contexte" '
+        /ghcr\.io\/devcontainers\/features\/docker-outside-of-docker/ { next }
+        /"build"[[:space:]]*:[[:space:]]*\{[[:space:]]*"dockerfile"[[:space:]]*:[[:space:]]*"Dockerfile"[[:space:]]*\}/ {
+            sub(/\{[[:space:]]*"dockerfile"[[:space:]]*:[[:space:]]*"Dockerfile"[[:space:]]*\}/,
+                "{ \"dockerfile\": \"../Dockerfile\", \"context\": \"..\" }")
+            print
+            next
+        }
+        contexte == "non" && /"build"[[:space:]]*:[[:space:]]*\{[[:space:]]*$/ {
+            print
+            print "    \"context\": \"..\","
+            next
+        }
+        /"dockerfile"[[:space:]]*:/ {
+            sub(/"dockerfile"[[:space:]]*:[[:space:]]*"[^"]*"/, "\"dockerfile\": \"../Dockerfile\"")
+        }
+        { print }
+    ' "$DOSSIER/.devcontainer/devcontainer.json" >"$dossier/devcontainer.json"
+}
+
+if hote_off; then
+    generer_config_sans_docker_hote
+    options+=(--config "$DOSSIER/.devcontainer/sans-docker-hote/devcontainer.json")
+fi
 LOG="$DOSSIER/.devzone.log"
 VIE="${DEVZONE_SIGNE_DE_VIE:-30}"
 QUESTION="${DEVZONE_ATTENTE_QUESTION:-20}"

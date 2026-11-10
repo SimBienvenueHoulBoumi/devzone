@@ -94,6 +94,21 @@ devzone desactiver <module>    # désactive et applique tout de suite
 
 Le choix est **propre à chaque devzone** (instance) et gardé dans le dossier `$RACINE/.devzone.modules` (monté de l'hôte, il survit aux rebuilds). Au premier démarrage d'une instance, si une connexion Claude Code ou opencode existe déjà dans les volumes, le module `ia` n'est pas activé : tout est désactivé par défaut et la connexion est signalée une seule fois (« devzone activer ia pour l'utiliser ici »), pas pour un état repris.
 
+### Socket Docker de l'hôte
+
+Par défaut, la feature `docker-outside-of-docker` monte le socket Docker du poste dans le conteneur : le récapitulatif affiche `⚠ socket Docker de l hôte partagé (agents compris)`. C'est ce qui permet à `docker`, Testcontainers et kind de parler au Docker de l'hôte, mais cela donne aussi au conteneur et à ses agents l'administration du Docker du poste.
+
+Pour retirer ce partage :
+
+```bash
+devzone desactiver docker-hote     # écrit docker-hote=off, puis demande une reconstruction
+make rebuild                       # sur le poste, pas dans le conteneur
+```
+
+Au lancement sur le poste, `manage/scripts/lancer.sh` lit la ligne `docker-hote` (absente = `on`). À `off`, il génère `.devcontainer/sans-docker-hote/devcontainer.json` (copie sans la feature, chemins de build adaptés au sous-dossier, dossier ignoré par git) et passe ce fichier au CLI devcontainers avec `--config`. Pour remettre le socket : `devzone activer docker-hote`, puis `make rebuild`.
+
+Sans socket, `docker` n'existe plus dans le conteneur : la commande affiche un message qui renvoie au workspace Kubernetes (`devzone workspace`, kubedock et BuildKit). Le relais du socket ne bloque pas le démarrage, et la connexion au cluster Kubernetes de l'hôte reste disponible ; en revanche, kind et les conteneurs lancés sur le Docker du poste ne le sont plus. `devzone etat --json` porte l'option dans le champ `docker_hote`.
+
 ### Commandes de l'application
 
 Les scripts internes de `.devcontainer/` ne sont pas des commandes utilisateur : `devzone` les enveloppe.
@@ -513,6 +528,7 @@ VS Code et les autres outils. La sortie texte n'est pas changée : ajoute
   "outils": { "retards": [ { "paquet": "…", "figee": "…", "installee": "…" } ], "commande": "devzone appliquer" },
   "modules": [ { "nom": "postgres", "actif": true, "description": "…", "etat": "prêt sur docker-desktop…",
                  "echec": null, "commande": null } ],
+  "docker_hote": true,
   "clusters": { "services": "docker-desktop", "services_distant": false,
                 "travail": "docker-desktop", "travail_interne": false, "commande": null },
   "ports": [ { "port": 8080, "actif": true, "application": "…" } ],

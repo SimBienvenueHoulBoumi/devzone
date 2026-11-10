@@ -53,6 +53,14 @@ if [ "$SOCKET" = /var/run/docker.sock ] && [ "${DEVZONE_RELAIS_REEL:-}" != oui ]
     exit 2
 fi
 
+# Sans socket (option docker-hote=off, #432) : rien à relayer ni à contrôler.
+# Sortie 0 pour ne pas gêner le démarrage ; docker renvoie au workspace.
+if [ ! -e "$SOCKET" ]; then
+    rm -f "$MARQUE" 2>/dev/null || true
+    echo "docker-relais : pas de socket Docker de l'hôte (option docker-hote=off)"
+    exit 0
+fi
+
 # $SUDO vide : commande lancée par env, jamais en commande intégrée (kill est
 # un builtin de bash : env passe par le PATH, comme sudo ; les tests y mettent
 # leurs faux outils)

@@ -31,6 +31,7 @@ LIGNES_GITIGNORE=(
     '.devzone.etat'
     '.password'
     '.devzone.sauvegarde/'
+    '.devcontainer/sans-docker-hote/'
 )
 
 version() {

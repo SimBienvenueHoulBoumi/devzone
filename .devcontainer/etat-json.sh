@@ -29,6 +29,7 @@ etat_json() {
     local plat_nom plat_url="" github_json="null"
     local outils_retards_json='[]' outils_commande=""
     local modules_json='[]' m actif desc ef content etat_val echec_val commande_val s
+    local docker_hote=false
     local services_cluster="" services_distant=false
     local travail_ctx="" travail_interne=false ctx_hote=""
     local clusters_services_raw="" clusters_travail_raw="" clusters_commande=""
@@ -158,6 +159,11 @@ etat_json() {
             <<<"$modules_json")"
     done
 
+    # Option docker-hote (#432) : absente = on
+    if [ "$(valeur docker-hote)" = on ]; then
+        docker_hote=true
+    fi
+
     services_cluster="$(cluster_lu)"
     if [ -n "$services_cluster" ] && ! cluster_est_local "$services_cluster"; then
         services_distant=true
@@ -239,6 +245,7 @@ etat_json() {
         --argjson retards "$outils_retards_json" \
         --arg outils_commande "$outils_commande" \
         --argjson modules "$modules_json" \
+        --argjson docker_hote "$docker_hote" \
         --arg clusters_services "$clusters_services_raw" \
         --argjson services_distant "$services_distant" \
         --arg clusters_travail "$clusters_travail_raw" \
@@ -256,6 +263,7 @@ etat_json() {
             plateforme: { nom: $plat_nom, url: (if $plat_url=="" then null else $plat_url end), github: $github },
             outils: { retards: $retards, commande: (if $outils_commande=="" then null else $outils_commande end) },
             modules: $modules,
+            docker_hote: $docker_hote,
             clusters: { services: (if $clusters_services=="" then null else $clusters_services end), services_distant: $services_distant, travail: (if $clusters_travail=="" then null else $clusters_travail end), travail_interne: $travail_interne, commande: (if $clusters_commande=="" then null else $clusters_commande end) },
             ports: $ports,
             applications: (if $applications=="" then null else $applications end),

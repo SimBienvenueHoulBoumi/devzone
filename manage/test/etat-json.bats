@@ -3,9 +3,9 @@
 
 setup() {
     load commun
-    kind_vide
     relais_docker_isole
     kube_isole
+    kind_vide
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
     export HOME="$BATS_TEST_TMPDIR/home"
     mkdir -p "$HOME" "$BATS_TEST_TMPDIR/bin" "$BATS_TEST_TMPDIR/racine/workspace"
@@ -137,6 +137,20 @@ GH
     [ "$status" -eq 0 ]
     [[ "$output" != *"secret-sentinel-123"* ]] || false
     [[ "$output" != *"secret-gh-456"* ]] || false
+}
+
+@test "etat-json : docker-hote on par défaut" {
+    run bash "$DEVZONE" etat --json
+    [ "$status" -eq 0 ]
+    printf '%s\n' "$output" | jq -e . >/dev/null
+    [ "$(printf '%s\n' "$output" | jq -r '.docker_hote')" = "true" ]
+}
+
+@test "etat-json : docker-hote=off → false" {
+    printf 'docker-hote=off\n' >"$DEVZONE_ETAT"
+    run bash "$DEVZONE" etat --json
+    [ "$status" -eq 0 ]
+    [ "$(printf '%s\n' "$output" | jq -r '.docker_hote')" = "false" ]
 }
 
 @test "etat-json : texte non modifié (devzone sans --json)" {

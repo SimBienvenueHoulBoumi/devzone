@@ -6,12 +6,12 @@
 
 setup() {
     load commun
+    relais_docker_isole
+    kube_isole
     kind_vide
     RELAIS="$BATS_TEST_DIRNAME/../../.devcontainer/docker-relais.sh"
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
     T="$BATS_TEST_TMPDIR"
-    relais_docker_isole
-    kube_isole
     export DEVZONE_RELAIS_SUDO=sudo
     export DEVZONE_RELAIS_ATTENTE=2
     unset DEVZONE_RELAIS_REEL DEVZONE_RELAIS_DOCKER DEVZONE_RELAIS_UTILISATEUR
@@ -140,6 +140,23 @@ relais_feature() {
     [ "$status" -eq 0 ]
     ! grep -q "^sudo" "$T/outils.log" || false
     grep -qx "kill 39" "$T/outils.log"
+}
+
+@test "sans socket (docker-hote=off) : code 0, aucun contrôle Docker, pas de marque" {
+    rm -f "$DEVZONE_RELAIS_SOCKET"
+    echo "ancien échec" >"$DEVZONE_RELAIS_MARQUE"
+    run bash "$RELAIS"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"pas de socket Docker"* ]] || false
+    ! grep -q docker "$T/outils.log" || false
+    [ ! -e "$DEVZONE_RELAIS_MARQUE" ]
+}
+
+@test "docker sans hôte : message clair vers le workspace Kubernetes" {
+    run bash "$BATS_TEST_DIRNAME/../../.devcontainer/docker-sans-hote.sh"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"devzone workspace"* ]] || false
+    [[ "$output" == *"docker-hote"* ]] || false
 }
 
 @test "devzone : récapitulatif ⚠ relais Docker si la marque existe" {
