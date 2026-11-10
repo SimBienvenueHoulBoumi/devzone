@@ -39,7 +39,7 @@ case "$*" in
     *"create namespace"*) touch "$T/ns" ;;
     *"label namespace"*) ;;
     *"get pvc -o jsonpath"*)
-        if [ -f "$T/pvcs" ]; then cat "$T/pvcs"; fi
+        if [[ "$*" == *"-n devzone-mysql"* ]] && [ -f "$T/pvcs" ]; then cat "$T/pvcs"; fi || false
         ;;
     *"readyReplicas"*) [ -f "$T/ready" ] && echo 1 || echo 0 ;;
     *"get statefulset mysql -o jsonpath"*)
@@ -49,6 +49,11 @@ case "$*" in
     *"apply -f -"*)
         [ -f "$T/APPLY_ECHEC" ] && exit 1 || false
         data="$(cat)"
+        if printf '%s\n' "$data" | grep -q 'kind: StatefulSet'; then printf '%s\n' "$data" >>"$T/apply.log"; else printf '%s\n' "$data" >>"$T/np.log"; fi
+        touch "$T/ns" ;;
+    *"apply -f "*)
+        [ -f "$T/APPLY_ECHEC" ] && exit 1 || false
+        data="$(cat "${@: -1}")"
         if printf '%s\n' "$data" | grep -q 'kind: StatefulSet'; then printf '%s\n' "$data" >>"$T/apply.log"; else printf '%s\n' "$data" >>"$T/np.log"; fi
         touch "$T/ns" ;;
     *"get secret mysql-admin -o jsonpath"* ) printf 'bWRwY2F0YWxvZ3Vl' ;;
@@ -135,6 +140,35 @@ attendre_nohup() {
     [ "$(stat -c %a "$SECRETS/admin-password" 2>/dev/null || stat -f %Lp "$SECRETS/admin-password")" = 600 ] || false
     [[ "$output" == *"127.0.0.1:3306"* ]] || false
     [[ "$output" != *mdpcatalogue* ]] || false
+}
+
+@test "appliquer : mysql=on réutilise le PVC du namespace devzone-mysql" {
+    printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_ETAT"
+    printf 'data-mysql-0\n' >"$BATS_TEST_TMPDIR/pvcs"
+    run bash "$DEVZONE" appliquer
+    [ "$status" -eq 0 ] || false
+    grep -q 'name: data' "$BATS_TEST_TMPDIR/apply.log" || false
+    [[ "$(cat "$BATS_TEST_TMPDIR/apply.log")" != *"name: donnees"* ]] || false
+}
+
+@test "appliquer : deux PVC mysql, refus avec liste et commande" {
+    printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_ETAT"
+    printf 'data-mysql-0\ndonnees-mysql-0\n' >"$BATS_TEST_TMPDIR/pvcs"
+    run bash "$DEVZONE" appliquer
+    [ "$status" -ne 0 ] || false
+    [[ "$output" == *"data-mysql-0"* ]] || false
+    [[ "$output" == *"donnees-mysql-0"* ]] || false
+    [[ "$output" == *"devzone mysql volume"* ]] || false
+    [ ! -s "$BATS_TEST_TMPDIR/apply.log" ] || false
+}
+
+@test "catalogue appliquer : mysql=on réutilise le PVC du namespace" {
+    printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_ETAT"
+    printf 'data-mysql-0\n' >"$BATS_TEST_TMPDIR/pvcs"
+    run bash "$CATALOGUE" appliquer
+    [ "$status" -eq 0 ] || false
+    grep -q 'name: data' "$BATS_TEST_TMPDIR/apply.log" || false
+    [[ "$(cat "$BATS_TEST_TMPDIR/apply.log")" != *"name: donnees"* ]] || false
 }
 
 @test "appliquer : mysql deja present et present, pas de reinstallation, relais relance" {

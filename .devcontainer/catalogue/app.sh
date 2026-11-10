@@ -58,8 +58,8 @@ app_installer() {
     if [ "$app" = mysql ]; then
         # shellcheck source=SCRIPTDIR/mysql/volume.sh
         # shellcheck disable=SC1091
-        NS="$ns" . "$(dossier_catalogue)/mysql/volume.sh"
-        claim="$(mysql_claim_choisir)" || return 2
+        . "$(dossier_catalogue)/mysql/volume.sh"
+        claim="$(mysql_claim_choisir "$ns")" || return 2
     fi
     man="$(mktemp)"
     sed -e "s|__APP__|$app|g" -e "s|__NS__|$ns|g" -e "s|__IMAGE__|$image|g" \

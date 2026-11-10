@@ -40,7 +40,7 @@ case "$*" in
     *"create namespace"*) touch "$T/ns" ;;
     *"label namespace"*) ;;
     *"get pvc -o jsonpath"*)
-        if [ -f "$T/pvcs" ]; then cat "$T/pvcs"; fi
+        if [[ "$*" == *"-n devzone-mysql"* ]] && [ -f "$T/pvcs" ]; then cat "$T/pvcs"; fi || false
         ;;
     *"readyReplicas"*) [ -f "$T/ready" ] && echo 1 || echo 0 ;;
     *"get statefulset mysql -o jsonpath"*)

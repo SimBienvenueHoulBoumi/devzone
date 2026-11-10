@@ -16,6 +16,9 @@ ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
 # shellcheck source=SCRIPTDIR/volume.sh
 # shellcheck disable=SC1091
 . "$ICI/volume.sh"
+# shellcheck source=SCRIPTDIR/installer.sh
+# shellcheck disable=SC1091
+. "$ICI/installer.sh"
 NS=devzone-mysql
 SECRETS="$RACINE/workspace/.mysql"
 MYSQL_PORT="${MYSQL_PORT:-3306}"
@@ -70,60 +73,6 @@ nombre_bases() {
     n="$(mysql_admin -N -B -e "SHOW DATABASES" 2>/dev/null | grep -vE '^(information_schema|mysql|performance_schema|sys)$' | grep -c . || true)"
     echo "${n:-0}"
 }
-# Secret admin (mysql-admin) : root.env ou secret existant, jamais régénéré.
-mysql_secret() {
-    local mdp fichier="$SECRETS/admin-password"
-    mkdir -p "$SECRETS"
-    chmod 700 "$SECRETS"
-    if k get secret mysql-admin >/dev/null 2>&1; then
-        mdp="$(k get secret mysql-admin -o jsonpath='{.data.password}' | base64 -d | tr -d '\n')"
-        (umask 077 && printf '%s' "$mdp" >"$fichier")
-        return 0
-    fi
-    mdp="$(sed -n 's/^MYSQL_PASSWORD=//p' "$SECRETS/root.env" 2>/dev/null | tail -1 || true)"
-    if [ -z "$mdp" ] && [ -s "$fichier" ]; then mdp="$(cat "$fichier")"; fi
-    if [ -z "$mdp" ]; then
-        (umask 077 && openssl rand -hex 24 | tr -d '\n' >"$fichier")
-        k create secret generic mysql-admin --from-file=password="$fichier" >/dev/null
-    elif [ ! -s "$fichier" ]; then
-        (umask 077 && printf '%s' "$mdp" >"$fichier")
-    fi
-}
-# Applique le manifeste avec le préfixe de claim choisi (#440)
-mysql_appliquer_manifeste() {
-    local claim="$1"
-    sed -e "s|__APP__|mysql|g" -e "s|__NS__|$NS|g" -e "s|__IMAGE__|$MYSQL_IMAGE|g" \
-        -e "s|__PORT__|$MYSQL_PORT|g" -e "s|__MEMOIRE__|$MYSQL_MEMOIRE|g" \
-        -e "s|__TAILLE__|$MYSQL_TAILLE|g" -e "s|__CLAIM__|$claim|g" \
-        "$ICI/manifeste.yaml" | kubectl --context devzone -n "$NS" apply -f - >/dev/null
-}
-
-# (Ré)installe MySQL sur le claim demandé, données du PVC gardées (#440)
-mysql_installer_claim() {
-    local claim="$1" CTX
-    CTX="$(contexte)"
-    if ! contexte_devzone_poser "$CTX"; then
-        echo "devzone : catalogue mysql : impossible de poser le contexte devzone sur $CTX" >&2
-        return 1
-    fi
-    echo "▶ MySQL sur le cluster $CTX (namespace $NS, volume ${claim}-mysql-0)…"
-    kubectl --context devzone create namespace "$NS" --dry-run=client -o yaml |
-        kubectl --context devzone apply -f - >/dev/null
-    kubectl --context devzone label namespace "$NS" "$CLUSTER_ETIQUETTE" --overwrite >/dev/null
-    namespace_isoler "$NS" >/dev/null
-    mysql_secret
-    k delete statefulset mysql --ignore-not-found >/dev/null 2>&1 || true
-    mysql_appliquer_manifeste "$claim"
-    if ! k rollout status statefulset/mysql --timeout="${MYSQL_ATTENTE}s" >/dev/null; then
-        echo "devzone : catalogue mysql : pas prêt après ${MYSQL_ATTENTE}s : kubectl --context $CTX -n $NS describe pod mysql-0" >&2
-        return 1
-    fi
-    mysql_secret
-    relais_lancer mysql "$CTX" "$NS" svc/mysql 3306:3306
-    echo "✔ MySQL prêt : 127.0.0.1:$MYSQL_PORT dans le conteneur"
-    regenerer_identifiants
-}
-
 installer() {
     local CTX claim
     CTX="$(contexte)"
@@ -140,8 +89,8 @@ installer() {
         echo "devzone : catalogue mysql : installation existante dans $NS, adoptée (volume et root.env gardés)"
     else
         mysql_secret
-        claim="$(mysql_claim_choisir)" || return 2
-        mysql_appliquer_manifeste "$claim"
+        claim="$(mysql_claim_choisir "$NS")" || return 2
+        mysql_appliquer_manifeste "$NS" "$claim"
         if ! k rollout status statefulset/mysql --timeout="${MYSQL_ATTENTE}s" >/dev/null; then
             echo "devzone : catalogue mysql : pas prêt après ${MYSQL_ATTENTE}s : kubectl --context $CTX -n $NS describe pod mysql-0" >&2
             return 1
@@ -277,7 +226,7 @@ case "${1:-}" in
     creer) creer "${@:2}" ;;
     liste) liste ;;
     supprimer) supprimer "${@:2}" ;;
-    volume) mysql_volume "${@:2}" ;;
+    volume) mysql_volume "$NS" "${@:2}" ;;
     relais-lancer) relais ;;
     relais-arreter) relais_arreter mysql ;;
     *)
