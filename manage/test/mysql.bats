@@ -168,14 +168,30 @@ teardown() {
     [ "$(cat "$SECRETS/admin-password")" = mdproot ] || false
 }
 
-@test "desinstaller : namespace supprime, donnees gardees" {
+@test "supprimer-donnees --oui : namespace et volumes supprimes, root.env garde" {
     touch "$BATS_TEST_TMPDIR/ns"
     printf 'MYSQL_PASSWORD=mdproot\n' >"$SECRETS/root.env"
-    run bash "$MYSQL" desinstaller
+    run bash "$MYSQL" supprimer-donnees --oui
     [ "$status" -eq 0 ] || false
     grep -q 'delete namespace devzone-mysql' "$BATS_TEST_TMPDIR/kubectl.log" || false
     [ -f "$SECRETS/root.env" ] || false
-    [[ "$output" == *"gardées"* ]] || false
+    [[ "$output" == *"✔ namespace devzone-mysql et volume supprimés ; workspace/.mysql/root.env gardé"* ]] || false
+}
+
+@test "supprimer-donnees : sans terminal ni --oui, refus et aucun delete" {
+    touch "$BATS_TEST_TMPDIR/ns"
+    run bash "$MYSQL" supprimer-donnees </dev/null
+    [ "$status" -eq 2 ] || false
+    [[ "$output" == *"confirmation impossible sans terminal : devzone mysql supprimer-donnees --oui"* ]] || false
+    ! grep -q 'delete' "$BATS_TEST_TMPDIR/kubectl.log" 2>/dev/null || false
+}
+
+@test "supprimer-donnees en terminal : Entrée = abandon, aucun delete" {
+    touch "$BATS_TEST_TMPDIR/ns"
+    DEVZONE_INTERACTIF=1 run bash "$MYSQL" supprimer-donnees <<<""
+    [ "$status" -eq 0 ] || false
+    [[ "$output" == *"Abandon"* ]] || false
+    ! grep -q 'delete' "$BATS_TEST_TMPDIR/kubectl.log" 2>/dev/null || false
 }
 
 attendre_nohup() {

@@ -3,7 +3,7 @@
 # .devcontainer/catalogue/<app>/ (app.conf, manifeste.yaml), installée dans le
 # cluster des services de devzone sous son namespace de app.conf ; l'état
 # voulu est la ligne <app>=on|off de .devzone.modules.
-#   catalogue.sh synchroniser | appliquer | lister | resume | json
+#   catalogue.sh synchroniser | appliquer | lister | resume | json | desinstaller <app>
 set -euo pipefail
 
 ICI="$(cd "$(dirname "$0")" && pwd)"
@@ -209,9 +209,11 @@ case "${1:-}" in
     lister) catalogue_lister ;;
     resume) catalogue_resume ;;
     json) catalogue_json ;;
+    # Retrait d'une application : StatefulSet et service, volume gardé (#441)
+    desinstaller) app_desinstaller "$2" ;;
     -h | --help | aide) sed -n '2,6p' "$0" | sed 's/^# \{0,1\}//' ;;
     *)
-        echo "devzone : catalogue : synchroniser | appliquer | lister | resume | json" >&2
+        echo "devzone : catalogue : synchroniser | appliquer | lister | resume | json | desinstaller <app>" >&2
         exit 1
         ;;
 esac
