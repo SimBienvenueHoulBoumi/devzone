@@ -63,9 +63,9 @@ kube_empreinte() {
 
 setup() {
     load commun
-    kind_vide
     relais_docker_isole
     kube_isole
+    kind_vide
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
     # Versions figées lues dans les fichiers : une montée automatique (workflow
     # versions) ne casse pas ces tests
@@ -150,6 +150,48 @@ GH
     [ "$status" -eq 0 ]
     [[ "$output" == *"○ module ia"*"devzone activer ia"* ]] || false
     [[ "$output" == *"○ module kubernetes"*"devzone activer kubernetes"* ]] || false
+}
+
+@test "docker-hote : partagé par défaut, avertissement dans l'état" {
+    : >"$DEVZONE_RELAIS_SOURCE"
+    run bash "$DEVZONE"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"⚠ socket Docker de l hôte partagé (agents compris)"* ]] || false
+}
+
+@test "docker-hote : socket monté avec option off → encore partagé, make rebuild" {
+    : >"$DEVZONE_RELAIS_SOURCE"
+    printf 'docker-hote=off\n' >"$DEVZONE_RACINE/.devzone.modules"
+    run bash "$DEVZONE"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"⚠ socket Docker de l hôte encore partagé : make rebuild sur le poste"* ]] || false
+}
+
+@test "docker-hote : option on, socket absent → absent, make rebuild" {
+    rm -f "$DEVZONE_RELAIS_SOURCE"
+    run bash "$DEVZONE"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"⚠ socket Docker de l hôte absent : make rebuild sur le poste"* ]] || false
+    [[ "$output" != *"socket Docker de l hôte partagé"* ]] || false
+}
+
+@test "docker-hote : desactiver écrit off, demande make rebuild, plus d'avertissement" {
+    run bash "$DEVZONE" desactiver docker-hote
+    [ "$status" -eq 0 ]
+    grep -qx 'docker-hote=off' "$DEVZONE_RACINE/.devzone.modules"
+    [[ "$output" == *"make rebuild"* ]] || false
+    rm -f "$DEVZONE_RELAIS_SOURCE"
+    run bash "$DEVZONE"
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"socket Docker de l hôte"* ]] || false
+}
+
+@test "docker-hote : activer écrit on, demande make rebuild" {
+    printf 'docker-hote=off\n' >"$DEVZONE_RACINE/.devzone.modules"
+    run bash "$DEVZONE" activer docker-hote
+    [ "$status" -eq 0 ]
+    grep -qx 'docker-hote=on' "$DEVZONE_RACINE/.devzone.modules"
+    [[ "$output" == *"make rebuild"* ]] || false
 }
 
 @test "état : identité git absente → nécessaire, avec les deux voies" {
