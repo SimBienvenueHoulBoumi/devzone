@@ -467,21 +467,42 @@ appliquer_mysql() {
         fi
         rm -f "$(fichier_echec mysql)"
     else
-        bash "$ICI/catalogue/mysql/mysql.sh" desinstaller
+        # Retrait sans suppression des données : volume gardé (#441) ; les
+        # bases ne partent qu'avec un oui (confirmer_suppression)
+        bash "$ICI/catalogue.sh" desinstaller mysql
+        if [ -n "${SUPPRIMER_DONNEES:-}" ]; then
+            bash "$ICI/catalogue/mysql/mysql.sh" supprimer-donnees --oui
+        fi
         rm -f "$(fichier_echec mysql)"
     fi
 }
 
 # Toutes les bases disparaissent : confirmation en terminal (sans terminal, la
-# commande est explicite)
-confirmer_suppression_postgres() {
-    local reponse
-    [ "$(valeur postgres)" = on ] || return 0
+# commande est explicite) ; un oui ou --oui marque SUPPRIMER_DONNEES, lu par
+# appliquer_mysql pour lancer supprimer-donnees (#441)
+confirmer_suppression() {
+    local app="$1" reponse arg
+    SUPPRIMER_DONNEES=""
+    [ "$(valeur "$app")" = on ] || return 0
+    for arg in "${@:2}"; do
+        case "$arg" in --oui) SUPPRIMER_DONNEES=1 ;; esac
+    done
+    [ -z "$SUPPRIMER_DONNEES" ] || return 0
     cluster_interactif || return 0
-    printf 'Désactiver postgres supprime toutes ses bases. Continuer ? [o/N] ' >&2
+    # mysql : la question porte sur le namespace (volume et bases restent) ;
+    # postgres : tout part, le refus annule
+    if [ "$app" = mysql ]; then
+        printf 'Désactiver mysql retire le serveur, le volume et les bases restent. Supprimer aussi le namespace devzone-mysql et ses volumes ? [o/N] ' >&2
+    else
+        printf 'Désactiver %s supprime toutes ses bases. Continuer ? [o/N] ' "$app" >&2
+    fi
     read -r reponse || reponse=""
     case "$reponse" in
-        o | O | oui) return 0 ;;
+        o | O | oui) SUPPRIMER_DONNEES=1; return 0 ;;
+    esac
+    # refus : mysql désactive quand même (volume gardés), postgres annule
+    case "$app" in
+        mysql) return 0 ;;
         *) echo "Abandon : rien n'a été supprimé."; return 1 ;;
     esac
 }
@@ -1159,8 +1180,8 @@ changer() {
         echo "devzone : module inconnu : $m ; modules : ${MODULES[*]}" >&2
         exit 1
     fi
-    if [ "$1" = off ] && [ "$m" = postgres ]; then
-        confirmer_suppression_postgres || return 0
+    if [ "$1" = off ] && { [ "$m" = postgres ] || [ "$m" = mysql ]; }; then
+        confirmer_suppression "$m" "${@:3}" || return 0
     fi
     ecrire "$m" "$1"
     "appliquer_$m" "$1" "${@:3}"
@@ -1175,7 +1196,7 @@ fi
 case "${1:-}" in
     "" | etat | modules) if [ "${2:-}" = "--json" ]; then etat_json; else etat; fi ;;
     activer) changer on "${2:-}" "${@:3}" ;;
-    desactiver) changer off "${2:-}" ;;
+    desactiver) changer off "${2:-}" "${@:3}" ;;
     appliquer)
         appliquer_repowarden
         [ "$(valeur ia)" = off ] || appliquer_ia on

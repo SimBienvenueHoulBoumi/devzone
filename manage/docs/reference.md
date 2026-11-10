@@ -360,9 +360,12 @@ devzone mysql supprimer <projet> [--oui]
 devzone mysql volume                 # liste les PVC *-mysql-0, marque le monté
 devzone mysql volume <nom>           # réapplique le StatefulSet sur ce volume (données gardées)
 devzone mysql volume --supprimer <nom> [--oui]
+devzone desactiver mysql             # retire StatefulSet, service et secret ; volume gardé
+devzone mysql supprimer-donnees [--oui]  # supprime le namespace et les volumes (confirmé)
 ```
 
 - **Volumes** : avant l'installation, si un seul PVC `*-mysql-0` existe dans le namespace, il est réutilisé ; aucun → claim `donnees` ; plusieurs → refus avec la liste et `devzone mysql volume <nom>`. `devzone mysql volume <nom>` réapplique le StatefulSet sur le PVC choisi sans supprimer les données. `--supprimer` demande confirmation `[o/N]` en terminal (`--oui` sans terminal) et refuse si le volume est monté. Le récapitulatif signale `⚠ volume <pvc> non utilisé : devzone mysql volume`.
+- **Désinstaller et supprimer les données** : `devzone desactiver mysql` retire le StatefulSet, le service et le secret, garde le volume (PVC) et les bases, et affiche `✔ mysql retiré du cluster ; volume <pvc> et bases gardés : devzone mysql volume`. En terminal, la question est « Désactiver mysql retire le serveur, le volume et les bases restent. Supprimer aussi le namespace devzone-mysql et ses volumes ? » : un `oui` (ou `--oui` sans terminal) supprime aussi le namespace `devzone-mysql` et ses volumes ; un refus garde le volume et les bases, le serveur part quand même ; sans terminal et sans `--oui`, les données restent. `devzone mysql supprimer-donnees [--oui]` fait cette suppression seule : confirmation `[o/N]` en terminal, `--oui` obligatoire sinon (sinon refus avec la commande exacte). Le namespace et les volumes partent, `workspace/.mysql/root.env` est gardé ; `devzone mysql volume` liste ensuite les volumes restants.
 
 ## Argo CD
 

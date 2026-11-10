@@ -79,28 +79,19 @@ app_installer() {
 }
 
 # Désinstalle une application : relais coupé, manifeste retiré, marque oubliée ;
-# en terminal, confirmation avant de supprimer les données (PVC), sinon gardées
+# le volume (PVC) et les données restent (#441) : la suppression des données est
+# confirmée à part (devzone mysql supprimer-donnees)
 app_desinstaller() {
-    local app="$1" ns reponse
+    local app="$1" ns claim pvc
     ns="$(app_ns "$app")"
     relais_arreter "$app"
     rm -f "$(fichier_echec "$app")"
+    claim="$(kubectl --context devzone -n "$ns" get statefulset "$app" \
+        -o jsonpath='{.spec.volumeClaimTemplates[0].metadata.name}' 2>/dev/null || true)"
     kubectl --context devzone -n "$ns" delete "statefulset/$app" "service/$app" \
         "secret/$app-admin" >/dev/null 2>&1 || true
-    if cluster_interactif; then
-        printf 'Supprimer les données de %s (namespace %s) ? [o/N] ' "$app" "$ns" >&2
-        read -r reponse || reponse=""
-        case "$reponse" in
-            o | O | oui)
-                kubectl --context devzone delete namespace "$ns" >/dev/null 2>&1 || true
-                rm -rf "$RACINE/workspace/.$app"
-                ;;
-            *) echo "Données de $app gardées (namespace $ns) ; pour les supprimer : devzone desactiver $app" ;;
-        esac
-    else
-        echo "Sans terminal : données de $app gardées (namespace $ns) ; pour les supprimer, dans un terminal : devzone desactiver $app"
-    fi
-    echo "✔ $app retiré du cluster"
+    pvc="${claim:-donnees}-$app-0"
+    echo "✔ $app retiré du cluster ; volume $pvc et bases gardés : devzone $app volume"
     regenerer_identifiants
 }
 

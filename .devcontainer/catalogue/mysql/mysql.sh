@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# MySQL du catalogue (#414) : creer, liste, supprimer, etat, relais, installer, desinstaller.
+# MySQL du catalogue (#414) : creer, liste, supprimer, etat, relais, installer, supprimer-donnees.
 set -euo pipefail
 ICI="$(cd "$(dirname "$0")" && pwd)"
 RACINE="${DEVZONE_RACINE:-$(dirname "$(dirname "$(dirname "$ICI")")")}"
@@ -101,21 +101,33 @@ installer() {
     echo "✔ MySQL prêt : 127.0.0.1:$MYSQL_PORT dans le conteneur"
     regenerer_identifiants
 }
-# Désinstalle MySQL : namespace supprimé, données de workspace/.mysql gardées
-desinstaller() {
-    local CTX
+# Supprime le namespace (donc les PVC), garde workspace/.mysql (#441) :
+# confirmation en terminal [o/N], --oui obligatoire sinon (refus, code 2)
+supprimer_donnees() {
+    local CTX oui="" arg reponse
+    for arg in "$@"; do
+        case "$arg" in
+            --oui) oui=1 ;;
+            *) refuse "argument inconnu : $arg" ;;
+        esac
+    done
+    if [ -z "$oui" ]; then
+        cluster_interactif || refuse "confirmation impossible sans terminal : devzone mysql supprimer-donnees --oui"
+        printf 'Supprimer le namespace %s et tous ses volumes ? [o/N] ' "$NS" >&2
+        read -r reponse || reponse=""
+        case "$reponse" in
+            o | O | oui) ;;
+            *) echo "Abandon : rien n'a été supprimé."; return 0 ;;
+        esac
+    fi
     CTX="$(cluster_lu)"
+    [ -n "$CTX" ] || refuse "aucun cluster choisi : devzone activer mysql"
+    installe || refuse "module inactif : devzone activer mysql"
+    echo "▶ Suppression de MySQL et de ses volumes sur $CTX…"
+    kubectl --context devzone delete namespace "$NS" --wait=true >/dev/null
     relais_arreter mysql
     rm -f "$(fichier_echec)"
-    if [ -n "$CTX" ]; then
-        contexte_devzone_poser "$CTX" ||
-            echo "devzone : catalogue mysql : contexte devzone non posé sur $CTX ; nettoyage local seulement" >&2
-    fi
-    if [ -n "$CTX" ] && installe; then
-        echo "▶ Suppression de MySQL sur $CTX (données de workspace/.mysql gardées)…"
-        kubectl --context devzone delete namespace "$NS" --wait=true >/dev/null
-    fi
-    echo "✔ MySQL désinstallé ; données de workspace/.mysql gardées"
+    echo "✔ namespace $NS et volume supprimés ; workspace/.mysql/root.env gardé"
     regenerer_identifiants
 }
 # État : désactivé, en échec, prêt, relais arrêté
@@ -221,7 +233,7 @@ relais() {
 }
 case "${1:-}" in
     installer) installer ;;
-    desinstaller) desinstaller ;;
+    supprimer-donnees) supprimer_donnees "${@:2}" ;;
     etat) etat ;;
     creer) creer "${@:2}" ;;
     liste) liste ;;
@@ -230,7 +242,7 @@ case "${1:-}" in
     relais-lancer) relais ;;
     relais-arreter) relais_arreter mysql ;;
     *)
-        echo "devzone : catalogue mysql : creer <projet> [--nouveau-mdp] | liste | supprimer <projet> [--oui] | volume [<nom>] [--supprimer <nom>] [--oui]" >&2
+        echo "devzone : catalogue mysql : creer <projet> [--nouveau-mdp] | liste | supprimer <projet> [--oui] | volume [<nom>] [--supprimer <nom>] [--oui] | supprimer-donnees [--oui]" >&2
         exit 1
         ;;
 esac
