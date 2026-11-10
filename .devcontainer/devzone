@@ -489,10 +489,20 @@ confirmer_suppression() {
     done
     [ -z "$SUPPRIMER_DONNEES" ] || return 0
     cluster_interactif || return 0
-    printf 'Désactiver %s supprime toutes ses bases. Continuer ? [o/N] ' "$app" >&2
+    # mysql : la question porte sur le namespace (volume et bases restent) ;
+    # postgres : tout part, le refus annule
+    if [ "$app" = mysql ]; then
+        printf 'Désactiver mysql retire le serveur, le volume et les bases restent. Supprimer aussi le namespace devzone-mysql et ses volumes ? [o/N] ' >&2
+    else
+        printf 'Désactiver %s supprime toutes ses bases. Continuer ? [o/N] ' "$app" >&2
+    fi
     read -r reponse || reponse=""
     case "$reponse" in
         o | O | oui) SUPPRIMER_DONNEES=1; return 0 ;;
+    esac
+    # refus : mysql désactive quand même (volume gardés), postgres annule
+    case "$app" in
+        mysql) return 0 ;;
         *) echo "Abandon : rien n'a été supprimé."; return 1 ;;
     esac
 }

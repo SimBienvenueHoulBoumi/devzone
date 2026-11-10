@@ -239,6 +239,32 @@ attendre_nohup() {
     [[ "$output" == *"✔ namespace devzone-mysql et volume supprimés ; workspace/.mysql/root.env gardé"* ]] || false
 }
 
+@test "desactiver mysql en terminal : N retire le serveur et garde le volume" {
+    mkdir -p "$SECRETS"
+    printf 'MYSQL_PASSWORD=mdproot\n' >"$SECRETS/root.env"
+    touch "$BATS_TEST_TMPDIR/ns" "$BATS_TEST_TMPDIR/sts" "$BATS_TEST_TMPDIR/secret"
+    printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_ETAT"
+    DEVZONE_INTERACTIF=1 run bash "$DEVZONE" desactiver mysql <<<"n"
+    [ "$status" -eq 0 ] || false
+    grep -q 'delete statefulset/mysql service/mysql' "$BATS_TEST_TMPDIR/kubectl.log" || false
+    ! grep -q 'delete namespace devzone-mysql' "$BATS_TEST_TMPDIR/kubectl.log" 2>/dev/null || false
+    grep -qx 'mysql=off' "$DEVZONE_ETAT" || false
+    [[ "$output" == *"Désactiver mysql retire le serveur"* ]] || false
+    [[ "$output" == *"volume donnees-mysql-0 et bases gardés"* ]] || false
+    [ "$(cat "$SECRETS/root.env")" = "MYSQL_PASSWORD=mdproot" ] || false
+}
+
+@test "desactiver mysql en terminal : o supprime aussi le namespace" {
+    touch "$BATS_TEST_TMPDIR/ns" "$BATS_TEST_TMPDIR/sts" "$BATS_TEST_TMPDIR/secret"
+    printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_ETAT"
+    DEVZONE_INTERACTIF=1 run bash "$DEVZONE" desactiver mysql <<<"o"
+    [ "$status" -eq 0 ] || false
+    grep -q 'delete statefulset/mysql service/mysql' "$BATS_TEST_TMPDIR/kubectl.log" || false
+    grep -q 'delete namespace devzone-mysql' "$BATS_TEST_TMPDIR/kubectl.log" || false
+    grep -qx 'mysql=off' "$DEVZONE_ETAT" || false
+    [[ "$output" == *"✔ namespace devzone-mysql et volume supprimés ; workspace/.mysql/root.env gardé"* ]] || false
+}
+
 @test "activer mysql : ecrit la ligne puis applique (changer pour application du catalogue)" {
     printf 'cluster=kind-devzone\nmysql=off\n' >"$DEVZONE_ETAT"
     run bash "$DEVZONE" activer mysql
