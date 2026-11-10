@@ -54,10 +54,17 @@ app_installer() {
     kubectl --context devzone label namespace "$ns" "$CLUSTER_ETIQUETTE" --overwrite >/dev/null
     namespace_isoler "$ns" >/dev/null
     app_secret "$app" "$ns"
+    local claim=donnees
+    if [ "$app" = mysql ]; then
+        # shellcheck source=SCRIPTDIR/mysql/volume.sh
+        # shellcheck disable=SC1091
+        NS="$ns" . "$(dossier_catalogue)/mysql/volume.sh"
+        claim="$(mysql_claim_choisir)" || return 2
+    fi
     man="$(mktemp)"
     sed -e "s|__APP__|$app|g" -e "s|__NS__|$ns|g" -e "s|__IMAGE__|$image|g" \
         -e "s|__PORT__|$port|g" -e "s|__MEMOIRE__|$(app_lire "$app" memoire)|g" \
-        -e "s|__TAILLE__|$(app_lire "$app" taille)|g" \
+        -e "s|__TAILLE__|$(app_lire "$app" taille)|g" -e "s|__CLAIM__|$claim|g" \
         "$(dossier_catalogue)/$app/manifeste.yaml" >"$man" &&
         kubectl --context devzone -n "$ns" apply -f "$man" >/dev/null
     rm -f "$man"

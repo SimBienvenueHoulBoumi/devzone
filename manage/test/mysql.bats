@@ -6,6 +6,7 @@ setup() {
     load commun
     relais_docker_isole
     kube_isole
+    # shellcheck disable=SC2034
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
     MYSQL="$BATS_TEST_DIRNAME/../../.devcontainer/catalogue/mysql/mysql.sh"
     SECRETS="$BATS_TEST_TMPDIR/racine/workspace/.mysql"
@@ -38,8 +39,16 @@ case "$*" in
     *"get namespace devzone-mysql"*) [ -f "$T/ns" ]; exit $? ;;
     *"create namespace"*) touch "$T/ns" ;;
     *"label namespace"*) ;;
+    *"get pvc -o jsonpath"*)
+        if [ -f "$T/pvcs" ]; then cat "$T/pvcs"; fi
+        ;;
     *"readyReplicas"*) [ -f "$T/ready" ] && echo 1 || echo 0 ;;
+    *"get statefulset mysql -o jsonpath"*)
+        if [ -f "$T/claim" ]; then cat "$T/claim"; else echo donnees; fi
+        ;;
     *"get statefulset mysql"*) [ -f "$T/sts" ]; exit $? ;;
+    *"delete statefulset mysql"*) rm -f "$T/sts" ;;
+    *"delete pvc"*) echo "$*" >>"$T/delete.log" ;;
     *"apply -f -"*)
         data="$(cat)"
         if printf '%s\n' "$data" | grep -q 'kind: StatefulSet'; then printf '%s\n' "$data" >>"$T/apply.log"; else printf '%s\n' "$data" >>"$T/np.log"; fi
@@ -53,7 +62,6 @@ case "$*" in
 esac
 exit 0
 KUBE
-    n=0
     cat >"$BATS_TEST_TMPDIR/bin/openssl" <<'SSL'
 #!/usr/bin/env bash
 n="$(cat "$BATS_TEST_TMPDIR/openssl.n" 2>/dev/null || echo 0)"
@@ -179,4 +187,71 @@ attendre_nohup() {
     done
     echo "nohup.log : ligne absente après 5 s : $motif" >&2
     return 1
+}
+
+@test "installer : sans PVC existant, claim donnees" {
+    run bash "$MYSQL" installer
+    [ "$status" -eq 0 ] || false
+    grep -q 'name: donnees' "$BATS_TEST_TMPDIR/apply.log" || false
+}
+
+@test "installer : un PVC existant, reutilise son prefixe" {
+    printf 'data-mysql-0\n' >"$BATS_TEST_TMPDIR/pvcs"
+    run bash "$MYSQL" installer
+    [ "$status" -eq 0 ] || false
+    grep -q '        name: data' "$BATS_TEST_TMPDIR/apply.log" || false
+    grep -q 'volumeMounts:' "$BATS_TEST_TMPDIR/apply.log" || false
+}
+
+@test "installer : plusieurs PVC, refus avec liste et commande" {
+    printf 'data-mysql-0\ndonnees-mysql-0\n' >"$BATS_TEST_TMPDIR/pvcs"
+    run bash "$MYSQL" installer
+    [ "$status" -eq 2 ] || false
+    [[ "$output" == *"data-mysql-0"* ]] || false
+    [[ "$output" == *"donnees-mysql-0"* ]] || false
+    [[ "$output" == *"devzone mysql volume <nom>"* ]] || false
+    [ ! -s "$BATS_TEST_TMPDIR/apply.log" ] || false
+}
+
+@test "mysql volume : liste les PVC et marque le monte" {
+    touch "$BATS_TEST_TMPDIR/ns"
+    printf 'data-mysql-0\ndonnees-mysql-0\n' >"$BATS_TEST_TMPDIR/pvcs"
+    printf 'data' >"$BATS_TEST_TMPDIR/claim"
+    run bash "$MYSQL" volume
+    [ "$status" -eq 0 ] || false
+    [[ "$output" == *"data-mysql-0 (monté)"* ]] || false
+    [[ "$output" == *"donnees-mysql-0"* ]] || false
+    [[ "$output" != *"donnees-mysql-0 (monté)"* ]] || false
+}
+
+@test "mysql volume <nom> : reapplique le StatefulSet sur ce volume" {
+    touch "$BATS_TEST_TMPDIR/ns" "$BATS_TEST_TMPDIR/sts"
+    run bash "$MYSQL" volume data
+    [ "$status" -eq 0 ] || false
+    grep -q 'delete statefulset mysql' "$BATS_TEST_TMPDIR/kubectl.log" || false
+    grep -q 'name: data' "$BATS_TEST_TMPDIR/apply.log" || false
+}
+
+@test "mysql volume --supprimer sans --oui ni terminal : aucun delete" {
+    touch "$BATS_TEST_TMPDIR/ns"
+    printf 'data' >"$BATS_TEST_TMPDIR/claim"
+    run bash "$MYSQL" volume --supprimer donnees </dev/null
+    [ "$status" -eq 2 ] || false
+    [ ! -f "$BATS_TEST_TMPDIR/delete.log" ] || false
+}
+
+@test "mysql volume --supprimer refuse si volume monte" {
+    touch "$BATS_TEST_TMPDIR/ns"
+    printf 'data' >"$BATS_TEST_TMPDIR/claim"
+    run bash "$MYSQL" volume --supprimer data --oui
+    [ "$status" -eq 2 ] || false
+    [ ! -f "$BATS_TEST_TMPDIR/delete.log" ] || false
+}
+
+@test "mysql volume --supprimer <nom> --oui : supprime le PVC" {
+    touch "$BATS_TEST_TMPDIR/ns"
+    printf 'data' >"$BATS_TEST_TMPDIR/claim"
+    run bash "$MYSQL" volume --supprimer donnees --oui
+    [ "$status" -eq 0 ] || false
+    grep -q 'delete pvc donnees-mysql-0' "$BATS_TEST_TMPDIR/delete.log" || false
 }

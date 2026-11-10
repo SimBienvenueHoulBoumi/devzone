@@ -38,7 +38,13 @@ case "$*" in
     *"get namespace devzone-mysql"*) [ -f "$T/ns" ]; exit $? ;;
     *"create namespace"*) touch "$T/ns" ;;
     *"label namespace"*) ;;
+    *"get pvc -o jsonpath"*)
+        if [ -f "$T/pvcs" ]; then cat "$T/pvcs"; fi
+        ;;
     *"readyReplicas"*) [ -f "$T/ready" ] && echo 1 || echo 0 ;;
+    *"get statefulset mysql -o jsonpath"*)
+        if [ -f "$T/claim" ]; then cat "$T/claim"; else echo donnees; fi
+        ;;
     *"get statefulset mysql"*) [ -f "$T/sts" ]; exit $? ;;
     *"apply -f -"*)
         [ -f "$T/APPLY_ECHEC" ] && exit 1 || false
@@ -207,4 +213,15 @@ attendre_nohup() {
     run bash "$DEVZONE" etat --json
     [ "$status" -eq 0 ] || false
     printf '%s' "$output" | jq -e '.applications | type == "array"' >/dev/null || false
+}
+
+@test "resume : avertit d'un volume mysql non utilisé" {
+    touch "$BATS_TEST_TMPDIR/ns" "$BATS_TEST_TMPDIR/sts" "$BATS_TEST_TMPDIR/ready"
+    printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_ETAT"
+    printf 'data' >"$BATS_TEST_TMPDIR/claim"
+    printf 'data-mysql-0\nancien-mysql-0\n' >"$BATS_TEST_TMPDIR/pvcs"
+    run bash "$DEVZONE"
+    [ "$status" -eq 0 ] || false
+    [[ "$output" == *"⚠ volume ancien-mysql-0 non utilisé : devzone mysql volume"* ]] || false
+    [[ "$output" != *"data-mysql-0 non utilisé"* ]] || false
 }
