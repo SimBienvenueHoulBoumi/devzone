@@ -5,7 +5,7 @@
 set -euo pipefail
 
 ICI="$(cd "$(dirname "$0")" && pwd)"
-RACINE="${DEVZONE_RACINE:-$(dirname "$ICI")}"
+RACINE="${DEVZONE_RACINE:-$(cd "$ICI/../.." && pwd)}"
 ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
 BASE="${DEVZONE_CATALOGUE_VEILLEUR_DIR:-$RACINE/.devzone.catalogue-veilleur}"
 VERROU="$BASE/verrou"
@@ -62,6 +62,7 @@ tour() {
 
 # Boucle : un tour toutes les 5 s, verrou rafraîchi à chaque tour
 boucle() {
+    mkdir -p "$BASE"
     if ! verrou_prendre; then return 0; fi
     trap 'rm -rf "$VERROU"' EXIT INT TERM
     while true; do
@@ -70,6 +71,29 @@ boucle() {
         tour || true
         sleep 5
     done
+}
+
+# Lance la boucle détachée (#435) et vérifie que son verrou vit
+lancer_detache() {
+    local i pid stable=0 detache=()
+    mkdir -p "$BASE"
+    # Même détachement que relais_lancer : setsid si présent, sinon nohup.
+    command -v setsid >/dev/null 2>&1 && detache=(setsid)
+    ${detache[@]+"${detache[@]}"} nohup env DEVZONE_CATALOGUE_REEL=oui bash "$0" boucle >"$BASE/veilleur.log" 2>&1 &
+    i=0
+    while [ "$i" -lt 20 ]; do
+        pid="$(cat "$VERROU/pid" 2>/dev/null || true)"
+        if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+            stable=$((stable + 1))
+            [ "$stable" -ge 5 ] && { echo "lancé"; return 0; }
+        else
+            stable=0
+        fi
+        sleep 0.1
+        i=$((i + 1))
+    done
+    echo "devzone : catalogue-veilleur : démarrage impossible, voir $BASE/veilleur.log" >&2
+    return 1
 }
 
 # Arrête le veilleur et retire le verrou
@@ -81,13 +105,13 @@ arreter() {
 }
 
 case "${1:-}" in
+    boucle | loop) if ! garde_veilleur; then exit 2; fi; boucle ;;
     demarrer | start | lancer)
         if ! garde_veilleur; then exit 2; fi
         if [ -f "$VERROU/pid" ] && kill -0 "$(cat "$VERROU/pid")" 2>/dev/null; then
             echo "déjà lancé"
         else
-            DEVZONE_CATALOGUE_REEL=oui bash "$0" boucle >/dev/null 2>&1 &
-            echo "lancé"
+            lancer_detache || exit 1
         fi
         ;;
     arreter | stop) arreter ; echo "arrêté" ;;

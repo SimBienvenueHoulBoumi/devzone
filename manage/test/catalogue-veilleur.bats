@@ -84,6 +84,40 @@ teardown() {
     [[ "$output" == *"refusé sous bats"* ]] || false
 }
 
+@test "veilleur : racine déduite = dépôt, deux niveaux au-dessus du script" {
+    unset DEVZONE_RACINE DEVZONE_ETAT DEVZONE_CATALOGUE_VEILLEUR_DIR
+    depot="$BATS_TEST_TMPDIR/depot"
+    mkdir -p "$depot/.devcontainer/catalogue"
+    cp "$VEILLEUR" "$depot/.devcontainer/catalogue/catalogue-veilleur.sh"
+    cat >"$depot/.devcontainer/catalogue.sh" <<'CATALOGUE'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >>"$BATS_TEST_TMPDIR/catalogue.log"
+CATALOGUE
+    : >"$depot/.devzone.modules"
+    run bash "$depot/.devcontainer/catalogue/catalogue-veilleur.sh" tour
+    [ "$status" -eq 0 ] || false
+    [ -f "$depot/.devzone.catalogue-veilleur/dernier" ] || false
+    [ "$(cat "$BATS_TEST_TMPDIR/catalogue.log")" = "appliquer" ] || false
+}
+
+@test "veilleur : demarrer dont la boucle meurt tout de suite rend un code non nul" {
+    base="$BATS_TEST_TMPDIR/veilleur"
+    mkdir -p "$base"
+    cat >"$BATS_TEST_TMPDIR/bin/nohup" <<NOHUP
+#!/usr/bin/env bash
+mkdir -p "$base/verrou"
+echo \$\$ >"$base/verrou/pid"
+exit 0
+NOHUP
+    chmod +x "$BATS_TEST_TMPDIR/bin/nohup"
+    run env -u BATS_TEST_TMPDIR \
+        DEVZONE_CATALOGUE_REEL=oui \
+        DEVZONE_CATALOGUE_VEILLEUR_DIR="$base" \
+        bash "$VEILLEUR" demarrer
+    [ "$status" -ne 0 ] || false
+    [[ "$output" == *"démarrage impossible"* ]] || false
+}
+
 @test "veilleur : un tour applique quand .devzone.modules change" {
     touch "$BATS_TEST_TMPDIR/ns" "$BATS_TEST_TMPDIR/sts" "$BATS_TEST_TMPDIR/ready"
     printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_ETAT"
