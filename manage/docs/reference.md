@@ -98,6 +98,8 @@ Le choix est **propre à chaque devzone** (instance) et gardé dans le dossier `
 
 Par défaut, la feature `docker-outside-of-docker` monte le socket Docker du poste dans le conteneur : le récapitulatif affiche `⚠ socket Docker de l hôte partagé (agents compris)`. C'est ce qui permet à `docker`, Testcontainers et kind de parler au Docker de l'hôte, mais cela donne aussi au conteneur et à ses agents l'administration du Docker du poste.
 
+Le récapitulatif suit le **socket réellement monté**, pas l'option : tant que `make rebuild` n'a pas été lancé, le conteneur courant garde son ancien montage, signalé par `⚠ socket Docker de l hôte encore partagé : make rebuild sur le poste` (option `off`) ou `⚠ socket Docker de l hôte absent : make rebuild sur le poste` (option `on`, socket absent). Sans socket et avec l'option `off`, tout est cohérent : rien n'est affiché.
+
 Pour retirer ce partage :
 
 ```bash
@@ -107,7 +109,7 @@ make rebuild                       # sur le poste, pas dans le conteneur
 
 Au lancement sur le poste, `manage/scripts/lancer.sh` lit la ligne `docker-hote` (absente = `on`). À `off`, il génère `.devcontainer/sans-docker-hote/devcontainer.json` (copie sans la feature, chemins de build adaptés au sous-dossier, dossier ignoré par git) et passe ce fichier au CLI devcontainers avec `--config`. Pour remettre le socket : `devzone activer docker-hote`, puis `make rebuild`.
 
-Sans socket, `docker` n'existe plus dans le conteneur : la commande affiche un message qui renvoie au workspace Kubernetes (`devzone workspace`, kubedock et BuildKit). Le relais du socket ne bloque pas le démarrage, et la connexion au cluster Kubernetes de l'hôte reste disponible ; en revanche, kind et les conteneurs lancés sur le Docker du poste ne le sont plus. `devzone etat --json` porte l'option dans le champ `docker_hote`.
+Sans socket, `docker` n'existe plus dans le conteneur : la commande affiche un message qui renvoie au workspace Kubernetes (`devzone workspace`, kubedock et BuildKit). Le relais du socket ne bloque pas le démarrage, et la connexion au cluster Kubernetes de l'hôte reste disponible ; en revanche, kind et les conteneurs lancés sur le Docker du poste ne le sont plus. `devzone etat --json` porte l'option dans le champ `docker_hote` et l'état réel du montage dans `docker_hote_actif`.
 
 ### Commandes de l'application
 
@@ -529,6 +531,7 @@ VS Code et les autres outils. La sortie texte n'est pas changée : ajoute
   "modules": [ { "nom": "postgres", "actif": true, "description": "…", "etat": "prêt sur docker-desktop…",
                  "echec": null, "commande": null } ],
   "docker_hote": true,
+  "docker_hote_actif": true,
   "clusters": { "services": "docker-desktop", "services_distant": false,
                 "travail": "docker-desktop", "travail_interne": false, "commande": null },
   "ports": [ { "port": 8080, "actif": true, "application": "…" } ],

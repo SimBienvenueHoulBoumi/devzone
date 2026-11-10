@@ -29,7 +29,7 @@ etat_json() {
     local plat_nom plat_url="" github_json="null"
     local outils_retards_json='[]' outils_commande=""
     local modules_json='[]' m actif desc ef content etat_val echec_val commande_val s
-    local docker_hote=false
+    local docker_hote=false docker_hote_actif=false relais_source
     local services_cluster="" services_distant=false
     local travail_ctx="" travail_interne=false ctx_hote=""
     local clusters_services_raw="" clusters_travail_raw="" clusters_commande=""
@@ -159,9 +159,14 @@ etat_json() {
             <<<"$modules_json")"
     done
 
-    # Option docker-hote (#432) : absente = on
+    # Option docker-hote (#432) : absente = on ; socket réellement monté
+    # (même source que docker-relais.sh), peut différer jusqu'au make rebuild
     if [ "$(valeur docker-hote)" = on ]; then
         docker_hote=true
+    fi
+    relais_source="${DEVZONE_RELAIS_SOURCE:-/var/run/docker-host.sock}"
+    if [ -e "$relais_source" ]; then
+        docker_hote_actif=true
     fi
 
     services_cluster="$(cluster_lu)"
@@ -246,6 +251,7 @@ etat_json() {
         --arg outils_commande "$outils_commande" \
         --argjson modules "$modules_json" \
         --argjson docker_hote "$docker_hote" \
+        --argjson docker_hote_actif "$docker_hote_actif" \
         --arg clusters_services "$clusters_services_raw" \
         --argjson services_distant "$services_distant" \
         --arg clusters_travail "$clusters_travail_raw" \
@@ -264,6 +270,7 @@ etat_json() {
             outils: { retards: $retards, commande: (if $outils_commande=="" then null else $outils_commande end) },
             modules: $modules,
             docker_hote: $docker_hote,
+            docker_hote_actif: $docker_hote_actif,
             clusters: { services: (if $clusters_services=="" then null else $clusters_services end), services_distant: $services_distant, travail: (if $clusters_travail=="" then null else $clusters_travail end), travail_interne: $travail_interne, commande: (if $clusters_commande=="" then null else $clusters_commande end) },
             ports: $ports,
             applications: (if $applications=="" then null else $applications end),

@@ -1063,9 +1063,16 @@ etat() {
             printf '  ○ module %-10s facultatif, %s : devzone activer %s\n' "$m" "$(description "$m")" "$m"
         fi
     done
-    # Socket Docker de l'hôte (#432) : partagé par défaut, averti à chaque état
-    if [ "$(valeur docker-hote)" = on ]; then
+    # Socket Docker de l'hôte (#432) : l'avertissement montre l'état réel,
+    # le socket monté (même variable que docker-relais.sh), pas l'option :
+    # le montage ne change qu'au make rebuild (faux rassurant en attendant)
+    relais_source="${DEVZONE_RELAIS_SOURCE:-/var/run/docker-host.sock}"
+    if [ -e "$relais_source" ] && [ "$(valeur docker-hote)" = on ]; then
         printf '  ⚠ socket Docker de l hôte partagé (agents compris)\n'
+    elif [ -e "$relais_source" ]; then
+        printf '  ⚠ socket Docker de l hôte encore partagé : make rebuild sur le poste\n'
+    elif [ "$(valeur docker-hote)" = on ]; then
+        printf '  ⚠ socket Docker de l hôte absent : make rebuild sur le poste\n'
     fi
     # Applications du catalogue (#414)
     if [ -d "$ICI/catalogue" ]; then
