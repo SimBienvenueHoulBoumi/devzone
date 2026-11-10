@@ -8,7 +8,7 @@ setup() {
     RACINE="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
     CLI="$RACINE/manage/devzone"
     export DEVZONE_SANS_DEMARRER=1
-    cd "$BATS_TEST_TMPDIR"
+    cd "$BATS_TEST_TMPDIR" || return 1
 }
 
 @test "devzone <dossier> : crée un devzone complet dans un dossier neuf" {
@@ -293,6 +293,36 @@ faux_docker() {
     run bash "$RACINE/manage/scripts/lancer.sh" up "$PWD/dz"
     [ "$status" -eq 1 ]
     [[ "$output" == *"erreur de construction"*"échec"* ]] || false
+}
+
+@test "lancer.sh : docker-hote=off → config sans la feature, chemins de build corrigés, --config passé" {
+    faux_cli 'exit 0'
+    mkdir -p dz/.devcontainer
+    cp "$RACINE/.devcontainer/devcontainer.json" dz/.devcontainer/devcontainer.json
+    printf 'docker-hote=off\n' >dz/.devzone.modules
+    run bash "$RACINE/manage/scripts/lancer.sh" up "$PWD/dz"
+    [ "$status" -eq 0 ]
+    cfg="$PWD/dz/.devcontainer/sans-docker-hote/devcontainer.json"
+    [ -f "$cfg" ]
+    ! grep -q "docker-outside-of-docker" "$cfg" || false
+    grep -q '"dockerfile": "../Dockerfile"' "$cfg"
+    grep -q '"context": ".."' "$cfg"
+    # JSONC : les commentaires de la copie d'origine sont gardés
+    grep -q '// Image de base' "$cfg"
+    [[ "$(cat "$BATS_TEST_TMPDIR/args")" == *"up --workspace-folder $PWD/dz --config $cfg"* ]] || false
+}
+
+@test "lancer.sh : docker-hote absent ou on → config normale, aucun --config" {
+    faux_cli 'exit 0'
+    run bash "$RACINE/manage/scripts/lancer.sh" up "$PWD/dz"
+    [ "$status" -eq 0 ]
+    [ ! -e dz/.devcontainer/sans-docker-hote/devcontainer.json ]
+    [[ "$(cat "$BATS_TEST_TMPDIR/args")" != *"--config"* ]] || false
+    printf 'docker-hote=on\n' >dz/.devzone.modules
+    run bash "$RACINE/manage/scripts/lancer.sh" rebuild "$PWD/dz"
+    [ "$status" -eq 0 ]
+    [ ! -e dz/.devcontainer/sans-docker-hote/devcontainer.json ]
+    [[ "$(cat "$BATS_TEST_TMPDIR/args")" != *"--config"* ]] || false
 }
 
 @test "scripts en LF" {

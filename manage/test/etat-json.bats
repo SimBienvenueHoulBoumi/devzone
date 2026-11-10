@@ -3,9 +3,9 @@
 
 setup() {
     load commun
-    kind_vide
     relais_docker_isole
     kube_isole
+    kind_vide
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
     export HOME="$BATS_TEST_TMPDIR/home"
     mkdir -p "$HOME" "$BATS_TEST_TMPDIR/bin" "$BATS_TEST_TMPDIR/racine/workspace"
@@ -137,6 +137,41 @@ GH
     [ "$status" -eq 0 ]
     [[ "$output" != *"secret-sentinel-123"* ]] || false
     [[ "$output" != *"secret-gh-456"* ]] || false
+}
+
+@test "etat-json : docker-hote on par défaut, socket présent → actif" {
+    : >"$DEVZONE_RELAIS_SOURCE"
+    run bash "$DEVZONE" etat --json
+    [ "$status" -eq 0 ]
+    printf '%s\n' "$output" | jq -e . >/dev/null
+    [ "$(printf '%s\n' "$output" | jq -r '.docker_hote')" = "true" ]
+    [ "$(printf '%s\n' "$output" | jq -r '.docker_hote_actif')" = "true" ]
+}
+
+@test "etat-json : docker-hote on, socket absent → actif false" {
+    rm -f "$DEVZONE_RELAIS_SOURCE"
+    run bash "$DEVZONE" etat --json
+    [ "$status" -eq 0 ]
+    [ "$(printf '%s\n' "$output" | jq -r '.docker_hote')" = "true" ]
+    [ "$(printf '%s\n' "$output" | jq -r '.docker_hote_actif')" = "false" ]
+}
+
+@test "etat-json : docker-hote=off, socket encore monté → actif true" {
+    : >"$DEVZONE_RELAIS_SOURCE"
+    printf 'docker-hote=off\n' >"$DEVZONE_ETAT"
+    run bash "$DEVZONE" etat --json
+    [ "$status" -eq 0 ]
+    [ "$(printf '%s\n' "$output" | jq -r '.docker_hote')" = "false" ]
+    [ "$(printf '%s\n' "$output" | jq -r '.docker_hote_actif')" = "true" ]
+}
+
+@test "etat-json : docker-hote=off sans socket → false" {
+    printf 'docker-hote=off\n' >"$DEVZONE_ETAT"
+    rm -f "$DEVZONE_RELAIS_SOURCE"
+    run bash "$DEVZONE" etat --json
+    [ "$status" -eq 0 ]
+    [ "$(printf '%s\n' "$output" | jq -r '.docker_hote')" = "false" ]
+    [ "$(printf '%s\n' "$output" | jq -r '.docker_hote_actif')" = "false" ]
 }
 
 @test "etat-json : texte non modifié (devzone sans --json)" {

@@ -122,6 +122,12 @@ valeur() {
     initialiser
     local v
     v="$(grep -E "^$1=" "$ETAT" | tail -1 | cut -d= -f2 || true)"
+    # Option docker-hote (#432) : ligne absente = on (socket de l'hôte
+    # partagé, comportement historique) ; les modules restent off par défaut
+    if [ "$1" = docker-hote ] && [ -z "$v" ]; then
+        echo on
+        return 0
+    fi
     [ "$v" = on ] && echo on || echo off
 }
 
@@ -1057,6 +1063,17 @@ etat() {
             printf '  ○ module %-10s facultatif, %s : devzone activer %s\n' "$m" "$(description "$m")" "$m"
         fi
     done
+    # Socket Docker de l'hôte (#432) : l'avertissement montre l'état réel,
+    # le socket monté (même variable que docker-relais.sh), pas l'option :
+    # le montage ne change qu'au make rebuild (faux rassurant en attendant)
+    relais_source="${DEVZONE_RELAIS_SOURCE:-/var/run/docker-host.sock}"
+    if [ -e "$relais_source" ] && [ "$(valeur docker-hote)" = on ]; then
+        printf '  ⚠ socket Docker de l hôte partagé (agents compris)\n'
+    elif [ -e "$relais_source" ]; then
+        printf '  ⚠ socket Docker de l hôte encore partagé : make rebuild sur le poste\n'
+    elif [ "$(valeur docker-hote)" = on ]; then
+        printf '  ⚠ socket Docker de l hôte absent : make rebuild sur le poste\n'
+    fi
     # Applications du catalogue (#414)
     if [ -d "$ICI/catalogue" ]; then
         bash "$ICI/catalogue.sh" resume
@@ -1118,6 +1135,19 @@ changer() {
     if [ -z "$m" ]; then
         echo "devzone : module inconnu : (aucun) ; modules : ${MODULES[*]}" >&2
         exit 1
+    fi
+    # Option docker-hote (#432) : le socket de l'hôte, partagé par défaut.
+    # Le choix ne s'applique qu'à la création du conteneur ; sans rebuild,
+    # le conteneur courant garde son montage.
+    if [ "$m" = docker-hote ]; then
+        ecrire docker-hote "$1"
+        if [ "$1" = on ]; then
+            echo "devzone : socket Docker de l'hôte partagé après reconstruction"
+        else
+            echo "devzone : socket Docker de l'hôte non partagé après reconstruction"
+        fi
+        echo "devzone : reconstruction nécessaire : sur le poste, make rebuild"
+        return 0
     fi
     if ! connu "$m"; then
         # Une application du catalogue : on écrit la ligne, on applique
