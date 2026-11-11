@@ -58,6 +58,9 @@ case "$*" in
         printf 'kind: ServiceAccount\nmetadata:\n  name: %s\n' "$(apres serviceaccount "$@")" ;;
     *"create rolebinding"*)
         printf 'kind: RoleBinding\nmetadata:\n  name: %s\n' "$(apres rolebinding "$@")" ;;
+    *"get namespaces -l"*)
+        if [ -f "$T/namespaces" ]; then cat "$T/namespaces"; fi
+        ;;
     *"apply -f -"*) cat >>"$T/apply.log" ;;
     *"delete rolebinding"*) ;;
 esac
@@ -153,4 +156,22 @@ KUBE
     [ "$status" -eq 1 ] || false
     [[ "$output" == *"kube-compte : jeton"* ]] || false
     [ ! -s "$BATS_TEST_TMPDIR/kubectl.log" ] || false
+}
+
+@test "kube-compte.sh jeton : rattrape les namespaces devzone existants (idempotent)" {
+    printf 'cluster=docker-desktop\n' >"$DEVZONE_ETAT"
+    printf 'namespace/devzone-mysql\nnamespace/devzone-gitlab\n' >"$BATS_TEST_TMPDIR/namespaces"
+    run bash "$KOMPTE" jeton
+    [ "$status" -eq 0 ] || false
+    [ "$(grep -c 'get namespaces -l app.kubernetes.io/managed-by=devzone' "$BATS_TEST_TMPDIR/kubectl.log")" -eq 1 ] || false
+    [ "$(grep -c -- '--context docker-desktop -n devzone-mysql create rolebinding devzone-agent' "$BATS_TEST_TMPDIR/kubectl.log")" -eq 1 ] || false
+    [ "$(grep -c -- '--context docker-desktop -n devzone-gitlab create rolebinding devzone-agent' "$BATS_TEST_TMPDIR/kubectl.log")" -eq 1 ] || false
+    [ "$(grep -c 'kind: RoleBinding' "$BATS_TEST_TMPDIR/apply.log")" -eq 2 ] || false
+    : >"$BATS_TEST_TMPDIR/kubectl.log"
+    : >"$BATS_TEST_TMPDIR/apply.log"
+    run bash "$KOMPTE" jeton
+    [ "$status" -eq 0 ] || false
+    [ "$(grep -c -- '--context docker-desktop -n devzone-mysql create rolebinding devzone-agent' "$BATS_TEST_TMPDIR/kubectl.log")" -eq 1 ] || false
+    [ "$(grep -c -- '--context docker-desktop -n devzone-gitlab create rolebinding devzone-agent' "$BATS_TEST_TMPDIR/kubectl.log")" -eq 1 ] || false
+    [ "$(grep -c 'kind: RoleBinding' "$BATS_TEST_TMPDIR/apply.log")" -eq 2 ] || false
 }

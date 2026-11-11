@@ -106,6 +106,17 @@ setup() {
     [[ "$output" == *"devzone activer ia"* ]] || false
 }
 
+@test "agent : session opencode avec KUBECONFIG dédié, sans hote.config" {
+    mkdir -p "$HOME/.kube"
+    printf 'current-context: docker-desktop\n' >"$HOME/.kube/config"
+    agent_consigne
+    agent_lance
+    [ "$status" -eq 0 ]
+    [ -f "$FAKE_OP_KUBECONFIG_LOG" ] || false
+    grep -qx "$DEVZONE_AGENT_ETAT/kubeconfig" "$FAKE_OP_KUBECONFIG_LOG" || false
+    ! grep -q 'hote.config' "$FAKE_OP_KUBECONFIG_LOG" || false
+}
+
 @test "agent : verrou recent sans pid -> pas repris, attente puis refus" {
     # Un verrou sans pid n'est volé que si son âge dépasse 30 s (#377)
     source "$BATS_TEST_DIRNAME/../../.devcontainer/agent-session.sh"

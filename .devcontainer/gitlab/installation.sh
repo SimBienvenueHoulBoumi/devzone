@@ -68,15 +68,11 @@ gitlab_installe() {
     compte_admin "$(compte_ctx)" get namespace "$GITLAB_NS" >/dev/null 2>&1
 }
 
-# Crée le namespace et l'étiquette par l'administrateur, autorise le compte
-# limité puis pose la NetworkPolicy isolante (étape A, #430).
+# Crée le namespace, étiquette et autorise le compte limité (#430), pose l'isolation.
 gitlab_namespace_preparer() {
     local ctx
     ctx="$(compte_ctx)"
-    compte_admin "$ctx" create namespace "$GITLAB_NS" --dry-run=client -o yaml |
-        compte_admin "$ctx" apply -f - >/dev/null
-    compte_admin "$ctx" label namespace "$GITLAB_NS" "$CLUSTER_ETIQUETTE" --overwrite >/dev/null
-    compte_autoriser "$ctx" "$GITLAB_NS"
+    compte_namespace "$ctx" "$GITLAB_NS"
     namespace_isoler "$GITLAB_NS"
 }
 

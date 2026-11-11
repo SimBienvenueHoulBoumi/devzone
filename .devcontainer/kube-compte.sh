@@ -90,6 +90,29 @@ compte_retirer() {
         --ignore-not-found >/dev/null || return 1
 }
 
+# Crée et étiquette le namespace ns par l'administrateur puis autorise le compte.
+compte_namespace() {
+    local ctx="$1" ns="$2"
+    compte_admin "$ctx" create namespace "$ns" --dry-run=client -o yaml |
+        compte_admin "$ctx" apply -f - >/dev/null || return 1
+    compte_admin "$ctx" label namespace "$ns" "$CLUSTER_ETIQUETTE" --overwrite >/dev/null || return 1
+    compte_autoriser "$ctx" "$ns" || return 1
+}
+
+# Rattrape les namespaces devzone existants : RoleBinding posée dans chaque
+# namespace étiqueté CLUSTER_ETIQUETTE (idempotent), pour les installations
+# antérieures au compte limité.
+compte_rattraper() {
+    local ctx="$1" ns etiquette="${CLUSTER_ETIQUETTE:-app.kubernetes.io/managed-by=devzone}"
+    while IFS= read -r ns; do
+        [ -n "$ns" ] || continue
+        ns="${ns#namespace/}"
+        compte_admin "$ctx" -n "$ns" create rolebinding "$COMPTES_SA" \
+            --clusterrole=edit --serviceaccount="$COMPTES_NS:$COMPTES_SA" \
+            --dry-run=client -o yaml | compte_admin "$ctx" apply -f - >/dev/null || return 1
+    done < <(compte_admin "$ctx" get namespaces -l "$etiquette" -o name 2>/dev/null || true)
+}
+
 # Renouvelle le jeton du compte (TokenRequest de 24 h) et l'écrit dans le
 # contexte devzone de ~/.kube/config : user devzone-agent, même cluster que le
 # contexte administrateur (entrée cluster copiée : server, autorité de
@@ -155,5 +178,6 @@ if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
         exit 0
     fi
     compte_poser "$ctx" || exit 1
+    compte_rattraper "$ctx" || exit 1
     compte_jeton "$ctx" || exit 1
 fi

@@ -82,12 +82,7 @@ installer() {
         return 1
     fi
     echo "▶ MySQL sur le cluster $CTX (namespace $NS)…"
-    # Namespace créé et étiqueté par l'administrateur (#430), puis compte
-    # limité autorisé dans le namespace
-    compte_admin "$CTX" create namespace "$NS" --dry-run=client -o yaml |
-        compte_admin "$CTX" apply -f - >/dev/null
-    compte_admin "$CTX" label namespace "$NS" "$CLUSTER_ETIQUETTE" --overwrite >/dev/null
-    compte_autoriser "$CTX" "$NS"
+    compte_namespace "$CTX" "$NS"
     namespace_isoler "$NS" >/dev/null
     if k get statefulset mysql >/dev/null 2>&1; then
         echo "devzone : catalogue mysql : installation existante dans $NS, adoptée (volume et root.env gardés)"
