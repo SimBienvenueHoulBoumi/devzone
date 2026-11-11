@@ -59,6 +59,32 @@ tour() {
     cd "$T/poste" && run bash "$SCRIPT" tour
 }
 
+# Le processus $1 vit-il ? Un zombie (mort, pas encore récolté par PID 1 du conteneur) est mort.
+vivant() {
+    kill -0 "$1" 2>/dev/null || return 1
+    [ "$(ps -o stat= -p "$1" 2>/dev/null | cut -c1)" != Z ]
+}
+
+# Attend 5 s au plus que le fichier pid du veilleur existe.
+attendre_pid_veilleur() {
+    local i
+    for i in $(seq 50); do
+        [ -s "$T/poste/.devzone.ports-workspace/pid" ] && return 0
+        sleep 0.1
+    done
+    return 1
+}
+
+# Attend 5 s au plus que le processus $1 ne vive plus et que le fichier pid ait disparu.
+attendre_arret() {
+    local i
+    for i in $(seq 50); do
+        if ! vivant "$1" && [ ! -e "$T/poste/.devzone.ports-workspace/pid" ]; then return 0; fi
+        sleep 0.1
+    done
+    return 1
+}
+
 @test "ports : nouveau port du pod relaye sur 127.0.0.1 seulement" {
     ecoute 5173
     tour
@@ -139,17 +165,19 @@ tour() {
     cd "$T/poste"
     run bash "$CLI" workspace ports demarrer
     [ "$status" -eq 0 ]
+    attendre_pid_veilleur || false
+    veilleur="$(cat .devzone.ports-workspace/pid)"
+    kill -0 "$veilleur" || false
     run bash "$CLI" workspace ports demarrer
-    [[ "$output" == *"déjà lancé"* ]] || false
-    [ "$(ps -eo args | grep -c "[p]orts-workspace.sh boucle")" -eq 1 ]
+    [[ "$output" == *"déjà lancé (pid $veilleur)"* ]] || false
     sleep 1
     pid="$(cat .devzone.ports-workspace/relais/5173)"
     run bash "$CLI" workspace ports etat
     [[ "$output" == *"actif"*"127.0.0.1:5173 relayé"* ]] || false
     run bash "$CLI" workspace ports arreter
     [ "$status" -eq 0 ]
-    ! kill -0 "$pid" 2>/dev/null || false
-    [ "$(ps -eo args | grep -c "[p]orts-workspace.sh boucle")" -eq 0 ]
+    attendre_arret "$veilleur" || false
+    ! vivant "$pid" || false
     run bash "$CLI" workspace ports etat
     [[ "$output" == *"arrêté"* ]] || false
 }
@@ -171,8 +199,10 @@ tour() {
     cd "$T/poste"
     run bash "$CLI" workspace demarrer
     [ "$status" -eq 0 ]
-    [ "$(ps -eo args | grep -c "[p]orts-workspace.sh boucle")" -eq 1 ]
+    attendre_pid_veilleur || false
+    veilleur="$(cat .devzone.ports-workspace/pid)"
+    kill -0 "$veilleur" || false
     run bash "$CLI" workspace arreter
     [ "$status" -eq 0 ]
-    [ "$(ps -eo args | grep -c "[p]orts-workspace.sh boucle")" -eq 0 ]
+    attendre_arret "$veilleur" || false
 }
