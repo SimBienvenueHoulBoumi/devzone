@@ -28,21 +28,26 @@ heure() {
 # Trace de verrou dans le journal de l'agent ($AGENT_JOURNAL, défini par
 # agent.sh) : une ligne à la prise et une au rendu, avec l'horloge et le pid,
 # pour le diagnostic des lancements simultanés du rang en CI (#421). Sans
-# journal, rien n'est écrit.
+# journal, rien n'est écrit. Une mention optionnelle (second argument) précise
+# le chemin, l'âge ou le pid lu.
 verrou_tracer() {
     local d
     [ -n "${AGENT_JOURNAL:-}" ] || return 0
     d="$(date +%s.%N 2>/dev/null)" || d=""
     case "$d" in "" | *N*) d="$(date +%s)" ;; esac
-    echo "=== verrou $1 $d pid $$" >>"$AGENT_JOURNAL"
+    echo "=== verrou $1 $d pid $$${2:+ $2}" >>"$AGENT_JOURNAL"
 }
 
 # Rang partagé : deux lancements simultanés ne doivent pas partir sur le même
 # modèle. mkdir est atomique et présent partout (flock manque sur macOS) ; seul
 # l'âge du verrou décide (#377), le pid écrit n'étant qu'un détail de
 # diagnostic : un pid lu dans un autre conteneur du volume n'existe pas ici.
+# Quand flock existe, la section rang est en outre prise sous son verrou sur
+# rang.lock (#421) : si deux mkdir réussissaient, flock sérialise quand même
+# la lecture et l'écriture du rang. Chaque branche est tracée (échec mkdir,
+# purge, prise) pour établir en CI lequel des deux lancements a réussi mkdir.
 verrou_prendre() {
-    local fin age
+    local fin age vpid
     fin=$(( $(date +%s) + ${DEVZONE_AGENT_VERROU_MAX:-10} ))
     while ! mkdir "$AGENT_ETAT/verrou" 2>/dev/null; do
         # Un verrou n'est orphelin que par son âge : le rang n'est tenu que
@@ -52,27 +57,52 @@ verrou_prendre() {
         if [ -d "$AGENT_ETAT/verrou" ]; then
             age="$(mtime "$AGENT_ETAT/verrou" 2>/dev/null)" || age=""
         fi
+        vpid="$(cat "$AGENT_ETAT/verrou/pid" 2>/dev/null)" || vpid=""
+        verrou_tracer "échec mkdir" "age=${age:-inconnue} pid-verrou=${vpid:-aucun}"
         if [ -n "$age" ] && [ "$(( $(date +%s) - age ))" -gt 30 ]; then
             rm -f "$AGENT_ETAT/verrou/pid"
-            if rmdir "$AGENT_ETAT/verrou" 2>/dev/null; then continue; fi
+            if rmdir "$AGENT_ETAT/verrou" 2>/dev/null; then
+                verrou_tracer "purgé" "age=$age"
+                continue
+            fi
         fi
         if [ "$(date +%s)" -ge "$fin" ]; then return 1; fi
         sleep 1
     done
+    # pid avant flock : l'autre agent ne retire jamais le dossier pendant notre
+    # attente sur rang.lock, sinon notre écriture de pid tomberait sur ENOENT.
     echo "$$" >"$AGENT_ETAT/verrou/pid"
-    verrou_tracer pris
+    if command -v flock >/dev/null 2>&1; then
+        # exec dans un if conditionne l'échec au lieu de tuer le shell (bash
+        # 3.2 comme GNU) ; sans flock, mkdir reste le seul garde-fou (macOS).
+        if { exec 9>"$AGENT_ETAT/rang.lock"; } && flock -w "${DEVZONE_AGENT_VERROU_MAX:-10}" 9; then
+            AGENT_VERROU_FLOCK=1
+        else
+            verrou_lacher
+            return 1
+        fi
+    fi
+    verrou_tracer pris "chemin=$AGENT_ETAT/verrou"
 }
 
 # Libère le rang partagé pris par verrou_prendre : retire le pid, puis le dossier,
 # mais seulement si ce verrou appartient à l'agent appelant (pid du fichier == $$).
-# Un verrou détenu par un autre agent n'est jamais supprimé ici.
+# Un verrou détenu par un autre agent n'est jamais supprimé ici. flock (#421)
+# est libéré dans tous les cas, même si le pid lu ne correspond pas : sinon le
+# prochain appelant resterait bloqué sur rang.lock.
 verrou_lacher() {
     local pid
-    pid="$(cat "$AGENT_ETAT/verrou/pid" 2>/dev/null)" || return 0
-    [ "$pid" = "$$" ] || return 0
-    rm -f "$AGENT_ETAT/verrou/pid"
-    rmdir "$AGENT_ETAT/verrou" 2>/dev/null || true
-    verrou_tracer rendu
+    pid="$(cat "$AGENT_ETAT/verrou/pid" 2>/dev/null)" || pid=""
+    if [ "$pid" = "$$" ]; then
+        rm -f "$AGENT_ETAT/verrou/pid"
+        rmdir "$AGENT_ETAT/verrou" 2>/dev/null || true
+        verrou_tracer rendu
+    fi
+    if [ "${AGENT_VERROU_FLOCK:-0}" = 1 ]; then
+        flock -u 9 2>/dev/null || true
+        exec 9>&-
+        AGENT_VERROU_FLOCK=0
+    fi
 }
 
 # Passe permission.edit en objet et ajoute en dernier un deny par fichier de droits
