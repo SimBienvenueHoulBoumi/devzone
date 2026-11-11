@@ -44,6 +44,10 @@ FREE_MODELS=(big-pickle deepseek-v4.1-flash-free glm-5.3-flash-free nemotron-3.5
 SILENCE="${DEVZONE_AGENT_SILENCE:-45}"
 FIGEE="${DEVZONE_AGENT_FIGEE:-600}"
 AGENT_ETAT="${DEVZONE_AGENT_ETAT:-$HOME/.local/state/oc-lancer}"
+# Pause entre lecture et écriture du rang (tests seulement) : active seulement
+# si DEVZONE_AGENT_PAUSE_RANG est défini sous bats ; jamais de pause par défaut.
+PAUSE_RANG=0
+if [ -n "${DEVZONE_AGENT_PAUSE_RANG:-}" ] && [ -n "${BATS_TEST_TMPDIR:-}" ]; then PAUSE_RANG="$DEVZONE_AGENT_PAUSE_RANG"; fi
 # Relances d'une même session pour cause réseau, par modèle, avant le modèle suivant
 RELANCES_RESEAU=3
 
@@ -77,6 +81,7 @@ agent_lancer() {
     [ "${#FREE_MODELS[@]}" -gt 0 ] || refuse "aucun modèle gratuit disponible"
     verrou_prendre || refuse "rang des modèles verrouillé : réessayer"
     debut=$(( $(cat "$etat/rang" 2>/dev/null || echo 0) % ${#FREE_MODELS[@]} ))
+    if [ "$PAUSE_RANG" -gt 0 ]; then sleep "$PAUSE_RANG"; fi
     echo $(( debut + 1 )) >"$etat/rang"
     verrou_lacher
     echo "=== rang $(( debut + 1 ))/${#FREE_MODELS[@]}" >>"$journal"

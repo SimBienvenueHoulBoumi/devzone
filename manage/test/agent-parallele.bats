@@ -57,6 +57,37 @@ diagnostic() {
     echo "===== fin diagnostic agent-parallele =====" >&2
 }
 
+# Affiche, sur la sortie de bats, les faits visibles au moment de l'echec d'une
+# assertion du test d'entrelacement du rang (#421) : les deux journaux avec
+# leurs lignes === rang (et === verrou pris/rendu), le contenu du fichier rang,
+# l'etat avec les horodatages, la date et le noyau.
+diagnostic_rang() {
+    echo "===== diagnostic rang =====" >&2
+    for j in "$j1" "$j2"; do
+        [ -e "$j" ] || continue
+        echo "### $j" >&2
+        cat "$j" >&2
+    done
+    echo "--- lignes === rang ---" >&2
+    grep -n '^=== rang' "$j1" "$j2" >&2 || true
+    echo "--- $DEVZONE_AGENT_ETAT/rang ---" >&2
+    if [ -r "$DEVZONE_AGENT_ETAT/rang" ]; then
+        cat "$DEVZONE_AGENT_ETAT/rang" >&2
+    else
+        echo "(absent)" >&2
+    fi
+    echo "--- $DEVZONE_AGENT_ETAT ---" >&2
+    case "$(uname -s)" in
+        Darwin) ls -laT "$DEVZONE_AGENT_ETAT" >&2 ;;
+        *) ls -la --time-style=full-iso "$DEVZONE_AGENT_ETAT" >&2 ;;
+    esac
+    echo "--- date ---" >&2
+    date +%s >&2
+    echo "--- noyau ---" >&2
+    uname -a >&2
+    echo "===== fin diagnostic rang =====" >&2
+}
+
 @test "agent : deux lancements simultanes -> les deux demarrent sur deux modeles differents" {
     printf 'construis la feature\n' >"$DEVZONE_RACINE/workspace/consigne.txt"
     mkdir -p "$DEVZONE_RACINE/workspace/projet-un" "$DEVZONE_RACINE/workspace/projet-deux"
@@ -70,13 +101,39 @@ diagnostic() {
     wait "$p1" || s1=$?
     s2=0
     wait "$p2" || s2=$?
-    [ "$s1" -eq 0 ]
-    [ "$s2" -eq 0 ]
-    grep -q '^=== modèle opencode/' "$j1" || false
-    grep -q '^=== modèle opencode/' "$j2" || false
-    ! grep -q "aucun modèle gratuit disponible" "$j1" || false
-    ! grep -q "aucun modèle gratuit disponible" "$j2" || false
-    [ "$(premier_modele "$j1")" != "$(premier_modele "$j2")" ]
+    [ "$s1" -eq 0 ] || { diagnostic_rang; false; }
+    [ "$s2" -eq 0 ] || { diagnostic_rang; false; }
+    grep -q '^=== modèle opencode/' "$j1" || { diagnostic_rang; false; }
+    grep -q '^=== modèle opencode/' "$j2" || { diagnostic_rang; false; }
+    if grep -q "aucun modèle gratuit disponible" "$j1"; then diagnostic_rang; false; fi
+    if grep -q "aucun modèle gratuit disponible" "$j2"; then diagnostic_rang; false; fi
+    [ "$(premier_modele "$j1")" != "$(premier_modele "$j2")" ] || { diagnostic_rang; false; }
+}
+
+# Exclusion déterministe du rang (#421) : le premier agent garde le verrou
+# DEVZONE_AGENT_PAUSE_RANG=3 s entre la lecture et l'écriture du rang ; lancé
+# 1 s après, le second attend le verrou puis part sur le rang suivant. Sans
+# exclusion, le second lirait le rang 0 avant l'écriture du premier.
+@test "agent : premier agent retient le verrou 3 s -> le second prend le rang 2" {
+    printf 'construis la feature\n' >"$DEVZONE_RACINE/workspace/consigne.txt"
+    mkdir -p "$DEVZONE_RACINE/workspace/projet-neuf" "$DEVZONE_RACINE/workspace/projet-dix"
+    j1="$DEVZONE_RACINE/workspace/.agents/projet-neuf.log"
+    j2="$DEVZONE_RACINE/workspace/.agents/projet-dix.log"
+    export DEVZONE_AGENT_PAUSE_RANG=3
+    lancer_fond "$DEVZONE_RACINE/workspace/projet-neuf" "$BATS_TEST_TMPDIR/neuf.out"
+    unset DEVZONE_AGENT_PAUSE_RANG
+    p1="$AGENT_PID"
+    sleep 1
+    lancer_fond "$DEVZONE_RACINE/workspace/projet-dix" "$BATS_TEST_TMPDIR/dix.out"
+    p2="$AGENT_PID"
+    s1=0
+    wait "$p1" || s1=$?
+    s2=0
+    wait "$p2" || s2=$?
+    [ "$s1" -eq 0 ] || { diagnostic_rang; false; }
+    [ "$s2" -eq 0 ] || { diagnostic_rang; false; }
+    grep -qE '^=== rang 2/[0-9]+$' "$j2" || { diagnostic_rang; false; }
+    [ "$(cat "$DEVZONE_AGENT_ETAT/rang")" = 2 ] || { diagnostic_rang; false; }
 }
 
 @test "agent : trois lancements simultanes -> aucun ne s'arrete faute de modele" {
