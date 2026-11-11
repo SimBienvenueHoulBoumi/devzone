@@ -24,8 +24,9 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 # Contrôles shell de repowarden ; jq : lu par son garde-fou des agents IA
 # (repowarden garde, module ia), qui sans lui ne vérifie rien
+# Python 3.12 d Ubuntu 24.04, paquets signés par apt, aucun serveur de clés (#464)
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends shellcheck bats jq \
+    && apt-get install -y --no-install-recommends shellcheck bats jq python3 python3-venv python3-pip python-is-python3 \
     && rm -rf /var/lib/apt/lists/*
 
 # k9s, actionlint (mêmes versions que la CI de repowarden), gitleaks, kind :
