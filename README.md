@@ -204,9 +204,12 @@ Le fichier est lisible par toi seul (600) et ignoré par git : ne le copie ni ne
 devzone mots-de-passe                  # régénère le fichier et affiche seulement son chemin
 devzone postgres creer <projet>         # création, ou nouveau mot de passe avec --nouveau-mdp
 devzone postgres supprimer <projet>     # suppression du compte et de sa ligne
+devzone gitlab nouveau-mdp [root|dev]  # mot de passe aléatoire (root ou dev) régénéré
 ```
 
 Les fichiers des modules restent la source : `workspace/.postgres/<projet>.env`, `workspace/.postgres/admin-password`, `workspace/.gitlab/root-password`, `workspace/.gitlab/dev-password` et `workspace/.argocd/admin.env`.
+
+Le secret Rails de GitLab est conservé dans `workspace/.gitlab/rails-secret.yaml` (600) et réappliqué à une réinstallation ; à défaut, si le secret a été perdu, le récapitulatif avertit : « GitLab réinstallé : si le navigateur affiche 422, supprimez les données de site de gitlab.localhost ».
 
 ## Accéder à PostgreSQL
 

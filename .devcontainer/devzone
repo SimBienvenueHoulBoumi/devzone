@@ -19,6 +19,7 @@
 #   devzone activer postgres [--contexte CTX] [--confirmer CTX]   PostgreSQL partagé, cluster au choix
 #   devzone postgres creer <projet>  base et utilisateur d'un projet (aussi : liste, psql, supprimer)
 #   devzone gitlab migrer [--oui]    GitLab dans le cluster des services, puis ancien cluster kind supprimé
+#   devzone gitlab nouveau-mdp [root|dev]  mot de passe aléatoire (root ou dev) régénéré
 #   devzone activer argocd           Argo CD dans le cluster des services, accès https://127.0.0.1:8443
 #   devzone argocd etat|relais-lancer|relais-arreter  Argo CD (module argocd)
 #   devzone cluster [CTX] [--oui] [--confirmer CTX]  cluster des services de devzone, ou en changer
@@ -449,7 +450,11 @@ appliquer_gitlab() {
         # Désactiver gitlab seulement si son namespace existe encore
         if bash "$ICI/gitlab/gitlab.sh" installe; then
             echo "devzone : gitlab désactivation…"
-            bash "$ICI/gitlab/gitlab.sh" desinstaller
+            if [ -n "${SUPPRIMER_DONNEES:-}" ]; then
+                bash "$ICI/gitlab/gitlab.sh" desinstaller --oui
+            else
+                bash "$ICI/gitlab/gitlab.sh" desinstaller
+            fi
         else
             echo "devzone : gitlab déjà désactivé (aucun namespace devzone-gitlab)."
         fi
@@ -583,9 +588,12 @@ confirmer_suppression() {
     [ -z "$SUPPRIMER_DONNEES" ] || return 0
     cluster_interactif || return 0
     # mysql : la question porte sur le namespace (volume et bases restent) ;
-    # postgres : tout part, le refus annule
+    # postgres : tout part, le refus annule ; gitlab : le secret Rails reste,
+    # sa suppression n'a lieu que sur une désinstallation complète voulue
     if [ "$app" = mysql ]; then
         printf 'Désactiver mysql retire le serveur, le volume et les bases restent. Supprimer aussi le namespace devzone-mysql et ses volumes ? [o/N] ' >&2
+    elif [ "$app" = gitlab ]; then
+        printf 'Désactiver gitlab garde le secret Rails (sessions du navigateur valides à la réinstallation). Supprimer aussi le secret Rails ? [o/N] ' >&2
     else
         printf 'Désactiver %s supprime toutes ses bases. Continuer ? [o/N] ' "$app" >&2
     fi
@@ -593,9 +601,9 @@ confirmer_suppression() {
     case "$reponse" in
         o | O | oui) SUPPRIMER_DONNEES=1; return 0 ;;
     esac
-    # refus : mysql désactive quand même (volume gardés), postgres annule
+    # refus : mysql et gitlab désactivent quand même (données gardées), postgres annule
     case "$app" in
-        mysql) return 0 ;;
+        mysql | gitlab) return 0 ;;
         *) echo "Abandon : rien n'a été supprimé."; return 1 ;;
     esac
 }
@@ -1192,6 +1200,10 @@ etat() {
     if [ -d "$ICI/catalogue" ]; then
         bash "$ICI/catalogue.sh" resume
     fi
+    # Secret Rails GitLab (#347) : avertissement si les secrets ont été perdus
+    if [ "$(valeur gitlab)" = on ] && [ ! -f "$RACINE/workspace/.gitlab/rails-secret.yaml" ]; then
+        echo "  ⚠ gitlab          GitLab réinstallé : si le navigateur affiche 422, supprimez les données de site de gitlab.localhost"
+    fi
     # Cluster de devzone distant : avertissement dans le récapitulatif
     cluster_actuel="$(cluster_lu)"
     if [ -n "$cluster_actuel" ] && ! cluster_est_local "$cluster_actuel"; then
@@ -1273,7 +1285,7 @@ changer() {
         echo "devzone : module inconnu : $m ; modules : ${MODULES[*]}" >&2
         exit 1
     fi
-    if [ "$1" = off ] && { [ "$m" = postgres ] || [ "$m" = mysql ]; }; then
+    if [ "$1" = off ] && { [ "$m" = postgres ] || [ "$m" = mysql ] || [ "$m" = gitlab ]; }; then
         confirmer_suppression "$m" "${@:3}" || return 0
     fi
     ecrire "$m" "$1"
