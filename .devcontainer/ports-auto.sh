@@ -17,10 +17,8 @@ mkdir -p "$BASE" "$BRIDGES"
 ports_auto_actif() { local v; v="$(grep -E '^ports_auto=' "$ETAT" 2>/dev/null | tail -1 | cut -d= -f2- || true)"; case "$v" in off|false|0|non|no) echo off ;; *) echo on ;; esac; }
 # Liste des ports exclus par l'utilisateur (ports_exclus=, virgules).
 ports_exclus_lus() { grep -E '^ports_exclus=' "$ETAT" 2>/dev/null | tail -1 | cut -d= -f2- || true; }
-# Ecrit (ou efface) une ligne cle=valeur dans l'etat, comme ecrire_ports pour ports=
-ecrire() {
-    etat_ecrire "$1" "${2:-}" || { echo "devzone : port : etat non enregistre : $ETAT" >&2; return 1; }
-}
+# Ecrit une ligne cle=valeur dans l'etat, comme ecrire_ports pour ports=
+ecrire() { etat_ecrire "$1" "${2:-}" || { echo "devzone : port : etat non enregistre : $ETAT" >&2; return 1; }; }
 # Un port est exclu quand il figure dans la liste ports_exclus=.
 port_exclu() { case ",$(ports_exclus_lus)," in *",$1,"*) return 0 ;; esac; return 1; }
 # Nom du relais automatique d'un port : devzone-<instance>-auto-<port>.
@@ -37,11 +35,9 @@ garde_veilleur() {
         echo "devzone : port : veilleur automatique refusé sous bats (tests)" >&2
         return 2
     fi
-    if [ "${DEVZONE_PORTS_AUTO_REEL:-}" != oui ]; then
-        echo "devzone : port : veilleur automatique refusé ici : lancer plutôt devzone reparer" >&2
-        return 2
-    fi
-    return 0
+    [ "${DEVZONE_PORTS_AUTO_REEL:-}" = oui ] && return 0
+    echo "devzone : port : veilleur automatique refusé ici : lancer plutôt devzone reparer" >&2
+    return 2
 }
 
 # Lance le relais automatique ; échec → message et code 1 (port déjà pris marqué).
@@ -61,8 +57,7 @@ fermer_auto() { local port="$1"; docker rm -f "$(nom_relais_auto "$port")" >/dev
 
 # Retire tous les relais automatiques et leurs ponts, puis vide les états.
 nettoyer_auto_tout() {
-    local port
-    [ -f "$ACTIFS" ] && while IFS= read -r port; do [ -n "$port" ] && fermer_auto "$port"; done <"$ACTIFS"
+    local port; [ -f "$ACTIFS" ] && while IFS= read -r port; do [ -n "$port" ] && fermer_auto "$port"; done <"$ACTIFS"
     [ -f "$OCCUPES" ] && while IFS= read -r port; do [ -n "$port" ] && arreter_pont "$port"; done <"$OCCUPES"
     : >"$ACTIFS" 2>/dev/null || true; : >"$OCCUPES" 2>/dev/null || true; : >"$PENDING" 2>/dev/null || true; rm -f "$BRIDGES"/*.pid 2>/dev/null || true
 }
@@ -239,8 +234,7 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
 case "${1:-}" in
     ''|boucle|loop) if ! garde_veilleur; then exit 2; fi; ports_auto_boucle ;;
     tour|one|un-tour) ports_auto_tour ;;
-    demarrer|start|lancer) if ! garde_veilleur; then exit 2; fi
-        if kill -0 "$(cat "$VERROU/pid" 2>/dev/null)" 2>/dev/null; then echo "déjà lancé"; else DEVZONE_PORTS_AUTO_REEL=oui bash "$0" boucle >/dev/null 2>&1 & echo "lancé"; fi ;;
+    demarrer|start|lancer) if ! garde_veilleur; then exit 2; fi; if kill -0 "$(cat "$VERROU/pid" 2>/dev/null)" 2>/dev/null; then echo "déjà lancé"; else DEVZONE_PORTS_AUTO_REEL=oui bash "$0" boucle >/dev/null 2>&1 & echo "lancé"; fi ;;
     arreter|stop) arreter_veilleur; echo "arrêté" ;;
     nettoyer|clean) nettoyer_auto_tout ;;
     auto) case "${2:-}" in on) ecrire ports_auto on; echo "✔ ports auto activés" ;; off) ecrire ports_auto off; arreter_veilleur; echo "✔ ports auto désactivés" ;; *) echo "devzone : port : auto on|off" >&2; exit 2 ;; esac ;;

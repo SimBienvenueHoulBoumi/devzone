@@ -60,25 +60,6 @@ cluster_ecrire() {
     etat_ecrire cluster "$1"
 }
 
-# Contexte de l'hôte (KUBECONFIG de l'hôte) qui pointe sur le cluster donné :
-# le cluster= de l'état attend le contexte réel de l'hôte (ex. docker-desktop),
-# pas le contexte « devzone » posé sur le cluster des services
-contexte_hote_du_cluster() {
-    local cluster="$1" hote ctx
-    hote="${DEVZONE_KUBE_HOTE:-$HOME/.kube/hote.config}"
-    while IFS= read -r ctx; do
-        [ -n "$ctx" ] || continue
-        # Le contexte « devzone » est posé par devzone sur le cluster des
-        # services : on cherche le contexte de l'hôte qui y pointe
-        [ "$ctx" = devzone ] && continue
-        if [ "$(KUBECONFIG="$hote" kubectl config view -o jsonpath="{.contexts[?(@.name=\"$ctx\")].context.cluster}" 2>/dev/null || true)" = "$cluster" ]; then
-            echo "$ctx"
-            return 0
-        fi
-    done < <(KUBECONFIG="$hote" kubectl config get-contexts -o name 2>/dev/null)
-    return 1
-}
-
 cluster_est_dedie() {
     [ "$1" = "${CLUSTER_DEDIE}" ]
 }
