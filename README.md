@@ -36,6 +36,7 @@ devzone prépare un devcontainer Ubuntu lancé par Docker, avec des versions d'o
 ### Prérequis
 
 - Docker Desktop (ou Docker Engine sous Linux). Pour Kubernetes (facultatif) : activer le cluster de Docker Desktop (*Settings → Kubernetes → Enable Kubernetes*).
+- Pour le [workspace Kubernetes](manage/docs/reference.md#workspace-kubernetes) (facultatif, `devzone workspace migrer` pour quitter le poste Docker, `revenir` pour y retourner) : un cluster Kubernetes 1.30 ou plus, `kubectl` et `helm` sur la machine, et Docker pour lire les volumes à migrer.
 - Node et npm (pour `npx` ou l'installation globale).
 - `make` (nécessaire pour `make shell` ; sous Windows sans `make`, voir le tableau « Au quotidien »).
 

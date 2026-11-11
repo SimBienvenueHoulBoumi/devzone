@@ -422,7 +422,7 @@ devzone $(version) : environnement de développement conteneurisé
   devzone desinstaller     dans un dossier devzone : retire conteneur, image, volumes
                            (à lancer avant npm uninstall -g devzone)
   devzone workspace demarrer|arreter|etat|shell
-  devzone workspace vscode|copier-vers|copier-depuis
+  devzone workspace vscode|copier-vers|copier-depuis|migrer|revenir|nettoyer-docker
                            poste Kubernetes : pilote le chart devzone-workspace
   devzone --version
 EOF
