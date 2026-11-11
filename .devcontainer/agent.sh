@@ -109,7 +109,14 @@ agent_lancer() {
         fi
         echo "=== modèle opencode/$m début $(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$journal"
         offset="$(wc -c <"$journal")"
-        (cd "$dossier" && DEVZONE_AGENT_SESSION=1 opencode run --print-logs --log-level ERROR --auto -m "opencode/$m" "$(cat "$consigne_courante")" </dev/null >>"$journal" 2>&1) &
+        local agent_kube="$etat/kubeconfig"
+        if [ -f "$HOME/.kube/config" ]; then
+            cp "$HOME/.kube/config" "$agent_kube"
+            KUBECONFIG="$agent_kube" kubectl config use-context devzone >/dev/null 2>&1 || true
+        else
+            : >"$agent_kube"
+        fi
+        (cd "$dossier" && KUBECONFIG="$agent_kube" DEVZONE_AGENT_SESSION=1 opencode run --print-logs --log-level ERROR --auto -m "opencode/$m" "$(cat "$consigne_courante")" </dev/null >>"$journal" 2>&1) &
         pid=$!
         demarre=0
         discard=0

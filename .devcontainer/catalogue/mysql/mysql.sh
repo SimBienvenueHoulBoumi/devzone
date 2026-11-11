@@ -35,8 +35,9 @@ regenerer_identifiants() {
 }
 # Raccourci kubectl dans le namespace devzone-mysql
 k() { kubectl --context devzone -n "$NS" "$@"; }
-# Le namespace devzone-mysql existe-t-il ?
-installe() { kubectl --context devzone get namespace "$NS" >/dev/null 2>&1; }
+# Le namespace devzone-mysql existe-t-il ? Lecture des namespaces réservée à
+# l'administrateur (#430)
+installe() { compte_admin "$(compte_ctx)" get namespace "$NS" >/dev/null 2>&1; }
 # Contexte du module : celui du cluster de devzone
 contexte() {
     local c
@@ -81,9 +82,7 @@ installer() {
         return 1
     fi
     echo "▶ MySQL sur le cluster $CTX (namespace $NS)…"
-    kubectl --context devzone create namespace "$NS" --dry-run=client -o yaml |
-        kubectl --context devzone apply -f - >/dev/null
-    kubectl --context devzone label namespace "$NS" "$CLUSTER_ETIQUETTE" --overwrite >/dev/null
+    compte_namespace "$CTX" "$NS"
     namespace_isoler "$NS" >/dev/null
     if k get statefulset mysql >/dev/null 2>&1; then
         echo "devzone : catalogue mysql : installation existante dans $NS, adoptée (volume et root.env gardés)"
@@ -124,7 +123,9 @@ supprimer_donnees() {
     [ -n "$CTX" ] || refuse "aucun cluster choisi : devzone activer mysql"
     installe || refuse "module inactif : devzone activer mysql"
     echo "▶ Suppression de MySQL et de ses volumes sur $CTX…"
-    kubectl --context devzone delete namespace "$NS" --wait=true >/dev/null
+    # RoleBinding retiré puis namespace supprimé par l'administrateur (#430)
+    compte_retirer "$CTX" "$NS" >/dev/null 2>&1 || true
+    compte_admin "$CTX" delete namespace "$NS" --wait=true >/dev/null
     relais_arreter mysql
     rm -f "$(fichier_echec)"
     echo "✔ namespace $NS et volume supprimés ; workspace/.mysql/root.env gardé"

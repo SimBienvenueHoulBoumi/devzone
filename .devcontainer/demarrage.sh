@@ -16,6 +16,10 @@ ICI="$(dirname "$0")"
 DEVZONE_RELAIS_REEL=oui bash "$ICI/docker-relais.sh" || echo "démarrage : relais Docker non corrigé (devzone reparer)"
 bash "$ICI/git-identite.sh" || echo "démarrage : identité git non traitée (devzone demarrer)"
 bash "$ICI/kube-config.sh" || echo "démarrage : clusters non traités (devzone demarrer)"
+# Jeton du compte Kubernetes limité (#430) : 24 h, renouvelé à chaque
+# démarrage ; compte posé au passage s'il manque. Sans cluster des services
+# choisi, rien à faire
+bash "$ICI/kube-compte.sh" jeton || echo "démarrage : jeton du compte kubernetes non renouvelé (devzone reparer)"
 # Module gitlab actif : /etc/hosts est un montage Docker régénéré à chaque
 # démarrage, gitlab.localhost doit être re-pose (ssh, glab et getent passent
 # par le résolveur système) ; hote-poser n'échoue jamais (avertissement seul)

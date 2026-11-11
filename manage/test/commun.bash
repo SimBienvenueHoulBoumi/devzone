@@ -57,6 +57,7 @@ agent_isole() {
     export FAKE_OP_LOG="$BATS_TEST_TMPDIR/opencode.log"
     export FAKE_OP_CONSIGNE_LOG="$BATS_TEST_TMPDIR/consignes.log"
     export FAKE_OP_CONFIG_LOG="$BATS_TEST_TMPDIR/config.log"
+    export FAKE_OP_KUBECONFIG_LOG="$BATS_TEST_TMPDIR/kubeconfig.log"
     export FAKE_OP_ECHEC_MODELS="" FAKE_OP_MESSAGE="" FAKE_OP_RESEAU_MODELS=""
     export FAKE_OP_RESEAU_CHAQUE="" FAKE_OP_MUET_MODELS="" FAKE_OP_FIGEE_MODELS=""
     export FAKE_OP_TEXTE_MODELS="" FAKE_OP_ANCIEN_ERREUR_MODELS="" FAKE_OP_DUREE=30
@@ -114,6 +115,7 @@ case "${1:-}" in
         echo "$modele" >>"${FAKE_OP_LOG:?}"
         printf '%s\n---\n' "$consigne" >>"${FAKE_OP_CONSIGNE_LOG:?}"
         printf '%s\n' "${OPENCODE_CONFIG_CONTENT:-}" >"${FAKE_OP_CONFIG_LOG:?}"
+        printf '%s\n' "${KUBECONFIG:-}" >"${FAKE_OP_KUBECONFIG_LOG:?}"
         case " ${FAKE_OP_ANCIEN_ERREUR_MODELS:-} " in
             *" $modele "*)
                 echo "Free usage limit"

@@ -16,6 +16,7 @@ setup() {
     cp "$RACINE_TEST/.devcontainer/cluster.sh" "$T/app/cluster.sh"
     cp "$RACINE_TEST/.devcontainer/etat.sh" "$T/app/etat.sh"
     cp "$RACINE_TEST/.devcontainer/kube-joignable.sh" "$T/app/kube-joignable.sh"
+    cp "$RACINE_TEST/.devcontainer/kube-compte.sh" "$T/app/kube-compte.sh"
     chmod +x "$APP"
     export PATH="$T/bin:$PATH"
 
@@ -76,6 +77,9 @@ case "$*" in
     *"config view"*)
         echo x
         ;;
+    *"create token"*)
+        echo jeton-de-test
+        ;;
 esac
 KUBE
     chmod +x "$T/bin/kubectl"
@@ -117,6 +121,22 @@ KUBE
     [[ "$(cat "$T/actions.log")" == *"gitlab hote-poser"* ]] || false
     [[ "$(cat "$T/actions.log")" == *"gitlab relais-lancer"* ]] || false
     [[ "$(cat "$T/actions.log")" == *"postgres relais-lancer"* ]] || false
+}
+
+@test "reparer : le jeton du compte kubernetes est renouvelé" {
+    faux_kubectl
+    printf 'cluster=docker-desktop\n' >"$DEVZONE_ETAT"
+    run bash "$APP" reparer
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"✔ compte kubernetes"* ]] || false
+    grep -q 'create token devzone-agent -n devzone-system --duration=24h' "$T/kubectl.log" || false
+}
+
+@test "reparer : sans cluster des services, pas de jeton du compte kubernetes" {
+    run bash "$APP" reparer
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"compte kubernetes"* ]] || false
+    ! grep -q 'create token' "$T/kubectl.log" 2>/dev/null || false
 }
 
 @test "reparer : lance le veilleur du catalogue" {

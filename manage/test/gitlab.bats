@@ -245,7 +245,7 @@ attendre_journal() {
     echo "dev" >"$KIND_CLUSTERS"
     run bash "$GITLAB" installer
     [ "$status" -eq 0 ] || false
-    grep -q -- "--kube-context devzone upgrade --install gitlab gitlab/gitlab --version 9.11.16 --namespace devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log" || false
+    grep -Eq -- "helm --kubeconfig [^ ]+ upgrade --install gitlab gitlab/gitlab --version 9.11.16 --namespace devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log" || false
     ! grep -q "create cluster" "$BATS_TEST_TMPDIR/kind.log" || false
 }
 
@@ -264,7 +264,7 @@ attendre_journal() {
     run bash "$GITLAB" installer
     [ "$status" -eq 0 ] || false
     ! grep -q "create cluster" "$BATS_TEST_TMPDIR/kind.log" || false
-    grep -q -- "--kube-context devzone upgrade --install gitlab gitlab/gitlab" "$BATS_TEST_TMPDIR/helm.log" || false
+    grep -Eq -- "helm --kubeconfig [^ ]+ upgrade --install gitlab gitlab/gitlab" "$BATS_TEST_TMPDIR/helm.log" || false
 }
 
 @test "gitlab : values.yaml configure le clone SSH (port 2224) et des services ClusterIP" {
@@ -318,8 +318,8 @@ attendre_journal() {
 @test "gitlab : charts figés, contexte devzone et namespace de l'instance" {
     run bash "$GITLAB" installer
     [ "$status" -eq 0 ]
-    grep -q -- "--kube-context devzone upgrade --install gitlab gitlab/gitlab --version 9.11.16 --namespace devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log"
-    grep -q -- "--kube-context devzone upgrade --install gitlab-runner gitlab/gitlab-runner --version 0.88.2 --namespace devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log"
+    grep -Eq -- "helm --kubeconfig [^ ]+ upgrade --install gitlab gitlab/gitlab --version 9.11.16 --namespace devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log"
+    grep -Eq -- "helm --kubeconfig [^ ]+ upgrade --install gitlab-runner gitlab/gitlab-runner --version 0.88.2 --namespace devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log"
 }
 
 @test "gitlab : secrets dans workspace/.gitlab (600), jamais dans le dépôt ni affichés" {
@@ -425,8 +425,10 @@ attendre_journal() {
     [ "$status" -eq 0 ]
     run bash "$GITLAB" desinstaller
     [ "$status" -eq 0 ]
-    grep -q -- "helm --kube-context devzone uninstall gitlab --namespace devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log"
-    grep -q "kubectl --context devzone delete namespace devzone-gitlab --ignore-not-found" "$BATS_TEST_TMPDIR/kubectl.log"
+    grep -Eq -- "helm --kubeconfig [^ ]+ uninstall gitlab --namespace devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log"
+    # Namespace supprimé par l'administrateur, pas par le compte limité (#430)
+    grep -q -- "--kubeconfig=.* delete namespace devzone-gitlab --ignore-not-found" "$BATS_TEST_TMPDIR/kubectl.log"
+    ! grep -q -- "--context devzone delete namespace devzone-gitlab" "$BATS_TEST_TMPDIR/kubectl.log" || false
     [ -f "$SECRETS/rails-secret.yaml" ]
     [ ! -e "$SECRETS/root-password" ] || false
     [ ! -e "$SECRETS/root-token" ] || false
@@ -476,7 +478,7 @@ attendre_journal() {
     run bash "$DEVZONE" activer gitlab
     [ "$status" -eq 0 ]
     [[ "$output" != *"déjà actif, rien à faire"* ]] || false
-    grep -q -- "--kube-context devzone upgrade --install gitlab gitlab/gitlab --version 9.11.16 --namespace devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log"
+    grep -Eq -- "helm --kubeconfig [^ ]+ upgrade --install gitlab gitlab/gitlab --version 9.11.16 --namespace devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log"
 }
 
 @test "devzone appliquer : gitlab actif, prêt sans runner en ligne → installer" {
@@ -485,7 +487,7 @@ attendre_journal() {
     mkdir -p "$SECRETS" && echo jeton >"$SECRETS/root-token"
     run bash "$DEVZONE" appliquer
     [ "$status" -eq 0 ]
-    grep -q -- "--kube-context devzone upgrade --install gitlab gitlab/gitlab --version 9.11.16 --namespace devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log"
+    grep -Eq -- "helm --kubeconfig [^ ]+ upgrade --install gitlab gitlab/gitlab --version 9.11.16 --namespace devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log"
 }
 
 @test "devzone appliquer : gitlab actif, prêt runner en ligne → pas d'installer" {

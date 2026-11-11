@@ -63,12 +63,14 @@ voulu() {
 }
 
 # Application présente dans le cluster : namespace étiqueté et StatefulSet du
-# nom de l'application ; sans cluster choisi ou absente : rien
+# nom de l'application ; sans cluster choisi ou absente : rien. Lecture des
+# namespaces réservée à l'administrateur (#430).
 presente() {
-    local ns
-    [ -n "$(cluster_lu)" ] || return 1
+    local ctx ns
+    ctx="$(cluster_lu)"
+    [ -n "$ctx" ] || return 1
     ns="$(app_ns "$1")"
-    kubectl --context devzone get namespace "$ns" >/dev/null 2>&1 &&
+    compte_admin "$ctx" get namespace "$ns" >/dev/null 2>&1 &&
         kubectl --context devzone -n "$ns" get statefulset "$1" >/dev/null 2>&1
 }
 
@@ -148,11 +150,14 @@ app_relais_arrete() {
     ! relais_actif "$app"
 }
 
-# Avertit des PVC mysql non montés par le StatefulSet (#440)
+# Avertit des PVC mysql non montés par le StatefulSet (#440). Lecture des
+# namespaces réservée à l'administrateur (#430).
 catalogue_mysql_volumes_inutilises() {
-    local ns monte pvc liste
+    local ctx ns monte pvc liste
+    ctx="$(cluster_lu)"
+    [ -n "$ctx" ] || return 0
     ns="$(app_ns mysql)"
-    kubectl --context devzone get namespace "$ns" >/dev/null 2>&1 || return 0
+    compte_admin "$ctx" get namespace "$ns" >/dev/null 2>&1 || return 0
     monte="$(kubectl --context devzone -n "$ns" get statefulset mysql -o jsonpath='{.spec.volumeClaimTemplates[0].metadata.name}' 2>/dev/null || true)"
     [ -n "$monte" ] || return 0
     liste="$(kubectl --context devzone -n "$ns" get pvc -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null | grep -E '\-mysql-0$' || true)"

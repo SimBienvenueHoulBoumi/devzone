@@ -130,8 +130,8 @@ SETSID
 @test "gitlab : helm dans le contexte devzone et le namespace devzone-gitlab, aucun kind créé" {
     run bash "$GITLAB" installer
     [ "$status" -eq 0 ] || false
-    grep -q -- "--kube-context devzone upgrade --install gitlab gitlab/gitlab --version 9.11.16 --namespace devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log" || false
-    grep -q -- "--kube-context devzone upgrade --install gitlab-runner gitlab/gitlab-runner --version 0.88.2 --namespace devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log" || false
+    grep -Eq -- "--kubeconfig [^ ]+ upgrade --install gitlab gitlab/gitlab --version 9.11.16 --namespace devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log" || false
+    grep -Eq -- "--kubeconfig [^ ]+ upgrade --install gitlab-runner gitlab/gitlab-runner --version 0.88.2 --namespace devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log" || false
     ! grep -q "create cluster" "$BATS_TEST_TMPDIR/kind.log" || false
 }
 
@@ -191,14 +191,14 @@ SETSID
     grep -qx "gitlab" "$KIND_CLUSTERS" || false
     ! grep -q "delete cluster" "$BATS_TEST_TMPDIR/kind.log" || false
     # L'installation dans le cluster des services a bien eu lieu avant la question
-    grep -q -- "--kube-context devzone upgrade --install gitlab gitlab/gitlab" "$BATS_TEST_TMPDIR/helm.log" || false
+    grep -Eq -- "--kubeconfig [^ ]+ upgrade --install gitlab gitlab/gitlab" "$BATS_TEST_TMPDIR/helm.log" || false
 }
 
 @test "gitlab migrer --oui : installe, refait le seed, puis supprime kind-gitlab" {
     printf 'gitlab\n' >"$KIND_CLUSTERS"
     run bash "$DEVZONE" gitlab migrer --oui
     [ "$status" -eq 0 ] || false
-    grep -q -- "--kube-context devzone upgrade --install gitlab gitlab/gitlab" "$BATS_TEST_TMPDIR/helm.log" || false
+    grep -Eq -- "--kubeconfig [^ ]+ upgrade --install gitlab gitlab/gitlab" "$BATS_TEST_TMPDIR/helm.log" || false
     grep -q "api/v4/projects" "$BATS_TEST_TMPDIR/curl.log" 2>/dev/null ||
         grep -q "gitlab-rails runner" "$BATS_TEST_TMPDIR/kubectl.log" || false
     grep -q "kind delete cluster --name gitlab" "$BATS_TEST_TMPDIR/kind.log" || false

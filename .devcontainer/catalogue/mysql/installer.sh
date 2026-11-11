@@ -39,9 +39,7 @@ mysql_installer_claim() {
         return 1
     fi
     echo "▶ MySQL sur le cluster $CTX (namespace $ns, volume ${claim}-mysql-0)…"
-    kubectl --context devzone create namespace "$ns" --dry-run=client -o yaml |
-        kubectl --context devzone apply -f - >/dev/null
-    kubectl --context devzone label namespace "$ns" "$CLUSTER_ETIQUETTE" --overwrite >/dev/null
+    compte_namespace "$CTX" "$ns"
     namespace_isoler "$ns" >/dev/null
     mysql_secret
     k delete statefulset mysql --ignore-not-found >/dev/null 2>&1 || true

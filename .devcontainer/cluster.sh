@@ -18,6 +18,7 @@
 #   kube_joignable_depuis_conteneur FICHIER   réécrit 127.0.0.1/localhost
 #   relais_lancer NOM CTX NS CIBLE PORTS…   port-forward gardé en vie
 #   relais_actif NOM / relais_arreter NOM
+#   compte_* (kube-compte.sh #430)    compte limité et contexte administrateur
 
 # Clusters kind et de l'hôte, comme remoteEnv de devcontainer.json : un
 # docker exec ou un script lancé hors du terminal du conteneur ne l'a pas,
@@ -51,6 +52,12 @@ CLUSTER_ETIQUETTE=app.kubernetes.io/managed-by=devzone
 # l'enveloppe kind, qui l'applique aussi aux clusters créés à la main
 # shellcheck source=SCRIPTDIR/kube-joignable.sh
 . "$(dirname "${BASH_SOURCE[0]}")/kube-joignable.sh"
+
+# Compte Kubernetes limité (#430) : compte_poser, compte_autoriser,
+# compte_retirer, compte_jeton, compte_admin (contexte administrateur) ;
+# les installeurs l'utilisent, cluster_liberer aussi
+# shellcheck source=SCRIPTDIR/kube-compte.sh
+. "$(dirname "${BASH_SOURCE[0]}")/kube-compte.sh"
 
 cluster_lu() {
     grep -E '^cluster=' "$ETAT" 2>/dev/null | tail -1 | cut -d= -f2- || true
@@ -317,7 +324,9 @@ cluster_liberer() {
     local ctx="$1" reste
     cluster_est_dedie "$ctx" || return 0
     kind get clusters 2>/dev/null | grep -qx "devzone${INSTANCE_SUFFIX}" || return 0
-    reste="$(kubectl --context "$ctx" get namespaces -l "$CLUSTER_ETIQUETTE" -o name 2>/dev/null || true)"
+    # Lecture des namespaces étiquetés par l'administrateur (#430) : la liste
+    # des namespaces est refusée au compte limité
+    reste="$(compte_admin "$ctx" get namespaces -l "$CLUSTER_ETIQUETTE" -o name 2>/dev/null || true)"
     if [ -z "$reste" ]; then
         kind delete cluster --name "devzone${INSTANCE_SUFFIX}" >/dev/null 2>&1 || true
         echo "▶ Cluster kind devzone supprimé (plus aucun service)."

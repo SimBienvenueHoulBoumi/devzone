@@ -49,9 +49,12 @@ app_installer() {
         return 1
     fi
     echo "▶ Application $app sur le cluster $CTX (namespace $ns)…"
-    kubectl --context devzone create namespace "$ns" --dry-run=client -o yaml |
-        kubectl --context devzone apply -f - >/dev/null
-    kubectl --context devzone label namespace "$ns" "$CLUSTER_ETIQUETTE" --overwrite >/dev/null
+    # Namespace créé et étiqueté par l'administrateur (#430), puis compte
+    # limité autorisé dans le namespace
+    compte_admin "$CTX" create namespace "$ns" --dry-run=client -o yaml |
+        compte_admin "$CTX" apply -f - >/dev/null
+    compte_admin "$CTX" label namespace "$ns" "$CLUSTER_ETIQUETTE" --overwrite >/dev/null
+    compte_autoriser "$CTX" "$ns"
     namespace_isoler "$ns" >/dev/null
     app_secret "$app" "$ns"
     local claim=donnees
@@ -82,10 +85,16 @@ app_installer() {
 # le volume (PVC) et les données restent (#441) : la suppression des données est
 # confirmée à part (devzone mysql supprimer-donnees)
 app_desinstaller() {
-    local app="$1" ns claim pvc
+    local app="$1" ns claim pvc CTX
     ns="$(app_ns "$app")"
     relais_arreter "$app"
     rm -f "$(fichier_echec "$app")"
+    # RoleBinding retiré par l'administrateur (#430) : le namespace et le
+    # volume restent, l'autorisation du compte ne doit pas traîner
+    CTX="$(cluster_lu)" || true
+    if [ -n "$CTX" ]; then
+        compte_retirer "$CTX" "$ns" >/dev/null 2>&1 || true
+    fi
     claim="$(kubectl --context devzone -n "$ns" get statefulset "$app" \
         -o jsonpath='{.spec.volumeClaimTemplates[0].metadata.name}' 2>/dev/null || true)"
     kubectl --context devzone -n "$ns" delete "statefulset/$app" "service/$app" \
