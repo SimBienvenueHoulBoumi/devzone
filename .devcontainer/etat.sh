@@ -35,6 +35,16 @@ etat_verrou_prendre() {
         fi
         sleep 1
     done
+    # flock sérialise l'écriture quand il existe (Linux), mkdir reste seul garde-fou sous macOS (#476, même motif que #461).
+    if command -v flock >/dev/null 2>&1; then
+        if { exec 8>"${ETAT}.lock"; } && flock -w 10 8; then
+            ETAT_VERROU_FLOCK=1
+        else
+            rm -rf "${ETAT}.verrou" 2>/dev/null || true
+            echo "devzone : état verrouillé ailleurs (flock) : ${ETAT}.lock" >&2
+            return 1
+        fi
+    fi
     ETAT_VERROU_PROF=1
     return 0
 }
@@ -45,6 +55,11 @@ etat_verrou_lacher() {
     [ "$prof" -gt 0 ] || return 0
     [ "$prof" -gt 1 ] && { ETAT_VERROU_PROF=$((prof - 1)); return 0; }
     ETAT_VERROU_PROF=0
+    if [ "${ETAT_VERROU_FLOCK:-0}" = 1 ]; then
+        flock -u 8 2>/dev/null || true
+        exec 8>&-
+        ETAT_VERROU_FLOCK=0
+    fi
     rm -rf "${ETAT}.verrou" 2>/dev/null || true
     return 0
 }
