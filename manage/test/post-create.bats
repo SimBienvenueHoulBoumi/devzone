@@ -8,6 +8,8 @@ setup() {
     kube_isole
     SCRIPT="$BATS_TEST_DIRNAME/../../.devcontainer/post-create.sh"
     DEVCONTAINER="$BATS_TEST_DIRNAME/../../.devcontainer/devcontainer.json"
+    LOCK="$BATS_TEST_DIRNAME/../../.devcontainer/devcontainer-lock.json"
+    DOCKERFILE="$BATS_TEST_DIRNAME/../../.devcontainer/Dockerfile"
     mkdir -p "$BATS_TEST_TMPDIR/bin"
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
 }
@@ -39,4 +41,15 @@ setup() {
 
 @test "volume devzone-agent : post-create.sh en fait le chown" {
     grep -q '/home/vscode/.local/state/oc-lancer' "$SCRIPT" || false
+}
+
+@test "devcontainer.json et devcontainer-lock.json : pas de feature python" {
+    ! grep -Fq 'features/python' "$DEVCONTAINER" || false
+    ! grep -Fq 'features/python' "$LOCK" || false
+}
+
+@test "Dockerfile : python3-venv et python-is-python3 installes par apt" {
+    grep -Fq 'python3-venv' "$DOCKERFILE" || false
+    grep -Fq 'python-is-python3' "$DOCKERFILE" || false
+    grep -Fq 'apt-get install' "$DOCKERFILE" || false
 }
