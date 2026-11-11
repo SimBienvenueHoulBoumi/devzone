@@ -120,6 +120,20 @@ tour() {
     ! grep -q port-forward "$T/kubectl.log" || false
 }
 
+@test "ports : service mysql relaye sur 3306 quand mysql est actif" {
+    echo "mysql=on" >"$T/poste/.devzone.modules"
+    tour
+    sleep 0.3
+    grep -q -- "--namespace devzone-mysql port-forward --address 127.0.0.1 svc/mysql 3306:3306" "$T/kubectl.log" || false
+}
+
+@test "ports : sans module mysql, aucun port 3306 relaye" {
+    echo "postgres=on" >"$T/poste/.devzone.modules"
+    tour
+    sleep 0.3
+    ! grep -q "svc/mysql" "$T/kubectl.log" || false
+}
+
 @test "ports demarrer : un seul veilleur, arreter le retire avec ses port-forward" {
     ecoute 5173
     cd "$T/poste"

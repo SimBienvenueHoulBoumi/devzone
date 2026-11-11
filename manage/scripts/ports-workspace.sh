@@ -54,13 +54,17 @@ pw_ports_pod() {
 }
 
 # Services de devzone à relayer, une ligne « port|namespace|cible » par service des
-# modules actifs : postgres (5432), et pgAdmin s'il existe dans le namespace.
+# modules actifs : postgres (5432) et pgAdmin s'il existe dans le namespace, mysql (3306).
 pw_services() {
-    grep -qxE 'postgres=(on|true|oui)' .devzone.modules 2>/dev/null || return 0
-    echo "5432|devzone-postgres|svc/postgres"
-    local port
-    port="$(pw_kubectl --namespace devzone-postgres get svc pgadmin -o "$PW_JSONPATH" 2>/dev/null || true)"
-    case "$port" in '' | *[!0-9]*) ;; *) echo "$port|devzone-postgres|svc/pgadmin" ;; esac
+    if grep -qxE 'postgres=(on|true|oui)' .devzone.modules 2>/dev/null; then
+        echo "5432|devzone-postgres|svc/postgres"
+        local port
+        port="$(pw_kubectl --namespace devzone-postgres get svc pgadmin -o "$PW_JSONPATH" 2>/dev/null || true)"
+        case "$port" in '' | *[!0-9]*) ;; *) echo "$port|devzone-postgres|svc/pgadmin" ;; esac
+    fi
+    if grep -qxE 'mysql=(on|true|oui)' .devzone.modules 2>/dev/null; then
+        echo "3306|devzone-mysql|svc/mysql"
+    fi
 }
 
 # Le port $1 est-il déjà pris sur le poste ? (lsof, sinon nc -z)
