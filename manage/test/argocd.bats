@@ -82,6 +82,17 @@ argocd_installe() {
     printf 'argocd=on\ncluster=docker-desktop\n' >"$DEVZONE_ETAT"
 }
 
+attendre_nohup() {
+    local motif="$1" i=0
+    while [ "$i" -lt 50 ]; do
+        if grep -q -- "$motif" "$BATS_TEST_TMPDIR/nohup.log" 2>/dev/null; then return 0; fi
+        i=$((i + 1))
+        sleep 0.1
+    done
+    echo "nohup.log : ligne absente après 5 s : $motif" >&2
+    return 1
+}
+
 @test "argocd : désactivé par défaut, état du module facultatif" {
     run bash "$DEVZONE" actif argocd
     [ "$status" -ne 0 ]
@@ -99,7 +110,7 @@ argocd_installe() {
     # Étiquette du namespace posée par l'administrateur, pas par le compte
     # limité (#430)
     grep -q -- '--context docker-desktop label namespace devzone-argocd app.kubernetes.io/managed-by=devzone' "$BATS_TEST_TMPDIR/kubectl.log"
-    grep -q 'helm --kube-context devzone upgrade --install argocd argo/argo-cd --version 10.14.0 --namespace devzone-argocd' "$BATS_TEST_TMPDIR/helm.log"
+    grep -Eq 'helm --kubeconfig [^ ]+ --kube-context docker-desktop upgrade --install argocd argo/argo-cd --version 10.14.0 --namespace devzone-argocd' "$BATS_TEST_TMPDIR/helm.log"
     grep -q -- '-f .*\.devcontainer/argocd/values.yaml' "$BATS_TEST_TMPDIR/helm.log"
     [ -f "$SECRETS/admin.env" ]
     [ "$(stat -c '%a' "$SECRETS/admin.env")" = 600 ]
@@ -108,7 +119,7 @@ argocd_installe() {
     [ -f "$DEVZONE_RACINE/.password" ]
     [ "$(stat -c '%a' "$DEVZONE_RACINE/.password")" = 600 ]
     grep -q "$(printf 'argocd\thttps://127.0.0.1:8443\tadmin\tsecret-admin')" "$DEVZONE_RACINE/.password"
-    grep -q '8443:443' "$BATS_TEST_TMPDIR/nohup.log"
+    attendre_nohup '8443:443'
     [[ "$output" == *"✔ module argocd prêt : https://127.0.0.1:8443"* ]] || false
     [[ "$output" != *"secret-admin"* ]] || false
 }
@@ -135,7 +146,7 @@ argocd_installe() {
     [ "$status" -eq 0 ]
     [[ "$output" == *"relais relancé"* ]] || false
     [ ! -f "$BATS_TEST_TMPDIR/helm.log" ]
-    grep -q '8443:443' "$BATS_TEST_TMPDIR/nohup.log"
+    attendre_nohup '8443:443'
 }
 
 @test "desactiver argocd : helm uninstall, namespace supprimé, services conservés" {
@@ -143,7 +154,7 @@ argocd_installe() {
     run bash "$DEVZONE" desactiver argocd
     [ "$status" -eq 0 ]
     grep -qx 'argocd=off' "$DEVZONE_ETAT"
-    grep -q 'helm --kube-context devzone uninstall argocd -n devzone-argocd' "$BATS_TEST_TMPDIR/helm.log"
+    grep -Eq 'helm --kubeconfig [^ ]+ --kube-context docker-desktop uninstall argocd -n devzone-argocd' "$BATS_TEST_TMPDIR/helm.log"
     # Namespace supprimé par l'administrateur, pas par le compte limité (#430)
     grep -q -- '--context docker-desktop delete namespace devzone-argocd' "$BATS_TEST_TMPDIR/kubectl.log"
     [ ! -e "$SECRETS" ]

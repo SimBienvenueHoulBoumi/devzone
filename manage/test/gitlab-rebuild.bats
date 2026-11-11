@@ -189,7 +189,7 @@ contexte_courant() {
     [ "$status" -eq 0 ] || false
     ! grep -q 'kind create' "$BATS_TEST_TMPDIR/kind.log" || false
     ! grep -q 'export kubeconfig' "$BATS_TEST_TMPDIR/kind.log" || false
-    grep -qF -- "--kube-context devzone upgrade --install gitlab gitlab/gitlab --version 9.11.16 --namespace devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log" || false
+    grep -Eq -- "helm --kubeconfig [^ ]+ --kube-context docker-desktop upgrade --install gitlab gitlab/gitlab --version 9.11.16 --namespace devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log" || false
     [ "$(contexte_courant)" = docker-desktop ] || false
 }
 

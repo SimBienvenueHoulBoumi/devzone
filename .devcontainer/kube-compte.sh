@@ -46,6 +46,23 @@ compte_admin() {
     fi
 }
 
+# helm sur le contexte administrateur ctx : les charts créent des CRD, des
+# ClusterRoles ou des RoleBindings, hors des droits du compte limité (edit).
+# Usage : compte_helm <ctx> <args helm…>
+compte_helm() {
+    local ctx="$1" conf
+    shift
+    if [ -z "$ctx" ]; then
+        ctx="$(kubectl config current-context 2>/dev/null || true)"
+    fi
+    conf="$(compte_config_admin "$ctx")"
+    if [ -n "$ctx" ]; then
+        helm --kubeconfig "$conf" --kube-context "$ctx" "$@"
+    else
+        helm --kubeconfig "$conf" "$@"
+    fi
+}
+
 # Contexte administrateur d'une installation : le cluster des services choisi
 # (cluster_lu de cluster.sh), sinon le contexte courant de kubectl.
 compte_ctx() {

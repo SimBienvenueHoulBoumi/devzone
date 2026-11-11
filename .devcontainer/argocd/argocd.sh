@@ -142,7 +142,7 @@ installer() {
     helm repo add argo https://argoproj.github.io/argo-helm >/dev/null 2>&1 || true
     helm repo update >/dev/null 2>&1 || true
     echo "▶ Installation d'Argo CD $ARGOCD_VERSION dans $NS…"
-    helm --kube-context devzone upgrade --install argocd argo/argo-cd \
+    compte_helm "$(compte_ctx)" upgrade --install argocd argo/argo-cd \
         --version "$ARGOCD_VERSION" \
         --namespace "$NS" \
         --create-namespace \
@@ -163,7 +163,7 @@ desinstaller() {
     relais_arreter argocd
     if installe; then
         echo "▶ Suppression d'Argo CD sur le cluster des services…"
-        if ! helm --kube-context devzone uninstall argocd -n "$NS" >/dev/null 2>&1; then
+        if ! compte_helm "$(compte_ctx)" uninstall argocd -n "$NS" >/dev/null 2>&1; then
             echo "devzone : argocd : helm uninstall a échoué (release déjà absente ?)" >&2
         fi
         ctx="$(compte_ctx)"

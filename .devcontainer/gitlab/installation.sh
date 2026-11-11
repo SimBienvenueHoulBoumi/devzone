@@ -95,7 +95,7 @@ gitlab_installer() {
     # Secret Rails (#347) : réinstallation -> réappliquer le secret conservé avant
     # le helm upgrade --install (le chart le réutilise, sessions navigateur valides)
     gitlab_secrets_appliquer
-    helm --kube-context devzone upgrade --install gitlab gitlab/gitlab \
+    compte_helm "$(compte_ctx)" upgrade --install gitlab gitlab/gitlab \
         --version 9.11.16 \
         --namespace "$GITLAB_NS" \
         --create-namespace \
@@ -130,7 +130,7 @@ gitlab_installer() {
     fi
     valeurs_runner="$(mktemp)"
     sed "s/__NAMESPACE__/$GITLAB_NS/g" "$ICI/runner-values.yaml" >"$valeurs_runner"
-    helm --kube-context devzone upgrade --install gitlab-runner gitlab/gitlab-runner \
+    compte_helm "$(compte_ctx)" upgrade --install gitlab-runner gitlab/gitlab-runner \
         --version 0.88.2 \
         --namespace "$GITLAB_NS" \
         -f "$valeurs_runner" \
@@ -160,8 +160,8 @@ gitlab_desinstaller() {
     gitlab_relais_arreter
     rm -rf "$(relais_dossier gitlab-web)" "$(relais_dossier gitlab-ssh)" \
         "$(relais_dossier gitlab-8929)" "$(relais_dossier gitlab-2224)"
-    helm --kube-context devzone uninstall gitlab --namespace "$GITLAB_NS" >/dev/null 2>&1 || true
-    helm --kube-context devzone uninstall gitlab-runner --namespace "$GITLAB_NS" >/dev/null 2>&1 || true
+    compte_helm "$(compte_ctx)" uninstall gitlab --namespace "$GITLAB_NS" >/dev/null 2>&1 || true
+    compte_helm "$(compte_ctx)" uninstall gitlab-runner --namespace "$GITLAB_NS" >/dev/null 2>&1 || true
     # RoleBinding retiré puis namespace supprimé par l'administrateur (#430)
     compte_retirer "$(compte_ctx)" "$GITLAB_NS" >/dev/null 2>&1 || true
     compte_admin "$(compte_ctx)" delete namespace "$GITLAB_NS" --ignore-not-found >/dev/null 2>&1 || true
