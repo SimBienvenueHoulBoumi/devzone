@@ -146,7 +146,7 @@ GETENT
     [ "$status" -eq 0 ] || false
     [ -f "$SECRETS/rails-secret.yaml" ] || false
     [ "$(stat -c %a "$SECRETS/rails-secret.yaml" 2>/dev/null || stat -f %Lp "$SECRETS/rails-secret.yaml")" = 600 ]
-    grep -q '^kind: Secret$' "$SECRETS/rails-secret.yaml" || false
+    jq -e '.kind == "Secret"' "$SECRETS/rails-secret.yaml" >/dev/null || false
     ! grep -q 'resourceVersion' "$SECRETS/rails-secret.yaml" || false
     [[ "$output" != *"c2VjcmV0czoK"* ]] || false
     grep -q -- "--kube-context devzone upgrade --install gitlab gitlab/gitlab" "$BATS_TEST_TMPDIR/helm.log" || false
@@ -211,7 +211,7 @@ GETENT
 }
 
 @test "gitlab : désinstallation simple garde rails-secret.yaml" {
-    printf 'secret-local\n' >"$SECRETS/rails-secret.yaml"
+    printf '%s\n' '{"kind":"Secret","metadata":{"name":"gitlab-rails-secret"}}' >"$SECRETS/rails-secret.yaml"
     printf 'root' >"$SECRETS/root-password"
     run bash "$GITLAB" desinstaller
     [ "$status" -eq 0 ] || false
@@ -221,7 +221,7 @@ GETENT
 }
 
 @test "gitlab : désinstallation complète --oui supprime rails-secret.yaml" {
-    printf 'secret-local\n' >"$SECRETS/rails-secret.yaml"
+    printf '%s\n' '{"kind":"Secret","metadata":{"name":"gitlab-rails-secret"}}' >"$SECRETS/rails-secret.yaml"
     run bash "$GITLAB" desinstaller --oui
     [ "$status" -eq 0 ] || false
     [ ! -e "$SECRETS" ] || false
@@ -238,7 +238,7 @@ GETENT
 @test "devzone : récapitulatif sans avertissement si le secret rails GitLab est conservé" {
     printf 'gitlab=on\n' >"$DEVZONE_ETAT"
     mkdir -p "$SECRETS"
-    echo secret-local >"$SECRETS/rails-secret.yaml"
+    printf '%s\n' '{"kind":"Secret","metadata":{"name":"gitlab-rails-secret"}}' >"$SECRETS/rails-secret.yaml"
     run bash "$DEVZONE"
     [ "$status" -eq 0 ] || false
     [[ "$output" != *"GitLab réinstallé"* ]] || false

@@ -12,34 +12,10 @@ GITLAB_RAILS_SECRET="gitlab-rails-secret"
 GITLAB_RAILS_FICHIER="$GITLAB_SECRETS_DIR/rails-secret.yaml"
 
 # Filtre jq : retire les champs propres au cluster (identité, version, gestion,
-# annotations du dernier apply) et rend un manifeste YAML réappliquable.
-GITLAB_RAILS_JQ='
-def scalaire:
-  if type == "string" then
-    if test("^[A-Za-z0-9._/=+-]+$") then . else tojson end
-  elif type == "number" or type == "boolean" then tostring
-  elif type == "null" then "null"
-  else tojson end;
-def yaml($ind):
-  if type == "object" then
-    (to_entries | map(
-      $ind + (.key | tostring) + ":" +
-      (if ((.value | type) == "object") or ((.value | type) == "array")
-       then "\n" + (.value | yaml($ind + "  "))
-       else " " + (.value | scalaire) end)
-    ) | join("\n"))
-  elif type == "array" then
-    (map($ind + "- " + (if type == "object" then "\n" + (yaml($ind + "  ")) else (. | scalaire) end)) | join("\n"))
-  else
-    $ind + scalaire
-  end;
-del(.metadata.resourceVersion, .metadata.uid, .metadata.creationTimestamp,
-    .metadata.managedFields, .metadata.ownerReferences,
-    .metadata.annotations["kubectl.kubernetes.io/last-applied-configuration"])
-| yaml("")
-'
+# annotations du dernier apply) et garde un manifeste JSON réappliquable.
+GITLAB_RAILS_JQ='del(.metadata.resourceVersion, .metadata.uid, .metadata.creationTimestamp, .metadata.managedFields, .metadata.ownerReferences, .metadata.annotations["kubectl.kubernetes.io/last-applied-configuration"])'
 
-# Lit le secret Rails du cluster et écrit un vrai manifeste Secret (première
+# Lit le secret Rails du cluster et écrit un vrai manifeste Secret en JSON (première
 # installation). Rien n'est écrit si la lecture échoue ou si le secret est absent.
 gitlab_secrets_copier() {
     local secret tmp
@@ -48,7 +24,7 @@ gitlab_secrets_copier() {
     [ -n "$secret" ] || return 0
     mkdir -p "$GITLAB_SECRETS_DIR" || return 0
     tmp="$(umask 077; mktemp "$GITLAB_SECRETS_DIR/.rails-secret.XXXXXX")" || return 0
-    if ! printf '%s\n' "$secret" | jq -r "$GITLAB_RAILS_JQ" >"$tmp" || [ ! -s "$tmp" ]; then
+    if ! printf '%s\n' "$secret" | jq "$GITLAB_RAILS_JQ" >"$tmp" || [ ! -s "$tmp" ]; then
         rm -f "$tmp"
         return 0
     fi
