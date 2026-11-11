@@ -86,7 +86,7 @@ devzone desactiver <module>    # désactive et applique tout de suite
 
 | Module | Activé | Désactivé |
 |---|---|---|
-| `ia` | Claude Code et opencode installés (versions figées), réinstallés à chaque rebuild, avec le [garde-fou repowarden](#garde-fou-des-assistants-ia) et une [configuration opencode par défaut](#configuration-dopencode) ; se connecter : `claude` (puis `/login`), `opencode auth login` | désinstallés ; le garde-fou (hook et plugin) et la configuration opencode par défaut sont retirés ; l'état de `devzone agent` (volume partagé), les journaux `workspace/.agents/` et les connexions restent |
+| `ia` | Claude Code et opencode installés (versions figées), réinstallés à chaque rebuild, avec le [garde-fou repowarden](#garde-fou-des-assistants-ia), une [configuration opencode par défaut](#configuration-dopencode) et la [skill devzone](#skill-devzone) posée dans `~/.claude/skills/devzone/` et `~/.config/opencode/skills/devzone/` ; se connecter : `claude` (puis `/login`), `opencode auth login` | désinstallés ; le garde-fou (hook et plugin), la configuration opencode par défaut et la skill devzone non modifiée sont retirés ; l'état de `devzone agent` (volume partagé), les journaux `workspace/.agents/` et les connexions restent |
 | `kubernetes` | à chaque démarrage : connexion au cluster de ta machine et metrics-server sur les clusters locaux (CPU et RAM dans k9s) | aucune connexion au cluster de ta machine ; kubectl, helm, k9s et kind restent installés, un cluster kind créé à la main reste utilisable ; metrics-server est retiré des clusters où devzone l'a installé |
 | `gitlab` | GitLab CE de test dans le [cluster des services](#cluster-de-devzone), namespace `devzone-gitlab` (chart figé), runner Kubernetes, projet `devzone/demo` avec pipeline ; http://gitlab.localhost:8929 ; au moins 8 Go de RAM allouable (voir [GitLab](#gitlab)) | releases Helm, namespace `devzone-gitlab` et secrets `workspace/.gitlab/` retirés ; rien d'autre touché |
 | `postgres` | PostgreSQL 16 partagé sur le [cluster de devzone](#cluster-de-devzone), une base par projet (`devzone postgres creer <projet>`), joignable sur `127.0.0.1:5432` dans le conteneur (voir [PostgreSQL](#postgresql)) | namespace `devzone-postgres` (toutes les bases) et secrets `workspace/.postgres/` supprimés, après confirmation en terminal ; kind dédié supprimé s'il ne sert plus |
@@ -143,6 +143,15 @@ Avec le module `ia`, devzone écrit une configuration opencode prête à l'emplo
 - **Changer de modèle** : modifier `model` (modèle par défaut), `small_model` (titre) et les `agent` concernés ; `opencode models` liste les modèles disponibles.
 - **Fournisseur payant** : `opencode auth login` (la connexion reste dans le volume `devzone-opencode-data`).
 - **Lancer opencode en tâche de fond** : `opencode run --auto "…" < /dev/null`. Sans `--auto`, toute demande de permission est refusée d'office et l'agent s'arrête ; sans `< /dev/null`, il attend son entrée et reste muet.
+
+### Skill devzone
+
+Avec le module `ia`, devzone pose la skill devzone (`.devcontainer/skills/devzone/SKILL.md`) dans `~/.claude/skills/devzone/` et `~/.config/opencode/skills/devzone/` (volumes, gardés aux rebuilds). Elle rappelle que tout se fait dans le conteneur avec les commandes `devzone` (jamais les scripts), les worktrees sous `workspace/wt/`, les modules, `devzone agent` (rotation, `etat`, `liberer`), le garde-fou et les fichiers de droits protégés, les services Kubernetes (contexte `devzone`, namespaces `devzone-*`) et ce qui revient au mainteneur (connexions, Ready, fusions).
+
+- **Pose** : si absente, la skill est écrite depuis le modèle ; si elle porte le repère `<!-- devzone : skill posée par devzone activer ia -->` et n'a pas été modifiée, elle est mise à jour ; personnalisée, elle est gardée.
+- **Désactivation** : `devzone desactiver ia` retire seulement la skill non modifiée ; une skill personnalisée est gardée.
+
+La skill « repowarden » est déjà posée par `repowarden agents init` : vérifiez seulement qu'elle est présente.
 
 ### Diriger opencode
 
