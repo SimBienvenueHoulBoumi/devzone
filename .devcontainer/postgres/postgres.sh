@@ -51,8 +51,10 @@ k() {
     kubectl --context devzone -n "$NS" "$@"
 }
 
+# Namespace présent dans le cluster des services : lecture des namespaces
+# réservée à l'administrateur (#430)
 installe() {
-    kubectl --context devzone get namespace "$NS" >/dev/null 2>&1
+    compte_admin "$(compte_ctx)" get namespace "$NS" >/dev/null 2>&1
 }
 
 # psql en superutilisateur dans le pod : connexion locale (socket), sans mot
@@ -104,9 +106,13 @@ installer() {
         return 1
     fi
     echo "▶ PostgreSQL sur le cluster $CTX (namespace $NS)…"
-    kubectl --context devzone create namespace "$NS" --dry-run=client -o yaml |
-        kubectl --context devzone apply -f - >/dev/null
-    kubectl --context devzone label namespace "$NS" "$CLUSTER_ETIQUETTE" --overwrite >/dev/null
+    # Namespace créé et étiqueté par l'administrateur (#430) : le compte limité
+    # n'a pas le droit de créer d'objets hors des namespaces devzone-*
+    compte_admin "$CTX" create namespace "$NS" --dry-run=client -o yaml |
+        compte_admin "$CTX" apply -f - >/dev/null
+    compte_admin "$CTX" label namespace "$NS" "$CLUSTER_ETIQUETTE" --overwrite >/dev/null
+    # Compte limité autorisé dans le namespace : RoleBinding vers edit
+    compte_autoriser "$CTX" "$NS"
     secret_admin
     sed "s/__TAILLE__/$POSTGRES_TAILLE/" "$ICI/postgres.yaml" |
         kubectl --context devzone apply -f - >/dev/null
@@ -134,7 +140,9 @@ desinstaller() {
     fi
     if [ -n "$CTX" ] && installe; then
         echo "▶ Suppression de PostgreSQL et de toutes ses bases sur $CTX…"
-        kubectl --context devzone delete namespace "$NS" --wait=true >/dev/null
+        # RoleBinding retiré puis namespace supprimé par l'administrateur (#430)
+        compte_retirer "$CTX" "$NS" >/dev/null 2>&1 || true
+        compte_admin "$CTX" delete namespace "$NS" --wait=true >/dev/null
         cluster_liberer "$CTX"
     fi
     rm -rf "$SECRETS"

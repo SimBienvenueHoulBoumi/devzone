@@ -149,7 +149,7 @@ GETENT
     jq -e '.kind == "Secret"' "$SECRETS/rails-secret.yaml" >/dev/null || false
     ! grep -q 'resourceVersion' "$SECRETS/rails-secret.yaml" || false
     [[ "$output" != *"c2VjcmV0czoK"* ]] || false
-    grep -q -- "--kube-context devzone upgrade --install gitlab gitlab/gitlab" "$BATS_TEST_TMPDIR/helm.log" || false
+    grep -Eq -- "helm --kubeconfig [^ ]+ upgrade --install gitlab gitlab/gitlab" "$BATS_TEST_TMPDIR/helm.log" || false
 }
 
 @test "gitlab : réinstallation réapplique le secret rails avant helm upgrade --install" {
@@ -159,7 +159,7 @@ GETENT
     run bash "$GITLAB" installer
     [ "$status" -eq 0 ] || false
     grep -q -- "-n devzone-gitlab apply -f .*rails-secret.yaml" "$BATS_TEST_TMPDIR/kubectl.log" || false
-    grep -q -- "--kube-context devzone upgrade --install gitlab gitlab/gitlab" "$BATS_TEST_TMPDIR/helm.log" || false
+    grep -Eq -- "helm --kubeconfig [^ ]+ upgrade --install gitlab gitlab/gitlab" "$BATS_TEST_TMPDIR/helm.log" || false
 }
 
 @test "gitlab : secret rails absent → aucun fichier, pas de fichier vide" {

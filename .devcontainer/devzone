@@ -656,9 +656,11 @@ changer_cluster() {
                 *) echo "Abandon : rien n'a changé."; return 0 ;;
             esac
         fi
-        # Retire PostgreSQL de l'ancien cluster (contexte explicite)
+        # Retire PostgreSQL de l'ancien cluster (contexte explicite) ;
+        # namespace et RoleBinding par l'administrateur (#430)
         export KUBECONFIG="$HOME/.kube/config:$HOME/.kube/hote.config"
-        kubectl --context "$ctx_ancien" delete namespace "$NS" --wait=true >/dev/null 2>&1 || true
+        compte_retirer "$ctx_ancien" "$NS" >/dev/null 2>&1 || true
+        compte_admin "$ctx_ancien" delete namespace "$NS" --wait=true >/dev/null 2>&1 || true
         cluster_liberer "$ctx_ancien"
         # Le nouveau cluster devient le contexte devzone
         cluster_ecrire "$ctx_new"
@@ -1000,6 +1002,11 @@ reparer_element() {
 reparer() {
     reparer_echec=0
     reparer_element "relais Docker" env DEVZONE_RELAIS_REEL=oui bash "$ICI/docker-relais.sh"
+    # Jeton du compte Kubernetes limité (#430) : 24 h, renouvelé ici ; sans
+    # module kubernetes et sans cluster des services, rien à faire
+    if [ "$(valeur kubernetes)" = on ] || [ -n "$(cluster_lu)" ]; then
+        reparer_element "compte kubernetes" bash "$ICI/kube-compte.sh" jeton
+    fi
     if [ "$(valeur gitlab)" = on ]; then
         reparer_element "nom gitlab" bash "$ICI/gitlab/gitlab.sh" hote-poser
         reparer_element "relais gitlab" bash "$ICI/gitlab/gitlab.sh" relais-lancer

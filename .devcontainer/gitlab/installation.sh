@@ -33,10 +33,10 @@ quantite_ki() {
 }
 
 # Somme des mémoires allouables des nœuds du cluster des services, en Kio.
-# Échoue si le contexte devzone ne répond pas (cluster injoignable).
+# Lecture des nœuds réservée à l'administrateur (#430).
 gitlab_memoire_cluster_ki() {
     local sortie valeur total=0
-    sortie="$(kubectl --context devzone get nodes \
+    sortie="$(compte_admin "$(compte_ctx)" get nodes \
         -o jsonpath='{range .items[*]}{.status.allocatable.memory}{"\n"}{end}' 2>/dev/null)" || return 1
     [ -n "$sortie" ] || return 1
     while IFS= read -r valeur; do
@@ -51,7 +51,7 @@ gitlab_memoire_cluster_ki() {
 gitlab_verifier_memoire_cluster() {
     local memoire
     if ! memoire="$(gitlab_memoire_cluster_ki)"; then
-        echo "devzone : gitlab : cluster des services injoignable (contexte devzone) : devzone cluster" >&2
+        echo "devzone : gitlab : cluster des services injoignable : devzone cluster" >&2
         return 2
     fi
     if [ "$memoire" -lt 8388608 ]; then
@@ -62,15 +62,16 @@ gitlab_verifier_memoire_cluster() {
 }
 
 # Namespace présent dans le cluster des services : GitLab est installé.
+# Lecture des namespaces réservée à l'administrateur (#430).
 gitlab_installe() {
-    kubectl --context devzone get namespace "$GITLAB_NS" >/dev/null 2>&1
+    compte_admin "$(compte_ctx)" get namespace "$GITLAB_NS" >/dev/null 2>&1
 }
 
-# Crée le namespace, l'étiquette et la NetworkPolicy isolante (étape A).
+# Crée le namespace, étiquette et autorise le compte limité (#430), pose l'isolation.
 gitlab_namespace_preparer() {
-    kubectl --context devzone create namespace "$GITLAB_NS" --dry-run=client -o yaml |
-        kubectl --context devzone apply -f - >/dev/null
-    kubectl --context devzone label namespace "$GITLAB_NS" "$CLUSTER_ETIQUETTE" --overwrite >/dev/null
+    local ctx
+    ctx="$(compte_ctx)"
+    compte_namespace "$ctx" "$GITLAB_NS"
     namespace_isoler "$GITLAB_NS"
 }
 
@@ -94,7 +95,7 @@ gitlab_installer() {
     # Secret Rails (#347) : réinstallation -> réappliquer le secret conservé avant
     # le helm upgrade --install (le chart le réutilise, sessions navigateur valides)
     gitlab_secrets_appliquer
-    helm --kube-context devzone upgrade --install gitlab gitlab/gitlab \
+    compte_helm "$(compte_ctx)" upgrade --install gitlab gitlab/gitlab \
         --version 9.11.16 \
         --namespace "$GITLAB_NS" \
         --create-namespace \
@@ -129,7 +130,7 @@ gitlab_installer() {
     fi
     valeurs_runner="$(mktemp)"
     sed "s/__NAMESPACE__/$GITLAB_NS/g" "$ICI/runner-values.yaml" >"$valeurs_runner"
-    helm --kube-context devzone upgrade --install gitlab-runner gitlab/gitlab-runner \
+    compte_helm "$(compte_ctx)" upgrade --install gitlab-runner gitlab/gitlab-runner \
         --version 0.88.2 \
         --namespace "$GITLAB_NS" \
         -f "$valeurs_runner" \
@@ -159,9 +160,11 @@ gitlab_desinstaller() {
     gitlab_relais_arreter
     rm -rf "$(relais_dossier gitlab-web)" "$(relais_dossier gitlab-ssh)" \
         "$(relais_dossier gitlab-8929)" "$(relais_dossier gitlab-2224)"
-    helm --kube-context devzone uninstall gitlab --namespace "$GITLAB_NS" >/dev/null 2>&1 || true
-    helm --kube-context devzone uninstall gitlab-runner --namespace "$GITLAB_NS" >/dev/null 2>&1 || true
-    kubectl --context devzone delete namespace "$GITLAB_NS" --ignore-not-found >/dev/null 2>&1 || true
+    compte_helm "$(compte_ctx)" uninstall gitlab --namespace "$GITLAB_NS" >/dev/null 2>&1 || true
+    compte_helm "$(compte_ctx)" uninstall gitlab-runner --namespace "$GITLAB_NS" >/dev/null 2>&1 || true
+    # RoleBinding retiré puis namespace supprimé par l'administrateur (#430)
+    compte_retirer "$(compte_ctx)" "$GITLAB_NS" >/dev/null 2>&1 || true
+    compte_admin "$(compte_ctx)" delete namespace "$GITLAB_NS" --ignore-not-found >/dev/null 2>&1 || true
     if [ -n "$supprimer_secret" ]; then
         rm -rf "$GITLAB_SECRETS_DIR"
         echo "secret Rails supprimé avec les données de GitLab."
