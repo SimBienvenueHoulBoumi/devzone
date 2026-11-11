@@ -662,6 +662,72 @@ KUBE
     [[ "$output" == *"opencode : configuration personnalisée, gardée"* ]] || false
 }
 
+@test "activer ia : skill devzone posée dans les deux dossiers, avec en-tête YAML" {
+    run bash "$DEVZONE" activer ia
+    [ "$status" -eq 0 ]
+    [ -f "$HOME/.claude/skills/devzone/SKILL.md" ]
+    [ -f "$HOME/.config/opencode/skills/devzone/SKILL.md" ]
+    [ "$(head -n 1 "$HOME/.claude/skills/devzone/SKILL.md")" = '---' ]
+    [ "$(head -n 1 "$HOME/.config/opencode/skills/devzone/SKILL.md")" = '---' ]
+    grep -q '^name: devzone$' "$HOME/.claude/skills/devzone/SKILL.md"
+    grep -q '^name: devzone$' "$HOME/.config/opencode/skills/devzone/SKILL.md"
+    grep -qF '<!-- devzone : skill posée par devzone activer ia -->' "$HOME/.claude/skills/devzone/SKILL.md"
+    grep -qF '<!-- devzone : skill posée par devzone activer ia -->' "$HOME/.config/opencode/skills/devzone/SKILL.md"
+    [[ "$output" == *"skill devzone posée"* ]] || false
+}
+
+@test "activer ia : skill déjà présente et identique -> pas de nouvelle pose ni mise à jour" {
+    bash "$DEVZONE" activer ia >/dev/null
+    run bash "$DEVZONE" activer ia
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"skill devzone posée"* ]] || false
+    [[ "$output" != *"skill devzone mise à jour"* ]] || false
+}
+
+@test "activer ia : skill personnalisée -> gardée" {
+    mkdir -p "$HOME/.claude/skills/devzone" "$HOME/.config/opencode/skills/devzone"
+    printf '# ma skill personnelle\nmon réglage\n' >"$HOME/.claude/skills/devzone/SKILL.md"
+    printf '# ma skill personnelle\nmon réglage\n' >"$HOME/.config/opencode/skills/devzone/SKILL.md"
+    run bash "$DEVZONE" activer ia
+    [ "$status" -eq 0 ]
+    [ "$(cat "$HOME/.claude/skills/devzone/SKILL.md")" = '# ma skill personnelle
+mon réglage' ]
+    [ "$(cat "$HOME/.config/opencode/skills/devzone/SKILL.md")" = '# ma skill personnelle
+mon réglage' ]
+    [[ "$output" == *"skill devzone personnalisée"* ]] || false
+}
+
+@test "activer ia : skill modifiée mais gardant le repère -> gardée" {
+    bash "$DEVZONE" activer ia >/dev/null
+    printf '\nmon réglage\n' >>"$HOME/.claude/skills/devzone/SKILL.md"
+    printf '\nmon réglage\n' >>"$HOME/.config/opencode/skills/devzone/SKILL.md"
+    run bash "$DEVZONE" activer ia
+    [ "$status" -eq 0 ]
+    [[ "$(cat "$HOME/.claude/skills/devzone/SKILL.md")" == *"mon réglage"* ]] || false
+    [[ "$(cat "$HOME/.config/opencode/skills/devzone/SKILL.md")" == *"mon réglage"* ]] || false
+    [[ "$output" == *"skill devzone personnalisée"* ]] || false
+}
+
+@test "desactiver ia : skill retirée si non modifiée" {
+    bash "$DEVZONE" activer ia >/dev/null
+    run bash "$DEVZONE" desactiver ia
+    [ "$status" -eq 0 ]
+    [ ! -f "$HOME/.claude/skills/devzone/SKILL.md" ]
+    [ ! -f "$HOME/.config/opencode/skills/devzone/SKILL.md" ]
+    [[ "$output" == *"skill devzone retirée"* ]] || false
+}
+
+@test "desactiver ia : skill personnalisée -> gardée" {
+    bash "$DEVZONE" activer ia >/dev/null
+    printf '# personnalisée\n' >"$HOME/.claude/skills/devzone/SKILL.md"
+    printf '# personnalisée\n' >"$HOME/.config/opencode/skills/devzone/SKILL.md"
+    run bash "$DEVZONE" desactiver ia
+    [ "$status" -eq 0 ]
+    [ -f "$HOME/.claude/skills/devzone/SKILL.md" ]
+    [ -f "$HOME/.config/opencode/skills/devzone/SKILL.md" ]
+    [[ "$output" == *"skill devzone personnalisée"* ]] || false
+}
+
 @test "modèle opencode : défauts durcis (bash en accord, secrets et curl interdits)" {
     modele="$BATS_TEST_DIRNAME/../../.devcontainer/opencode.jsonc"
     grep -q '"edit": "allow"' "$modele"
