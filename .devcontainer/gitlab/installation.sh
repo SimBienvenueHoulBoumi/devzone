@@ -33,8 +33,7 @@ quantite_ki() {
 }
 
 # Somme des mémoires allouables des nœuds du cluster des services, en Kio.
-# Lecture des nœuds réservée à l'administrateur (#430) ; échoue si le cluster
-# ne répond pas.
+# Lecture des nœuds réservée à l'administrateur (#430).
 gitlab_memoire_cluster_ki() {
     local sortie valeur total=0
     sortie="$(compte_admin "$(compte_ctx)" get nodes \
