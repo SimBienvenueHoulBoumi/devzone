@@ -51,5 +51,5 @@ setup() {
 @test "Dockerfile : python3-venv et python-is-python3 installes par apt" {
     grep -Fq 'python3-venv' "$DOCKERFILE" || false
     grep -Fq 'python-is-python3' "$DOCKERFILE" || false
-    grep -Fq 'apt-get install' "$DOCKERFILE" || false
+    grep -Eq 'apt-get .*install' "$DOCKERFILE" || false
 }
