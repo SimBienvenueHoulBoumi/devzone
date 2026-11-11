@@ -15,39 +15,10 @@
 #   etat_recouvrement_*           état restauré ou reconstruit (étape 4)
 #   etat_initialiser [modules…]   crée l'état s'il manque
 
-# Verrou exclusif (mkdir) : une seule écriture à la fois. Le détenteur
-# disparu est deviné par l'âge du dossier (aucun kill) et le compteur rend
-# le verrou reprenable dans le même processus (initialiser puis ecrire).
-etat_verrou_prendre() {
-    local age debut
-    [ "${ETAT_VERROU_PROF:-0}" -gt 0 ] && { ETAT_VERROU_PROF=$((ETAT_VERROU_PROF + 1)); return 0; }
-    mkdir -p "$(dirname "$ETAT")" || return 1
-    debut="$(date +%s)"
-    while ! mkdir "${ETAT}.verrou" 2>/dev/null; do
-        age="$(stat -c %Y "${ETAT}.verrou" 2>/dev/null || stat -f %m "${ETAT}.verrou" 2>/dev/null || true)"
-        if [ -n "$age" ] && [ "$(( $(date +%s) - age ))" -gt 30 ]; then
-            rm -rf "${ETAT}.verrou"
-            continue
-        fi
-        if [ "$(( $(date +%s) - debut ))" -ge 10 ]; then
-            echo "devzone : état verrouillé ailleurs : ${ETAT}.verrou" >&2
-            return 1
-        fi
-        sleep 1
-    done
-    ETAT_VERROU_PROF=1
-    return 0
-}
-
-# Rend le verrou pris par ce processus ; profondeur > 1 : détenu encore
-etat_verrou_lacher() {
-    local prof="${ETAT_VERROU_PROF:-0}"
-    [ "$prof" -gt 0 ] || return 0
-    [ "$prof" -gt 1 ] && { ETAT_VERROU_PROF=$((prof - 1)); return 0; }
-    ETAT_VERROU_PROF=0
-    rm -rf "${ETAT}.verrou" 2>/dev/null || true
-    return 0
-}
+# Verrou d'écriture (#476) : etat_verrou_prendre, etat_verrou_lacher
+# shellcheck source=SCRIPTDIR/etat-verrou.sh
+# shellcheck disable=SC1091
+. "$(dirname "${BASH_SOURCE[0]}")/etat-verrou.sh"
 
 # Abandon sous verrou : le temporaire part, le verrou est lâché
 etat_echec() {
