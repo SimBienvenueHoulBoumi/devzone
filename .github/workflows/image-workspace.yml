@@ -7,6 +7,19 @@ on:
   push:
     tags:
       - "v*"
+  # Appelé par release.yml à chaque livraison (#486), ou à la main pour publier une version
+  workflow_call:
+    inputs:
+      tag:
+        description: Tag de la release (vX.Y.Z)
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag de la release (vX.Y.Z)
+        type: string
+        required: true
 
 permissions:
   contents: read
@@ -30,17 +43,23 @@ jobs:
           push: never
 
   publish:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: github.event_name == 'workflow_call' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
       contents: read
       packages: write
+    env:
+      # Tag de l'image : version sans le « v » (vX.Y.Z → X.Y.Z), aussi poussée en latest
+      TAG: ${{ inputs.tag || github.ref_name }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Version de l'image
+        id: version
+        run: echo "version=${TAG#v}" >>"$GITHUB_OUTPUT"
       - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           registry: ghcr.io
@@ -50,5 +69,5 @@ jobs:
         with:
           configFile: .devcontainer/devcontainer.json
           imageName: ghcr.io/simbienvenuehoulboumi/devzone-workspace
-          imageTag: ${{ github.ref_name }}
+          imageTag: ${{ steps.version.outputs.version }},latest
           push: always
