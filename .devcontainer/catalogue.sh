@@ -12,6 +12,9 @@ ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
 # shellcheck source=SCRIPTDIR/cluster.sh
 # shellcheck disable=SC1091
 . "$ICI/cluster.sh"
+# shellcheck source=SCRIPTDIR/etat.sh
+# shellcheck disable=SC1091
+. "$ICI/etat.sh"
 # shellcheck source=SCRIPTDIR/password.sh
 # shellcheck disable=SC1091
 . "$ICI/password.sh"
@@ -78,25 +81,30 @@ app_prete() {
 }
 
 # Ajoute à l'état les lignes <app>=off des applications absentes (une fois
-# chacune, jamais une ligne existante modifiée), précédées une fois du commentaire
+# chacune, jamais une ligne existante modifiée), précédées une fois du
+# commentaire ; la lecture et l'écriture tiennent le même verrou (#417) :
+# une écriture concurrente ne peut pas être perdue entre les deux
 catalogue_synchroniser() (
     local app entete manque="" tmp
     [ -f "$ETAT" ] || return 0
     entete="# Applications du catalogue : passer à on pour installer (devzone catalogue)"
+    etat_verrou_prendre || return 1
+    # Le verrou est rendu à la sortie, y compris sur une erreur sous set -e
+    trap 'etat_verrou_lacher' EXIT
     while IFS= read -r app; do
         [ -n "$app" ] || continue
         grep -qE "^${app}=" "$ETAT" 2>/dev/null && continue
         manque="${manque}${manque:+$'\n'}${app}=off"
     done <<<"$(catalogue_apps)"
     [ -n "$manque" ] || return 0
-    mkdir -p "$(dirname "$ETAT")"
     tmp="$(mktemp)"
     {
         cat "$ETAT"
         grep -qF "$entete" "$ETAT" || echo "$entete"
         echo "$manque"
     } >"$tmp"
-    mv "$tmp" "$ETAT"
+    etat_poser "$tmp"
+    rm -f "$tmp"
 )
 
 # État réel d'une application : disponible, attendue, installée, echec

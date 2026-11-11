@@ -186,6 +186,16 @@ GH
     [[ "$output" != *"socket Docker de l hôte"* ]] || false
 }
 
+@test "docker-hote : desactiver concurrent avec une écriture d'état : aucune ligne perdue" {
+    printf 'docker-hote=off\nia=on\n' >"$DEVZONE_RACINE/.devzone.modules"
+    ETAT="$DEVZONE_RACINE/.devzone.modules" bash -c '. "$1"; etat_ecrire postgres on' _ "$BATS_TEST_DIRNAME/../../.devcontainer/etat.sh" & pid_w=$!
+    bash "$DEVZONE" desactiver docker-hote & pid_d=$!
+    wait "$pid_w"
+    wait "$pid_d"
+    grep -qx 'docker-hote=off' "$DEVZONE_RACINE/.devzone.modules"
+    grep -qx 'postgres=on' "$DEVZONE_RACINE/.devzone.modules"
+}
+
 @test "docker-hote : activer écrit on, demande make rebuild" {
     printf 'docker-hote=off\n' >"$DEVZONE_RACINE/.devzone.modules"
     run bash "$DEVZONE" activer docker-hote

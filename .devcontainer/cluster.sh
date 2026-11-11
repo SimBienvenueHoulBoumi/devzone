@@ -28,6 +28,12 @@ export KUBECONFIG
 # État des modules : défini par l'appelant ; valeur par défaut pour les tests
 : "${ETAT:=${DEVZONE_ETAT:-$HOME/.devzone.modules}}"
 
+# Écriture sûre de l'état (#417) : verrou, temporaire dans le dossier de
+# l'état, copie de secours .prec — partagée par devzone, ports et ports-auto
+# shellcheck source=SCRIPTDIR/etat.sh
+# shellcheck disable=SC1091
+. "$(dirname "${BASH_SOURCE[0]}")/etat.sh"
+
 # Nom d'instance : vide ou « devzone » = instance par défaut (pas de suffixe)
 : "${DEVZONE_INSTANCE:=}"
 INSTANCE_SUFFIX=""
@@ -51,12 +57,7 @@ cluster_lu() {
 }
 
 cluster_ecrire() {
-    local tmp
-    mkdir -p "$(dirname "$ETAT")"
-    tmp="$(mktemp)"
-    grep -vE '^cluster=' "$ETAT" 2>/dev/null >"$tmp" || true
-    echo "cluster=$1" >>"$tmp"
-    mv "$tmp" "$ETAT"
+    etat_ecrire cluster "$1"
 }
 
 cluster_est_dedie() {

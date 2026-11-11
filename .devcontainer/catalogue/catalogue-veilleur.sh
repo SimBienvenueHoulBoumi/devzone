@@ -7,6 +7,9 @@ set -euo pipefail
 ICI="$(cd "$(dirname "$0")" && pwd)"
 RACINE="${DEVZONE_RACINE:-$(cd "$ICI/../.." && pwd)}"
 ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
+# shellcheck source=SCRIPTDIR/etat.sh
+# shellcheck disable=SC1091
+. "$(dirname "$ICI")/etat.sh"
 BASE="${DEVZONE_CATALOGUE_VEILLEUR_DIR:-$RACINE/.devzone.catalogue-veilleur}"
 VERROU="$BASE/verrou"
 DERNIER="$BASE/dernier"
@@ -49,6 +52,10 @@ verrou_rafraichir() { touch "$VERROU" 2>/dev/null || true; echo "$$" >"$VERROU/p
 tour() {
     local maintenant ancien
     [ -f "$ETAT" ] || return 0
+    # État restauré ou reconstruit : le veilleur ne suit pas un état douteux,
+    # et ne désinstalle jamais tant que devzone appliquer ne l'a pas confirmé
+    etat_recouvrement_attente && return 0
+    etat_recouvrement_en_attente && return 0
     mkdir -p "$BASE"
     maintenant="$(stat -c %Y "$ETAT" 2>/dev/null || stat -f %m "$ETAT" 2>/dev/null || true)"
     [ -n "$maintenant" ] || return 0

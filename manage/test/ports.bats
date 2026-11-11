@@ -318,6 +318,10 @@ CURL
     mkdir -p "$BATS_TEST_TMPDIR/depot"
     cp -r "$BATS_TEST_DIRNAME/../../.devcontainer" "$BATS_TEST_TMPDIR/depot/.devcontainer"
     export TMPDIR="/nonexistent"
+    # Depuis #417 le temporaire est créé dans le dossier de l'état (jamais dans
+    # TMPDIR) : c'est ce dossier qui devient inutilisable, l'écriture échoue
+    printf 'bloc\n' >"$BATS_TEST_TMPDIR/depot/bloc"
+    export DEVZONE_ETAT="$BATS_TEST_TMPDIR/depot/bloc/.devzone.modules"
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
     run bash "$BATS_TEST_TMPDIR/depot/.devcontainer/ports.sh" ouvrir 8080
     [[ "$output" == *"devzone : port : état non enregistré"* ]] || false
