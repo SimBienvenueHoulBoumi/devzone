@@ -35,10 +35,12 @@ demarrer() {
     # shellcheck disable=SC2046
     helm $(drapeau_helm) upgrade --install devzone-workspace "$(chemin_chart)" \
         --namespace devzone-workspace --create-namespace
+    ports_demarrer silence
 }
 
 # Désinstalle le workspace du cluster.
 arreter() {
+    ports_arreter
     # shellcheck disable=SC2046
     helm $(drapeau_helm) uninstall devzone-workspace --namespace devzone-workspace
 }
@@ -107,6 +109,8 @@ copier_depuis() {
 . "$ICI/scripts/migrer.sh"
 # shellcheck source=scripts/migrer-retour.sh
 . "$ICI/scripts/migrer-retour.sh"
+# shellcheck source=scripts/ports-workspace.sh
+. "$ICI/scripts/ports-workspace.sh"
 
 case "${1:-}" in
     demarrer) demarrer ;;
@@ -116,17 +120,19 @@ case "${1:-}" in
     vscode) vscode ;;
     copier-vers) copier_vers "${@:2}" ;;
     copier-depuis) copier_depuis "${@:2}" ;;
+    ports) ports "${@:2}" ;;
     migrer) migrer "${@:2}" ;;
     revenir) revenir "${@:2}" ;;
     nettoyer-docker) nettoyer_docker "${@:2}" ;;
     '' | -h | --help | aide)
-        echo "devzone workspace demarrer|arreter|etat|shell|vscode|copier-vers|copier-depuis|migrer|revenir|nettoyer-docker"
+        echo "devzone workspace demarrer|arreter|etat|shell|vscode|copier-vers|copier-depuis|ports|migrer|revenir|nettoyer-docker"
+        echo "  ports [demarrer|arreter|etat] applications et services du pod sur localhost du poste"
         echo "  migrer [--oui]        copie le poste Docker vers le workspace Kubernetes (rien n'est supprimé)"
         echo "  revenir [--rapatrier] retour au poste Docker ; --rapatrier : projets du pod recopiés d'abord"
         echo "  nettoyer-docker       supprime les volumes Docker devzone-*, après confirmation [o/N] (--oui)"
         ;;
     *)
-        echo "✖ sous-commande inconnue : $1 (devzone workspace demarrer|arreter|etat|shell|vscode|copier-vers|copier-depuis|migrer|revenir|nettoyer-docker)" >&2
+        echo "✖ sous-commande inconnue : $1 (devzone workspace demarrer|arreter|etat|shell|vscode|copier-vers|copier-depuis|ports|migrer|revenir|nettoyer-docker)" >&2
         exit 1
         ;;
 esac

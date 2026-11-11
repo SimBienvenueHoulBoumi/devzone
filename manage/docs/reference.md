@@ -255,6 +255,7 @@ devzone workspace shell                   # shell dans le conteneur workspace
 devzone workspace vscode                  # marche a suivre : attache VS Code au pod
 devzone workspace copier-vers <dossier>   # copie un dossier du poste vers les projets du pod
 devzone workspace copier-depuis <dossier> # copie un projet du pod vers le poste
+devzone workspace ports [demarrer|arreter|etat] # applications et services du pod sur localhost du poste
 devzone workspace migrer [--oui]          # copie le poste Docker vers le workspace Kubernetes
 devzone workspace revenir [--rapatrier]   # retour au poste Docker
 devzone workspace nettoyer-docker [--oui] # supprime les volumes Docker devzone-* (confirmation)
@@ -281,6 +282,16 @@ Les commandes utilisent helm et kubectl du poste, avec le contexte devzone s il 
 **Retour arriere** : `devzone workspace revenir` remet `workspace=docker` et rappelle `make shell`. Le poste Docker et ses volumes n'ont jamais ete touches par `migrer` : rien d'autre a faire. `--rapatrier` recopie d'abord tous les projets du pod dans `./workspace` (`copier-depuis`, les dossiers du poste du meme nom sont ecrases) ; en cas d'echec, la bascule n'a pas lieu.
 
 **Nettoyage** : les volumes Docker ne sont jamais supprimes par `migrer` ni `revenir`. `devzone workspace nettoyer-docker` liste les volumes `devzone-*` presents puis demande [o/N] avant de les supprimer (`--oui` sans terminal ; sinon refus). Irreversible : apres, `revenir` repart de volumes vides.
+
+### Applications et services sur localhost du poste
+
+`devzone workspace demarrer` lance un veilleur sur le poste (`manage/scripts/ports-workspace.sh`), `devzone workspace arreter` l'arrête avec tous ses `kubectl port-forward`. `devzone workspace ports [demarrer|arreter|etat]` le pilote seul.
+
+- **Pod** : toutes les 3 s, `kubectl exec` dans le pod lit `ss -ltnH`. Chaque port TCP en écoute ≥ 1024 (hors kubedock 2475 et BuildKit 1234) est relayé vers `127.0.0.1:<même port>` du poste, jamais sur le réseau local (`--address 127.0.0.1`). Un serveur lancé dans le pod (`npm run dev`) est donc joignable sur http://localhost:5173 sans commande ; le port qui disparaît voit son relais arrêté.
+- **Services de devzone** : avec le module `postgres` actif dans `.devzone.modules`, `svc/postgres` du namespace `devzone-postgres` est relayé sur `127.0.0.1:5432`, et pgAdmin (`svc/pgadmin`) s'il existe, par le même mécanisme.
+- **Port déjà pris sur le poste** (`lsof`, sinon `nc -z`) : une seule ligne « ⚠ port <n> déjà pris sur le poste, non relayé » dans `.devzone.ports-workspace/journal.log` et dans `ports etat`, sans boucle d'essais.
+- **Un seul veilleur** : verrou `mkdir` et pid dans `.devzone.ports-workspace/` du dossier devzone ; un second `demarrer` répond « déjà lancé ».
+- **Garde-fou** : le veilleur ne tourne jamais sous bats, sauf `DEVZONE_PORTS_WORKSPACE_REEL=oui` (tests avec faux `kubectl` et `lsof`).
 
 ### Edition depuis le poste
 
