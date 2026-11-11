@@ -105,8 +105,8 @@ diagnostic_rang() {
     [ "$s2" -eq 0 ] || { diagnostic_rang; false; }
     grep -q '^=== modèle opencode/' "$j1" || { diagnostic_rang; false; }
     grep -q '^=== modèle opencode/' "$j2" || { diagnostic_rang; false; }
-    ! grep -q "aucun modèle gratuit disponible" "$j1" || { diagnostic_rang; false; }
-    ! grep -q "aucun modèle gratuit disponible" "$j2" || { diagnostic_rang; false; }
+    if grep -q "aucun modèle gratuit disponible" "$j1"; then diagnostic_rang; false; fi
+    if grep -q "aucun modèle gratuit disponible" "$j2"; then diagnostic_rang; false; fi
     [ "$(premier_modele "$j1")" != "$(premier_modele "$j2")" ] || { diagnostic_rang; false; }
 }
 
