@@ -291,7 +291,7 @@ Les commandes utilisent helm et kubectl du poste, avec le contexte devzone s il 
 - **Services de devzone** : avec le module `postgres` actif dans `.devzone.modules`, `svc/postgres` du namespace `devzone-postgres` est relayé sur `127.0.0.1:5432`, et pgAdmin (`svc/pgadmin`) s'il existe, par le même mécanisme. Avec le module `mysql` actif, `svc/mysql` du namespace `devzone-mysql` est relayé sur `127.0.0.1:3306`.
 - **Port déjà pris sur le poste** (`lsof`, sinon `nc -z`) : une seule ligne « ⚠ port <n> déjà pris sur le poste, non relayé » dans `.devzone.ports-workspace/journal.log` et dans `ports etat`, sans boucle d'essais.
 - **Un seul veilleur** : verrou `mkdir` et pid dans `.devzone.ports-workspace/` du dossier devzone ; un second `demarrer` répond « déjà lancé ».
-- **Garde-fou** : le veilleur ne tourne jamais sous bats, sauf `DEVZONE_PORTS_WORKSPACE_REEL=oui` (tests avec faux `kubectl` et `lsof`).
+- **Garde-fou** : le veilleur ne tourne jamais pendant les tests automatiques (faux kubectl et lsof).
 
 ### Edition depuis le poste
 
