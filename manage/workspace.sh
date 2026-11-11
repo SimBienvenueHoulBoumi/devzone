@@ -105,6 +105,8 @@ copier_depuis() {
 
 # shellcheck source=scripts/migrer.sh
 . "$ICI/scripts/migrer.sh"
+# shellcheck source=scripts/migrer-retour.sh
+. "$ICI/scripts/migrer-retour.sh"
 
 case "${1:-}" in
     demarrer) demarrer ;;

@@ -31,6 +31,22 @@ setup() {
     ! grep -q "volume rm" "$T/docker.log" || false
 }
 
+@test "revenir --rapatrier : version du poste sauvegardee avant d'etre remplacee" {
+    echo "travail local" >"$T/poste/workspace/alpha/local.txt"
+    mkdir -p "$T/pod/workspaces/projets/alpha"
+    echo "modifie au pod" >"$T/pod/workspaces/projets/alpha/a.txt"
+    ws revenir --rapatrier
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"projet alpha : version du poste sauvegardée dans .devzone.sauvegarde/"* ]] || false
+    sauv="$(find "$T/poste/.devzone.sauvegarde" -mindepth 1 -maxdepth 1 -type d | head -1)"
+    [[ "$(basename "$sauv")" =~ ^[0-9]{8}-[0-9]{6}$ ]] || false
+    [ "$(cat "$sauv/workspace/alpha/local.txt")" = "travail local" ]
+    [ "$(cat "$sauv/workspace/alpha/a.txt")" = "a" ]
+    [ "$(cat "$T/poste/workspace/alpha/a.txt")" = "modifie au pod" ]
+    ! [ -e "$T/poste/workspace/alpha/local.txt" ] || false
+    [ -f "$T/poste/workspace/beta/b.txt" ]
+}
+
 @test "revenir --rapatrier : copie echouee, pas de bascule" {
     echo "workspace=kubernetes" >>"$T/poste/.devzone.modules"
     mkdir -p "$T/pod/workspaces/projets/alpha"

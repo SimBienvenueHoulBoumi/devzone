@@ -203,24 +203,6 @@ migrer() {
     echo "✔ migration terminée"
 }
 
-# devzone workspace revenir [--rapatrier] : workspace=docker ; --rapatrier recopie d'abord les projets du pod.
-revenir() {
-    local rapatrier p liste
-    rapatrier="$(lire_option --rapatrier "revenir [--rapatrier]" "$@")" || return 1
-    if [ "$rapatrier" = 1 ]; then
-        echo "▶ rapatriement : projets du pod vers ./workspace (les dossiers du poste sont écrasés)"
-        liste="$(kc exec "$POD" -c workspace -- ls -1 "$DOSSIER_PROJETS")" || { echec "liste des projets du pod illisible"; return 1; }
-        mkdir -p workspace
-        while IFS= read -r p; do
-            [ -n "$p" ] || continue
-            echo "  … $p"
-            (copier_depuis "$PWD/workspace/$p") || { echec "rapatriement de $p échoué"; return 1; }
-        done <<<"$liste"
-    fi
-    noter_workspace docker || { echec "écriture de .devzone.modules impossible"; return 1; }
-    echo "✔ workspace=docker : le poste Docker et ses volumes sont intacts. Relance-le : make shell"
-}
-
 # devzone workspace nettoyer-docker [--oui] : supprime les volumes Docker devzone-*, après confirmation.
 nettoyer_docker() {
     local oui x v presents=()
