@@ -12,13 +12,16 @@ setup() {
     export DEVZONE_ETAT="$BATS_TEST_TMPDIR/modules"
     SECRETS="$DEVZONE_RACINE/workspace/.argocd"
     mkdir -p "$HOME" "$DEVZONE_RACINE/workspace" "$BATS_TEST_TMPDIR/bin"
-    printf 'argocd=off\n' >"$DEVZONE_ETAT"
+    printf 'argocd=off\ncluster=docker-desktop\n' >"$DEVZONE_ETAT"
+    # Cluster de l'hôte : docker-desktop, avec son kubeconfig vide (isolé)
+    : >"$DEVZONE_KUBE_HOTE"
 
     cat >"$BATS_TEST_TMPDIR/bin/kubectl" <<'KUBE'
 #!/usr/bin/env bash
 echo "kubectl $*" >>"$BATS_TEST_TMPDIR/kubectl.log"
 T="$BATS_TEST_TMPDIR"
 case "$*" in
+    *"config get-contexts -o name"*) echo "docker-desktop" ;;
     *"get nodes"*)
         case "${FAUX_MEMOIRE_CLUSTER:-2Gi}" in
             injoignable) exit 1 ;;
@@ -76,7 +79,7 @@ argocd_installe() {
     mkdir -p "$SECRETS"
     printf 'ARGOCD_URL=https://127.0.0.1:8443\nARGOCD_USER=admin\nARGOCD_PASSWORD=secret-admin\n' \
         >"$SECRETS/admin.env"
-    printf 'argocd=on\n' >"$DEVZONE_ETAT"
+    printf 'argocd=on\ncluster=docker-desktop\n' >"$DEVZONE_ETAT"
 }
 
 @test "argocd : désactivé par défaut, état du module facultatif" {
@@ -93,7 +96,9 @@ argocd_installe() {
     grep -qx 'argocd=on' "$DEVZONE_ETAT"
     grep -q 'kind: NetworkPolicy' "$BATS_TEST_TMPDIR/apply.log"
     grep -q 'name: devzone-meme-namespace' "$BATS_TEST_TMPDIR/apply.log"
-    grep -q 'kubectl --context devzone label namespace devzone-argocd app.kubernetes.io/managed-by=devzone' "$BATS_TEST_TMPDIR/kubectl.log"
+    # Étiquette du namespace posée par l'administrateur, pas par le compte
+    # limité (#430)
+    grep -q -- '--context docker-desktop label namespace devzone-argocd app.kubernetes.io/managed-by=devzone' "$BATS_TEST_TMPDIR/kubectl.log"
     grep -q 'helm --kube-context devzone upgrade --install argocd argo/argo-cd --version 10.14.0 --namespace devzone-argocd' "$BATS_TEST_TMPDIR/helm.log"
     grep -q -- '-f .*\.devcontainer/argocd/values.yaml' "$BATS_TEST_TMPDIR/helm.log"
     [ -f "$SECRETS/admin.env" ]
@@ -139,7 +144,8 @@ argocd_installe() {
     [ "$status" -eq 0 ]
     grep -qx 'argocd=off' "$DEVZONE_ETAT"
     grep -q 'helm --kube-context devzone uninstall argocd -n devzone-argocd' "$BATS_TEST_TMPDIR/helm.log"
-    grep -q 'kubectl --context devzone delete namespace devzone-argocd' "$BATS_TEST_TMPDIR/kubectl.log"
+    # Namespace supprimé par l'administrateur, pas par le compte limité (#430)
+    grep -q -- '--context docker-desktop delete namespace devzone-argocd' "$BATS_TEST_TMPDIR/kubectl.log"
     [ ! -e "$SECRETS" ]
     [[ "$output" == *"les services restent, sous helm direct"* ]] || false
 }

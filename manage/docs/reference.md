@@ -445,6 +445,15 @@ Les modules qui déploient un service (`postgres`, `gitlab`) s'installent sur **
 - **Cluster distant** : choisir un cluster distant nécessite une confirmation en terminal, ou `--confirmer CTX` sans terminal. Sans confirmation exacte, le choix est refusé. Quand le cluster de devzone est distant, le récapitulatif `devzone` affiche un avertissement `⚠ cluster distant : <contexte>`.
 - **Namespace** : pour un contexte du poste (ceux de `hote.config`, recopié depuis le poste à chaque démarrage), le namespace fixé par `devzone utiliser -n` ne survit pas à un redémarrage ; pour les clusters kind du conteneur, il est gardé jusqu'au rebuild.
 
+### Compte limité aux namespaces devzone
+
+Le contexte `devzone` n'agit qu'avec un compte limité : shell, relais et agents n'ont jamais le rôle d'administrateur du cluster ([#430](https://github.com/SimBienvenueHoulBoumi/devzone/issues/430)).
+
+- **Compte** : ServiceAccount `devzone-agent` du namespace `devzone-system`, lié au ClusterRole `edit` dans chaque namespace `devzone-*` par un RoleBinding. `edit` couvre lecture, écriture, secrets et NetworkPolicies du namespace ; ni RBAC ni quotas, et rien hors des namespaces `devzone-*` (la suppression d'un namespace, la lecture des nœuds restent des opérations d'administrateur).
+- **Jeton** : TokenRequest de 24 h écrit dans le contexte `devzone` de `~/.kube/config` (user `devzone-agent`, entrée cluster copiée du contexte de l'hôte). Renouvelé à chaque démarrage du conteneur et par `devzone reparer` ; expiré, `devzone reparer` le renouvelle.
+- **Administrateur réservé aux installeurs** : création du namespace, étiquette, RoleBinding et suppression passent par le contexte administrateur (`~/.kube/hote.config` pour les clusters de l'hôte, `~/.kube/config` pour les clusters kind). Le compte est posé par les installeurs sur un cluster encore vierge, utilisable au prochain renouvellement de jeton.
+- **Sans cluster des services choisi** : `devzone reparer` ne renouvelle pas de jeton et le reste de l'application continue sur le contexte courant de kubectl.
+
 ### Isolement
 
 - **NetworkPolicy `devzone-meme-namespace`** : pose une règle isolante dans un namespace : seuls les pods du même namespace peuvent joindre les services devzone (PostgreSQL, etc.). Cette règle est gérée par `devzone postgres autoriser <ns>` et `devzone postgres interdire <ns>`.

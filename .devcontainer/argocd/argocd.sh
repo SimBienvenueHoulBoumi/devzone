@@ -59,10 +59,11 @@ quantite_ki() {
 }
 
 # Somme des mémoires allouables des nœuds du cluster des services, en Kio ;
-# échoue si le contexte devzone ne répond pas.
+# échoue si le cluster ne répond pas. Lecture des nœuds réservée à
+# l'administrateur (#430).
 memoire_cluster_ki() {
     local sortie valeur total=0
-    sortie="$(kubectl --context devzone get nodes \
+    sortie="$(compte_admin "$(compte_ctx)" get nodes \
         -o jsonpath='{range .items[*]}{.status.allocatable.memory}{"\n"}{end}' 2>/dev/null)" || return 1
     [ -n "$sortie" ] || return 1
     while IFS= read -r valeur; do
@@ -77,7 +78,7 @@ memoire_cluster_ki() {
 verifier_memoire() {
     local memoire
     if ! memoire="$(memoire_cluster_ki)"; then
-        echo "devzone : argocd : cluster des services injoignable (contexte devzone) : devzone cluster" >&2
+        echo "devzone : argocd : cluster des services injoignable : devzone cluster" >&2
         return 2
     fi
     if [ "$memoire" -lt 1048576 ]; then
@@ -87,15 +88,20 @@ verifier_memoire() {
 }
 
 # Namespace présent dans le cluster des services : Argo CD est installé.
+# Lecture des namespaces réservée à l'administrateur (#430).
 installe() {
-    kubectl --context devzone get namespace "$NS" >/dev/null 2>&1
+    compte_admin "$(compte_ctx)" get namespace "$NS" >/dev/null 2>&1
 }
 
-# Crée le namespace, l'étiquette et la NetworkPolicy isolante du module.
+# Crée le namespace et l'étiquette par l'administrateur, autorise le compte
+# limité puis pose la NetworkPolicy isolante du module (#430).
 preparer_namespace() {
-    kubectl --context devzone create namespace "$NS" --dry-run=client -o yaml |
-        kubectl --context devzone apply -f - >/dev/null
-    kubectl --context devzone label namespace "$NS" "$CLUSTER_ETIQUETTE" --overwrite >/dev/null
+    local ctx
+    ctx="$(compte_ctx)"
+    compte_admin "$ctx" create namespace "$NS" --dry-run=client -o yaml |
+        compte_admin "$ctx" apply -f - >/dev/null
+    compte_admin "$ctx" label namespace "$NS" "$CLUSTER_ETIQUETTE" --overwrite >/dev/null
+    compte_autoriser "$ctx" "$NS"
     namespace_isoler "$NS"
 }
 
@@ -150,15 +156,19 @@ installer() {
 }
 
 # Désinstalle la release Helm et supprime le namespace ; les autres services
-# du cluster restent, sous helm direct.
+# du cluster restent, sous helm direct. Le RoleBinding et le namespace partent
+# par l'administrateur (#430).
 desinstaller() {
+    local ctx
     relais_arreter argocd
     if installe; then
         echo "▶ Suppression d'Argo CD sur le cluster des services…"
         if ! helm --kube-context devzone uninstall argocd -n "$NS" >/dev/null 2>&1; then
             echo "devzone : argocd : helm uninstall a échoué (release déjà absente ?)" >&2
         fi
-        kubectl --context devzone delete namespace "$NS" --wait=true >/dev/null
+        ctx="$(compte_ctx)"
+        compte_retirer "$ctx" "$NS" >/dev/null 2>&1 || true
+        compte_admin "$ctx" delete namespace "$NS" --wait=true >/dev/null
     fi
     rm -rf "$SECRETS"
     echo "✔ module argocd désactivé ; les services restent, sous helm direct."

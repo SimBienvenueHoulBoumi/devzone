@@ -290,7 +290,8 @@ attendre_nohup() {
     run bash "$DEVZONE" desactiver postgres </dev/null
     [ "$status" -eq 0 ]
     grep -q 'kubectl config set-context devzone --cluster=kind-devzone --user=kind-devzone' "$BATS_TEST_TMPDIR/kubectl.log"
-    grep -q 'kubectl --context devzone delete namespace devzone-postgres' "$BATS_TEST_TMPDIR/kubectl.log"
+    # Suppression du namespace par l'administrateur (compte limité sans droit)
+    grep -q -- '--context kind-devzone delete namespace devzone-postgres' "$BATS_TEST_TMPDIR/kubectl.log"
     grep -q 'kind delete cluster --name devzone' "$BATS_TEST_TMPDIR/kind.log"
     [ ! -d "$SECRETS" ]
     grep -qx 'postgres=off' "$DEVZONE_ETAT"
@@ -305,7 +306,8 @@ attendre_nohup() {
     actif_sur docker-desktop
     run bash "$DEVZONE" desactiver postgres </dev/null
     grep -q 'kubectl config set-context devzone --cluster=docker-desktop --user=docker-desktop' "$BATS_TEST_TMPDIR/kubectl.log"
-    grep -q 'kubectl --context devzone delete namespace devzone-postgres' "$BATS_TEST_TMPDIR/kubectl.log"
+    # Suppression du namespace par l'administrateur (compte limité sans droit)
+    grep -q -- '--context docker-desktop delete namespace devzone-postgres' "$BATS_TEST_TMPDIR/kubectl.log"
     ! grep -q 'kind delete' "$BATS_TEST_TMPDIR/kind.log" || false
 }
 
@@ -359,7 +361,8 @@ attendre_nohup() {
     run bash "$DEVZONE" cluster docker-desktop --oui </dev/null
     [ "$status" -eq 0 ]
     grep -qx 'cluster=docker-desktop' "$DEVZONE_ETAT"
-    grep -q 'kubectl --context kind-devzone delete namespace devzone-postgres' "$BATS_TEST_TMPDIR/kubectl.log"
+    # Suppression du namespace de l'ancien cluster par l'administrateur (#430)
+    grep -q -- '--context kind-devzone delete namespace devzone-postgres' "$BATS_TEST_TMPDIR/kubectl.log"
     # L'installation dans le nouveau cluster passe par le contexte devzone, relié à docker-desktop
     grep -q 'kubectl config set-context devzone --cluster=docker-desktop --user=docker-desktop' "$BATS_TEST_TMPDIR/kubectl.log"
     grep -q 'kubectl --context devzone apply -f -' "$BATS_TEST_TMPDIR/kubectl.log"

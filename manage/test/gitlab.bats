@@ -426,7 +426,9 @@ attendre_journal() {
     run bash "$GITLAB" desinstaller
     [ "$status" -eq 0 ]
     grep -q -- "helm --kube-context devzone uninstall gitlab --namespace devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log"
-    grep -q "kubectl --context devzone delete namespace devzone-gitlab --ignore-not-found" "$BATS_TEST_TMPDIR/kubectl.log"
+    # Namespace supprimé par l'administrateur, pas par le compte limité (#430)
+    grep -q -- "--kubeconfig=.* delete namespace devzone-gitlab --ignore-not-found" "$BATS_TEST_TMPDIR/kubectl.log"
+    ! grep -q -- "--context devzone delete namespace devzone-gitlab" "$BATS_TEST_TMPDIR/kubectl.log" || false
     [ -f "$SECRETS/rails-secret.yaml" ]
     [ ! -e "$SECRETS/root-password" ] || false
     [ ! -e "$SECRETS/root-token" ] || false
