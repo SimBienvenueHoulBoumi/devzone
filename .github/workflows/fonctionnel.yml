@@ -72,6 +72,9 @@ jobs:
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v7
+      # DNS publics pour le Docker du runner : son DNS échoue parfois sur archive.ubuntu.com (#468)
+      - name: DNS du Docker du runner
+        run: bash manage/scripts/ci-dns.sh
       - run: bash manage/test/fonctionnel.sh
 
   cli:
@@ -81,6 +84,9 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
+      # DNS publics pour le Docker du runner : son DNS échoue parfois sur archive.ubuntu.com (#468)
+      - name: DNS du Docker du runner
+        run: bash manage/scripts/ci-dns.sh
       - run: bash manage/test/cli-terminal.sh
 
   windows:
