@@ -52,6 +52,22 @@ case "$*" in
     *"label namespace "*) touch "$T/namespace" ;;
     *"get namespace "*) [ -f "$T/namespace" ] && exit 0 ; exit 1 ;;
     *"delete namespace "*) rm -f "$T/namespace" ;;
+    *"get secret "*"gitlab-rails-secret"*)
+        cat <<'SECRET'
+{
+  "apiVersion": "v1",
+  "data": {"secrets.yml": "c2VjcmV0czoK"},
+  "kind": "Secret",
+  "metadata": {
+    "name": "gitlab-rails-secret",
+    "namespace": "devzone-gitlab",
+    "resourceVersion": "123",
+    "uid": "abc"
+  },
+  "type": "Opaque"
+}
+SECRET
+        ;;
     *"get secret"*) echo "cGFzc3dvcmQxMjM=" ;;
     *"get pod"*) echo "gitlab-toolbox-1" ;;
     *"gitlab-rails runner"*) echo "jeton-root-secret" ;;
@@ -411,7 +427,9 @@ attendre_journal() {
     [ "$status" -eq 0 ]
     grep -q -- "helm --kube-context devzone uninstall gitlab --namespace devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log"
     grep -q "kubectl --context devzone delete namespace devzone-gitlab --ignore-not-found" "$BATS_TEST_TMPDIR/kubectl.log"
-    [ ! -e "$SECRETS" ]
+    [ -f "$SECRETS/rails-secret.yaml" ]
+    [ ! -e "$SECRETS/root-password" ] || false
+    [ ! -e "$SECRETS/root-token" ] || false
     [ ! -f "$BATS_TEST_TMPDIR/namespace" ] || false
     [ ! -s "$KIND_CLUSTERS" ] || false
 }

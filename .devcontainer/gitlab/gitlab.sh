@@ -309,7 +309,7 @@ gitlab_etat() {
 # Gestion des sous-commandes
 case "${1:-}" in
     installer)    gitlab_installer ;;
-    desinstaller) gitlab_desinstaller ;;
+    desinstaller) gitlab_desinstaller "${@:2}" ;;
     migrer)       shift; gitlab_migrer "$@" ;;
     installe)     gitlab_installe ;;
     etat)         gitlab_etat ;;

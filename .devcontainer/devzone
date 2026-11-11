@@ -357,7 +357,11 @@ appliquer_gitlab() {
         # Désactiver gitlab seulement si son namespace existe encore
         if bash "$ICI/gitlab/gitlab.sh" installe; then
             echo "devzone : gitlab désactivation…"
-            bash "$ICI/gitlab/gitlab.sh" desinstaller
+            if [ -n "${SUPPRIMER_DONNEES:-}" ]; then
+                bash "$ICI/gitlab/gitlab.sh" desinstaller --oui
+            else
+                bash "$ICI/gitlab/gitlab.sh" desinstaller
+            fi
         else
             echo "devzone : gitlab déjà désactivé (aucun namespace devzone-gitlab)."
         fi
@@ -491,9 +495,12 @@ confirmer_suppression() {
     [ -z "$SUPPRIMER_DONNEES" ] || return 0
     cluster_interactif || return 0
     # mysql : la question porte sur le namespace (volume et bases restent) ;
-    # postgres : tout part, le refus annule
+    # postgres : tout part, le refus annule ; gitlab : le secret Rails reste,
+    # sa suppression n'a lieu que sur une désinstallation complète voulue
     if [ "$app" = mysql ]; then
         printf 'Désactiver mysql retire le serveur, le volume et les bases restent. Supprimer aussi le namespace devzone-mysql et ses volumes ? [o/N] ' >&2
+    elif [ "$app" = gitlab ]; then
+        printf 'Désactiver gitlab garde le secret Rails (sessions du navigateur valides à la réinstallation). Supprimer aussi le secret Rails ? [o/N] ' >&2
     else
         printf 'Désactiver %s supprime toutes ses bases. Continuer ? [o/N] ' "$app" >&2
     fi
@@ -501,9 +508,9 @@ confirmer_suppression() {
     case "$reponse" in
         o | O | oui) SUPPRIMER_DONNEES=1; return 0 ;;
     esac
-    # refus : mysql désactive quand même (volume gardés), postgres annule
+    # refus : mysql et gitlab désactivent quand même (données gardées), postgres annule
     case "$app" in
-        mysql) return 0 ;;
+        mysql | gitlab) return 0 ;;
         *) echo "Abandon : rien n'a été supprimé."; return 1 ;;
     esac
 }
@@ -1185,7 +1192,7 @@ changer() {
         echo "devzone : module inconnu : $m ; modules : ${MODULES[*]}" >&2
         exit 1
     fi
-    if [ "$1" = off ] && { [ "$m" = postgres ] || [ "$m" = mysql ]; }; then
+    if [ "$1" = off ] && { [ "$m" = postgres ] || [ "$m" = mysql ] || [ "$m" = gitlab ]; }; then
         confirmer_suppression "$m" "${@:3}" || return 0
     fi
     ecrire "$m" "$1"

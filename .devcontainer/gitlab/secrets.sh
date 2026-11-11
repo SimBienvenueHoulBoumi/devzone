@@ -11,22 +11,62 @@
 GITLAB_RAILS_SECRET="gitlab-rails-secret"
 GITLAB_RAILS_FICHIER="$GITLAB_SECRETS_DIR/rails-secret.yaml"
 
-# Lit le secret Rails du cluster et écrit le fichier source (première installation).
+# Filtre jq : retire les champs propres au cluster (identité, version, gestion,
+# annotations du dernier apply) et rend un manifeste YAML réappliquable.
+GITLAB_RAILS_JQ='
+def scalaire:
+  if type == "string" then
+    if test("^[A-Za-z0-9._/=+-]+$") then . else tojson end
+  elif type == "number" or type == "boolean" then tostring
+  elif type == "null" then "null"
+  else tojson end;
+def yaml($ind):
+  if type == "object" then
+    (to_entries | map(
+      $ind + (.key | tostring) + ":" +
+      (if ((.value | type) == "object") or ((.value | type) == "array")
+       then "\n" + (.value | yaml($ind + "  "))
+       else " " + (.value | scalaire) end)
+    ) | join("\n"))
+  elif type == "array" then
+    (map($ind + "- " + (if type == "object" then "\n" + (yaml($ind + "  ")) else (. | scalaire) end)) | join("\n"))
+  else
+    $ind + scalaire
+  end;
+del(.metadata.resourceVersion, .metadata.uid, .metadata.creationTimestamp,
+    .metadata.managedFields, .metadata.ownerReferences,
+    .metadata.annotations["kubectl.kubernetes.io/last-applied-configuration"])
+| yaml("")
+'
+
+# Lit le secret Rails du cluster et écrit un vrai manifeste Secret (première
+# installation). Rien n'est écrit si la lecture échoue ou si le secret est absent.
 gitlab_secrets_copier() {
-    mkdir -p "$GITLAB_SECRETS_DIR"
-    kubectl --context devzone get secret -n "$GITLAB_NS" "$GITLAB_RAILS_SECRET" \
-        -o jsonpath='{.data.secrets\.yml}' 2>/dev/null | base64 -d >"$GITLAB_RAILS_FICHIER"
-    chmod 600 "$GITLAB_RAILS_FICHIER"
+    local secret tmp
+    secret="$(kubectl --context devzone get secret -n "$GITLAB_NS" \
+        "$GITLAB_RAILS_SECRET" -o json 2>/dev/null)" || return 0
+    [ -n "$secret" ] || return 0
+    mkdir -p "$GITLAB_SECRETS_DIR" || return 0
+    tmp="$(umask 077; mktemp "$GITLAB_SECRETS_DIR/.rails-secret.XXXXXX")" || return 0
+    if ! printf '%s\n' "$secret" | jq -r "$GITLAB_RAILS_JQ" >"$tmp" || [ ! -s "$tmp" ]; then
+        rm -f "$tmp"
+        return 0
+    fi
+    chmod 600 "$tmp" || {
+        rm -f "$tmp"
+        return 0
+    }
+    mv -f "$tmp" "$GITLAB_RAILS_FICHIER"
 }
 
 # Réapplique le secret Rails depuis le fichier source avant un helm upgrade
 # --install : le chart réutilise le secret existant, les sessions du navigateur
-# restent valides après une réinstallation.
+# restent valides après une réinstallation. L'échec est affiché et rendu.
 gitlab_secrets_appliquer() {
     if [ ! -f "$GITLAB_RAILS_FICHIER" ]; then
         return 0
     fi
-    kubectl --context devzone apply -f "$GITLAB_RAILS_FICHIER" >/dev/null 2>&1
+    kubectl --context devzone -n "$GITLAB_NS" apply -f "$GITLAB_RAILS_FICHIER"
 }
 
 # Avertit si le secret Rails n'a pas pu être conservé : la réinstallation régénère
@@ -37,11 +77,12 @@ gitlab_secrets_avertir() {
     fi
 }
 
-# Mot de passe aléatoire (root | dev) : appliqué par gitlab-rails runner dans le
-# pod toolbox, puis le fichier source et le regroupé .password sont mis à jour.
+# Mot de passe aléatoire (root | dev) : script Ruby passé sur l'entrée standard
+# de gitlab-rails runner (jamais dans la ligne de commande du pod), puis le
+# fichier source et le regroupé .password sont mis à jour si le runner confirme.
 # Rien n'est affiché, seulement le chemin.
 gitlab_nouveau_mdp() {
-    local utilisateur="${1:-}" mdp pod script
+    local utilisateur="${1:-}" mdp pod script sortie fichier
     case "$utilisateur" in
         root | dev) ;;
         *)
@@ -55,13 +96,23 @@ gitlab_nouveau_mdp() {
         echo "devzone : gitlab : pod toolbox (label app=toolbox) introuvable, mot de passe non changé." >&2
         return 1
     fi
-    script="u = User.find_by_username(\"$utilisateur\"); u.password = \"${mdp}\"; u.password_confirmation = \"${mdp}\"; u.save; puts u.persisted?"
-    if ! kubectl --context devzone exec -n "$GITLAB_NS" "$pod" -- gitlab-rails runner "$script" >/dev/null 2>&1; then
+    script="u = User.find_by_username(\"$utilisateur\")
+u.password = \"$mdp\"
+u.password_confirmation = \"$mdp\"
+u.save!
+puts \"OK\""
+    if ! sortie="$(printf '%s\n' "$script" | kubectl --context devzone exec -i -n "$GITLAB_NS" "$pod" -- gitlab-rails runner -)"; then
         echo "devzone : gitlab : mot de passe (gitlab-rails runner) non appliqué." >&2
         return 1
     fi
-    printf '%s' "$mdp" >"$GITLAB_SECRETS_DIR/$utilisateur-password"
-    chmod 600 "$GITLAB_SECRETS_DIR/$utilisateur-password"
+    if [[ "$sortie" != *OK* ]]; then
+        echo "devzone : gitlab : mot de passe non confirmé par gitlab-rails runner." >&2
+        return 1
+    fi
+    fichier="$GITLAB_SECRETS_DIR/$utilisateur-password"
+    mkdir -p "$GITLAB_SECRETS_DIR" || return 1
+    (umask 077 && printf '%s' "$mdp" >"$fichier") || return 1
+    chmod 600 "$fichier"
     password_regenerer ||
         echo "devzone : gitlab : identifiants regroupés non mis à jour (devzone mots-de-passe)" >&2
     printf '%s\n' "$RACINE/.password"
