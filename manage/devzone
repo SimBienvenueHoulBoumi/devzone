@@ -465,6 +465,18 @@ creer() {
     echo "Ensuite : cd $cible && make shell (ou ouvre le dossier dans VS Code : Reopen in Container)."
 }
 
+# Commandes du conteneur (#471) : liste figée, à garder alignée sur le case
+# final de .devcontainer/devzone (test de cohérence dans manage/test/cli.bats)
+commande_du_conteneur() {
+    case "$1" in
+        actif | activer | agent | appliquer | argocd | catalogue | cluster | clusters | \
+            demarrer | desactiver | etat | gitlab | metrics | modules | mots-de-passe | \
+            mysql | paquets | plateforme | port | postgres | reparer | test-bash32 | \
+            test-gitlab | utiliser) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
 case "${1:-}" in
     "" | -h | --help | aide) aide ;;
     -v | --version) version ;;
@@ -491,5 +503,11 @@ case "${1:-}" in
         echo "✖ option inconnue : $1 (devzone --help)" >&2
         exit 1
         ;;
-    *) creer "$1" ;;
+    *)
+        if commande_du_conteneur "$1"; then
+            echo "✖ devzone $1 : commande du conteneur ; lance-la dans devzone (make shell), ou choisis un autre nom de dossier" >&2
+            exit 2
+        fi
+        creer "$1"
+        ;;
 esac

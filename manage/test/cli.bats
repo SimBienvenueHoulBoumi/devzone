@@ -366,3 +366,35 @@ faux_docker() {
         [ -e "${c%/}" ] || { echo "chemin cité mais absent : $c"; return 1; }
     done <<<"$chemins"
 }
+
+@test "devzone modules : commande du conteneur refusée sur le poste, aucun dossier créé" {
+    run bash "$CLI" modules
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"devzone modules : commande du conteneur"* ]] || false
+    [ ! -e modules ]
+}
+
+@test "devzone mon-projet : un nom libre crée toujours le dossier" {
+    run bash "$CLI" mon-projet
+    [ "$status" -eq 0 ]
+    [ -d mon-projet/.devcontainer ]
+}
+
+@test "devzone : chaque commande du conteneur figure dans la liste du lanceur" {
+    local cmd noms
+    # Cas du case final de .devcontainer/devzone : lignes à 4 espaces, avant ')'
+    noms="$(sed -n '/^case "\${1:-}" in/,/^esac/p' "$RACINE/.devcontainer/devzone" |
+        grep -oE '^    [^ ][^)]*\)' | sed 's/)$//' | tr '|' '\n' | tr -d ' "')"
+    [ -n "$noms" ]
+    # Sans expansion : le cas par défaut « * » ne doit pas devenir une liste de fichiers
+    set -f
+    for cmd in $noms; do
+        case "$cmd" in
+            workspace | desinstaller | mettre-a-jour | -h | --help | -v | --version | aide | help | '*') continue ;;
+        esac
+        # Le lanceur ne doit pas créer de dossier pour ce nom
+        run bash "$CLI" "$cmd"
+        [ "$status" -eq 2 ] || { echo "absent de la liste du lanceur : $cmd"; return 1; }
+        [ ! -e "$cmd" ] || { echo "dossier créé : $cmd"; return 1; }
+    done
+}
