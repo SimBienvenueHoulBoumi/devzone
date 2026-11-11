@@ -662,11 +662,15 @@ KUBE
     [[ "$output" == *"opencode : configuration personnalisée, gardée"* ]] || false
 }
 
-@test "activer ia : skill devzone posée dans les deux dossiers" {
+@test "activer ia : skill devzone posée dans les deux dossiers, avec en-tête YAML" {
     run bash "$DEVZONE" activer ia
     [ "$status" -eq 0 ]
     [ -f "$HOME/.claude/skills/devzone/SKILL.md" ]
     [ -f "$HOME/.config/opencode/skills/devzone/SKILL.md" ]
+    [ "$(head -n 1 "$HOME/.claude/skills/devzone/SKILL.md")" = '---' ]
+    [ "$(head -n 1 "$HOME/.config/opencode/skills/devzone/SKILL.md")" = '---' ]
+    grep -q '^name: devzone$' "$HOME/.claude/skills/devzone/SKILL.md"
+    grep -q '^name: devzone$' "$HOME/.config/opencode/skills/devzone/SKILL.md"
     grep -qF '<!-- devzone : skill posée par devzone activer ia -->' "$HOME/.claude/skills/devzone/SKILL.md"
     grep -qF '<!-- devzone : skill posée par devzone activer ia -->' "$HOME/.config/opencode/skills/devzone/SKILL.md"
     [[ "$output" == *"skill devzone posée"* ]] || false
@@ -690,6 +694,17 @@ KUBE
 mon réglage' ]
     [ "$(cat "$HOME/.config/opencode/skills/devzone/SKILL.md")" = '# ma skill personnelle
 mon réglage' ]
+    [[ "$output" == *"skill devzone personnalisée"* ]] || false
+}
+
+@test "activer ia : skill modifiée mais gardant le repère -> gardée" {
+    bash "$DEVZONE" activer ia >/dev/null
+    printf '\nmon réglage\n' >>"$HOME/.claude/skills/devzone/SKILL.md"
+    printf '\nmon réglage\n' >>"$HOME/.config/opencode/skills/devzone/SKILL.md"
+    run bash "$DEVZONE" activer ia
+    [ "$status" -eq 0 ]
+    [[ "$(cat "$HOME/.claude/skills/devzone/SKILL.md")" == *"mon réglage"* ]] || false
+    [[ "$(cat "$HOME/.config/opencode/skills/devzone/SKILL.md")" == *"mon réglage"* ]] || false
     [[ "$output" == *"skill devzone personnalisée"* ]] || false
 }
 
