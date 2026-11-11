@@ -91,6 +91,9 @@ gitlab_installer() {
     # Installation des services en ClusterIP, sans exposition directe :
     # l'accès passe uniquement par le relais port-forward du conteneur
     echo "▶ Installation du chart GitLab dans $GITLAB_NS…"
+    # Secret Rails (#347) : réinstallation -> réappliquer le secret conservé avant
+    # le helm upgrade --install (le chart le réutilise, sessions navigateur valides)
+    gitlab_secrets_appliquer
     helm --kube-context devzone upgrade --install gitlab gitlab/gitlab \
         --version 9.11.16 \
         --namespace "$GITLAB_NS" \
@@ -98,6 +101,9 @@ gitlab_installer() {
         -f "$ICI/values.yaml" \
         --timeout "${GITLAB_ATTENTE}s" \
         --wait
+    if [ ! -f "$GITLAB_RAILS_FICHIER" ]; then
+        gitlab_secrets_copier
+    fi
 
     # Relais avant l'attente : curl et git en HTTP résolvent *.localhost vers
     # la boucle locale et n'atteignent GitLab que par ces port-forward (#320)
@@ -130,6 +136,8 @@ gitlab_installer() {
         --set "runnerToken=${runner_token}"
     rm -f "$valeurs_runner"
 
+    gitlab_secrets_avertir
+
     echo "▶ Installation terminée."
     echo "  URL : http://gitlab.localhost:8929"
     echo "  Utilisateur : root"
@@ -137,7 +145,16 @@ gitlab_installer() {
 }
 
 # Retire GitLab : relais, releases Helm et namespace de l'instance seulement.
+# Le secret Rails est gardé (sessions du navigateur valides à la réinstallation),
+# sauf désinstallation complète voulue (--oui) : il part alors avec les données.
 gitlab_desinstaller() {
+    local supprimer_secret="" arg
+    for arg in "$@"; do
+        case "$arg" in
+            --oui) supprimer_secret=1 ;;
+            *) echo "devzone : gitlab desinstaller : argument inconnu : $arg" >&2; return 2 ;;
+        esac
+    done
     echo "▶ Désinstallation de GitLab…"
     gitlab_relais_arreter
     rm -rf "$(relais_dossier gitlab-web)" "$(relais_dossier gitlab-ssh)" \
@@ -145,7 +162,15 @@ gitlab_desinstaller() {
     helm --kube-context devzone uninstall gitlab --namespace "$GITLAB_NS" >/dev/null 2>&1 || true
     helm --kube-context devzone uninstall gitlab-runner --namespace "$GITLAB_NS" >/dev/null 2>&1 || true
     kubectl --context devzone delete namespace "$GITLAB_NS" --ignore-not-found >/dev/null 2>&1 || true
-    rm -rf "$GITLAB_SECRETS_DIR"
+    if [ -n "$supprimer_secret" ]; then
+        rm -rf "$GITLAB_SECRETS_DIR"
+        echo "secret Rails supprimé avec les données de GitLab."
+    elif [ -d "$GITLAB_SECRETS_DIR" ]; then
+        find "$GITLAB_SECRETS_DIR" -mindepth 1 ! -name rails-secret.yaml -exec rm -rf {} + 2>/dev/null || true
+        if [ -f "$GITLAB_RAILS_FICHIER" ]; then
+            echo "secret Rails gardé dans workspace/.gitlab/rails-secret.yaml (sessions du navigateur valides à la réinstallation)"
+        fi
+    fi
     gitlab_hote_retirer
     echo "✔ GitLab désinstallé."
     regenerer_identifiants
