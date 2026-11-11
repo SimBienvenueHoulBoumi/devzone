@@ -15,6 +15,7 @@ setup() {
     cp "$RACINE_TEST/.devcontainer/devzone" "$APP"
     cp "$RACINE_TEST/.devcontainer/cluster.sh" "$T/app/cluster.sh"
     cp "$RACINE_TEST/.devcontainer/etat.sh" "$T/app/etat.sh"
+    cp "$RACINE_TEST/.devcontainer/etat-verrou.sh" "$T/app/etat-verrou.sh"
     cp "$RACINE_TEST/.devcontainer/kube-joignable.sh" "$T/app/kube-joignable.sh"
     cp "$RACINE_TEST/.devcontainer/kube-compte.sh" "$T/app/kube-compte.sh"
     chmod +x "$APP"

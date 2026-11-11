@@ -90,6 +90,7 @@ teardown() {
     mkdir -p "$depot/.devcontainer/catalogue"
     cp "$VEILLEUR" "$depot/.devcontainer/catalogue/catalogue-veilleur.sh"
     cp "$BATS_TEST_DIRNAME/../../.devcontainer/etat.sh" "$depot/.devcontainer/etat.sh"
+    cp "$BATS_TEST_DIRNAME/../../.devcontainer/etat-verrou.sh" "$depot/.devcontainer/etat-verrou.sh"
     cat >"$depot/.devcontainer/catalogue.sh" <<'CATALOGUE'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >>"$BATS_TEST_TMPDIR/catalogue.log"
