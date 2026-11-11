@@ -111,8 +111,9 @@ agent_lancer() {
         offset="$(wc -c <"$journal")"
         local agent_kube="$etat/kubeconfig"
         if [ -f "$HOME/.kube/config" ]; then
-            cp "$HOME/.kube/config" "$agent_kube"
-            KUBECONFIG="$agent_kube" kubectl config use-context devzone >/dev/null 2>&1 || true
+            (umask 077; KUBECONFIG="$HOME/.kube/config" kubectl config view --minify --flatten --context devzone >"$agent_kube") 2>/dev/null || : >"$agent_kube"
+            chmod 600 "$agent_kube"
+            [ -s "$agent_kube" ] || echo "=== kubernetes : aucun contexte devzone, session sans accès" >>"$journal"
         else
             : >"$agent_kube"
         fi

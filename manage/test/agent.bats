@@ -117,6 +117,40 @@ setup() {
     ! grep -q 'hote.config' "$FAKE_OP_KUBECONFIG_LOG" || false
 }
 
+# Faux kubectl : « config view --minify --flatten --context devzone » ne rend que
+# le contexte devzone de $KUBECONFIG, et échoue s'il n'existe pas (#470)
+faux_kubectl_devzone() {
+    cat >"$BATS_TEST_TMPDIR/bin/kubectl" <<'KUBECTL'
+#!/usr/bin/env bash
+[ "$*" = "config view --minify --flatten --context devzone" ] || exit 1
+grep -q 'name: devzone' "$KUBECONFIG" 2>/dev/null || { echo "error: context was not found" >&2; exit 1; }
+grep -v 'kind-x' "$KUBECONFIG"
+KUBECTL
+    chmod +x "$BATS_TEST_TMPDIR/bin/kubectl"
+}
+
+@test "agent : kubeconfig de session sans les autres contextes, en 600 (#470)" {
+    faux_kubectl_devzone
+    printf 'contexts:\n- name: devzone\n- name: kind-x\n' >"$HOME/.kube/config"
+    agent_consigne
+    agent_lance
+    [ "$status" -eq 0 ]
+    grep -q 'name: devzone' "$DEVZONE_AGENT_ETAT/kubeconfig" || false
+    ! grep -q 'kind-x' "$DEVZONE_AGENT_ETAT/kubeconfig" || false
+    [ "$(stat -c %a "$DEVZONE_AGENT_ETAT/kubeconfig")" = 600 ]
+}
+
+@test "agent : sans contexte devzone -> kubeconfig vide et ligne de journal (#470)" {
+    faux_kubectl_devzone
+    printf 'contexts:\n- name: kind-x\n' >"$HOME/.kube/config"
+    agent_consigne
+    agent_lance
+    [ "$status" -eq 0 ]
+    [ ! -s "$DEVZONE_AGENT_ETAT/kubeconfig" ]
+    [ "$(stat -c %a "$DEVZONE_AGENT_ETAT/kubeconfig")" = 600 ]
+    grep -q "=== kubernetes : aucun contexte devzone, session sans accès" "$(agent_journal)" || false
+}
+
 @test "agent : verrou recent sans pid -> pas repris, attente puis refus" {
     # Un verrou sans pid n'est volé que si son âge dépasse 30 s (#377)
     source "$BATS_TEST_DIRNAME/../../.devcontainer/agent-session.sh"
