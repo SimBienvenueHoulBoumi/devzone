@@ -25,6 +25,18 @@ heure() {
     fi
 }
 
+# Trace de verrou dans le journal de l'agent ($AGENT_JOURNAL, défini par
+# agent.sh) : une ligne à la prise et une au rendu, avec l'horloge et le pid,
+# pour le diagnostic des lancements simultanés du rang en CI (#421). Sans
+# journal, rien n'est écrit.
+verrou_tracer() {
+    local d
+    [ -n "${AGENT_JOURNAL:-}" ] || return 0
+    d="$(date +%s.%N 2>/dev/null)" || d=""
+    case "$d" in "" | *N*) d="$(date +%s)" ;; esac
+    echo "=== verrou $1 $d pid $$" >>"$AGENT_JOURNAL"
+}
+
 # Rang partagé : deux lancements simultanés ne doivent pas partir sur le même
 # modèle. mkdir est atomique et présent partout (flock manque sur macOS) ; seul
 # l'âge du verrou décide (#377), le pid écrit n'étant qu'un détail de
@@ -48,12 +60,19 @@ verrou_prendre() {
         sleep 1
     done
     echo "$$" >"$AGENT_ETAT/verrou/pid"
+    verrou_tracer pris
 }
 
-# Libère le rang partagé pris par verrou_prendre : retire le pid, puis le dossier.
+# Libère le rang partagé pris par verrou_prendre : retire le pid, puis le dossier,
+# mais seulement si ce verrou appartient à l'agent appelant (pid du fichier == $$).
+# Un verrou détenu par un autre agent n'est jamais supprimé ici.
 verrou_lacher() {
+    local pid
+    pid="$(cat "$AGENT_ETAT/verrou/pid" 2>/dev/null)" || return 0
+    [ "$pid" = "$$" ] || return 0
     rm -f "$AGENT_ETAT/verrou/pid"
     rmdir "$AGENT_ETAT/verrou" 2>/dev/null || true
+    verrou_tracer rendu
 }
 
 # Passe permission.edit en objet et ajoute en dernier un deny par fichier de droits
