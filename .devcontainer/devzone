@@ -60,7 +60,7 @@ MODULES=(ia kubernetes gitlab postgres argocd mysql)
 # change pas : deux montées simultanées (workflow versions) se fusionnent sans
 # conflit, git n'en signalant qu'entre lignes voisines modifiées.
 # Claude Code
-IA_CLAUDE=@anthropic-ai/claude-code@2.1.321
+IA_CLAUDE=@anthropic-ai/claude-code@2.1.322
 # opencode
 IA_OPENCODE=opencode-ai@1.19.5
 IA_PAQUETS=("$IA_CLAUDE" "$IA_OPENCODE")
