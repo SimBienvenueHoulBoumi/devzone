@@ -15,13 +15,6 @@
       "version": "lts",
       "pnpmVersion": "latest"
     },
-    "ghcr.io/devcontainers/features/python:1": {
-      "version": "3.12",
-      // Pas d'outils pipx : leur lanceur « python -E » ignore PYTHONPATH et
-      // PYTHONPYCACHEPREFIX, dont repowarden a besoin pour lancer les tests
-      // (ruff, vulture et pytest viennent du Dockerfile, par uv)
-      "installTools": false
-    },
     "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {},
     "ghcr.io/devcontainers/features/kubectl-helm-minikube:1": {
       "minikube": "none"

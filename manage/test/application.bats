@@ -14,6 +14,7 @@ setup() {
     mkdir -p "$T/app/gitlab" "$T/app/postgres" "$T/app/catalogue/mysql" "$T/bin" "$DEVZONE_RACINE"
     cp "$RACINE_TEST/.devcontainer/devzone" "$APP"
     cp "$RACINE_TEST/.devcontainer/cluster.sh" "$T/app/cluster.sh"
+    cp "$RACINE_TEST/.devcontainer/etat.sh" "$T/app/etat.sh"
     cp "$RACINE_TEST/.devcontainer/kube-joignable.sh" "$T/app/kube-joignable.sh"
     chmod +x "$APP"
     export PATH="$T/bin:$PATH"
