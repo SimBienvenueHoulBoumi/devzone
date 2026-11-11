@@ -96,20 +96,97 @@ connu() {
     return 1
 }
 
-# Premier démarrage (aucun état) : tout désactivé ; l'ancien état global
-# (version précédente) est repris une fois, par déplacement
+# Première installation (#417) : l'état par défaut, écrit d'un bloc
+etat_defaut() {
+    local stage
+    stage="$(mktemp)" || return 1
+    printf 'ia=off\nkubernetes=off\ngitlab=off\n' >"$stage"
+    if etat_poser "$stage"; then
+        rm -f "$stage"
+        return 0
+    fi
+    rm -f "$stage"
+    return 1
+}
+
+# État absent sans copie de secours (#417, étape 3) : reconstruit depuis les
+# namespaces étiquetés devzone du cluster des services (module à on si son
+# namespace existe, cluster= du contexte devzone). Rend 1 s'il n'y a rien à
+# reconstruire : première installation réelle.
+etat_reconstruire() {
+    local nss m stage vu=0 code=0 cluster_ctx cluster_hote
+    command -v kubectl >/dev/null 2>&1 || return 1
+    nss="$(kubectl get namespaces -l "$CLUSTER_ETIQUETTE" -o name 2>/dev/null || true)"
+    [ -n "$nss" ] || return 1
+    stage="$(mktemp)" || return 1
+    for m in "${MODULES[@]}"; do
+        if printf '%s\n' "$nss" | grep -qx "namespace/devzone-$m"; then
+            printf '%s=on\n' "$m" >>"$stage" || code=1
+            vu=1
+        else
+            printf '%s=off\n' "$m" >>"$stage" || code=1
+        fi
+    done
+    # Contexte devzone -> cluster des services ; le cluster= attend le contexte
+    # réel de l'hôte qui pointe sur ce même cluster (ex. docker-desktop), pas le
+    # contexte « devzone ». Sans contexte hôte identifiable : aucune ligne.
+    cluster_ctx="$(kubectl config view -o jsonpath="{.contexts[?(@.name=\"devzone\")].context.cluster}" 2>/dev/null || true)"
+    cluster_hote=""
+    if [ -n "$cluster_ctx" ]; then
+        cluster_hote="$(contexte_hote_du_cluster "$cluster_ctx")"
+        if [ -n "$cluster_hote" ]; then
+            printf 'cluster=%s\n' "$cluster_hote" >>"$stage" || code=1
+        fi
+    fi
+    if [ "$code" -eq 0 ] && [ "$vu" -eq 1 ] && etat_poser "$stage"; then
+        echo "devzone : état reconstruit depuis les namespaces du cluster des services : $ETAT (confirmez par devzone appliquer)" >&2
+        [ -n "$cluster_hote" ] || echo "devzone : aucun contexte d'hôte ne pointe sur le cluster des services : pas de ligne cluster= dans $ETAT" >&2
+        rm -f "$stage"
+        return 0
+    fi
+    rm -f "$stage"
+    return 1
+}
+
+# Premier démarrage (aucun état) : ancien état global repris une fois, sinon
+# copie de secours restaurée, sinon état reconstruit, sinon tout désactivé
 initialiser() {
+    [ -f "$ETAT" ] && return 0
+
     # Migration : ancien état global (~/.config/devzone/modules) vers l'état
     # de l'instance ($RACINE/.devzone.modules) ; déplacé, pas copié : le
     # premier devzone démarré après la mise à jour garde ses choix
-    if [ ! -f "$ETAT" ] && [ -f "$HOME/.config/devzone/modules" ]; then
-        mkdir -p "$(dirname "$ETAT")"
-        mv "$HOME/.config/devzone/modules" "$ETAT"
+    if [ -f "$HOME/.config/devzone/modules" ]; then
+        if etat_poser "$HOME/.config/devzone/modules"; then
+            rm -f "$HOME/.config/devzone/modules"
+            return 0
+        fi
     fi
 
-    [ -f "$ETAT" ] && return 0
-    mkdir -p "$(dirname "$ETAT")"
-    printf 'ia=off\nkubernetes=off\ngitlab=off\nargocd=off\n' >"$ETAT"
+    etat_verrou_prendre || return 1
+    if [ -f "$ETAT" ]; then
+        etat_verrou_lacher
+        return 0
+    fi
+    # 1. Copie de secours laissée par la dernière écriture (#417)
+    if [ -f "${ETAT}.prec" ] && etat_poser "${ETAT}.prec"; then
+        echo "devzone : état restauré depuis la copie de secours : $ETAT (confirmez par devzone appliquer)" >&2
+        etat_recouvrement_marquer
+        etat_verrou_lacher
+        return 0
+    fi
+    # 2. Reconstruction depuis le cluster des services (#417)
+    if etat_reconstruire; then
+        etat_recouvrement_marquer
+        etat_verrou_lacher
+        return 0
+    fi
+    # 3. Première installation : tout désactivé (#417)
+    if ! etat_defaut; then
+        etat_verrou_lacher
+        return 1
+    fi
+    etat_verrou_lacher
     # Connexion déjà établie par une autre devzone (volumes partagés) :
     # signalée une seule fois, à la création de l'état de cette instance ;
     # stderr : initialiser est aussi appelé dans $(valeur …). Rien pour un
@@ -117,6 +194,7 @@ initialiser() {
     if [ -f "$HOME/.claude/.credentials.json" ] || [ -f "$HOME/.local/share/opencode/auth.json" ]; then
         echo "devzone : connexion Claude Code/opencode partagée trouvée : devzone activer ia pour l'utiliser ici" >&2
     fi
+    return 0
 }
 
 valeur() {
@@ -132,23 +210,28 @@ valeur() {
     [ "$v" = on ] && echo on || echo off
 }
 
+# Verrou tenu de l'initialisation à l'écriture (#417) : l'état n'est jamais
+# recréé à vide entre les deux
 ecrire() {
-    initialiser
-    local tmp
-    tmp="$(mktemp)"
-    grep -vE "^$1=" "$ETAT" >"$tmp" || true
-    echo "$1=$2" >>"$tmp"
-    mv "$tmp" "$ETAT"
+    etat_verrou_prendre || return 1
+    if ! initialiser || ! etat_ecrire "$1" "$2"; then
+        etat_verrou_lacher
+        return 1
+    fi
+    etat_verrou_lacher
+    return 0
 }
 
 # Retire une clé du fichier d'état : la configuration d'un service n'existe
 # que pendant qu'il est choisi (#242)
 retirer_cle() {
-    initialiser
-    local tmp
-    tmp="$(mktemp)"
-    grep -vE "^$1=" "$ETAT" 2>/dev/null >"$tmp" || true
-    mv "$tmp" "$ETAT"
+    etat_verrou_prendre || return 1
+    if ! initialiser || ! etat_retirer "$1"; then
+        etat_verrou_lacher
+        return 1
+    fi
+    etat_verrou_lacher
+    return 0
 }
 
 # Vrai si le fichier ne contient que la clé $schema (créé d'office par opencode)
@@ -1303,6 +1386,9 @@ case "${1:-}" in
     activer) changer on "${2:-}" "${@:3}" ;;
     desactiver) changer off "${2:-}" "${@:3}" ;;
     appliquer)
+        # L'utilisateur confirme l'état courant (#417, étape 4) : les
+        # veilleurs peuvent de nouveau désinstaller
+        etat_recouvrement_confirmer
         appliquer_repowarden
         [ "$(valeur ia)" = off ] || appliquer_ia on
         [ "$(valeur gitlab)" = off ] || appliquer_gitlab on

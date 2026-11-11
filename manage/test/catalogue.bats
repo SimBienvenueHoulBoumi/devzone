@@ -126,6 +126,17 @@ attendre_nohup() {
     grep -qx 'mysql=on' "$DEVZONE_ETAT" || false
 }
 
+@test "synchroniser concurrent : mysql=off ajouté une fois, ligne existante respectée" {
+    printf 'ia=on\nautre=off\n' >"$DEVZONE_ETAT"
+    bash "$CATALOGUE" synchroniser & pid_a=$!
+    bash "$CATALOGUE" synchroniser & pid_b=$!
+    wait "$pid_a"
+    wait "$pid_b"
+    grep -qx 'mysql=off' "$DEVZONE_ETAT" || false
+    grep -qx 'ia=on' "$DEVZONE_ETAT" || false
+    [ "$(grep -c '^mysql=' "$DEVZONE_ETAT")" -eq 1 ] || false
+}
+
 @test "appliquer : mysql=on installe (manifest, secret, relais 127.0.0.1:3306)" {
     printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_ETAT"
     run bash "$DEVZONE" appliquer

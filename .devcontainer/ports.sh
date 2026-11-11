@@ -12,10 +12,16 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then set -euo pipefail; fi
 
 SOCAT_IMAGE=alpine/socat:1.8.0.3
 
-ICI="$(cd "$(dirname "$0")" && pwd)"
+ICI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RACINE="${DEVZONE_RACINE:-$(dirname "$ICI")}"
 ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
 INSTANCE="${DEVZONE_INSTANCE:-devzone}"
+
+# Écriture sûre de l'état (#417) : verrou, temporaire dans le dossier de
+# l'état, copie de secours .prec
+# shellcheck source=SCRIPTDIR/etat.sh
+# shellcheck disable=SC1091
+. "$ICI/etat.sh"
 
 refuse() { echo "devzone : port : $*" >&2; exit 1; }
 
@@ -33,13 +39,12 @@ trier_ports() {
         sort -n -u | paste -sd, -
 }
 
+# Écrit la ligne ports= de l'état (#417 : jamais de mv hors de etat.sh)
 ecrire_ports() {
-    local valeur="${1:-}" tmp
-    mkdir -p "$(dirname "$ETAT")"
-    tmp="$(mktemp)" || { echo "devzone : port : état non enregistré : $ETAT" >&2; exit 1; }
-    grep -vE '^ports=' "$ETAT" 2>/dev/null >"$tmp" || true
-    echo "ports=$valeur" >>"$tmp"
-    mv "$tmp" "$ETAT" || { echo "devzone : port : état non enregistré : $ETAT" >&2; exit 1; }
+    etat_ecrire ports "${1:-}" || {
+        echo "devzone : port : état non enregistré : $ETAT" >&2
+        exit 1
+    }
 }
 
 ajouter_port() {

@@ -28,6 +28,12 @@ export KUBECONFIG
 # État des modules : défini par l'appelant ; valeur par défaut pour les tests
 : "${ETAT:=${DEVZONE_ETAT:-$HOME/.devzone.modules}}"
 
+# Écriture sûre de l'état (#417) : verrou, temporaire dans le dossier de
+# l'état, copie de secours .prec — partagée par devzone, ports et ports-auto
+# shellcheck source=SCRIPTDIR/etat.sh
+# shellcheck disable=SC1091
+. "$(dirname "${BASH_SOURCE[0]}")/etat.sh"
+
 # Nom d'instance : vide ou « devzone » = instance par défaut (pas de suffixe)
 : "${DEVZONE_INSTANCE:=}"
 INSTANCE_SUFFIX=""
@@ -51,12 +57,26 @@ cluster_lu() {
 }
 
 cluster_ecrire() {
-    local tmp
-    mkdir -p "$(dirname "$ETAT")"
-    tmp="$(mktemp)"
-    grep -vE '^cluster=' "$ETAT" 2>/dev/null >"$tmp" || true
-    echo "cluster=$1" >>"$tmp"
-    mv "$tmp" "$ETAT"
+    etat_ecrire cluster "$1"
+}
+
+# Contexte de l'hôte (KUBECONFIG de l'hôte) qui pointe sur le cluster donné :
+# le cluster= de l'état attend le contexte réel de l'hôte (ex. docker-desktop),
+# pas le contexte « devzone » posé sur le cluster des services
+contexte_hote_du_cluster() {
+    local cluster="$1" hote ctx
+    hote="${DEVZONE_KUBE_HOTE:-$HOME/.kube/hote.config}"
+    while IFS= read -r ctx; do
+        [ -n "$ctx" ] || continue
+        # Le contexte « devzone » est posé par devzone sur le cluster des
+        # services : on cherche le contexte de l'hôte qui y pointe
+        [ "$ctx" = devzone ] && continue
+        if [ "$(KUBECONFIG="$hote" kubectl config view -o jsonpath="{.contexts[?(@.name=\"$ctx\")].context.cluster}" 2>/dev/null || true)" = "$cluster" ]; then
+            echo "$ctx"
+            return 0
+        fi
+    done < <(KUBECONFIG="$hote" kubectl config get-contexts -o name 2>/dev/null)
+    return 1
 }
 
 cluster_est_dedie() {
