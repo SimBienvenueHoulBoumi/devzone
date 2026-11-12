@@ -144,6 +144,9 @@ spec:
             # les chemins montes depuis le volume etat (et non dans le home de root).
             - name: HOME
               value: /home/vscode
+            # Repère du workspace Kubernetes : devzone agent lance opencode ici (#431)
+            - name: DEVZONE_WORKSPACE
+              value: kubernetes
             # Testcontainers et docker parlent a kubedock, et buildctl a BuildKit.
             # Ryuk est coupe : kubedock nettoie les conteneurs de test lui-meme.
             - name: DOCKER_HOST
