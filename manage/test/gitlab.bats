@@ -275,6 +275,20 @@ attendre_journal() {
     grep -A1 "nginx-ingress:" "$values" | grep -q "enabled: false" || false
 }
 
+@test "gitlab : values.yaml fixe les HPA à 1 réplica (#490)" {
+    local values="$BATS_TEST_DIRNAME/../../.devcontainer/gitlab/values.yaml"
+    local name bloc
+    for name in webservice sidekiq gitlab-shell; do
+        bloc="$(awk -v n="$name" '
+            $0 == "  " n ":" { dans=1; next }
+            dans && /^  [^ ]/ { dans=0 }
+            dans { print }
+        ' "$values")"
+        [[ "$bloc" == *"minReplicas: 1"* ]] || false
+        [[ "$bloc" == *"maxReplicas: 1"* ]] || false
+    done
+}
+
 @test "gitlab : kind.yaml et le cluster kind-gitlab sont retirés" {
     [ ! -e "$BATS_TEST_DIRNAME/../../.devcontainer/gitlab/kind.yaml" ] || false
     ! grep -q "kind create cluster --name gitlab" "$BATS_TEST_DIRNAME/../../.devcontainer/gitlab/installation.sh" || false
