@@ -47,7 +47,7 @@ jobs:
     if: inputs.tag != '' || startsWith(github.ref, 'refs/tags/v')
     needs: build
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 120
     permissions:
       contents: read
       packages: write
@@ -66,9 +66,13 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      # Image multi-architecture : Mac Apple Silicon (arm64) et postes amd64 (#494)
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - uses: devcontainers/ci@513af61f4de4f75d37e4438f184ba4358f0fc1ca # v0.3.1900000450
         with:
           configFile: .devcontainer/devcontainer.json
           imageName: ghcr.io/simbienvenuehoulboumi/devzone-workspace
           imageTag: ${{ steps.version.outputs.version }},latest
+          platform: linux/amd64,linux/arm64
           push: always
