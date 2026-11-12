@@ -162,10 +162,23 @@ attendre_nohup() {
     grep -q -- '--context devzone apply -f -' "$BATS_TEST_TMPDIR/kubectl.log"
 }
 
+@test "argocd app add : GitLab de devzone, URL interne et jeton root du module dans un Secret de dépôt" {
+    argocd_installe
+    mkdir -p "$DEVZONE_RACINE/workspace/.gitlab"
+    printf 'glpat-SECRET' >"$DEVZONE_RACINE/workspace/.gitlab/root-token"
+    run bash "$DEVZONE" argocd app add http://gitlab.localhost:8929/devzone/demo.git k8s
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"glpat-SECRET"* ]] || false
+    grep -q 'repoURL: http://gitlab-webservice-default.devzone-gitlab.svc:8181/devzone/demo.git' "$BATS_TEST_TMPDIR/apply.log"
+    grep -q 'argocd.argoproj.io/secret-type: repository' "$BATS_TEST_TMPDIR/apply.log"
+    grep -q 'password: glpat-SECRET' "$BATS_TEST_TMPDIR/apply.log"
+    grep -q -- '--context devzone -n devzone-gitlab patch networkpolicy devzone-meme-namespace' "$BATS_TEST_TMPDIR/kubectl.log"
+}
+
 @test "argocd app : module inactif refusé, et renvoi au poste dans le pod du workspace" {
     run bash "$DEVZONE" argocd app list
     [ "$status" -eq 2 ]
-    [[ "$output" == *"devzone enable argocd"* ]] || false
+    [[ "$output" == *"module off: devzone enable argocd"* ]] || false
     argocd_installe
     run env DEVZONE_WORKSPACE=kubernetes bash "$DEVZONE" argocd app list
     [ "$status" -eq 2 ]

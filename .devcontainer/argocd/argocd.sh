@@ -202,6 +202,22 @@ relais() {
 APPS_CMD="devzone argocd app"
 # shellcheck disable=SC2034 # read by apps.sh
 APPS_GENERATOR="$ICI/application.sh"
+# shellcheck disable=SC2034 # read by apps.sh: GitLab namespace of this instance
+APPS_GITLAB_NS="devzone-gitlab${INSTANCE_SUFFIX}"
+# shellcheck disable=SC2034 # read by apps.sh
+APPS_GITLAB_TOKEN_FILE="$RACINE/workspace/.gitlab/root-token"
+# shellcheck disable=SC2034 # read by gitops.sh
+GITOPS_CMD="devzone argocd init"
+# shellcheck disable=SC2034 # read by conf.sh and apps.sh: .argocd.conf of the instance
+ARGOCD_CONF_DIR="$RACINE"
+# shellcheck disable=SC2034
+ARGOCD_CONF="${DEVZONE_ARGOCD_CONF:-$RACINE/.argocd.conf}"
+# shellcheck source=SCRIPTDIR/conf.sh
+# shellcheck disable=SC1091
+. "$ICI/conf.sh"
+# shellcheck source=SCRIPTDIR/gitops.sh
+# shellcheck disable=SC1091
+. "$ICI/gitops.sh"
 # shellcheck source=SCRIPTDIR/apps.sh
 # shellcheck disable=SC1091
 . "$ICI/apps.sh"
@@ -213,15 +229,25 @@ case "${1:-}" in
     etat) etat ;;
     relais-lancer) relais ;;
     relais-arreter) relais_arreter argocd ;;
+    init)
+        # GitOps repository of the user (#516): created or designated, then
+        # the root Application when the module is installed
+        gitops_init "${@:2}" || exit $?
+        if installe; then gitops_root; fi
+        ;;
+    apply)
+        installe || refuse "module off: devzone enable argocd"
+        gitops_init && gitops_root && apps_reconcile
+        ;;
     app)
         if [ "${DEVZONE_WORKSPACE:-}" = kubernetes ]; then
             refuse "in the workspace pod, on the workstation: devzone workspace argocd app ${*:2}"
         fi
-        installe || refuse "module inactif : devzone enable argocd"
+        installe || refuse "module off: devzone enable argocd"
         argocd_app "${@:2}"
         ;;
     *)
-        echo "devzone argocd : installer | desinstaller | etat | app add|list|remove" >&2
+        echo "devzone argocd : installer | desinstaller | etat | init [--repo <url>|--none] | apply | app add|list|remove" >&2
         exit 1
         ;;
 esac

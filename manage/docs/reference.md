@@ -452,15 +452,19 @@ Le module `argocd` fournit Argo CD sur le [cluster de devzone](#cluster-de-devzo
 devzone enable argocd      # installe Argo CD dans le cluster des services
 devzone disable argocd   # désinstalle Argo CD, les autres services restent
 devzone argocd etat         # état du module
-devzone argocd app add <dépôt> [chemin] [--name N] [--revision R] [--namespace NS]  # un projet déployé par Argo CD
+devzone argocd init [--repo <url>|--none]  # dépôt GitOps (GitHub) : créé, désigné, ou aucun
+devzone argocd apply        # applique .argocd.conf de l'instance
+devzone argocd app add <dépôt> [chemin] [--name N] [--revision R] [--namespace NS] [--token T] [--username U]  # un projet déployé par Argo CD
 devzone argocd app list     # Applications des projets, synchronisation et santé
 devzone argocd app remove <N>  # retire l'Application et ses ressources
 ```
 
+Les projets sont déclarés dans `.argocd.conf` à la racine de devzone et, s'il y en a un, dans le dépôt GitOps de l'utilisateur : voir [Dépôt GitOps et `.argocd.conf`](#dépôt-gitops-et-argocdconf).
+
 - **Ce qui est installé** : chart `argo/argo-cd` en version figée (`10.14.0`), namespace `devzone-argocd` étiqueté `app.kubernetes.io/managed-by=devzone` et isolé par NetworkPolicy. Valeurs minimales (`.devcontainer/argocd/values.yaml`) : un réplica par composant, sans Dex ni notifications, serveur en `ClusterIP`, sans Ingress ni LoadBalancer.
 - **Mémoire** : l'installation est refusée sous environ 1 Go de mémoire allouable dans le cluster, avec le message pour l'agrandir.
 - **Accès** : un relais `kubectl port-forward` rend l'interface joignable sur https://127.0.0.1:8443 **dans le conteneur** (`ARGOCD_PORT` pour un autre port) ; relancé à chaque démarrage et par `devzone apply`. PID et journal : `workspace/.argocd/relais.*`.
-- **Projets** : `devzone argocd app add <dépôt> [chemin]` déclare une Application `app-<N>` (nom tiré du dépôt, ou `--name`), révision `HEAD` (ou `--revision`), ressources dans le namespace `devzone-app-<N>` (ou `--namespace`), synchronisation automatique avec `prune` et `selfHeal`. Dépôts publics ; les identifiants de dépôts privés viendront avec le lot B de #516. Le compte limité (#430) gère ces Applications grâce aux rôles agrégés du chart (`createAggregateRoles`).
+- **Projets** : `devzone argocd app add <dépôt> [chemin]` déclare une Application `app-<N>` (nom tiré du dépôt, ou `--name`), révision `HEAD` (ou `--revision`), ressources dans le namespace `devzone-app-<N>` (ou `--namespace`), synchronisation automatique avec `prune` et `selfHeal`. Un dépôt **GitHub public** ne demande rien d'autre ; un dépôt **privé** prend `--token T` (et `--username U`, `root` par défaut), rangés dans un Secret de dépôt `repo-<N>` de `devzone-argocd` (étiquette `argocd.argoproj.io/secret-type=repository`), jamais dans l'Application. Le **GitLab de devzone** s'indique avec son URL habituelle (`http://gitlab.localhost:8929/<groupe>/<projet>.git`) : elle est réécrite vers le service du cluster (`http://gitlab-webservice-default.devzone-gitlab.svc:8181/…`, la seule adresse qu'Argo CD atteint), le jeton root du module (`workspace/.gitlab/root-token`) sert sauf `--token`, et la NetworkPolicy de `devzone-gitlab` est ouverte aux namespaces devzone (même règle que `devzone postgres autoriser`). `app remove <N>` supprime l'Application, ses ressources, son Secret de dépôt et le namespace `devzone-app-<N>`. Le compte limité (#430) gère tout cela grâce aux rôles agrégés du chart (`createAggregateRoles`). Dépôt de démo : https://github.com/SimBienvenueHoulBoumi/devzone-argocd-demo (`k8s/`).
 - **Mot de passe** : lu dans le Secret `argocd-initial-admin-secret`, rangé dans `workspace/.argocd/admin.env` (600) puis repris dans [`.password`](#identifiants-regroupés) ; utilisateur `admin`, jamais affiché.
 - **Désactivation** : `helm uninstall` de la release et suppression du namespace `devzone-argocd`, puis de `workspace/.argocd/` ; **les autres services restent**, sous helm direct.
 
@@ -469,22 +473,51 @@ devzone argocd app remove <N>  # retire l'Application et ses ressources
 En mode workspace Kubernetes, Argo CD devient le moyen de déploiement de devzone (#516). Tout se pilote depuis le poste (`manage/scripts/argocd-workspace.sh`, `argocd-services.sh`), qui a les droits d'administrateur du cluster ; le pod n'en a pas.
 
 ```bash
-devzone workspace start                      # installe Argo CD s'il manque, puis le workspace (Application)
+devzone workspace start                      # installe Argo CD s'il manque, puis le workspace (Application) et .argocd.conf
 devzone workspace services enable argocd     # installe Argo CD (ou le réinstalle) depuis le poste
 devzone workspace services disable argocd    # le retire ; les services restent, sous helm direct
-devzone workspace argocd status              # installé ou non, Applications (synchronisation, santé, révision)
-devzone workspace argocd app add <dépôt> [chemin] [--name N] [--revision R] [--namespace NS]
+devzone workspace argocd status              # installé ou non, dépôt GitOps, Applications (synchronisation, santé, révision)
+devzone workspace argocd init [--repo <url>|--none]   # dépôt GitOps : créé sur GitHub, désigné, ou aucun
+devzone workspace argocd apply               # applique .argocd.conf (Applications ajoutées, retirées)
+devzone workspace argocd app add <dépôt> [chemin] [--name N] [--revision R] [--namespace NS] [--token T] [--username U]
 devzone workspace argocd app list | app remove <N>
 ```
+
+#### Dépôt GitOps et `.argocd.conf`
+
+Les déclarations ne restent pas dans le cluster : elles vivent dans un **dépôt GitOps propre à l'utilisateur**, que suit Argo CD, et dans un **fichier de configuration** du dossier devzone, `.argocd.conf`, de la même forme que `.repowarden.conf` :
+
+```ini
+[argocd]
+    repo = https://github.com/<login>/devzone-argocd.git   # none : application directe, sans dépôt
+
+[app demo]
+    repo = https://github.com/argoproj/argocd-example-apps
+    path = guestbook
+    revision = HEAD
+    namespace = devzone-app-demo
+
+[app interne]
+    repo = http://gitlab.localhost:8929/devzone/interne.git   # GitLab de devzone : URL réécrite vers le service du cluster
+    path = k8s
+    username = root
+    token-file = workspace/.gitlab/root-token                 # jamais le jeton lui-même, seulement son chemin
+```
+
+- **Le fichier est la déclaration** : versionné avec le dossier devzone (il n'est pas ignoré par git), écrit par devzone (`argocd init`, `app add`, `app remove`) et appliqué par `devzone workspace argocd apply` et `workspace start` : chaque `[app N]` devient l'Application `app-N` ; une Application de projet absente du fichier est retirée (avec ses ressources, son Secret de dépôt et son namespace `devzone-app-N`). Il peut aussi s'éditer à la main, puis `apply`.
+- **Dépôt GitOps** : `devzone workspace argocd init` crée `<login>/devzone-argocd` (privé, `gh repo create` avec la connexion `gh` du poste) s'il manque et le note dans `[argocd] repo` ; `workspace start` le fait sans option. `--repo <url>` désigne un dépôt GitHub existant ; `--none` renonce (les Applications sont appliquées directement, comme sans dépôt). Sans `gh` connecté : un avis, application directe.
+- **Ce qui va dans le dépôt** : une Application racine `devzone` (seul objet posé par `kubectl`) suit le dossier `apps/` ; `workspace start`, `services enable|disable postgres` et `app add|remove` y écrivent ou retirent `apps/<nom>.yaml` par l'API GitHub (`gh api`, sans clone ni commit local), puis demandent un `refresh` (Argo CD ne lit Git que toutes les 3 min). Argo CD lit le dépôt avec le jeton `gh auth token` du poste (`DEVZONE_GITOPS_TOKEN` pour un autre), rangé dans le Secret de dépôt `repo-devzone-argocd`. Les secrets des services restent créés à part, jamais dans Git.
+- **Dépôts privés et GitLab de devzone** : `--token T` range le jeton dans `workspace/.argocd/tokens/<N>` (600, hors Git) et note `token-file` ; une URL `gitlab.localhost` est réécrite vers `http://gitlab-webservice-default.devzone-gitlab.svc:8181/…` (la seule adresse qu'Argo CD atteint), le jeton root du module sert à défaut (`workspace/.gitlab/root-token` du poste, sinon celui du pod), et la NetworkPolicy de `devzone-gitlab` est ouverte aux namespaces devzone.
+- **Un GitLab comme dépôt GitOps** (et non seulement comme source d'un projet) : lot B.
 
 - **D'office** : `devzone workspace start` installe Argo CD (chart `argo/argo-cd` figé, `.devcontainer/argocd/values.yaml`, au moins 1 Go de mémoire allouable, sinon un avertissement et le workspace part en helm direct) **sauf** si `.devzone.modules` du poste porte `argocd=off`. `services disable argocd` écrit cette ligne ; `services enable argocd` la remet à `on`.
 - **Mot de passe et interface** : le mot de passe `admin` est lu dans `argocd-initial-admin-secret`, rangé dans `workspace/.argocd/admin.env` du **poste** (600) et dans [`.password`](#identifiants-regroupés) du poste ; jamais affiché. Le [veilleur des ports](#ports-vers-le-poste) relaie le port https du service `argocd-server` sur `https://localhost:8443` (127.0.0.1 seulement, certificat auto-signé à accepter).
 - **Le workspace est une Application** : `devzone workspace start` crée l'Application `devzone-workspace` (chart `charts/devzone-workspace` du dépôt devzone public, révision `v<version du paquet>`, paramètres `image.tag`, `image.repository` avec `--image`, `image.pullPolicy=Always` pour `latest`) à la place de `helm upgrade --install`. Une release helm existante est **adoptée** : ses secrets de release sont supprimés, aucune ressource n'est touchée, le pod ne redémarre pas. `devzone workspace stop` supprime l'Application (le pod part, les volumes restent) ; sans Application, `helm uninstall` comme avant. Un **clone de développement** (version `0.0.0`) reste en helm direct, car son chart local n'est pas dans Git ; `DEVZONE_ARGOCD_REVISION=<branche>` force une révision (essais).
 - **PostgreSQL par Argo CD** : avec Argo CD actif, `devzone workspace services enable postgres` crée le namespace `devzone-postgres` (étiqueté, isolé par NetworkPolicy), le secret `postgres-admin` **à part** (mot de passe généré sur le poste, ou relu dans un secret existant ; miroir `workspace/.postgres/admin-password` du poste, `.password` mis à jour), puis l'Application `devzone-postgres` (chart `charts/devzone-postgres`, mêmes objets que `postgres.yaml` : une installation existante est adoptée sans recréation). `selfHeal` recrée ce qui est supprimé à la main. `disable postgres --oui` supprime l'Application, le namespace et toutes les bases. Sans Argo CD, le chemin de #528 (installeur dans le pod) reste.
-- **Projets** : mêmes commandes que dans le conteneur, préfixées par `devzone workspace argocd`.
+- **Projets** : déclarés dans `.argocd.conf` (ci-dessous), mêmes commandes que dans le conteneur, préfixées par `devzone workspace argocd`.
 - **Secrets hors de Git** : les secrets Kubernetes sont créés par devzone, jamais dans le dépôt ; les Applications ne font que les référencer. Pas d'opérateur supplémentaire (Sealed Secrets, External Secrets) : un poste de développement n'a pas de coffre central, et devzone range déjà ses mots de passe dans `.password`.
 - **Retrait** : `services disable argocd` retire d'abord le finaliseur de chaque Application puis la supprime **sans cascade** (les ressources restent), désinstalle la release et le namespace ; les services continuent sous helm direct.
-- **Lot B** (ticket à part) : Applications `gitlab` et `mysql`, dépôts privés et GitLab de devzone, Applications des services sur le poste Docker.
+- **Lot B** (ticket à part) : Applications `gitlab` et `mysql`, Applications des services sur le poste Docker.
 
 ## Ports vers le poste
 

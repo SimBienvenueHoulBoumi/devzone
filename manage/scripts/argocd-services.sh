@@ -5,8 +5,8 @@
 #   workspace_deploy <repository> <tag> <with-image>   start: Application, else helm direct
 #   workspace_undeploy                                 stop: Application, else helm uninstall
 #   argocd_toggle enable|disable                       devzone workspace services … argocd
-#   postgres_argocd enable|disable [--oui]             postgres as an Application
-#   argocd_cmd status | app add|list|remove            devzone workspace argocd …
+#   postgres_argocd enable|disable [--yes]             postgres as an Application
+#   argocd_cmd status | init | apply | app add|list|remove   devzone workspace argocd …
 # Secrets stay out of Git: created here, only referenced by the charts.
 # bash 3.2 (macOS).
 
@@ -14,14 +14,72 @@ WORKSPACE_APP="devzone-workspace"
 POSTGRES_APP="devzone-postgres"
 POSTGRES_NS="devzone-postgres"
 
+# The only option of a removal: --yes (--oui still accepted); prints 1 or 0
+yes_flag() {
+    local usage="$1" arg found=0
+    shift
+    for arg in "$@"; do
+        case "$arg" in
+            --yes | --oui) found=1 ;;
+            *) echo "✖ unknown option: $arg (devzone workspace $usage)" >&2; return 1 ;;
+        esac
+    done
+    echo "$found"
+}
+
+# [y/N] in a terminal; without one, --yes is required
+confirm_removal() {
+    local answer=""
+    [ "${2:-0}" = 1 ] && return 0
+    if [ ! -t 0 ]; then
+        echo "✖ no terminal: confirmation impossible, run again with --yes" >&2
+        return 1
+    fi
+    read -r -p "$1 [y/N] " answer || true
+    case "$answer" in y | Y | yes | YES | o | O | oui) return 0 ;; esac
+    echo "✖ cancelled, nothing changed" >&2
+    return 1
+}
+
 # shellcheck disable=SC2034 # read by apps.sh
 APPS_CMD="devzone workspace argocd app"
 # shellcheck disable=SC2034 # read by apps.sh
 APPS_GENERATOR="$RACINE/.devcontainer/argocd/application.sh"
+# shellcheck disable=SC2034 # read by gitops.sh
+GITOPS_CMD="devzone workspace argocd init"
+# .argocd.conf of the devzone folder of the workstation (conf.sh)
+# shellcheck disable=SC2034 # read by conf.sh and apps.sh
+ARGOCD_CONF_DIR="$PWD"
+# shellcheck disable=SC2034
+ARGOCD_CONF="$PWD/.argocd.conf"
+# shellcheck source=../../.devcontainer/argocd/conf.sh
+# shellcheck disable=SC1091
+. "$RACINE/.devcontainer/argocd/conf.sh"
+# shellcheck source=../../.devcontainer/argocd/gitops.sh
+# shellcheck disable=SC1091
+. "$RACINE/.devcontainer/argocd/gitops.sh"
 # shellcheck source=../../.devcontainer/argocd/apps.sh
 # shellcheck disable=SC1091
 . "$RACINE/.devcontainer/argocd/apps.sh"
 argocd_kubectl() { ak "$@"; }
+
+# workspace start and argocd apply: the declarations of .argocd.conf held
+argocd_reconcile() {
+    argocd_installed || return 0
+    gitops_init || return 1
+    gitops_root || return 1
+    apps_reconcile
+}
+
+# Root token of the devzone GitLab for app add: the file of the workstation,
+# else the one of the pod (the module was installed there, #528); never printed
+apps_gitlab_token() {
+    if [ -s "$PWD/workspace/.gitlab/root-token" ]; then
+        cat "$PWD/workspace/.gitlab/root-token"
+    else
+        ak -n "$NAMESPACE" exec "$POD" -c workspace -- cat "$DOSSIER_PROJETS/workspace/.gitlab/root-token" 2>/dev/null || true
+    fi
+}
 
 # Argo CD holds the devzone charts only with a Git revision (release tag or
 # DEVZONE_ARGOCD_REVISION): a development clone stays on helm direct
@@ -42,15 +100,18 @@ helm_release_forget() {
 }
 
 workspace_deploy() {
-    local depot="$1" tag="$2" avec_image="$3" params
+    local repository="$1" tag="$2" with_image="$3" params
     if ! argocd_holds_charts; then
         argocd_clone_notice
-        workspace_helm_deploy "$depot" "$tag" "$avec_image"
+        workspace_helm_deploy "$repository" "$tag" "$with_image"
         return
     fi
     params="image.tag=$tag"
-    [ -z "$avec_image" ] || params="$params image.repository=$depot"
+    [ -z "$with_image" ] || params="$params image.repository=$repository"
     [ "$tag" != latest ] || params="$params image.pullPolicy=Always"
+    # GitOps repository created or designated first, with its root Application
+    gitops_init || return 1
+    gitops_root || return 1
     echo "▶ Application $WORKSPACE_APP (Argo CD, charts/devzone-workspace at $(argocd_revision))…"
     helm_release_forget devzone-workspace devzone-workspace
     # shellcheck disable=SC2086
@@ -78,7 +139,7 @@ argocd_toggle() {
         return 1
     fi
     case "$action" in
-        enable) argocd_install && state_note argocd on ;;
+        enable) argocd_install && state_note argocd on && gitops_init && gitops_root ;;
         disable) argocd_uninstall && state_note argocd off ;;
     esac
 }
@@ -141,8 +202,8 @@ postgres_argocd() {
             echo "✔ Application $POSTGRES_APP declared; status: devzone workspace argocd status; local access: devzone workspace ports"
             ;;
         disable)
-            yes="$(lire_option --oui "services disable postgres [--oui]" "$@")" || return 1
-            confirmer "Remove PostgreSQL and ALL its databases (Application and namespace $POSTGRES_NS)?" "$yes" || return 1
+            yes="$(yes_flag "services disable postgres [--yes]" "$@")" || return 1
+            confirm_removal "Remove PostgreSQL and ALL its databases (Application and namespace $POSTGRES_NS)?" "$yes" || return 1
             argocd_delete_application "$POSTGRES_APP"
             ak delete namespace "$POSTGRES_NS" --wait=true --ignore-not-found >/dev/null
             rm -rf "$PWD/workspace/.postgres"
@@ -156,6 +217,17 @@ postgres_argocd() {
 argocd_cmd() {
     case "${1:-status}" in
         status | etat) argocd_status ;;
+        init)
+            gitops_init "${@:2}" || return $?
+            if argocd_installed; then gitops_root; fi
+            ;;
+        apply)
+            if ! argocd_installed; then
+                echo "✖ Argo CD not installed: devzone workspace services enable argocd" >&2
+                return 1
+            fi
+            argocd_reconcile
+            ;;
         app)
             if ! argocd_installed; then
                 echo "✖ Argo CD not installed: devzone workspace services enable argocd" >&2
@@ -164,7 +236,7 @@ argocd_cmd() {
             argocd_app "${@:2}"
             ;;
         *)
-            echo "✖ devzone workspace argocd status | app add <repo url> [path] [--name N] [--revision R] | app list | app remove <N>" >&2
+            echo "✖ devzone workspace argocd status | init [--repo <url>|--none] | apply | app add <repo url> [path] [--name N] [--revision R] | app list | app remove <N>" >&2
             return 1
             ;;
     esac

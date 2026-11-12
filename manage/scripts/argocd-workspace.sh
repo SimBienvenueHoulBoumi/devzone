@@ -160,14 +160,15 @@ argocd_ensure() {
 }
 
 # Applications removed without cascade (finalizer dropped first: the services
-# stay, under helm direct), then helm uninstall and the namespace
+# stay, under helm direct; the GitOps repository keeps its files), then helm
+# uninstall and the namespace
 argocd_uninstall() {
     local app
     if argocd_installed; then
         echo "▶ Argo CD removal: Applications released (their resources stay), release and namespace deleted…"
         while IFS= read -r app; do
             [ -n "$app" ] || continue
-            argocd_delete_application "${app#*/}" keep
+            gitops_direct_delete_application "${app#*/}" keep
         done <<<"$(ak -n "$ARGOCD_NS" get applications.argoproj.io -o name 2>/dev/null || true)"
         # shellcheck disable=SC2046
         helm $(drapeau_helm) uninstall argocd --namespace "$ARGOCD_NS" >/dev/null 2>&1 || true
@@ -179,19 +180,16 @@ argocd_uninstall() {
 }
 
 # Applies the Application <name> of <kind> to <namespace> from <repo> at
-# <revision>, <path>; the other arguments are Helm parameters key=value
+# <revision>, <path>; the other arguments are Helm parameters key=value.
+# In the GitOps repository when one is designated (gitops.sh), else directly
 argocd_apply_application() {
-    bash "$(argocd_generator)" "$@" | ak apply -f - >/dev/null
+    gitops_apply_application "$@"
 }
 
-# Deletes an Application; keep: finalizer dropped first, its resources stay
+# Deletes an Application (and its file of the GitOps repository); keep:
+# finalizer dropped first, its resources stay
 argocd_delete_application() {
-    local name="$1" mode="${2:-cascade}"
-    if [ "$mode" = keep ]; then
-        ak -n "$ARGOCD_NS" patch application.argoproj.io "$name" --type merge \
-            -p '{"metadata":{"finalizers":null}}' >/dev/null 2>&1 || true
-    fi
-    ak -n "$ARGOCD_NS" delete application.argoproj.io "$name" --ignore-not-found --wait=true >/dev/null
+    gitops_delete_application "$@"
 }
 
 argocd_application_exists() {
@@ -208,6 +206,11 @@ argocd_status() {
         echo "✔ argocd installed: https://localhost:$ARGOCD_LOCAL_PORT (devzone workspace ports), user admin, password in .password"
     else
         echo "⚠ argocd installed but argocd=off in .devzone.modules: devzone workspace services enable argocd, or disable to remove it"
+    fi
+    if gitops_enabled; then
+        echo "  GitOps repository: $(gitops_repo) (apps/, root Application $GITOPS_ROOT_APP)"
+    else
+        echo "  no GitOps repository: Applications applied directly (devzone workspace argocd init)"
     fi
     ak -n "$ARGOCD_NS" get applications.argoproj.io \
         -o custom-columns='APPLICATION:.metadata.name,KIND:.metadata.labels.devzone\.io/kind,SYNC:.status.sync.status,HEALTH:.status.health.status,REVISION:.spec.source.targetRevision' \

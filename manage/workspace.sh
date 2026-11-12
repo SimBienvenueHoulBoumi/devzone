@@ -80,6 +80,8 @@ demarrer() {
     # Argo CD first when wanted (#516): the workspace is then an Application
     argocd_ensure
     workspace_deploy "$depot" "$tag" "$avec_image"
+    # Projects of .argocd.conf held too (#516)
+    argocd_reconcile || true
     attendre_pod "$image" || return 1
     ports_demarrer silence
 }

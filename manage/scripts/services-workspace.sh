@@ -3,7 +3,7 @@
 # (gitlab, postgres, argocd) of a Kubernetes workspace from the workstation.
 # Sourced by manage/workspace.sh (drapeau_kubectl, POD, NAMESPACE).
 #   devzone workspace services enable <service> [options]
-#   devzone workspace services disable <service> [--oui]
+#   devzone workspace services disable <service> [--yes]
 #   devzone workspace services status
 # Why: the pod has no administrator access to the cluster (#430), while the
 # installers need one. The workstation creates a ServiceAccount bound to
@@ -120,6 +120,8 @@ services_run() {
         return 1
     fi
     echo "▶ $action $service in the pod $POD…"
+    # The installer of the pod still spells --oui (#510): --yes translated
+    set -- "${@/--yes/--oui}"
     # shellcheck disable=SC2046
     printf '%s\n' "$token" | kubectl $(drapeau_kubectl) exec -i "$POD" --namespace "$NAMESPACE" \
         -c workspace -- bash "$SERVICES_ADMIN_SCRIPT" "$action" "$service" "$@" || code=$?
