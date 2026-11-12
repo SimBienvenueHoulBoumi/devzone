@@ -245,6 +245,8 @@ HELM
     export FAUX_CONTEXTES="docker-desktop"
     export FAUX_REVISION="rev-new"
     export FAUX_POD_REVISIONS="rev-old rev-new"
+    # Two polling rounds at least: 1 s is too short on a loaded CI runner (#522)
+    export DEVZONE_WORKSPACE_ATTENTE=10
     export FAUX_POD_ETATS="Running ImagePullBackOff"
     : >"$T/helm.log"
     run bash "$CLI" workspace demarrer
@@ -257,6 +259,8 @@ HELM
     export FAUX_CONTEXTES="docker-desktop"
     export FAUX_REVISION="rev-new"
     export FAUX_POD_REVISIONS="rev-old rev-new"
+    # Two polling rounds at least: 1 s is too short on a loaded CI runner (#522)
+    export DEVZONE_WORKSPACE_ATTENTE=10
     export FAUX_POD_ETATS="ErrImagePull Running"
     : >"$T/helm.log"
     run bash "$CLI" workspace demarrer
