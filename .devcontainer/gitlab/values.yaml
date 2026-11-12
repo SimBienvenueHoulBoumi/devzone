@@ -43,6 +43,7 @@ nginx-ingress:
   enabled: false
 
 # Réplicas à 1 et ressources réduites
+# Sans minReplicas/maxReplicas, les HPA du chart montent jusqu'à 10 pods (#490)
 gitlab:
   # Metriques pour Prometheus : exporter desactive (inutile pour un test de
   # GitLab, pouvait provoquer un echec de helm --wait)
@@ -51,11 +52,15 @@ gitlab:
   webservice:
     service:
       type: ClusterIP
+    minReplicas: 1
+    maxReplicas: 1
     resources:
       requests:
         cpu: 100m
         memory: 128Mi
   sidekiq:
+    minReplicas: 1
+    maxReplicas: 1
     resources:
       requests:
         cpu: 250m
@@ -68,6 +73,8 @@ gitlab:
   gitlab-shell:
     service:
       type: ClusterIP
+    minReplicas: 1
+    maxReplicas: 1
     resources:
       requests:
         cpu: 50m

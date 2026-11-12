@@ -67,6 +67,17 @@ jobs:
     secrets:
       npm-token: ${{ secrets.NPM_TOKEN }}
 
+  # Image du workspace Kubernetes publiée à chaque livraison (#486)
+  image:
+    needs: release
+    if: needs.release.outputs.tag_name != ''
+    uses: ./.github/workflows/image-workspace.yml
+    permissions:
+      contents: read
+      packages: write
+    with:
+      tag: ${{ needs.release.outputs.tag_name }}
+
   # Suivi des tickets : livrés en préversion → préprod ; publiés, ou livrés sur
   # main sans nouvelle version (ni fix ni feat) → done et fermés
   tickets:

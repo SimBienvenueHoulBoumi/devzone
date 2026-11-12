@@ -23,6 +23,7 @@ case "$*" in
     "config get-contexts -o name") echo docker-desktop ;;
     *" exec "*" ss "*) cat "$T/ss" ;;
     *" get svc pgadmin "*) [ -f "$T/pgadmin" ] && cat "$T/pgadmin" ;;
+    *"get pod devzone-workspace-0 "*) echo "${FAUX_POD:-Running}" ;;
     *" port-forward "*) exec sleep 120 ;;
 esac
 exit 0
@@ -40,6 +41,7 @@ LSOF
     export PATH="$T/bin:$PATH"
     export DEVZONE_PORTS_WORKSPACE_REEL=oui
     export DEVZONE_PORTS_WORKSPACE_PAS=0.2
+    export DEVZONE_WORKSPACE_ATTENTE=1 DEVZONE_WORKSPACE_PAS=0.1
     : >"$T/kubectl.log"
 }
 
