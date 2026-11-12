@@ -62,9 +62,10 @@ voulu() {
     [ "$v" = on ] && echo on || echo off
 }
 
-# Application present in the cluster: its service in the app namespace resolves
-# in the cluster DNS; nothing without a chosen cluster or when absent. Reading
-# the namespaces reserved to the administrator (#430).
+# Application present in the cluster. In the Kubernetes workspace pod: its
+# service resolves in the cluster DNS (no RBAC needed, #515). Elsewhere: labelled
+# namespace and StatefulSet of the app name; reading the namespaces is reserved
+# to the administrator (#430). Nothing without a chosen cluster or when absent.
 presente() {
     local ctx ns
     ns="$(app_ns "$1")"
