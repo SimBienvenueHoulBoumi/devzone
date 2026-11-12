@@ -62,15 +62,18 @@ voulu() {
     [ "$v" = on ] && echo on || echo off
 }
 
-# Application présente dans le cluster : namespace étiqueté et StatefulSet du
-# nom de l'application ; sans cluster choisi ou absente : rien. Lecture des
-# namespaces réservée à l'administrateur (#430).
+# Application present in the cluster: its service in the app namespace resolves
+# in the cluster DNS; nothing without a chosen cluster or when absent. Reading
+# the namespaces reserved to the administrator (#430).
 presente() {
-    local ctx ns liste
+    local ctx ns
     ns="$(app_ns "$1")"
     if [ "${DEVZONE_WORKSPACE:-}" = kubernetes ]; then
-        liste="$(kubectl --context devzone -n "$ns" get statefulset,deployment -o name 2>/dev/null || true)"
-        [ -n "$liste" ]
+        # In the pod there is no kubeconfig and the limited service account
+        # cannot list StatefulSets (#430): presence is the cluster DNS
+        # resolving the service, no RBAC needed, the pod service account
+        # stays limited
+        getent hosts "$(app_lire "$1" nom).${ns}.svc" >/dev/null 2>&1
         return
     fi
     ctx="$(cluster_lu)"

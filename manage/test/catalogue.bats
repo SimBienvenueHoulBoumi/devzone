@@ -42,9 +42,6 @@ case "$*" in
         if [[ "$*" == *"-n devzone-mysql"* ]] && [ -f "$T/pvcs" ]; then cat "$T/pvcs"; fi || false
         ;;
     *"readyReplicas"*) [ -f "$T/ready" ] && echo 1 || echo 0 ;;
-    *"get statefulset,deployment"*)
-        [ -f "$T/sts" ] && echo "statefulset.apps/mysql"
-        ;;
     *"get statefulset mysql -o jsonpath"*)
         if [ -f "$T/claim" ]; then cat "$T/claim"; else echo donnees; fi
         ;;
@@ -91,6 +88,18 @@ echo "npm $*" >>"$BATS_TEST_TMPDIR/npm.log"
 if [ "${1:-}" = ls ] && [ "${2:-}" = -g ]; then echo '{"dependencies":{}}'; fi || false
 exit 0
 NPM
+    # Faux getent : le service <app>.<namespace>.svc du cluster est resolvable
+    # tant que le marqueur $T/svc existe (presence par le DNS du cluster, #515)
+    cat >"$BATS_TEST_TMPDIR/bin/getent" <<'GETENT'
+#!/usr/bin/env bash
+T="$BATS_TEST_TMPDIR"
+case "$2" in
+    *.devzone-mysql.svc)
+        [ -f "$T/svc" ] && exit 0
+        ;;
+esac
+exit 2
+GETENT
     chmod +x "$BATS_TEST_TMPDIR"/bin/*
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
 }
@@ -230,19 +239,21 @@ attendre_nohup() {
 
 @test "resume : DEVZONE_WORKSPACE=kubernetes → installée via le cluster, accès devzone workspace ports" {
     export DEVZONE_WORKSPACE=kubernetes
-    touch "$BATS_TEST_TMPDIR/ns" "$BATS_TEST_TMPDIR/sts" "$BATS_TEST_TMPDIR/ready"
+    touch "$BATS_TEST_TMPDIR/svc"
     printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_ETAT"
     run bash "$DEVZONE"
     [ "$status" -eq 0 ]
     [[ "$output" == *"installée : local access: devzone workspace ports"* ]] || false
+    ! grep -q 'get statefulset' "$BATS_TEST_TMPDIR/kubectl.log" 2>/dev/null || false
 }
 
-@test "resume : DEVZONE_WORKSPACE=kubernetes → liste vide → application attendue" {
+@test "resume : DEVZONE_WORKSPACE=kubernetes → service absent → application attendue" {
     export DEVZONE_WORKSPACE=kubernetes
     printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_ETAT"
     run bash "$DEVZONE"
     [ "$status" -eq 0 ]
     [[ "$output" == *"attendue : devzone appliquer"* ]] || false
+    ! grep -q 'get statefulset' "$BATS_TEST_TMPDIR/kubectl.log" 2>/dev/null || false
 }
 
 @test "desactiver mysql : sans --oui ni terminal, volume garde, aucun delete namespace" {
