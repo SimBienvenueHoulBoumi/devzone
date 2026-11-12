@@ -5,7 +5,6 @@ set -euo pipefail
 
 ICI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RACINE="$(cd "$ICI/.." && pwd)"
-
 # Pod, namespace et dossier des projets dans le conteneur (#399).
 POD="devzone-workspace-0"
 NAMESPACE="devzone-workspace"
@@ -48,11 +47,17 @@ image_par_defaut() {
 
 # Attend le pod du workspace ; image introuvable ou pod lent sont dits clairement.
 attendre_pod() {
-    local image="$1" attente pas debut etat evenements arch
+    local image="$1" attente pas debut etat evenements arch target_revision pod_revision
     attente="${DEVZONE_WORKSPACE_ATTENTE:-120}"
     pas="${DEVZONE_WORKSPACE_PAS:-2}"
     debut="$SECONDS"
     while [ $((SECONDS - debut)) -lt "$attente" ]; do
+        # Why: after helm upgrade the pod is still the old one; judge only the revision the StatefulSet is updating to, within the same wait bound.
+        # shellcheck disable=SC2046
+        target_revision="$(kubectl $(drapeau_kubectl) get statefulset devzone-workspace --namespace devzone-workspace -o jsonpath='{.status.updateRevision}' 2>/dev/null)" || true
+        # shellcheck disable=SC2046
+        pod_revision="$(kubectl $(drapeau_kubectl) get pod devzone-workspace-0 --namespace devzone-workspace -o jsonpath='{.metadata.labels.controller-revision-hash}' 2>/dev/null)" || true
+        if [ -z "$target_revision" ] || [ -z "$pod_revision" ] || [ "$target_revision" != "$pod_revision" ]; then sleep "$pas"; continue; fi
         # shellcheck disable=SC2046
         etat="$(kubectl $(drapeau_kubectl) get pod devzone-workspace-0 --namespace devzone-workspace \
             -o jsonpath='{.status.phase} {.status.initContainerStatuses[*].state.waiting.reason} {.status.containerStatuses[*].state.waiting.reason}' 2>/dev/null)" || true
