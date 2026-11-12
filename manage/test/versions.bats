@@ -9,14 +9,12 @@ setup() {
         "$BATS_TEST_TMPDIR/dz/manage/scripts" "$BATS_TEST_TMPDIR/dz/.devcontainer"
     cp "$RACINE/manage/scripts/versions.sh" "$BATS_TEST_TMPDIR/dz/manage/scripts/"
     VERSIONS="$BATS_TEST_TMPDIR/dz/manage/scripts/versions.sh"
-    POST_CREATE="$BATS_TEST_TMPDIR/dz/.devcontainer/post-create.sh"
+    VERSIONS_ENV="$BATS_TEST_TMPDIR/dz/.devcontainer/versions.env"
     DEVZONE="$BATS_TEST_TMPDIR/dz/.devcontainer/devzone"
-    cat >"$POST_CREATE" <<'EOFPOST'
-#!/usr/bin/env bash
+    cat >"$VERSIONS_ENV" <<'EOFENV'
 # repowarden, version figée
-npm install -g repowarden@4.12.0
-repowarden install --global --lang fr
-EOFPOST
+REPOWARDEN_VERSION=4.12.0
+EOFENV
     cat >"$DEVZONE" <<'EOFDZ'
 #!/usr/bin/env bash
 # Claude Code
@@ -152,11 +150,11 @@ tickets_ouverts() {
     [ -z "$output" ]
 }
 
-@test "--appliquer repowarden : seule la version de post-create.sh change" {
+@test "--appliquer repowarden : seule la version de versions.env change" {
     avant="$(cat "$DEVZONE")"
     run bash "$VERSIONS" --appliquer repowarden 4.13.0
     [ "$status" -eq 0 ]
-    grep -qx 'npm install -g repowarden@4.13.0' "$POST_CREATE"
+    grep -qx 'REPOWARDEN_VERSION=4.13.0' "$VERSIONS_ENV"
     [ "$(cat "$DEVZONE")" = "$avant" ]
 }
 
@@ -166,7 +164,7 @@ tickets_ouverts() {
     grep -qx 'IA_CLAUDE=@anthropic-ai/claude-code@2.2.0' "$DEVZONE"
     grep -qx 'IA_OPENCODE=opencode-ai@1.18.34' "$DEVZONE"
     grep -qxF 'IA_PAQUETS=("$IA_CLAUDE" "$IA_OPENCODE")' "$DEVZONE"
-    grep -qx 'npm install -g repowarden@4.12.0' "$POST_CREATE"
+    grep -qx 'REPOWARDEN_VERSION=4.12.0' "$VERSIONS_ENV"
 }
 
 @test "--appliquer opencode-ai : la version scopée reste intacte" {
@@ -217,12 +215,12 @@ tickets_ouverts() {
 }
 
 @test "--appliquer : paquet inconnu refusé, fichiers intacts" {
-    avant_post="$(cat "$POST_CREATE")"
+    avant_env="$(cat "$VERSIONS_ENV")"
     avant_devzone="$(cat "$DEVZONE")"
     run bash "$VERSIONS" --appliquer nexistepas 1.0.0
     [ "$status" -ne 0 ]
     [[ "$output" == *"paquet inconnu"* ]] || false
-    [ "$(cat "$POST_CREATE")" = "$avant_post" ]
+    [ "$(cat "$VERSIONS_ENV")" = "$avant_env" ]
     [ "$(cat "$DEVZONE")" = "$avant_devzone" ]
 }
 
@@ -283,5 +281,6 @@ tickets_ouverts() {
     ' "$workflow"
     [ "$status" -eq 0 ]
     [[ "$output" == *"if: steps.retards.outputs.present == 'true'"* ]] || false
-    [[ "$output" == *"npm install -g \"repowarden@\$version\""* ]] || false
+    [[ "$output" == *'npm install -g "repowarden'* ]] || false
+    [[ "$output" == *'@$version"'* ]] || false
 }

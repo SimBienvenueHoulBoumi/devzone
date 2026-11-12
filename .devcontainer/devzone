@@ -883,13 +883,13 @@ outils_retard() {
 # Remet repowarden à la version figée s'il en diffère, comme post-create.sh
 # (il installe les hooks git globaux)
 appliquer_repowarden() {
-    local ligne figee installee
+    local ligne figee installee paquet=repowarden
     [ -f "$VERSIONS" ] || return 0
     ligne="$(bash "$VERSIONS" --installees 2>/dev/null | awk '$1 == "repowarden"' || true)"
     [ -n "$ligne" ] || return 0
     read -r _ figee installee <<<"$ligne"
     echo "devzone : installation de repowarden $figee…"
-    npm install -g "repowarden@$figee" >/dev/null
+    npm install -g "$paquet@$figee" >/dev/null
     repowarden install --global --lang fr
     echo "devzone : repowarden $installee → $figee"
 }

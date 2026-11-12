@@ -99,3 +99,9 @@ RUN export UV_TOOL_DIR=/opt/uv/tools UV_TOOL_BIN_DIR=/usr/local/bin \
     && uv tool install "ruff==${RUFF_VERSION}" \
     && uv tool install "vulture==${VULTURE_VERSION}" \
     && uv tool install "pytest==${PYTEST_VERSION}"
+
+# devzone scripts inside the image: the Kubernetes workspace pod has no
+# /workspaces/devzone checkout (#503). The Docker devcontainer relinks
+# /usr/local/bin/devzone to the mounted repository in post-create.sh.
+COPY . /usr/local/share/devzone/.devcontainer
+RUN ln -sf /usr/local/share/devzone/.devcontainer/devzone /usr/local/bin/devzone
