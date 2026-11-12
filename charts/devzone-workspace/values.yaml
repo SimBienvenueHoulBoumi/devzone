@@ -43,9 +43,10 @@ buildkit:
 # Conteneur workspace et volume de ses projets (#399) : le PVC workspace est
 # monte sur /workspaces/projets, ou le conteneur demarre (workingDir).
 workspace:
-  # Command: keep the pod alive (sleep infinity, like VS Code for a
-  # devcontainer) and run workspace-init.sh in the background at startup:
-  # the init script never blocks the pod (#503). Empty = image default command.
+  # Command: run workspace-init.sh in the foreground first, then keep the pod
+  # alive with sleep infinity (like VS Code for a devcontainer) (#503). The init
+  # script runs before exec, its errors are ignored (|| true) and its journal is
+  # ~/.local/state/devzone/init.log. Empty = image default command.
   command: ["bash", "-c", "mkdir -p \"$HOME/.local/state/devzone\"; bash /usr/local/share/devzone/.devcontainer/workspace-init.sh >>\"$HOME/.local/state/devzone/init.log\" 2>&1 || true; exec sleep infinity"]
   # Taille du volume des projets.
   taille: 20Gi

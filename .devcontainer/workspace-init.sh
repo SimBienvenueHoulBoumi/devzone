@@ -38,12 +38,12 @@ init_repowarden() {
     installed="$(repowarden --version 2>/dev/null || true)"
     if [ "$installed" = "${REPOWARDEN_VERSION:-}" ]; then
         log "repowarden $installed already installed"
-    elif npm install -g "repowarden@${REPOWARDEN_VERSION:-}" >/dev/null 2>&1; then
+    elif npm install -g "repowarden@${REPOWARDEN_VERSION:-}" 2>&1; then
         log "repowarden ${REPOWARDEN_VERSION:-} installed"
     else
         log "repowarden: npm install failed"
     fi
-    if repowarden install --global --lang fr >/dev/null 2>&1; then
+    if repowarden install --global --lang fr 2>&1; then
         log "repowarden global hooks installed"
     else
         log "repowarden: install --global failed"
@@ -51,7 +51,7 @@ init_repowarden() {
 }
 
 init_modules() {
-    if devzone appliquer >/dev/null 2>&1; then
+    if devzone appliquer 2>&1; then
         log "modules applied"
     else
         log "modules incomplete"
