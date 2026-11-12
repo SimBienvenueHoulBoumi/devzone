@@ -207,6 +207,14 @@ copier_depuis() {
 # shellcheck source=scripts/ports-workspace.sh
 . "$ICI/scripts/ports-workspace.sh"
 
+# English command names are accepted, French ones unchanged (#502)
+# shellcheck source=../.devcontainer/command-aliases.sh
+# shellcheck disable=SC1091
+. "$RACINE/.devcontainer/command-aliases.sh"
+if [ "$#" -gt 0 ]; then
+    set -- "$(command_canonical "$1")" "${@:2}"
+fi
+
 case "${1:-}" in
     demarrer) demarrer "${@:2}" ;;
     arreter) arreter ;;

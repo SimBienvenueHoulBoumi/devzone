@@ -478,9 +478,20 @@ commande_du_conteneur() {
             demarrer | desactiver | etat | gitlab | metrics | modules | mots-de-passe | \
             mysql | paquets | plateforme | port | postgres | reparer | test-bash32 | \
             test-gitlab | utiliser) return 0 ;;
+        # English names of the container commands (#502)
+        is-enabled | enable | disable | apply | catalog | start | status | \
+            passwords | packages | platform | repair | use) return 0 ;;
         *) return 1 ;;
     esac
 }
+
+# English command names are accepted, French ones unchanged (#502)
+# shellcheck source=SCRIPTDIR/../.devcontainer/command-aliases.sh
+# shellcheck disable=SC1091
+. "$PAQUET/.devcontainer/command-aliases.sh"
+if [ "$#" -gt 0 ]; then
+    set -- "$(command_canonical "$1")" "${@:2}"
+fi
 
 case "${1:-}" in
     "" | -h | --help | aide) aide ;;
