@@ -1,38 +1,36 @@
-# Montées de version automatiques des outils figés du conteneur : repowarden
-# (versions.env) et assistants IA (une ligne IA_… par paquet, devzone).
-# Comparaison toutes les heures et à la main ; pour chaque paquet en retard,
-# ouvre le ticket (ou met à jour celui déjà ouvert), propose une conception,
-# crée la branche du ticket, applique la montée, commit et pousse : la PR
-# brouillon s'ouvre par le circuit habituel, la CI teste le conteneur.
+# Automatic version bumps of the pinned tools of the container: repowarden
+# (versions.env) and AI assistants (one IA_ line per package, devzone).
+# Compared every hour and by hand; for each package behind, opens the ticket
+# (or updates the one already open), proposes a design, creates the ticket
+# branch, applies the bump, commits and pushes: the draft PR opens through the
+# usual flow, the CI tests the container.
 #
-# La GitHub App (REPOWARDEN_APP_CLIENT_ID, REPOWARDEN_APP_KEY) signe les
-# actions : le push déclenche la CI et le suivi des tickets, comme les autres
+# The GitHub App (REPOWARDEN_APP_CLIENT_ID, REPOWARDEN_APP_KEY) signs the
+# actions: the push triggers the CI and the ticket tracking, like the other
 # workflows.
 #
-# La conception postée est « ## Conception proposée », jamais « retenue » :
-# la vérification ticket n'accepte qu'une conception du mainteneur, qui la
-# reprend lui-même (« ## Conception retenue ») sur le ticket, puis passe la
-# PR en ready.
+# The posted design is "## Conception proposée", never "retenue": the ticket
+# check only accepts a design from the maintainer, who takes it over
+# ("## Conception retenue") on the ticket, then marks the PR ready.
 #
-# Écart assumé (montées de version seulement) : le workflow valide le ticket
-# qu'il crée, pour que la branche du ticket puisse naître ; le contrôle humain
-# reste la conception retenue et le passage de la PR en ready.
+# Accepted exception (version bumps only): the workflow validates the ticket it
+# creates, so that the ticket branch can be created; the human control stays the
+# retained design and marking the PR ready.
 #
-# Un ticket au même titre ouvert par quelqu'un d'autre est ignoré : il ne peut
-# pas bloquer les montées.
-# Pas de déclenchement croisé depuis repowarden : cela demanderait un jeton
-# d'un autre propriétaire ; sans nouvelle version, le job s'arrête après la
-# comparaison.
+# A ticket with the same title opened by someone else is ignored: it cannot
+# block the bumps.
+# No cross trigger from repowarden: it would need a token of another owner;
+# without a new version, the job stops after the comparison.
 name: versions
 
 on:
   schedule:
-    - cron: "17 * * * *" # toutes les heures à la minute 17
-  workflow_dispatch: # à la main (Actions → versions → Run workflow)
+    - cron: "17 * * * *" # every hour at minute 17
+  workflow_dispatch: # by hand (Actions -> versions -> Run workflow)
 
 permissions: {}
 
-# Une seule comparaison à la fois : deux runs ne doivent pas ouvrir le même ticket
+# One comparison at a time: two runs must not open the same ticket
 concurrency:
   group: versions
   cancel-in-progress: false
@@ -42,15 +40,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      # Le jeton de l'App n'existe que si la comparaison trouve un retard :
-      # le checkout utilise donc le jeton par défaut, sans mémoriser ses
-      # identifiants, puis le remote est réécrit avec le jeton de l'App avant
-      # les push (voir plus bas).
+      # The App token only exists when the comparison finds a package behind:
+      # so the checkout uses the default token, without keeping its
+      # credentials, then the remote is rewritten with the App token before
+      # the pushes (see below).
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-          fetch-depth: 0 # branches des tickets et historiques complets
-      - name: Comparer les versions figées à npm
+          fetch-depth: 0 # ticket branches and full histories
+      - name: Compare the pinned versions with npm
         id: retards
         run: |
           bash manage/scripts/versions.sh > retards.txt
@@ -60,7 +58,7 @@ jobs:
           else
             echo "present=false" >>"$GITHUB_OUTPUT"
           fi
-      - name: Jeton de la GitHub App
+      - name: GitHub App token
         if: steps.retards.outputs.present == 'true'
         id: app
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
@@ -70,7 +68,7 @@ jobs:
           permission-contents: write
           permission-issues: write
           permission-pull-requests: write
-      - name: Identité git de l'App
+      - name: Git identity of the App
         if: steps.retards.outputs.present == 'true'
         env:
           GH_TOKEN: ${{ steps.app.outputs.token }}
@@ -79,20 +77,20 @@ jobs:
           id="$(gh api "users/${slug}[bot]" --jq .id)"
           git config user.name "${slug}[bot]"
           git config user.email "${id}+${slug}[bot]@users.noreply.github.com"
-      - name: Repowarden même version figée que le conteneur
+      - name: Repowarden at the same pinned version as the container
         if: steps.retards.outputs.present == 'true'
         run: |
           version="$(sed -nE 's/^REPOWARDEN_VERSION=([^[:space:]]+)$/\1/p' .devcontainer/versions.env | head -1)"
           npm install -g "repowarden@$version"
-      # Le remote porte le jeton de l'App : les push de la boucle ci-dessous
-      # sont signés par l'App, qui déclenche la CI et le suivi des tickets.
-      - name: Remote avec le jeton de l'App pour les push
+      # The remote carries the App token: the pushes of the loop below are signed
+      # by the App, which triggers the CI and the ticket tracking.
+      - name: Remote with the App token for the pushes
         if: steps.retards.outputs.present == 'true'
         env:
           GH_TOKEN: ${{ steps.app.outputs.token }}
         run: |
           git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-      - name: Ticket et PR pour chaque paquet en retard
+      - name: Ticket and PR for each package behind
         if: steps.retards.outputs.present == 'true'
         env:
           GH_TOKEN: ${{ steps.app.outputs.token }}
@@ -103,8 +101,8 @@ jobs:
           while read -r paquet ancienne nouvelle; do
             [ -n "$paquet" ] || continue
             titre="$paquet $nouvelle dans le conteneur"
-            # Un ticket ouvert par l'App existe déjà pour ce paquet (titre « paquet … ») ;
-            # même titre ouvert par quelqu'un d'autre : ignoré, il ne bloque pas la montée.
+            # A ticket opened by the App already exists for this package (title "package ...");
+            # same title opened by someone else: ignored, it does not block the bump.
             existant="$(bash manage/scripts/versions.sh --ticket-existant "$paquet" "app/${APP_SLUG}")"
             if [ -n "$existant" ]; then
               n="${existant%%$'\t'*}"
@@ -140,11 +138,12 @@ jobs:
           EOF
             )"
             repowarden ticket comment "$n" "$conception"
-            # Validation d'office pour que la branche du ticket puisse naître
+            # Validated automatically so that the ticket branch can be created
             repowarden ticket label "$n" validé
             repowarden ticket "$n"
             bash manage/scripts/versions.sh --appliquer "$paquet" "$nouvelle"
-            git add -- .devcontainer/post-create.sh .devcontainer/devzone
+            # versions.env holds the repowarden version since #503
+            git add -- .devcontainer/versions.env .devcontainer/devzone
             repowarden cc -m "$paquet $nouvelle" \
               --type chore --scope devcontainer \
               --body "Monte $paquet de $ancienne à $nouvelle, dernière version npm." \

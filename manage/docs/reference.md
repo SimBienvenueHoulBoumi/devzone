@@ -268,7 +268,7 @@ L'image vient de ghcr.io, avec le tag de la version de devzone (`latest` depuis 
 
 ### Projets dans un volume
 
-- **Montage** : le PVC `workspace` est monte sur `/workspaces/projets`, ou le conteneur demarre (`workingDir`). Sa taille se regle avec `workspace.taille` (20 Gi par defaut).
+- **Montage** : le PVC `workspace` est monte sur `/workspaces/projets`, ou le conteneur demarre (`workingDir`). Sa taille se regle avec `workspace.size` (20 Gi par defaut).
 - **Conservation** : le PVC porte l annotation `helm.sh/resource-policy: keep` et n est jamais supprime par `helm uninstall` : `devzone workspace arreter` retire le pod, pas les projets. Le perdre demande une suppression a la main dans le cluster.
 - **Copies** : `devzone workspace copier-vers <dossier>` copie le dossier du poste dans `/workspaces/projets/<nom du dossier>` ; `devzone workspace copier-depuis <dossier>` ramene `/workspaces/projets/<nom du dossier>` dans ce dossier du poste. Les deux passent par `kubectl cp` (tar est present dans l image).
 
@@ -278,7 +278,7 @@ L'image vient de ghcr.io, avec le tag de la version de devzone (`latest` depuis 
 
 1. **Verifications** : cluster joignable, pod `devzone-workspace-0` demarre (sinon `devzone workspace demarrer`), Docker du poste en marche, place suffisante sur `/workspaces/projets`.
 2. **Projets** : chaque `./workspace/<projet>` est copie dans `/workspaces/projets/<projet>` (`.git` compris, comme `copier-vers`), puis verifie par nombre de fichiers et taille.
-3. **Identites et caches** : chaque volume Docker `devzone-<x>` (ou `$DEVZONE_VOLUMES-<x>`) est lu en lecture seule par un conteneur `docker run --rm -v … :/src:ro` (image `busybox:1.36`, `DEVZONE_IMAGE_COPIE` pour une autre), puis copie par `kubectl cp` vers son chemin du volume `etat` (`persistence.etat.chemins` du chart) : `gh` → `~/.config/gh`, `git` → `~/.config/git`, `claude` → `~/.claude`, `opencode-config` → `~/.config/opencode`, `opencode-data` → `~/.local/share/opencode`, `agent` → `~/.local/state/oc-lancer`, `m2`, `gradle`, `pnpm`. Un volume absent est ignore ; `config` (`~/.config/devzone`, ancien etat) n'a pas de chemin dans le chart et est ignore. Chaque copie est verifiee.
+3. **Identites et caches** : chaque volume Docker `devzone-<x>` (ou `$DEVZONE_VOLUMES-<x>`) est lu en lecture seule par un conteneur `docker run --rm -v … :/src:ro` (image `busybox:1.36`, `DEVZONE_IMAGE_COPIE` pour une autre), puis copie par `kubectl cp` vers son chemin du volume `etat` (`persistence.state.paths` du chart) : `gh` → `~/.config/gh`, `git` → `~/.config/git`, `claude` → `~/.claude`, `opencode-config` → `~/.config/opencode`, `opencode-data` → `~/.local/share/opencode`, `agent` → `~/.local/state/oc-lancer`, `m2`, `gradle`, `pnpm`. Un volume absent est ignore ; `config` (`~/.config/devzone`, ancien etat) n'a pas de chemin dans le chart et est ignore. Chaque copie est verifiee.
 4. **Etat** : `.devzone.modules` et `.devzone.paquets` du poste (s'ils existent) sont copies dans `/workspaces/projets/` du pod.
 5. **Bascule** : la ligne `workspace=kubernetes` est notee dans `.devzone.modules` du poste.
 

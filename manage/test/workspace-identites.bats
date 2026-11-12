@@ -29,7 +29,7 @@ bloc_workspace() {
     awk '/^        - name: workspace$/{p=1} /^  volumeClaimTemplates:/{p=0} p' <<<"$1"
 }
 
-# Les 9 chemins par defaut de persistence.etat.chemins (sans les tirets).
+# Les 9 chemins par defaut de persistence.state.paths (sans les tirets).
 chemins_defaut() {
     printf '%s\n' .config/gh .config/git .claude .config/opencode \
         .local/share/opencode .local/state/oc-lancer .m2 .gradle .local/share/pnpm
@@ -103,8 +103,8 @@ chemins_defaut() {
     ! grep -q -- 'mountPath: /etat' <<<"$output" || false
 }
 
-@test "montages : un chemin ajoute dans persistence.etat.chemins est monte et cree" {
-    run rendu_ss --set 'persistence.etat.chemins[9]=.config/devzone'
+@test "montages : un chemin ajoute dans persistence.state.paths est monte et cree" {
+    run rendu_ss --set 'persistence.state.paths[9]=.config/devzone'
     [ "$status" -eq 0 ]
     grep -q -- '/home/vscode/.devzone-etat/.config/devzone' <<<"$output" || false
     grep -q -- 'subPath: ".config/devzone"' <<<"$output" || false

@@ -275,7 +275,7 @@ tickets_ouverts() {
     workflow="$RACINE/.github/workflows/versions.yml"
     grep -Eq 'cron: *"17 \* \* \* \*"' "$workflow"
     run awk '
-        /- name: Repowarden même version figée que le conteneur/ { dans = 1; next }
+        /- name: Repowarden at the same pinned version as the container/ { dans = 1; next }
         dans && /^      - / { exit }
         dans { print }
     ' "$workflow"

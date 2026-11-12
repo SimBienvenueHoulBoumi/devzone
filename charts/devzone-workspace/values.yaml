@@ -1,8 +1,8 @@
 replicaCount: 1
 
-# Securite du pod : utilisateur vscode (UID 1000), jamais root. Les sidecars
-# heritent de runAsUser (kubedock inclus, qui n'en declare pas) ; buildkit le
-# redeclare, rootless en 1000.
+# Pod security: user vscode (UID 1000), never root. The sidecars inherit
+# runAsUser (kubedock included, which declares none); buildkit declares it
+# again, rootless as 1000.
 securityContext:
   runAsUser: 1000
   runAsGroup: 1000
@@ -14,42 +14,43 @@ image:
   tag: ""
   pullPolicy: IfNotPresent
 
-# Docker sans privilege. kubedock (API Docker) : Testcontainers et docker lancent
-# leurs conteneurs comme des pods du namespace, ecoute sur 127.0.0.1:2475 du pod.
+# Docker with no extra rights. kubedock (Docker API): Testcontainers and docker
+# start their containers as pods of the namespace; it listens on 127.0.0.1:2475
+# of the pod.
 kubedock:
   image: joyrex2001/kubedock:0.23.0
-  # Delai accorde a kubedock pour demarrer un conteneur de test (--timeout). Par
-  # defaut, kubedock n'attend qu'une minute : au premier lancement sur un noeud, le
-  # pod de test doit tirer son image, et ce tirage depasse souvent cette minute.
-  # Sans ce delai, kubedock abandonne (« timeout starting container »).
-  delai: 5m
+  # Time given to kubedock to start a test container (--timeout). By default
+  # kubedock waits one minute only: on the first run on a node, the test pod
+  # must pull its image, which often takes longer. Without this timeout,
+  # kubedock gives up ("timeout starting container").
+  timeout: 5m
   resources:
     limits:
       cpu: "1"
       memory: "1Gi"
 
-# BuildKit rootless : construit les images (buildctl, BUILDKIT_HOST), ecoute sur
-# 127.0.0.1:1234 du pod. Jamais privilegie.
+# Rootless BuildKit: builds the images (buildctl, devzone build); listens on
+# 127.0.0.1:1234 of the pod, with no extra rights.
 buildkit:
   image: moby/buildkit:v0.34.2-rootless
-  # seccomp et AppArmor Unconfined : BuildKit a besoin de mount et unshare, que les
-  # profils par defaut bloquent (docs BuildKit, rootless). AppArmor : Kubernetes 1.30+.
+  # seccomp and AppArmor Unconfined: BuildKit needs mount and unshare, which the
+  # default profiles block (BuildKit docs, rootless). AppArmor: Kubernetes 1.30+.
   unconfined: true
   resources:
     limits:
       cpu: "2"
       memory: "4Gi"
 
-# Conteneur workspace et volume de ses projets (#399) : le PVC workspace est
-# monte sur /workspaces/projets, ou le conteneur demarre (workingDir).
+# Workspace container and the volume of its projects (#399): the workspace PVC
+# is mounted on /workspaces/projets, where the container starts (workingDir).
 workspace:
   # Command: run workspace-init.sh in the foreground first, then keep the pod
   # alive with sleep infinity (like VS Code for a devcontainer) (#503). The init
   # script runs before exec, its errors are ignored (|| true) and its journal is
   # ~/.local/state/devzone/init.log. Empty = image default command.
   command: ["bash", "-c", "mkdir -p \"$HOME/.local/state/devzone\"; bash /usr/local/share/devzone/.devcontainer/workspace-init.sh >>\"$HOME/.local/state/devzone/init.log\" 2>&1 || true; exec sleep infinity"]
-  # Taille du volume des projets.
-  taille: 20Gi
+  # Size of the projects volume.
+  size: 20Gi
   storageClass: ""
 
 resources:
@@ -61,13 +62,14 @@ resources:
     memory: "1Gi"
 
 persistence:
-  # Identités, connexions et caches, gardés d'un redémarrage à l'autre. Chaque
-  # chemin (relatif au home de vscode) est monté depuis ce volume à son
-  # emplacement habituel ; l'initContainer etat-init crée les dossiers d'abord.
-  etat:
+  # Identities, logins and caches, kept from one restart to the next. Each path
+  # (relative to the home of vscode) is mounted from this volume at its usual
+  # place; the etat-init initContainer creates the directories first. The
+  # volume itself keeps its historical name "etat" (existing data, #507).
+  state:
     size: 10Gi
     storageClass: ""
-    chemins:
+    paths:
       - .config/gh
       - .config/git
       - .claude
@@ -86,7 +88,7 @@ serviceAccount:
 
 networkPolicy:
   enabled: true
-  # Entree limitee au namespace. Sortie libre par defaut : un poste de dev a
-  # besoin d'Internet (Maven, npm, images Docker). Mettre true limite la sortie
-  # au namespace et au DNS (kube-system). La liste blanche de sortie est #220.
-  sortieRestreinte: false
+  # Ingress limited to the namespace. Egress open by default: a development
+  # workstation needs the Internet (Maven, npm, Docker images). true limits the
+  # egress to the namespace and to DNS (kube-system). The egress allow list is #220.
+  restrictEgress: false
