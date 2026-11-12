@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Commande devzone sur ta machine (paquet npm) :
 #   devzone <dossier>        crée un devzone dans <dossier> puis le lance
-#   devzone mettre-a-jour    dans un dossier devzone : passe à la version du paquet
-#   devzone desinstaller     dans un dossier devzone : retire tout ce qu'il a créé
+#   devzone update           dans un dossier devzone : passe à la version du paquet
+#   devzone uninstall        dans un dossier devzone : retire tout ce qu'il a créé
 #   devzone --version | --help
 # Dans le conteneur, « devzone » est une autre commande : les modules
 # (.devcontainer/devzone).
@@ -421,14 +421,15 @@ aide() {
 devzone $(version) : environnement de développement conteneurisé
 
   devzone <dossier>        crée un devzone dans <dossier> puis le lance (make up)
-  devzone mettre-a-jour [--oui] [--sans-reconstruire]
+  devzone update [--oui] [--sans-reconstruire]
                            dans un dossier devzone : passe à la version du paquet
                            (sauvegarde les fichiers remplacés, propose make rebuild)
-  devzone desinstaller     dans un dossier devzone : retire conteneur, image, volumes
+  devzone uninstall        dans un dossier devzone : retire conteneur, image, volumes
                            (à lancer avant npm uninstall -g devzone)
-  devzone workspace demarrer|arreter|etat|shell
-  devzone workspace vscode|copier-vers|copier-depuis|migrer|revenir|nettoyer-docker
+  devzone workspace start|stop|status|shell
+  devzone workspace vscode|copy-to|copy-from|migrate|revert|clean-docker
                            poste Kubernetes : pilote le chart devzone-workspace
+  (anciens noms français acceptés : mettre-a-jour, desinstaller, demarrer…)
   devzone --version
 EOF
 }

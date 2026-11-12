@@ -8,7 +8,7 @@ Ton poste de développement Linux, prêt en une commande, identique sur Mac, Win
 - Les outils et services prêts : Java, Node, Python, Docker, Kubernetes, PostgreSQL, GitLab au besoin.
 - Les agents IA encadrés par repowarden.
 - Local et gratuit : rien n'est hébergé.
-- Une mise à jour avec `devzone mettre-a-jour`, et des outils ajoutés qui survivent au rebuild (devzone paquets).
+- Une mise à jour avec `devzone update`, et des outils ajoutés qui survivent au rebuild (devzone packages).
 
 ## Pourquoi devzone ?
 
@@ -24,7 +24,7 @@ devzone les évite : le même environnement sur chaque poste, sur ta machine.
 
 - Pas de systemd : les services fournis par devzone démarrent avec devzone, pas avec `systemctl`.
 - Pas de bureau graphique : tout se passe en terminal ou dans VS Code.
-- Le socket Docker de l'hôte est partagé par défaut : c'est un compromis de sécurité assumé, qui donne un accès administrateur au Docker de l'hôte, y compris aux agents IA ([#291](https://github.com/SimBienvenueHoulBoumi/devzone/issues/291)). Pour le retirer : `devzone desactiver docker-hote`, puis `make rebuild` sur le poste. Sans ce socket, `docker` renvoie vers le workspace Kubernetes (`devzone workspace`, kubedock et BuildKit) ; les conteneurs et kind lancés sur le Docker du poste ne fonctionnent plus dans le conteneur, alors que la connexion au cluster Kubernetes de l'hôte et les modules restent utilisables. Pour le remettre : `devzone activer docker-hote`, puis `make rebuild`.
+- Le socket Docker de l'hôte est partagé par défaut : c'est un compromis de sécurité assumé, qui donne un accès administrateur au Docker de l'hôte, y compris aux agents IA ([#291](https://github.com/SimBienvenueHoulBoumi/devzone/issues/291)). Pour le retirer : `devzone disable docker-hote`, puis `make rebuild` sur le poste. Sans ce socket, `docker` renvoie vers le workspace Kubernetes (`devzone workspace`, kubedock et BuildKit) ; les conteneurs et kind lancés sur le Docker du poste ne fonctionnent plus dans le conteneur, alors que la connexion au cluster Kubernetes de l'hôte et les modules restent utilisables. Pour le remettre : `devzone enable docker-hote`, puis `make rebuild`.
 - Le terminal garde l'administrateur du cluster ; les agents n'ont que le compte limité aux namespaces `devzone-*` (rôle `edit`, jeton renouvelé toutes les 24 h). Les installeurs seuls agissent en administrateur ([#430](https://github.com/SimBienvenueHoulBoumi/devzone/issues/430)).
 
 ## Comment ça marche
@@ -36,7 +36,7 @@ devzone prépare un devcontainer Ubuntu lancé par Docker, avec des versions d'o
 ### Prérequis
 
 - Docker Desktop (ou Docker Engine sous Linux). Pour Kubernetes (facultatif) : activer le cluster de Docker Desktop (*Settings → Kubernetes → Enable Kubernetes*).
-- Pour le [workspace Kubernetes](manage/docs/reference.md#workspace-kubernetes) (facultatif, `devzone workspace migrer` pour quitter le poste Docker, `revenir` pour y retourner) : un cluster Kubernetes 1.30 ou plus, `kubectl` et `helm` sur la machine, et Docker pour lire les volumes à migrer.
+- Pour le [workspace Kubernetes](manage/docs/reference.md#workspace-kubernetes) (facultatif, `devzone workspace migrate` pour quitter le poste Docker, `revenir` pour y retourner) : un cluster Kubernetes 1.30 ou plus, `kubectl` et `helm` sur la machine, et Docker pour lire les volumes à migrer.
 - Node et npm (pour `npx` ou l'installation globale).
 - `make` (nécessaire pour `make shell` ; sous Windows sans `make`, voir le tableau « Au quotidien »).
 
@@ -80,8 +80,8 @@ devzone : état (devzone pour le réafficher)
   ✖ identité git    nécessaire pour commiter : gh auth login -s workflow (automatique),
                     ou git config --file ~/.config/git/config user.name "<nom>" et user.email "<email>"
   ○ GitHub          facultatif (push et PR, tickets repowarden) : gh auth login -s workflow
-  ○ module ia         facultatif, assistants IA : Claude Code, opencode : devzone activer ia
-  ○ module kubernetes facultatif, connexion au cluster de l'hôte et metrics-server au démarrage : devzone activer kubernetes
+  ○ module ia         facultatif, assistants IA : Claude Code, opencode : devzone enable ia
+  ○ module kubernetes facultatif, connexion au cluster de l'hôte et metrics-server au démarrage : devzone enable kubernetes
 ```
 
 Le premier lancement prend 4 à 5 min mesurées, plus le téléchargement des images de base sur une machine neuve.
@@ -119,26 +119,26 @@ Pour en savoir plus : [Mettre en route un projet](https://github.com/SimBienvenu
 |---|---|
 | Langages | Java 21 + Maven + Gradle, Node LTS + pnpm, Python 3.12 (apt) + uv |
 | Conteneurs, Kubernetes | Docker de l'hôte (socket partagé), kubectl, helm, k9s, kind ; connexion au cluster de l'hôte (module `kubernetes`) ; Testcontainers (`TESTCONTAINERS_HOST_OVERRIDE`) ; montages (`$LOCAL_WORKSPACE_FOLDER`) |
-| GitHub (ou GitLab), qualité | gh, ou glab connecté à une instance GitLab (`devzone plateforme gitlab` dans le conteneur, [manage/docs/reference.md](manage/docs/reference.md#plateforme-github-ou-gitlab)) ; repowarden (hooks git globaux), shellcheck, bats, actionlint, gitleaks, ruff, vulture, pytest |
+| GitHub (ou GitLab), qualité | gh, ou glab connecté à une instance GitLab (`devzone platform gitlab` dans le conteneur, [manage/docs/reference.md](manage/docs/reference.md#plateforme-github-ou-gitlab)) ; repowarden (hooks git globaux), shellcheck, bats, actionlint, gitleaks, ruff, vulture, pytest |
 | Assistants IA | Claude Code, opencode (module `ia`, désactivé par défaut) |
 
 ## Installer un outil qui reste
 
-Un outil mis a la main (sudo apt install tree) ne survit pas a un make rebuild : l'image est reconstruite de zero. Pour un outil qui doit rester, devzone paquets garde la liste des paquets a reinstaller :
+Un outil mis a la main (sudo apt install tree) ne survit pas a un make rebuild : l'image est reconstruite de zero. Pour un outil qui doit rester, devzone packages garde la liste des paquets a reinstaller :
 
 ```sh
-devzone paquets
-devzone paquets ajouter tree
-devzone paquets retirer tree
-devzone paquets appliquer
+devzone packages
+devzone packages ajouter tree
+devzone packages retirer tree
+devzone packages appliquer
 ```
 
-- devzone paquets affiche la liste : ✔ paquets installes, ○ paquets a installer ;
-- devzone paquets ajouter <nom>… valide chaque paquet (apt-cache), installe puis l'ajoute a la liste ;
-- devzone paquets retirer <nom> retire la liste et desinstalle ;
-- devzone paquets appliquer installe les paquets manquants apres un rebuild.
+- devzone packages affiche la liste : ✔ paquets installes, ○ paquets a installer ;
+- devzone packages ajouter <nom>… valide chaque paquet (apt-cache), installe puis l'ajoute a la liste ;
+- devzone packages retirer <nom> retire la liste et desinstalle ;
+- devzone packages appliquer installe les paquets manquants apres un rebuild.
 
-La liste vit dans .devzone.paquets a la racine du dossier devzone, hors du depot. Un paquet en echec est signale dans le recap (⚠ paquets : …) ; devzone paquets appliquer peut alors etre relance.
+La liste vit dans .devzone.paquets a la racine du dossier devzone, hors du depot. Un paquet en echec est signale dans le recap (⚠ paquets : …) ; devzone packages appliquer peut alors etre relance.
 
 ## Au quotidien
 
@@ -150,9 +150,9 @@ La liste vit dans .devzone.paquets a la racine du dossier devzone, hors du depot
 | Supprimer le conteneur | — | `make down` | — |
 | Reconstruire (après une modification de `.devcontainer/`) | *Dev Containers: Rebuild Container* | `make rebuild` | `npx @devcontainers/cli up --workspace-folder . --remove-existing-container` |
 | État | — | `make status` | — |
-| **Désinstaller** (tout ce que devzone a créé, après confirmation) | — | `make desinstaller` | `npx devzone desinstaller` |
+| **Désinstaller** (tout ce que devzone a créé, après confirmation) | — | `make desinstaller` | `npx devzone uninstall` |
 
-Après `devzone workspace migrer`, `make up`, `make shell` et `make stop` pilotent le workspace Kubernetes ; `devzone workspace revenir` rend le poste Docker.
+Après `devzone workspace migrate`, `make up`, `make shell` et `make stop` pilotent le workspace Kubernetes ; `devzone workspace revert` rend le poste Docker.
 
 ### Mettre à jour devzone
 
@@ -160,7 +160,7 @@ Après `devzone workspace migrer`, `make up`, `make shell` et `make stop` pilote
 
 ```bash
 cd mon-devzone
-devzone mettre-a-jour
+devzone update
 ```
 
 Pour la dernière version publiée, sans installation globale :
@@ -174,21 +174,21 @@ La commande affiche la version du dossier et celle du paquet, et ne fait rien si
 
 `workspace/`, `.devzone.modules`, `.devzone.paquets`, `.password`, `.app`, `.devzone.log` et les volumes Docker ne sont jamais touchés.
 
-La mise à jour ne change jamais le mode du poste ; sur un poste Docker avec Kubernetes joignable, elle propose `devzone workspace migrer`.
+La mise à jour ne change jamais le mode du poste ; sur un poste Docker avec Kubernetes joignable, elle propose `devzone workspace migrate`.
 
 Dans le conteneur, le récapitulatif `devzone` signale une version publiée plus récente (vérification npm au plus une fois par jour, sans bloquer hors ligne) : `○ devzone X.Y.Z disponible : sur le poste, devzone mettre-a-jour`.
 
 ## Options
 
-**Module `ia`** : active Claude Code et opencode (versions figées), avec le garde-fou repowarden qui les arrête avant de modifier `main` ou `develop` ou de commiter sans `repowarden cc` (voir [manage/docs/reference.md](manage/docs/reference.md#garde-fou-des-assistants-ia)). Pour l'activer : `devzone activer ia`. Ils sont désinstallés quand le module est désactivé, mais tes connexions restent dans leurs volumes.
+**Module `ia`** : active Claude Code et opencode (versions figées), avec le garde-fou repowarden qui les arrête avant de modifier `main` ou `develop` ou de commiter sans `repowarden cc` (voir [manage/docs/reference.md](manage/docs/reference.md#garde-fou-des-assistants-ia)). Pour l'activer : `devzone enable ia`. Ils sont désinstallés quand le module est désactivé, mais tes connexions restent dans leurs volumes.
 
-**Module `kubernetes`** : active à chaque démarrage la connexion au cluster de l'hôte et l'installation de metrics-server sur les clusters locaux (pour voir le CPU et la RAM dans k9s). Pour l'activer : `devzone activer kubernetes`. Sans ce module, kubectl, helm, k9s et kind restent installés.
+**Module `kubernetes`** : active à chaque démarrage la connexion au cluster de l'hôte et l'installation de metrics-server sur les clusters locaux (pour voir le CPU et la RAM dans k9s). Pour l'activer : `devzone enable kubernetes`. Sans ce module, kubectl, helm, k9s et kind restent installés.
 
-**Plateforme GitHub ou GitLab** : GitHub par défaut (nouvelle architecture). Pour servir une équipe sur GitLab : `devzone plateforme gitlab --url URL` (ou sans `--url` quand le module `gitlab` est activé, pour l'instance de test) : glab est installé (version figée, somme vérifiée) et connecté à l'instance, et `devzone` l'affiche à la place des contrôles `gh`. `devzone plateforme github` revient en arrière (glab retiré). GitLab est accessible directement depuis le poste sans relais temporaire. Détails dans [manage/docs/reference.md](manage/docs/reference.md#plateforme-github-ou-gitlab).
+**Plateforme GitHub ou GitLab** : GitHub par défaut (nouvelle architecture). Pour servir une équipe sur GitLab : `devzone platform gitlab --url URL` (ou sans `--url` quand le module `gitlab` est activé, pour l'instance de test) : glab est installé (version figée, somme vérifiée) et connecté à l'instance, et `devzone` l'affiche à la place des contrôles `gh`. `devzone platform github` revient en arrière (glab retiré). GitLab est accessible directement depuis le poste sans relais temporaire. Détails dans [manage/docs/reference.md](manage/docs/reference.md#plateforme-github-ou-gitlab).
 
-**Module `postgres`** : un PostgreSQL partagé, une base par projet (voir [Accéder à PostgreSQL](#accéder-à-postgresql)). Pour l'activer : `devzone activer postgres`.
+**Module `postgres`** : un PostgreSQL partagé, une base par projet (voir [Accéder à PostgreSQL](#accéder-à-postgresql)). Pour l'activer : `devzone enable postgres`.
 
-**Module `argocd`** : Argo CD sur le cluster de devzone, interface sur https://127.0.0.1:8443 dans le conteneur (voir [Argo CD](manage/docs/reference.md#argo-cd)). Pour l'activer : `devzone activer argocd`.
+**Module `argocd`** : Argo CD sur le cluster de devzone, interface sur https://127.0.0.1:8443 dans le conteneur (voir [Argo CD](manage/docs/reference.md#argo-cd)). Pour l'activer : `devzone enable argocd`.
 
 Ces modules sont désactivés par défaut, activables à la demande depuis le conteneur (sans rebuild), et leur choix est conservé d'un démarrage à l'autre.
 
@@ -207,7 +207,7 @@ argocd	https://127.0.0.1:8443	admin	…
 Le fichier est lisible par toi seul (600) et ignoré par git : ne le copie ni ne le commit jamais. Il est régénéré à chaque création, suppression ou changement de compte (modules `gitlab`, `postgres` et `argocd`, seed GitLab, démarrage) :
 
 ```sh
-devzone mots-de-passe                  # régénère le fichier et affiche seulement son chemin
+devzone passwords                  # régénère le fichier et affiche seulement son chemin
 devzone postgres creer <projet>         # création, ou nouveau mot de passe avec --nouveau-mdp
 devzone postgres supprimer <projet>     # suppression du compte et de sa ligne
 devzone gitlab nouveau-mdp [root|dev]  # mot de passe aléatoire (root ou dev) régénéré
@@ -222,7 +222,7 @@ Le secret Rails de GitLab est conservé dans `workspace/.gitlab/rails-secret.yam
 Le module `postgres` installe un PostgreSQL 16 partagé sur le cluster de devzone : une base et un utilisateur par projet. Toutes les commandes se lancent dans le conteneur (`make shell`).
 
 ```sh
-devzone activer postgres          # la première fois : choix du cluster (kind dédié ou cluster de l'hôte)
+devzone enable postgres          # la première fois : choix du cluster (kind dédié ou cluster de l'hôte)
 devzone postgres creer monprojet  # base et utilisateur « monprojet »
 ```
 
@@ -330,7 +330,7 @@ Cette commande supprime le conteneur, l'image `vsc-devzone-…`, les volumes `de
 Avec la commande installée globalement (`npm install -g devzone`), tu peux aussi lancer, dans le dossier du devzone :
 
 ```bash
-devzone desinstaller
+devzone uninstall
 ```
 
 Même effet que `make desinstaller`. Ensuite seulement, pour retirer la commande de ta machine :
@@ -344,8 +344,8 @@ Même effet que `make desinstaller`.
 
 ```sh
 devzone clusters                    # vue : contextes, type, etat, namespace
-devzone utiliser CTX [-n NS]        # bascule le cluster de travail de kubectl
-devzone utiliser -n NS              # change seulement le namespace du cluster courant
+devzone use CTX [-n NS]        # bascule le cluster de travail de kubectl
+devzone use -n NS              # change seulement le namespace du cluster courant
 ```
 
 L invite du shell affiche `⎈ ctx/ns` (cyan si local, rouge gras avec distant sinon). Un rebuild repart sur le cluster de l hote : le choix de kubectl ecrit dans `~/.kube/config`, qui n est pas dans un volume.
