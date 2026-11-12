@@ -44,10 +44,12 @@ git config --global --replace-all credential.https://github.com.helper ''
 git config --global --add credential.https://github.com.helper '!gh auth git-credential'
 git config --global url.https://github.com/.insteadOf git@github.com:
 
-# repowarden, version figée (il installe des hooks git globaux) ; mettre à jour
-# en changeant la version ici, puis Rebuild Container
+# repowarden, pinned version (it installs global git hooks); update
+# .devcontainer/versions.env, then Rebuild Container
 echo "devzone : installation de repowarden…"
-npm install -g repowarden@4.17.1
+# shellcheck source=SCRIPTDIR/versions.env
+. "$(dirname "${BASH_SOURCE[0]}")/versions.env"
+npm install -g "repowarden@$REPOWARDEN_VERSION"
 repowarden install --global --lang fr
 
 # Modules facultatifs (assistants IA, Kubernetes) : commande devzone, état

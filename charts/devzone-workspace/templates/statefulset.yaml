@@ -147,6 +147,15 @@ spec:
             # Repère du workspace Kubernetes : devzone agent lance opencode ici (#431)
             - name: DEVZONE_WORKSPACE
               value: kubernetes
+            # Root of the devzone projects in the Kubernetes workspace (#503)
+            - name: DEVZONE_RACINE
+              value: /workspaces/projets
+            # Global npm prefix, stored on the mounted etat volume (#503)
+            - name: NPM_CONFIG_PREFIX
+              value: /home/vscode/.local/npm
+            # Image PATH plus the npm global bin, installed at startup (#503)
+            - name: PATH
+              value: /home/vscode/.local/npm/bin:/usr/local/share/nvm/current/bin:/usr/local/sdkman/bin:/usr/local/sdkman/candidates/java/current/bin:/usr/local/sdkman/candidates/gradle/current/bin:/usr/local/sdkman/candidates/maven/current/bin:/usr/local/sdkman/candidates/ant/current/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
             # Testcontainers et docker parlent a kubedock, et buildctl a BuildKit.
             # Ryuk est coupe : kubedock nettoie les conteneurs de test lui-meme.
             - name: DOCKER_HOST

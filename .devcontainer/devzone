@@ -55,6 +55,12 @@ MODULES=(ia kubernetes gitlab postgres argocd mysql)
 # shellcheck source=SCRIPTDIR/cluster.sh
 # shellcheck disable=SC1091
 . "$ICI/cluster.sh"
+# English command names are accepted (#502); a copied devzone may miss the file
+# shellcheck source=SCRIPTDIR/command-aliases.sh
+# shellcheck disable=SC1091
+if [ -f "$ICI/command-aliases.sh" ]; then
+    . "$ICI/command-aliases.sh"
+fi
 
 # Assistants IA, versions figées : mettre à jour ici, puis devzone appliquer
 # (ou Rebuild Container). Une ligne par paquet, séparées par une ligne qui ne
@@ -877,13 +883,13 @@ outils_retard() {
 # Remet repowarden à la version figée s'il en diffère, comme post-create.sh
 # (il installe les hooks git globaux)
 appliquer_repowarden() {
-    local ligne figee installee
+    local ligne figee installee paquet=repowarden
     [ -f "$VERSIONS" ] || return 0
     ligne="$(bash "$VERSIONS" --installees 2>/dev/null | awk '$1 == "repowarden"' || true)"
     [ -n "$ligne" ] || return 0
     read -r _ figee installee <<<"$ligne"
     echo "devzone : installation de repowarden $figee…"
-    npm install -g "repowarden@$figee" >/dev/null
+    npm install -g "$paquet@$figee" >/dev/null
     repowarden install --global --lang fr
     echo "devzone : repowarden $installee → $figee"
 }
@@ -1292,6 +1298,13 @@ changer() {
 # shellcheck disable=SC1091
 if [ -f "$ICI/etat-json.sh" ]; then
     . "$ICI/etat-json.sh"
+fi
+
+# English command name of the first argument becomes the French one (#502);
+# without any argument, nothing changes
+if [ "$#" -gt 0 ]; then
+    canon="$(command_canonical "$1" 2>/dev/null)" || canon="$1"
+    set -- "$canon" "${@:2}"
 fi
 
 case "${1:-}" in
