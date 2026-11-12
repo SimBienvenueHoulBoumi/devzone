@@ -19,6 +19,12 @@ ARG RUFF_VERSION=0.17.0
 ARG VULTURE_VERSION=2.16
 # pytest : même version que la CI de repowarden (ci/requirements/e2e-python.in)
 ARG PYTEST_VERSION=9.1.1
+# BuildKit client (buildctl) for the Kubernetes workspace pod (#514). Pinned to
+# the buildkitd sidecar version; checksums from the moby/buildkit v0.34.2 release
+# assets (https://github.com/moby/buildkit/releases/tag/v0.34.2).
+ARG BUILDKIT_VERSION=0.34.2
+ARG BUILDKIT_SHA256_AMD64=b9f18b8e37eb450e9e5df03117045237cdd12d3c4a0034ffeeaa857852a15e13
+ARG BUILDKIT_SHA256_ARM64=a4ad483a33b2f1544c5ccce1c5956c559e1a6e84b8bf6cedd847d695885237a3
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
@@ -82,6 +88,24 @@ RUN set -eu; \
     }; \
     installer kubectx "$kctx_sha"; \
     installer kubens "$kns_sha"
+
+# BuildKit client: the workspace pod talks to the buildkitd sidecar over
+# BUILDKIT_HOST but has no client in the image (#514). Install only buildctl,
+# same version as the sidecar, from the official moby/buildkit release archive
+# with SHA-256 verification (https://github.com/moby/buildkit/releases/tag/v0.34.2).
+RUN set -eu; \
+    arch="$(dpkg --print-architecture)"; \
+    case "$arch" in \
+        arm64) bk_sha="${BUILDKIT_SHA256_ARM64}" ;; \
+        amd64) bk_sha="${BUILDKIT_SHA256_AMD64}" ;; \
+        *) echo "Architecture non prise en charge : $arch" >&2; exit 1 ;; \
+    esac; \
+    tmp="$(mktemp -d)"; \
+    curl -fsSL "https://github.com/moby/buildkit/releases/download/v${BUILDKIT_VERSION}/buildkit-v${BUILDKIT_VERSION}.linux-${arch}.tar.gz" -o "$tmp/buildkit.tar.gz"; \
+    echo "$bk_sha  $tmp/buildkit.tar.gz" | sha256sum -c --quiet; \
+    tar -xzf "$tmp/buildkit.tar.gz" -C "$tmp" bin/buildctl; \
+    install -m 0755 "$tmp/bin/buildctl" /usr/local/bin/buildctl; \
+    rm -rf "$tmp"
 
 # kind passe par une enveloppe (#291) : avec le Docker de l'hôte, un cluster
 # créé à la main doit être rendu joignable depuis le conteneur (kube-joignable.sh)

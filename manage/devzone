@@ -474,7 +474,7 @@ creer() {
 # final de .devcontainer/devzone (test de cohérence dans manage/test/cli.bats)
 commande_du_conteneur() {
     case "$1" in
-        actif | activer | agent | appliquer | argocd | catalogue | cluster | clusters | \
+        actif | activer | agent | appliquer | argocd | build | catalogue | cluster | clusters | \
             demarrer | desactiver | etat | gitlab | metrics | modules | mots-de-passe | \
             mysql | paquets | plateforme | port | postgres | reparer | test-bash32 | \
             test-gitlab | utiliser) return 0 ;;

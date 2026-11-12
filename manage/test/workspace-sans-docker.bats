@@ -90,9 +90,13 @@ bloc_sidecar() {
 @test "kubedock : arguments de l'essai (server --port-forward --reverse-proxy --timeout)" {
     run rendu_de templates/statefulset.yaml
     [ "$status" -eq 0 ]
-    local args
-    args="$(awk '/^          args:/{p=1;next} p && /^          [a-z]/{exit} p' <<<"$(bloc_sidecar "$(bloc_init "$output")" "        - name: kubedock")" | sed 's/^ *- //' | paste -sd' ' -)"
-    [ "$args" = 'server --port-forward --reverse-proxy --timeout "5m"' ]
+    local kd
+    kd="$(bloc_sidecar "$(bloc_init "$output")" "        - name: kubedock")"
+    grep -q -- '- server' <<<"$kd" || false
+    grep -q -- '- --port-forward' <<<"$kd" || false
+    grep -q -- '- --reverse-proxy' <<<"$kd" || false
+    grep -q -- '- --timeout' <<<"$kd" || false
+    grep -q -- '- "5m"' <<<"$kd" || false
 }
 
 @test "kubedock : --timeout depuis kubedock.timeout (5m par defaut, premier tirage d'image)" {
@@ -100,10 +104,26 @@ bloc_sidecar() {
     [ "$status" -eq 0 ]
     local args
     args="$(awk '/^          args:/{p=1;next} p && /^          [a-z]/{exit} p' <<<"$(bloc_sidecar "$(bloc_init "$output")" "        - name: kubedock")" | sed 's/^ *- //' | paste -sd' ' -)"
-    [ "$args" = 'server --port-forward --reverse-proxy --timeout "5m"' ]
+    [ "$args" = 'server --port-forward --reverse-proxy --timeout "5m" --reapmax "30m" --prune-start' ]
     run rendu_de templates/statefulset.yaml --set kubedock.timeout=10m
     [ "$status" -eq 0 ]
     grep -q -- '- "10m"' <<<"$(bloc_sidecar "$(bloc_init "$output")" "        - name: kubedock")" || false
+}
+
+@test "kubedock : reapmax et prune-start configurables (#514)" {
+    run rendu_de templates/statefulset.yaml
+    [ "$status" -eq 0 ]
+    local kd
+    kd="$(bloc_sidecar "$(bloc_init "$output")" "        - name: kubedock")"
+    grep -q -- '- --reapmax' <<<"$kd" || false
+    grep -q -- '- "30m"' <<<"$kd" || false
+    grep -q -- '- --prune-start' <<<"$kd" || false
+    run rendu_de templates/statefulset.yaml --set kubedock.reapmax=0 --set kubedock.pruneStart=false
+    [ "$status" -eq 0 ]
+    kd="$(bloc_sidecar "$(bloc_init "$output")" "        - name: kubedock")"
+    grep -q -- '- --reapmax' <<<"$kd" || false
+    grep -q -- '- "0"' <<<"$kd" || false
+    ! grep -q -- '- --prune-start' <<<"$kd" || false
 }
 
 @test "kubedock : NAMESPACE vient de metadata.namespace du pod" {
