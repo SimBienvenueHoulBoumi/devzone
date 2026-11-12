@@ -317,6 +317,60 @@ fichier_echec() {
     echo "$ETAT-echec-$1"
 }
 
+# Services in the Kubernetes workspace pod (#528): gitlab, postgres and argocd
+# live in the cluster and are installed from the workstation (devzone
+# workspace services). The pod has no kubeconfig and its service account is
+# limited (#430): their presence is the cluster DNS resolving the service,
+# like the catalogue (#515), never the failure marker of an installer.
+dans_pod() {
+    [ "${DEVZONE_WORKSPACE:-}" = kubernetes ]
+}
+
+service_module() {
+    case "$1" in
+        gitlab | postgres | argocd) return 0 ;;
+    esac
+    return 1
+}
+
+# DNS name of the service of a module: <service>.<namespace>.svc
+service_dns() {
+    case "$1" in
+        gitlab) echo "gitlab-webservice-default.devzone-gitlab${INSTANCE_SUFFIX}.svc" ;;
+        postgres) echo "postgres.devzone-postgres.svc" ;;
+        argocd) echo "argocd-server.devzone-argocd.svc" ;;
+    esac
+}
+
+service_present() {
+    getent hosts "$(service_dns "$1")" >/dev/null 2>&1
+}
+
+# Status line of a service module in the pod: present → active; absent → the
+# workstation command that installs it
+service_ligne_pod() {
+    local m="$1"
+    if service_present "$m"; then
+        printf '  ✔ module %-10s active: %s (%s)\n' "$m" "$(description "$m")" "$(service_dns "$m")"
+    elif [ "$(valeur "$m")" = on ]; then
+        printf '  ⚠ module %-10s not in the cluster: on the workstation, devzone workspace services enable %s\n' "$m" "$m"
+    else
+        printf '  ○ module %-10s optional, %s: on the workstation, devzone workspace services enable %s\n' "$m" "$(description "$m")" "$m"
+    fi
+}
+
+# devzone apply of a service module: in the Kubernetes workspace pod nothing
+# is installed (the workstation does it, #528) and the failure marker of an
+# earlier start is cleared; elsewhere, the installer of the module
+appliquer_service() {
+    if dans_pod; then
+        rm -f "$(fichier_echec "$1")"
+        echo "devzone: $1 is installed from the workstation (devzone workspace services enable $1): nothing to do in the pod"
+        return 0
+    fi
+    "appliquer_$1" on
+}
+
 # Journal du dernier npm (son chemin est à donner en cas d'échec), ou son
 # dossier ; noms horodatés : le dernier dans l'ordre du glob est le plus récent
 dernier_journal_npm() {
@@ -1183,7 +1237,10 @@ etat() {
         echo "  ⚠ worktree        $chemin absent ici (créé hors du conteneur ?) : le gérer de ce côté-là, jamais git worktree prune ici (manage/docs/reference.md, Worktrees git)"
     done < <(worktrees_absents)
     for m in "${MODULES[@]}"; do
-        if [ "$(valeur "$m")" = on ] && [ -f "$(fichier_echec "$m")" ]; then
+        if dans_pod && service_module "$m"; then
+            # Kubernetes workspace pod (#528): presence by the cluster DNS
+            service_ligne_pod "$m"
+        elif [ "$(valeur "$m")" = on ] && [ -f "$(fichier_echec "$m")" ]; then
             printf '  ✖ module %-10s en échec : installation incomplète (%s) : devzone appliquer\n' "$m" "$(cat "$(fichier_echec "$m")")"
         elif [ "$(valeur "$m")" = on ] && [ "$m" = gitlab ]; then
             # GitLab actif : son état réel (prêt, runner, en échec)
@@ -1306,6 +1363,17 @@ changer() {
         echo "devzone : module inconnu : $m ; modules : ${MODULES[*]}" >&2
         exit 1
     fi
+    # In the Kubernetes workspace pod the services are installed from the
+    # workstation (#528): the pod has no administrator access to the cluster.
+    # DEVZONE_SERVICES_ADMIN=1: run by services-admin.sh with a temporary one.
+    if dans_pod && service_module "$m" && [ -z "${DEVZONE_SERVICES_ADMIN:-}" ]; then
+        if [ "$1" = on ]; then
+            echo "devzone: in the workspace pod, $m is installed from the workstation: devzone workspace services enable $m" >&2
+        else
+            echo "devzone: in the workspace pod, $m is removed from the workstation: devzone workspace services disable $m" >&2
+        fi
+        return 2
+    fi
     if [ "$1" = off ] && { [ "$m" = postgres ] || [ "$m" = mysql ] || [ "$m" = gitlab ]; }; then
         confirmer_suppression "$m" "${@:3}" || return 0
     fi
@@ -1336,10 +1404,12 @@ case "${1:-}" in
         etat_recouvrement_confirmer
         appliquer_repowarden
         [ "$(valeur ia)" = off ] || appliquer_ia on
-        [ "$(valeur gitlab)" = off ] || appliquer_gitlab on
-        [ "$(valeur postgres)" = off ] || appliquer_postgres on
+        # gitlab, postgres, argocd: installed from the workstation in the
+        # Kubernetes workspace pod (#528), by their installer elsewhere
+        [ "$(valeur gitlab)" = off ] || appliquer_service gitlab
+        [ "$(valeur postgres)" = off ] || appliquer_service postgres
         [ "$(valeur mysql)" = off ] || appliquer_mysql on
-        [ "$(valeur argocd)" = off ] || appliquer_argocd on
+        [ "$(valeur argocd)" = off ] || appliquer_service argocd
         ;;
     actif)
         connu "${2:-}" || { echo "devzone : module inconnu : ${2:-(aucun)}" >&2; exit 2; }

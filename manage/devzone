@@ -429,6 +429,8 @@ devzone $(version) : environnement de développement conteneurisé
   devzone workspace start|stop|status|shell
   devzone workspace vscode|copy-to|copy-from|migrate|revert|clean-docker
                            poste Kubernetes : pilote le chart devzone-workspace
+  devzone workspace services enable|disable <service>|status
+                           services (gitlab, postgres, argocd) du workspace Kubernetes
   (anciens noms français acceptés : mettre-a-jour, desinstaller, demarrer…)
   devzone --version
 EOF

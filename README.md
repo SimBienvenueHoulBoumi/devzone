@@ -152,7 +152,7 @@ La liste vit dans .devzone.paquets a la racine du dossier devzone, hors du depot
 | État | — | `make status` | — |
 | **Désinstaller** (tout ce que devzone a créé, après confirmation) | — | `make desinstaller` | `npx devzone uninstall` |
 
-Après `devzone workspace migrate`, `make up`, `make shell` et `make stop` pilotent le workspace Kubernetes ; `devzone workspace revert` rend le poste Docker.
+Après `devzone workspace migrate`, `make up`, `make shell` et `make stop` pilotent le workspace Kubernetes ; `devzone workspace revert` rend le poste Docker. Les services GitLab, PostgreSQL et Argo CD s'y installent depuis le poste : `devzone workspace services enable postgres` (voir [la référence](manage/docs/reference.md#services-de-devzone-dans-le-workspace-kubernetes)).
 
 ### Mettre à jour devzone
 
