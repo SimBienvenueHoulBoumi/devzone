@@ -152,6 +152,8 @@ La liste vit dans .devzone.paquets a la racine du dossier devzone, hors du depot
 | État | — | `make status` | — |
 | **Désinstaller** (tout ce que devzone a créé, après confirmation) | — | `make desinstaller` | `npx devzone desinstaller` |
 
+Après `devzone workspace migrer`, `make up`, `make shell` et `make stop` pilotent le workspace Kubernetes ; `devzone workspace revenir` rend le poste Docker.
+
 ### Mettre à jour devzone
 
 À la création, le dossier garde sa version dans `.devzone.version` : la version, puis l'empreinte sha256 de chaque fichier copié depuis le paquet. Pour passer un dossier existant à la version du paquet :
@@ -171,6 +173,8 @@ npx devzone@latest mettre-a-jour
 La commande affiche la version du dossier et celle du paquet, et ne fait rien si elles sont égales. Sinon, elle sauvegarde dans `.devzone.sauvegarde/<date>/` les fichiers remplacés ou supprimés, liste les fichiers modifiés localement et demande confirmation (`--oui` pour un script ; sans terminal, `--oui` est nécessaire), remplace les fichiers du paquet, retire les anciennes arborescences (`core/`, `scripts/`), complète `.gitignore` sans l'écraser, puis propose `make rebuild`. `--sans-reconstruire` saute cette proposition ; sans terminal, la reconstruction n'est jamais lancée.
 
 `workspace/`, `.devzone.modules`, `.devzone.paquets`, `.password`, `.app`, `.devzone.log` et les volumes Docker ne sont jamais touchés.
+
+La mise à jour ne change jamais le mode du poste ; sur un poste Docker avec Kubernetes joignable, elle propose `devzone workspace migrer`.
 
 Dans le conteneur, le récapitulatif `devzone` signale une version publiée plus récente (vérification npm au plus une fois par jour, sans bloquer hors ligne) : `○ devzone X.Y.Z disponible : sur le poste, devzone mettre-a-jour`.
 

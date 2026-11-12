@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
-# mode du poste pour make up|shell|stop|rebuild (#472) : faux npx, faux docker
-# et faux manage/workspace.sh qui journalisent leurs arguments. Aucun cluster,
-# aucun Docker et aucun npx reel.
+# mode du poste pour make up|shell|stop|rebuild et cible conseil (#472) : faux
+# npx, faux docker, faux kubectl et faux helm qui journalisent leurs arguments.
+# Aucun cluster, aucun Docker, aucun npx et aucun kubectl reel.
 
 setup() {
     load commun
@@ -22,6 +22,7 @@ DOCKER
     chmod +x "$T/bin/npx" "$T/bin/docker"
     export PATH="$T/bin:$PATH"
     : >"$FAKE_LOG"
+    unset FAKE_KUBE_CLUSTER_INFO
 }
 
 # Faux manage/workspace.sh du dossier : journalise ses arguments.
@@ -31,6 +32,73 @@ faux_workspace() {
 #!/usr/bin/env bash
 echo "workspace $*" >>"$FAKE_LOG"
 WS
+}
+
+# Faux kubectl et faux helm : kubectl journalise puis répond (FAKE_KUBE_
+# CLUSTER_INFO=echec → cluster-info en échec), get-contexts liste devzone.
+faux_kube() {
+    cat >"$T/bin/kubectl" <<'KUBECTL'
+#!/usr/bin/env bash
+echo "kubectl $*" >>"$FAKE_LOG"
+case "$*" in
+    *"get-contexts"*) echo devzone ;;
+    *"cluster-info"*) [ "${FAKE_KUBE_CLUSTER_INFO:-ok}" = ok ] ;;
+esac
+KUBECTL
+    cat >"$T/bin/helm" <<'HELM'
+#!/usr/bin/env bash
+echo "helm $*" >>"$FAKE_LOG"
+HELM
+    chmod +x "$T/bin/kubectl" "$T/bin/helm"
+    PATH="$T/bin:/usr/bin:/bin"
+    export PATH
+}
+
+# Cible conseil d'après mise à jour (#472) : mode kubernetes → message du
+# prochain demarrer ; Docker avec Kubernetes joignable → migrer proposé ;
+# sinon rien. Toujours code 0.
+
+@test "conseil : workspace kubernetes → message du prochain demarrer, sans kubectl" {
+    printf 'workspace=kubernetes\n' >"$T/dossier/.devzone.modules"
+    faux_kube
+    : >"$FAKE_LOG"
+    run bash "$POSTE" conseil "$T/dossier"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"prochain devzone workspace demarrer"* ]] || false
+    [ ! -s "$FAKE_LOG" ]
+}
+
+@test "conseil : docker, kubectl et helm, cluster-info ok → migrer proposé avec --context devzone" {
+    rm -f "$T/dossier/.devzone.modules"
+    faux_kube
+    : >"$FAKE_LOG"
+    run bash "$POSTE" conseil "$T/dossier"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"devzone workspace migrer"* ]] || false
+    [[ "$output" == *"devzone workspace revenir"* ]] || false
+    [[ "$(cat "$FAKE_LOG")" == *"cluster-info --request-timeout=5s --context devzone"* ]] || false
+}
+
+@test "conseil : docker, cluster-info en échec → rien" {
+    rm -f "$T/dossier/.devzone.modules"
+    FAKE_KUBE_CLUSTER_INFO=echec
+    export FAKE_KUBE_CLUSTER_INFO
+    faux_kube
+    : >"$FAKE_LOG"
+    run bash "$POSTE" conseil "$T/dossier"
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+}
+
+@test "conseil : docker sans helm dans le PATH → rien" {
+    rm -f "$T/dossier/.devzone.modules"
+    faux_kube
+    rm "$T/bin/helm"
+    : >"$FAKE_LOG"
+    run bash "$POSTE" conseil "$T/dossier"
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+    [ ! -s "$FAKE_LOG" ]
 }
 
 @test "docker (ligne absente, workspace=docker, valeur inconnue) : code 3, rien affiche ni journalise" {

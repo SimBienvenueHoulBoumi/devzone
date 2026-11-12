@@ -387,6 +387,11 @@ mettre_a_jour() {
     # 6. Nouveau manifeste, puis reconstruction proposée
     ecrire_manifeste "$dossier"
     echo "✔ devzone $pkg : mis à jour."
+    bash "$PAQUET/manage/scripts/poste.sh" conseil "$dossier" || true
+    # la mise à jour ne change jamais le mode du poste (#472)
+    if [ "$(grep -E '^workspace=' "$dossier/.devzone.modules" 2>/dev/null | tail -1)" = "workspace=kubernetes" ]; then
+        return 0
+    fi
     if [ -n "$sans" ]; then
         echo "Reconstruction non lancée (--sans-reconstruire)."
         return 0
