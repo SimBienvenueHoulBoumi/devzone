@@ -26,6 +26,12 @@ case "$*" in
     *"get pod devzone-workspace-0 "*)
         echo "${FAUX_POD:-Running}"
         ;;
+    *"get events "*)
+        echo "${FAUX_EVENEMENTS:-}"
+        ;;
+    *"get nodes "*)
+        echo "${FAUX_ARCH:-arm64}"
+        ;;
 esac
 exit 0
 KUBE
@@ -194,6 +200,20 @@ HELM
     [ "$status" -eq 1 ]
     [[ "$output" == *"introuvable"* ]] || false
     [[ "$output" == *"--image"* ]] || false
+    grep -q -- "uninstall devzone-workspace" "$T/helm.log" || false
+}
+
+@test "workspace demarrer : image sans version pour l architecture du noeud" {
+    export FAUX_CONTEXTES="docker-desktop"
+    export FAUX_POD="Pending ImagePullBackOff"
+    export FAUX_EVENEMENTS="failed to resolve reference : no match for platform in manifest list"
+    export FAUX_ARCH="arm64"
+    : >"$T/helm.log"
+    run bash "$CLI" workspace demarrer
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"sans version pour arm64"* ]] || false
+    [[ "$output" != *"introuvable"* ]] || false
+    [[ "$output" == *"amd64 et arm64"* ]] || false
     grep -q -- "uninstall devzone-workspace" "$T/helm.log" || false
 }
 

@@ -48,7 +48,7 @@ image_par_defaut() {
 
 # Attend le pod du workspace ; image introuvable ou pod lent sont dits clairement.
 attendre_pod() {
-    local image="$1" attente pas debut etat
+    local image="$1" attente pas debut etat evenements arch
     attente="${DEVZONE_WORKSPACE_ATTENTE:-120}"
     pas="${DEVZONE_WORKSPACE_PAS:-2}"
     debut="$SECONDS"
@@ -58,7 +58,21 @@ attendre_pod() {
             -o jsonpath='{.status.phase} {.status.initContainerStatuses[*].state.waiting.reason} {.status.containerStatuses[*].state.waiting.reason}' 2>/dev/null)" || true
         case "$etat" in
             *ErrImagePull* | *ImagePullBackOff*)
-                echo "✖ image $image introuvable : elle est publiée à chaque livraison de devzone." >&2
+                # shellcheck disable=SC2046
+                evenements="$(kubectl $(drapeau_kubectl) get events --namespace devzone-workspace \
+                    --field-selector involvedObject.name=devzone-workspace-0 \
+                    -o jsonpath='{.items[*].message}' 2>/dev/null)" || true
+                case "$evenements" in
+                    *"no match for platform"*)
+                        # shellcheck disable=SC2046
+                        arch="$(kubectl $(drapeau_kubectl) get nodes \
+                            -o jsonpath='{.items[0].status.nodeInfo.architecture}' 2>/dev/null)" || true
+                        echo "✖ image $image sans version pour $arch : les livraisons de devzone la publient pour amd64 et arm64." >&2
+                        ;;
+                    *)
+                        echo "✖ image $image introuvable : elle est publiée à chaque livraison de devzone." >&2
+                        ;;
+                esac
                 echo "  Pour une image construite à la main : devzone workspace demarrer --image <repository:tag>" >&2
                 # shellcheck disable=SC2046
                 helm $(drapeau_helm) uninstall devzone-workspace --namespace devzone-workspace >/dev/null 2>&1 || true
