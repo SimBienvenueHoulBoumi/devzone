@@ -5,6 +5,7 @@
 setup() {
     load migration
     migration_isole
+    export DEVZONE_WORKSPACE_ATTENTE=1 DEVZONE_WORKSPACE_PAS=0.1
 }
 
 @test "migrer : les cinq etapes, projets, identites, etat, bascule" {

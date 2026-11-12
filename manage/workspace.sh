@@ -51,9 +51,6 @@ attendre_pod() {
     local image="$1" attente pas debut etat
     attente="${DEVZONE_WORKSPACE_ATTENTE:-120}"
     pas="${DEVZONE_WORKSPACE_PAS:-2}"
-    if [ -n "${BATS_TEST_TMPDIR:-}" ] && [ -z "${DEVZONE_WORKSPACE_ATTENTE:-}" ]; then
-        attente=1
-    fi
     debut="$SECONDS"
     while [ $((SECONDS - debut)) -lt "$attente" ]; do
         # shellcheck disable=SC2046
