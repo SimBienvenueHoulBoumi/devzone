@@ -94,6 +94,8 @@ devzone disable <module>    # désactive et applique tout de suite
 
 Le choix est **propre à chaque devzone** (instance) et gardé dans le dossier `$RACINE/.devzone.modules` (monté de l'hôte, il survit aux rebuilds). Au premier démarrage d'une instance, si une connexion Claude Code ou opencode existe déjà dans les volumes, le module `ia` n'est pas activé : tout est désactivé par défaut et la connexion est signalée une seule fois (« devzone enable ia pour l'utiliser ici »), pas pour un état repris.
 
+Dans le [workspace Kubernetes](#services-de-devzone-dans-le-workspace-kubernetes), `gitlab`, `postgres` et `argocd` s'installent depuis le poste (`devzone workspace services enable <service>`) ; le pod n'affiche que leur présence dans le cluster.
+
 ### Socket Docker de l'hôte
 
 Par défaut, la feature `docker-outside-of-docker` monte le socket Docker du poste dans le conteneur : le récapitulatif affiche `⚠ socket Docker de l hôte partagé (agents compris)`. C'est ce qui permet à `docker`, Testcontainers et kind de parler au Docker de l'hôte, mais cela donne aussi au conteneur et à ses agents l'administration du Docker du poste.
@@ -257,6 +259,9 @@ devzone workspace vscode                  # marche a suivre : attache VS Code au
 devzone workspace copy-to <dossier>   # copie un dossier du poste vers les projets du pod
 devzone workspace copy-from <dossier> # copie un projet du pod vers le poste
 devzone workspace ports [demarrer|arreter|etat] # applications et services du pod sur localhost du poste
+devzone workspace services enable <service> [options]  # installe gitlab, postgres ou argocd dans le cluster
+devzone workspace services disable <service> [--oui]   # les retire
+devzone workspace services status          # présents ou non, par namespace
 devzone workspace migrate [--oui]          # copie le poste Docker vers le workspace Kubernetes
 devzone workspace revert [--rapatrier]   # retour au poste Docker
 devzone workspace clean-docker [--oui] # supprime les volumes Docker devzone-* (confirmation)
@@ -297,6 +302,15 @@ Apres `devzone workspace migrate`, `make up`, `make shell` et `make stop` pilote
 - **Port déjà pris sur le poste** (`lsof`, sinon `nc -z`) : une seule ligne « ⚠ port <n> déjà pris sur le poste, non relayé » dans `.devzone.ports-workspace/journal.log` et dans `ports etat`, sans boucle d'essais.
 - **Un seul veilleur** : verrou `mkdir` et pid dans `.devzone.ports-workspace/` du dossier devzone ; un second `demarrer` répond « déjà lancé ».
 - **Garde-fou** : le veilleur ne tourne jamais pendant les tests automatiques (faux kubectl et lsof).
+
+### Services de devzone dans le workspace Kubernetes
+
+Les modules `gitlab`, `postgres` et `argocd` vivent dans le cluster, mais le pod du workspace n'a pas de kubeconfig et son compte de service est limité à son namespace (#430) : il ne peut ni installer un service ni lire ses namespaces. Depuis #528 :
+
+- **État dans le pod** : `devzone status` juge la présence d'un service par le DNS du cluster (`gitlab-webservice-default.devzone-gitlab.svc`, `postgres.devzone-postgres.svc`, `argocd-server.devzone-argocd.svc`), comme le catalogue. Présent → `✔ module postgres active: … (postgres.devzone-postgres.svc)` ; absent → `⚠ module gitlab not in the cluster: on the workstation, devzone workspace services enable gitlab` (module actif dans `.devzone.modules`) ou `○ module … optional` (inactif). Aucun « en échec » venu d'un installeur : la marque d'échec n'est pas lue dans le pod. `devzone status --json` porte les mêmes valeurs (`etat`, `commande`, `echec` à `null`).
+- **Démarrage du pod** : `devzone apply` (lancé par `workspace-init.sh`) n'installe plus ces services ; il l'écrit (« installed from the workstation ») et efface les marques d'échec des anciens démarrages. Dans le pod, `devzone enable gitlab` ou `devzone disable postgres` refusent (code 2) et renvoient à la commande du poste, sans toucher l'état.
+- **Installation depuis le poste** : `devzone workspace services enable <service> [options]` (les options de `devzone enable`, par exemple `--contexte CTX` pour postgres) et `devzone workspace services disable <service> [--oui]` (`--oui` indispensable : pas de terminal dans le pod pour confirmer). Le poste crée un ServiceAccount `devzone-services-admin` dans `devzone-workspace`, lié à `cluster-admin` le temps de l'opération, lui demande un jeton d'une heure (`kubectl create token`, kubectl 1.24 ou plus) puis lance l'installeur habituel **dans le pod du workspace** (`kubectl exec`, script `.devcontainer/services-admin.sh`) : le jeton passe sur l'entrée standard, jamais en argument ni affiché, et ne vit que dans un kubeconfig temporaire du pod (droits 600, contextes `devzone-admin` et `devzone`), supprimé à la fin. L'état et les secrets (`workspace/.postgres/`, `workspace/.gitlab/`, `workspace/.argocd/` sous `/workspaces/projets`) restent dans le pod, comme sur le poste Docker. À la fin, même en échec : relais du pod arrêtés (l'accès passe par le DNS du cluster et `devzone workspace ports`), ligne `cluster=` de l'état remise comme avant, ServiceAccount et ClusterRoleBinding supprimés. `devzone workspace services status` dit, par namespace, ce qui est installé.
+- **Hors périmètre** : Argo CD comme source des services (#516) ; `mysql` et le catalogue (déjà par DNS, #515) ; les commandes `devzone postgres creer …` dans le pod, qui demandent encore un kubeconfig.
 
 ### Construire une image dans le workspace
 

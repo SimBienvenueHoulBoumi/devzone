@@ -106,7 +106,19 @@ etat_json() {
         echec_val=""
         etat_val=""
         commande_val=""
-        if [ "$actif" = true ]; then
+        if dans_pod && service_module "$m"; then
+            # Kubernetes workspace pod (#528): presence by the cluster DNS,
+            # installation from the workstation; no failure marker read here
+            if service_present "$m"; then
+                etat_val="active: $(service_dns "$m")"
+            elif [ "$actif" = true ]; then
+                etat_val="not in the cluster"
+                commande_val="devzone workspace services enable $m"
+            else
+                etat_val="facultatif"
+                commande_val="devzone workspace services enable $m"
+            fi
+        elif [ "$actif" = true ]; then
             ef="$(fichier_echec "$m")"
             if [ -f "$ef" ]; then
                 content="$(cat "$ef" 2>/dev/null || true)"

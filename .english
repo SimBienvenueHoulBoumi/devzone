@@ -8,6 +8,10 @@ manage/test/shard.sh
 manage/test/shard.bats
 .devcontainer/workspace-build.sh
 manage/test/workspace-build.bats
+.devcontainer/services-admin.sh
+manage/scripts/services-workspace.sh
+manage/test/services-pod.bats
+manage/test/workspace-services.bats
 charts/devzone-workspace/Chart.yaml
 charts/devzone-workspace/values.yaml
 charts/devzone-workspace/templates/_helpers.tpl
