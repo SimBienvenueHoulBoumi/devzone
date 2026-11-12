@@ -84,6 +84,8 @@ setup() {
     run bash "$SCRIPT" synthese true success cancelled success success success success
     [ "$status" -ne 0 ]
     [[ "$output" == *"fonctionnel"*"cancelled"* ]] || false
+    # Un job coupé par son délai finit aussi en cancelled (#522)
+    [[ "$output" == *"timeout or cancelled"* ]] || false
 }
 
 @test "synthese : job sauté alors qu'il fallait tester → échec" {
@@ -126,12 +128,14 @@ setup() {
 @test "fonctionnel.yml : job bats sur ubuntu et macOS (bash 3.2), sur chaque PR sans décision par chemin" {
     bloc="$(awk '/^  bats:/ { dans = 1; print; next } dans && /^  [a-z0-9-]+:/ { exit } dans { print }' "$WORKFLOW")"
     [ -n "$bloc" ]
-    [[ "$bloc" == *"os: [ubuntu-latest, macos-latest]"* ]] || false
+    [[ "$bloc" == *"os: ubuntu-latest, shard: 1, total: 4"* ]] || false
+    [[ "$bloc" == *"os: ubuntu-latest, shard: 4, total: 4"* ]] || false
+    [[ "$bloc" == *"os: macos-latest"* ]] || false
     [[ "$bloc" == *'runs-on: ${{ matrix.os }}'* ]] || false
     [[ "$bloc" != *"needs.changements"* ]] || { echo "bats doit tourner sur chaque PR"; false; }
     [[ "$bloc" == *"bats@"* ]] || false
-    # ubuntu : toute la suite ; macOS : /bin/bash (3.2) en tête du PATH, vérifié
-    [[ "$bloc" == *"bats manage/test/"* ]] || false
+    # ubuntu : toute la suite en quatre lots (#522) ; macOS : /bin/bash (3.2) en tête du PATH, vérifié
+    [[ "$bloc" == *'manage/test/shard.sh "$SHARD" "$TOTAL"'* ]] || false
     [[ "$bloc" == *"ln -s /bin/bash"* ]] || false
     [[ "$bloc" == *'BASH_VERSINFO[0]}" = 3'* ]] || false
     for f in cli.bats versions.bats ci-conteneur.bats agent.bats agent-ecarts.bats; do

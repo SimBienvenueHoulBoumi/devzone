@@ -4,3 +4,5 @@
 manage/scripts/check-english.sh
 manage/test/command-aliases.bats
 manage/test/check-english.bats
+manage/test/shard.sh
+manage/test/shard.bats
