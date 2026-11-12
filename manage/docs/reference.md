@@ -300,7 +300,7 @@ Apres `devzone workspace migrer`, `make up`, `make shell` et `make stop` piloten
 
 ### Construire une image dans le workspace
 
-Dans le pod Kubernetes (`DEVZONE_WORKSPACE=kubernetes`), le client BuildKit `buildctl` (même version que le sidecar `buildkitd`) est installé dans l'image et parle au sidecar via `BUILDKIT_HOST=tcp://127.0.0.1:1234` (#514, archive officielle https://github.com/moby/buildkit/releases/tag/v0.34.2).
+Dans le pod du workspace Kubernetes, le client BuildKit `buildctl` (même version que le sidecar `buildkitd`) est installé dans l'image et parle au sidecar BuildKit du pod (#514, archive officielle https://github.com/moby/buildkit/releases/tag/v0.34.2).
 
 ```bash
 devzone build <dossier> [--tag <nom>]
