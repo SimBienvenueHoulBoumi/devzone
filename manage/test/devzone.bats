@@ -209,6 +209,15 @@ GH
     [[ "$output" == *"make rebuild"* ]] || false
 }
 
+@test "état : DEVZONE_WORKSPACE=kubernetes → pas d'avertissement socket Docker, ligne workspace Kubernetes pod" {
+    : >"$DEVZONE_RELAIS_SOURCE"
+    export DEVZONE_WORKSPACE=kubernetes
+    run bash "$DEVZONE"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Kubernetes pod, service account access only (no Docker socket)"* ]] || false
+    ! grep -q '⚠ socket Docker de l hôte' <<<"$output" || false
+}
+
 @test "état : identité git absente → nécessaire, avec les deux voies" {
     run bash "$DEVZONE"
     [[ "$output" == *"✖ identité git"*"gh auth login -s workflow"* ]] || false
