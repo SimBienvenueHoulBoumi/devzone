@@ -149,6 +149,29 @@ attendre_nohup() {
     attendre_nohup '8443:443'
 }
 
+@test "argocd app add : Application of the project applied with the devzone context (#516)" {
+    argocd_installe
+    run bash "$DEVZONE" argocd app add https://github.com/argoproj/argocd-example-apps guestbook
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"✔ Application app-argocd-example-apps"* ]] || false
+    grep -q 'kind: Application' "$BATS_TEST_TMPDIR/apply.log"
+    grep -q 'name: app-argocd-example-apps' "$BATS_TEST_TMPDIR/apply.log"
+    grep -q 'devzone.io/kind: project' "$BATS_TEST_TMPDIR/apply.log"
+    grep -q 'path: guestbook' "$BATS_TEST_TMPDIR/apply.log"
+    grep -q 'namespace: devzone-app-argocd-example-apps' "$BATS_TEST_TMPDIR/apply.log"
+    grep -q -- '--context devzone apply -f -' "$BATS_TEST_TMPDIR/kubectl.log"
+}
+
+@test "argocd app : module inactif refusé, et renvoi au poste dans le pod du workspace" {
+    run bash "$DEVZONE" argocd app list
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"devzone enable argocd"* ]] || false
+    argocd_installe
+    run env DEVZONE_WORKSPACE=kubernetes bash "$DEVZONE" argocd app list
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"devzone workspace argocd app list"* ]] || false
+}
+
 @test "desactiver argocd : helm uninstall, namespace supprimé, services conservés" {
     argocd_installe
     run bash "$DEVZONE" desactiver argocd

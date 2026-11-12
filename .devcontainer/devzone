@@ -23,6 +23,7 @@
 #   devzone gitlab nouveau-mdp [root|dev]  mot de passe aléatoire (root ou dev) régénéré
 #   devzone activer argocd           Argo CD dans le cluster des services, accès https://127.0.0.1:8443
 #   devzone argocd etat|relais-lancer|relais-arreter  Argo CD (module argocd)
+#   devzone argocd app add <repo url> [path]|list|remove <N>  projets déployés par Argo CD (#516)
 #   devzone cluster [CTX] [--oui] [--confirmer CTX]  cluster des services de devzone, ou en changer
 #   devzone port [<n>|--fermer <n>]  relais d'un port du conteneur vers le poste
 #   devzone mots-de-passe           régénère .password et affiche son chemin

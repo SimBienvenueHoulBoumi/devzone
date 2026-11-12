@@ -91,6 +91,16 @@ services_run() {
         echo "✖ unknown service: ${service:-(none)} ($(services_usage))" >&2
         return 1
     fi
+    # Argo CD itself, and postgres when Argo CD holds the devzone charts: done
+    # by the workstation, no installer in the pod (#516)
+    if [ "$service" = argocd ]; then
+        argocd_toggle "$action" "$@"
+        return
+    fi
+    if [ "$service" = postgres ] && argocd_holds_charts; then
+        postgres_argocd "$action" "$@"
+        return
+    fi
     if ! services_pod_running; then
         echo "✖ workspace pod $POD not running: devzone workspace start" >&2
         return 1

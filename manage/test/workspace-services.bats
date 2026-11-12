@@ -35,6 +35,9 @@ exit 0
 KUBE
     chmod +x "$T/bin/kubectl"
     export PATH="$T/bin:$PATH"
+    # Devzone folder of the workstation: its own state, Argo CD off (#516)
+    cd "$T" || return 1
+    printf 'workspace=kubernetes\nargocd=off\n' >"$T/.devzone.modules"
 }
 
 @test "services enable gitlab: administrator applied, token on stdin only, installer in the pod, administrator removed" {
@@ -65,7 +68,7 @@ KUBE
 
 @test "services enable: pod not running, nothing applied" {
     export FAUX_POD=Pending
-    run bash "$CLI" workspace services enable argocd
+    run bash "$CLI" workspace services enable gitlab
     [ "$status" -eq 1 ]
     [[ "$output" == *"not running: devzone workspace start"* ]] || false
     [ ! -f "$T/apply.yaml" ]

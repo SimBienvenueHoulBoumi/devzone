@@ -77,6 +77,16 @@ demarrer() {
         esac
     done
     image="$depot:$tag"
+    # Argo CD first when wanted (#516): the workspace is then an Application
+    argocd_ensure
+    workspace_deploy "$depot" "$tag" "$avec_image"
+    attendre_pod "$image" || return 1
+    ports_demarrer silence
+}
+
+# helm direct: the chart of the package, image set by the options
+workspace_helm_deploy() {
+    local depot="$1" tag="$2" avec_image="$3" args=()
     args=(--namespace devzone-workspace --create-namespace)
     if [ -n "$avec_image" ]; then
         args+=(--set "image.repository=$depot" --set "image.tag=$tag")
@@ -90,15 +100,12 @@ demarrer() {
     fi
     # shellcheck disable=SC2046
     helm $(drapeau_helm) upgrade --install devzone-workspace "$(chemin_chart)" "${args[@]}"
-    attendre_pod "$image" || return 1
-    ports_demarrer silence
 }
 
-# Désinstalle le workspace du cluster.
+# Désinstalle le workspace du cluster (Application Argo CD ou release helm).
 arreter() {
     ports_arreter
-    # shellcheck disable=SC2046
-    helm $(drapeau_helm) uninstall devzone-workspace --namespace devzone-workspace
+    workspace_undeploy
 }
 
 # Affiche l'état des pods du workspace.
@@ -171,6 +178,10 @@ copier_depuis() {
 . "$ICI/scripts/ports-workspace.sh"
 # shellcheck source=scripts/services-workspace.sh
 . "$ICI/scripts/services-workspace.sh"
+# shellcheck source=scripts/argocd-workspace.sh
+. "$ICI/scripts/argocd-workspace.sh"
+# shellcheck source=scripts/argocd-services.sh
+. "$ICI/scripts/argocd-services.sh"
 
 # English command names are accepted, French ones unchanged (#502).
 # A copied devzone may miss the aliases file: then no normalization.
@@ -196,18 +207,21 @@ case "${1:-}" in
     revenir) revenir "${@:2}" ;;
     nettoyer-docker) nettoyer_docker "${@:2}" ;;
     services) services "${@:2}" ;;
+    argocd) argocd_cmd "${@:2}" ;;
     '' | -h | --help | aide)
-        echo "devzone workspace demarrer|arreter|etat|shell|vscode|copier-vers|copier-depuis|ports|services|migrer|revenir|nettoyer-docker"
+        echo "devzone workspace demarrer|arreter|etat|shell|vscode|copier-vers|copier-depuis|ports|services|argocd|migrer|revenir|nettoyer-docker"
         echo "  demarrer [--image dépôt:tag]  installe le workspace (image de la version de devzone par défaut)"
         echo "  ports [demarrer|arreter|etat] applications et services du pod sur localhost du poste"
         echo "  services enable|disable <service> [options] | status"
         echo "                        devzone services (gitlab, postgres, argocd) of the cluster, installed from the workstation"
+        echo "  argocd status | app add <repo url> [path] [--name N] [--revision R] | app list | app remove <N>"
+        echo "                        Argo CD of the workspace: deployments held in Git, your projects as Applications"
         echo "  migrer [--oui]        copie le poste Docker vers le workspace Kubernetes (rien n'est supprimé)"
         echo "  revenir [--rapatrier] retour au poste Docker ; --rapatrier : projets du pod recopiés d'abord"
         echo "  nettoyer-docker       supprime les volumes Docker devzone-*, après confirmation [o/N] (--oui)"
         ;;
     *)
-        echo "✖ sous-commande inconnue : $1 (devzone workspace demarrer|arreter|etat|shell|vscode|copier-vers|copier-depuis|ports|services|migrer|revenir|nettoyer-docker)" >&2
+        echo "✖ sous-commande inconnue : $1 (devzone workspace demarrer|arreter|etat|shell|vscode|copier-vers|copier-depuis|ports|services|argocd|migrer|revenir|nettoyer-docker)" >&2
         exit 1
         ;;
 esac

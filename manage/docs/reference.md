@@ -262,6 +262,8 @@ devzone workspace ports [demarrer|arreter|etat] # applications et services du po
 devzone workspace services enable <service> [options]  # installe gitlab, postgres ou argocd dans le cluster
 devzone workspace services disable <service> [--oui]   # les retire
 devzone workspace services status          # présents ou non, par namespace
+devzone workspace argocd status            # Argo CD et ses Applications (#516)
+devzone workspace argocd app add <dépôt> [chemin] | app list | app remove <N>  # projets déployés par Argo CD
 devzone workspace migrate [--oui]          # copie le poste Docker vers le workspace Kubernetes
 devzone workspace revert [--rapatrier]   # retour au poste Docker
 devzone workspace clean-docker [--oui] # supprime les volumes Docker devzone-* (confirmation)
@@ -298,7 +300,7 @@ Apres `devzone workspace migrate`, `make up`, `make shell` et `make stop` pilote
 `devzone workspace start` lance un veilleur sur le poste (`manage/scripts/ports-workspace.sh`), `devzone workspace stop` l'arrête avec tous ses `kubectl port-forward`. `devzone workspace ports [demarrer|arreter|etat]` le pilote seul.
 
 - **Pod** : toutes les 3 s, `kubectl exec` dans le pod lit `ss -ltnH`. Chaque port TCP en écoute ≥ 1024 (hors kubedock 2475 et BuildKit 1234) est relayé vers `127.0.0.1:<même port>` du poste, jamais sur le réseau local (`--address 127.0.0.1`). Un serveur lancé dans le pod (`npm run dev`) est donc joignable sur http://localhost:5173 sans commande ; le port qui disparaît voit son relais arrêté.
-- **Services de devzone** : avec le module `postgres` actif dans `.devzone.modules`, `svc/postgres` du namespace `devzone-postgres` est relayé sur `127.0.0.1:5432`, et pgAdmin (`svc/pgadmin`) s'il existe, par le même mécanisme. Avec le module `mysql` actif, `svc/mysql` du namespace `devzone-mysql` est relayé sur `127.0.0.1:3306`.
+- **Services de devzone** : avec le module `postgres` actif dans `.devzone.modules`, `svc/postgres` du namespace `devzone-postgres` est relayé sur `127.0.0.1:5432`, et pgAdmin (`svc/pgadmin`) s'il existe, par le même mécanisme. Avec le module `mysql` actif, `svc/mysql` du namespace `devzone-mysql` est relayé sur `127.0.0.1:3306`. Quand Argo CD est installé (et `argocd` n'est pas `off`), le port https de `svc/argocd-server` est relayé sur `127.0.0.1:8443` (#516).
 - **Port déjà pris sur le poste** (`lsof`, sinon `nc -z`) : une seule ligne « ⚠ port <n> déjà pris sur le poste, non relayé » dans `.devzone.ports-workspace/journal.log` et dans `ports etat`, sans boucle d'essais.
 - **Un seul veilleur** : verrou `mkdir` et pid dans `.devzone.ports-workspace/` du dossier devzone ; un second `demarrer` répond « déjà lancé ».
 - **Garde-fou** : le veilleur ne tourne jamais pendant les tests automatiques (faux kubectl et lsof).
@@ -309,7 +311,7 @@ Les modules `gitlab`, `postgres` et `argocd` vivent dans le cluster, mais le pod
 
 - **État dans le pod** : `devzone status` juge la présence d'un service par le DNS du cluster (`gitlab-webservice-default.devzone-gitlab.svc`, `postgres.devzone-postgres.svc`, `argocd-server.devzone-argocd.svc`), comme le catalogue. Présent → `✔ module postgres active: … (postgres.devzone-postgres.svc)` ; absent → `⚠ module gitlab not in the cluster: on the workstation, devzone workspace services enable gitlab` (module actif dans `.devzone.modules`) ou `○ module … optional` (inactif). Aucun « en échec » venu d'un installeur : la marque d'échec n'est pas lue dans le pod. `devzone status --json` porte les mêmes valeurs (`etat`, `commande`, `echec` à `null`).
 - **Démarrage du pod** : `devzone apply` (lancé par `workspace-init.sh`) n'installe plus ces services ; il l'écrit (« installed from the workstation ») et efface les marques d'échec des anciens démarrages. Dans le pod, `devzone enable gitlab` ou `devzone disable postgres` refusent (code 2) et renvoient à la commande du poste, sans toucher l'état.
-- **Installation depuis le poste** : `devzone workspace services enable <service> [options]` (les options de `devzone enable`, par exemple `--contexte CTX` pour postgres) et `devzone workspace services disable <service> [--oui]` (`--oui` indispensable : pas de terminal dans le pod pour confirmer). Le poste crée un ServiceAccount `devzone-services-admin` dans `devzone-workspace`, lié à `cluster-admin` le temps de l'opération, lui demande un jeton d'une heure (`kubectl create token`, kubectl 1.24 ou plus) puis lance l'installeur habituel **dans le pod du workspace** (`kubectl exec`, script `.devcontainer/services-admin.sh`) : le jeton passe sur l'entrée standard, jamais en argument ni affiché, et ne vit que dans un kubeconfig temporaire du pod (droits 600, contextes `devzone-admin` et `devzone`), supprimé à la fin. L'état et les secrets (`workspace/.postgres/`, `workspace/.gitlab/`, `workspace/.argocd/` sous `/workspaces/projets`) restent dans le pod, comme sur le poste Docker. À la fin, même en échec : relais du pod arrêtés (l'accès passe par le DNS du cluster et `devzone workspace ports`), ligne `cluster=` de l'état remise comme avant, ServiceAccount et ClusterRoleBinding supprimés. `devzone workspace services status` dit, par namespace, ce qui est installé.
+- **Installation depuis le poste** : `devzone workspace services enable <service> [options]` (les options de `devzone enable`, par exemple `--contexte CTX` pour postgres) et `devzone workspace services disable <service> [--oui]` (`--oui` indispensable : pas de terminal dans le pod pour confirmer). Le poste crée un ServiceAccount `devzone-services-admin` dans `devzone-workspace`, lié à `cluster-admin` le temps de l'opération, lui demande un jeton d'une heure (`kubectl create token`, kubectl 1.24 ou plus) puis lance l'installeur habituel **dans le pod du workspace** (`kubectl exec`, script `.devcontainer/services-admin.sh`) : le jeton passe sur l'entrée standard, jamais en argument ni affiché, et ne vit que dans un kubeconfig temporaire du pod (droits 600, contextes `devzone-admin` et `devzone`), supprimé à la fin. L'état et les secrets (`workspace/.postgres/`, `workspace/.gitlab/`, `workspace/.argocd/` sous `/workspaces/projets`) restent dans le pod, comme sur le poste Docker. À la fin, même en échec : relais du pod arrêtés (l'accès passe par le DNS du cluster et `devzone workspace ports`), ligne `cluster=` de l'état remise comme avant, ServiceAccount et ClusterRoleBinding supprimés. `devzone workspace services status` dit, par namespace, ce qui est installé. Depuis #516, `argocd` est installé ou retiré par le poste lui-même (helm), et `postgres` passe par une Application Argo CD quand Argo CD est actif (voir [Argo CD dans le workspace Kubernetes](#argo-cd-dans-le-workspace-kubernetes)).
 - **Hors périmètre** : Argo CD comme source des services (#516) ; `mysql` et le catalogue (déjà par DNS, #515) ; les commandes `devzone postgres creer …` dans le pod, qui demandent encore un kubeconfig.
 
 ### Construire une image dans le workspace
@@ -444,19 +446,45 @@ devzone mysql supprimer-donnees [--oui]  # supprime le namespace et les volumes 
 
 ## Argo CD
 
-Le module `argocd` fournit Argo CD sur le [cluster de devzone](#cluster-de-devzone). L'étape A installe le module ; les Applications (services et workspace) viendront après #401.
+Le module `argocd` fournit Argo CD sur le [cluster de devzone](#cluster-de-devzone). Sur le poste Docker, c'est un module comme les autres (ci-dessous) ; dans le [workspace Kubernetes](#argo-cd-dans-le-workspace-kubernetes), Argo CD est installé d'office et tient les déploiements de devzone (#516).
 
 ```bash
 devzone enable argocd      # installe Argo CD dans le cluster des services
 devzone disable argocd   # désinstalle Argo CD, les autres services restent
 devzone argocd etat         # état du module
+devzone argocd app add <dépôt> [chemin] [--name N] [--revision R] [--namespace NS]  # un projet déployé par Argo CD
+devzone argocd app list     # Applications des projets, synchronisation et santé
+devzone argocd app remove <N>  # retire l'Application et ses ressources
 ```
 
 - **Ce qui est installé** : chart `argo/argo-cd` en version figée (`10.14.0`), namespace `devzone-argocd` étiqueté `app.kubernetes.io/managed-by=devzone` et isolé par NetworkPolicy. Valeurs minimales (`.devcontainer/argocd/values.yaml`) : un réplica par composant, sans Dex ni notifications, serveur en `ClusterIP`, sans Ingress ni LoadBalancer.
 - **Mémoire** : l'installation est refusée sous environ 1 Go de mémoire allouable dans le cluster, avec le message pour l'agrandir.
-- **Accès** : un relais `kubectl port-forward` rend l'interface joignable sur https://127.0.0.1:8443 **dans le conteneur** (`ARGOCD_PORT` pour un autre port) ; relancé à chaque démarrage et par `devzone apply`. Sur le poste, l'accès passera par #401. PID et journal : `workspace/.argocd/relais.*`.
+- **Accès** : un relais `kubectl port-forward` rend l'interface joignable sur https://127.0.0.1:8443 **dans le conteneur** (`ARGOCD_PORT` pour un autre port) ; relancé à chaque démarrage et par `devzone apply`. PID et journal : `workspace/.argocd/relais.*`.
+- **Projets** : `devzone argocd app add <dépôt> [chemin]` déclare une Application `app-<N>` (nom tiré du dépôt, ou `--name`), révision `HEAD` (ou `--revision`), ressources dans le namespace `devzone-app-<N>` (ou `--namespace`), synchronisation automatique avec `prune` et `selfHeal`. Dépôts publics ; les identifiants de dépôts privés viendront avec le lot B de #516. Le compte limité (#430) gère ces Applications grâce aux rôles agrégés du chart (`createAggregateRoles`).
 - **Mot de passe** : lu dans le Secret `argocd-initial-admin-secret`, rangé dans `workspace/.argocd/admin.env` (600) puis repris dans [`.password`](#identifiants-regroupés) ; utilisateur `admin`, jamais affiché.
 - **Désactivation** : `helm uninstall` de la release et suppression du namespace `devzone-argocd`, puis de `workspace/.argocd/` ; **les autres services restent**, sous helm direct.
+
+### Argo CD dans le workspace Kubernetes
+
+En mode workspace Kubernetes, Argo CD devient le moyen de déploiement de devzone (#516). Tout se pilote depuis le poste (`manage/scripts/argocd-workspace.sh`, `argocd-services.sh`), qui a les droits d'administrateur du cluster ; le pod n'en a pas.
+
+```bash
+devzone workspace start                      # installe Argo CD s'il manque, puis le workspace (Application)
+devzone workspace services enable argocd     # installe Argo CD (ou le réinstalle) depuis le poste
+devzone workspace services disable argocd    # le retire ; les services restent, sous helm direct
+devzone workspace argocd status              # installé ou non, Applications (synchronisation, santé, révision)
+devzone workspace argocd app add <dépôt> [chemin] [--name N] [--revision R] [--namespace NS]
+devzone workspace argocd app list | app remove <N>
+```
+
+- **D'office** : `devzone workspace start` installe Argo CD (chart `argo/argo-cd` figé, `.devcontainer/argocd/values.yaml`, au moins 1 Go de mémoire allouable, sinon un avertissement et le workspace part en helm direct) **sauf** si `.devzone.modules` du poste porte `argocd=off`. `services disable argocd` écrit cette ligne ; `services enable argocd` la remet à `on`.
+- **Mot de passe et interface** : le mot de passe `admin` est lu dans `argocd-initial-admin-secret`, rangé dans `workspace/.argocd/admin.env` du **poste** (600) et dans [`.password`](#identifiants-regroupés) du poste ; jamais affiché. Le [veilleur des ports](#ports-vers-le-poste) relaie le port https du service `argocd-server` sur `https://localhost:8443` (127.0.0.1 seulement, certificat auto-signé à accepter).
+- **Le workspace est une Application** : `devzone workspace start` crée l'Application `devzone-workspace` (chart `charts/devzone-workspace` du dépôt devzone public, révision `v<version du paquet>`, paramètres `image.tag`, `image.repository` avec `--image`, `image.pullPolicy=Always` pour `latest`) à la place de `helm upgrade --install`. Une release helm existante est **adoptée** : ses secrets de release sont supprimés, aucune ressource n'est touchée, le pod ne redémarre pas. `devzone workspace stop` supprime l'Application (le pod part, les volumes restent) ; sans Application, `helm uninstall` comme avant. Un **clone de développement** (version `0.0.0`) reste en helm direct, car son chart local n'est pas dans Git ; `DEVZONE_ARGOCD_REVISION=<branche>` force une révision (essais).
+- **PostgreSQL par Argo CD** : avec Argo CD actif, `devzone workspace services enable postgres` crée le namespace `devzone-postgres` (étiqueté, isolé par NetworkPolicy), le secret `postgres-admin` **à part** (mot de passe généré sur le poste, ou relu dans un secret existant ; miroir `workspace/.postgres/admin-password` du poste, `.password` mis à jour), puis l'Application `devzone-postgres` (chart `charts/devzone-postgres`, mêmes objets que `postgres.yaml` : une installation existante est adoptée sans recréation). `selfHeal` recrée ce qui est supprimé à la main. `disable postgres --oui` supprime l'Application, le namespace et toutes les bases. Sans Argo CD, le chemin de #528 (installeur dans le pod) reste.
+- **Projets** : mêmes commandes que dans le conteneur, préfixées par `devzone workspace argocd`.
+- **Secrets hors de Git** : les secrets Kubernetes sont créés par devzone, jamais dans le dépôt ; les Applications ne font que les référencer. Pas d'opérateur supplémentaire (Sealed Secrets, External Secrets) : un poste de développement n'a pas de coffre central, et devzone range déjà ses mots de passe dans `.password`.
+- **Retrait** : `services disable argocd` retire d'abord le finaliseur de chaque Application puis la supprime **sans cascade** (les ressources restent), désinstalle la release et le namespace ; les services continuent sous helm direct.
+- **Lot B** (ticket à part) : Applications `gitlab` et `mysql`, dépôts privés et GitLab de devzone, Applications des services sur le poste Docker.
 
 ## Ports vers le poste
 

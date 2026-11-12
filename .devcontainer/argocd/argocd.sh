@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Module argocd (#411) : Argo CD dans le cluster des services de devzone.
 #   argocd.sh installer | desinstaller | etat | relais-lancer | relais-arreter
+#   argocd.sh app add <repo url> [path] [--name N] [--revision R] | app list | app remove <N>
 # Namespace devzone-argocd isolé, relais 127.0.0.1:8443 dans le conteneur.
 # Mot de passe admin dans workspace/.argocd/admin.env (600), repris dans
 # .password ; jamais affiché.
@@ -195,14 +196,30 @@ relais() {
     fi
 }
 
+# Applications of the projects (#516): shared with the workstation (apps.sh),
+# here with the limited devzone context (aggregate roles of the chart)
+APPS_CMD="devzone argocd app"
+APPS_GENERATOR="$ICI/application.sh"
+# shellcheck source=SCRIPTDIR/apps.sh
+# shellcheck disable=SC1091
+. "$ICI/apps.sh"
+argocd_kubectl() { kubectl --context devzone "$@"; }
+
 case "${1:-}" in
     installer) installer ;;
     desinstaller) desinstaller ;;
     etat) etat ;;
     relais-lancer) relais ;;
     relais-arreter) relais_arreter argocd ;;
+    app)
+        if [ "${DEVZONE_WORKSPACE:-}" = kubernetes ]; then
+            refuse "in the workspace pod, on the workstation: devzone workspace argocd app ${*:2}"
+        fi
+        installe || refuse "module inactif : devzone enable argocd"
+        argocd_app "${@:2}"
+        ;;
     *)
-        echo "devzone argocd : installer | desinstaller | etat" >&2
+        echo "devzone argocd : installer | desinstaller | etat | app add|list|remove" >&2
         exit 1
         ;;
 esac
