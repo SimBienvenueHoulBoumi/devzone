@@ -192,12 +192,20 @@ jobs:
   # CI (commande npm, lancer.sh, docker.sh, desinstaller.sh, versions.sh,
   # ci-conteneur.sh) ; devzone.bats teste la commande du conteneur (Linux)
   bats:
+    # Whole suite on ubuntu split into four shards (manage/test/shard.sh):
+    # in one job it went past its timeout as the suite grew (#522)
+    name: bats (${{ matrix.os }}${{ matrix.shard && format(' {0}/{1}', matrix.shard, matrix.total) || '' }})
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        include:
+          - { os: ubuntu-latest, shard: 1, total: 4 }
+          - { os: ubuntu-latest, shard: 2, total: 4 }
+          - { os: ubuntu-latest, shard: 3, total: 4 }
+          - { os: ubuntu-latest, shard: 4, total: 4 }
+          - { os: macos-latest }
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
       - name: bash 3.2 du système en tête du PATH (macOS)
@@ -206,9 +214,15 @@ jobs:
           mkdir -p "$RUNNER_TEMP/bash32"
           ln -s /bin/bash "$RUNNER_TEMP/bash32/bash"
           echo "$RUNNER_TEMP/bash32" >>"$GITHUB_PATH"
-      - name: bats manage/test/ (ubuntu)
+      - name: bats manage/test/ (ubuntu, shard)
         if: runner.os == 'Linux'
-        run: npx --yes bats@1.10.0 manage/test/
+        env:
+          SHARD: ${{ matrix.shard }}
+          TOTAL: ${{ matrix.total }}
+        run: |
+          # One file name per line, no spaces: word splitting is wanted here
+          # shellcheck disable=SC2046
+          npx --yes bats@1.10.0 $(bash manage/test/shard.sh "$SHARD" "$TOTAL")
       - name: bats des scripts de l'hôte sous bash 3.2 (macOS)
         if: runner.os == 'macOS'
         run: |

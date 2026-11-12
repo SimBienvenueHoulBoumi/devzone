@@ -30,6 +30,10 @@ a_tester() {
 job_reussi() {
     if [ "$2" = success ]; then
         echo "✔ $1 : success"
+    elif [ "$2" = cancelled ]; then
+        # A job past its timeout also ends as cancelled (#522)
+        echo "✖ $1 : cancelled (timeout or cancelled run: see the job duration)"
+        return 1
     else
         echo "✖ $1 : $2"
         return 1
