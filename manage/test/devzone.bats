@@ -100,22 +100,27 @@ if [ "${1:-}" = view ]; then
     [ -n "${NPM_PUBLIEE:-}" ] && printf '%s\n' "$NPM_PUBLIEE"
     exit 0
 fi
-if [ "${1:-}" = install ] && [[ " $* " == *" opencode-ai@"* ]]; then
+if [ "${1:-}" = install ]; then
     sleep "${NPM_DUREE:-0}"
-    n="$(grep -c "^npm install.* opencode-ai@" "$NPM_LOG")"
-    if [ "${NPM_ECHEC:-0}" = 1 ] || [ "$n" -le "${NPM_IA_ECHECS:-0}" ]; then
-        mkdir -p "$HOME/.npm/_logs"
-        echo "error code EBADPLATFORM" >"$HOME/.npm/_logs/2026-10-24T11_46_18_245Z-debug-0.log"
-        echo "npm error A complete log of this run can be found in: $HOME/.npm/_logs/2026-10-24T11_46_18_245Z-debug-0.log" >&2
-        exit 1
+    if [[ " $* " == *"claude-code@"* ]]; then
+        printf '#!/usr/bin/env bash\necho "2.1.0 (Claude Code)"\n' >"$NPM_BIN/claude"
+        chmod +x "$NPM_BIN/claude"
     fi
-    printf '#!/usr/bin/env bash\necho "2.1.0 (Claude Code)"\n' >"$NPM_BIN/claude"
-    if [ "$n" -gt "${NPM_IA_SANS_BINAIRE:-0}" ]; then
-        printf '#!/usr/bin/env bash\necho 1.0.0\n' >"$NPM_BIN/opencode"
-    else
-        printf '#!/usr/bin/env bash\necho "binaire absent" >&2\nexit 1\n' >"$NPM_BIN/opencode"
+    if [[ " $* " == *" opencode-ai@"* ]]; then
+        n="$(grep -c "^npm install.* opencode-ai@" "$NPM_LOG")"
+        if [ "${NPM_ECHEC:-0}" = 1 ] || [ "$n" -le "${NPM_IA_ECHECS:-0}" ]; then
+            mkdir -p "$HOME/.npm/_logs"
+            echo "error code EBADPLATFORM" >"$HOME/.npm/_logs/2026-10-24T11_46_18_245Z-debug-0.log"
+            echo "npm error A complete log of this run can be found in: $HOME/.npm/_logs/2026-10-24T11_46_18_245Z-debug-0.log" >&2
+            exit 1
+        fi
+        if [ "$n" -gt "${NPM_IA_SANS_BINAIRE:-0}" ]; then
+            printf '#!/usr/bin/env bash\necho 1.0.0\n' >"$NPM_BIN/opencode"
+        else
+            printf '#!/usr/bin/env bash\necho "binaire absent" >&2\nexit 1\n' >"$NPM_BIN/opencode"
+        fi
+        chmod +x "$NPM_BIN/opencode"
     fi
-    chmod +x "$NPM_BIN/claude" "$NPM_BIN/opencode"
 fi
 if [ "${1:-}" = ls ] && [ "${2:-}" = -g ]; then
     printf '{"dependencies":{'
@@ -287,7 +292,8 @@ GH
 @test "activer ia : installe les versions figées, état gardé" {
     run bash "$DEVZONE" activer ia
     [ "$status" -eq 0 ]
-    grep -qE "install -g .* @anthropic-ai/claude-code@[0-9.]+ opencode-ai@[0-9.]+$" "$BATS_TEST_TMPDIR/npm.log"
+    grep -qE "install -g .* @anthropic-ai/claude-code@[0-9.]+$" "$BATS_TEST_TMPDIR/npm.log"
+    grep -qE "install -g .* opencode-ai@[0-9.]+$" "$BATS_TEST_TMPDIR/npm.log"
     run bash "$DEVZONE" actif ia
     [ "$status" -eq 0 ]
 }
@@ -323,15 +329,26 @@ GH
     [[ "$output" == *"installation de Claude Code et opencode (quelques minutes)"*"toujours en cours"*"Claude Code et opencode installés"* ]] || false
 }
 
-@test "activer ia : npm en échec → code non nul, paquets et journal npm cités, état en échec" {
+@test "activer ia : npm en échec → code non nul, paquet et journal npm cités, état en échec" {
     NPM_ECHEC=1 run bash "$DEVZONE" activer ia
     [ "$status" -ne 0 ]
-    [[ "$output" == *"échec de l'installation"*"@anthropic-ai/claude-code@"*"opencode-ai@"* ]] || false
+    [[ "$output" == *"échec de l'installation"*"opencode-ai@"* ]] || false
+    [[ "$output" != *"@anthropic-ai/claude-code@"* ]] || false
     [[ "$output" == *"$HOME/.npm/_logs/2026-10-24T11_46_18_245Z-debug-0.log"* ]] || false
     [[ "$output" != *"ia actif"* ]] || false
     run bash "$DEVZONE"
     [[ "$output" == *"✖ module ia"*"en échec"*"devzone appliquer"* ]] || false
     [[ "$output" != *"✔ module ia"* ]] || false
+}
+
+@test "activer ia : npm en échec pour opencode seul → Claude Code installé, échec nomme opencode" {
+    NPM_ECHEC=1 run bash "$DEVZONE" activer ia
+    [ "$status" -ne 0 ]
+    failure="$output"
+    PATH="$BATS_TEST_TMPDIR/bin:/usr/bin:/bin" run claude --version
+    [ "$status" -eq 0 ]
+    [[ "$failure" == *"opencode-ai@"* ]] || false
+    [[ "$failure" != *"@anthropic-ai/claude-code@"* ]] || false
 }
 
 @test "appliquer : échec ia → code non nul ; puis réussite → état actif, plus en échec" {

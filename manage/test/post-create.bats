@@ -53,3 +53,9 @@ setup() {
     grep -Fq 'python-is-python3' "$DOCKERFILE" || false
     grep -Eq 'apt-get .*install' "$DOCKERFILE" || false
 }
+
+# Parents des montages subPath du volume etat : sans ces dossiers appartenant a
+# vscode, Kubernetes les cree en root et opencode --version echoue en EACCES (#513)
+@test "Dockerfile : ~/.local/state et ~/.local/share crees pour vscode (uid/gid 1000)" {
+    grep -Eq 'install -d -o 1000 -g 1000 /home/vscode/.local /home/vscode/.local/bin /home/vscode/.local/state /home/vscode/.local/share /home/vscode/.config' "$DOCKERFILE" || false
+}

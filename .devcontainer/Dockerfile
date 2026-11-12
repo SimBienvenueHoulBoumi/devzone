@@ -100,6 +100,14 @@ RUN export UV_TOOL_DIR=/opt/uv/tools UV_TOOL_BIN_DIR=/usr/local/bin \
     && uv tool install "vulture==${VULTURE_VERSION}" \
     && uv tool install "pytest==${PYTEST_VERSION}"
 
+# Parents of the etat subPath mounts must belong to vscode (UID/GID 1000):
+# the image has no ~/.local, so Kubernetes creates ~/.local, ~/.local/state
+# and ~/.local/share as root when mounting the etat volume subPaths
+# (~/.local/npm, ~/.local/state/oc-lancer, ~/.local/share/opencode...), and
+# every tool writing there fails with EACCES (opencode --version: mkdir
+# /home/vscode/.local/state) (#513)
+RUN install -d -o 1000 -g 1000 /home/vscode/.local /home/vscode/.local/bin /home/vscode/.local/state /home/vscode/.local/share /home/vscode/.config
+
 # devzone scripts inside the image: the Kubernetes workspace pod has no
 # /workspaces/devzone checkout (#503). The Docker devcontainer relinks
 # /usr/local/bin/devzone to the mounted repository in post-create.sh.
