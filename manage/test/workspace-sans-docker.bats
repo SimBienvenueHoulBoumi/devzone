@@ -181,12 +181,40 @@ bloc_sidecar() {
     grep -q -- "value: tcp://127.0.0.1:1234" <<<"$principal" || false
 }
 
-@test "workspace : une commande qui ne se termine pas (sleep infinity par defaut)" {
+@test "workspace : la commande lance workspace-init.sh puis ne se termine pas (#503)" {
     run rendu_de templates/statefulset.yaml
     [ "$status" -eq 0 ]
     local principal
     principal="$(awk '/^        - name: workspace$/{p=1} /^          resources:/{p=0} p' <<<"$output")"
-    grep -q -- 'command: \["sleep","infinity"\]' <<<"$principal" || false
+    [[ "$principal" == *"workspace-init.sh"* ]] || false
+    [[ "$principal" == *"sleep infinity"* ]] || false
+}
+
+@test "variables : DEVZONE_RACINE et NPM_CONFIG_PREFIX du workspace (#503)" {
+    run rendu_de templates/statefulset.yaml
+    [ "$status" -eq 0 ]
+    local principal
+    principal="$(awk '/^        - name: workspace$/{p=1} /^          resources:/{p=0} p' <<<"$output")"
+    grep -A1 -- "- name: DEVZONE_RACINE" <<<"$principal" | grep -q -- "value: /workspaces/projets" || false
+    grep -A1 -- "- name: NPM_CONFIG_PREFIX" <<<"$principal" | grep -q -- "value: /home/vscode/.local/npm" || false
+}
+
+@test "variables : PATH du workspace commence par le bin npm global (#503)" {
+    run rendu_de templates/statefulset.yaml
+    [ "$status" -eq 0 ]
+    local principal ligne
+    principal="$(awk '/^        - name: workspace$/{p=1} /^          resources:/{p=0} p' <<<"$output")"
+    ligne="$(grep -A1 -- "- name: PATH" <<<"$principal" | tail -1)"
+    [[ "$ligne" == *"value: /home/vscode/.local/npm/bin:"* ]] || false
+}
+
+@test "workspace : montages etat de .local/npm et .local/state/devzone (#503)" {
+    run rendu_de templates/statefulset.yaml
+    [ "$status" -eq 0 ]
+    grep -q -- 'subPath: ".local/npm"' <<<"$output" || false
+    grep -q -- 'mountPath: "/home/vscode/.local/npm"' <<<"$output" || false
+    grep -q -- 'subPath: ".local/state/devzone"' <<<"$output" || false
+    grep -q -- 'mountPath: "/home/vscode/.local/state/devzone"' <<<"$output" || false
 }
 
 @test "reseau : aucun port declare (ni containerPort, ni hostPort) et aucun port d'API Docker expose" {

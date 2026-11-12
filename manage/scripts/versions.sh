@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Versions figées du conteneur : compare repowarden (post-create.sh) et les
+# Versions figées du conteneur : compare repowarden (versions.env) et les
 # assistants IA (lignes IA_…, devzone) à la dernière version npm, ou applique
 # une montée.
 #   bash manage/scripts/versions.sh
@@ -14,15 +14,18 @@
 set -euo pipefail
 
 ICI="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-POST_CREATE="$ICI/.devcontainer/post-create.sh"
+VERSIONS_ENV="$ICI/.devcontainer/versions.env"
 DEVZONE="$ICI/.devcontainer/devzone"
 
 # Liste « paquet version » des versions figées dans les deux fichiers ; dans
 # devzone, une ligne IA_<NOM>=<paquet>@<version> par assistant IA
 figees() {
-    local ligne element
-    ligne="$(sed -nE 's/.*npm install -g (repowarden)@([^[:space:]]+).*/\1 \2/p' "$POST_CREATE" | head -1)"
-    [ -z "$ligne" ] || echo "$ligne"
+    local element
+    if [ -f "$VERSIONS_ENV" ]; then
+        # shellcheck disable=SC1090
+        . "$VERSIONS_ENV"
+        [ -z "${REPOWARDEN_VERSION:-}" ] || echo "repowarden $REPOWARDEN_VERSION"
+    fi
     while read -r element; do
         case "$element" in
             ?*@*) echo "${element%@*} ${element##*@}" ;;
@@ -128,11 +131,11 @@ appliquer() {
             ;;
     esac
     if [ "$paquet" = repowarden ]; then
-        fichier="$POST_CREATE"
-        grep -qF 'npm install -g repowarden@' "$fichier" ||
+        fichier="$VERSIONS_ENV"
+        grep -qE '^REPOWARDEN_VERSION=' "$fichier" ||
             { echo "versions : paquet inconnu : $paquet" >&2; exit 1; }
         tmp="$(mktemp)"
-        sed -E "s|(npm install -g repowarden@)[^[:space:]]+|\1${version}|" "$fichier" >"$tmp"
+        sed -E "s|^(REPOWARDEN_VERSION=)[^[:space:]]+$|\1${version}|" "$fichier" >"$tmp"
     else
         fichier="$DEVZONE"
         figees | awk -v p="$paquet" '$1 == p { trouve = 1 } END { exit trouve ? 0 : 1 }' ||

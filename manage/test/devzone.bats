@@ -69,7 +69,7 @@ setup() {
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
     # Versions figées lues dans les fichiers : une montée automatique (workflow
     # versions) ne casse pas ces tests
-    REPOWARDEN_FIGE="$(sed -nE 's/.*npm install -g repowarden@([^[:space:]]+).*/\1/p' "$BATS_TEST_DIRNAME/../../.devcontainer/post-create.sh" | head -1)"
+    REPOWARDEN_FIGE="$(sed -nE 's/^REPOWARDEN_VERSION=([^[:space:]]+)$/\1/p' "$BATS_TEST_DIRNAME/../../.devcontainer/versions.env" | head -1)"
     IA_FIGES="$(sed -nE 's/^IA_[A-Z0-9_]+=([^[:space:]()"]+)@([^@[:space:]()"]+)$/\1 \2/p' "$DEVZONE")"
     export HOME="$BATS_TEST_TMPDIR/home"
     mkdir -p "$HOME" "$BATS_TEST_TMPDIR/bin"
@@ -601,7 +601,8 @@ KUBE
     printf 'repowarden 4.9.2\n' >"$NPM_INSTALLEES"
     run bash "$DEVZONE" appliquer
     [ "$status" -eq 0 ]
-    grep -qx "npm install -g repowarden@$REPOWARDEN_FIGE" "$BATS_TEST_TMPDIR/npm.log"
+    RPW=repowarden
+    grep -qx "npm install -g ${RPW}@$REPOWARDEN_FIGE" "$BATS_TEST_TMPDIR/npm.log"
     grep -qx "repowarden install --global --lang fr" "$BATS_TEST_TMPDIR/repowarden.log"
     [[ "$output" == *"repowarden 4.9.2 → $REPOWARDEN_FIGE"* ]] || false
 }
