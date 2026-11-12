@@ -14,10 +14,12 @@ WORKSPACE_APP="devzone-workspace"
 POSTGRES_APP="devzone-postgres"
 POSTGRES_NS="devzone-postgres"
 
+# shellcheck disable=SC2034 # read by apps.sh
+APPS_CMD="devzone workspace argocd app"
+# shellcheck disable=SC2034 # read by apps.sh
+APPS_GENERATOR="$RACINE/.devcontainer/argocd/application.sh"
 # shellcheck source=../../.devcontainer/argocd/apps.sh
 # shellcheck disable=SC1091
-APPS_CMD="devzone workspace argocd app"
-APPS_GENERATOR="$RACINE/.devcontainer/argocd/application.sh"
 . "$RACINE/.devcontainer/argocd/apps.sh"
 argocd_kubectl() { ak "$@"; }
 

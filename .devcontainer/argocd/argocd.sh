@@ -198,7 +198,9 @@ relais() {
 
 # Applications of the projects (#516): shared with the workstation (apps.sh),
 # here with the limited devzone context (aggregate roles of the chart)
+# shellcheck disable=SC2034 # read by apps.sh
 APPS_CMD="devzone argocd app"
+# shellcheck disable=SC2034 # read by apps.sh
 APPS_GENERATOR="$ICI/application.sh"
 # shellcheck source=SCRIPTDIR/apps.sh
 # shellcheck disable=SC1091
