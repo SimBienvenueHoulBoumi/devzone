@@ -30,11 +30,95 @@ chemin_chart() {
     printf '%s/charts/devzone-workspace' "$RACINE"
 }
 
+# Dépôt de l'image publiée à chaque livraison de devzone.
+IMAGE_DEPOT="ghcr.io/simbienvenuehoulboumi/devzone-workspace"
+
+# Pourquoi : sans tag, le chart prend son appVersion (0.1.0), une image jamais
+# publiée ; la version du paquet est publiée à chaque livraison, et un clone de
+# développement (0.0.0) utilise latest.
+image_par_defaut() {
+    local version
+    version="$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' "$RACINE/package.json" | head -1)"
+    if [ -z "$version" ] || [ "$version" = "0.0.0" ]; then
+        echo "latest"
+    else
+        echo "$version"
+    fi
+}
+
+# Attend le pod du workspace ; image introuvable ou pod lent sont dits clairement.
+attendre_pod() {
+    local image="$1" attente pas debut etat
+    attente="${DEVZONE_WORKSPACE_ATTENTE:-120}"
+    pas="${DEVZONE_WORKSPACE_PAS:-2}"
+    if [ -n "${BATS_TEST_TMPDIR:-}" ] && [ -z "${DEVZONE_WORKSPACE_ATTENTE:-}" ]; then
+        attente=1
+    fi
+    debut="$SECONDS"
+    while [ $((SECONDS - debut)) -lt "$attente" ]; do
+        # shellcheck disable=SC2046
+        etat="$(kubectl $(drapeau_kubectl) get pod devzone-workspace-0 --namespace devzone-workspace \
+            -o jsonpath='{.status.phase} {.status.initContainerStatuses[*].state.waiting.reason} {.status.containerStatuses[*].state.waiting.reason}' 2>/dev/null)" || true
+        case "$etat" in
+            *ErrImagePull* | *ImagePullBackOff*)
+                echo "✖ image $image introuvable : elle est publiée à chaque livraison de devzone." >&2
+                echo "  Pour une image construite à la main : devzone workspace demarrer --image <repository:tag>" >&2
+                # shellcheck disable=SC2046
+                helm $(drapeau_helm) uninstall devzone-workspace --namespace devzone-workspace >/dev/null 2>&1 || true
+                return 1
+                ;;
+            Running*)
+                echo "✔ workspace démarré ($image)"
+                return 0
+                ;;
+        esac
+        sleep "$pas"
+    done
+    echo "⚠ pod pas encore prêt après $attente s : devzone workspace etat" >&2
+    return 0
+}
+
 # Installe ou met à jour le workspace dans le cluster.
 demarrer() {
+    local depot tag image avec_image="" args=()
+    depot="$IMAGE_DEPOT"
+    tag="$(image_par_defaut)"
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --image)
+                if [ $# -lt 2 ] || [ -z "$2" ]; then
+                    echo "✖ option --image : indique une image <repository:tag> (devzone workspace demarrer --image <repository:tag>)" >&2
+                    return 1
+                fi
+                case "$2" in
+                    *:*)
+                        depot="${2%:*}"
+                        tag="${2##*:}"
+                        avec_image=oui
+                        ;;
+                    *)
+                        echo "✖ option --image : image sans tag, attendu <repository:tag> (devzone workspace demarrer --image <repository:tag>)" >&2
+                        return 1
+                        ;;
+                esac
+                shift 2
+                ;;
+            *)
+                echo "✖ option inconnue : $1 (devzone workspace demarrer [--image <repository:tag>])" >&2
+                return 1
+                ;;
+        esac
+    done
+    image="$depot:$tag"
+    args=(--namespace devzone-workspace --create-namespace)
+    if [ -n "$avec_image" ]; then
+        args+=(--set "image.repository=$depot" --set "image.tag=$tag")
+    else
+        args+=(--set "image.tag=$tag")
+    fi
     # shellcheck disable=SC2046
-    helm $(drapeau_helm) upgrade --install devzone-workspace "$(chemin_chart)" \
-        --namespace devzone-workspace --create-namespace
+    helm $(drapeau_helm) upgrade --install devzone-workspace "$(chemin_chart)" "${args[@]}"
+    attendre_pod "$image" || return 1
     ports_demarrer silence
 }
 
@@ -113,7 +197,7 @@ copier_depuis() {
 . "$ICI/scripts/ports-workspace.sh"
 
 case "${1:-}" in
-    demarrer) demarrer ;;
+    demarrer) demarrer "${@:2}" ;;
     arreter) arreter ;;
     etat) etat ;;
     shell) shell ;;
@@ -126,6 +210,7 @@ case "${1:-}" in
     nettoyer-docker) nettoyer_docker "${@:2}" ;;
     '' | -h | --help | aide)
         echo "devzone workspace demarrer|arreter|etat|shell|vscode|copier-vers|copier-depuis|ports|migrer|revenir|nettoyer-docker"
+        echo "  demarrer [--image dépôt:tag]  installe le workspace (image de la version de devzone par défaut)"
         echo "  ports [demarrer|arreter|etat] applications et services du pod sur localhost du poste"
         echo "  migrer [--oui]        copie le poste Docker vers le workspace Kubernetes (rien n'est supprimé)"
         echo "  revenir [--rapatrier] retour au poste Docker ; --rapatrier : projets du pod recopiés d'abord"

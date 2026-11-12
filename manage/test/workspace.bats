@@ -23,6 +23,9 @@ case "$*" in
     "config current-context")
         echo "${FAUX_CONTEXTE_COURANT:-docker-desktop}"
         ;;
+    *"get pod devzone-workspace-0 "*)
+        echo "${FAUX_POD:-Running}"
+        ;;
 esac
 exit 0
 KUBE
@@ -34,6 +37,7 @@ exit 0
 HELM
     chmod +x "$T/bin/kubectl" "$T/bin/helm"
     export PATH="$T/bin:$PATH"
+    export DEVZONE_WORKSPACE_ATTENTE=1 DEVZONE_WORKSPACE_PAS=0.1
 }
 
 @test "workspace demarrer : helm upgrade --install avec contexte devzone s'il existe" {
@@ -162,6 +166,43 @@ HELM
     run bash "$CLI" workspace
     [ "$status" -eq 0 ]
     [[ "$output" == *"demarrer|arreter|etat|shell|vscode|copier-vers|copier-depuis"* ]] || false
+}
+
+@test "workspace demarrer : sans option, tag latest (package.json en 0.0.0)" {
+    export FAUX_CONTEXTES="docker-desktop"
+    export FAUX_CONTEXTE_COURANT="docker-desktop"
+    : >"$T/helm.log"
+    run bash "$CLI" workspace demarrer
+    [ "$status" -eq 0 ]
+    grep -q -- "--set image.tag=latest" "$T/helm.log" || false
+}
+
+@test "workspace demarrer : --image depot:tag passe repository et tag" {
+    export FAUX_CONTEXTES="docker-desktop"
+    : >"$T/helm.log"
+    run bash "$CLI" workspace demarrer --image registre.local/ws:essai
+    [ "$status" -eq 0 ]
+    grep -q -- "--set image.repository=registre.local/ws" "$T/helm.log" || false
+    grep -q -- "--set image.tag=essai" "$T/helm.log" || false
+}
+
+@test "workspace demarrer : image introuvable, message et desinstallation" {
+    export FAUX_CONTEXTES="docker-desktop"
+    export FAUX_POD="Pending ImagePullBackOff"
+    : >"$T/helm.log"
+    run bash "$CLI" workspace demarrer
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"introuvable"* ]] || false
+    [[ "$output" == *"--image"* ]] || false
+    grep -q -- "uninstall devzone-workspace" "$T/helm.log" || false
+}
+
+@test "workspace demarrer : --image sans valeur, usage et aucun helm" {
+    export FAUX_CONTEXTES="docker-desktop"
+    : >"$T/helm.log"
+    run bash "$CLI" workspace demarrer --image
+    [ "$status" -eq 1 ]
+    ! grep -q upgrade "$T/helm.log" || false
 }
 
 @test "chart : helm lint et helm template" {
