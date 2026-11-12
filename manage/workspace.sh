@@ -169,6 +169,8 @@ copier_depuis() {
 . "$ICI/scripts/migrer-retour.sh"
 # shellcheck source=scripts/ports-workspace.sh
 . "$ICI/scripts/ports-workspace.sh"
+# shellcheck source=scripts/services-workspace.sh
+. "$ICI/scripts/services-workspace.sh"
 
 # English command names are accepted, French ones unchanged (#502).
 # A copied devzone may miss the aliases file: then no normalization.
@@ -193,16 +195,19 @@ case "${1:-}" in
     migrer) migrer "${@:2}" ;;
     revenir) revenir "${@:2}" ;;
     nettoyer-docker) nettoyer_docker "${@:2}" ;;
+    services) services "${@:2}" ;;
     '' | -h | --help | aide)
-        echo "devzone workspace demarrer|arreter|etat|shell|vscode|copier-vers|copier-depuis|ports|migrer|revenir|nettoyer-docker"
+        echo "devzone workspace demarrer|arreter|etat|shell|vscode|copier-vers|copier-depuis|ports|services|migrer|revenir|nettoyer-docker"
         echo "  demarrer [--image dépôt:tag]  installe le workspace (image de la version de devzone par défaut)"
         echo "  ports [demarrer|arreter|etat] applications et services du pod sur localhost du poste"
+        echo "  services enable|disable <service> [options] | status"
+        echo "                        devzone services (gitlab, postgres, argocd) of the cluster, installed from the workstation"
         echo "  migrer [--oui]        copie le poste Docker vers le workspace Kubernetes (rien n'est supprimé)"
         echo "  revenir [--rapatrier] retour au poste Docker ; --rapatrier : projets du pod recopiés d'abord"
         echo "  nettoyer-docker       supprime les volumes Docker devzone-*, après confirmation [o/N] (--oui)"
         ;;
     *)
-        echo "✖ sous-commande inconnue : $1 (devzone workspace demarrer|arreter|etat|shell|vscode|copier-vers|copier-depuis|ports|migrer|revenir|nettoyer-docker)" >&2
+        echo "✖ sous-commande inconnue : $1 (devzone workspace demarrer|arreter|etat|shell|vscode|copier-vers|copier-depuis|ports|services|migrer|revenir|nettoyer-docker)" >&2
         exit 1
         ;;
 esac
