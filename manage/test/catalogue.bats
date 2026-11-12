@@ -42,6 +42,9 @@ case "$*" in
         if [[ "$*" == *"-n devzone-mysql"* ]] && [ -f "$T/pvcs" ]; then cat "$T/pvcs"; fi || false
         ;;
     *"readyReplicas"*) [ -f "$T/ready" ] && echo 1 || echo 0 ;;
+    *"get statefulset,deployment"*)
+        [ -f "$T/sts" ] && echo "statefulset.apps/mysql"
+        ;;
     *"get statefulset mysql -o jsonpath"*)
         if [ -f "$T/claim" ]; then cat "$T/claim"; else echo donnees; fi
         ;;
@@ -223,6 +226,23 @@ attendre_nohup() {
     [[ "$ligne" == "⚠ application mysql"* ]] || false
     [[ "$ligne" == *"devzone reparer"* ]] || false
     [[ "$ligne" != *"✔"* ]] || false
+}
+
+@test "resume : DEVZONE_WORKSPACE=kubernetes → installée via le cluster, accès devzone workspace ports" {
+    export DEVZONE_WORKSPACE=kubernetes
+    touch "$BATS_TEST_TMPDIR/ns" "$BATS_TEST_TMPDIR/sts" "$BATS_TEST_TMPDIR/ready"
+    printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_ETAT"
+    run bash "$DEVZONE"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"installée : local access: devzone workspace ports"* ]] || false
+}
+
+@test "resume : DEVZONE_WORKSPACE=kubernetes → liste vide → application attendue" {
+    export DEVZONE_WORKSPACE=kubernetes
+    printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_ETAT"
+    run bash "$DEVZONE"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"attendue : devzone appliquer"* ]] || false
 }
 
 @test "desactiver mysql : sans --oui ni terminal, volume garde, aucun delete namespace" {

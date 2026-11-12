@@ -66,10 +66,15 @@ voulu() {
 # nom de l'application ; sans cluster choisi ou absente : rien. Lecture des
 # namespaces réservée à l'administrateur (#430).
 presente() {
-    local ctx ns
+    local ctx ns liste
+    ns="$(app_ns "$1")"
+    if [ "${DEVZONE_WORKSPACE:-}" = kubernetes ]; then
+        liste="$(kubectl --context devzone -n "$ns" get statefulset,deployment -o name 2>/dev/null || true)"
+        [ -n "$liste" ]
+        return
+    fi
     ctx="$(cluster_lu)"
     [ -n "$ctx" ] || return 1
-    ns="$(app_ns "$1")"
     compte_admin "$ctx" get namespace "$ns" >/dev/null 2>&1 &&
         kubectl --context devzone -n "$ns" get statefulset "$1" >/dev/null 2>&1
 }
@@ -142,6 +147,10 @@ catalogue_lister() {
 # Relais de l application installee : etat de son script, sinon pid du relais
 app_relais_arrete() {
     local app="$1" script etat
+    if [ "${DEVZONE_WORKSPACE:-}" = kubernetes ]; then
+        # In the pod, no relay: the access goes through the workspace ports
+        return 1
+    fi
     script="$ICI/catalogue/$app/$app.sh"
     if [ -f "$script" ]; then
         etat="$(bash "$script" etat 2>/dev/null || true)"
@@ -181,8 +190,12 @@ catalogue_resume() {
                 if app_relais_arrete "$app"; then
                     printf '  ⚠ application %-12s installée, relais arrêté : devzone reparer\n' "$app"
                 else
-                    printf '  ✔ application %-12s installée : 127.0.0.1:%s\n' \
-                        "$app" "$(app_lire "$app" port)"
+                    if [ "${DEVZONE_WORKSPACE:-}" = kubernetes ]; then
+                        printf '  ✔ application %-12s installée : local access: devzone workspace ports\n' "$app"
+                    else
+                        printf '  ✔ application %-12s installée : 127.0.0.1:%s\n' \
+                            "$app" "$(app_lire "$app" port)"
+                    fi
                 fi ;;
             attendue) printf '  ⚠ application %-12s attendue : devzone appliquer\n' "$app" ;;
             *) printf '  ✖ application %s en échec : %s : devzone appliquer\n' \
