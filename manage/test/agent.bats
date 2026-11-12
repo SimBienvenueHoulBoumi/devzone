@@ -137,7 +137,7 @@ KUBECTL
     [ "$status" -eq 0 ]
     grep -q 'name: devzone' "$DEVZONE_AGENT_ETAT/kubeconfig" || false
     ! grep -q 'kind-x' "$DEVZONE_AGENT_ETAT/kubeconfig" || false
-    [ "$(stat -c %a "$DEVZONE_AGENT_ETAT/kubeconfig")" = 600 ]
+    [ "$(stat -c %a "$DEVZONE_AGENT_ETAT/kubeconfig" 2>/dev/null || stat -f %Lp "$DEVZONE_AGENT_ETAT/kubeconfig")" = 600 ]
 }
 
 @test "agent : sans contexte devzone -> kubeconfig vide et ligne de journal (#470)" {
@@ -147,7 +147,7 @@ KUBECTL
     agent_lance
     [ "$status" -eq 0 ]
     [ ! -s "$DEVZONE_AGENT_ETAT/kubeconfig" ]
-    [ "$(stat -c %a "$DEVZONE_AGENT_ETAT/kubeconfig")" = 600 ]
+    [ "$(stat -c %a "$DEVZONE_AGENT_ETAT/kubeconfig" 2>/dev/null || stat -f %Lp "$DEVZONE_AGENT_ETAT/kubeconfig")" = 600 ]
     grep -q "=== kubernetes : aucun contexte devzone, session sans accès" "$(agent_journal)" || false
 }
 
