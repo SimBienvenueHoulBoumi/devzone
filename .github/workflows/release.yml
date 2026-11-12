@@ -70,7 +70,7 @@ jobs:
   # Image du workspace Kubernetes publiée à chaque livraison (#486)
   image:
     needs: release
-    if: needs.release.outputs.release_created == 'true' || github.event_name == 'workflow_dispatch'
+    if: needs.release.outputs.tag_name != ''
     uses: ./.github/workflows/image-workspace.yml
     permissions:
       contents: read

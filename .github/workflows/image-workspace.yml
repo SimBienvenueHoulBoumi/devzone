@@ -43,7 +43,8 @@ jobs:
           push: never
 
   publish:
-    if: github.event_name == 'workflow_call' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
+    # Tag fourni (appel par release.yml ou lancement à la main) ou push d un tag v*
+    if: inputs.tag != '' || startsWith(github.ref, 'refs/tags/v')
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 45
