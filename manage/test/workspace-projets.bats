@@ -1,6 +1,6 @@
 #!/usr/bin/env bats
 # Projets du workspace dans un volume (#399) : montage sur /workspaces/projets,
-# workingDir, annotation helm.sh/resource-policy: keep et taille (workspace.taille).
+# workingDir, annotation helm.sh/resource-policy: keep et taille (workspace.size).
 # helm est le vrai helm (lint et template exigés par la conception, comme dans
 # workspace-sans-docker.bats) ; kubectl est un faux outil dans
 # $BATS_TEST_TMPDIR/bin : aucun cluster n'est touché.
@@ -61,11 +61,11 @@ bloc_pvc() {
     grep -q -- "helm.sh/resource-policy: keep" <<<"$pvc" || false
 }
 
-@test "projets : taille du volume workspace, 20Gi par defaut et workspace.taille reglable" {
+@test "projets : taille du volume workspace, 20Gi par defaut et workspace.size reglable" {
     run rendu --show-only templates/statefulset.yaml
     [ "$status" -eq 0 ]
     grep -q -- "storage: 20Gi" <<<"$output" || false
-    run rendu --show-only templates/statefulset.yaml --set workspace.taille=50Gi
+    run rendu --show-only templates/statefulset.yaml --set workspace.size=50Gi
     [ "$status" -eq 0 ]
     grep -q -- "storage: 50Gi" <<<"$output" || false
 }
