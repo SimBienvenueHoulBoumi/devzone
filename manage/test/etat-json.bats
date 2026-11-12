@@ -174,6 +174,16 @@ GH
     [ "$(printf '%s\n' "$output" | jq -r '.docker_hote_actif')" = "false" ]
 }
 
+@test "etat-json : DEVZONE_WORKSPACE=kubernetes → socket absent, sans alerte" {
+    : >"$DEVZONE_RELAIS_SOURCE"
+    export DEVZONE_WORKSPACE=kubernetes
+    run bash "$DEVZONE" etat --json
+    [ "$status" -eq 0 ]
+    printf '%s\n' "$output" | jq -e . >/dev/null
+    [ "$(printf '%s\n' "$output" | jq -r '.docker_hote')" = "false" ]
+    [ "$(printf '%s\n' "$output" | jq -r '.docker_hote_actif')" = "false" ]
+}
+
 @test "etat-json : texte non modifié (devzone sans --json)" {
     run bash "$DEVZONE"
     [ "$status" -eq 0 ]

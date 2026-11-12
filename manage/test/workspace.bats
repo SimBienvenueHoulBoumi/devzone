@@ -205,6 +205,8 @@ HELM
     run bash "$CLI" workspace demarrer
     [ "$status" -eq 0 ]
     grep -q -- "--set image.tag=latest" "$T/helm.log" || false
+    # latest is always pulled again (#515)
+    grep -q -- "--set image.pullPolicy=Always" "$T/helm.log" || false
 }
 
 @test "workspace demarrer : --image depot:tag passe repository et tag" {
@@ -214,6 +216,8 @@ HELM
     [ "$status" -eq 0 ]
     grep -q -- "--set image.repository=registre.local/ws" "$T/helm.log" || false
     grep -q -- "--set image.tag=essai" "$T/helm.log" || false
+    # a fixed tag keeps the chart pull policy (#515)
+    ! grep -q -- "image.pullPolicy=Always" "$T/helm.log" || false
 }
 
 @test "workspace demarrer : image introuvable, message et desinstallation" {
