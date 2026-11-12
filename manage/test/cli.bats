@@ -122,7 +122,7 @@ setup() {
 
 @test "README : commandes npm citées, sous-commandes citées dans devzone --help" {
     readme="$RACINE/README.md"
-    for c in 'npm install -g devzone' 'npm uninstall -g devzone' 'devzone desinstaller'; do
+    for c in 'npm install -g devzone' 'npm uninstall -g devzone' 'devzone uninstall'; do
         grep -q -- "$c" "$readme" || { echo "absent du README : $c"; return 1; }
     done
     run bash "$CLI" --help
