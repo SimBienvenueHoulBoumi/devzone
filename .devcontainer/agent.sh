@@ -36,6 +36,10 @@ RACINE="${DEVZONE_RACINE:-$(dirname "$ICI")}"
 # shellcheck source=agent-session.sh
 # shellcheck disable=SC1091
 . "$ICI/agent-session.sh"
+# Workspace Kubernetes : projet et journal dans le pod (#431)
+# shellcheck source=agent-workspace.sh
+# shellcheck disable=SC1091
+. "$ICI/agent-workspace.sh"
 
 # Liste de secours si « opencode models opencode » ne répond pas : même ordre
 # que la configuration opencode livrée par devzone.
@@ -110,14 +114,20 @@ agent_lancer() {
         echo "=== modèle opencode/$m début $(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$journal"
         offset="$(wc -c <"$journal")"
         local agent_kube="$etat/kubeconfig"
-        if [ -f "$HOME/.kube/config" ]; then
-            (umask 077; KUBECONFIG="$HOME/.kube/config" kubectl config view --minify --flatten --context devzone >"$agent_kube") 2>/dev/null || : >"$agent_kube"
-            chmod 600 "$agent_kube"
-            [ -s "$agent_kube" ] || echo "=== kubernetes : aucun contexte devzone, session sans accès" >>"$journal"
+        if agent_dans_pod; then
+            # Dans le pod, le compte de service limité est le seul accès : aucun
+            # kubeconfig du poste n'entre dans l'environnement d'opencode.
+            (cd "$dossier" && env -u KUBECONFIG DEVZONE_AGENT_SESSION=1 opencode run --print-logs --log-level ERROR --auto -m "opencode/$m" "$(cat "$consigne_courante")" </dev/null >>"$journal" 2>&1) &
         else
-            : >"$agent_kube"
+            if [ -f "$HOME/.kube/config" ]; then
+                (umask 077; KUBECONFIG="$HOME/.kube/config" kubectl config view --minify --flatten --context devzone >"$agent_kube") 2>/dev/null || : >"$agent_kube"
+                chmod 600 "$agent_kube"
+                [ -s "$agent_kube" ] || echo "=== kubernetes : aucun contexte devzone, session sans accès" >>"$journal"
+            else
+                : >"$agent_kube"
+            fi
+            (cd "$dossier" && KUBECONFIG="$agent_kube" DEVZONE_AGENT_SESSION=1 opencode run --print-logs --log-level ERROR --auto -m "opencode/$m" "$(cat "$consigne_courante")" </dev/null >>"$journal" 2>&1) &
         fi
-        (cd "$dossier" && KUBECONFIG="$agent_kube" DEVZONE_AGENT_SESSION=1 opencode run --print-logs --log-level ERROR --auto -m "opencode/$m" "$(cat "$consigne_courante")" </dev/null >>"$journal" 2>&1) &
         pid=$!
         demarre=0
         discard=0
@@ -231,17 +241,6 @@ agent_lancer() {
     exit 3
 }
 
-agent_aide() {
-    cat <<'AGENTEOF2'
-usage : devzone agent <dossier> <fichier-consigne>
-        lance opencode sur la consigne, modèles gratuits en rotation
-        devzone agent etat
-        sessions connues et modèles écartés
-        devzone agent liberer [<modèle>|--tous]
-        lève un écart de modèle
-AGENTEOF2
-}
-
 case "${1:-}" in
     etat) if [ "${2:-}" = "--json" ]; then exec bash "$ICI/agent-etat-json.sh"; else agent_etat; fi ;;
     liberer)
@@ -254,9 +253,19 @@ case "${1:-}" in
         exit 2
         ;;
     *)
+        mode_local=0
+        if [ "${1:-}" = "--local" ]; then
+            mode_local=1
+            shift
+        fi
         if [ "$#" -lt 2 ]; then
             agent_aide >&2
             exit 2
+        fi
+        if [ "$mode_local" = 0 ] && workspace_disponible; then
+            code=0
+            agent_workspace "$1" "$2" || code=$?
+            exit "$code"
         fi
         agent_lancer "$1" "$2"
         ;;
