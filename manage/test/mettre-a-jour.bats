@@ -299,6 +299,19 @@ echo moi' ]
     [ ! -e "$T/reconstruction.log" ]
 }
 
+@test "mode kubernetes : conseil affiché, make rebuild jamais proposé" {
+    cp "$RACINE/manage/scripts/poste.sh" "$T/v2/manage/scripts/poste.sh"
+    creer_v1
+    printf 'workspace=kubernetes\n' >"$DZ/.devzone.modules"
+    cd "$DZ"
+    run bash "$MAJ" mettre-a-jour --oui
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"prochain devzone workspace demarrer"* ]] || false
+    [[ "$output" != *"rebuild"* ]] || false
+    [ "$(cat "$DZ/.devzone.modules")" = 'workspace=kubernetes' ]
+    [ ! -e "$T/reconstruction.log" ]
+}
+
 @test "manifeste piégé : ../dehors/secret refusé" {
     pieger_manifeste '../dehors/secret'
 }

@@ -282,6 +282,8 @@ L'image vient de ghcr.io, avec le tag de la version de devzone (`latest` depuis 
 4. **Etat** : `.devzone.modules` et `.devzone.paquets` du poste (s'ils existent) sont copies dans `/workspaces/projets/` du pod.
 5. **Bascule** : la ligne `workspace=kubernetes` est notee dans `.devzone.modules` du poste.
 
+Apres `devzone workspace migrer`, `make up`, `make shell` et `make stop` pilotent le workspace Kubernetes ; `make rebuild` refuse ; `devzone workspace revenir` rend le poste Docker.
+
 **Retour arriere** : `devzone workspace revenir` remet `workspace=docker` et rappelle `make shell`. Le poste Docker et ses volumes n'ont jamais ete touches par `migrer` : rien d'autre a faire. `--rapatrier` recopie d'abord tous les projets du pod dans `./workspace` (`copier-depuis`, les dossiers du poste du meme nom sont ecrases) ; en cas d'echec, la bascule n'a pas lieu.
 
 **Nettoyage** : les volumes Docker ne sont jamais supprimes par `migrer` ni `revenir`. `devzone workspace nettoyer-docker` liste les volumes `devzone-*` presents puis demande [o/N] avant de les supprimer (`--oui` sans terminal ; sinon refus). Irreversible : apres, `revenir` repart de volumes vides.
