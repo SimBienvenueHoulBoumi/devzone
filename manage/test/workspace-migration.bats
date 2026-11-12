@@ -108,7 +108,7 @@ setup() {
     [ ! -s "$T/kubectl.log" ]
 }
 
-@test "migrer : chemins des volumes identiques a persistence.etat.chemins du chart" {
+@test "migrer : chemins des volumes identiques a persistence.state.paths du chart" {
     run grep -oE '^        [a-z0-9-]+\) echo \.[A-Za-z0-9_./-]+' "$RACINE/manage/scripts/migrer.sh"
     [ "$status" -eq 0 ]
     [ "$(wc -l <<<"$output")" -eq 9 ]

@@ -39,7 +39,7 @@ lire_option() {
 }
 
 # Chemin du volume etat (relatif au home de vscode) d'un volume Docker devzone-<x> ;
-# vide si le chart n'en monte aucun (persistence.etat.chemins).
+# vide si le chart n'en monte aucun (persistence.state.paths).
 chemin_etat() {
     case "$1" in
         gh) echo .config/gh ;;

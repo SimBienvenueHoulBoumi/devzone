@@ -6,7 +6,7 @@ metadata:
 spec:
   serviceName: {{ include "devzone-workspace.fullname" . }}
   replicas: {{ .Values.replicaCount }}
-  # Les PVC (projets, connexions) ne sont jamais supprimes avec le StatefulSet.
+  # The PVCs (projects, logins) are never deleted with the StatefulSet.
   persistentVolumeClaimRetentionPolicy:
     whenDeleted: Retain
     whenScaled: Retain
@@ -19,28 +19,29 @@ spec:
         app.kubernetes.io/name: {{ include "devzone-workspace.name" . }}
     spec:
       serviceAccountName: {{ include "devzone-workspace.serviceAccountName" . }}
-      # Pod en utilisateur vscode (UID 1000), jamais root : le HOME du workspace est
-      # /home/vscode, ou sont montees les connexions. fsGroup 1000 rend le volume etat
-      # ecrit par vscode. Reglages dans values.yaml (securityContext).
+      # Pod as user vscode (UID 1000), never root: the HOME of the workspace is
+      # /home/vscode, where the logins are mounted. fsGroup 1000 makes the state
+      # volume writable by vscode. Settings in values.yaml (securityContext).
       securityContext:
         {{- toYaml .Values.securityContext | nindent 8 }}
-      # Sidecars natifs (restartPolicy: Always, Kubernetes 1.29+) : ils demarrent
-      # avant le conteneur workspace, et leur startupProbe bloque ce demarrage tant
-      # qu'ils ne repondent pas. Aucun n'est privilegie, et aucun ne declare de port :
-      # ils n'ecoutent que sur 127.0.0.1 du pod.
+      # Native sidecars (restartPolicy: Always, Kubernetes 1.29+): they start
+      # before the workspace container, and their startupProbe holds that start
+      # until they answer. None gets extra rights and none declares a port: they only
+      # listen on 127.0.0.1 of the pod.
       initContainers:
-        # etat-init : cree les dossiers du volume etat (identites, connexions,
-        # caches). Il tourne en vscode (UID 1000), sans privilege. Un lien symbolique
-        # ecrit ici ne survivrait pas : le conteneur workspace a son propre systeme
-        # de fichiers. Le workspace monte donc chaque dossier (subPath) a sa place.
+        # etat-init: creates the directories of the state volume (identities,
+        # logins, caches). It runs as vscode (UID 1000), with no extra rights. A
+        # symbolic link written here would not survive: the workspace container
+        # has its own file system. So the workspace mounts each directory
+        # (subPath) at its place. The names "etat" stay: existing volumes (#507).
         - name: etat-init
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           {{- /*
-            Commentaire Helm : il ne figure pas dans le rendu. La liste $dirs vient
-            de persistence.etat.chemins, comme les montages du workspace.
+            Helm comment: not in the rendering. The $dirs list comes from
+            persistence.state.paths, like the mounts of the workspace.
           */}}
           {{- $dirs := list }}
-          {{- range .Values.persistence.etat.chemins }}
+          {{- range .Values.persistence.state.paths }}
           {{- $dirs = append $dirs (printf "/home/vscode/.devzone-etat/%s" .) }}
           {{- end }}
           command: ["sh", "-c", "mkdir -p {{ join " " $dirs }}"]
@@ -60,24 +61,24 @@ spec:
             limits:
               cpu: "100m"
               memory: "64Mi"
-        # kubedock : API Docker du pod. Les conteneurs de test deviennent des pods du
-        # namespace, crees avec le Role du chart (limite au namespace).
+        # kubedock: Docker API of the pod. Test containers become pods of the
+        # namespace, created with the Role of the chart (limited to the namespace).
         - name: kubedock
           image: {{ .Values.kubedock.image }}
           restartPolicy: Always
           {{- /*
-            Reglages de l'essai du lead (#410) : server --port-forward --reverse-proxy.
-            NAMESPACE vient du pod, pour que kubedock cree les pods dans son namespace.
-            --reapmax/--prune-start clean up kubedock test resources (#514,
-            https://github.com/joyrex2001/kubedock/blob/master/config.md). Commentaire
-            Helm : il ne figure pas dans le rendu.
+            Settings from the lead's trial (#410): server --port-forward --reverse-proxy.
+            NAMESPACE comes from the pod, so that kubedock creates the pods in its
+            namespace. --reapmax/--prune-start clean up kubedock test resources (#514,
+            https://github.com/joyrex2001/kubedock/blob/master/config.md). Helm
+            comment: not in the rendering.
           */}}
           args:
             - server
             - --port-forward
             - --reverse-proxy
             - --timeout
-            - {{ .Values.kubedock.delai | quote }}
+            - {{ .Values.kubedock.timeout | quote }}
             - --reapmax
             - {{ .Values.kubedock.reapmax | quote }}
             {{- if .Values.kubedock.pruneStart }}
@@ -100,15 +101,15 @@ spec:
             failureThreshold: 60
           resources:
             {{- toYaml .Values.kubedock.resources | nindent 12 }}
-        # BuildKit rootless : construit les images, sans privilege ni socket du noeud.
-        # Reglages rootless de la doc BuildKit pour Kubernetes (examples/kubernetes).
+        # Rootless BuildKit: builds the images, with no extra rights or node socket.
+        # Rootless settings of the BuildKit docs for Kubernetes (examples/kubernetes).
         - name: buildkitd
           image: {{ .Values.buildkit.image }}
           restartPolicy: Always
           {{- /*
-            --oci-worker-no-process-sandbox : rootless n'a pas de sandbox de processus
-            sur Kubernetes (doc BuildKit). L'UID 1000 est celui de l'image rootless.
-            Commentaire Helm : il ne figure pas dans le rendu.
+            --oci-worker-no-process-sandbox: rootless has no process sandbox on
+            Kubernetes (BuildKit docs). UID 1000 is the one of the rootless image.
+            Helm comment: not in the rendering.
           */}}
           args:
             - --oci-worker-no-process-sandbox
@@ -134,37 +135,37 @@ spec:
         - name: workspace
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          # Les projets vivent sur le PVC workspace : le conteneur y demarre.
+          # The projects live on the workspace PVC: the container starts there.
           workingDir: /workspaces/projets
           {{- /*
-            Sans command, le conteneur lance l'entrypoint de l'image (bash pour un
-            devcontainer), qui se termine aussitot faute de terminal : le pod boucle
-            en redemarrages. sleep infinity le garde en vie, comme VS Code pour un
-            devcontainer ; le poste entre ensuite par kubectl exec. Commentaire Helm :
-            il ne figure pas dans le rendu.
+            Without command, the container runs the entrypoint of the image (bash
+            for a devcontainer), which ends at once without a terminal: the pod
+            loops on restarts. sleep infinity keeps it alive, like VS Code for a
+            devcontainer; the workstation then enters through kubectl exec. Helm
+            comment: not in the rendering.
           */}}
           {{- with .Values.workspace.command }}
           command: {{ toJson . }}
           {{- end }}
           env:
-            # HOME de vscode : gh, claude, opencode... ecrivent leurs connexions dans
-            # les chemins montes depuis le volume etat (et non dans le home de root).
+            # HOME of vscode: gh, claude, opencode... write their logins in the
+            # paths mounted from the state volume (not in the home of root).
             - name: HOME
               value: /home/vscode
-            # Repère du workspace Kubernetes : devzone agent lance opencode ici (#431)
+            # Marker of the Kubernetes workspace: devzone agent runs opencode here (#431)
             - name: DEVZONE_WORKSPACE
               value: kubernetes
             # Root of the devzone projects in the Kubernetes workspace (#503)
             - name: DEVZONE_RACINE
               value: /workspaces/projets
-            # Global npm prefix, stored on the mounted etat volume (#503)
+            # Global npm prefix, stored on the mounted state volume (#503)
             - name: NPM_CONFIG_PREFIX
               value: /home/vscode/.local/npm
             # Image PATH plus the npm global bin, installed at startup (#503)
             - name: PATH
               value: /home/vscode/.local/npm/bin:/usr/local/share/nvm/current/bin:/usr/local/sdkman/bin:/usr/local/sdkman/candidates/java/current/bin:/usr/local/sdkman/candidates/gradle/current/bin:/usr/local/sdkman/candidates/maven/current/bin:/usr/local/sdkman/candidates/ant/current/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-            # Testcontainers et docker parlent a kubedock, et buildctl a BuildKit.
-            # Ryuk est coupe : kubedock nettoie les conteneurs de test lui-meme.
+            # Testcontainers and docker talk to kubedock, and buildctl to BuildKit.
+            # Ryuk is off: kubedock cleans the test containers up itself.
             - name: DOCKER_HOST
               value: tcp://127.0.0.1:2475
             - name: TESTCONTAINERS_RYUK_DISABLED
@@ -180,9 +181,9 @@ spec:
               mountPath: /workspaces/projets
             - name: etat
               mountPath: /home/vscode/.devzone-etat
-            # Identites et caches : chaque chemin du volume etat est monte a son
-            # emplacement habituel (gh, git, Claude Code, opencode, devzone agent, caches).
-            {{- range .Values.persistence.etat.chemins }}
+            # Identities and caches: each path of the state volume is mounted at
+            # its usual place (gh, git, Claude Code, opencode, devzone agent, caches).
+            {{- range .Values.persistence.state.paths }}
             - name: etat
               subPath: {{ . | quote }}
               mountPath: {{ printf "/home/vscode/%s" . | quote }}
@@ -191,7 +192,7 @@ spec:
     - metadata:
         name: workspace
         annotations:
-          # Les projets ne sont jamais supprimes par helm uninstall (#399).
+          # The projects are never deleted by helm uninstall (#399).
           helm.sh/resource-policy: keep
       spec:
         accessModes: ["ReadWriteOnce"]
@@ -200,18 +201,18 @@ spec:
         {{- end }}
         resources:
           requests:
-            storage: {{ .Values.workspace.taille }}
+            storage: {{ .Values.workspace.size }}
     - metadata:
         name: etat
         annotations:
-          # Le PVC survit a la desinstallation du chart (connexions gardees). La
-          # vraie protection est persistentVolumeClaimRetentionPolicy ci-dessous.
+          # The PVC survives the uninstall of the chart (logins kept). The real
+          # protection is persistentVolumeClaimRetentionPolicy above.
           helm.sh/resource-policy: keep
       spec:
         accessModes: ["ReadWriteOnce"]
-        {{- if .Values.persistence.etat.storageClass }}
-        storageClassName: {{ .Values.persistence.etat.storageClass }}
+        {{- if .Values.persistence.state.storageClass }}
+        storageClassName: {{ .Values.persistence.state.storageClass }}
         {{- end }}
         resources:
           requests:
-            storage: {{ .Values.persistence.etat.size }}
+            storage: {{ .Values.persistence.state.size }}

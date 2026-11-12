@@ -1203,13 +1203,19 @@ etat() {
     # Socket Docker de l'hôte (#432) : l'avertissement montre l'état réel,
     # le socket monté (même variable que docker-relais.sh), pas l'option :
     # le montage ne change qu'au make rebuild (faux rassurant en attendant)
-    relais_source="${DEVZONE_RELAIS_SOURCE:-/var/run/docker-host.sock}"
-    if [ -e "$relais_source" ] && [ "$(valeur docker-hote)" = on ]; then
-        printf '  ⚠ socket Docker de l hôte partagé (agents compris)\n'
-    elif [ -e "$relais_source" ]; then
-        printf '  ⚠ socket Docker de l hôte encore partagé : make rebuild sur le poste\n'
-    elif [ "$(valeur docker-hote)" = on ]; then
-        printf '  ⚠ socket Docker de l hôte absent : make rebuild sur le poste\n'
+    # In the Kubernetes workspace (DEVZONE_WORKSPACE=kubernetes), the pod has
+    # no Docker host socket: no alert, the service account is the cluster access
+    if [ "${DEVZONE_WORKSPACE:-}" = kubernetes ]; then
+        printf '  ✔ workspace       Kubernetes pod, service account access only (no Docker socket)\n'
+    else
+        relais_source="${DEVZONE_RELAIS_SOURCE:-/var/run/docker-host.sock}"
+        if [ -e "$relais_source" ] && [ "$(valeur docker-hote)" = on ]; then
+            printf '  ⚠ socket Docker de l hôte partagé (agents compris)\n'
+        elif [ -e "$relais_source" ]; then
+            printf '  ⚠ socket Docker de l hôte encore partagé : make rebuild sur le poste\n'
+        elif [ "$(valeur docker-hote)" = on ]; then
+            printf '  ⚠ socket Docker de l hôte absent : make rebuild sur le poste\n'
+        fi
     fi
     # Applications du catalogue (#414)
     if [ -d "$ICI/catalogue" ]; then

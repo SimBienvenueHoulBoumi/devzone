@@ -1,7 +1,6 @@
-# Branches de PR supprimées après merge (la suppression automatique de GitHub
-# est désactivée dans le flux develop : elle supprimerait develop au merge de
-# la livraison). main, develop et toute branche encore source d'une PR ouverte
-# sont conservées.
+# PR branches deleted after merge (GitHub automatic deletion is off in the
+# develop flow: it would delete develop when the delivery is merged). main,
+# develop and any branch still the source of an open PR are kept.
 name: nettoyage
 
 on:

@@ -161,12 +161,19 @@ etat_json() {
 
     # Option docker-hote (#432) : absente = on ; socket réellement monté
     # (même source que docker-relais.sh), peut différer jusqu'au make rebuild
-    if [ "$(valeur docker-hote)" = on ]; then
-        docker_hote=true
-    fi
-    relais_source="${DEVZONE_RELAIS_SOURCE:-/var/run/docker-host.sock}"
-    if [ -e "$relais_source" ]; then
-        docker_hote_actif=true
+    # In the Kubernetes workspace (DEVZONE_WORKSPACE=kubernetes), the pod has
+    # no Docker host socket: the socket is absent (#515)
+    if [ "${DEVZONE_WORKSPACE:-}" = kubernetes ]; then
+        docker_hote=false
+        docker_hote_actif=false
+    else
+        if [ "$(valeur docker-hote)" = on ]; then
+            docker_hote=true
+        fi
+        relais_source="${DEVZONE_RELAIS_SOURCE:-/var/run/docker-host.sock}"
+        if [ -e "$relais_source" ]; then
+            docker_hote_actif=true
+        fi
     fi
 
     services_cluster="$(cluster_lu)"

@@ -114,7 +114,7 @@ setup() {
     [ -n "$bloc" ]
     [[ "$bloc" == *"runs-on: ubuntu-24.04-arm"* ]] || false
     [[ "$bloc" == *"if: needs.changements.outputs.tester == 'true'"* ]] || false
-    [[ "$bloc" == *"devzone activer ia"* ]] || false
+    [[ "$bloc" == *"devzone enable ia"* ]] || false
     [[ "$bloc" == *"claude --version"* ]] || false
     [[ "$bloc" == *"opencode --version"* ]] || false
 }

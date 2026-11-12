@@ -99,16 +99,13 @@ bloc_sidecar() {
     grep -q -- '- "5m"' <<<"$kd" || false
 }
 
-@test "kubedock : --timeout depuis kubedock.delai (5m par defaut, premier tirage d'image)" {
+@test "kubedock : --timeout depuis kubedock.timeout (5m par defaut, premier tirage d'image)" {
     run rendu_de templates/statefulset.yaml
     [ "$status" -eq 0 ]
-    local kd
-    kd="$(bloc_sidecar "$(bloc_init "$output")" "        - name: kubedock")"
-    grep -q -- '- "5m"' <<<"$kd" || false
-    grep -q -- '- --reapmax' <<<"$kd" || false
-    grep -q -- '- "30m"' <<<"$kd" || false
-    grep -q -- '- --prune-start' <<<"$kd" || false
-    run rendu_de templates/statefulset.yaml --set kubedock.delai=10m
+    local args
+    args="$(awk '/^          args:/{p=1;next} p && /^          [a-z]/{exit} p' <<<"$(bloc_sidecar "$(bloc_init "$output")" "        - name: kubedock")" | sed 's/^ *- //' | paste -sd' ' -)"
+    [ "$args" = 'server --port-forward --reverse-proxy --timeout "5m" --reapmax "30m" --prune-start' ]
+    run rendu_de templates/statefulset.yaml --set kubedock.timeout=10m
     [ "$status" -eq 0 ]
     grep -q -- '- "10m"' <<<"$(bloc_sidecar "$(bloc_init "$output")" "        - name: kubedock")" || false
 }
@@ -263,8 +260,8 @@ bloc_sidecar() {
     ! grep -q -- "egress:" <<<"$output" || false
 }
 
-@test "reseau : sortieRestreinte=true ajoute la regle Egress (namespace et DNS)" {
-    run rendu_de templates/networkpolicy.yaml --set networkPolicy.sortieRestreinte=true
+@test "reseau : restrictEgress=true ajoute la regle Egress (namespace et DNS)" {
+    run rendu_de templates/networkpolicy.yaml --set networkPolicy.restrictEgress=true
     [ "$status" -eq 0 ]
     grep -q -- "- Egress" <<<"$output" || false
     grep -q -- "egress:" <<<"$output" || false

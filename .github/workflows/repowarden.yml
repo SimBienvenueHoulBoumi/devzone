@@ -1,11 +1,11 @@
-# Vérifications repowarden en CI, les mêmes que les hooks du poste, plus la PR
-# elle-même : titre et description (devenus le message du commit en squash),
-# signatures d'agent IA refusées. Exigées pour merger (repowarden proteger).
+# repowarden checks in CI, the same as the workstation hooks, plus the PR
+# itself: title and description (they become the squash commit message), AI
+# agent signatures refused. Required to merge (repowarden proteger).
 name: repowarden
 
 on:
   pull_request:
-    # edited : revérifie quand le titre ou la description de la PR change
+    # edited: checks again when the PR title or description changes
     types: [opened, synchronize, reopened, edited]
   push:
     branches: [main, develop]
@@ -13,7 +13,7 @@ on:
 
 permissions:
   contents: read
-  pull-requests: write # fix-pr : PR mal visée reciblée vers develop
+  pull-requests: write # fix-pr: a PR aimed at the wrong branch is retargeted to develop
 
 jobs:
   repowarden:
@@ -21,9 +21,9 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          fetch-depth: 0 # historique complet : messages de commit, diff depuis la base
+          fetch-depth: 0 # full history: commit messages, diff from the base
       - uses: simdevWarden/repowarden@v4
         with:
-          # Seul develop entre dans main : une PR de travail ouverte vers main
-          # est reciblée vers develop avant les vérifications
+          # Only develop goes into main: a work PR opened against main is
+          # retargeted to develop before the checks
           fix-pr: "true"
