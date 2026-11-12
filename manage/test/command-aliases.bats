@@ -92,3 +92,18 @@ TABLE
     [[ "$output" == *"commande du conteneur"* ]] || false
     [ ! -e enable ]
 }
+
+@test "manage/devzone copied without command-aliases.sh still answers --version" {
+    mkdir -p "$T/paquet/manage"
+    cp "$CLI" "$T/paquet/manage/devzone"
+    run bash "$T/paquet/manage/devzone" --version
+    [ "$status" -eq 0 ]
+    [ -n "$output" ]
+}
+
+@test "manage/devzone stop creates ./stop, not ./arreter" {
+    DEVZONE_SANS_DEMARRER=1 run bash "$CLI" stop
+    [ "$status" -eq 0 ]
+    [ -d stop ]
+    [ ! -e arreter ]
+}

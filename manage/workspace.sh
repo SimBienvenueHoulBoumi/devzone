@@ -207,12 +207,15 @@ copier_depuis() {
 # shellcheck source=scripts/ports-workspace.sh
 . "$ICI/scripts/ports-workspace.sh"
 
-# English command names are accepted, French ones unchanged (#502)
+# English command names are accepted, French ones unchanged (#502).
+# A copied devzone may miss the aliases file: then no normalization.
 # shellcheck source=../.devcontainer/command-aliases.sh
 # shellcheck disable=SC1091
-. "$RACINE/.devcontainer/command-aliases.sh"
-if [ "$#" -gt 0 ]; then
-    set -- "$(command_canonical "$1")" "${@:2}"
+if [ -f "$RACINE/.devcontainer/command-aliases.sh" ]; then
+    . "$RACINE/.devcontainer/command-aliases.sh"
+    if [ "$#" -gt 0 ]; then
+        set -- "$(command_canonical "$1")" "${@:2}"
+    fi
 fi
 
 case "${1:-}" in
