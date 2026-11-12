@@ -249,6 +249,7 @@ Depuis le poste :
 
 ```bash
 devzone workspace demarrer                # installe ou met a jour le workspace
+devzone workspace demarrer --image dépôt:tag   # image construite à la main
 devzone workspace arreter                 # desinstalle le workspace
 devzone workspace etat                    # etat des pods
 devzone workspace shell                   # shell dans le conteneur workspace
@@ -262,6 +263,8 @@ devzone workspace nettoyer-docker [--oui] # supprime les volumes Docker devzone-
 ```
 
 Les commandes utilisent helm et kubectl du poste, avec le contexte devzone s il existe, sinon le contexte courant. L image est construite par la CI a chaque PR et publiee sur ghcr.io a la livraison.
+
+L'image vient de ghcr.io, avec le tag de la version de devzone (`latest` depuis un clone du dépôt) ; si elle manque, demarrer le dit et désinstalle le workspace.
 
 ### Projets dans un volume
 
