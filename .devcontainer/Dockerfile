@@ -103,7 +103,7 @@ RUN set -eu; \
     tmp="$(mktemp -d)"; \
     curl -fsSL "https://github.com/moby/buildkit/releases/download/v${BUILDKIT_VERSION}/buildkit-v${BUILDKIT_VERSION}.linux-${arch}.tar.gz" -o "$tmp/buildkit.tar.gz"; \
     echo "$bk_sha  $tmp/buildkit.tar.gz" | sha256sum -c --quiet; \
-    tar -xzf "$tmp/buildkit.tar.gz" -C "$tmp" ./bin/buildctl; \
+    tar -xzf "$tmp/buildkit.tar.gz" -C "$tmp" bin/buildctl; \
     install -m 0755 "$tmp/bin/buildctl" /usr/local/bin/buildctl; \
     rm -rf "$tmp"
 
