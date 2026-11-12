@@ -23,8 +23,32 @@ case "$*" in
     "config current-context")
         echo "${FAUX_CONTEXTE_COURANT:-docker-desktop}"
         ;;
+    *"get statefulset devzone-workspace "*)
+        echo "${FAUX_REVISION:-rev-1}"
+        ;;
+    *"get pod devzone-workspace-0 "*controller-revision-hash*)
+        if [ -n "${FAUX_POD_REVISIONS:-}" ]; then
+            read -r -a revisions <<<"$FAUX_POD_REVISIONS"
+            index=0
+            [ -f "$T/pod-revision.count" ] && index="$(cat "$T/pod-revision.count")"
+            [ "$index" -ge "${#revisions[@]}" ] && index=$((${#revisions[@]} - 1))
+            echo "${revisions[$index]}"
+            echo "$index" >"$T/pod-revision.index"
+            echo "$((index + 1))" >"$T/pod-revision.count"
+        else
+            echo "${FAUX_REVISION:-rev-1}"
+        fi
+        ;;
     *"get pod devzone-workspace-0 "*)
-        echo "${FAUX_POD:-Running}"
+        if [ -n "${FAUX_POD_ETATS:-}" ]; then
+            read -r -a states <<<"$FAUX_POD_ETATS"
+            index=0
+            [ -f "$T/pod-revision.index" ] && index="$(cat "$T/pod-revision.index")"
+            [ "$index" -ge "${#states[@]}" ] && index=$((${#states[@]} - 1))
+            echo "${states[$index]}"
+        else
+            echo "${FAUX_POD:-Running}"
+        fi
         ;;
     *"get events "*)
         echo "${FAUX_EVENEMENTS:-}"
@@ -215,6 +239,30 @@ HELM
     [[ "$output" != *"introuvable"* ]] || false
     [[ "$output" == *"amd64 et arm64"* ]] || false
     grep -q -- "uninstall devzone-workspace" "$T/helm.log" || false
+}
+
+@test "workspace demarrer : ancien pod Running puis nouvelle revision en ImagePullBackOff" {
+    export FAUX_CONTEXTES="docker-desktop"
+    export FAUX_REVISION="rev-new"
+    export FAUX_POD_REVISIONS="rev-old rev-new"
+    export FAUX_POD_ETATS="Running ImagePullBackOff"
+    : >"$T/helm.log"
+    run bash "$CLI" workspace demarrer
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"introuvable"* ]] || false
+    grep -q -- "uninstall devzone-workspace" "$T/helm.log" || false
+}
+
+@test "workspace demarrer : ancien pod ErrImagePull puis nouvelle revision Running" {
+    export FAUX_CONTEXTES="docker-desktop"
+    export FAUX_REVISION="rev-new"
+    export FAUX_POD_REVISIONS="rev-old rev-new"
+    export FAUX_POD_ETATS="ErrImagePull Running"
+    : >"$T/helm.log"
+    run bash "$CLI" workspace demarrer
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"✔ workspace démarré"* ]] || false
+    ! grep -q -- "uninstall devzone-workspace" "$T/helm.log" || false
 }
 
 @test "workspace demarrer : --image sans valeur, usage et aucun helm" {
