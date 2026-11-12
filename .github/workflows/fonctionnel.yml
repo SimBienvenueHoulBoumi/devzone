@@ -1,27 +1,26 @@
-# Tests fonctionnels : construit un devzone isolé et joue les scénarios d'un
-# utilisateur (outils, modules, Kubernetes avec kind, hooks, redémarrage,
-# rebuild) ; même script qu'en local (make test-fonctionnel). Job cli : la CLI
-# tapée dans un vrai terminal, chaque commande avec un délai maximal (make
-# test-cli). Job windows : fins de ligne, paquet npm (installé dans un préfixe
-# isolé, jamais le global de la machine) et commande devzone sous windows-latest
-# (manage/test/windows.sh, jouable en local), puis même parcours via cmd avec une
-# installation réellement globale (raccourci .cmd de npm, le cas d'un utilisateur
-# Windows). Job ia-arm64 : assistants IA installés aux versions figées sur
-# arm64 (Mac Apple Silicon), claude et opencode vérifiés.
+# Functional tests: builds an isolated devzone and plays the scenarios of a
+# user (tools, modules, Kubernetes with kind, hooks, restart, rebuild); same
+# script as locally (make test-fonctionnel). Job cli: the CLI typed in a real
+# terminal, each command with a maximum time (make test-cli). Job windows: line
+# endings, npm package (installed in an isolated prefix, never the global one of
+# the machine) and devzone command on windows-latest (manage/test/windows.sh,
+# runnable locally), then the same path through cmd with a really global install
+# (npm .cmd shim, the case of a Windows user). Job ia-arm64: AI assistants
+# installed at the pinned versions on arm64 (Apple Silicon Mac), claude and
+# opencode checked.
 #
-# Exigés pour merger, dans develop comme dans main (livraison), par la
-# vérification de synthèse tests-conteneur (requiredChecks, .repowarden.conf).
-# Le workflow tourne sur chaque PR (aucun filtre paths : la synthèse doit
-# toujours exister) ; le job changements décide par chemin : fonctionnel, cli,
-# windows et ia-arm64 (une dizaine de minutes chacun, 15 pour windows) ne
-# tournent que si la PR touche le conteneur, les tests, la CLI, .gitattributes
-# ou package.json (manage/test/ci-conteneur.sh) ; une PR de docs seule n'attend pas.
-# Job bats : bats manage/test/ (tests unitaires) sur chaque PR, sans décision
-# par chemin (quelques secondes ; un test peut lire la doc ou un workflow),
-# sous ubuntu et sous macOS avec le bash 3.2 du système (scripts de l'hôte).
-# tests-conteneur réussit si bats a réussi et si les quatre autres ont réussi,
-# ou s'ils n'avaient pas à tourner ; un échec ou une annulation la fait
-# échouer. Push sur develop et main : bats seul. À la main : tout tourne.
+# Required to merge, in develop as in main (livraison), through the
+# tests-conteneur summary check (requiredChecks, .repowarden.conf). The workflow
+# runs on every PR (no paths filter: the summary must always exist); the
+# changements job decides by path: fonctionnel, cli, windows and ia-arm64 (about
+# ten minutes each, 15 for windows) only run when the PR touches the container,
+# the tests, the CLI, .gitattributes or package.json (manage/test/ci-conteneur.sh);
+# a docs-only PR does not wait. Job bats: bats manage/test/ (unit tests) on every
+# PR, with no path decision (a test can read the docs or a workflow), on ubuntu
+# and on macOS with the system bash 3.2 (host scripts). tests-conteneur passes
+# when bats passed and the four others passed, or did not have to run; a failure
+# or a cancellation makes it fail. Push on develop and main: bats only. By hand:
+# everything runs.
 name: fonctionnel
 
 on:
@@ -46,8 +45,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          fetch-depth: 0 # base et tête de la PR, pour la liste des fichiers changés
-      - name: Fichiers changés touchant le conteneur, les tests ou la CLI
+          fetch-depth: 0 # base and head of the PR, for the list of changed files
+      - name: Changed files touching the container, the tests or the CLI
         id: detection
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
@@ -59,8 +58,8 @@ jobs:
               cat changes.txt
               tester="$(bash manage/test/ci-conteneur.sh a-tester <changes.txt)"
               ;;
-            push) tester=false ;; # develop et main : déjà testés par la PR, bats seul
-            *) tester=true ;;     # à la main : tout tourne
+            push) tester=false ;; # develop and main: already tested by the PR, bats only
+            *) tester=true ;;     # by hand: everything runs
           esac
           echo "tester=$tester"
           echo "tester=$tester" >>"$GITHUB_OUTPUT"
@@ -72,8 +71,8 @@ jobs:
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v7
-      # DNS publics pour le Docker du runner : son DNS échoue parfois sur archive.ubuntu.com (#468)
-      - name: DNS du Docker du runner
+      # Public DNS for the runner Docker: its DNS sometimes fails on archive.ubuntu.com (#468)
+      - name: Runner Docker DNS
         run: bash manage/scripts/ci-dns.sh
       - run: bash manage/test/fonctionnel.sh
 
@@ -84,8 +83,8 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
-      # DNS publics pour le Docker du runner : son DNS échoue parfois sur archive.ubuntu.com (#468)
-      - name: DNS du Docker du runner
+      # Public DNS for the runner Docker: its DNS sometimes fails on archive.ubuntu.com (#468)
+      - name: Runner Docker DNS
         run: bash manage/scripts/ci-dns.sh
       - run: bash manage/test/cli-terminal.sh
 
@@ -95,29 +94,29 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 15
     steps:
-      # Réglages d'un poste Windows ; avant le checkout, sinon la copie est déjà faite
-      - name: Checkout avec core.autocrlf true (comme un poste Windows)
+      # Windows workstation settings; before the checkout, otherwise the copy is already made
+      - name: Checkout with core.autocrlf true (like a Windows workstation)
         shell: cmd
         run: |
           git config --global core.autocrlf true
           git config --global core.safecrlf false
       - uses: actions/checkout@v7
-      # Les fins de ligne sont vérifiées par manage/test/windows.sh (même critère que la
-      # garde de manage/test/cli.bats : tout fichier suivi commençant par #!, Makefile)
-      - name: Tests Windows sous Git Bash (manage/test/windows.sh)
+      # Line endings are checked by manage/test/windows.sh (same rule as the guard of
+      # manage/test/cli.bats: every tracked file starting with #!, Makefile)
+      - name: Windows tests under Git Bash (manage/test/windows.sh)
         shell: bash
         run: bash manage/test/windows.sh
-      # Sous shell: cmd, une commande qui échoue n'arrête pas le script : chaque
-      # commande qui doit réussir est suivie de || exit /b 1, et la fin du
-      # script est explicite (sans elle, l'étape prend le code de la dernière
-      # commande, ici un desinstaller qui échoue à raison)
-      # Version lue par node avec le chemin en argument (%CD%\package.json, donc
-      # jamais de quote imbriquée : dans un for /f de cmd, une ' non échappée
-      # termine la chaîne), écrite dans un fichier puis relue par set /p
-      # Chaque sortie de devzone est écrite dans sortie.txt puis affichée
-      # (type) : un échec montre ce que la commande a répondu. Le code retour
-      # est lu dans %SORTIE% avant le type, qui le remettrait à zéro
-      - name: La commande devzone via le raccourci .cmd de npm (comme un utilisateur)
+      # Under shell: cmd, a failing command does not stop the script: each command
+      # that must succeed is followed by || exit /b 1, and the end of the script
+      # is explicit (without it, the step takes the code of the last command,
+      # here an uninstall that rightly fails)
+      # Version read by node with the path as argument (%CD%\package.json, so
+      # never a nested quote: in a cmd for /f, an unescaped quote ends the
+      # string), written to a file then read back by set /p
+      # Each devzone output is written to sortie.txt then shown (type): a
+      # failure shows what the command answered. The return code is read into
+      # %SORTIE% before type, which would reset it
+      - name: The devzone command through the npm .cmd shim (like a user)
         shell: cmd
         run: |
           node -p "require(process.argv[1]).version" %CD%\package.json > %RUNNER_TEMP%\version.txt || exit /b 1
@@ -148,7 +147,7 @@ jobs:
           if not exist %RUNNER_TEMP%\dzcmd\manage\scripts\lancer.sh exit /b 1
           if not exist %RUNNER_TEMP%\dzcmd\manage\scripts\desinstaller.sh exit /b 1
           mkdir %RUNNER_TEMP%\plein || exit /b 1
-          echo important > %RUNNER_TEMP%\plein\fichier
+          echo important > %RUNNER_TEMP%\plein\notes.txt
           call devzone %RUNNER_TEMP%\plein > %RUNNER_TEMP%\sortie.txt 2>&1
           set SORTIE=%errorlevel%
           type %RUNNER_TEMP%\sortie.txt
@@ -161,11 +160,11 @@ jobs:
           if %SORTIE% equ 0 exit /b 1
           exit /b 0
 
-  # Assistants IA sur arm64 (Mac Apple Silicon), que les jobs x86_64 ne voient
-  # pas (#194) : le script devzone du conteneur installe les versions figées
-  # (Ubuntu 24.04, glibc, Node LTS comme l'image et sa feature node), puis
-  # claude et opencode doivent répondre. Une montée de version d'un assistant
-  # touche .devcontainer/devzone : ce job la valide avant le merge
+  # AI assistants on arm64 (Apple Silicon Mac), which the x86_64 jobs do not see
+  # (#194): the devzone script of the container installs the pinned versions
+  # (Ubuntu 24.04, glibc, Node LTS like the image and its node feature), then
+  # claude and opencode must answer. A version bump of an assistant touches
+  # .devcontainer/devzone: this job validates it before the merge
   ia-arm64:
     needs: changements
     if: needs.changements.outputs.tester == 'true'
@@ -176,21 +175,21 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: lts/*
-      - name: devzone activer ia, puis claude --version et opencode --version
+      - name: devzone enable ia, then claude --version and opencode --version
         env:
           DEVZONE_ETAT: ${{ runner.temp }}/devzone-modules
         run: |
           uname -m
           node --version
-          bash .devcontainer/devzone activer ia
+          bash .devcontainer/devzone enable ia
           claude --version
           opencode --version
 
-  # Tests unitaires (bats manage/test/) sur chaque PR et chaque push de develop
-  # et main (#192). ubuntu : toute la suite. macOS : /bin/bash (3.2, celui du
-  # système) en tête du PATH, pour les scripts qui tournent sur l'hôte ou en
-  # CI (commande npm, lancer.sh, docker.sh, desinstaller.sh, versions.sh,
-  # ci-conteneur.sh) ; devzone.bats teste la commande du conteneur (Linux)
+  # Unit tests (bats manage/test/) on every PR and every push of develop and
+  # main (#192). ubuntu: the whole suite. macOS: /bin/bash (3.2, the system one)
+  # first in PATH, for the scripts that run on the host or in CI (npm command,
+  # lancer.sh, docker.sh, desinstaller.sh, versions.sh, ci-conteneur.sh);
+  # devzone.bats tests the container command (Linux)
   bats:
     # Whole suite on ubuntu split into four shards (manage/test/shard.sh):
     # in one job it went past its timeout as the suite grew (#522)
@@ -208,7 +207,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
-      - name: bash 3.2 du système en tête du PATH (macOS)
+      - name: System bash 3.2 first in PATH (macOS)
         if: runner.os == 'macOS'
         run: |
           mkdir -p "$RUNNER_TEMP/bash32"
@@ -223,7 +222,7 @@ jobs:
           # One file name per line, no spaces: word splitting is wanted here
           # shellcheck disable=SC2046
           npx --yes bats@1.10.0 $(bash manage/test/shard.sh "$SHARD" "$TOTAL")
-      - name: bats des scripts de l'hôte sous bash 3.2 (macOS)
+      - name: bats of the host scripts under bash 3.2 (macOS)
         if: runner.os == 'macOS'
         run: |
           bash --version | head -1
@@ -241,8 +240,8 @@ jobs:
       - name: english check
         run: bash manage/scripts/check-english.sh
 
-  # Synthèse exigée pour merger (requiredChecks) : toujours lancée, jamais
-  # « skipped » (GitHub compterait un job sauté comme réussi)
+  # Summary required to merge (requiredChecks): always run, never "skipped"
+  # (GitHub would count a skipped job as passed)
   tests-conteneur:
     needs: [changements, fonctionnel, cli, windows, ia-arm64, bats]
     if: always()
@@ -250,7 +249,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v7
-      - name: Tests du conteneur réussis, ou sans objet
+      - name: Container tests passed, or not needed
         env:
           TESTER: ${{ needs.changements.outputs.tester }}
           CHANGEMENTS: ${{ needs.changements.result }}

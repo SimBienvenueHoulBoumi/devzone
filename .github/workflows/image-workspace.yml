@@ -1,23 +1,23 @@
 name: image-workspace
 
-# Image complète du devcontainer (Dockerfile + features de devcontainer.json),
-# construite par l'action officielle devcontainers/ci, version figée.
+# Full devcontainer image (Dockerfile + features of devcontainer.json), built by
+# the official devcontainers/ci action, pinned version.
 on:
   pull_request:
   push:
     tags:
       - "v*"
-  # Appelé par release.yml à chaque livraison (#486), ou à la main pour publier une version
+  # Called by release.yml at every delivery (#486), or by hand to publish a version
   workflow_call:
     inputs:
       tag:
-        description: Tag de la release (vX.Y.Z)
+        description: Release tag (vX.Y.Z)
         type: string
         required: true
   workflow_dispatch:
     inputs:
       tag:
-        description: Tag de la release (vX.Y.Z)
+        description: Release tag (vX.Y.Z)
         type: string
         required: true
 
@@ -32,8 +32,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      # DNS publics pour le Docker du runner : son DNS échoue parfois sur archive.ubuntu.com (#468)
-      - name: DNS du Docker du runner
+      # Public DNS for the runner Docker: its DNS sometimes fails on archive.ubuntu.com (#468)
+      - name: Runner Docker DNS
         run: bash manage/scripts/ci-dns.sh
       - uses: devcontainers/ci@513af61f4de4f75d37e4438f184ba4358f0fc1ca # v0.3.1900000450
         with:
@@ -43,7 +43,7 @@ jobs:
           push: never
 
   publish:
-    # Tag fourni (appel par release.yml ou lancement à la main) ou push d un tag v*
+    # Tag given (call from release.yml or run by hand) or push of a v* tag
     if: inputs.tag != '' || startsWith(github.ref, 'refs/tags/v')
     needs: build
     runs-on: ubuntu-latest
@@ -52,13 +52,13 @@ jobs:
       contents: read
       packages: write
     env:
-      # Tag de l'image : version sans le « v » (vX.Y.Z → X.Y.Z), aussi poussée en latest
+      # Image tag: version without the v (vX.Y.Z -> X.Y.Z), also pushed as latest
       TAG: ${{ inputs.tag || github.ref_name }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Version de l'image
+      - name: Image version
         id: version
         run: echo "version=${TAG#v}" >>"$GITHUB_OUTPUT"
       - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
@@ -66,7 +66,7 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      # Image multi-architecture : Mac Apple Silicon (arm64) et postes amd64 (#494)
+      # Multi-architecture image: Apple Silicon Mac (arm64) and amd64 workstations (#494)
       - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - uses: devcontainers/ci@513af61f4de4f75d37e4438f184ba4358f0fc1ca # v0.3.1900000450

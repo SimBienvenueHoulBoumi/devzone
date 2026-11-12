@@ -8,13 +8,13 @@ spec:
   podSelector: {}
   policyTypes:
     - Ingress
-    {{- if .Values.networkPolicy.sortieRestreinte }}
+    {{- if .Values.networkPolicy.restrictEgress }}
     - Egress
     {{- end }}
   ingress:
     - from:
         - podSelector: {}
-  {{- if .Values.networkPolicy.sortieRestreinte }}
+  {{- if .Values.networkPolicy.restrictEgress }}
   egress:
     - to:
         - podSelector: {}
