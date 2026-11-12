@@ -326,18 +326,50 @@ dernier_journal_npm() {
     echo "${journal:-$HOME/.npm/_logs}"
 }
 
-# Installe les assistants IA figés, vérifiés par leur --version, 3 essais : npm
-# abandonne en silence un binaire de plateforme non téléchargé (#194)
+# opencode's postinstall only finds a platform binary that npm installed as an
+# optional dependency; when npm skipped it (pod libc mismatch), the install
+# fails with EBADPLATFORM. Name it explicitly, at the same version, so it is
+# installed alongside. Output: package@version.
+opencode_platform_package() {
+    local os arch musl=""
+    case "$(uname -s)" in
+        Darwin) os=darwin ;;
+        *) os=linux ;;
+    esac
+    case "$(uname -m)" in
+        aarch64 | arm64) arch=arm64 ;;
+        *) arch=x64 ;;
+    esac
+    if ldd --version 2>&1 | grep -qi musl; then
+        musl=-musl
+    fi
+    echo "opencode-${os}-${arch}${musl}@${IA_OPENCODE##*@}"
+}
+
+# Installs each pinned AI assistant with its own npm command (3 tries each),
+# then checks its binary: npm silently drops a platform binary it failed to
+# download (#194), and one assistant failing must not block the other.
 installer_ia() {
-    local essai
-    for essai in 1 2 3; do
-        if avec_progression npm install -g --no-fund --no-audit --loglevel=error "${IA_PAQUETS[@]}" >/dev/null &&
-            claude --version >/dev/null 2>&1 && opencode --version >/dev/null 2>&1; then
-            return 0
-        fi
-        [ "$essai" -eq 3 ] || echo "devzone : installation des assistants IA incomplète, nouvel essai ($((essai + 1))/3)…" >&2
+    local package binary attempt packages
+    IA_FAILED=()
+    for package in "${IA_PAQUETS[@]}"; do
+        case "$package" in
+            opencode-ai@*) binary=opencode; packages=("$(opencode_platform_package)" "$package") ;;
+            *) binary=claude; packages=("$package") ;;
+        esac
+        for attempt in 1 2 3; do
+            if avec_progression npm install -g --no-fund --no-audit --loglevel=error "${packages[@]}" >/dev/null &&
+                "$binary" --version >/dev/null 2>&1; then
+                break
+            fi
+            if [ "$attempt" -lt 3 ]; then
+                echo "devzone : installation de ${package%@*} incomplète, nouvel essai ($((attempt + 1))/3)…" >&2
+            else
+                IA_FAILED+=("$package")
+            fi
+        done
     done
-    return 1
+    [ "${#IA_FAILED[@]}" -eq 0 ]
 }
 
 appliquer_ia() {
@@ -347,7 +379,7 @@ appliquer_ia() {
         if ! installer_ia; then
             journal="$(dernier_journal_npm)"
             echo "journal npm : $journal" >"$(fichier_echec ia)"
-            echo "devzone : échec de l'installation de ${IA_PAQUETS[*]} (npm install -g, 3 essais) ; journal npm : $journal ; réessayer : devzone appliquer" >&2
+            echo "devzone : échec de l'installation de ${IA_FAILED[*]} (npm install -g, 3 essais) ; journal npm : $journal ; réessayer : devzone appliquer" >&2
             return 1
         fi
         rm -f "$(fichier_echec ia)"
