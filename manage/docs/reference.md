@@ -298,6 +298,20 @@ Apres `devzone workspace migrer`, `make up`, `make shell` et `make stop` piloten
 - **Un seul veilleur** : verrou `mkdir` et pid dans `.devzone.ports-workspace/` du dossier devzone ; un second `demarrer` répond « déjà lancé ».
 - **Garde-fou** : le veilleur ne tourne jamais pendant les tests automatiques (faux kubectl et lsof).
 
+### Construire une image dans le workspace
+
+Dans le pod Kubernetes (`DEVZONE_WORKSPACE=kubernetes`), le client BuildKit `buildctl` (même version que le sidecar `buildkitd`) est installé dans l'image et parle au sidecar via `BUILDKIT_HOST=tcp://127.0.0.1:1234` (#514, archive officielle https://github.com/moby/buildkit/releases/tag/v0.34.2).
+
+```bash
+devzone build <dossier> [--tag <nom>]
+```
+
+- Sans `--tag` : `buildctl build --frontend dockerfile.v0 --local context=<dossier> --local dockerfile=<dossier> --output type=cacheonly` (validation/cache uniquement).
+- Avec `--tag <nom>` : sortie `--output type=image,name=<nom>,push=false` (image chargée dans le cache du sidecar).
+- Hors du pod, `devzone build` refuse avec « use docker build on the Docker workstation ».
+
+Le cache d'images reste dans le système de fichiers du sidecar `buildkitd` : il est perdu au redémarrage de ce conteneur.
+
 ### Edition depuis le poste
 
 **VS Code** : `devzone workspace vscode` affiche la marche a suivre. Extensions « Kubernetes » et « Dev Containers » ; dans la vue Kubernetes, avec le contexte `devzone` : namespace `devzone-workspace`, pod `devzone-workspace-0`, conteneur `workspace` → « Attach to Running Kubernetes Container », puis ouvre le dossier `/workspaces/projets`.
@@ -316,7 +330,8 @@ En attendant ces deux points, edite le projet sur le poste par les copies : `dev
 - Les ports des conteneurs sont relayes par kubedock (`--port-forward --reverse-proxy`) : rien a publier sur le pod.
 - Le conteneur `workspace` ne demarre qu'une fois kubedock et BuildKit joignables (startupProbe, 60 s au plus).
 - Fonctions de Testcontainers non prises en charge par kubedock 0.23.0 : reseaux, montages et compose ne sont pas essayes (#410).
-- Les images construites par BuildKit (`BUILDKIT_HOST=tcp://127.0.0.1:1234`, `buildctl`) restent dans le systeme de fichiers du sidecar `buildkitd` : le cache est perdu quand ce conteneur redemarre.
+- **Conteneurs au premier plan** : `docker run --rm` n'attache pas la sortie et les pods terminés/`--rm` peuvent rester en `Completed` (limite de kubedock 0.23.0, constatée). Utiliser `docker run -d` puis `docker logs`, ou Testcontainers (qui lit les logs). Pour limiter l'accumulation, kubedock est lancé avec `--reapmax` et `--prune-start` (https://github.com/joyrex2001/kubedock/blob/master/config.md).
+- Les images construites par BuildKit (`BUILDKIT_HOST=tcp://127.0.0.1:1234`, `devzone build`) restent dans le systeme de fichiers du sidecar `buildkitd` : le cache est perdu quand ce conteneur redemarre.
 
 ### Securite : workspace sans Docker
 

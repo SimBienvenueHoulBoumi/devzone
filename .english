@@ -6,3 +6,5 @@ manage/test/command-aliases.bats
 manage/test/check-english.bats
 manage/test/shard.sh
 manage/test/shard.bats
+.devcontainer/workspace-build.sh
+manage/test/workspace-build.bats

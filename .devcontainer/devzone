@@ -16,6 +16,7 @@
 #   devzone test-bash32             lance les tests bats sous bash 3.2 (conteneur Docker)
 #   devzone test-gitlab             essai de bout en bout du module et de la plateforme GitLab
 #   devzone agent <dossier> <fichier-consigne>  dirige opencode sur une consigne
+#   devzone build <dossier> [--tag <nom>]  construit une image dans le workspace Kubernetes (BuildKit)
 #   devzone activer postgres [--contexte CTX] [--confirmer CTX]   PostgreSQL partagé, cluster au choix
 #   devzone postgres creer <projet>  base et utilisateur d'un projet (aussi : liste, psql, supprimer)
 #   devzone gitlab migrer [--oui]    GitLab dans le cluster des services, puis ancien cluster kind supprimé
@@ -1342,6 +1343,9 @@ case "${1:-}" in
         ;;
     agent)
         bash "$ICI/agent.sh" "${@:2}"
+        ;;
+    build)
+        bash "$ICI/workspace-build.sh" "${@:2}"
         ;;
     reparer) reparer ;;
     demarrer) bash "$ICI/demarrage.sh" ;;
