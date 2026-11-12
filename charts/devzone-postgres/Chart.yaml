@@ -1,0 +1,6 @@
+apiVersion: v2
+name: devzone-postgres
+description: Shared PostgreSQL of devzone, one database per project (#280), deployed by Argo CD (#516)
+type: application
+version: 0.1.0
+appVersion: "16.15"

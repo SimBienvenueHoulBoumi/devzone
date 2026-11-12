@@ -37,8 +37,8 @@ attendre_pod() {
                         ;;
                 esac
                 echo "  Pour une image construite à la main : devzone workspace demarrer --image <repository:tag>" >&2
-                # shellcheck disable=SC2046
-                helm $(drapeau_helm) uninstall devzone-workspace --namespace devzone-workspace >/dev/null 2>&1 || true
+                # Application Argo CD ou release helm (#516) : sinon selfHeal recréerait le pod
+                workspace_undeploy >/dev/null 2>&1 || true
                 return 1
                 ;;
             Running*)

@@ -56,6 +56,8 @@ case "$*" in
     *"get nodes "*)
         echo "${FAUX_ARCH:-arm64}"
         ;;
+    *"get namespace devzone-argocd"*) [ -n "${FAUX_ARGOCD:-}" ]; exit $? ;;
+    *"get application.argoproj.io devzone-workspace"*) [ -n "${FAUX_APP:-}" ]; exit $? ;;
 esac
 exit 0
 KUBE
@@ -68,6 +70,10 @@ HELM
     chmod +x "$T/bin/kubectl" "$T/bin/helm"
     export PATH="$T/bin:$PATH"
     export DEVZONE_WORKSPACE_ATTENTE=1 DEVZONE_WORKSPACE_PAS=0.1
+    # Devzone folder of the workstation: its state, never the real one; Argo CD
+    # off here (its own tests: workspace-argocd.bats, #516)
+    cd "$T" || return 1
+    printf 'workspace=kubernetes\nargocd=off\n' >"$T/.devzone.modules"
 }
 
 @test "workspace demarrer : helm upgrade --install avec contexte devzone s'il existe" {
