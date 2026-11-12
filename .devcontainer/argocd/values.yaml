@@ -3,6 +3,10 @@
 # L'accès passe par le relais kubectl port-forward du conteneur (8443:443).
 global:
   domain: ""
+# Aggregate ClusterRoles (#516): the Application resources join the edit role,
+# so the limited devzone account (#430) manages the Applications of the
+# projects in devzone-argocd (devzone argocd app …)
+createAggregateRoles: true
 dex:
   enabled: false
 notifications:

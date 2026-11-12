@@ -431,6 +431,8 @@ devzone $(version) : environnement de développement conteneurisé
                            poste Kubernetes : pilote le chart devzone-workspace
   devzone workspace services enable|disable <service>|status
                            services (gitlab, postgres, argocd) du workspace Kubernetes
+  devzone workspace argocd status|init|apply|app add|list|remove
+                           Argo CD du workspace : dépôt GitOps, .argocd.conf, projets
   (anciens noms français acceptés : mettre-a-jour, desinstaller, demarrer…)
   devzone --version
 EOF

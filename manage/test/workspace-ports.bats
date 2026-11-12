@@ -23,6 +23,7 @@ case "$*" in
     "config get-contexts -o name") echo docker-desktop ;;
     *" exec "*" ss "*) cat "$T/ss" ;;
     *" get svc pgadmin "*) [ -f "$T/pgadmin" ] && cat "$T/pgadmin" ;;
+    *" get svc argocd-server "*) [ -f "$T/argocd" ] && cat "$T/argocd" ;;
     *"get pod devzone-workspace-0 "*) echo "${FAUX_POD:-Running}" ;;
     *" port-forward "*) exec sleep 120 ;;
 esac
@@ -160,6 +161,26 @@ attendre_arret() {
     tour
     sleep 0.3
     ! grep -q "svc/mysql" "$T/kubectl.log" || false
+}
+
+@test "ports : Argo CD UI relayed on 8443 to the https port of the service (#516)" {
+    echo 443 >"$T/argocd"
+    tour
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"port 8443 relayé"* ]] || false
+    sleep 0.3
+    grep -q -- "--namespace devzone-argocd port-forward --address 127.0.0.1 svc/argocd-server 8443:443" "$T/kubectl.log" || false
+}
+
+@test "ports : no Argo CD relay without the service, nor with argocd=off" {
+    tour
+    sleep 0.3
+    ! grep -q "svc/argocd-server" "$T/kubectl.log" || false
+    echo 443 >"$T/argocd"
+    echo "argocd=off" >"$T/poste/.devzone.modules"
+    tour
+    sleep 0.3
+    ! grep -q "svc/argocd-server" "$T/kubectl.log" || false
 }
 
 @test "ports demarrer : un seul veilleur, arreter le retire avec ses port-forward" {

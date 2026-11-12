@@ -1,0 +1,11 @@
+# Same objects as .devcontainer/postgres/postgres.yaml, the helm-direct path:
+# manage/test/chart-postgres.bats checks that both renderings agree. The
+# secret postgres-admin (superuser password) is created apart by devzone,
+# never by the chart (#516: secrets out of Git).
+image: postgres:16.15-alpine
+# Size of the data volume (POSTGRES_TAILLE of the helm-direct path)
+size: 5Gi
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
