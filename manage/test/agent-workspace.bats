@@ -68,6 +68,15 @@ KUBECTL
     ! grep -q -- "devzone agent" "$FAKE_KC_LOG" || false
 }
 
+@test "agent-workspace : dossier absent -> code 2, message dossier introuvable" {
+    agent_consigne
+    run bash "$DEVZONE" agent "$DEVZONE_RACINE/workspace/absent" "$DEVZONE_RACINE/workspace/consigne.txt"
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"dossier introuvable"* ]] || false
+    ! grep -q -- " cp " "$FAKE_KC_LOG" || false
+    ! grep -q -- "devzone agent" "$FAKE_KC_LOG" || false
+}
+
 @test "agent-workspace : pod absent -> lancement local" {
     agent_consigne
     export FAKE_KC_PHASE=Pending

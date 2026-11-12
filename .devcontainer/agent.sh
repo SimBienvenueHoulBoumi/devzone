@@ -8,7 +8,6 @@
 # Au premier plan ; & ou nohup pour plusieurs sessions en parallèle, une par
 # dossier (le journal et le rang des modèles sont partagés par instance).
 set -euo pipefail
-
 # Dossier du script, liens symboliques suivis à la main : readlink -f n'existe
 # pas sur macOS (tests sous bash 3.2).
 SOURCE="${BASH_SOURCE[0]}"
@@ -23,7 +22,6 @@ done
 ICI="$(cd -P "$(dirname "$SOURCE")" && pwd)"
 # shellcheck disable=SC2034 # lue par agent-session.sh
 RACINE="${DEVZONE_RACINE:-$(dirname "$ICI")}"
-
 # Écarts de modèles et attente du réseau (#328)
 # shellcheck source=agent-erreurs.sh
 # shellcheck disable=SC1091
@@ -40,7 +38,6 @@ RACINE="${DEVZONE_RACINE:-$(dirname "$ICI")}"
 # shellcheck source=agent-workspace.sh
 # shellcheck disable=SC1091
 . "$ICI/agent-workspace.sh"
-
 # Liste de secours si « opencode models opencode » ne répond pas : même ordre
 # que la configuration opencode livrée par devzone.
 FREE_MODELS=(big-pickle deepseek-v4.1-flash-free glm-5.3-flash-free nemotron-3.5-super-vl-free
@@ -54,9 +51,7 @@ PAUSE_RANG=0
 if [ -n "${DEVZONE_AGENT_PAUSE_RANG:-}" ] && [ -n "${BATS_TEST_TMPDIR:-}" ]; then PAUSE_RANG="$DEVZONE_AGENT_PAUSE_RANG"; fi
 # Relances d'une même session pour cause réseau, par modèle, avant le modèle suivant
 RELANCES_RESEAU=3
-
 refuse() { echo "devzone agent : $*" >&2; exit 2; }
-
 agent_lancer() {
     local dossier="$1" consigne="$2"
     local journal etat debut m i pid code offset taille demarre freeze discard nouveau
@@ -89,7 +84,6 @@ agent_lancer() {
     echo $(( debut + 1 )) >"$etat/rang"
     verrou_lacher
     echo "=== rang $(( debut + 1 ))/${#FREE_MODELS[@]}" >>"$journal"
-
     consigne_courante="$consigne"
     # Reprise : une session neuve repart du travail déjà présent (git status,
     # diff, log), sans historique de conversation.
@@ -102,7 +96,6 @@ agent_lancer() {
         printf '\n\nREPRISE : une session précédente a été interrompue. Lis git status, git diff et git log dans le dossier, vérifie ce travail contre la consigne ci-dessus, corrige ce qui s en écarte et termine ce qui manque.\n' >>"$c"
         consigne_courante="$c"
     }
-
     i=0
     while [ "$i" -lt "${#FREE_MODELS[@]}" ]; do
         m="${FREE_MODELS[$(( (debut + i) % ${#FREE_MODELS[@]} ))]}"
@@ -113,21 +106,7 @@ agent_lancer() {
         fi
         echo "=== modèle opencode/$m début $(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$journal"
         offset="$(wc -c <"$journal")"
-        local agent_kube="$etat/kubeconfig"
-        if agent_dans_pod; then
-            # Dans le pod, le compte de service limité est le seul accès : aucun
-            # kubeconfig du poste n'entre dans l'environnement d'opencode.
-            (cd "$dossier" && env -u KUBECONFIG DEVZONE_AGENT_SESSION=1 opencode run --print-logs --log-level ERROR --auto -m "opencode/$m" "$(cat "$consigne_courante")" </dev/null >>"$journal" 2>&1) &
-        else
-            if [ -f "$HOME/.kube/config" ]; then
-                (umask 077; KUBECONFIG="$HOME/.kube/config" kubectl config view --minify --flatten --context devzone >"$agent_kube") 2>/dev/null || : >"$agent_kube"
-                chmod 600 "$agent_kube"
-                [ -s "$agent_kube" ] || echo "=== kubernetes : aucun contexte devzone, session sans accès" >>"$journal"
-            else
-                : >"$agent_kube"
-            fi
-            (cd "$dossier" && KUBECONFIG="$agent_kube" DEVZONE_AGENT_SESSION=1 opencode run --print-logs --log-level ERROR --auto -m "opencode/$m" "$(cat "$consigne_courante")" </dev/null >>"$journal" 2>&1) &
-        fi
+        opencode_lancer "$dossier" "$m" "$consigne_courante" "$journal" "$etat"
         pid=$!
         demarre=0
         discard=0
@@ -240,7 +219,6 @@ agent_lancer() {
     echo "=== aucun modèle gratuit disponible" >>"$journal"
     exit 3
 }
-
 case "${1:-}" in
     etat) if [ "${2:-}" = "--json" ]; then exec bash "$ICI/agent-etat-json.sh"; else agent_etat; fi ;;
     liberer)
