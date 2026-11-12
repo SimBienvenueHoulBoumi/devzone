@@ -69,7 +69,9 @@ spec:
           {{- /*
             Settings from the lead's trial (#410): server --port-forward --reverse-proxy.
             NAMESPACE comes from the pod, so that kubedock creates the pods in its
-            namespace. Helm comment: not in the rendering.
+            namespace. --reapmax/--prune-start clean up kubedock test resources (#514,
+            https://github.com/joyrex2001/kubedock/blob/master/config.md). Helm
+            comment: not in the rendering.
           */}}
           args:
             - server
@@ -77,6 +79,11 @@ spec:
             - --reverse-proxy
             - --timeout
             - {{ .Values.kubedock.timeout | quote }}
+            - --reapmax
+            - {{ .Values.kubedock.reapmax | quote }}
+            {{- if .Values.kubedock.pruneStart }}
+            - --prune-start
+            {{- end }}
           env:
             - name: NAMESPACE
               valueFrom:

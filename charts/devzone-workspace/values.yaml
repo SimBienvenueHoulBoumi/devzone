@@ -24,6 +24,11 @@ kubedock:
   # must pull its image, which often takes longer. Without this timeout,
   # kubedock gives up ("timeout starting container").
   timeout: 5m
+  # Cleanup of kubedock-managed test pods (#514). --reapmax reaps resources older
+  # than this age (0 disables reaping); --prune-start removes leftover kubedock
+  # resources before the API starts. https://github.com/joyrex2001/kubedock/blob/master/config.md
+  reapmax: 30m
+  pruneStart: true
   resources:
     limits:
       cpu: "1"
