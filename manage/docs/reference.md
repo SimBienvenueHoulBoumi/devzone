@@ -10,9 +10,9 @@
 - nom du profil GitHub (sinon le login) ;
 - email noreply `<id>+<login>@users.noreply.github.com` : les commits sont rattachés au compte, l'email personnel n'est pas exposé.
 
-Une identité déjà définie n'est jamais remplacée. Pour un autre email : `git config --file ~/.config/git/config user.email "<email>"`. Après un `gh auth login` en cours de session : `devzone demarrer`.
+Une identité déjà définie n'est jamais remplacée. Pour un autre email : `git config --file ~/.config/git/config user.email "<email>"`. Après un `gh auth login` en cours de session : `devzone start`.
 
-**Assistants IA** (module `ia`, voir [Modules](#modules)) : `devzone activer ia`, puis `claude` (puis `/login`), `opencode auth login`.
+**Assistants IA** (module `ia`, voir [Modules](#modules)) : `devzone enable ia`, puis `claude` (puis `/login`), `opencode auth login`.
 
 Les connexions (**GitHub**, **git**, **Claude Code**, **opencode**) et les caches (**Maven**, **Gradle**, **pnpm**) sont **partagés volontairement** entre les devzone d'une machine : elles vivent dans les volumes Docker (voir [Données conservées](#données-conservées)). Le dépôt ne contient aucun identifiant.
 
@@ -20,21 +20,21 @@ Les connexions (**GitHub**, **git**, **Claude Code**, **opencode**) et les cache
 
 ## Plateforme : GitHub ou GitLab
 
-devzone est pensé pour GitHub ; `devzone plateforme` choisit celle à laquelle la CLI se connecte (`github` par défaut, comportement actuel, rien ne change) :
+devzone est pensé pour GitHub ; `devzone platform` choisit celle à laquelle la CLI se connecte (`github` par défaut, comportement actuel, rien ne change) :
 
 ```bash
-devzone plateforme                  # affiche la plateforme et son état
-devzone plateforme github           # retour à GitHub : glab et sa configuration retirés
-devzone plateforme gitlab --url https://gitlab.example.com:3443
-devzone plateforme gitlab           # sans --url : l'instance du module gitlab (http://gitlab.localhost:8929)
+devzone platform                  # affiche la plateforme et son état
+devzone platform github           # retour à GitHub : glab et sa configuration retirés
+devzone platform gitlab --url https://gitlab.example.com:3443
+devzone platform gitlab           # sans --url : l'instance du module gitlab (http://gitlab.localhost:8929)
 ```
 
 - **Choix par instance** : gardé aux rebuilds dans le fichier d'état (`$RACINE/.devzone.modules`, lignes `plateforme=` et `gitlab_url=`), comme les [modules](#modules).
 - **glab** (CLI GitLab), installé **seulement** quand GitLab est choisi : binaire de la release officielle de gitlab.org (chart de gitlab-org/cli), version figée et somme SHA-256 vérifiées, dans `~/.local/bin` ; au retour à `github`, le binaire et sa configuration (`~/.config/glab-cli/`) sont retirés — la configuration d'un service n'existe que pendant qu'il est choisi.
 - **Connexion** : instance du module `gitlab` → automatique, avec le jeton root du module (`workspace/.gitlab/`, protocole http, jamais affiché) ; autre instance (gitlab.com ou auto-hébergée) → `glab auth login --hostname <hôte>`, interactif (code de connexion à saisir).
 - **État** : la ligne `plateforme` affiche l'instance et « glab connecté », ou « non connecté » avec la commande à lancer. Avec `gitlab`, les lignes propres à GitHub signalent qu'elles ne s'appliquent pas : repowarden (bots, tickets, workflows du dépôt devzone) reste uniquement sur GitHub en attendant son support GitLab ([simdevWarden/repowarden#531](https://github.com/simdevWarden/repowarden/issues/531)). `gh` connecté reste utile pour ces tickets.
-- **Instance de test** : le [module gitlab](#gitlab) fournit l'instance locale du conteneur (utilisateur `root`, secrets dans `workspace/.gitlab/`) ; dès qu'il est actif, `devzone plateforme gitlab` (sans `--url`) la cible d'office.
-- **Mise à jour de glab** : dans `.devcontainer/devzone`, `GLAB_VERSION` et les deux sommes `GLAB_SOMME_ARM64` / `GLAB_SOMME_AMD64` (checksums.txt de la release), puis `devzone plateforme gitlab --url URL` (glab est re-téléchargé seulement s'il est absent ou cassé : le retirer d'abord, `rm ~/.local/bin/glab`).
+- **Instance de test** : le [module gitlab](#gitlab) fournit l'instance locale du conteneur (utilisateur `root`, secrets dans `workspace/.gitlab/`) ; dès qu'il est actif, `devzone platform gitlab` (sans `--url`) la cible d'office.
+- **Mise à jour de glab** : dans `.devcontainer/devzone`, `GLAB_VERSION` et les deux sommes `GLAB_SOMME_ARM64` / `GLAB_SOMME_AMD64` (checksums.txt de la release), puis `devzone platform gitlab --url URL` (glab est re-téléchargé seulement s'il est absent ou cassé : le retirer d'abord, `rm ~/.local/bin/glab`).
 
 
 
@@ -80,8 +80,8 @@ Les fonctionnalités facultatives sont des modules, **désactivés par défaut**
 
 ```bash
 devzone                        # état : identité git, GitHub, outils, modules
-devzone activer <module>       # active et applique tout de suite
-devzone desactiver <module>    # désactive et applique tout de suite
+devzone enable <module>       # active et applique tout de suite
+devzone disable <module>    # désactive et applique tout de suite
 ```
 
 | Module | Activé | Désactivé |
@@ -92,7 +92,7 @@ devzone desactiver <module>    # désactive et applique tout de suite
 | `postgres` | PostgreSQL 16 partagé sur le [cluster de devzone](#cluster-de-devzone), une base par projet (`devzone postgres creer <projet>`), joignable sur `127.0.0.1:5432` dans le conteneur (voir [PostgreSQL](#postgresql)) | namespace `devzone-postgres` (toutes les bases) et secrets `workspace/.postgres/` supprimés, après confirmation en terminal ; kind dédié supprimé s'il ne sert plus |
 | `argocd` | Argo CD sur le [cluster de devzone](#cluster-de-devzone), namespace `devzone-argocd` (chart figé), serveur en `ClusterIP` ; https://127.0.0.1:8443 dans le conteneur ; au moins 1 Go de RAM allouable (voir [Argo CD](#argo-cd)) | release Helm et namespace `devzone-argocd` retirés, secret `workspace/.argocd/` supprimé ; les autres services restent, sous helm direct |
 
-Le choix est **propre à chaque devzone** (instance) et gardé dans le dossier `$RACINE/.devzone.modules` (monté de l'hôte, il survit aux rebuilds). Au premier démarrage d'une instance, si une connexion Claude Code ou opencode existe déjà dans les volumes, le module `ia` n'est pas activé : tout est désactivé par défaut et la connexion est signalée une seule fois (« devzone activer ia pour l'utiliser ici »), pas pour un état repris.
+Le choix est **propre à chaque devzone** (instance) et gardé dans le dossier `$RACINE/.devzone.modules` (monté de l'hôte, il survit aux rebuilds). Au premier démarrage d'une instance, si une connexion Claude Code ou opencode existe déjà dans les volumes, le module `ia` n'est pas activé : tout est désactivé par défaut et la connexion est signalée une seule fois (« devzone enable ia pour l'utiliser ici »), pas pour un état repris.
 
 ### Socket Docker de l'hôte
 
@@ -103,23 +103,23 @@ Le récapitulatif suit le **socket réellement monté**, pas l'option : tant que
 Pour retirer ce partage :
 
 ```bash
-devzone desactiver docker-hote     # écrit docker-hote=off, puis demande une reconstruction
+devzone disable docker-hote     # écrit docker-hote=off, puis demande une reconstruction
 make rebuild                       # sur le poste, pas dans le conteneur
 ```
 
-Au lancement sur le poste, `manage/scripts/lancer.sh` lit la ligne `docker-hote` (absente = `on`). À `off`, il génère `.devcontainer/sans-docker-hote/devcontainer.json` (copie sans la feature, chemins de build adaptés au sous-dossier, dossier ignoré par git) et passe ce fichier au CLI devcontainers avec `--config`. Pour remettre le socket : `devzone activer docker-hote`, puis `make rebuild`.
+Au lancement sur le poste, `manage/scripts/lancer.sh` lit la ligne `docker-hote` (absente = `on`). À `off`, il génère `.devcontainer/sans-docker-hote/devcontainer.json` (copie sans la feature, chemins de build adaptés au sous-dossier, dossier ignoré par git) et passe ce fichier au CLI devcontainers avec `--config`. Pour remettre le socket : `devzone enable docker-hote`, puis `make rebuild`.
 
-Sans socket, `docker` n'existe plus dans le conteneur : la commande affiche un message qui renvoie au workspace Kubernetes (`devzone workspace`, kubedock et BuildKit). Le relais du socket ne bloque pas le démarrage, et la connexion au cluster Kubernetes de l'hôte reste disponible ; en revanche, kind et les conteneurs lancés sur le Docker du poste ne le sont plus. `devzone etat --json` porte l'option dans le champ `docker_hote` et l'état réel du montage dans `docker_hote_actif`.
+Sans socket, `docker` n'existe plus dans le conteneur : la commande affiche un message qui renvoie au workspace Kubernetes (`devzone workspace`, kubedock et BuildKit). Le relais du socket ne bloque pas le démarrage, et la connexion au cluster Kubernetes de l'hôte reste disponible ; en revanche, kind et les conteneurs lancés sur le Docker du poste ne le sont plus. `devzone status --json` porte l'option dans le champ `docker_hote` et l'état réel du montage dans `docker_hote_actif`.
 
 ### Commandes de l'application
 
 Les scripts internes de `.devcontainer/` ne sont pas des commandes utilisateur : `devzone` les enveloppe.
 
 ```bash
-devzone reparer                 # relance relais Docker, gitlab, postgres, ports et identifiants
-devzone demarrer                # démarrage complet (identité git, clusters, relais, récapitulatif)
+devzone repair                 # relance relais Docker, gitlab, postgres, ports et identifiants
+devzone start                # démarrage complet (identité git, clusters, relais, récapitulatif)
 devzone metrics [contexte…]     # installe metrics-server sur un cluster local
-devzone utiliser CTX [--confirmer CTX]  # bascule le cluster de travail de kubectl
+devzone use CTX [--confirmer CTX]  # bascule le cluster de travail de kubectl
 devzone clusters                       # vue des clusters connectes (travail et services)
 ```
 
@@ -131,11 +131,11 @@ Avec le module `ia` actif, devzone branche le [garde-fou de repowarden](https://
 
 - **Où** : `~/.claude/settings.json` (hook `PreToolUse`) et `~/.config/opencode/plugins/repowarden-garde.js`, dans les volumes : gardés aux rebuilds. Un réglage déjà présent est complété, jamais écrasé.
 - **Le voir à l'œuvre** : dans un dépôt sur `main`, demander à l'assistant de modifier un fichier : il est refusé (« branche protégée ») avec la commande à lancer.
-- **Limites** : un filet, pas un mur. Une modification faite par le shell (`sed -i`, redirection `>`, script) n'est vue qu'au commit, par les hooks ; une commande cachée dans `bash -c "…"` n'est pas vue. Sans `repowarden` ni `jq`, rien n'est bloqué. `devzone desactiver ia` retire le garde-fou (hook et plugin) et la configuration opencode par défaut ; l'état de `devzone agent`, les journaux `workspace/.agents/` et les connexions restent.
+- **Limites** : un filet, pas un mur. Une modification faite par le shell (`sed -i`, redirection `>`, script) n'est vue qu'au commit, par les hooks ; une commande cachée dans `bash -c "…"` n'est pas vue. Sans `repowarden` ni `jq`, rien n'est bloqué. `devzone disable ia` retire le garde-fou (hook et plugin) et la configuration opencode par défaut ; l'état de `devzone agent`, les journaux `workspace/.agents/` et les connexions restent.
 
 ### Configuration d'opencode
 
-Avec le module `ia`, devzone écrit une configuration opencode prête à l'emploi dans `~/.config/opencode/opencode.jsonc` (volume `devzone-opencode-config`) : modèles gratuits par rôle (`build`, `plan`, `general`, `explore`, titre, résumé, compaction), partage et mises à jour désactivés. Elle est mise à jour à chaque `devzone activer ia` et à chaque démarrage, tant que sa première ligne repère `// devzone : configuration opencode par défaut …` est présente.
+Avec le module `ia`, devzone écrit une configuration opencode prête à l'emploi dans `~/.config/opencode/opencode.jsonc` (volume `devzone-opencode-config`) : modèles gratuits par rôle (`build`, `plan`, `general`, `explore`, titre, résumé, compaction), partage et mises à jour désactivés. Elle est mise à jour à chaque `devzone enable ia` et à chaque démarrage, tant que sa première ligne repère `// devzone : configuration opencode par défaut …` est présente.
 
 - **Permissions par défaut** : ce qui sert au travail est permis sans question (`edit`, `git`, `repowarden`, `gh` en lecture, lecture et recherche, fichiers du projet, tests, linters et build) ; le reste demande ton accord (`ask`, dont `webfetch`) ; les fuites possibles de secrets sont interdites (`deny`) : `gh auth token`, `gh auth status --show-token`, `~/.config/gh/hosts.yml`, `*.credentials*`, `auth.json`, `~/.ssh/*`, l'environnement (`env`, `printenv`, `set`, `export -p`), `curl`/`wget`, `nc`, `ssh`, `scp`, `sudo`, `rm -rf /` et les push forcés. Le dernier motif qui correspond l'emporte : les `deny` sont en fin de liste.
 - **Pourquoi `curl`/`wget` sont interdits** : une requête peut envoyer des données (jeton, fichier) vers l'extérieur. Le réseau passe par `webfetch`, qui reste disponible après ton accord.
@@ -148,8 +148,8 @@ Avec le module `ia`, devzone écrit une configuration opencode prête à l'emplo
 
 Avec le module `ia`, devzone pose la skill devzone (`.devcontainer/skills/devzone/SKILL.md`) dans `~/.claude/skills/devzone/` et `~/.config/opencode/skills/devzone/` (volumes, gardés aux rebuilds). Elle rappelle que tout se fait dans le conteneur avec les commandes `devzone` (jamais les scripts), les worktrees sous `workspace/wt/`, les modules, `devzone agent` (rotation, `etat`, `liberer`), le garde-fou et les fichiers de droits protégés, les services Kubernetes (contexte `devzone`, namespaces `devzone-*`) et ce qui revient au mainteneur (connexions, Ready, fusions).
 
-- **Pose** : si absente, la skill est écrite depuis le modèle ; si elle porte le repère `<!-- devzone : skill posée par devzone activer ia -->` et n'a pas été modifiée, elle est mise à jour ; personnalisée, elle est gardée.
-- **Désactivation** : `devzone desactiver ia` retire seulement la skill non modifiée ; une skill personnalisée est gardée.
+- **Pose** : si absente, la skill est écrite depuis le modèle ; si elle porte le repère `<!-- devzone : skill posée par devzone enable ia -->` et n'a pas été modifiée, elle est mise à jour ; personnalisée, elle est gardée.
+- **Désactivation** : `devzone disable ia` retire seulement la skill non modifiée ; une skill personnalisée est gardée.
 
 La skill « repowarden » est déjà posée par `repowarden agents init` : vérifiez seulement qu'elle est présente.
 
@@ -184,13 +184,13 @@ devzone agent liberer <modèle>|--tous        # lève un écart de modèle
 Les comptes créés par devzone (modules `gitlab`, `postgres` et `argocd`) sont regroupés dans `$RACINE/.password`, à côté de `.devzone.modules`.
 
 ```bash
-devzone mots-de-passe          # régénère le fichier et affiche seulement son chemin
+devzone passwords          # régénère le fichier et affiche seulement son chemin
 ```
 
 - **Format** : en-tête en commentaire, puis une ligne par compte, colonnes séparées par des tabulations : `service`, `adresse`, `utilisateur`, `mot de passe`. Tri stable par service puis utilisateur ; aucune ligne vide.
 - **Source** : les fichiers des modules restent la référence (`workspace/.gitlab/root-password`, `workspace/.gitlab/dev-password`, `workspace/.postgres/admin-password`, `workspace/.postgres/<projet>.env`, `workspace/.argocd/admin.env`). `.password` est une vue régénérée, jamais une seconde copie à tenir à jour.
 - **Mise à jour** : `password_regenerer` (`.devcontainer/password.sh`) est appelée à la fin de chaque création, suppression ou changement de compte : installation, `creer`, `supprimer` et `--nouveau-mdp` de postgres ; seed et désinstallation de gitlab ; installation et désinstallation d'argocd ; démarrage de devzone. Un échec n'empêche jamais l'opération, il affiche un avertissement.
-- **Protection** : fichier ignoré par git (`.gitignore`) et droits **600** posés avant l'écriture (`umask 077`, fichier temporaire dans le même dossier puis `mv`). Aucune commande ne lit ni n'affiche son contenu ; le récapitulatif et `devzone mots-de-passe` citent seulement le chemin. Sans aucun compte, le fichier est supprimé.
+- **Protection** : fichier ignoré par git (`.gitignore`) et droits **600** posés avant l'écriture (`umask 077`, fichier temporaire dans le même dossier puis `mv`). Aucune commande ne lit ni n'affiche son contenu ; le récapitulatif et `devzone passwords` citent seulement le chemin. Sans aucun compte, le fichier est supprimé.
 
 
 
@@ -214,20 +214,20 @@ Plusieurs devzone peuvent cohabiter sur une même machine (un par projet, un par
 
 ## Kubernetes
 
-devzone fournit les outils, pas le cluster, et n'en crée jamais tout seul. Avec le module `kubernetes` actif (`devzone activer kubernetes`), il se connecte à chaque démarrage au cluster de l'hôte s'il existe et répond (en pratique `docker-desktop`) ; sinon, ou en plus, créer un cluster dans le conteneur :
+devzone fournit les outils, pas le cluster, et n'en crée jamais tout seul. Avec le module `kubernetes` actif (`devzone enable kubernetes`), il se connecte à chaque démarrage au cluster de l'hôte s'il existe et répond (en pratique `docker-desktop`) ; sinon, ou en plus, créer un cluster dans le conteneur :
 
 ```bash
 kind create cluster          # ~2 min la première fois
 kubectl config get-contexts  # clusters de l'hôte + clusters kind
-devzone utiliser <nom>       # bascule le cluster de travail de kubectl
+devzone use <nom>       # bascule le cluster de travail de kubectl
 ```
 
-- **Cluster actif** : celui de l'hôte par défaut s'il répond (en pratique `docker-desktop`), sinon kind dédié `kind-devzone`. Un choix fait avec `devzone utiliser` est gardé aux redémarrages.
+- **Cluster actif** : celui de l'hôte par défaut s'il répond (en pratique `docker-desktop`), sinon kind dédié `kind-devzone`. Un choix fait avec `devzone use` est gardé aux redémarrages.
 - **Clusters kind** : tournent sur le Docker de l'hôte (socket partagé, #291). Leur API écoute sur 127.0.0.1 **du poste**, jamais sur le réseau local ; `kind` (enveloppe de devzone) réécrit l'adresse en `host.docker.internal` dans le kubeconfig du conteneur, en gardant la vérification TLS : un cluster créé à la main par `kind create cluster` est joignable tout de suite. Nom suffixé par instance quand ce n'est pas l'instance par défaut. Ils redémarrent avec Docker Desktop, sont conservés par `make rebuild` et `make down`, et supprimés par `kind delete cluster` (ou `make desinstaller`).
-- **Relais du socket Docker** ([#293](https://github.com/SimBienvenueHoulBoumi/devzone/issues/293)) : sous Docker Desktop, la feature `docker-outside-of-docker` relaie le socket de l'hôte par `socat` sans option `-t`. Un `docker exec` sans entrée standard (kind lance ainsi `kubeadm init`) y est coupé au bout de 0,5 s, avec une sortie tronquée et un code 0 : kind croit l'init réussi (« failed to remove control plane taint … connection refused »). Au démarrage, devzone remplace ce relais par le même avec `-t 86400`, puis vérifie qu'un `docker exec` long va au bout. En cas d'échec, une ligne `⚠ relais Docker` apparaît dans le récapitulatif `devzone`, avec la commande à relancer : `devzone reparer`. Sous Linux (socket par groupe, sans socat), seul le contrôle est fait.
+- **Relais du socket Docker** ([#293](https://github.com/SimBienvenueHoulBoumi/devzone/issues/293)) : sous Docker Desktop, la feature `docker-outside-of-docker` relaie le socket de l'hôte par `socat` sans option `-t`. Un `docker exec` sans entrée standard (kind lance ainsi `kubeadm init`) y est coupé au bout de 0,5 s, avec une sortie tronquée et un code 0 : kind croit l'init réussi (« failed to remove control plane taint … connection refused »). Au démarrage, devzone remplace ce relais par le même avec `-t 86400`, puis vérifie qu'un `docker exec` long va au bout. En cas d'échec, une ligne `⚠ relais Docker` apparaît dans le récapitulatif `devzone`, avec la commande à relancer : `devzone repair`. Sous Linux (socket par groupe, sans socat), seul le contrôle est fait.
 - **CPU et RAM dans k9s** (`kubectl top`) : module `kubernetes` actif, metrics-server est installé au démarrage sur les clusters **locaux** qui ne l'ont pas (Docker Desktop, kind…), jamais sur un cluster distant. Après un `kind create cluster` : `devzone metrics` (ou `devzone metrics <contexte>` pour un cluster précis).
 - **Cluster de l'hôte** : `~/.kube` est monté en lecture seule, jamais modifié ; sa copie adaptée est `~/.kube/hote.config` (`127.0.0.1` remplacé par `host.docker.internal`). Après un changement de cluster sur l'hôte : `make stop && make up`.
-- **Messages de démarrage** (`kube-config : …`, `metrics-server : …`, récapitulatif) : dans le terminal de création, ou en relançant `devzone demarrer`.
+- **Messages de démarrage** (`kube-config : …`, `metrics-server : …`, récapitulatif) : dans le terminal de création, ou en relançant `devzone start`.
 
 L'adresse `127.0.0.1` du cluster de l'hôte est réécrite en `host.docker.internal` par `kube-config.sh` au démarrage, rendant le cluster joignable depuis le conteneur. Le certificat de l'API inclut `host.docker.internal` dans ses SAN (configuré via `networking.apiServerAddress` et `kubeadmConfigPatches` dans la config kind).
 
@@ -248,18 +248,18 @@ Le poste de developpement peut tourner dans le cluster, avec Kubernetes 1.30 ou 
 Depuis le poste :
 
 ```bash
-devzone workspace demarrer                # installe ou met a jour le workspace
-devzone workspace demarrer --image dépôt:tag   # image construite à la main
-devzone workspace arreter                 # desinstalle le workspace
-devzone workspace etat                    # etat des pods
+devzone workspace start                # installe ou met a jour le workspace
+devzone workspace start --image dépôt:tag   # image construite à la main
+devzone workspace stop                 # desinstalle le workspace
+devzone workspace status                    # etat des pods
 devzone workspace shell                   # shell dans le conteneur workspace
 devzone workspace vscode                  # marche a suivre : attache VS Code au pod
-devzone workspace copier-vers <dossier>   # copie un dossier du poste vers les projets du pod
-devzone workspace copier-depuis <dossier> # copie un projet du pod vers le poste
+devzone workspace copy-to <dossier>   # copie un dossier du poste vers les projets du pod
+devzone workspace copy-from <dossier> # copie un projet du pod vers le poste
 devzone workspace ports [demarrer|arreter|etat] # applications et services du pod sur localhost du poste
-devzone workspace migrer [--oui]          # copie le poste Docker vers le workspace Kubernetes
-devzone workspace revenir [--rapatrier]   # retour au poste Docker
-devzone workspace nettoyer-docker [--oui] # supprime les volumes Docker devzone-* (confirmation)
+devzone workspace migrate [--oui]          # copie le poste Docker vers le workspace Kubernetes
+devzone workspace revert [--rapatrier]   # retour au poste Docker
+devzone workspace clean-docker [--oui] # supprime les volumes Docker devzone-* (confirmation)
 ```
 
 Les commandes utilisent helm et kubectl du poste, avec le contexte devzone s il existe, sinon le contexte courant. L image est construite par la CI a chaque PR et publiee sur ghcr.io a la livraison.
@@ -269,28 +269,28 @@ L'image vient de ghcr.io, avec le tag de la version de devzone (`latest` depuis 
 ### Projets dans un volume
 
 - **Montage** : le PVC `workspace` est monte sur `/workspaces/projets`, ou le conteneur demarre (`workingDir`). Sa taille se regle avec `workspace.size` (20 Gi par defaut).
-- **Conservation** : le PVC porte l annotation `helm.sh/resource-policy: keep` et n est jamais supprime par `helm uninstall` : `devzone workspace arreter` retire le pod, pas les projets. Le perdre demande une suppression a la main dans le cluster.
-- **Copies** : `devzone workspace copier-vers <dossier>` copie le dossier du poste dans `/workspaces/projets/<nom du dossier>` ; `devzone workspace copier-depuis <dossier>` ramene `/workspaces/projets/<nom du dossier>` dans ce dossier du poste. Les deux passent par `kubectl cp` (tar est present dans l image).
+- **Conservation** : le PVC porte l annotation `helm.sh/resource-policy: keep` et n est jamais supprime par `helm uninstall` : `devzone workspace stop` retire le pod, pas les projets. Le perdre demande une suppression a la main dans le cluster.
+- **Copies** : `devzone workspace copy-to <dossier>` copie le dossier du poste dans `/workspaces/projets/<nom du dossier>` ; `devzone workspace copy-from <dossier>` ramene `/workspaces/projets/<nom du dossier>` dans ce dossier du poste. Les deux passent par `kubectl cp` (tar est present dans l image).
 
 ### Migration depuis le poste Docker
 
-`devzone workspace migrer [--oui]` se lance sur le poste, dans le dossier devzone. Il demande une confirmation [o/N] (`--oui` pour s'en passer ; sans terminal et sans `--oui`, il refuse), puis enchaine cinq etapes, chacune annoncee, et s'arrete a la premiere erreur avec un message clair. Il copie, il ne supprime rien.
+`devzone workspace migrate [--oui]` se lance sur le poste, dans le dossier devzone. Il demande une confirmation [o/N] (`--oui` pour s'en passer ; sans terminal et sans `--oui`, il refuse), puis enchaine cinq etapes, chacune annoncee, et s'arrete a la premiere erreur avec un message clair. Il copie, il ne supprime rien.
 
-1. **Verifications** : cluster joignable, pod `devzone-workspace-0` demarre (sinon `devzone workspace demarrer`), Docker du poste en marche, place suffisante sur `/workspaces/projets`.
+1. **Verifications** : cluster joignable, pod `devzone-workspace-0` demarre (sinon `devzone workspace start`), Docker du poste en marche, place suffisante sur `/workspaces/projets`.
 2. **Projets** : chaque `./workspace/<projet>` est copie dans `/workspaces/projets/<projet>` (`.git` compris, comme `copier-vers`), puis verifie par nombre de fichiers et taille.
 3. **Identites et caches** : chaque volume Docker `devzone-<x>` (ou `$DEVZONE_VOLUMES-<x>`) est lu en lecture seule par un conteneur `docker run --rm -v … :/src:ro` (image `busybox:1.36`, `DEVZONE_IMAGE_COPIE` pour une autre), puis copie par `kubectl cp` vers son chemin du volume `etat` (`persistence.state.paths` du chart) : `gh` → `~/.config/gh`, `git` → `~/.config/git`, `claude` → `~/.claude`, `opencode-config` → `~/.config/opencode`, `opencode-data` → `~/.local/share/opencode`, `agent` → `~/.local/state/oc-lancer`, `m2`, `gradle`, `pnpm`. Un volume absent est ignore ; `config` (`~/.config/devzone`, ancien etat) n'a pas de chemin dans le chart et est ignore. Chaque copie est verifiee.
 4. **Etat** : `.devzone.modules` et `.devzone.paquets` du poste (s'ils existent) sont copies dans `/workspaces/projets/` du pod.
 5. **Bascule** : la ligne `workspace=kubernetes` est notee dans `.devzone.modules` du poste.
 
-Apres `devzone workspace migrer`, `make up`, `make shell` et `make stop` pilotent le workspace Kubernetes ; `make rebuild` refuse ; `devzone workspace revenir` rend le poste Docker.
+Apres `devzone workspace migrate`, `make up`, `make shell` et `make stop` pilotent le workspace Kubernetes ; `make rebuild` refuse ; `devzone workspace revert` rend le poste Docker.
 
-**Retour arriere** : `devzone workspace revenir` remet `workspace=docker` et rappelle `make shell`. Le poste Docker et ses volumes n'ont jamais ete touches par `migrer` : rien d'autre a faire. `--rapatrier` recopie d'abord tous les projets du pod dans `./workspace` (`copier-depuis`, les dossiers du poste du meme nom sont ecrases) ; en cas d'echec, la bascule n'a pas lieu.
+**Retour arriere** : `devzone workspace revert` remet `workspace=docker` et rappelle `make shell`. Le poste Docker et ses volumes n'ont jamais ete touches par `migrer` : rien d'autre a faire. `--rapatrier` recopie d'abord tous les projets du pod dans `./workspace` (`copier-depuis`, les dossiers du poste du meme nom sont ecrases) ; en cas d'echec, la bascule n'a pas lieu.
 
-**Nettoyage** : les volumes Docker ne sont jamais supprimes par `migrer` ni `revenir`. `devzone workspace nettoyer-docker` liste les volumes `devzone-*` presents puis demande [o/N] avant de les supprimer (`--oui` sans terminal ; sinon refus). Irreversible : apres, `revenir` repart de volumes vides.
+**Nettoyage** : les volumes Docker ne sont jamais supprimes par `migrer` ni `revenir`. `devzone workspace clean-docker` liste les volumes `devzone-*` presents puis demande [o/N] avant de les supprimer (`--oui` sans terminal ; sinon refus). Irreversible : apres, `revenir` repart de volumes vides.
 
 ### Applications et services sur localhost du poste
 
-`devzone workspace demarrer` lance un veilleur sur le poste (`manage/scripts/ports-workspace.sh`), `devzone workspace arreter` l'arrête avec tous ses `kubectl port-forward`. `devzone workspace ports [demarrer|arreter|etat]` le pilote seul.
+`devzone workspace start` lance un veilleur sur le poste (`manage/scripts/ports-workspace.sh`), `devzone workspace stop` l'arrête avec tous ses `kubectl port-forward`. `devzone workspace ports [demarrer|arreter|etat]` le pilote seul.
 
 - **Pod** : toutes les 3 s, `kubectl exec` dans le pod lit `ss -ltnH`. Chaque port TCP en écoute ≥ 1024 (hors kubedock 2475 et BuildKit 1234) est relayé vers `127.0.0.1:<même port>` du poste, jamais sur le réseau local (`--address 127.0.0.1`). Un serveur lancé dans le pod (`npm run dev`) est donc joignable sur http://localhost:5173 sans commande ; le port qui disparaît voit son relais arrêté.
 - **Services de devzone** : avec le module `postgres` actif dans `.devzone.modules`, `svc/postgres` du namespace `devzone-postgres` est relayé sur `127.0.0.1:5432`, et pgAdmin (`svc/pgadmin`) s'il existe, par le même mécanisme. Avec le module `mysql` actif, `svc/mysql` du namespace `devzone-mysql` est relayé sur `127.0.0.1:3306`.
@@ -321,7 +321,7 @@ Le cache d'images reste dans le système de fichiers du sidecar `buildkitd` : il
 1. Gateway → *Remote Development* → *New Connection* → *SSH* : hôte `127.0.0.1`, port transfere du pod, utilisateur `vscode`.
 2. Dossier ouvert par le backend : `/workspaces/projets/<projet>`.
 
-En attendant ces deux points, edite le projet sur le poste par les copies : `devzone workspace copier-vers <dossier>` avant, `devzone workspace copier-depuis <dossier>` apres.
+En attendant ces deux points, edite le projet sur le poste par les copies : `devzone workspace copy-to <dossier>` avant, `devzone workspace copy-from <dossier>` apres.
 
 ### Testcontainers et docker dans le workspace
 
@@ -349,13 +349,13 @@ Le module `gitlab` fournit une instance GitLab de test dans le [cluster des serv
 
 ```bash
 devzone                        # état : identité git, GitHub, outils, modules
-devzone activer gitlab         # active et installe GitLab dans le cluster des services
-devzone desactiver gitlab      # désinstalle GitLab et supprime son namespace
+devzone enable gitlab         # active et installe GitLab dans le cluster des services
+devzone disable gitlab      # désinstalle GitLab et supprime son namespace
 devzone gitlab migrer          # installe, puis propose de supprimer l'ancien cluster kind
 devzone gitlab migrer --oui    # idem sans confirmation
 devzone gitlab nouveau-mdp [root|dev]  # mot de passe aléatoire (root ou dev) régénéré
-devzone appliquer              # applique les modules actifs
-devzone actif gitlab           # code 0 si GitLab est actif
+devzone apply              # applique les modules actifs
+devzone is-enabled gitlab           # code 0 si GitLab est actif
 ```
 
 - **Ressources** : au moins 8 Go de RAM **allouable dans le cluster des services** (somme des nœuds, refus sinon) ; environ 8 Go occupés une fois GitLab installé. Trop lourd pour la CI GitHub : testé à la main.
@@ -369,7 +369,7 @@ devzone actif gitlab           # code 0 si GitLab est actif
 - **Secrets Rails** : le secret `gitlab-rails-secret` du namespace `devzone-gitlab` est conservé dans `workspace/.gitlab/rails-secret.yaml` (600, ignoré par git) à la première installation, puis réappliqué avant `helm upgrade --install` à une réinstallation : le chart le réutilise et les sessions du navigateur restent valides, sans 422.
 - **Réinstallation** : à défaut, si les secrets ont été perdus, la fin d'installation et le récapitulatif préviennent : « GitLab réinstallé : si le navigateur affiche 422, supprimez les données de site de gitlab.localhost ».
 - **Mot de passe régénérable** : `devzone gitlab nouveau-mdp [root|dev]` applique un mot de passe aléatoire par `gitlab-rails runner` dans le pod toolbox, puis met à jour le fichier source et le regroupé `.password` ; rien n'est affiché, seulement le chemin.
-- **Désactivation** : `devzone desactiver gitlab` arrête les deux relais, désinstalle les releases Helm `gitlab` et `gitlab-runner`, supprime le namespace `devzone-gitlab<instance>` et le reste de `workspace/.gitlab/`, mais **garde `rails-secret.yaml`** : « secret Rails gardé dans workspace/.gitlab/rails-secret.yaml (sessions du navigateur valides à la réinstallation) ». Le secret ne part qu'avec une désinstallation complète voulue (`devzone desactiver gitlab --oui`, ou la réponse `o` à la confirmation). Le cluster des services et son contexte courant ne sont pas touchés.
+- **Désactivation** : `devzone disable gitlab` arrête les deux relais, désinstalle les releases Helm `gitlab` et `gitlab-runner`, supprime le namespace `devzone-gitlab<instance>` et le reste de `workspace/.gitlab/`, mais **garde `rails-secret.yaml`** : « secret Rails gardé dans workspace/.gitlab/rails-secret.yaml (sessions du navigateur valides à la réinstallation) ». Le secret ne part qu'avec une désinstallation complète voulue (`devzone disable gitlab --oui`, ou la réponse `o` à la confirmation). Le cluster des services et son contexte courant ne sont pas touchés.
 
 ### Essai de bout en bout : `devzone test-gitlab`
 
@@ -381,7 +381,7 @@ devzone test-gitlab --complet    # désactive, contrôle qu'il ne reste rien, pu
 devzone test-gitlab --statut     # publie aussi le statut gitlab-integration sur HEAD
 ```
 
-- **Étapes**, chacune chronométrée : 1 module actif (sinon activé) ; 2 état « prêt » et runner en ligne ; 3 `gitlab.localhost` résolu vers `127.0.0.1` et relais TCP actifs sur 8929 et 2224 (`gitlab.sh hote-poser` et `relais-lancer`), sinon ✖ avec l'adresse ou le port manquant ; 4 pipeline de `devzone/demo` relancé sur `main` et attendu jusqu'à `success` ; 5 clone SSH (clé ed25519 jetable) et clone HTTP authentifié par un assistant d'identifiants (Basic `oauth2` + jeton lu dans le fichier, jamais dans les arguments d'un processus, l'URL ni `.git/config`) ; 6 plateforme `gitlab` avec `glab repo clone`, puis retour à la plateforme d'avant ; 7 suite d'intégration `test/gitlab/` de repowarden ([#533](https://github.com/simdevWarden/repowarden/issues/533)), dossier absent à la réf → étape sautée avec la raison, échec → sortie gardée dans `${TMPDIR:-/tmp}/devzone-test-gitlab-repowarden.log` (jeton masqué) et citée dans la raison. Avec `--complet`, une étape 8 précède les autres : `devzone desactiver gitlab`, puis contrôle qu'il ne reste ni namespace `devzone-gitlab<instance>` (nom calculé comme `gitlab.sh`), ni conteneur étiqueté `devzone.instance=<instance>` du module sur le Docker de l'hôte, ni `workspace/.gitlab/`, ni ligne `# devzone:gitlab` de `/etc/hosts`.
+- **Étapes**, chacune chronométrée : 1 module actif (sinon activé) ; 2 état « prêt » et runner en ligne ; 3 `gitlab.localhost` résolu vers `127.0.0.1` et relais TCP actifs sur 8929 et 2224 (`gitlab.sh hote-poser` et `relais-lancer`), sinon ✖ avec l'adresse ou le port manquant ; 4 pipeline de `devzone/demo` relancé sur `main` et attendu jusqu'à `success` ; 5 clone SSH (clé ed25519 jetable) et clone HTTP authentifié par un assistant d'identifiants (Basic `oauth2` + jeton lu dans le fichier, jamais dans les arguments d'un processus, l'URL ni `.git/config`) ; 6 plateforme `gitlab` avec `glab repo clone`, puis retour à la plateforme d'avant ; 7 suite d'intégration `test/gitlab/` de repowarden ([#533](https://github.com/simdevWarden/repowarden/issues/533)), dossier absent à la réf → étape sautée avec la raison, échec → sortie gardée dans `${TMPDIR:-/tmp}/devzone-test-gitlab-repowarden.log` (jeton masqué) et citée dans la raison. Avec `--complet`, une étape 8 précède les autres : `devzone disable gitlab`, puis contrôle qu'il ne reste ni namespace `devzone-gitlab<instance>` (nom calculé comme `gitlab.sh`), ni conteneur étiqueté `devzone.instance=<instance>` du module sur le Docker de l'hôte, ni `workspace/.gitlab/`, ni ligne `# devzone:gitlab` de `/etc/hosts`.
 - **Résumé** : une ligne par étape (✔/✖/sauté, durée, raison) et un total ; le code de sortie n'est 0 que sans ✖ (une étape sautée n'échoue pas). Un jeton n'est jamais affiché.
 - **Nettoyage garanti** par `trap … EXIT` : clé SSH retirée de GitLab, dossiers temporaires supprimés, plateforme d'avant restaurée, même si une étape échoue.
 - **Variables** : `GITLAB_TEST_PIPELINE` (délai du pipeline, 600 s par défaut), `GITLAB_TEST_INTERVALLE` (intervalle d'interrogation du pipeline, 5 s par défaut), `REPOWARDEN_TEST_REF` (réf. de la suite d'intégration, `develop` par défaut), `DEVZONE_RACINE` (racine du dépôt, comme `gitlab.sh`).
@@ -394,17 +394,17 @@ devzone test-gitlab --statut     # publie aussi le statut gitlab-integration sur
 Le module `postgres` fournit un PostgreSQL partagé : une base et un utilisateur par projet, sur le [cluster de devzone](#cluster-de-devzone).
 
 ```bash
-devzone activer postgres [--contexte CTX]   # installe (choix du cluster la première fois)
+devzone enable postgres [--contexte CTX]   # installe (choix du cluster la première fois)
 devzone postgres creer <projet>             # base + utilisateur <projet>, identifiants dans workspace/.postgres/<projet>.env
 devzone postgres creer <projet> --nouveau-mdp
 devzone postgres liste                      # bases et propriétaires
 devzone postgres psql [<projet>]            # console psql dans le pod (superutilisateur sans projet)
 devzone postgres supprimer <projet> [--oui] # base, utilisateur et fichier .env
-devzone desactiver postgres                 # supprime PostgreSQL et TOUTES ses bases
+devzone disable postgres                 # supprime PostgreSQL et TOUTES ses bases
 ```
 
 - **Ce qui est installé** : `.devcontainer/postgres/postgres.yaml`, StatefulSet `postgres` (image `postgres:16.x-alpine` figée), volume persistant de 5 Gi (`POSTGRES_TAILLE`), Service `postgres:5432`, namespace `devzone-postgres` étiqueté `app.kubernetes.io/managed-by=devzone`. Pas de chart ni d'image Bitnami.
-- **Accès** : un relais `kubectl port-forward` rend le service joignable sur `127.0.0.1:5432` **dans le conteneur** (`POSTGRES_PORT` pour un autre port) ; relancé à chaque démarrage et par `devzone appliquer`. PID et journal : `workspace/.postgres/relais.*`.
+- **Accès** : un relais `kubectl port-forward` rend le service joignable sur `127.0.0.1:5432` **dans le conteneur** (`POSTGRES_PORT` pour un autre port) ; relancé à chaque démarrage et par `devzone apply`. PID et journal : `workspace/.postgres/relais.*`.
 - **Bases par projet** : nom en minuscules, chiffres et `_`. `creer` est idempotent : le mot de passe est gardé (sauf `--nouveau-mdp`) ; `REVOKE CONNECT … FROM PUBLIC` : un projet ne se connecte pas à la base d'un autre. Le fichier `<projet>.env` (600) contient `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` et `DB_URL` (JDBC).
 - **Secrets** : mot de passe du superutilisateur `postgres` dans le secret `postgres-admin` et `workspace/.postgres/admin-password` (600) ; jamais régénéré tant que le secret existe ; jamais affiché.
 - **Désactivation** : namespace supprimé (volume compris), `workspace/.postgres/` supprimé, kind dédié supprimé s'il ne porte plus aucun service. `make desinstaller` supprime aussi le namespace d'un cluster de l'hôte.
@@ -414,33 +414,33 @@ devzone desactiver postgres                 # supprime PostgreSQL et TOUTES ses 
 Le catalogue `mysql` fournit un MySQL partagé (une base par projet), sur le [cluster de devzone](#cluster-de-devzone), namespace `devzone-mysql`, joignable sur `127.0.0.1:3306` dans le conteneur.
 
 ```bash
-devzone activer mysql
+devzone enable mysql
 devzone mysql creer <projet> [--nouveau-mdp]
 devzone mysql liste
 devzone mysql supprimer <projet> [--oui]
 devzone mysql volume                 # liste les PVC *-mysql-0, marque le monté
 devzone mysql volume <nom>           # réapplique le StatefulSet sur ce volume (données gardées)
 devzone mysql volume --supprimer <nom> [--oui]
-devzone desactiver mysql             # retire StatefulSet, service et secret ; volume gardé
+devzone disable mysql             # retire StatefulSet, service et secret ; volume gardé
 devzone mysql supprimer-donnees [--oui]  # supprime le namespace et les volumes (confirmé)
 ```
 
 - **Volumes** : avant l'installation, si un seul PVC `*-mysql-0` existe dans le namespace, il est réutilisé ; aucun → claim `donnees` ; plusieurs → refus avec la liste et `devzone mysql volume <nom>`. `devzone mysql volume <nom>` réapplique le StatefulSet sur le PVC choisi sans supprimer les données. `--supprimer` demande confirmation `[o/N]` en terminal (`--oui` sans terminal) et refuse si le volume est monté. Le récapitulatif signale `⚠ volume <pvc> non utilisé : devzone mysql volume`.
-- **Désinstaller et supprimer les données** : `devzone desactiver mysql` retire le StatefulSet, le service et le secret, garde le volume (PVC) et les bases, et affiche `✔ mysql retiré du cluster ; volume <pvc> et bases gardés : devzone mysql volume`. En terminal, la question est « Désactiver mysql retire le serveur, le volume et les bases restent. Supprimer aussi le namespace devzone-mysql et ses volumes ? » : un `oui` (ou `--oui` sans terminal) supprime aussi le namespace `devzone-mysql` et ses volumes ; un refus garde le volume et les bases, le serveur part quand même ; sans terminal et sans `--oui`, les données restent. `devzone mysql supprimer-donnees [--oui]` fait cette suppression seule : confirmation `[o/N]` en terminal, `--oui` obligatoire sinon (sinon refus avec la commande exacte). Le namespace et les volumes partent, `workspace/.mysql/root.env` est gardé ; `devzone mysql volume` liste ensuite les volumes restants.
+- **Désinstaller et supprimer les données** : `devzone disable mysql` retire le StatefulSet, le service et le secret, garde le volume (PVC) et les bases, et affiche `✔ mysql retiré du cluster ; volume <pvc> et bases gardés : devzone mysql volume`. En terminal, la question est « Désactiver mysql retire le serveur, le volume et les bases restent. Supprimer aussi le namespace devzone-mysql et ses volumes ? » : un `oui` (ou `--oui` sans terminal) supprime aussi le namespace `devzone-mysql` et ses volumes ; un refus garde le volume et les bases, le serveur part quand même ; sans terminal et sans `--oui`, les données restent. `devzone mysql supprimer-donnees [--oui]` fait cette suppression seule : confirmation `[o/N]` en terminal, `--oui` obligatoire sinon (sinon refus avec la commande exacte). Le namespace et les volumes partent, `workspace/.mysql/root.env` est gardé ; `devzone mysql volume` liste ensuite les volumes restants.
 
 ## Argo CD
 
 Le module `argocd` fournit Argo CD sur le [cluster de devzone](#cluster-de-devzone). L'étape A installe le module ; les Applications (services et workspace) viendront après #401.
 
 ```bash
-devzone activer argocd      # installe Argo CD dans le cluster des services
-devzone desactiver argocd   # désinstalle Argo CD, les autres services restent
+devzone enable argocd      # installe Argo CD dans le cluster des services
+devzone disable argocd   # désinstalle Argo CD, les autres services restent
 devzone argocd etat         # état du module
 ```
 
 - **Ce qui est installé** : chart `argo/argo-cd` en version figée (`10.14.0`), namespace `devzone-argocd` étiqueté `app.kubernetes.io/managed-by=devzone` et isolé par NetworkPolicy. Valeurs minimales (`.devcontainer/argocd/values.yaml`) : un réplica par composant, sans Dex ni notifications, serveur en `ClusterIP`, sans Ingress ni LoadBalancer.
 - **Mémoire** : l'installation est refusée sous environ 1 Go de mémoire allouable dans le cluster, avec le message pour l'agrandir.
-- **Accès** : un relais `kubectl port-forward` rend l'interface joignable sur https://127.0.0.1:8443 **dans le conteneur** (`ARGOCD_PORT` pour un autre port) ; relancé à chaque démarrage et par `devzone appliquer`. Sur le poste, l'accès passera par #401. PID et journal : `workspace/.argocd/relais.*`.
+- **Accès** : un relais `kubectl port-forward` rend l'interface joignable sur https://127.0.0.1:8443 **dans le conteneur** (`ARGOCD_PORT` pour un autre port) ; relancé à chaque démarrage et par `devzone apply`. Sur le poste, l'accès passera par #401. PID et journal : `workspace/.argocd/relais.*`.
 - **Mot de passe** : lu dans le Secret `argocd-initial-admin-secret`, rangé dans `workspace/.argocd/admin.env` (600) puis repris dans [`.password`](#identifiants-regroupés) ; utilisateur `admin`, jamais affiché.
 - **Désactivation** : `helm uninstall` de la release et suppression du namespace `devzone-argocd`, puis de `workspace/.argocd/` ; **les autres services restent**, sous helm direct.
 
@@ -458,11 +458,11 @@ devzone port inclure <n>      # réintègre un port à la liste automatique
 ```
 
 - **Relais** : conteneur `devzone-<instance>-port-<n>`, étiqueté `devzone.instance=<instance>` et `devzone.port=<n>`, image figée `SOCAT_IMAGE=alpine/socat:1.8.0.3` (`.devcontainer/ports.sh`). Il publie `-p 127.0.0.1:<n>:<n>` seulement, avec `--restart unless-stopped`.
-- **Veilleur automatique (#394)** : `.devcontainer/ports-auto.sh` surveille les ports écoutés dans le conteneur toutes les 2 s (`ss -ltnH`). Un port non déjà relayé, non exclu, pas un service de devzone (5432, 8929, 2224) et pas un pont du veilleur est relayé : pont interne sur l'IP du conteneur si l'application n'écoute que sur `127.0.0.1`/`::1`, puis relais poste `devzone-<instance>-auto-<n>`. Le port disparu depuis plus de 10 s retire le pont et le relais. Un port déjà pris sur le poste est marqué occupé et n'est plus réessayé. Un seul veilleur tourne (verrou `mkdir` dans `/tmp/devzone-ports-auto/`, rafraîchi à chaque tour ; une instance morte est remplacée). Le veilleur s'arrête seul si le dossier d'état disparaît. Il ne tourne qu'à la demande des scripts de démarrage : tout autre appel est refusé (code 2), affiche la commande à faire (`devzone reparer`).
-- **Désactivation** : `devzone port auto off` arrête le veilleur et retire les relais automatiques ; `devzone port auto on` le réactive : le veilleur repart au prochain démarrage du conteneur ou via `devzone reparer`. Au démarrage, les relais automatiques d'une session précédente sont retirés.
+- **Veilleur automatique (#394)** : `.devcontainer/ports-auto.sh` surveille les ports écoutés dans le conteneur toutes les 2 s (`ss -ltnH`). Un port non déjà relayé, non exclu, pas un service de devzone (5432, 8929, 2224) et pas un pont du veilleur est relayé : pont interne sur l'IP du conteneur si l'application n'écoute que sur `127.0.0.1`/`::1`, puis relais poste `devzone-<instance>-auto-<n>`. Le port disparu depuis plus de 10 s retire le pont et le relais. Un port déjà pris sur le poste est marqué occupé et n'est plus réessayé. Un seul veilleur tourne (verrou `mkdir` dans `/tmp/devzone-ports-auto/`, rafraîchi à chaque tour ; une instance morte est remplacée). Le veilleur s'arrête seul si le dossier d'état disparaît. Il ne tourne qu'à la demande des scripts de démarrage : tout autre appel est refusé (code 2), affiche la commande à faire (`devzone repair`).
+- **Désactivation** : `devzone port auto off` arrête le veilleur et retire les relais automatiques ; `devzone port auto on` le réactive : le veilleur repart au prochain démarrage du conteneur ou via `devzone repair`. Au démarrage, les relais automatiques d'une session précédente sont retirés.
 - **Réseau et IP** : lus par `docker inspect "$(hostname)"` sur le Docker de l'hôte ; le relais rejoint le conteneur par son IP sur son réseau Docker. Conteneur devzone introuvable (Docker de l'hôte absent) : refus clair, code 1.
 - **État** : ligne `ports=8080,3000` dans `$RACINE/.devzone.modules`, triée et sans doublon ; `--fermer` retire le port. Le relais déjà ouvert est idempotent (message, code 0).
-- **Démarrage** : `devzone demarrer` relance chaque relais de l'état vers l'IP actuelle du conteneur (elle change à chaque redémarrage). Un échec affiche un avertissement sans bloquer le démarrage ; `devzone reparer` le reprend sans redémarrer.
+- **Démarrage** : `devzone start` relance chaque relais de l'état vers l'IP actuelle du conteneur (elle change à chaque redémarrage). Un échec affiche un avertissement sans bloquer le démarrage ; `devzone repair` le reprend sans redémarrer.
 - **Refus, code 1** : port non numérique ou hors 1-65535 ; Docker de l'hôte injoignable ; port déjà pris sur le poste (échec de `docker run`, « port is already allocated » ou « address already in use »), l'état restant inchangé.
 - **Plusieurs instances** : le nom du relais et l'étiquette portent `DEVZONE_INSTANCE` ; deux instances qui veulent le même port du poste : la seconde reçoit le refus « déjà utilisé ».
 - **Récapitulatif** : ligne `ports vers le poste` avec `8080 ●, 3000 ○`, ou `aucun (devzone port <n>)`.
@@ -478,8 +478,8 @@ Les modules qui déploient un service (`postgres`, `gitlab`) s'installent sur **
 - **Cluster distant** : choisir un cluster distant nécessite une confirmation en terminal, ou `--confirmer CTX` sans terminal. Sans confirmation exacte, le choix est refusé. Quand le cluster de devzone est distant, le récapitulatif `devzone` affiche un avertissement `⚠ cluster distant : <contexte>`.
 - **Voir / changer** : `devzone cluster` affiche le cluster et les possibles ; `devzone cluster CTX [--confirmer CTX]` y déplace les services actifs (désinstallés de l'ancien, installés sur le nouveau). **Les données ne sont pas migrées** : confirmation en terminal, `--oui` sans terminal.
 - **Cluster de l'hôte** : devzone n'y crée que ses namespaces étiquetés `app.kubernetes.io/managed-by=devzone`, et les supprime à la désactivation. Désactiver le module `kubernetes` rend ce cluster injoignable pour les services.
-- **Contexte courant** : les clusters kind sont créés sans basculer dessus ; `devzone utiliser CTX` bascule seulement le cluster de travail de kubectl, jamais le cluster des services de devzone. Si tu te retrouves sur un cluster interne (kind-devzone), reviens avec `devzone utiliser <ton cluster>`.
-- **Namespace** : pour un contexte du poste (ceux de `hote.config`, recopié depuis le poste à chaque démarrage), le namespace fixé par `devzone utiliser -n` ne survit pas à un redémarrage ; pour les clusters kind du conteneur, il est gardé jusqu'au rebuild.
+- **Contexte courant** : les clusters kind sont créés sans basculer dessus ; `devzone use CTX` bascule seulement le cluster de travail de kubectl, jamais le cluster des services de devzone. Si tu te retrouves sur un cluster interne (kind-devzone), reviens avec `devzone use <ton cluster>`.
+- **Namespace** : pour un contexte du poste (ceux de `hote.config`, recopié depuis le poste à chaque démarrage), le namespace fixé par `devzone use -n` ne survit pas à un redémarrage ; pour les clusters kind du conteneur, il est gardé jusqu'au rebuild.
 
 - **Deux notions** : `★` marque le cluster de travail de kubectl (kubectl, k9s, helm), `●` le cluster des services de devzone (`devzone cluster`). Un contexte peut porter les deux marques. `devzone clusters` affiche la vue.
 - **Rebuild** : `le choix de kubectl` écrit dans `~/.kube/config`, qui n'est pas dans un volume ; un rebuild repart sur le cluster de l'hôte.
@@ -491,16 +491,16 @@ Les modules qui déploient un service (`postgres`, `gitlab`) s'installent sur **
 - **Déplacement de cluster** : `devzone cluster CTX [--oui]` déplace PostgreSQL : suppression dans l'ancien cluster, installation dans le nouveau. Les données ne sont pas migrées, d'où la confirmation requise.
 - **Contextes locaux vs distants** : un cluster est local quand son serveur écoute sur une adresse de boucle (`127.0.0.1`, `localhost`, `::1`, `host.docker.internal`) — lu dans la configuration kubeconfig, sans appel réseau. Le cluster kind dédié (`kind-devzone`) est toujours local. Tout autre cluster (serveur sur une adresse distante) est distant. Le choix par défaut est d'abord le contexte courant de l'hôte (en pratique `docker-desktop`), puis kind dédié `kind-devzone`.
 - **Cluster distant** : choisir un cluster distant nécessite une confirmation en terminal, ou `--confirmer CTX` sans terminal. Sans confirmation exacte, le choix est refusé. Quand le cluster de devzone est distant, le récapitulatif `devzone` affiche un avertissement `⚠ cluster distant : <contexte>`.
-- **Namespace** : pour un contexte du poste (ceux de `hote.config`, recopié depuis le poste à chaque démarrage), le namespace fixé par `devzone utiliser -n` ne survit pas à un redémarrage ; pour les clusters kind du conteneur, il est gardé jusqu'au rebuild.
+- **Namespace** : pour un contexte du poste (ceux de `hote.config`, recopié depuis le poste à chaque démarrage), le namespace fixé par `devzone use -n` ne survit pas à un redémarrage ; pour les clusters kind du conteneur, il est gardé jusqu'au rebuild.
 
 ### Compte limité aux namespaces devzone
 
 Le contexte `devzone` n'agit qu'avec un compte limité : shell, relais et agents n'ont jamais le rôle d'administrateur du cluster ([#430](https://github.com/SimBienvenueHoulBoumi/devzone/issues/430)).
 
 - **Compte** : ServiceAccount `devzone-agent` du namespace `devzone-system`, lié au ClusterRole `edit` dans chaque namespace `devzone-*` par un RoleBinding. `edit` couvre lecture, écriture, secrets et NetworkPolicies du namespace ; ni RBAC ni quotas, et rien hors des namespaces `devzone-*` (la suppression d'un namespace, la lecture des nœuds restent des opérations d'administrateur).
-- **Jeton** : TokenRequest de 24 h écrit dans le contexte `devzone` de `~/.kube/config` (user `devzone-agent`, entrée cluster copiée du contexte de l'hôte). Renouvelé à chaque démarrage du conteneur et par `devzone reparer` ; expiré, `devzone reparer` le renouvelle.
+- **Jeton** : TokenRequest de 24 h écrit dans le contexte `devzone` de `~/.kube/config` (user `devzone-agent`, entrée cluster copiée du contexte de l'hôte). Renouvelé à chaque démarrage du conteneur et par `devzone repair` ; expiré, `devzone repair` le renouvelle.
 - **Administrateur réservé aux installeurs** : création du namespace, étiquette, RoleBinding et suppression passent par le contexte administrateur (`~/.kube/hote.config` pour les clusters de l'hôte, `~/.kube/config` pour les clusters kind). Le compte est posé par les installeurs sur un cluster encore vierge, utilisable au prochain renouvellement de jeton.
-- **Sans cluster des services choisi** : `devzone reparer` ne renouvelle pas de jeton et le reste de l'application continue sur le contexte courant de kubectl.
+- **Sans cluster des services choisi** : `devzone repair` ne renouvelle pas de jeton et le reste de l'application continue sur le contexte courant de kubectl.
 
 ### Isolement
 
@@ -526,7 +526,7 @@ Le conteneur est jetable ; ce qui compte vit dans des volumes Docker, sur ta mac
 | `devzone-claude` | connexion et réglages de Claude Code | gardé | gardé | gardé |
 | `devzone-opencode-config`, `devzone-opencode-data` | connexion et réglages d'opencode | gardé | gardé | gardé |
 | `devzone-agent` | état de `devzone agent` (modèles écartés, rang), partagé entre les devzone | gardé | gardé | gardé |
-| `devzone-config` | modules activés (`devzone activer`) : ancien état utilisateur, repris une fois | gardé | gardé | gardé |
+| `devzone-config` | modules activés (`devzone enable`) : ancien état utilisateur, repris une fois | gardé | gardé | gardé |
 | `devzone-m2`, `devzone-pnpm` | caches Maven (`~/.m2`) et pnpm | gardé | gardé | gardé |
 | `devzone-gradle` | cache Gradle (`~/.gradle`) | gardé | gardé | gardé |
 | volume du Docker interne | images Docker et clusters kind du conteneur | gardé | gardé | gardé |
@@ -542,7 +542,7 @@ Un dossier devzone garde sa version dans `.devzone.version` : la version, puis u
 
 ```bash
 cd mon-devzone
-devzone mettre-a-jour              # version du paquet installé
+devzone update              # version du paquet installé
 npx devzone@latest mettre-a-jour   # dernière version publiée
 ```
 
@@ -563,9 +563,9 @@ Dans le conteneur, le récapitulatif `devzone` lit `$RACINE/.devzone.version` et
 |---|---|---|
 | k9s, actionlint, gitleaks, kind | `.devcontainer/Dockerfile` : `ARG …_VERSION` **et** les empreintes `sha256` (arm64 + amd64) | `make rebuild` |
 | uv, ruff, vulture, pytest | `.devcontainer/Dockerfile` : `ARG …_VERSION` | `make rebuild` |
-| repowarden | `.devcontainer/versions.env` : `REPOWARDEN_VERSION=x.y.z` | `devzone appliquer` (ou `make rebuild`) |
-| Claude Code, opencode | `.devcontainer/devzone` : une ligne par paquet, `IA_CLAUDE=@anthropic-ai/claude-code@x.y.z` et `IA_OPENCODE=opencode-ai@x.y.z` | `devzone activer ia` (ou `make rebuild`) |
-| glab (plateforme gitlab) | `.devcontainer/devzone` : `GLAB_VERSION` et les sommes `GLAB_SOMME_ARM64` / `GLAB_SOMME_AMD64` | `rm ~/.local/bin/glab` puis `devzone plateforme gitlab --url URL` |
+| repowarden | `.devcontainer/versions.env` : `REPOWARDEN_VERSION=x.y.z` | `devzone apply` (ou `make rebuild`) |
+| Claude Code, opencode | `.devcontainer/devzone` : une ligne par paquet, `IA_CLAUDE=@anthropic-ai/claude-code@x.y.z` et `IA_OPENCODE=opencode-ai@x.y.z` | `devzone enable ia` (ou `make rebuild`) |
+| glab (plateforme gitlab) | `.devcontainer/devzone` : `GLAB_VERSION` et les sommes `GLAB_SOMME_ARM64` / `GLAB_SOMME_AMD64` | `rm ~/.local/bin/glab` puis `devzone platform gitlab --url URL` |
 | metrics-server | `.devcontainer/metrics-server.sh` : `VERSION` | `devzone metrics` sur un nouveau cluster |
 | Java, Node, Python, Docker, kubectl, helm, gh | `.devcontainer/devcontainer.json` (features), versions figées dans `devcontainer-lock.json` | `npx @devcontainers/cli upgrade --workspace-folder .` puis `make rebuild` |
 
@@ -573,22 +573,22 @@ Empreinte d'une archive : `curl -fsSL <url> | shasum -a 256`.
 
 **Montées automatiques** : les versions de `repowarden` et des assistants IA (`IA_CLAUDE`, `IA_OPENCODE`) sont comparées toutes les heures à npm par le workflow `versions` (`.github/workflows/versions.yml`). Pour chaque paquet en retard, il ouvre ou met à jour un ticket, y propose une conception (« Conception proposée »), crée sa branche, applique la montée (`manage/scripts/versions.sh --appliquer`), commit et pousse : la PR brouillon s'ouvre et la CI teste le conteneur. Le mainteneur confirme la conception sur le ticket (« Conception retenue », attendue par la vérification `ticket`), puis passe la PR en ready. Une ligne par paquet : deux montées ouvertes en même temps (Claude Code et opencode) se fusionnent l'une après l'autre sans conflit. À la main : *Actions → versions → Run workflow* ; en local, `bash manage/scripts/versions.sh` liste les paquets en retard. Sans nouvelle version, le job s'arrête après la comparaison ; pas de déclenchement croisé depuis repowarden, qui demanderait un jeton d'un autre propriétaire.
 
-**Rattraper sans rebuild** : l'état affiché au démarrage (et par `devzone`) compare les outils installés à leur version figée. Une ligne `⚠ outils          repowarden 4.9.2 installé, 4.12.0 figé : devzone appliquer` signale un écart ; `devzone appliquer` réinstalle repowarden à la version figée et les modules actifs. `✔ outils          versions figées` indique que tout correspond. Les outils installés par `apt` ou l'image (Java, Node, Python, …) ne sont pas concernés.
+**Rattraper sans rebuild** : l'état affiché au démarrage (et par `devzone`) compare les outils installés à leur version figée. Une ligne `⚠ outils          repowarden 4.9.2 installé, 4.12.0 figé : devzone appliquer` signale un écart ; `devzone apply` réinstalle repowarden à la version figée et les modules actifs. `✔ outils          versions figées` indique que tout correspond. Les outils installés par `apt` ou l'image (Java, Node, Python, …) ne sont pas concernés.
 
 
 
 ## Garder des paquets systeme
 
-Un paquet installe a la main (`sudo apt install tree`) est perdu au prochain rebuild. `devzone paquets` maintient la liste des paquets a reinstaller apres un rebuild :
+Un paquet installe a la main (`sudo apt install tree`) est perdu au prochain rebuild. `devzone packages` maintient la liste des paquets a reinstaller apres un rebuild :
 
 | Action | Commande |
 |---|---|
-| Lister | `devzone paquets` : ✔ paquets installes, ○ paquets a installer |
-| Ajouter | `devzone paquets ajouter <nom>…` : valide (`apt-cache`), installe, ajoute a la liste |
-| Retirer | `devzone paquets retirer <nom>` : retire la liste et desinstalle |
-| Appliquer | `devzone paquets appliquer` : installe les paquets manquants |
+| Lister | `devzone packages` : ✔ paquets installes, ○ paquets a installer |
+| Ajouter | `devzone packages ajouter <nom>…` : valide (`apt-cache`), installe, ajoute a la liste |
+| Retirer | `devzone packages retirer <nom>` : retire la liste et desinstalle |
+| Appliquer | `devzone packages appliquer` : installe les paquets manquants |
 
-La liste est relue au post-create et affiche dans le recap (`⚠ paquets : …`) l'etat des paquets non installes. `devzone paquets appliquer` peut etre relance.
+La liste est relue au post-create et affiche dans le recap (`⚠ paquets : …`) l'etat des paquets non installes. `devzone packages appliquer` peut etre relance.
 
 ## Sortie machine
 
@@ -607,7 +607,7 @@ VS Code et les autres outils. La sortie texte n'est pas changée : ajoute
   espace. Ajouter un champ reste dans `schema: 1` ; retirer ou renommer un champ
   fait passer `schema` à 2 : fonde ta lecture dessus.
 
-`devzone etat --json` (le récapitulatif complet, rubrique par rubrique) :
+`devzone status --json` (le récapitulatif complet, rubrique par rubrique) :
 
 ```json
 {
@@ -616,7 +616,7 @@ VS Code et les autres outils. La sortie texte n'est pas changée : ajoute
   "identite_git": { "ok": true, "nom": "…", "email": "…", "commande": null },
   "plateforme": { "nom": "github", "url": null,
                   "github": { "connecte": true, "workflow": true, "commande": null } },
-  "outils": { "retards": [ { "paquet": "…", "figee": "…", "installee": "…" } ], "commande": "devzone appliquer" },
+  "outils": { "retards": [ { "paquet": "…", "figee": "…", "installee": "…" } ], "commande": "devzone apply" },
   "modules": [ { "nom": "postgres", "actif": true, "description": "…", "etat": "prêt sur docker-desktop…",
                  "echec": null, "commande": null } ],
   "docker_hote": true,
@@ -625,14 +625,14 @@ VS Code et les autres outils. La sortie texte n'est pas changée : ajoute
                 "travail": "docker-desktop", "travail_interne": false, "commande": null },
   "ports": [ { "port": 8080, "actif": true, "application": "…" } ],
   "identifiants": "/workspaces/devzone/.password",
-  "alertes": [ { "code": "relais_docker", "message": "…", "commande": "devzone reparer" } ],
+  "alertes": [ { "code": "relais_docker", "message": "…", "commande": "devzone repair" } ],
   "erreurs": {}
 }
 ```
 
 Les alertes possibles : `relais_docker`, `paquets`, `worktree`,
 `cluster_distant` (services sur un cluster distant), `cluster_interne`
-(cluster de travail de devzone, revenir avec `devzone utiliser <ton cluster>`).
+(cluster de travail de devzone, revenir avec `devzone use <ton cluster>`).
 
 `devzone agent etat --json` (sessions, écarts, droits modifiés) :
 
@@ -665,20 +665,44 @@ outil peut relancer la consigne ensuite avec `devzone agent`.
 | PR de livraison restée ouverte | une vérification rouge (voir la PR), `delivery-auto: false`, ou GitHub App absente ou désinstallée (avertissement dans le run `release`) | corriger la vérification ; installer l'App (`repowarden app init` sur ta machine) |
 | `repowarden app init` depuis `make shell` : la page `http://127.0.0.1:…` ne s'ouvre pas, ou GitHub ne revient pas | la page est servie dans le conteneur, injoignable depuis le navigateur de ta machine | lancer la commande **sur ta machine** : `npx -y repowarden app init --repo <compte>/<dépôt>` |
 | `repowarden app init` : « nom déjà utilisé » | un essai précédent a créé l'App sans en récupérer les identifiants | supprimer l'App orpheline (*GitHub → Settings → Developer settings → GitHub Apps*), ou `--nom <autre-nom>` |
-| `git commit` : « Please tell me who you are » | identité git absente | avec GitHub : `gh auth login -s workflow` puis `devzone demarrer` ; sans GitHub : `git config --file ~/.config/git/config user.name "<nom>"` et `user.email "<email>"` |
+| `git commit` : « Please tell me who you are » | identité git absente | avec GitHub : `gh auth login -s workflow` puis `devzone start` ; sans GitHub : `git config --file ~/.config/git/config user.name "<nom>"` et `user.email "<email>"` |
 | `gh auth login` : « Press Enter to open … in your browser », rien ne s'ouvre | pas de navigateur dans le conteneur (`make shell`) | ouvrir https://github.com/login/device à la main et saisir le code |
-| `k9s` : `Error: exit status 1` puis son aide ; `kubectl` : `localhost:8080` … `connection refused` | aucun cluster actif (module `kubernetes` désactivé, ou pas de cluster sur ta machine) | `devzone activer kubernetes` (cluster de ta machine), `kind create cluster`, ou `devzone utiliser <nom>` |
-| `claude` ou `opencode` : « command not found » | module `ia` désactivé | `devzone activer ia` |
-| `devzone` affiche `✖ module ia         en échec : installation incomplète (journal npm : …)` | l'installation de Claude Code ou d'opencode a échoué (réseau, paquet) ; le message d'échec nomme les paquets et le journal npm | lire le journal cité, puis `devzone appliquer` pour réessayer (ou `devzone desactiver ia`) |
-| `devzone activer ia` ou `devzone appliquer` sans rien afficher de neuf pendant plusieurs minutes | installation de Claude Code et opencode (plusieurs centaines de Mo) : annoncée, puis une ligne `… toujours en cours (N s)` toutes les 30 s | attendre la ligne `Claude Code et opencode installés` ou le message d'échec |
+| `k9s` : `Error: exit status 1` puis son aide ; `kubectl` : `localhost:8080` … `connection refused` | aucun cluster actif (module `kubernetes` désactivé, ou pas de cluster sur ta machine) | `devzone enable kubernetes` (cluster de ta machine), `kind create cluster`, ou `devzone use <nom>` |
+| `claude` ou `opencode` : « command not found » | module `ia` désactivé | `devzone enable ia` |
+| `devzone` affiche `✖ module ia         en échec : installation incomplète (journal npm : …)` | l'installation de Claude Code ou d'opencode a échoué (réseau, paquet) ; le message d'échec nomme les paquets et le journal npm | lire le journal cité, puis `devzone apply` pour réessayer (ou `devzone disable ia`) |
+| `devzone enable ia` ou `devzone apply` sans rien afficher de neuf pendant plusieurs minutes | installation de Claude Code et opencode (plusieurs centaines de Mo) : annoncée, puis une ligne `… toujours en cours (N s)` toutes les 30 s | attendre la ligne `Claude Code et opencode installés` ou le message d'échec |
 | CPU et RAM vides dans k9s | metrics-server absent du cluster | `devzone metrics` |
 | Deux conteneurs devzone | `make up` lancé pendant que VS Code ouvrait le conteneur | `make down`, puis un seul lancement |
 | Windows (Git Bash, MSYS) : `~/.kube` introuvable | `HOME` et `USERPROFILE` concaténés dans le chemin monté | lancer depuis VS Code ou PowerShell |
 | Pas de `~/.kube` sur l'hôte | Docker le crée vide au démarrage (sous Linux avec Docker Engine, il appartient à root) | rien à faire : le conteneur démarre quand même |
 
+## Anciens noms des commandes
+
+Les commandes de devzone s'écrivent en anglais (#502). Les anciens noms français restent acceptés et font exactement la même chose :
+
+| Ancien nom | Nom actuel |
+|---|---|
+| `devzone actif` | `devzone is-enabled` |
+| `devzone activer` / `desactiver` | `devzone enable` / `disable` |
+| `devzone appliquer` | `devzone apply` |
+| `devzone aide` | `devzone help` |
+| `devzone catalogue` | `devzone catalog` |
+| `devzone demarrer` / `etat` | `devzone start` / `status` |
+| `devzone mots-de-passe` | `devzone passwords` |
+| `devzone paquets` | `devzone packages` |
+| `devzone plateforme` | `devzone platform` |
+| `devzone reparer` | `devzone repair` |
+| `devzone utiliser` | `devzone use` |
+| `devzone mettre-a-jour` / `desinstaller` | `devzone update` / `uninstall` |
+| `devzone workspace demarrer` / `arreter` / `etat` | `devzone workspace start` / `stop` / `status` |
+| `devzone workspace copier-vers` / `copier-depuis` | `devzone workspace copy-to` / `copy-from` |
+| `devzone workspace migrer` / `revenir` / `nettoyer-docker` | `devzone workspace migrate` / `revert` / `clean-docker` |
+
+Les options (`--oui`, `--sans-reconstruire`, `--rapatrier`) et les messages affichés passeront en anglais avec les lots suivants (#508, #509, #510).
+
 ## Pour les contributeurs
 
-Les commandes de l'application (`devzone reparer`, `demarrer`, `metrics`,
+Les commandes de l'application (`devzone repair`, `demarrer`, `metrics`,
 `utiliser`) remplacent les scripts directs pour l'utilisateur. Les scripts
 internes restent appelables pendant le développement et par les tests :
 
