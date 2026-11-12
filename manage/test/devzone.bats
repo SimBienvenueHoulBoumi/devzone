@@ -150,21 +150,6 @@ GH
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
 }
 
-# Fake uname/ldd for opencode's platform package: a bin dir to prepend to PATH.
-faux_plateforme() {
-    local dir="$BATS_TEST_TMPDIR/platforme-$1-$2-$3"
-    mkdir -p "$dir"
-    printf '#!/usr/bin/env bash\ncase "${1:-}" in -s) echo "%s" ;; -m) echo "%s" ;; *) echo "%s" ;; esac\n' \
-        "$1" "$2" "$1" >"$dir/uname"
-    if [ "$3" = musl ]; then
-        printf '#!/usr/bin/env bash\necho "musl libc 1.2.4"\n' >"$dir/ldd"
-    else
-        printf '#!/usr/bin/env bash\necho "ldd (GNU libc) 2.36"\n' >"$dir/ldd"
-    fi
-    chmod +x "$dir/uname" "$dir/ldd"
-    echo "$dir"
-}
-
 @test "par défaut : tous les modules désactivés, avec la commande pour les activer" {
     run bash "$DEVZONE"
     [ "$status" -eq 0 ]
@@ -313,28 +298,6 @@ faux_plateforme() {
     [ "$status" -eq 0 ]
 }
 
-@test "activer ia : opencode linux arm64 glibc → paquet de plateforme avant, même version" {
-    faux="$(faux_plateforme Linux aarch64 glibc)"
-    PATH="$faux:$PATH" run bash "$DEVZONE" activer ia
-    [ "$status" -eq 0 ]
-    version="$(sed -nE 's/^IA_OPENCODE=.*@([0-9][^[:space:]]*)$/\1/p' "$DEVZONE")"
-    grep -qE "install -g .* opencode-linux-arm64@${version} opencode-ai@${version}$" "$BATS_TEST_TMPDIR/npm.log"
-}
-
-@test "activer ia : opencode linux x86_64 → paquet de plateforme x64" {
-    faux="$(faux_plateforme Linux x86_64 glibc)"
-    PATH="$faux:$PATH" run bash "$DEVZONE" activer ia
-    [ "$status" -eq 0 ]
-    grep -qE "install -g .* opencode-linux-x64@[0-9.]+ opencode-ai@[0-9.]+$" "$BATS_TEST_TMPDIR/npm.log"
-}
-
-@test "activer ia : opencode musl → suffixe -musl" {
-    faux="$(faux_plateforme Linux aarch64 musl)"
-    PATH="$faux:$PATH" run bash "$DEVZONE" activer ia
-    [ "$status" -eq 0 ]
-    grep -qE "install -g .* opencode-linux-arm64-musl@[0-9.]+ opencode-ai@[0-9.]+$" "$BATS_TEST_TMPDIR/npm.log"
-}
-
 @test "activer ia : binaire optionnel abandonné par npm (opencode ne répond pas) → réinstallé" {
     NPM_IA_SANS_BINAIRE=1 run bash "$DEVZONE" activer ia
     [ "$status" -eq 0 ]
@@ -379,8 +342,7 @@ faux_plateforme() {
 }
 
 @test "activer ia : npm en échec pour opencode seul → Claude Code installé, échec nomme opencode" {
-    faux="$(faux_plateforme Linux aarch64 glibc)"
-    NPM_ECHEC=1 PATH="$faux:$BATS_TEST_TMPDIR/bin:/usr/bin:/bin" run bash "$DEVZONE" activer ia
+    NPM_ECHEC=1 run bash "$DEVZONE" activer ia
     [ "$status" -ne 0 ]
     failure="$output"
     PATH="$BATS_TEST_TMPDIR/bin:/usr/bin:/bin" run claude --version

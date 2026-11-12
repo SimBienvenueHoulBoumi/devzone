@@ -326,39 +326,19 @@ dernier_journal_npm() {
     echo "${journal:-$HOME/.npm/_logs}"
 }
 
-# opencode's postinstall only finds a platform binary that npm installed as an
-# optional dependency; when npm skipped it (pod libc mismatch), the install
-# fails with EBADPLATFORM. Name it explicitly, at the same version, so it is
-# installed alongside. Output: package@version.
-opencode_platform_package() {
-    local os arch musl=""
-    case "$(uname -s)" in
-        Darwin) os=darwin ;;
-        *) os=linux ;;
-    esac
-    case "$(uname -m)" in
-        aarch64 | arm64) arch=arm64 ;;
-        *) arch=x64 ;;
-    esac
-    if ldd --version 2>&1 | grep -qi musl; then
-        musl=-musl
-    fi
-    echo "opencode-${os}-${arch}${musl}@${IA_OPENCODE##*@}"
-}
-
 # Installs each pinned AI assistant with its own npm command (3 tries each),
 # then checks its binary: npm silently drops a platform binary it failed to
 # download (#194), and one assistant failing must not block the other.
 installer_ia() {
-    local package binary attempt packages
+    local package binary attempt
     IA_FAILED=()
     for package in "${IA_PAQUETS[@]}"; do
         case "$package" in
-            opencode-ai@*) binary=opencode; packages=("$(opencode_platform_package)" "$package") ;;
-            *) binary=claude; packages=("$package") ;;
+            opencode-ai@*) binary=opencode ;;
+            *) binary=claude ;;
         esac
         for attempt in 1 2 3; do
-            if avec_progression npm install -g --no-fund --no-audit --loglevel=error "${packages[@]}" >/dev/null &&
+            if avec_progression npm install -g --no-fund --no-audit --loglevel=error "$package" >/dev/null &&
                 "$binary" --version >/dev/null 2>&1; then
                 break
             fi
