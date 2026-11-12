@@ -248,3 +248,25 @@ bloc_sidecar() {
     run helm template devzone-workspace "$CHART" --namespace devzone-workspace
     [ "$status" -eq 0 ]
 }
+
+@test "variables : DEVZONE_WORKSPACE=kubernetes repere le conteneur workspace" {
+    run rendu_de templates/statefulset.yaml
+    [ "$status" -eq 0 ]
+    local principal
+    principal="$(awk '/^        - name: workspace$/{p=1} /^          resources:/{p=0} p' <<<"$output")"
+    grep -q -- "- name: DEVZONE_WORKSPACE" <<<"$principal" || false
+    grep -A1 -- "- name: DEVZONE_WORKSPACE" <<<"$principal" | grep -q -- "value: kubernetes" || false
+}
+
+@test "sans-docker : aucun socket docker dans le rendu" {
+    run rendu
+    [ "$status" -eq 0 ]
+    ! grep -q -- "docker.sock" <<<"$output" || false
+}
+
+@test "workspace : aucun volume ni montage de kubeconfig (.kube)" {
+    run rendu
+    [ "$status" -eq 0 ]
+    ! grep -q -- "\.kube/" <<<"$output" || false
+    ! grep -q -- "name: kubeconfig" <<<"$output" || false
+}
