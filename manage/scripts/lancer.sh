@@ -1,44 +1,44 @@
 #!/usr/bin/env bash
-# Lance le conteneur sur l'hôte, sans jamais rester muet :
-#   bash manage/scripts/lancer.sh up [dossier]        (make up)
-#   bash manage/scripts/lancer.sh rebuild [dossier]   (make rebuild : reconstruit de zéro)
-# Sortie complète du CLI devcontainer dans <dossier>/.devzone.log ; dans le
-# terminal : les étapes clés, un signe de vie au plus toutes les
-# DEVZONE_SIGNE_DE_VIE secondes (30), et une question posée dans le conteneur
-# (dernière ligne du journal restée sans réponse DEVZONE_ATTENTE_QUESTION
-# secondes, 20) est affichée et le lancement arrêté : personne ne peut y
-# répondre (le CLI tourne sans entrée), attendre serait bloquer indéfiniment.
-# Portable : bash 3.2 (macOS) et Linux.
+# Starts the container on the host without ever staying silent:
+#   bash manage/scripts/lancer.sh up [folder]        (make up)
+#   bash manage/scripts/lancer.sh rebuild [folder]   (make rebuild: rebuild from scratch)
+# Full devcontainer CLI output goes to <folder>/.devzone.log; the terminal shows
+# key steps, a heartbeat at least every DEVZONE_SIGNE_DE_VIE seconds (30), and a
+# question asked inside the container (last log line left unanswered for
+# DEVZONE_ATTENTE_QUESTION seconds, 20) is shown and startup is stopped: nobody
+# can answer it (the CLI runs without input), waiting would hang forever.
+# Portable: bash 3.2 (macOS) and Linux.
 set -uo pipefail
 
 mode="${1:-}"
-DOSSIER="${2:-$PWD}"
+FOLDER="${2:-$PWD}"
 case "$mode" in
-    up) options=() fini="devzone lancé" ;;
-    rebuild) options=(--remove-existing-container) fini="devzone reconstruit" ;;
+    up) options=() done_msg="devzone started" ;;
+    rebuild) options=(--remove-existing-container) done_msg="devzone rebuilt" ;;
     *)
-        echo "usage : bash manage/scripts/lancer.sh up|rebuild [dossier]" >&2
+        echo "usage: bash manage/scripts/lancer.sh up|rebuild [folder]" >&2
         exit 2
         ;;
 esac
 
-# Socket Docker de l'hôte (#432) : ligne docker-hote de l'état de l'instance,
-# écrite par devzone dans le conteneur. Absente ou on : comportement historique.
-hote_off() {
+# Host Docker socket (#432): docker-hote line in instance state, written by devzone
+# inside the container. Missing or on: historical behavior.
+host_off() {
     local v
-    v="$(grep -E '^docker-hote=' "$DOSSIER/.devzone.modules" 2>/dev/null | tail -1 | cut -d= -f2 || true)"
+    v="$(grep -E '^docker-hote=' "$FOLDER/.devzone.modules" 2>/dev/null | tail -1 | cut -d= -f2 || true)"
     [ "$v" = off ]
 }
 
-# Copie de devcontainer.json sans la feature docker-outside-of-docker, pour un
-# conteneur sans le socket de l'hôte. Le fichier vit un niveau plus bas : les
-# chemins de build remontent d'un cran (../). Écrit à chaque lancement, dans un
-# dossier ignoré par git ; les commentaires du JSON d'origine sont gardés.
-generer_config_sans_docker_hote() {
-    local dossier="$DOSSIER/.devcontainer/sans-docker-hote" contexte=non
-    grep -q '"context"' "$DOSSIER/.devcontainer/devcontainer.json" && contexte=oui
-    mkdir -p "$dossier"
-    awk -v contexte="$contexte" '
+# Copy of devcontainer.json without the docker-outside-of-docker feature, for a
+# container without the host socket. The file lives one level deeper: build
+# paths go up one level (../). Written at each start, in a git-ignored folder;
+# comments from the original JSON are kept.
+# shellcheck disable=SC2034
+generate_config_without_host_docker() {
+    local folder="$FOLDER/.devcontainer/without-host-docker" context=no
+    grep -q '"context"' "$FOLDER/.devcontainer/devcontainer.json" && context=yes
+    mkdir -p "$folder"
+    awk -v context="$context" '
         /ghcr\.io\/devcontainers\/features\/docker-outside-of-docker/ { next }
         /"build"[[:space:]]*:[[:space:]]*\{[[:space:]]*"dockerfile"[[:space:]]*:[[:space:]]*"Dockerfile"[[:space:]]*\}/ {
             sub(/\{[[:space:]]*"dockerfile"[[:space:]]*:[[:space:]]*"Dockerfile"[[:space:]]*\}/,
@@ -46,7 +46,7 @@ generer_config_sans_docker_hote() {
             print
             next
         }
-        contexte == "non" && /"build"[[:space:]]*:[[:space:]]*\{[[:space:]]*$/ {
+        context == "no" && /"build"[[:space:]]*:[[:space:]]*\{[[:space:]]*$/ {
             print
             print "    \"context\": \"..\","
             next
@@ -55,124 +55,124 @@ generer_config_sans_docker_hote() {
             sub(/"dockerfile"[[:space:]]*:[[:space:]]*"[^"]*"/, "\"dockerfile\": \"../Dockerfile\"")
         }
         { print }
-    ' "$DOSSIER/.devcontainer/devcontainer.json" >"$dossier/devcontainer.json"
+    ' "$FOLDER/.devcontainer/devcontainer.json" >"$folder/devcontainer.json"
 }
 
-if hote_off; then
-    generer_config_sans_docker_hote
-    options+=(--config "$DOSSIER/.devcontainer/sans-docker-hote/devcontainer.json")
+if host_off; then
+    generate_config_without_host_docker
+    options+=(--config "$FOLDER/.devcontainer/without-host-docker/devcontainer.json")
 fi
-LOG="$DOSSIER/.devzone.log"
-VIE="${DEVZONE_SIGNE_DE_VIE:-30}"
-QUESTION="${DEVZONE_ATTENTE_QUESTION:-20}"
+LOG="$FOLDER/.devzone.log"
+HEARTBEAT="${DEVZONE_SIGNE_DE_VIE:-30}"
+QUESTION_WAIT="${DEVZONE_ATTENTE_QUESTION:-20}"
 ESC="$(printf '\033')"
 
-# Ligne du journal lisible : sans codes de couleur ni retours chariot
-propre() { sed "s/${ESC}\[[0-9;?]*[A-Za-z]//g" | tr -d '\r'; }
-# Dernière ligne non vide du journal, raccourcie
-derniere() { tail -c 2000 "$LOG" | propre | grep -v '^[[:space:]]*$' | tail -1 | cut -c1-110; }
+# Readable log line: without color codes or carriage returns
+clean_line() { sed "s/${ESC}\[[0-9;?]*[A-Za-z]//g" | tr -d '\r'; }
+# Last non-empty log line, shortened
+last_line() { tail -c 2000 "$LOG" | clean_line | grep -v '^[[:space:]]*$' | tail -1 | cut -c1-110; }
 
-# Question en attente : dernière ligne inachevée (sans retour à la ligne,
-# comme une invite) qui finit par [o/N], [y/N], ? ou une demande de mot de passe
-motif='(\[[^]]*/[^]]*\]|\?|[Pp]assword[^:]*:|[Mm]ot de passe[^:]*:)[[:space:]]*$'
-question() {
-    local ligne
-    # Dernier octet : vide après $( ) si c'est un retour à la ligne
+# Pending question: last unfinished line (no newline, like a prompt) ending with
+# [o/N], [y/N], ? or a password prompt
+pattern='(\[[^]]*/[^]]*\]|\?|[Pp]assword[^:]*:|[Mm]ot de passe[^:]*:)[[:space:]]*$'
+pending_question() {
+    local line
+    # Last byte: empty after $( ) if it is a newline
     [ -n "$(tail -c 1 "$LOG")" ] || return 1
-    ligne="$(tail -c 600 "$LOG" | propre | tail -1)"
-    [[ "$ligne" =~ $motif ]] || return 1
-    printf '%s\n' "$ligne" | cut -c1-200
+    line="$(tail -c 600 "$LOG" | clean_line | tail -1)"
+    [[ "$line" =~ $pattern ]] || return 1
+    printf '%s\n' "$line" | cut -c1-200
 }
 
-# Étapes clés, chacune affichée une fois ; état de devzone recopié tel quel
-vus=" "
-lues=0
-etapes() {
-    local total ligne
+# Key steps, each shown once; devzone state copied as-is
+seen=" "
+read_lines=0
+show_steps() {
+    local total line
     total="$(wc -l <"$LOG" | tr -d ' ')"
-    [ "$total" -gt "$lues" ] || return 0
-    while IFS= read -r ligne; do
-        case "$ligne" in
-            *"Start: Run: docker buildx build"* | *"Start: Run: docker build"*) annoncer image "Construction de l'image (plusieurs minutes la première fois)" ;;
-            *"Start: Run: docker run"*) annoncer conteneur "Création du conteneur" ;;
-            *"Running the postCreateCommand"*) annoncer postcreate "Installation dans le conteneur (repowarden, modules)" ;;
-            *"Running the postStartCommand"*) annoncer poststart "Démarrage (identité git, clusters, état)" ;;
-            "devzone prêt"* | "devzone : "* | "  ✔ "* | "  ✖ "* | "  ○ "* | "  ⚠ "* | "                    "[!\ ]* | "git-identite : "* | "kube-config : "* | "metrics-server : "*)
-                echo "  $ligne"
-                derniere_annonce="$(date +%s)"
+    [ "$total" -gt "$read_lines" ] || return 0
+    while IFS= read -r line; do
+        case "$line" in
+            *"Start: Run: docker buildx build"* | *"Start: Run: docker build"*) announce image "Building image (several minutes the first time)" ;;
+            *"Start: Run: docker run"*) announce container "Creating container" ;;
+            *"Running the postCreateCommand"*) announce postcreate "Installing in container (repowarden, modules)" ;;
+            *"Running the postStartCommand"*) announce poststart "Starting (git identity, clusters, state)" ;;
+            "devzone ready"* | "devzone started"* | "devzone rebuilt"* | "devzone : "* | "  ✔ "* | "  ✖ "* | "  ○ "* | "  ⚠ "* | "                    "[!\ ]* | "git-identite : "* | "kube-config : "* | "metrics-server : "*)
+                echo "  $line"
+                last_announce="$(date +%s)"
                 ;;
         esac
-    done < <(sed -n "$((lues + 1)),${total}p" "$LOG" | propre)
-    lues="$total"
+    done < <(sed -n "$((read_lines + 1)),${total}p" "$LOG" | clean_line)
+    read_lines="$total"
 }
-annoncer() {
-    case "$vus" in *" $1 "*) return 0 ;; esac
-    vus="$vus$1 "
+announce() {
+    case "$seen" in *" $1 "*) return 0 ;; esac
+    seen="$seen$1 "
     echo "▶ $2"
-    derniere_annonce="$(date +%s)"
+    last_announce="$(date +%s)"
 }
 
-arreter() {
+stop_launch() {
     [ -n "${pid:-}" ] || return 0
     pkill -TERM -P "$pid" 2>/dev/null || true
     kill -TERM "$pid" 2>/dev/null || true
     wait "$pid" 2>/dev/null || true
     pid=""
 }
-trap 'arreter; echo; echo "interrompu — journal : .devzone.log"; exit 130' INT TERM
+trap 'stop_launch; echo; echo "interrupted - log: .devzone.log"; exit 130' INT TERM
 
-# Docker d'abord : sans lui, le CLI ne donnerait qu'une erreur JSON brute
+# Docker first: without it the CLI would only show a raw JSON error
 # shellcheck source=SCRIPTDIR/docker.sh
 . "$(dirname "${BASH_SOURCE[0]}")/docker.sh"
-docker_pret "${DEVZONE_COMMANDE:-make $mode}" || exit 1
+docker_ready "${DEVZONE_COMMANDE:-make $mode}" || exit 1
 
 : >"$LOG"
-debut="$(date +%s)"
-derniere_annonce="$debut"
-echo "▶ Lancement de devzone (journal complet : .devzone.log)"
-# Entrée vide : le CLI ne relaie rien ; une question posée dans le conteneur
-# resterait sans réponse, d'où sa détection ci-dessous
-npx -y @devcontainers/cli up --workspace-folder "$DOSSIER" ${options[@]+"${options[@]}"} </dev/null >"$LOG" 2>&1 &
+start="$(date +%s)"
+last_announce="$start"
+echo "▶ Starting devzone (full log: .devzone.log)"
+# Empty input: the CLI forwards nothing; a question asked inside the container
+# would stay unanswered, hence the detection below
+npx -y @devcontainers/cli up --workspace-folder "$FOLDER" ${options[@]+"${options[@]}"} </dev/null >"$LOG" 2>&1 &
 pid=$!
 
-taille=0
-calme=0
+size=0
+quiet=0
 while kill -0 "$pid" 2>/dev/null; do
     sleep 1
     t="$(wc -c <"$LOG" | tr -d ' ')"
-    if [ "$t" != "$taille" ]; then
-        taille="$t"
-        calme=0
-        etapes
+    if [ "$t" != "$size" ]; then
+        size="$t"
+        quiet=0
+        show_steps
     else
-        calme=$((calme + 1))
+        quiet=$((quiet + 1))
     fi
-    if [ "$calme" -ge "$QUESTION" ] && q="$(question)"; then
-        arreter
-        echo "✖ Une étape du conteneur pose une question et attend une réponse (journal immobile depuis $calme s) :" >&2
+    if [ "$quiet" -ge "$QUESTION_WAIT" ] && q="$(pending_question)"; then
+        stop_launch
+        echo "✖ A container step asks a question and waits for an answer (log idle for $quiet s):" >&2
         echo "    $q" >&2
-        echo "  Personne ne peut y répondre ici : lancement arrêté au lieu d'attendre indéfiniment." >&2
-        echo "  Journal complet : .devzone.log ; signale-le : https://github.com/SimBienvenueHoulBoumi/devzone/issues" >&2
-        echo "  Le conteneur est peut-être incomplet : make rebuild pour repartir de zéro." >&2
+        echo "  Nobody can answer it here: startup stopped instead of waiting forever." >&2
+        echo "  Full log: .devzone.log; report it: https://github.com/SimBienvenueHoulBoumi/devzone/issues" >&2
+        echo "  The container may be incomplete: make rebuild to start from scratch." >&2
         exit 1
     fi
-    maintenant="$(date +%s)"
-    if [ $((maintenant - derniere_annonce)) -ge "$VIE" ]; then
-        ecoule=$((maintenant - debut))
-        info="en cours depuis $((ecoule / 60)) min $((ecoule % 60)) s"
-        [ "$calme" -lt "$VIE" ] || info="$info, aucune nouvelle ligne depuis $calme s"
-        echo "  … $info : $(derniere)"
-        derniere_annonce="$maintenant"
+    now="$(date +%s)"
+    if [ $((now - last_announce)) -ge "$HEARTBEAT" ]; then
+        elapsed=$((now - start))
+        info="running for $((elapsed / 60)) min $((elapsed % 60)) s"
+        [ "$quiet" -lt "$HEARTBEAT" ] || info="$info, no new line for $quiet s"
+        echo "  … $info: $(last_line)"
+        last_announce="$now"
     fi
 done
 wait "$pid"
 code=$?
 pid=""
-etapes
+show_steps
 if [ "$code" -eq 0 ]; then
-    echo "$fini"
+    echo "$done_msg"
 else
-    tail -15 "$LOG" | propre
-    echo "échec — log complet : .devzone.log"
+    tail -15 "$LOG" | clean_line
+    echo "failed - full log: .devzone.log"
     exit 1
 fi

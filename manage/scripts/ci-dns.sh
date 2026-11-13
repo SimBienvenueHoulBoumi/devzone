@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
-# DNS publics pour le Docker d'un runner GitHub Actions (#468) : le DNS des
-# runners ubuntu échoue parfois à résoudre archive.ubuntu.com pendant la
-# construction du conteneur. Ajoute 1.1.1.1 et 8.8.8.8 à daemon.json (les clés
-# existantes sont gardées), redémarre Docker et attend qu'il réponde.
-# Garde-fou : refuse hors CI, jamais lancé sur un poste.
+# Public DNS for Docker on a GitHub Actions runner (#468): runner ubuntu DNS
+# sometimes fails to resolve archive.ubuntu.com while building the container.
+# Adds 1.1.1.1 and 8.8.8.8 to daemon.json (existing keys are kept), restarts
+# Docker and waits until it responds.
+# Guard: refuses outside CI, never run on a workstation.
 set -euo pipefail
 
 if [ "${CI:-}" != true ] || [ "${GITHUB_ACTIONS:-}" != true ]; then
-    echo "ci-dns.sh : réservé à GitHub Actions (CI et GITHUB_ACTIONS doivent valoir true)" >&2
+    echo "ci-dns.sh: reserved for GitHub Actions (CI and GITHUB_ACTIONS must be true)" >&2
     exit 1
 fi
 
-# Chemin surchargeable pour les tests
+# Overridable path for tests
 daemon="${DEVZONE_CI_DOCKER_DAEMON:-/etc/docker/daemon.json}"
 tmp="$(mktemp)"
 trap 'rm -f "$tmp"' EXIT
 
-# Fusion avec le fichier existant, ou création s'il n'existe pas
+# Merge with existing file, or create it if missing
 if [ -s "$daemon" ]; then
     jq '. + {"dns": ["1.1.1.1", "8.8.8.8"]}' "$daemon" >"$tmp"
 else
@@ -27,12 +27,12 @@ sudo cp "$tmp" "$daemon"
 
 sudo systemctl restart docker
 
-# Attente de Docker : 20 secondes au plus
+# Wait for Docker: at most 20 seconds
 for _ in $(seq 1 20); do
     if docker info >/dev/null 2>&1; then
         exit 0
     fi
     sleep 1
 done
-echo "ci-dns.sh : Docker ne répond pas après 20 s" >&2
+echo "ci-dns.sh: Docker did not respond after 20 s" >&2
 exit 1

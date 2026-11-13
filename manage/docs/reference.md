@@ -109,7 +109,7 @@ devzone disable docker-hote     # écrit docker-hote=off, puis demande une recon
 make rebuild                       # sur le poste, pas dans le conteneur
 ```
 
-Au lancement sur le poste, `manage/scripts/lancer.sh` lit la ligne `docker-hote` (absente = `on`). À `off`, il génère `.devcontainer/sans-docker-hote/devcontainer.json` (copie sans la feature, chemins de build adaptés au sous-dossier, dossier ignoré par git) et passe ce fichier au CLI devcontainers avec `--config`. Pour remettre le socket : `devzone enable docker-hote`, puis `make rebuild`.
+Au lancement sur le poste, `manage/scripts/lancer.sh` lit la ligne `docker-hote` (absente = `on`). À `off`, il génère `.devcontainer/without-host-docker/devcontainer.json` (copie sans la feature, chemins de build adaptés au sous-dossier, dossier ignoré par git) et passe ce fichier au CLI devcontainers avec `--config`. Pour remettre le socket : `devzone enable docker-hote`, puis `make rebuild`.
 
 Sans socket, `docker` n'existe plus dans le conteneur : la commande affiche un message qui renvoie au workspace Kubernetes (`devzone workspace`, kubedock et BuildKit). Le relais du socket ne bloque pas le démarrage, et la connexion au cluster Kubernetes de l'hôte reste disponible ; en revanche, kind et les conteneurs lancés sur le Docker du poste ne le sont plus. `devzone status --json` porte l'option dans le champ `docker_hote` et l'état réel du montage dans `docker_hote_actif`.
 
@@ -258,7 +258,7 @@ devzone workspace shell                   # shell dans le conteneur workspace
 devzone workspace vscode                  # marche a suivre : attache VS Code au pod
 devzone workspace copy-to <dossier>   # copie un dossier du poste vers les projets du pod
 devzone workspace copy-from <dossier> # copie un projet du pod vers le poste
-devzone workspace ports [demarrer|arreter|etat] # applications et services du pod sur localhost du poste
+devzone workspace ports [start|stop|status] # applications and services from pod on workstation localhost
 devzone workspace services enable <service> [options]  # installe gitlab, postgres ou argocd dans le cluster
 devzone workspace services disable <service> [--oui]   # les retire
 devzone workspace services status          # présents ou non, par namespace
@@ -269,7 +269,7 @@ devzone workspace clean-docker [--oui] # supprime les volumes Docker devzone-* (
 
 Les commandes utilisent helm et kubectl du poste, avec le contexte devzone s il existe, sinon le contexte courant. L image est construite par la CI a chaque PR et publiee sur ghcr.io a la livraison.
 
-L'image vient de ghcr.io, avec le tag de la version de devzone (`latest` depuis un clone du dépôt) ; si elle manque, demarrer le dit et désinstalle le workspace.
+L'image vient de ghcr.io, avec le tag de la version de devzone (`latest` depuis un clone du dépôt) ; if missing, start reports it and uninstalls the workspace.
 
 ### Projets dans un volume
 
@@ -295,12 +295,12 @@ Apres `devzone workspace migrate`, `make up`, `make shell` et `make stop` pilote
 
 ### Applications et services sur localhost du poste
 
-`devzone workspace start` lance un veilleur sur le poste (`manage/scripts/ports-workspace.sh`), `devzone workspace stop` l'arrête avec tous ses `kubectl port-forward`. `devzone workspace ports [demarrer|arreter|etat]` le pilote seul.
+`devzone workspace start` lance un veilleur sur le poste (`manage/scripts/ports-workspace.sh`), `devzone workspace stop` l'arrête avec tous ses `kubectl port-forward`. `devzone workspace ports [start|stop|status]` drives it alone.
 
 - **Pod** : toutes les 3 s, `kubectl exec` dans le pod lit `ss -ltnH`. Chaque port TCP en écoute ≥ 1024 (hors kubedock 2475 et BuildKit 1234) est relayé vers `127.0.0.1:<même port>` du poste, jamais sur le réseau local (`--address 127.0.0.1`). Un serveur lancé dans le pod (`npm run dev`) est donc joignable sur http://localhost:5173 sans commande ; le port qui disparaît voit son relais arrêté.
 - **Services de devzone** : avec le module `postgres` actif dans `.devzone.modules`, `svc/postgres` du namespace `devzone-postgres` est relayé sur `127.0.0.1:5432`, et pgAdmin (`svc/pgadmin`) s'il existe, par le même mécanisme. Avec le module `mysql` actif, `svc/mysql` du namespace `devzone-mysql` est relayé sur `127.0.0.1:3306`.
 - **Port déjà pris sur le poste** (`lsof`, sinon `nc -z`) : une seule ligne « ⚠ port <n> déjà pris sur le poste, non relayé » dans `.devzone.ports-workspace/journal.log` et dans `ports etat`, sans boucle d'essais.
-- **Un seul veilleur** : verrou `mkdir` et pid dans `.devzone.ports-workspace/` du dossier devzone ; un second `demarrer` répond « déjà lancé ».
+- **Un seul veilleur** : verrou `mkdir` et pid dans `.devzone.ports-workspace/` du dossier devzone ; a second `start` answers "already running".
 - **Garde-fou** : le veilleur ne tourne jamais pendant les tests automatiques (faux kubectl et lsof).
 
 ### Services de devzone dans le workspace Kubernetes
@@ -712,11 +712,17 @@ Les commandes de devzone s'écrivent en anglais (#502). Les anciens noms frança
 | `devzone workspace copier-vers` / `copier-depuis` | `devzone workspace copy-to` / `copy-from` |
 | `devzone workspace migrer` / `revenir` / `nettoyer-docker` | `devzone workspace migrate` / `revert` / `clean-docker` |
 
-Les options (`--oui`, `--sans-reconstruire`, `--rapatrier`) et les messages affichés passeront en anglais avec les lots suivants (#508, #509, #510).
+| Ancien | Nouveau |
+|---|---|
+| `--oui` | `--yes` |
+| `--rapatrier` | `--bring-back` |
+| `conseil` | `advice` |
+| `GARDER=connexions` | `KEEP=logins` |
+| `CONFIRMER=oui` | `CONFIRM=yes` |
 
 ## Pour les contributeurs
 
-Les commandes de l'application (`devzone repair`, `demarrer`, `metrics`,
+Les commandes de l'application (`devzone repair`, `start`, `metrics`,
 `utiliser`) remplacent les scripts directs pour l'utilisateur. Les scripts
 internes restent appelables pendant le développement et par les tests :
 

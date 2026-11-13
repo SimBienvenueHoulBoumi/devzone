@@ -1,40 +1,40 @@
 #!/usr/bin/env bash
-# Versions figées du conteneur : compare repowarden (versions.env) et les
-# assistants IA (lignes IA_…, devzone) à la dernière version npm, ou applique
-# une montée.
+# Pinned container versions: compares repowarden (versions.env) and AI
+# assistants (IA_… lines, devzone) to the latest npm version, or applies an
+# upgrade.
 #   bash manage/scripts/versions.sh
-#       une ligne « paquet ancienne nouvelle » par paquet en retard, rien sinon
-#   bash manage/scripts/versions.sh --installees
-#       une ligne « paquet figée installée » par outil installé en retard
-#   bash manage/scripts/versions.sh --appliquer <paquet> <version>
-#       remplace cette version figée dans son fichier, rien d'autre
-#   bash manage/scripts/versions.sh --ticket-existant <paquet> <auteur>
-#       « numéro<TAB>titre » du ticket ouvert par <auteur>, rien sinon
-# Compatible bash 3.2 (macOS).
+#       one "package old new" line per outdated package, nothing otherwise
+#   bash manage/scripts/versions.sh --installed
+#       one "package pinned installed" line per installed tool behind its pin
+#   bash manage/scripts/versions.sh --apply <package> <version>
+#       replaces that pinned version in its file, nothing else
+#   bash manage/scripts/versions.sh --existing-ticket <package> <author>
+#       "number<TAB>title" of the open ticket by <author>, nothing otherwise
+# Compatible with bash 3.2 (macOS).
 set -euo pipefail
 
-ICI="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-VERSIONS_ENV="$ICI/.devcontainer/versions.env"
-DEVZONE="$ICI/.devcontainer/devzone"
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+VERSIONS_ENV="$HERE/.devcontainer/versions.env"
+DEVZONE="$HERE/.devcontainer/devzone"
 
-# Liste « paquet version » des versions figées dans les deux fichiers ; dans
-# devzone, une ligne IA_<NOM>=<paquet>@<version> par assistant IA
-figees() {
-    local element
+# List "package version" of pinned versions in both files; in devzone, one
+# IA_<NAME>=<package>@<version> line per AI assistant
+pinned() {
+    local item
     if [ -f "$VERSIONS_ENV" ]; then
         # shellcheck disable=SC1090
         . "$VERSIONS_ENV"
         [ -z "${REPOWARDEN_VERSION:-}" ] || echo "repowarden $REPOWARDEN_VERSION"
     fi
-    while read -r element; do
-        case "$element" in
-            ?*@*) echo "${element%@*} ${element##*@}" ;;
+    while read -r item; do
+        case "$item" in
+            ?*@*) echo "${item%@*} ${item##*@}" ;;
         esac
     done < <(sed -nE 's/^IA_[A-Z0-9_]+=([^[:space:]()"]+)$/\1/p' "$DEVZONE")
 }
 
-# Vrai si la version $1 est plus récente que $2 (composants numériques)
-plus_recente() {
+# True if version $1 is newer than $2 (numeric components)
+newer() {
     local i x y
     local IFS=.
     local a b
@@ -53,117 +53,117 @@ plus_recente() {
     return 1
 }
 
-# Dernière version publiée sur npm (vide si npm ne répond pas)
-derniere() {
+# Latest version published on npm (empty if npm does not respond)
+latest() {
     npm view "$1" version 2>/dev/null | tail -1 | tr -d '[:space:]'
 }
 
-# Une ligne par paquet en retard, rien si tout est à jour
-lister() {
-    local paquet ancienne nouvelle
-    while read -r paquet ancienne; do
-        [ -n "$paquet" ] || continue
-        nouvelle="$(derniere "$paquet")"
-        if [ -z "$nouvelle" ]; then
-            echo "versions : version npm illisible pour $paquet" >&2
+# One line per outdated package, nothing if everything is up to date
+list_outdated() {
+    local package old new
+    while read -r package old; do
+        [ -n "$package" ] || continue
+        new="$(latest "$package")"
+        if [ -z "$new" ]; then
+            echo "versions: cannot read npm version for $package" >&2
             exit 1
         fi
-        if plus_recente "$nouvelle" "$ancienne"; then
-            echo "$paquet $ancienne $nouvelle"
+        if newer "$new" "$old"; then
+            echo "$package $old $new"
         fi
-    done < <(figees)
+    done < <(pinned)
 }
 
-# Versions installées globalement (paquet version), lues en une seule fois ;
-# échoue si npm ou jq ne répond pas (l'état omet alors la ligne)
-installees() {
+# Globally installed versions (package version), read once;
+# fails if npm or jq does not respond (state then omits the line)
+installed_packages() {
     local json
     json="$(npm ls -g --depth=0 --json 2>/dev/null || true)"
     [ -n "$json" ] || return 1
     printf '%s\n' "$json" | jq -r '.dependencies // {} | to_entries[] | "\(.key) \(.value.version)"'
 }
 
-# Une ligne « paquet figée installée » par outil installé dont la version
-# diffère de la version figée ; un outil non installé n'est pas listé
-comparer_installees() {
-    local paquet figee installee liste
-    liste="$(installees)"
-    while read -r paquet figee; do
-        [ -n "$paquet" ] || continue
-        installee="$(printf '%s\n' "$liste" | awk -v p="$paquet" '$1 == p { print $2; exit }')"
-        [ -n "$installee" ] || continue
-        [ "$installee" = "$figee" ] || echo "$paquet $figee $installee"
-    done < <(figees)
+# One "package pinned installed" line per installed tool whose version differs
+# from the pinned version; a tool not installed is not listed
+compare_installed() {
+    local package pin installed list
+    list="$(installed_packages)"
+    while read -r package pin; do
+        [ -n "$package" ] || continue
+        installed="$(printf '%s\n' "$list" | awk -v p="$package" '$1 == p { print $2; exit }')"
+        [ -n "$installed" ] || continue
+        [ "$installed" = "$pin" ] || echo "$package $pin $installed"
+    done < <(pinned)
 }
 
-# Affiche « numéro<TAB>titre » du ticket ouvert par $2 dont le titre commence
-# par « $1 », rien sinon : un ticket au même titre ouvert par un autre est ignoré.
-ticket_existant() {
-    local paquet="$1" auteur="$2" tickets numero titre auteur_ticket
+# Prints "number<TAB>title" of the open ticket by $2 whose title starts with
+# "$1", nothing otherwise: a ticket with the same title opened by someone else is ignored.
+existing_ticket() {
+    local package="$1" author="$2" tickets number title ticket_author
     tickets="$(gh issue list --state open --limit 200 --json number,title,author \
         --jq '.[] | "\(.number)\t\(.title)\t\(.author.login)"')"
-    while IFS=$'\t' read -r numero titre auteur_ticket; do
-        [ -n "$numero" ] || continue
-        case "$titre" in
-            "$paquet "*) ;;
+    while IFS=$'\t' read -r number title ticket_author; do
+        [ -n "$number" ] || continue
+        case "$title" in
+            "$package "*) ;;
             *) continue ;;
         esac
-        [ "$auteur_ticket" = "$auteur" ] || continue
-        printf '%s\t%s\n' "$numero" "$titre"
+        [ "$ticket_author" = "$author" ] || continue
+        printf '%s\t%s\n' "$number" "$title"
         return 0
     done <<<"$tickets"
 }
 
-# Échappe $1 pour un motif sed (le délimiteur est « | »)
-echapper() {
+# Escapes $1 for a sed pattern (delimiter is "|")
+escape_sed() {
     printf '%s' "$1" | sed "s/[][\\\\.*^$()+?{}|]/\\\\&/g"
 }
 
-# Remplace la seule version figée de $1 par $2, dans son fichier. Le contenu
-# est réécrit dans le fichier existant (pas de mv) : ses droits, notamment le
-# droit d'exécution de devzone, sont conservés.
-appliquer() {
-    local paquet="$1" version="$2" motif tmp fichier
+# Replaces the single pinned version of $1 with $2 in its file. Content is
+# written back into the existing file (no mv): its permissions, including the
+# execute bit on devzone, are preserved.
+apply() {
+    local package="$1" version="$2" pattern tmp file
     case "$version" in
         "" | *[!0-9A-Za-z.+-]*)
-            echo "versions : version invalide : ${version:-(aucune)}" >&2
+            echo "versions: invalid version: ${version:-(none)}" >&2
             exit 1
             ;;
     esac
-    if [ "$paquet" = repowarden ]; then
-        fichier="$VERSIONS_ENV"
-        grep -qE '^REPOWARDEN_VERSION=' "$fichier" ||
-            { echo "versions : paquet inconnu : $paquet" >&2; exit 1; }
+    if [ "$package" = repowarden ]; then
+        file="$VERSIONS_ENV"
+        grep -qE '^REPOWARDEN_VERSION=' "$file" ||
+            { echo "versions: unknown package: $package" >&2; exit 1; }
         tmp="$(mktemp)"
-        sed -E "s|^(REPOWARDEN_VERSION=)[^[:space:]]+$|\1${version}|" "$fichier" >"$tmp"
+        sed -E "s|^(REPOWARDEN_VERSION=)[^[:space:]]+$|\1${version}|" "$file" >"$tmp"
     else
-        fichier="$DEVZONE"
-        figees | awk -v p="$paquet" '$1 == p { trouve = 1 } END { exit trouve ? 0 : 1 }' ||
-            { echo "versions : paquet inconnu : $paquet" >&2; exit 1; }
-        motif="$(echapper "$paquet")"
+        file="$DEVZONE"
+        pinned | awk -v p="$package" '$1 == p { found = 1 } END { exit found ? 0 : 1 }' ||
+            { echo "versions: unknown package: $package" >&2; exit 1; }
+        pattern="$(escape_sed "$package")"
         tmp="$(mktemp)"
-        sed -E "s|^(IA_[A-Z0-9_]+=${motif}@)[^[:space:]]+$|\1${version}|" "$fichier" >"$tmp"
+        sed -E "s|^(IA_[A-Z0-9_]+=${pattern}@)[^[:space:]]+$|\1${version}|" "$file" >"$tmp"
     fi
-    cat "$tmp" >"$fichier"
+    cat "$tmp" >"$file"
     rm -f "$tmp"
 }
 
 case "${1:-}" in
-    "") lister ;;
-    --installees) comparer_installees ;;
-    --appliquer)
+    "") list_outdated ;;
+    --installed | --installees) compare_installed ;;
+    --apply | --appliquer)
         [ "$#" -eq 3 ] ||
-            { echo "usage : bash manage/scripts/versions.sh [--installees | --appliquer <paquet> <version> | --ticket-existant <paquet> <auteur>]" >&2; exit 2; }
-        appliquer "$2" "$3"
+            { echo "usage: bash manage/scripts/versions.sh [--installed | --apply <package> <version> | --existing-ticket <package> <author>]" >&2; exit 2; }
+        apply "$2" "$3"
         ;;
-    --ticket-existant)
+    --existing-ticket | --ticket-existant)
         [ "$#" -eq 3 ] ||
-            { echo "usage : bash manage/scripts/versions.sh [--installees | --appliquer <paquet> <version> | --ticket-existant <paquet> <auteur>]" >&2; exit 2; }
-        ticket_existant "$2" "$3"
+            { echo "usage: bash manage/scripts/versions.sh [--installed | --apply <package> <version> | --existing-ticket <package> <author>]" >&2; exit 2; }
+        existing_ticket "$2" "$3"
         ;;
     -h | --help) sed -n '2,17p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' ;;
     *)
-        echo "usage : bash manage/scripts/versions.sh [--installees | --appliquer <paquet> <version> | --ticket-existant <paquet> <auteur>]" >&2
+        echo "usage: bash manage/scripts/versions.sh [--installed | --apply <package> <version> | --existing-ticket <package> <author>]" >&2
         exit 2
         ;;
 esac

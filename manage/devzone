@@ -32,6 +32,7 @@ LIGNES_GITIGNORE=(
     '.password'
     '.devzone.sauvegarde/'
     '.devcontainer/sans-docker-hote/'
+    '.devcontainer/without-host-docker/'
 )
 
 version() {
@@ -460,7 +461,7 @@ creer() {
     # Docker d'abord : le dossier reste prêt, à lancer une fois Docker démarré
     # shellcheck source=SCRIPTDIR/scripts/docker.sh
     . "$PAQUET/manage/scripts/docker.sh"
-    if ! docker_pret "cd $cible && make shell"; then
+    if ! docker_ready "cd $cible && make shell"; then
         echo "  Le dossier est prêt : rien à refaire, sauf ce lancement." >&2
         exit 1
     fi
