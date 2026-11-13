@@ -1,51 +1,51 @@
 #!/usr/bin/env bash
-# Aide commune des tests de migration (#403, workspace-migration.bats et
-# workspace-retour.bats) : faux docker et kubectl sous $BATS_TEST_TMPDIR/bin. Le
-# « pod » est le dossier $T/pod, les « volumes Docker » sont les dossiers de
-# $T/volumes, le poste est $T/poste. Aucun vrai volume, aucun cluster touche.
+# Common helpers for migration tests (#403, workspace-migration.bats and
+# workspace-retour.bats): fake docker and kubectl under $BATS_TEST_TMPDIR/bin.
+# The "pod" is $T/pod, "Docker volumes" are folders under $T/volumes, the
+# workstation is $T/workstation. No real volume or cluster is touched.
 
-# Isole HOME, relais et kubeconfig, cree le poste, le pod et les faux outils.
-migration_isole() {
+# Isolate HOME, relay and kubeconfig, create workstation, pod and fake tools.
+migration_isolate() {
     load commun
     relais_docker_isole
     kube_isole
     RACINE="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
     CLI="$RACINE/manage/devzone"
     T="$BATS_TEST_TMPDIR"
-    mkdir -p "$T/bin" "$T/poste/workspace/alpha" "$T/poste/workspace/beta" "$T/pod/workspaces/projets" "$T/pod/home/vscode"
-    export FAUX_POD="$T/pod"
-    echo "a" >"$T/poste/workspace/alpha/a.txt"
-    echo "b" >"$T/poste/workspace/beta/b.txt"
-    echo "ia=on" >"$T/poste/.devzone.modules"
-    echo "jq" >"$T/poste/.devzone.paquets"
+    mkdir -p "$T/bin" "$T/workstation/workspace/alpha" "$T/workstation/workspace/beta" "$T/pod/workspaces/projets" "$T/pod/home/vscode"
+    export FAKE_POD="$T/pod"
+    echo "a" >"$T/workstation/workspace/alpha/a.txt"
+    echo "b" >"$T/workstation/workspace/beta/b.txt"
+    echo "ia=on" >"$T/workstation/.devzone.modules"
+    echo "jq" >"$T/workstation/.devzone.paquets"
     cat >"$T/bin/kubectl" <<'KUBE'
 #!/usr/bin/env bash
-# Faux kubectl : le pod est $FAUX_POD (/workspaces/projets et /home/vscode y sont reroutes).
+# Fake kubectl: pod is $FAKE_POD (/workspaces/projets and /home/vscode rerouted).
 T="$BATS_TEST_TMPDIR"
 echo "kubectl $*" >>"$T/kubectl.log"
 reroute() {
-    local a="${1//\/workspaces\/projets/$FAUX_POD/workspaces/projets}"
-    printf '%s' "${a//\/home\/vscode/$FAUX_POD/home/vscode}"
+    local a="${1//\/workspaces\/projets/$FAKE_POD/workspaces/projets}"
+    printf '%s' "${a//\/home\/vscode/$FAKE_POD/home/vscode}"
 }
-[ "${1:-}" = config ] && { [ "${2:-}" = get-contexts ] && echo "${FAUX_CONTEXTES:-docker-desktop}"; exit 0; }
-args=("$@"); verbe=""; pos=(); i=0
+[ "${1:-}" = config ] && { [ "${2:-}" = get-contexts ] && echo "${FAKE_CONTEXTS:-docker-desktop}"; exit 0; }
+args=("$@"); verb=""; pos=(); i=0
 while [ "$i" -lt "${#args[@]}" ]; do
     a="${args[$i]}"
     case "$a" in
         --context | --namespace | -c | -o) i=$((i + 1)) ;;
         --) break ;;
         -*) ;;
-        *) if [ -z "$verbe" ]; then verbe="$a"; else pos+=("$a"); fi ;;
+        *) if [ -z "$verb" ]; then verb="$a"; else pos+=("$a"); fi ;;
     esac
     i=$((i + 1))
 done
-case "$verbe" in
+case "$verb" in
     get)
-        [ -n "${FAUX_CLUSTER_KO:-}" ] && exit 1
-        [ "${pos[0]}" = pod ] && echo "${FAUX_PHASE:-Running}"
+        [ -n "${FAKE_CLUSTER_KO:-}" ] && exit 1
+        [ "${pos[0]}" = pod ] && echo "${FAKE_PHASE:-Running}"
         ;;
     cp)
-        [ -n "${FAUX_CP_ECHEC:-}" ] && { echo "error: tar" >&2; exit 1; }
+        [ -n "${FAKE_CP_FAIL:-}" ] && { echo "error: tar" >&2; exit 1; }
         if [[ "${pos[0]}" == devzone-workspace-0:* ]]; then
             src="$(reroute "${pos[0]#*:}")"; dest="${pos[1]}"
         else
@@ -53,7 +53,7 @@ case "$verbe" in
         fi
         if [ -d "$src" ]; then
             mkdir -p "$dest" && cp -a "$src/." "$dest/"
-            [ -n "${FAUX_CP_TRONQUE:-}" ] && find "$dest" -type f | head -1 | xargs rm -f
+            [ -n "${FAKE_CP_TRUNCATE:-}" ] && find "$dest" -type f | head -1 | xargs rm -f
         else
             mkdir -p "$(dirname "$dest")" && cp -a "$src" "$dest"
         fi
@@ -61,7 +61,7 @@ case "$verbe" in
     exec)
         idx=0; for a in "$@"; do idx=$((idx + 1)); [ "$a" = "--" ] && break; done
         cmd=("${@:idx + 1}")
-        if [ "${cmd[0]}" = df ] && [ -n "${FAUX_DF_KO:-}" ]; then
+        if [ "${cmd[0]}" = df ] && [ -n "${FAKE_DF_KO:-}" ]; then
             printf 'Filesystem 1024-blocks Used Available Capacity Mounted\nx 10 9 1 90%% /\n'; exit 0
         fi
         for j in "${!cmd[@]}"; do cmd[j]="$(reroute "${cmd[j]}")"; done
@@ -72,7 +72,7 @@ exit 0
 KUBE
     cat >"$T/bin/docker" <<'DOCKER'
 #!/usr/bin/env bash
-# Faux docker : les volumes sont les dossiers de $BATS_TEST_TMPDIR/volumes.
+# Fake docker: volumes are folders under $BATS_TEST_TMPDIR/volumes.
 T="$BATS_TEST_TMPDIR"
 echo "docker $*" >>"$T/docker.log"
 case "$1 ${2:-}" in
@@ -81,7 +81,7 @@ case "$1 ${2:-}" in
     "volume rm") rm -rf "$T/volumes/$3" ;;
     "run --rm")
         vol="${4%%:*}"
-        [ -n "${FAUX_DOCKER_RUN_KO:-}" ] && exit 1
+        [ -n "${FAKE_DOCKER_RUN_KO:-}" ] && exit 1
         tar cf - -C "$T/volumes/$vol" .
         ;;
 esac
@@ -92,14 +92,14 @@ DOCKER
     : >"$T/docker.log"
 }
 
-# Cree des volumes Docker de test (gh, m2) avec un fichier chacun.
-faux_volumes() {
+# Create test Docker volumes (gh, m2) with one file each.
+fake_volumes() {
     mkdir -p "$T/volumes/devzone-gh" "$T/volumes/devzone-m2"
     echo "token" >"$T/volumes/devzone-gh/hosts.yml"
     echo "jar" >"$T/volumes/devzone-m2/a.jar"
 }
 
-# Lance une sous-commande workspace depuis le dossier du poste de test.
+# Run a workspace subcommand from the test workstation folder.
 ws() {
-    cd "$T/poste" && run bash "$CLI" workspace "$@"
+    cd "$T/workstation" && run bash "$CLI" workspace "$@"
 }

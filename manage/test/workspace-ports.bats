@@ -1,22 +1,22 @@
 #!/usr/bin/env bats
-# Applications et services du workspace sur localhost du poste (#401). Faux kubectl
-# (ss, port-forward) et faux lsof sous $BATS_TEST_TMPDIR/bin : aucun cluster ni port
-# du poste touche. Le veilleur ne tourne que sous DEVZONE_PORTS_WORKSPACE_REEL=oui.
+# Applications and services of the workspace on workstation localhost (#401). Fake kubectl
+# (ss, port-forward) and fake lsof under $BATS_TEST_TMPDIR/bin: no cluster or
+# workstation port is touched. The watcher runs only under DEVZONE_PORTS_WORKSPACE_REEL=oui.
 
 setup() {
     load commun
     relais_docker_isole
     kube_isole
-    RACINE="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
-    CLI="$RACINE/manage/devzone"
-    SCRIPT="$RACINE/manage/scripts/ports-workspace.sh"
+    ROOT="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
+    CLI="$ROOT/manage/devzone"
+    SCRIPT="$ROOT/manage/scripts/ports-workspace.sh"
     T="$BATS_TEST_TMPDIR"
-    mkdir -p "$T/bin" "$T/poste"
+    mkdir -p "$T/bin" "$T/workstation"
     : >"$T/ss"
-    : >"$T/pris"
+    : >"$T/taken"
     cat >"$T/bin/kubectl" <<'KUBE'
 #!/usr/bin/env bash
-# Faux kubectl : ss lit $T/ss, port-forward reste en vie (sleep) et se journalise.
+# Fake kubectl: ss reads $T/ss, port-forward stays alive (sleep) and logs.
 T="$BATS_TEST_TMPDIR"
 echo "kubectl $*" >>"$T/kubectl.log"
 case "$*" in
@@ -24,7 +24,7 @@ case "$*" in
     *" exec "*" ss "*) cat "$T/ss" ;;
     *" get svc pgadmin "*) [ -f "$T/pgadmin" ] && cat "$T/pgadmin" ;;
     *" get svc argocd-server "*) [ -f "$T/argocd" ] && cat "$T/argocd" ;;
-    *"get pod devzone-workspace-0 "*) echo "${FAUX_POD:-Running}" ;;
+    *"get pod devzone-workspace-0 "*) echo "${FAKE_POD:-Running}" ;;
     *" port-forward "*) exec sleep 120 ;;
 esac
 exit 0
@@ -34,7 +34,7 @@ KUBE
 echo "lsof $*" >>"$BATS_TEST_TMPDIR/lsof.log"
 for a in "$@"; do
     case "$a" in -iTCP:*) ;; *) continue ;; esac
-    grep -qx -- "${a#-iTCP:}" "$BATS_TEST_TMPDIR/pris" 2>/dev/null && exit 0
+    grep -qx -- "${a#-iTCP:}" "$BATS_TEST_TMPDIR/taken" 2>/dev/null && exit 0
 done
 exit 1
 LSOF
@@ -47,185 +47,197 @@ LSOF
 }
 
 teardown() {
-    ( cd "$T/poste" && DEVZONE_PORTS_WORKSPACE_REEL=oui bash "$CLI" workspace ports arreter >/dev/null 2>&1 ) || true
+    ( cd "$T/workstation" && DEVZONE_PORTS_WORKSPACE_REEL=oui bash "$CLI" workspace ports stop >/dev/null 2>&1 ) || true
 }
 
-# Ecoute simulee dans le pod : une ligne ss -ltnH par port donne.
-ecoute() {
+# Simulated listening in the pod: one ss -ltnH line per given port.
+listening() {
     : >"$T/ss"
     local p
     for p in "$@"; do echo "LISTEN 0 511 0.0.0.0:$p 0.0.0.0:*" >>"$T/ss"; done
 }
 
-# Un tour du veilleur, depuis le dossier du poste de test.
-tour() {
-    cd "$T/poste" && run bash "$SCRIPT" tour
+# One watcher round, from the test workstation folder.
+round() {
+    cd "$T/workstation" && run bash "$SCRIPT" round
 }
 
-# Le processus $1 vit-il ? Un zombie (mort, pas encore récolté par PID 1 du conteneur) est mort.
-vivant() {
+# Is process $1 alive? A zombie (dead, not yet reaped by container PID 1) is dead.
+alive() {
     kill -0 "$1" 2>/dev/null || return 1
     [ "$(ps -o stat= -p "$1" 2>/dev/null | cut -c1)" != Z ]
 }
 
-# Attend 5 s au plus que le fichier pid du veilleur existe.
-attendre_pid_veilleur() {
+# Waits up to 5 s for the watcher pid file to exist.
+wait_watcher_pid() {
     local i
     for i in $(seq 50); do
-        [ -s "$T/poste/.devzone.ports-workspace/pid" ] && return 0
+        [ -s "$T/workstation/.devzone.ports-workspace/pid" ] && return 0
         sleep 0.1
     done
     return 1
 }
 
-# Attend 5 s au plus que le processus $1 ne vive plus et que le fichier pid ait disparu.
-attendre_arret() {
+# Waits up to 5 s for process $1 to be gone and pid file removed.
+wait_stopped() {
     local i
     for i in $(seq 50); do
-        if ! vivant "$1" && [ ! -e "$T/poste/.devzone.ports-workspace/pid" ]; then return 0; fi
+        if ! alive "$1" && [ ! -e "$T/workstation/.devzone.ports-workspace/pid" ]; then return 0; fi
         sleep 0.1
     done
     return 1
 }
 
-@test "ports : nouveau port du pod relaye sur 127.0.0.1 seulement" {
-    ecoute 5173
-    tour
+@test "ports: new pod port relayed on 127.0.0.1 only" {
+    listening 5173
+    round
     [ "$status" -eq 0 ]
-    [[ "$output" == *"port 5173 relayé"* ]] || false
+    [[ "$output" == *"port 5173 relayed"* ]] || false
     sleep 0.3
     grep -q -- "port-forward --address 127.0.0.1 pod/devzone-workspace-0 5173:5173" "$T/kubectl.log" || false
 }
 
-@test "ports : ports inferieurs a 1024 et ports internes ignores" {
-    ecoute 80 1023 2475 1234 3000
-    tour
+@test "ports: ports below 1024 and internal ports ignored" {
+    listening 80 1023 2475 1234 3000
+    round
     sleep 0.3
     [ "$(grep -c port-forward "$T/kubectl.log")" -eq 1 ]
     grep -q "3000:3000" "$T/kubectl.log" || false
 }
 
-@test "ports : port deja relaye, pas de second port-forward" {
-    ecoute 5173
-    tour
-    tour
+@test "ports: already relayed port, no second port-forward" {
+    listening 5173
+    round
+    round
     sleep 0.3
     [ "$(grep -c port-forward "$T/kubectl.log")" -eq 1 ]
 }
 
-@test "ports : port disparu, port-forward arrete" {
-    ecoute 5173
-    tour
-    pid="$(cat "$T/poste/.devzone.ports-workspace/relais/5173")"
+@test "ports: disappeared port, port-forward stopped" {
+    listening 5173
+    round
+    pid="$(cat "$T/workstation/.devzone.ports-workspace/relais/5173")"
     kill -0 "$pid"
-    ecoute
-    tour
+    listening
+    round
     sleep 0.3
     ! kill -0 "$pid" 2>/dev/null || false
-    [ ! -e "$T/poste/.devzone.ports-workspace/relais/5173" ]
+    [ ! -e "$T/workstation/.devzone.ports-workspace/relais/5173" ]
 }
 
-@test "ports : port pris sur le poste, signale une seule fois, pas relaye" {
-    echo 5173 >"$T/pris"
-    ecoute 5173
-    tour
-    [[ "$output" == *"⚠ port 5173 déjà pris sur le poste, non relayé"* ]] || false
-    tour
-    [[ "$output" != *"déjà pris"* ]] || false
+@test "ports: port taken on workstation, reported once, not relayed" {
+    echo 5173 >"$T/taken"
+    listening 5173
+    round
+    [[ "$output" == *"⚠ port 5173 already in use on the workstation, not relayed"* ]] || false
+    round
+    [[ "$output" != *"already in use"* ]] || false
     ! grep -q port-forward "$T/kubectl.log" || false
 }
 
-@test "ports : services de devzone relayes quand postgres est actif" {
-    echo "postgres=on" >"$T/poste/.devzone.modules"
+@test "ports: devzone services relayed when postgres is active" {
+    echo "postgres=on" >"$T/workstation/.devzone.modules"
     echo 5433 >"$T/pgadmin"
-    tour
+    round
     sleep 0.3
     grep -q -- "--namespace devzone-postgres port-forward --address 127.0.0.1 svc/postgres 5432:5432" "$T/kubectl.log" || false
     grep -q -- "port-forward --address 127.0.0.1 svc/pgadmin 5433:5433" "$T/kubectl.log" || false
 }
 
-@test "ports : sans module postgres, aucun service relaye" {
-    tour
+@test "ports: without postgres module, no service relayed" {
+    round
     ! grep -q port-forward "$T/kubectl.log" || false
 }
 
-@test "ports : service mysql relaye sur 3306 quand mysql est actif" {
-    echo "mysql=on" >"$T/poste/.devzone.modules"
-    tour
+@test "ports: mysql service relayed on 3306 when mysql is active" {
+    echo "mysql=on" >"$T/workstation/.devzone.modules"
+    round
     sleep 0.3
     grep -q -- "--namespace devzone-mysql port-forward --address 127.0.0.1 svc/mysql 3306:3306" "$T/kubectl.log" || false
 }
 
-@test "ports : sans module mysql, aucun port 3306 relaye" {
-    echo "postgres=on" >"$T/poste/.devzone.modules"
-    tour
+@test "ports: without mysql module, no 3306 port relayed" {
+    echo "postgres=on" >"$T/workstation/.devzone.modules"
+    round
     sleep 0.3
     ! grep -q "svc/mysql" "$T/kubectl.log" || false
 }
 
-@test "ports : Argo CD UI relayed on 8443 to the https port of the service (#516)" {
+@test "ports: Argo CD UI relayed on 8443 to the https port of the service (#516)" {
     echo 443 >"$T/argocd"
-    tour
+    round
     [ "$status" -eq 0 ]
-    [[ "$output" == *"port 8443 relayé"* ]] || false
+    [[ "$output" == *"port 8443 relayed"* ]] || false
     sleep 0.3
     grep -q -- "--namespace devzone-argocd port-forward --address 127.0.0.1 svc/argocd-server 8443:443" "$T/kubectl.log" || false
 }
 
-@test "ports : no Argo CD relay without the service, nor with argocd=off" {
-    tour
+@test "ports: no Argo CD relay without the service, nor with argocd=off" {
+    round
     sleep 0.3
     ! grep -q "svc/argocd-server" "$T/kubectl.log" || false
     echo 443 >"$T/argocd"
-    echo "argocd=off" >"$T/poste/.devzone.modules"
-    tour
+    echo "argocd=off" >"$T/workstation/.devzone.modules"
+    round
     sleep 0.3
     ! grep -q "svc/argocd-server" "$T/kubectl.log" || false
 }
 
-@test "ports demarrer : un seul veilleur, arreter le retire avec ses port-forward" {
-    ecoute 5173
-    cd "$T/poste"
-    run bash "$CLI" workspace ports demarrer
+@test "ports start: only one watcher, stop removes it with its port-forwards" {
+    listening 5173
+    cd "$T/workstation"
+    run bash "$CLI" workspace ports start
     [ "$status" -eq 0 ]
-    attendre_pid_veilleur || false
-    veilleur="$(cat .devzone.ports-workspace/pid)"
-    kill -0 "$veilleur" || false
-    run bash "$CLI" workspace ports demarrer
-    [[ "$output" == *"déjà lancé (pid $veilleur)"* ]] || false
+    wait_watcher_pid || false
+    watcher="$(cat .devzone.ports-workspace/pid)"
+    kill -0 "$watcher" || false
+    run bash "$CLI" workspace ports start
+    [[ "$output" == *"already running (pid $watcher)"* ]] || false
     sleep 1
     pid="$(cat .devzone.ports-workspace/relais/5173)"
-    run bash "$CLI" workspace ports etat
-    [[ "$output" == *"actif"*"127.0.0.1:5173 relayé"* ]] || false
+    run bash "$CLI" workspace ports status
+    [[ "$output" == *"running"*"127.0.0.1:5173 relayed"* ]] || false
+    run bash "$CLI" workspace ports stop
+    [ "$status" -eq 0 ]
+    wait_stopped "$watcher" || false
+    ! alive "$pid" || false
+    run bash "$CLI" workspace ports status
+    [[ "$output" == *"stopped"* ]] || false
+}
+
+@test "ports start and demarrer: same behavior" {
+    listening 5173
+    cd "$T/workstation"
+    run bash "$CLI" workspace ports demarrer
+    [ "$status" -eq 0 ]
+    wait_watcher_pid || false
+    watcher="$(cat .devzone.ports-workspace/pid)"
     run bash "$CLI" workspace ports arreter
     [ "$status" -eq 0 ]
-    attendre_arret "$veilleur" || false
-    ! vivant "$pid" || false
-    run bash "$CLI" workspace ports etat
-    [[ "$output" == *"arrêté"* ]] || false
+    wait_stopped "$watcher" || false
 }
 
-@test "ports demarrer : refuse sous bats sans DEVZONE_PORTS_WORKSPACE_REEL" {
+@test "ports start: refused under bats without DEVZONE_PORTS_WORKSPACE_REEL" {
     unset DEVZONE_PORTS_WORKSPACE_REEL
-    cd "$T/poste"
-    run bash "$CLI" workspace ports demarrer
-    [[ "$output" == *"refusé sous bats"* ]] || false
+    cd "$T/workstation"
+    run bash "$CLI" workspace ports start
+    [[ "$output" == *"refused under bats"* ]] || false
     [ ! -e .devzone.ports-workspace/pid ]
-    [ -z "$(ps -eo args | grep "[p]orts-workspace.sh boucle" || true)" ]
+    [ -z "$(ps -eo args | grep "[p]orts-workspace.sh loop" || true)" ]
 }
 
-@test "workspace demarrer et arreter : veilleur lance puis arrete" {
+@test "workspace start and stop: watcher started then stopped" {
     export PATH="$T/bin:$PATH"
     printf '#!/usr/bin/env bash\nexit 0\n' >"$T/bin/helm"
     chmod +x "$T/bin/helm"
-    ecoute 3000
-    cd "$T/poste"
-    run bash "$CLI" workspace demarrer
+    listening 3000
+    cd "$T/workstation"
+    run bash "$CLI" workspace start
     [ "$status" -eq 0 ]
-    attendre_pid_veilleur || false
-    veilleur="$(cat .devzone.ports-workspace/pid)"
-    kill -0 "$veilleur" || false
-    run bash "$CLI" workspace arreter
+    wait_watcher_pid || false
+    watcher="$(cat .devzone.ports-workspace/pid)"
+    kill -0 "$watcher" || false
+    run bash "$CLI" workspace stop
     [ "$status" -eq 0 ]
-    attendre_arret "$veilleur" || false
+    wait_stopped "$watcher" || false
 }

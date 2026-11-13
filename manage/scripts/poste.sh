@@ -1,35 +1,35 @@
 #!/usr/bin/env bash
-# Pourquoi : make up|shell|stop|rebuild pilote toujours le conteneur Docker,
-# même après « devzone workspace migrer », qui note workspace=kubernetes dans
-# .devzone.modules (#472). Ce script lit ce mode : en Kubernetes il passe la
-# main à manage/workspace.sh (clone du dépôt) ou à npx devzone@<version>
-# workspace (dossier créé par npx devzone) ; en Docker il rend 3 sans rien
-# faire, et le Makefile garde alors sa recette d'origine. La cible conseil
-# affiche, d'après mise à jour, ce que le poste peut faire ensuite (#472).
-# Portable : bash 3.2 (macOS) et Linux.
+# Why: make up|shell|stop|rebuild always drives the Docker container, even
+# after "devzone workspace migrate", which writes workspace=kubernetes in
+# .devzone.modules (#472). This script reads that mode: in Kubernetes it hands
+# off to manage/workspace.sh (repo clone) or npx devzone@<version> workspace
+# (folder created by npx devzone); in Docker it returns 3 and does nothing, so
+# the Makefile keeps its original recipe. The advice target shows, after an
+# update, what the workstation can do next (#472).
+# Portable: bash 3.2 (macOS) and Linux.
 set -uo pipefail
 
 usage() {
-    echo "usage : bash manage/scripts/poste.sh up|shell|stop|rebuild|conseil <dossier>" >&2
+    echo "usage: bash manage/scripts/poste.sh up|shell|stop|rebuild|advice <folder>" >&2
 }
 
-# Dernière valeur workspace= de <dossier>/.devzone.modules ; absente, vide ou
-# autre que kubernetes → docker.
-mode_workspace() {
-    local dossier="$1" valeur
-    valeur="$(grep '^workspace=' "$dossier/.devzone.modules" 2>/dev/null | tail -1 | cut -d= -f2- || true)"
-    if [ "$valeur" = "kubernetes" ]; then
+# Last workspace= value in <folder>/.devzone.modules; missing, empty or not
+# kubernetes -> docker.
+workspace_mode() {
+    local folder="$1" value
+    value="$(grep '^workspace=' "$folder/.devzone.modules" 2>/dev/null | tail -1 | cut -d= -f2- || true)"
+    if [ "$value" = "kubernetes" ]; then
         echo kubernetes
     else
         echo docker
     fi
 }
 
-# Version du dossier : première ligne « version X.Y.Z » de .devzone.version ;
-# illisible ou vide → latest.
-version_dossier() {
-    local dossier="$1" version
-    version="$(sed -n 's/^version \([^[:space:]]*\)[[:space:]]*$/\1/p' "$dossier/.devzone.version" 2>/dev/null | head -1 || true)"
+# Folder version: first "version X.Y.Z" line in .devzone.version; unreadable or
+# empty -> latest.
+folder_version() {
+    local folder="$1" version
+    version="$(sed -n 's/^version \([^[:space:]]*\)[[:space:]]*$/\1/p' "$folder/.devzone.version" 2>/dev/null | head -1 || true)"
     if [ -z "$version" ]; then
         echo latest
     else
@@ -37,9 +37,9 @@ version_dossier() {
     fi
 }
 
-# Kubernetes joignable : kubectl et helm présents, et kubectl cluster-info
-# qui répond en 5 s (--context devzone si ce contexte est déclaré).
-kube_pret() {
+# Kubernetes reachable: kubectl and helm present, and kubectl cluster-info
+# responds within 5 s (--context devzone if that context is declared).
+kube_ready() {
     command -v kubectl >/dev/null 2>&1 || return 1
     command -v helm >/dev/null 2>&1 || return 1
     if kubectl config get-contexts -o name 2>/dev/null | grep -qx 'devzone'; then
@@ -49,53 +49,52 @@ kube_pret() {
     fi
 }
 
-# Commande workspace du dossier : le script du clone s'il existe, sinon la CLI
-# publiée de la version du dossier, exécutée depuis le dossier.
+# Workspace command for the folder: clone script if present, otherwise the
+# published CLI for the folder version, run from the folder.
 workspace_cmd() {
-    local dossier="$1" version
+    local folder="$1" version
     shift
-    if [ -f "$dossier/manage/workspace.sh" ]; then
-        (cd "$dossier" && bash manage/workspace.sh "$@")
+    if [ -f "$folder/manage/workspace.sh" ]; then
+        (cd "$folder" && bash manage/workspace.sh "$@")
     else
-        version="$(version_dossier "$dossier")"
-        (cd "$dossier" && npx -y "devzone@$version" workspace "$@")
+        version="$(folder_version "$folder")"
+        (cd "$folder" && npx -y "devzone@$version" workspace "$@")
     fi
 }
 
-cible="${1:-}"
-dossier="${2:-}"
-case "$cible" in
-    up | shell | stop | rebuild | conseil) ;;
+target="${1:-}"
+folder="${2:-}"
+case "$target" in
+    up | shell | stop | rebuild | advice | conseil) ;;
     *)
         usage
         exit 2
         ;;
 esac
-if [ -z "$dossier" ]; then
+if [ -z "$folder" ]; then
     usage
     exit 2
 fi
 
-# Conseil d'après mise à jour : toujours code 0, rien à faire en Docker sans
-# Kubernetes joignable.
-if [ "$cible" = conseil ]; then
-    if [ "$(mode_workspace "$dossier")" = kubernetes ]; then
-        echo "Workspace Kubernetes : la nouvelle image est prise au prochain devzone workspace demarrer (ou make up)."
-    elif kube_pret; then
-        echo "Kubernetes joignable : devzone workspace migrer passe ce poste dans le cluster (rien n'est supprimé, retour : devzone workspace revenir)."
+# Advice after update: always exit 0, nothing to do in Docker without reachable Kubernetes.
+if [ "$target" = "advice" ] || [ "$target" = "conseil" ]; then
+    if [ "$(workspace_mode "$folder")" = kubernetes ]; then
+        echo "Kubernetes workspace: the new image is used on the next devzone workspace start (or make up)."
+    elif kube_ready; then
+        echo "Kubernetes reachable: devzone workspace migrate moves this workstation to the cluster (nothing is deleted, rollback: devzone workspace revert)."
     fi
     exit 0
 fi
 
-# Poste Docker : le Makefile reprend sa recette actuelle (code 3).
-[ "$(mode_workspace "$dossier")" = kubernetes ] || exit 3
+# Docker workstation: Makefile resumes its current recipe (exit 3).
+[ "$(workspace_mode "$folder")" = kubernetes ] || exit 3
 
-case "$cible" in
-    up) workspace_cmd "$dossier" demarrer ;;
-    shell) workspace_cmd "$dossier" demarrer && workspace_cmd "$dossier" shell ;;
-    stop) workspace_cmd "$dossier" arreter ;;
+case "$target" in
+    up) workspace_cmd "$folder" start ;;
+    shell) workspace_cmd "$folder" start && workspace_cmd "$folder" shell ;;
+    stop) workspace_cmd "$folder" stop ;;
     rebuild)
-        echo "✖ make rebuild : ce poste est en workspace Kubernetes (workspace=kubernetes dans .devzone.modules), rien à reconstruire sur la machine ; retour au poste Docker : devzone workspace revenir" >&2
+        echo "✖ make rebuild: this workstation is in Kubernetes workspace mode (workspace=kubernetes in .devzone.modules), nothing to rebuild on the machine; back to Docker workstation: devzone workspace revert" >&2
         exit 1
         ;;
 esac
