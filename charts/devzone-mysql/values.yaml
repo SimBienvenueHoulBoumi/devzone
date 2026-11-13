@@ -1,0 +1,19 @@
+# Same objects as .devcontainer/catalogue/mysql/manifeste.yaml, the helm-direct
+# path of the catalogue (#414): manage/test/chart-mysql.bats checks that both
+# renderings agree. The secret <name>-admin (root password) is created apart by
+# devzone, never by the chart (#538: secrets out of Git).
+# Name of the application (Service, StatefulSet and secret ref): mysql of the
+# catalogue by default.
+name: mysql
+image: mysql:8.4
+# Port of the Service (the container always listens on 3306)
+port: 3306
+# Memory request (MYSQL_MEMOIRE of the catalogue)
+memory: 1Gi
+# Size of the data volume (MYSQL_TAILLE of the catalogue)
+size: 5Gi
+# Name of the volume claim template (chosen among the existing PVCs, #440)
+claim: donnees
+resources:
+  requests:
+    cpu: 100m

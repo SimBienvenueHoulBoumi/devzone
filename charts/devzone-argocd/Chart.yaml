@@ -1,0 +1,13 @@
+apiVersion: v2
+name: devzone-argocd
+description: Argo CD of devzone, minimal and pinned (#411, #538): a wrapper of the official chart argo-cd
+type: application
+version: 0.1.0
+appVersion: "3.3.0"
+dependencies:
+  # Version pinned (10.14.0): the Application and the helm-direct install both
+  # take this chart, and devzone-argocd manages itself once self-hosted (#538).
+  # Run `helm dependency build` before the installation.
+  - name: argo-cd
+    version: 10.14.0
+    repository: https://argoproj.github.io/argo-helm

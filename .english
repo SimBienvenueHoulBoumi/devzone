@@ -25,6 +25,14 @@ charts/devzone-postgres/templates/service.yaml
 charts/devzone-postgres/templates/statefulset.yaml
 manage/test/argocd-application.bats
 manage/test/chart-postgres.bats
+charts/devzone-mysql/Chart.yaml
+charts/devzone-mysql/values.yaml
+charts/devzone-mysql/templates/service.yaml
+charts/devzone-mysql/templates/statefulset.yaml
+charts/devzone-argocd/Chart.yaml
+charts/devzone-argocd/values.yaml
+manage/test/chart-mysql.bats
+manage/test/chart-argocd.bats
 manage/test/workspace-argocd.bats
 charts/devzone-workspace/Chart.yaml
 charts/devzone-workspace/values.yaml

@@ -120,7 +120,8 @@ gitops_ready() {
     [[ "$output" != *"secret-admin"* ]] || false
     [[ "$output" == *"✔ Argo CD ready: https://localhost:8443"* ]] || false
     grep -q 'label namespace devzone-argocd app.kubernetes.io/managed-by=devzone' "$T/kubectl.log"
-    grep -q -- 'upgrade --install argocd argo/argo-cd --version 10.14.0 --namespace devzone-argocd -f .*/.devcontainer/argocd/values.yaml --timeout 600s --wait' "$T/helm.log"
+    grep -q 'dependency build .*charts/devzone-argocd' "$T/helm.log"
+    grep -q -- 'upgrade --install argocd .*charts/devzone-argocd --namespace devzone-argocd --timeout 600s --wait' "$T/helm.log"
     [ "$(stat -c '%a' "$T/workspace/.argocd/admin.env")" = 600 ]
     grep -qx 'ARGOCD_PASSWORD=secret-admin' "$T/workspace/.argocd/admin.env"
     grep -qx 'ARGOCD_URL=https://localhost:8443' "$T/workspace/.argocd/admin.env"
@@ -172,7 +173,7 @@ gitops_ready() {
     export FAKE_GH_OUT=1
     run bash "$CLI" workspace demarrer
     [ "$status" -eq 0 ]
-    grep -q 'upgrade --install argocd argo/argo-cd' "$T/helm.log"
+    grep -q 'upgrade --install argocd .*charts/devzone-argocd' "$T/helm.log"
     ! grep -q 'upgrade --install devzone-workspace' "$T/helm.log" || false
     grep -q 'name: devzone-workspace' "$T/application.yaml"
     grep -q 'devzone.io/kind: workspace' "$T/application.yaml"

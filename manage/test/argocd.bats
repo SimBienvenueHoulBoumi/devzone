@@ -110,8 +110,11 @@ attendre_nohup() {
     # Étiquette du namespace posée par l'administrateur, pas par le compte
     # limité (#430)
     grep -q -- '--context docker-desktop label namespace devzone-argocd app.kubernetes.io/managed-by=devzone' "$BATS_TEST_TMPDIR/kubectl.log"
-    grep -Eq 'helm --kubeconfig [^ ]+ --kube-context docker-desktop upgrade --install argocd argo/argo-cd --version 10.14.0 --namespace devzone-argocd' "$BATS_TEST_TMPDIR/helm.log"
-    grep -q -- '-f .*\.devcontainer/argocd/values.yaml' "$BATS_TEST_TMPDIR/helm.log"
+    # Chart enveloppe charts/devzone-argocd : dépendance construite puis
+    # installation du chart local, avec le contexte devzone (#538)
+    grep -Eq 'helm dependency build .*charts/devzone-argocd' "$BATS_TEST_TMPDIR/helm.log"
+    grep -Eq 'helm --kubeconfig [^ ]+ --kube-context docker-desktop upgrade --install argocd .*charts/devzone-argocd --namespace devzone-argocd' "$BATS_TEST_TMPDIR/helm.log"
+    ! grep -q 'argo/argo-cd' "$BATS_TEST_TMPDIR/helm.log" || false
     [ -f "$SECRETS/admin.env" ]
     [ "$(stat -c '%a' "$SECRETS/admin.env")" = 600 ]
     grep -qx 'ARGOCD_PASSWORD=secret-admin' "$SECRETS/admin.env"
