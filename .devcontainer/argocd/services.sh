@@ -28,6 +28,7 @@
 
 : "${SERVICES_LIST:=postgres}"
 
+# Names of the Application and of the namespace of a service
 services_app_of() { printf 'devzone-%s' "$1"; }
 services_ns_of() { printf 'devzone-%s' "$1"; }
 
