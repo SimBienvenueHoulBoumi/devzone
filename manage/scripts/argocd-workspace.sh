@@ -21,6 +21,7 @@ ARGOCD_WAIT="${ARGOCD_ATTENTE:-600}"
 ARGOCD_MIN_MEMORY_KI=1048576
 DEVZONE_REPO_URL="${DEVZONE_REPO_URL:-https://github.com/SimBienvenueHoulBoumi/devzone.git}"
 
+# Wrapper chart installed by the workstation and by the container (#538)
 argocd_chart() { printf '%s/charts/devzone-argocd' "$RACINE"; }
 argocd_generator() { printf '%s/.devcontainer/argocd/application.sh' "$RACINE"; }
 argocd_secrets_dir() { printf '%s/workspace/.argocd' "$PWD"; }
