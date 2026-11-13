@@ -20,6 +20,7 @@ manage/test/workspace-services.bats
 manage/test/argocd-conf.bats
 manage/scripts/argocd-workspace.sh
 manage/scripts/argocd-services.sh
+manage/scripts/argocd-services-svc.sh
 charts/devzone-postgres/Chart.yaml
 charts/devzone-postgres/values.yaml
 charts/devzone-postgres/templates/service.yaml

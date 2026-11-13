@@ -100,6 +100,7 @@ catalogue_argocd_apply() {
 
 # The Application devzone-<app> exists in devzone-argocd
 catalogue_argocd_application_exists() {
+    catalogue_argocd_module_on || return 1
     kubectl --context devzone -n devzone-argocd get application.argoproj.io "devzone-$1" >/dev/null 2>&1
 }
 

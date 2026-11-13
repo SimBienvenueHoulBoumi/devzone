@@ -88,12 +88,14 @@ EOF
 # The Application devzone-<svc>: chart charts/devzone-<svc> of the devzone
 # repository at the revision; the parameters hook adds helm parameters
 services_application_apply() {
-    local svc="$1"
+    local svc="$1" extra=""
     set -- "$(services_app_of "$svc")" service "$(services_ns_of "$svc")" \
         "$DEVZONE_REPO_URL" "$(argocd_revision)" "charts/devzone-$svc"
     if command -v "services_chart_$svc" >/dev/null 2>&1; then
-        # shellcheck disable=SC2046
-        set -- "$@" $("services_chart_$svc")
+        # A failing hook (several volumes to choose from…) stops the apply
+        extra="$("services_chart_$svc")" || return $?
+        # shellcheck disable=SC2086
+        set -- "$@" $extra
     fi
     gitops_apply_application "$@"
 }
