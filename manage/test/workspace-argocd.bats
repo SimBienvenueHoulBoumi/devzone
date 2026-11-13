@@ -247,6 +247,7 @@ gitops_ready() {
     run bash "$CLI" workspace services enable postgres
     [ "$status" -eq 0 ]
     [[ "$output" == *"✔ Application devzone-postgres declared"* ]] || false
+    grep -q 'postgres = on' "$T/.argocd.conf"
     grep -q 'label namespace devzone-postgres app.kubernetes.io/managed-by=devzone' "$T/kubectl.log"
     grep -q 'kind: NetworkPolicy' "$T/apply.yaml"
     grep -q 'name: devzone-meme-namespace' "$T/apply.yaml"
@@ -271,17 +272,19 @@ gitops_ready() {
     [ "$(cat "$T/workspace/.postgres/admin-password")" = "already-there" ]
 }
 
-@test "services disable postgres with Argo CD: --yes required without a terminal, then Application and namespace removed" {
+@test "services disable postgres with Argo CD: Application removed, namespace and data kept; --yes removes the data" {
     argocd_installed
     mkdir -p "$T/workspace/.postgres" && : >"$T/workspace/.postgres/admin-password"
     run bash "$CLI" workspace services disable postgres </dev/null
-    [ "$status" -eq 1 ]
-    [[ "$output" == *"--yes"* ]] || false
-    ! grep -q 'delete application' "$T/kubectl.log" || false
-    run bash "$CLI" workspace services disable postgres --yes
     [ "$status" -eq 0 ]
+    grep -q 'postgres = off' "$T/.argocd.conf"
     grep -q 'delete application.argoproj.io devzone-postgres --ignore-not-found --wait=true' "$T/kubectl.log"
     ! grep -q 'patch application.argoproj.io devzone-postgres' "$T/kubectl.log" || false
+    ! grep -q 'delete namespace devzone-postgres' "$T/kubectl.log" || false
+    [ -e "$T/workspace/.postgres" ]
+    [[ "$output" == *"--yes to remove the data"* ]] || false
+    run bash "$CLI" workspace services disable postgres --yes
+    [ "$status" -eq 0 ]
     grep -q 'delete namespace devzone-postgres --wait=true' "$T/kubectl.log"
     [ ! -e "$T/workspace/.postgres" ]
 }
@@ -292,6 +295,43 @@ gitops_ready() {
     [ "$status" -eq 0 ]
     grep -q 'exec -i devzone-workspace-0 .*services-admin.sh enable postgres' "$T/kubectl.log"
     [ ! -f "$T/application.yaml" ]
+}
+
+@test "workspace argocd apply reconciles the [services] section of .argocd.conf" {
+    export FAKE_GH_OUT=1
+    argocd_installed
+    printf '[argocd]\n    repo = none\n\n[services]\n    postgres = on\n' >"$T/.argocd.conf"
+    run bash "$CLI" workspace argocd apply
+    [ "$status" -eq 0 ]
+    grep -q 'name: devzone-postgres' "$T/application.yaml"
+    grep -q 'devzone.io/kind: service' "$T/application.yaml"
+    grep -q 'path: charts/devzone-postgres' "$T/application.yaml"
+    grep -q 'targetRevision: feat/essai' "$T/application.yaml"
+    [ -f "$T/pg-secret-created" ]
+    # off: the Application leaves, the namespace and the data stay
+    rm -f "$T/application.yaml" "$T/pg-secret-created"
+    printf '[argocd]\n    repo = none\n\n[services]\n    postgres = off\n' >"$T/.argocd.conf"
+    run bash "$CLI" workspace argocd apply
+    [ "$status" -eq 0 ]
+    grep -q 'delete application.argoproj.io devzone-postgres --ignore-not-found --wait=true' "$T/kubectl.log"
+    ! grep -q 'delete namespace devzone-postgres' "$T/kubectl.log" || false
+    [ -e "$T/workspace/.postgres" ] || [ ! -f "$T/pg-secret-created" ]
+}
+
+@test "workspace argocd apply: the line postgres=on of .devzone.modules is read in compatibility" {
+    export FAKE_GH_OUT=1
+    argocd_installed
+    printf '[argocd]\n    repo = none\n' >"$T/.argocd.conf"
+    printf 'workspace=kubernetes\npostgres=on\n' >"$T/.devzone.modules"
+    run bash "$CLI" workspace argocd apply
+    [ "$status" -eq 0 ]
+    grep -q 'name: devzone-postgres' "$T/application.yaml"
+    # ...but the [services] section, once written, wins over the old line
+    rm -f "$T/application.yaml"
+    printf '[argocd]\n    repo = none\n\n[services]\n    postgres = off\n' >"$T/.argocd.conf"
+    run bash "$CLI" workspace argocd apply
+    [ "$status" -eq 0 ]
+    ! grep -q 'name: devzone-postgres' "$T/application.yaml" 2>/dev/null || false
 }
 
 # ---- projects ----

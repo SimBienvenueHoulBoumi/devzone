@@ -14,6 +14,7 @@ manage/test/services-pod.bats
 manage/test/workspace-services.bats
 .devcontainer/argocd/application.sh
 .devcontainer/argocd/apps.sh
+.devcontainer/argocd/services.sh
 .devcontainer/argocd/gitops.sh
 .devcontainer/argocd/conf.sh
 manage/test/argocd-conf.bats
