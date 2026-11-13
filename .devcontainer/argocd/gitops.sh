@@ -77,12 +77,12 @@ gitops_init() {
                 return 1
             fi
             echo "✔ GitOps repository created: https://github.com/$slug (private)"
+            gitops_repo_note "$repo"
             gitops_put_text README.md "# devzone-argocd
 
 GitOps repository of devzone, written by the devzone commands (never by hand): the Argo CD of devzone follows the apps/ folder, one Application per file (the workspace, the services, the projects added with argocd app add). Removing a file removes the Application and its resources.
 " "devzone: GitOps repository"
             gitops_put_text apps/.gitkeep "" "devzone: apps folder"
-            gitops_repo_note "$repo"
             return 0
         fi
         gitops_repo_note "$repo"

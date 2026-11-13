@@ -28,7 +28,7 @@ etat_json() {
     local id_nom="" id_email="" id_ok=false id_commande=""
     local plat_nom plat_url="" github_json="null"
     local outils_retards_json='[]' outils_commande=""
-    local modules_json='[]' m actif desc ef content etat_val echec_val commande_val s
+    local modules_json='[]' m actif desc ef content etat_val echec_val commande_val s argocd_repo=""
     local docker_hote=false docker_hote_actif=false relais_source
     local services_cluster="" services_distant=false
     local travail_ctx="" travail_interne=false ctx_hote=""
@@ -255,6 +255,8 @@ etat_json() {
         append_alerte cluster_interne "cluster de travail : $travail_ctx (cluster interne de devzone)" "devzone utiliser $ctx_hote"
     fi
 
+    argocd_repo="$(conf_get argocd repo)"
+
     jq -n \
         --argjson schema 1 \
         --arg dv "$dv_raw" \
@@ -269,6 +271,7 @@ etat_json() {
         --argjson retards "$outils_retards_json" \
         --arg outils_commande "$outils_commande" \
         --argjson modules "$modules_json" \
+        --arg argocd_repo "$argocd_repo" \
         --argjson docker_hote "$docker_hote" \
         --argjson docker_hote_actif "$docker_hote_actif" \
         --arg clusters_services "$clusters_services_raw" \
@@ -286,6 +289,7 @@ etat_json() {
             devzone: { version: (if $dv=="" then null else $dv end), disponible: (if $dvp=="" then null else $dvp end) },
             identite_git: { ok: $id_ok, nom: (if $id_nom=="" then null else $id_nom end), email: (if $id_email=="" then null else $id_email end), commande: (if $id_commande=="" then null else $id_commande end) },
             plateforme: { nom: $plat_nom, url: (if $plat_url=="" then null else $plat_url end), github: $github },
+            argocd_repo: (if $argocd_repo == "" then null else $argocd_repo end),
             outils: { retards: $retards, commande: (if $outils_commande=="" then null else $outils_commande end) },
             modules: $modules,
             docker_hote: $docker_hote,

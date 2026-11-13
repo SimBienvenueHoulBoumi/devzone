@@ -453,6 +453,7 @@ devzone enable argocd      # installe Argo CD dans le cluster des services
 devzone disable argocd   # désinstalle Argo CD, les autres services restent
 devzone argocd etat         # état du module
 devzone argocd init [--repo <url>|--none]  # dépôt GitOps (GitHub) : créé, désigné, ou aucun
+devzone <dossier> --gitops <github|none|<url>>  # création du dossier avec le dépôt GitOps (même dépôt que ci-dessus)
 devzone argocd apply        # applique .argocd.conf de l'instance
 devzone argocd app add <dépôt> [chemin] [--name N] [--revision R] [--namespace NS] [--token T] [--username U]  # un projet déployé par Argo CD
 devzone argocd app list     # Applications des projets, synchronisation et santé
@@ -505,7 +506,7 @@ Les déclarations ne restent pas dans le cluster : elles vivent dans un **dépô
 ```
 
 - **Le fichier est la déclaration** : versionné avec le dossier devzone (il n'est pas ignoré par git), écrit par devzone (`argocd init`, `app add`, `app remove`) et appliqué par `devzone workspace argocd apply` et `workspace start` : chaque `[app N]` devient l'Application `app-N` ; une Application de projet absente du fichier est retirée (avec ses ressources, son Secret de dépôt et son namespace `devzone-app-N`). Il peut aussi s'éditer à la main, puis `apply`.
-- **Dépôt GitOps** : `devzone workspace argocd init` crée `<login>/devzone-argocd` (privé, `gh repo create` avec la connexion `gh` du poste) s'il manque et le note dans `[argocd] repo` ; `workspace start` le fait sans option. `--repo <url>` désigne un dépôt GitHub existant ; `--none` renonce (les Applications sont appliquées directement, comme sans dépôt). Sans `gh` connecté : un avis, application directe.
+- **Dépôt GitOps** : `devzone workspace argocd init` crée `<login>/devzone-argocd` (privé, `gh repo create` avec la connexion `gh` du poste) s'il manque et le note dans `[argocd] repo` ; `workspace start` le fait sans option. `--repo <url>` désigne un dépôt GitHub existant ; `--none` renonce (les Applications sont appliquées directement, comme sans dépôt). Sans `gh` connecté : un avis, application directe. La même option accompagne la création du dossier : `devzone <dossier> --gitops <github|none|<url>>`.
 - **Ce qui va dans le dépôt** : une Application racine `devzone` (seul objet posé par `kubectl`) suit le dossier `apps/` ; `workspace start`, `services enable|disable postgres` et `app add|remove` y écrivent ou retirent `apps/<nom>.yaml` par l'API GitHub (`gh api`, sans clone ni commit local), puis demandent un `refresh` (Argo CD ne lit Git que toutes les 3 min). Argo CD lit le dépôt avec le jeton `gh auth token` du poste (`DEVZONE_GITOPS_TOKEN` pour un autre), rangé dans le Secret de dépôt `repo-devzone-argocd`. Les secrets des services restent créés à part, jamais dans Git.
 - **Dépôts privés et GitLab de devzone** : `--token T` range le jeton dans `workspace/.argocd/tokens/<N>` (600, hors Git) et note `token-file` ; une URL `gitlab.localhost` est réécrite vers `http://gitlab-webservice-default.devzone-gitlab.svc:8181/…` (la seule adresse qu'Argo CD atteint), le jeton root du module sert à défaut (`workspace/.gitlab/root-token` du poste, sinon celui du pod), et la NetworkPolicy de `devzone-gitlab` est ouverte aux namespaces devzone.
 - **Un GitLab comme dépôt GitOps** (et non seulement comme source d'un projet) : lot B.

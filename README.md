@@ -63,6 +63,12 @@ cd mon-devzone
 make shell
 ```
 
+Avec un compte GitHub, l'option `--gitops <github|none|<url>>` renseigne le dépôt GitOps dès la création du dossier :
+
+```bash
+npx devzone mon-devzone --gitops github
+```
+
 Ou bien récupérer le code directement :
 
 ```bash

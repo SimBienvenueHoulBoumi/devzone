@@ -62,6 +62,46 @@ setup() {
     [ ! -e plein/Makefile ]
 }
 
+@test "devzone <dossier> --gitops none : .argocd.conf note no GitOps" {
+    run bash "$CLI" mon-devzone --gitops none
+    [ "$status" -eq 0 ]
+    grep -q '^\[argocd\]$' mon-devzone/.argocd.conf
+    grep -q '^    repo = none$' mon-devzone/.argocd.conf
+    export ARGOCD_CONF="$BATS_TEST_TMPDIR/mon-devzone/.argocd.conf"
+    . "$RACINE/.devcontainer/argocd/conf.sh"
+    [ "$(conf_get argocd repo)" = none ]
+}
+
+@test "devzone <dossier> --gitops <url> : .argocd.conf note the URL" {
+    run bash "$CLI" mon-devzone --gitops https://github.com/x/y.git
+    [ "$status" -eq 0 ]
+    grep -q '^    repo = https://github.com/x/y.git$' mon-devzone/.argocd.conf
+}
+
+@test "devzone <dossier> --gitops github : .argocd.conf note the GitHub repository" {
+    mkdir -p "$BATS_TEST_TMPDIR/bin"
+    cat >"$BATS_TEST_TMPDIR/bin/gh" <<'GH'
+#!/usr/bin/env bash
+case "$*" in
+    "auth status") exit 0 ;;
+    "api user --jq .login") echo tester ;;
+esac
+exit 0
+GH
+    chmod +x "$BATS_TEST_TMPDIR/bin/gh"
+    export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
+    run bash "$CLI" mon-devzone --gitops github
+    [ "$status" -eq 0 ]
+    grep -q '^    repo = https://github.com/tester/devzone-argocd.git$' mon-devzone/.argocd.conf
+}
+
+@test "devzone <dossier> sans option ni terminal : none et avis sur --gitops" {
+    run bash "$CLI" mon-devzone
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"--gitops"* ]] || false
+    grep -q '^    repo = none$' mon-devzone/.argocd.conf
+}
+
 @test "devzone desinstaller : refusé hors d'un dossier devzone" {
     run bash "$CLI" desinstaller
     [ "$status" -eq 1 ]

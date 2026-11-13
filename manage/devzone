@@ -526,6 +526,7 @@ creer() {
     # or none, written in the .argocd.conf of the new devzone (conf.sh writes
     # the header of the file when absent)
     . "$PAQUET/.devcontainer/argocd/conf.sh"
+    # shellcheck disable=SC2034 # read by conf.sh
     ARGOCD_CONF="$cible/.argocd.conf"
     if [ "$gitops" = github ]; then
         if ! gh auth status >/dev/null 2>&1; then

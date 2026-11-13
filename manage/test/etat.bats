@@ -207,6 +207,19 @@ KUBE
     [ -z "$trouve" ] || { echo "écriture directe hors etat.sh : $trouve"; false; }
 }
 
+@test "etat : ligne argocd GitOps repository designates the URL" {
+    printf '[argocd]\n    repo = https://github.com/tester/devzone-argocd.git\n' >"$DEVZONE_RACINE/.argocd.conf"
+    run bash "$DEVZONE" etat
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"  ○ argocd          GitOps repository: https://github.com/tester/devzone-argocd.git"* ]] || false
+}
+
+@test "etat : ligne argocd sans dépôt GitOps : notice init" {
+    run bash "$DEVZONE" etat
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"  ○ argocd          no GitOps repository: devzone argocd init"* ]] || false
+}
+
 @test "restauration fraîche : le veilleur de ports ne fait rien 60 s" {
     printf 'ia=on\nports_auto=on\n' >"$DEVZONE_ETAT.prec"
     rm -f "$DEVZONE_ETAT"

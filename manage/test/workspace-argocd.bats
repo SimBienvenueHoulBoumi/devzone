@@ -406,6 +406,29 @@ gitops_ready() {
     [ "$(grep -c 'repo create' "$T/gh.log")" -eq 1 ]
 }
 
+@test "workspace argocd init --repo: missing repository created with README and apps folder" {
+    argocd_installed
+    run bash "$CLI" workspace argocd init --repo https://github.com/tester/devzone-argocd.git
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"✔ GitOps repository created: https://github.com/tester/devzone-argocd (private)"* ]] || false
+    grep -q 'gh repo create tester/devzone-argocd --private' "$T/gh.log"
+    [ -s "$T/gitops/README.md" ]
+    [ -f "$T/gitops/apps/.gitkeep" ]
+    grep -q '^\[argocd\]$' "$T/.argocd.conf"
+    grep -q '^    repo = https://github.com/tester/devzone-argocd.git$' "$T/.argocd.conf"
+}
+
+@test "workspace argocd init --repo: existing repository, nothing created" {
+    argocd_installed
+    gitops_ready
+    run bash "$CLI" workspace argocd init --repo https://github.com/tester/devzone-argocd.git
+    [ "$status" -eq 0 ]
+    [ "$(grep -c 'repo create' "$T/gh.log")" -eq 0 ]
+    [ ! -e "$T/gitops.log" ]
+    grep -q '^\[argocd\]$' "$T/.argocd.conf"
+    grep -q '^    repo = https://github.com/tester/devzone-argocd.git$' "$T/.argocd.conf"
+}
+
 @test "workspace argocd init: gh not connected → notice and direct apply; --none noted in .argocd.conf" {
     argocd_installed
     export FAKE_GH_OUT=1

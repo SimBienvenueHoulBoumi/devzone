@@ -63,6 +63,14 @@ MODULES=(ia kubernetes gitlab postgres argocd mysql)
 if [ -f "$ICI/command-aliases.sh" ]; then
     . "$ICI/command-aliases.sh"
 fi
+# .argocd.conf of the instance: the GitOps repository designation (#539)
+# shellcheck source=SCRIPTDIR/argocd/conf.sh
+# shellcheck disable=SC1091
+# shellcheck disable=SC2034 # read by conf.sh
+if [ -f "$ICI/argocd/conf.sh" ]; then
+    ARGOCD_CONF="$RACINE/.argocd.conf"
+    . "$ICI/argocd/conf.sh"
+fi
 
 # Assistants IA, versions figées : mettre à jour ici, puis devzone appliquer
 # (ou Rebuild Container). Une ligne par paquet, séparées par une ligne qui ne
@@ -1189,7 +1197,7 @@ utiliser() {
 # État complet : ✔ prêt, ✖ nécessaire, ○ facultatif, ⚠ à corriger ; chaque
 # point à faire avec sa commande (affiché à chaque démarrage)
 etat() {
-    local nom email statut m retards chemin ports_etat relais_marque ctx_travail ctx_hote paquets_marque paquets_noms
+    local nom email statut m retards chemin ports_etat relais_marque ctx_travail ctx_hote paquets_marque paquets_noms argocd_repo
     echo "devzone : état (devzone pour le réafficher)"
     ligne_version_disponible
     nom="$(git config --get user.name || true)"
@@ -1258,6 +1266,13 @@ etat() {
             printf '  ○ module %-10s facultatif, %s : devzone activer %s\n' "$m" "$(description "$m")" "$m"
         fi
     done
+    # GitOps repository of the instance (#539): the designation of .argocd.conf
+    argocd_repo="$(conf_get argocd repo)"
+    if [ -n "$argocd_repo" ] && [ "$argocd_repo" != none ]; then
+        printf '  ○ argocd          GitOps repository: %s\n' "$argocd_repo"
+    else
+        printf '  ○ argocd          no GitOps repository: devzone argocd init\n'
+    fi
     # Socket Docker de l'hôte (#432) : l'avertissement montre l'état réel,
     # le socket monté (même variable que docker-relais.sh), pas l'option :
     # le montage ne change qu'au make rebuild (faux rassurant en attendant)
