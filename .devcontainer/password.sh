@@ -18,6 +18,7 @@ password_regenerer() (
     local cible="$PASSWORD_CIBLE" racine="$PASSWORD_RACINE"
     local gl="$racine/workspace/.gitlab" pg="$racine/workspace/.postgres"
     local ar="$racine/workspace/.argocd"
+    local my="$racine/workspace/.mysql"
     local tab entrees tmp fichier nom service adresse utilisateur mdp
     tab="$(printf '\t')"
     entrees="$(mktemp "$racine/.password.entrees.XXXXXX")" || return 1
@@ -39,6 +40,13 @@ password_regenerer() (
         mdp="$(cat "$pg/admin-password")"
         if [ -n "$mdp" ]; then
             printf 'postgres\t%s\tpostgres\t%s\n' "127.0.0.1:5432" "$mdp" >>"$entrees"
+        fi
+    fi
+    # MySQL root du catalogue (helm direct ou Argo CD, #538) : miroir du poste
+    if [ -s "$my/admin-password" ]; then
+        mdp="$(cat "$my/admin-password")"
+        if [ -n "$mdp" ]; then
+            printf 'mysql\t%s\troot\t%s\n' "127.0.0.1:3306" "$mdp" >>"$entrees"
         fi
     fi
     if [ -s "$ar/admin.env" ]; then

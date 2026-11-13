@@ -50,3 +50,4 @@ charts/devzone-workspace/templates/statefulset.yaml
 .github/workflows/release.yml
 .github/workflows/repowarden.yml
 .github/workflows/tickets.yml
+.devcontainer/argocd/catalogue-argocd.sh

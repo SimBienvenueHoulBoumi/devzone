@@ -21,6 +21,37 @@ mysql_secret() {
     fi
 }
 
+# Attente du StatefulSet posé par Argo CD (#538) : la synchronisation est en
+# tâche de fond, le rollout est sondé jusqu'à MYSQL_ATTENTE
+mysql_attendre() {
+    local fin=$((SECONDS + MYSQL_ATTENTE))
+    while [ "$SECONDS" -lt "$fin" ]; do
+        if k rollout status statefulset/mysql --timeout=10s >/dev/null 2>&1; then
+            return 0
+        fi
+        sleep 5
+    done
+    echo "devzone : catalogue mysql : pas prêt après ${MYSQL_ATTENTE}s : kubectl --context $1 -n $NS describe pod mysql-0" >&2
+    return 1
+}
+
+# Installation MySQL par Argo CD (#538) : Application devzone-mysql (chart
+# charts/devzone-mysql du dépôt devzone), namespace et secret créés à part ;
+# le claim suit les volumes existants, comme le chemin manifeste
+mysql_installer_argocd() {
+    local CTX="$1" claim extra=""
+    mysql_secret
+    claim="$(mysql_claim_choisir "$NS")" || return 2
+    [ "$claim" = donnees ] || extra="claim=$claim"
+    catalogue_argocd_apply mysql "$NS" "$MYSQL_IMAGE" "$MYSQL_PORT" \
+        "$MYSQL_MEMOIRE" "$MYSQL_TAILLE" "$extra" || return 1
+    mysql_attendre "$CTX" || return 1
+    mysql_secret
+    relais_lancer mysql "$CTX" "$NS" svc/mysql 3306:3306
+    echo "✔ MySQL prêt : 127.0.0.1:$MYSQL_PORT dans le conteneur"
+    regenerer_identifiants
+}
+
 # Applique le manifeste avec le préfixe de claim choisi (#440)
 mysql_appliquer_manifeste() {
     local ns="$1" claim="$2"
