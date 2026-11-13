@@ -53,17 +53,24 @@ pw_pod_ports() {
     done
 }
 
-# devzone services to relay, one "port|namespace|target" line per active module service:
-# postgres (5432) and pgAdmin if present in namespace, mysql (3306).
+# devzone services to relay, one "port|namespace|target[|remote port]" line per
+# active module service: postgres (5432) and pgAdmin if present in namespace,
+# mysql (3306), and the Argo CD UI (8443 → 443) when present (#516).
 pw_services() {
+    local port
     if grep -qxE 'postgres=(on|true|oui)' .devzone.modules 2>/dev/null; then
         echo "5432|devzone-postgres|svc/postgres"
-        local port
         port="$(pw_kubectl --namespace devzone-postgres get svc pgadmin -o "$PW_JSONPATH" 2>/dev/null || true)"
         case "$port" in '' | *[!0-9]*) ;; *) echo "$port|devzone-postgres|svc/pgadmin" ;; esac
     fi
     if grep -qxE 'mysql=(on|true|oui)' .devzone.modules 2>/dev/null; then
         echo "3306|devzone-mysql|svc/mysql"
+    fi
+    # Argo CD UI: https port of svc/argocd-server on 127.0.0.1:8443, unless argocd=off
+    if ! grep -qx 'argocd=off' .devzone.modules 2>/dev/null; then
+        port="$(pw_kubectl --namespace devzone-argocd get svc argocd-server \
+            -o 'jsonpath={.spec.ports[?(@.name=="https")].port}' 2>/dev/null || true)"
+        case "$port" in '' | *[!0-9]*) ;; *) echo "${DEVZONE_ARGOCD_PORT:-8443}|devzone-argocd|svc/argocd-server|$port" ;; esac
     fi
 }
 
@@ -76,10 +83,10 @@ pw_taken() {
     fi
 }
 
-# Starts relay of port $1 to target $3 in namespace $2, unless already alive;
-# port taken on workstation: only one warning line per port.
+# Starts relay of port $1 to port $4 (default: $1) of target $3 in namespace $2,
+# unless already alive; port taken on workstation: only one warning line per port.
 pw_relay() {
-    local port="$1" ns="$2" target="$3" d pid
+    local port="$1" ns="$2" target="$3" remote="${4:-$1}" d pid
     d="$(pw_dir)"
     pid="$(cat "$d/relais/$port" 2>/dev/null || true)"
     pw_alive "$pid" && return 0
@@ -88,7 +95,7 @@ pw_relay() {
         return 0
     fi
     # shellcheck disable=SC2046
-    kubectl $(pw_ctx) --namespace "$ns" port-forward --address 127.0.0.1 "$target" "$port:$port" </dev/null >/dev/null 2>&1 &
+    kubectl $(pw_ctx) --namespace "$ns" port-forward --address 127.0.0.1 "$target" "$port:$remote" </dev/null >/dev/null 2>&1 &
     echo $! >"$d/relais/$port"
     rm -f "$d/pris/$port"
     echo "→ port $port relayed on 127.0.0.1"
@@ -105,13 +112,13 @@ pw_remove() {
 
 # One watcher round: relay new ports, remove those that disappeared.
 pw_round() {
-    local d wanted="" p ns target l f
+    local d wanted="" p ns target remote l f
     d="$(pw_dir)"
     mkdir -p "$d/relais" "$d/pris"
-    while IFS='|' read -r p ns target; do
+    while IFS='|' read -r p ns target remote; do
         [ -n "$p" ] || continue
         wanted="$wanted $p "
-        pw_relay "$p" "$ns" "$target"
+        pw_relay "$p" "$ns" "$target" "${remote:-$p}"
     done <<<"$(pw_services)"
     for p in $(pw_pod_ports); do
         case "$wanted" in *" $p "*) continue ;; esac

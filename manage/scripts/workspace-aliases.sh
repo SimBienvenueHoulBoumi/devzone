@@ -30,7 +30,12 @@ workspace_ports_command() {
     esac
 }
 
-# compatibility aliases, removed with lot 4 (#509)
+# compatibility aliases, removed with lot 4 (#509); RACINE and ICI are still
+# read by the scripts of the lot 5 files (argocd-*.sh, services-workspace.sh)
+# shellcheck disable=SC2034
+RACINE="$ROOT"
+# shellcheck disable=SC2034
+ICI="$HERE"
 drapeau_kubectl() { kubectl_flag "$@"; }
 drapeau_helm() { helm_flag "$@"; }
 chemin_chart() { chart_path "$@"; }

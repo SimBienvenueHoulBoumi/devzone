@@ -152,7 +152,7 @@ La liste vit dans .devzone.paquets a la racine du dossier devzone, hors du depot
 | État | — | `make status` | — |
 | **Désinstaller** (tout ce que devzone a créé, après confirmation) | — | `make desinstaller` | `npx devzone uninstall` |
 
-Après `devzone workspace migrate`, `make up`, `make shell` et `make stop` pilotent le workspace Kubernetes ; `devzone workspace revert` rend le poste Docker. Les services GitLab, PostgreSQL et Argo CD s'y installent depuis le poste : `devzone workspace services enable postgres` (voir [la référence](manage/docs/reference.md#services-de-devzone-dans-le-workspace-kubernetes)).
+Après `devzone workspace migrate`, `make up`, `make shell` et `make stop` pilotent le workspace Kubernetes ; `devzone workspace revert` rend le poste Docker. Les services GitLab, PostgreSQL et Argo CD s'y installent depuis le poste : `devzone workspace services enable postgres` (voir [la référence](manage/docs/reference.md#services-de-devzone-dans-le-workspace-kubernetes)). Argo CD y est installé d'office et tient les déploiements : interface sur https://localhost:8443 (mot de passe `admin` dans `.password`), dépôt GitOps `<login>/devzone-argocd` créé sur ton GitHub, projets déclarés dans `.argocd.conf` (`devzone workspace argocd app add <dépôt>`) ; voir [Argo CD dans le workspace Kubernetes](manage/docs/reference.md#argo-cd-dans-le-workspace-kubernetes).
 
 ### Mettre à jour devzone
 

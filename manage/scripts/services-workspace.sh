@@ -3,7 +3,7 @@
 # (gitlab, postgres, argocd) of a Kubernetes workspace from the workstation.
 # Sourced by manage/workspace.sh (drapeau_kubectl, POD, NAMESPACE).
 #   devzone workspace services enable <service> [options]
-#   devzone workspace services disable <service> [--oui]
+#   devzone workspace services disable <service> [--yes]
 #   devzone workspace services status
 # Why: the pod has no administrator access to the cluster (#430), while the
 # installers need one. The workstation creates a ServiceAccount bound to
@@ -91,6 +91,16 @@ services_run() {
         echo "✖ unknown service: ${service:-(none)} ($(services_usage))" >&2
         return 1
     fi
+    # Argo CD itself, and postgres when Argo CD holds the devzone charts: done
+    # by the workstation, no installer in the pod (#516)
+    if [ "$service" = argocd ]; then
+        argocd_toggle "$action" "$@"
+        return
+    fi
+    if [ "$service" = postgres ] && argocd_holds_charts; then
+        postgres_argocd "$action" "$@"
+        return
+    fi
     if ! services_pod_running; then
         echo "✖ workspace pod $POD not running: devzone workspace start" >&2
         return 1
@@ -110,6 +120,8 @@ services_run() {
         return 1
     fi
     echo "▶ $action $service in the pod $POD…"
+    # The installer of the pod still spells --oui (#510): --yes translated
+    set -- "${@/--yes/--oui}"
     # shellcheck disable=SC2046
     printf '%s\n' "$token" | kubectl $(drapeau_kubectl) exec -i "$POD" --namespace "$NAMESPACE" \
         -c workspace -- bash "$SERVICES_ADMIN_SCRIPT" "$action" "$service" "$@" || code=$?
