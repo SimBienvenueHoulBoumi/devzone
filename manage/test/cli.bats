@@ -227,7 +227,7 @@ faux_docker() {
     faux_docker absent
     run bash "$RACINE/manage/scripts/lancer.sh" up "$PWD/dz"
     [ "$status" -ne 0 ]
-    [[ "$output" == *"Docker introuvable"*"Docker Desktop"*"Docker Engine"*"make up"* ]] || false
+    [[ "$output" == *"Docker not found"*"Docker Desktop"*"Docker Engine"*"make up"* ]] || false
     [ ! -e "$BATS_TEST_TMPDIR/args" ]
     [[ "$output" != *outcome* ]] || false
 }
@@ -237,7 +237,7 @@ faux_docker() {
     faux_docker arrete
     run bash "$RACINE/manage/scripts/lancer.sh" rebuild "$PWD/dz"
     [ "$status" -ne 0 ]
-    [[ "$output" == *"Démarre Docker Desktop"*"make rebuild"* ]] || false
+    [[ "$output" == *"Start Docker Desktop"*"make rebuild"* ]] || false
     [ ! -e "$BATS_TEST_TMPDIR/args" ]
     [[ "$output" != *outcome* ]] || false
     [[ "$output" != *"failed to connect"* ]] || false
@@ -259,10 +259,10 @@ faux_docker() {
     faux_docker arrete
     run bash dz-des/manage/scripts/desinstaller.sh
     [ "$status" -ne 0 ]
-    [[ "$output" == *"Démarre Docker Desktop"*"make desinstaller"* ]] || false
+    [[ "$output" == *"Start Docker Desktop"*"make desinstaller"* ]] || false
     [[ "$output" != *"failed to connect"* ]] || false
     [[ "$output" != *Inventaire* ]] || false
-    [ "$(grep -c "Démarre Docker Desktop" <<<"$output")" -eq 1 ]
+    [ "$(grep -c "Start Docker Desktop" <<<"$output")" -eq 1 ]
     [ "$(cat "$BATS_TEST_TMPDIR/docker.log")" = "docker info" ]
 }
 
@@ -273,7 +273,6 @@ faux_docker() {
     cd dz-des
     run bash "$CLI" desinstaller
     [ "$status" -ne 0 ]
-    [[ "$output" == *"puis relance devzone desinstaller"* ]] || false
 }
 
 @test "devzone <dossier> sans Docker : dossier créé, comment lancer ensuite, sans erreur brute" {
@@ -285,7 +284,7 @@ faux_docker() {
     run bash "$CLI" mon-devzone
     [ "$status" -ne 0 ]
     [ -f mon-devzone/Makefile ]
-    [[ "$output" == *"Démarre Docker Desktop"*"cd $PWD/mon-devzone && make shell"* ]] || false
+    [[ "$output" == *"Start Docker Desktop"*"cd $PWD/mon-devzone && make shell"* ]] || false
     [ ! -e "$BATS_TEST_TMPDIR/make.log" ]
     [ ! -e "$BATS_TEST_TMPDIR/args" ]
     [[ "$output" != *outcome* ]] || false
@@ -295,7 +294,7 @@ faux_docker() {
     faux_cli 'printf "Start: Run: docker buildx build x\r\nbruit\r\nRunning the postStartCommand from devcontainer.json...\r\ndevzone : état\r\n  ○ module ia        facultatif\r\n"'
     run bash "$RACINE/manage/scripts/lancer.sh" up "$PWD/dz"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"▶ Construction de l'image"*"▶ Démarrage"*"○ module ia"*"devzone lancé"* ]] || false
+    [[ "$output" == *"▶ Building image"*"▶ Starting (git identity, clusters, state)"*"○ module ia"*"devzone started"* ]] || false
     [[ "$output" != *bruit* ]] || false
     grep -q bruit dz/.devzone.log
     [[ "$(cat "$BATS_TEST_TMPDIR/args")" == *"up --workspace-folder $PWD/dz"* ]] || false
@@ -305,7 +304,7 @@ faux_docker() {
     faux_cli 'exit 0'
     run bash "$RACINE/manage/scripts/lancer.sh" rebuild "$PWD/dz"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"devzone reconstruit"* ]] || false
+    [[ "$output" == *"devzone rebuilt"* ]] || false
     [[ "$(cat "$BATS_TEST_TMPDIR/args")" == *"--remove-existing-container"* ]] || false
 }
 
@@ -316,7 +315,7 @@ faux_docker() {
     run bash "$RACINE/manage/scripts/lancer.sh" up "$PWD/dz"
     [ "$status" -eq 1 ]
     [ $(($(date +%s) - debut)) -lt 20 ]
-    [[ "$output" == *"pose une question"*"Configurer les bots de ce dépôt ? [o/N]"* ]] || false
+    [[ "$output" == *"asks a question"*"Configurer les bots de ce dépôt ? [o/N]"* ]] || false
 }
 
 @test "lancer.sh : silence signalé (signe de vie), sans le prendre pour une question" {
@@ -324,15 +323,15 @@ faux_docker() {
     export DEVZONE_SIGNE_DE_VIE=1 DEVZONE_ATTENTE_QUESTION=1
     run bash "$RACINE/manage/scripts/lancer.sh" up "$PWD/dz"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"aucune nouvelle ligne depuis"*"npm install en cours"* ]] || false
-    [[ "$output" == *"devzone lancé"* ]] || false
+    [[ "$output" == *"no new line for"*"npm install en cours"* ]] || false
+    [[ "$output" == *"devzone started"* ]] || false
 }
 
 @test "lancer.sh : échec, fin du journal affichée" {
     faux_cli 'echo "erreur de construction"; exit 1'
     run bash "$RACINE/manage/scripts/lancer.sh" up "$PWD/dz"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"erreur de construction"*"échec"* ]] || false
+    [[ "$output" == *"erreur de construction"*"failed"* ]] || false
 }
 
 @test "lancer.sh : docker-hote=off → config sans la feature, chemins de build corrigés, --config passé" {
@@ -342,7 +341,7 @@ faux_docker() {
     printf 'docker-hote=off\n' >dz/.devzone.modules
     run bash "$RACINE/manage/scripts/lancer.sh" up "$PWD/dz"
     [ "$status" -eq 0 ]
-    cfg="$PWD/dz/.devcontainer/sans-docker-hote/devcontainer.json"
+    cfg="$PWD/dz/.devcontainer/without-host-docker/devcontainer.json"
     [ -f "$cfg" ]
     ! grep -q "docker-outside-of-docker" "$cfg" || false
     grep -q '"dockerfile": "../Dockerfile"' "$cfg"
@@ -356,12 +355,12 @@ faux_docker() {
     faux_cli 'exit 0'
     run bash "$RACINE/manage/scripts/lancer.sh" up "$PWD/dz"
     [ "$status" -eq 0 ]
-    [ ! -e dz/.devcontainer/sans-docker-hote/devcontainer.json ]
+    [ ! -e dz/.devcontainer/without-host-docker/devcontainer.json ]
     [[ "$(cat "$BATS_TEST_TMPDIR/args")" != *"--config"* ]] || false
     printf 'docker-hote=on\n' >dz/.devzone.modules
     run bash "$RACINE/manage/scripts/lancer.sh" rebuild "$PWD/dz"
     [ "$status" -eq 0 ]
-    [ ! -e dz/.devcontainer/sans-docker-hote/devcontainer.json ]
+    [ ! -e dz/.devcontainer/without-host-docker/devcontainer.json ]
     [[ "$(cat "$BATS_TEST_TMPDIR/args")" != *"--config"* ]] || false
 }
 

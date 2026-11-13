@@ -252,7 +252,7 @@ DOCKER
     : >"$BATS_TEST_TMPDIR/docker.log"
     run bash "$BATS_TEST_DIRNAME/../../manage/scripts/desinstaller.sh"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"make desinstaller sur ta machine"* ]] || false
+    [[ "$output" == *"make desinstaller on your machine"* ]] || false
     ! grep -qE "docker (rm|rmi|volume rm|network rm)" "$BATS_TEST_TMPDIR/docker.log" || false
 }
 

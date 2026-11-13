@@ -317,7 +317,7 @@ echo moi' ]
     cd "$DZ"
     run bash "$MAJ" mettre-a-jour --oui
     [ "$status" -eq 0 ]
-    [[ "$output" == *"prochain devzone workspace demarrer"* ]] || false
+    [[ "$output" == *"next devzone workspace start"* ]] || false
     [[ "$output" != *"rebuild"* ]] || false
     [ "$(cat "$DZ/.devzone.modules")" = 'workspace=kubernetes' ]
     [ ! -e "$T/reconstruction.log" ]

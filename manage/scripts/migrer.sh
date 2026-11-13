@@ -1,46 +1,51 @@
 #!/usr/bin/env bash
-# Migration du poste Docker vers le workspace Kubernetes, et retour arrière (#403).
-# Sourcé par manage/workspace.sh : utilise POD, NAMESPACE, DOSSIER_PROJETS,
-# drapeau_kubectl, copier_vers et copier_depuis. Rien n'est jamais supprimé, sauf
-# par nettoyer-docker, après confirmation. Lancé depuis le dossier devzone du poste.
+# Migration from Docker workstation to Kubernetes workspace, and rollback (#403).
+# Sourced by manage/workspace.sh: uses POD, NAMESPACE, PROJECTS_DIR,
+# kubectl_flag, copy_to and copy_from. Nothing is ever deleted except by
+# clean-docker, after confirmation. Run from the devzone workstation folder.
 
-# Home de vscode dans le pod et image des copies de volumes Docker.
-HOME_POD="/home/vscode"
-IMAGE_COPIE="${DEVZONE_IMAGE_COPIE:-busybox:1.36}"
-# Volumes Docker du poste : devzone-<x>, ou $DEVZONE_VOLUMES-<x> (tests fonctionnels).
-VOLUMES_DOCKER=(gh git claude opencode-config opencode-data agent config m2 gradle pnpm)
-# Mesure d'un dossier ($1) : « nombre de fichiers octets ».
-MESURE='n=$(find "$1" -type f | wc -l | tr -d " "); o=$(find "$1" -type f -exec wc -c {} + 2>/dev/null | awk '\''$2!="total"{s+=$1} END{print s+0}'\''); echo "$n $o"'
+# vscode home in the pod and image used to copy Docker volumes.
+POD_HOME="/home/vscode"
+COPY_IMAGE="${DEVZONE_IMAGE_COPIE:-busybox:1.36}"
+# Docker workstation volumes: devzone-<x>, or $DEVZONE_VOLUMES-<x> (functional tests).
+DOCKER_VOLUMES=(gh git claude opencode-config opencode-data agent config m2 gradle pnpm)
+# Folder size measurement ($1): "file count bytes".
+# shellcheck disable=SC2016
+MEASURE='n=$(find "$1" -type f | wc -l | tr -d " "); o=$(find "$1" -type f -exec wc -c {} + 2>/dev/null | awk '\''$2!="total"{s+=$1} END{print s+0}'\''); echo "$n $o"'
 
-# kubectl du poste, contexte devzone s'il existe, namespace du workspace.
+# Workstation kubectl, devzone context if it exists, workspace namespace.
 kc() {
-    local drapeau
-    drapeau="$(drapeau_kubectl)"
+    local flag
+    flag="$(kubectl_flag)"
     # shellcheck disable=SC2086
-    kubectl $drapeau --namespace "$NAMESPACE" "$@"
+    kubectl $flag --namespace "$NAMESPACE" "$@"
 }
 
-# Erreur claire sur stderr (le code 1 est rendu par l'appelant).
-echec() {
+# Clear error on stderr (exit code 1 returned by caller).
+fail() {
     echo "✖ $*" >&2
 }
 
-# Lit l'unique option acceptée ($1) des arguments suivants ($3…) : affiche 1 si
-# présente, 0 sinon ; toute autre option : erreur avec l'usage ($2), code 1.
-lire_option() {
-    local option="$1" usage="$2" a trouve=0
+# Reads the single accepted flag ($1) from following args ($3…): prints 1 if
+# present, 0 otherwise; any other flag: error with usage ($2), exit code 1.
+read_flag() {
+    local flag="$1" usage="$2" a found=0 legacy=""
     shift 2
+    case "$flag" in
+        --yes) legacy="--oui" ;;
+        --bring-back) legacy="--rapatrier" ;;
+    esac
     for a in "$@"; do
-        if [ "$a" = "$option" ]; then trouve=1; continue; fi
-        echec "option inconnue : $a (devzone workspace $usage)"
+        if [ "$a" = "$flag" ] || { [ -n "$legacy" ] && [ "$a" = "$legacy" ]; }; then found=1; continue; fi
+        fail "unknown option: $a (devzone workspace $usage)"
         return 1
     done
-    echo "$trouve"
+    echo "$found"
 }
 
-# Chemin du volume etat (relatif au home de vscode) d'un volume Docker devzone-<x> ;
-# vide si le chart n'en monte aucun (persistence.state.paths).
-chemin_etat() {
+# State volume path (relative to vscode home) for a devzone-<x> Docker volume;
+# empty if the chart mounts none (persistence.state.paths).
+state_path() {
     case "$1" in
         gh) echo .config/gh ;;
         git) echo .config/git ;;
@@ -54,127 +59,130 @@ chemin_etat() {
     esac
 }
 
-# Nom du volume Docker de <x>.
-volume_docker() {
+# Docker volume name for <x>.
+docker_volume() {
     printf '%s-%s' "${DEVZONE_VOLUMES:-devzone}" "$1"
 }
 
-# Demande [o/N] ($1 : question, $2 : 1 si --oui). Sans terminal et sans --oui : refus.
-confirmer() {
-    local rep=""
+# Asks [y/N] ($1: question, $2: 1 if --yes). Without terminal and without --yes: refuse.
+confirm() {
+    local reply=""
     [ "${2:-0}" = 1 ] && return 0
     if [ ! -t 0 ]; then
-        echo "✖ pas de terminal : confirmation impossible, relance avec --oui" >&2
+        echo "✖ no terminal: cannot confirm, run again with --yes" >&2
         return 1
     fi
-    read -r -p "$1 [o/N] " rep || true
-    case "$rep" in o | O | oui | OUI | Oui) return 0 ;; esac
-    echo "✖ annulé, rien n'a été modifié" >&2
+    read -r -p "$1 [y/N] " reply || true
+    case "$reply" in y | Y | yes | YES | Yes | o | O | oui | OUI | Oui) return 0 ;; esac
+    echo "✖ canceled, nothing changed" >&2
     return 1
 }
 
-# Compare le dossier du poste ($1) à celui du pod ($2) : mêmes fichiers, même taille.
-verifier_copie() {
-    local poste pod
-    poste="$(sh -c "$MESURE" _ "$1")"
-    pod="$(kc exec "$POD" -c workspace -- sh -c "$MESURE" _ "$2")" || pod="illisible"
-    if [ "$poste" != "$pod" ]; then
-        echec "copie différente pour $2 : poste « $poste », pod « $pod » (fichiers octets)"
+# Compares workstation folder ($1) with pod folder ($2): same files, same size.
+verify_copy() {
+    local local_state pod_state
+    local_state="$(sh -c "$MEASURE" _ "$1")"
+    pod_state="$(kc exec "$POD" -c workspace -- sh -c "$MEASURE" _ "$2")" || pod_state="unreadable"
+    if [ "$local_state" != "$pod_state" ]; then
+        fail "different copy for $2: workstation \"$local_state\", pod \"$pod_state\" (files bytes)"
         return 1
     fi
-    echo "  ✔ $2 : ${poste% *} fichier(s), ${poste#* } octet(s)"
+    echo "  ✔ $2: ${local_state% *} file(s), ${local_state#* } byte(s)"
 }
 
-# Étape 1 : cluster joignable, pod démarré, place suffisante pour les projets.
-etape_verifs() {
-    local phase besoin libre
-    echo "▶ [1/5] vérifications : cluster, workspace, espace"
+# Step 1: cluster reachable, pod started, enough space for projects.
+step_checks() {
+    local phase needed free
+    echo "▶ [1/5] checks: cluster, workspace, space"
     kc get --raw /readyz >/dev/null 2>&1 || {
-        echec "cluster injoignable : vérifie le contexte kubectl (kubectl config get-contexts)"
+        fail "unreachable cluster: check kubectl context (kubectl config get-contexts)"
         return 1
     }
-    command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1 || {
-        echec "Docker ne répond pas : il faut lire les volumes devzone-* du poste"
-        return 1
-    }
-    phase="$(kc get pod "$POD" -o 'jsonpath={.status.phase}' 2>/dev/null || true)"
-    [ "$phase" = "Running" ] || { echec "workspace non démarré (pod $POD : ${phase:-absent}) : devzone workspace demarrer"; return 1; }
-    besoin=0
-    [ -d workspace ] && besoin="$(du -sk workspace | cut -f1)"
-    libre="$(kc exec "$POD" -c workspace -- df -Pk "$DOSSIER_PROJETS" | awk 'NR==2{print $4}')" || libre=0
-    if [ "${libre:-0}" -lt "$besoin" ]; then
-        echec "espace insuffisant sur $DOSSIER_PROJETS : ${libre:-0} Ko libres, $besoin Ko de projets"
+    if ! command -v docker >/dev/null 2>&1 || ! docker info >/dev/null 2>&1; then
+        fail "Docker does not respond: devzone-* workstation volumes must be readable"
         return 1
     fi
-    echo "  ✔ cluster joignable, pod $POD prêt, $libre Ko libres pour $besoin Ko de projets"
+    phase="$(kc get pod "$POD" -o 'jsonpath={.status.phase}' 2>/dev/null || true)"
+    [ "$phase" = "Running" ] || { fail "workspace not started (pod $POD: ${phase:-missing}): devzone workspace start"; return 1; }
+    needed=0
+    [ -d workspace ] && needed="$(du -sk workspace | cut -f1)"
+    free="$(kc exec "$POD" -c workspace -- df -Pk "$PROJECTS_DIR" | awk 'NR==2{print $4}')" || free=0
+    if [ "${free:-0}" -lt "$needed" ]; then
+        fail "not enough space on $PROJECTS_DIR: ${free:-0} KB free, $needed KB of projects"
+        return 1
+    fi
+    echo "  ✔ cluster reachable, pod $POD ready, $free KB free for $needed KB of projects"
 }
 
-# Étape 2 : chaque projet de ./workspace copié dans le pod, puis vérifié.
-etape_projets() {
-    local d nom
-    echo "▶ [2/5] projets : ./workspace/<projet> vers $DOSSIER_PROJETS (.git compris)"
+# Step 2: each project in ./workspace copied to the pod, then verified.
+step_projects() {
+    local d name
+    echo "▶ [2/5] projects: ./workspace/<project> to $PROJECTS_DIR (.git included)"
     for d in workspace/*/; do
         [ -d "$d" ] || continue
-        nom="$(basename "$d")"
-        echo "  … $nom"
-        (copier_vers "$d") || { echec "copie du projet $nom échouée"; return 1; }
-        verifier_copie "$d" "$DOSSIER_PROJETS/$nom" || return 1
+        name="$(basename "$d")"
+        echo "  … $name"
+        (copy_to "$d") || { fail "project $name copy failed"; return 1; }
+        verify_copy "$d" "$PROJECTS_DIR/$name" || return 1
     done
 }
 
-# Copie le volume Docker <x> ($1) vers $2 du home du pod, par un conteneur en lecture seule.
-copier_volume() {
-    local v cible="$HOME_POD/$2" tmp statut=0
-    v="$(volume_docker "$1")"
+# Copies Docker volume <x> ($1) to $2 under pod home, through a read-only container.
+copy_volume() {
+    local v target="$POD_HOME/$2" tmp status=0
+    v="$(docker_volume "$1")"
     tmp="$(mktemp -d)"
-    if ! docker run --rm -v "$v:/src:ro" "$IMAGE_COPIE" tar cf - -C /src . | tar xf - -C "$tmp"; then
-        echec "lecture du volume $v échouée"
-        statut=1
-    elif ! kc cp "$tmp/." "$POD:$cible" -c workspace; then
-        echec "copie de $v vers $cible échouée"
-        statut=1
+    if ! docker run --rm -v "$v:/src:ro" "$COPY_IMAGE" tar cf - -C /src . | tar xf - -C "$tmp"; then
+        fail "volume $v read failed"
+        status=1
+    elif ! kc cp "$tmp/." "$POD:$target" -c workspace; then
+        fail "volume $v copy to $target failed"
+        status=1
     else
-        verifier_copie "$tmp" "$cible" || statut=1
+        verify_copy "$tmp" "$target" || status=1
     fi
     rm -rf "$tmp"
-    return "$statut"
+    return "$status"
 }
 
-# Étape 3 : identités et caches, volumes Docker vers les chemins du volume etat.
-etape_identites() {
-    local x chemin v
-    echo "▶ [3/5] identités et caches : volumes Docker vers le volume etat"
-    for x in "${VOLUMES_DOCKER[@]}"; do
-        chemin="$(chemin_etat "$x")"
-        v="$(volume_docker "$x")"
-        if [ -z "$chemin" ]; then
-            echo "  – $v : aucun chemin dans le volume etat du chart, ignoré"
+# Step 3: identities and caches, Docker volumes to state volume paths.
+step_identities() {
+    local x path v
+    echo "▶ [3/5] identities and caches: Docker volumes to state volume"
+    for x in "${DOCKER_VOLUMES[@]}"; do
+        path="$(state_path "$x")"
+        v="$(docker_volume "$x")"
+        if [ -z "$path" ]; then
+            echo "  – $v: no path in chart, skipped"
         elif ! docker volume inspect "$v" >/dev/null 2>&1; then
-            echo "  – $v : absent, ignoré"
+            echo "  – $v: missing, ignored"
         else
-            echo "  … $v → $HOME_POD/$chemin"
-            copier_volume "$x" "$chemin" || return 1
+            echo "  … $v → $POD_HOME/$path"
+            copy_volume "$x" "$path" || return 1
         fi
     done
 }
 
-# Étape 4 : .devzone.modules et .devzone.paquets du poste copiés dans le pod.
-etape_etat() {
+# Step 4: workstation .devzone.modules and .devzone.paquets copied to the pod.
+step_state() {
     local f
-    echo "▶ [4/5] état : .devzone.modules et .devzone.paquets vers $DOSSIER_PROJETS"
+    echo "▶ [4/5] state: .devzone.modules and .devzone.paquets to $PROJECTS_DIR"
     for f in .devzone.modules .devzone.paquets; do
         if [ ! -f "$f" ]; then
-            echo "  – $f : absent du poste, ignoré"
+            echo "  – $f: missing on workstation, skipped"
             continue
         fi
-        kc cp "$PWD/$f" "$POD:$DOSSIER_PROJETS/$f" -c workspace \
-            && kc exec "$POD" -c workspace -- test -f "$DOSSIER_PROJETS/$f" || { echec "copie de $f échouée ou absente du pod"; return 1; }
+        if ! kc cp "$PWD/$f" "$POD:$PROJECTS_DIR/$f" -c workspace \
+            || ! kc exec "$POD" -c workspace -- test -f "$PROJECTS_DIR/$f"; then
+            fail "failed to copy $f or missing from pod"
+            return 1
+        fi
         echo "  ✔ $f"
     done
 }
 
-# Note workspace=$1 dans .devzone.modules du poste (ligne remplacée, le reste intact).
-noter_workspace() {
+# Writes workspace=$1 in workstation .devzone.modules (line replaced, rest kept).
+record_workspace() {
     local f=".devzone.modules" tmp
     tmp="$f.tmp.$$"
     {
@@ -183,43 +191,51 @@ noter_workspace() {
     } >"$tmp" && mv "$tmp" "$f"
 }
 
-# Étape 5 : bascule, workspace=kubernetes noté sur le poste ; rien n'est supprimé.
-etape_bascule() {
-    echo "▶ [5/5] bascule : workspace=kubernetes dans .devzone.modules"
-    noter_workspace kubernetes || { echec "écriture de .devzone.modules impossible"; return 1; }
-    echo "  ✔ fait ; le poste Docker et ses volumes sont intacts (retour : devzone workspace revenir)"
+# Step 5: switch, workspace=kubernetes recorded on workstation; nothing is deleted.
+step_switch() {
+    echo "▶ [5/5] switch: workspace=kubernetes in .devzone.modules"
+    record_workspace kubernetes || { fail "cannot write .devzone.modules"; return 1; }
+    echo "  ✔ done; Docker workstation and its volumes are intact (rollback: devzone workspace revert)"
 }
 
-# devzone workspace migrer [--oui] : les cinq étapes, arrêt à la première erreur.
-migrer() {
-    local oui
-    oui="$(lire_option --oui "migrer [--oui]" "$@")" || return 1
-    confirmer "Migrer ce poste Docker vers le workspace Kubernetes (copie, rien n'est supprimé) ?" "$oui" || return 1
-    etape_verifs || return 1
-    etape_projets || return 1
-    etape_identites || return 1
-    etape_etat || return 1
-    etape_bascule || return 1
-    echo "✔ migration terminée"
+# devzone workspace migrate [--yes]: the five steps, stop at first error.
+migrate_workspace() {
+    local yes
+    yes="$(read_flag --yes "migrate [--yes]" "$@")" || return 1
+    confirm "Migrate this Docker workstation to the Kubernetes workspace (copy, nothing is deleted)?" "$yes" || return 1
+    step_checks || return 1
+    step_projects || return 1
+    step_identities || return 1
+    step_state || return 1
+    step_switch || return 1
+    echo "✔ migration complete"
 }
 
-# devzone workspace nettoyer-docker [--oui] : supprime les volumes Docker devzone-*, après confirmation.
-nettoyer_docker() {
-    local oui x v presents=()
-    oui="$(lire_option --oui "nettoyer-docker [--oui]" "$@")" || return 1
-    for x in "${VOLUMES_DOCKER[@]}"; do
-        v="$(volume_docker "$x")"
-        ! docker volume inspect "$v" >/dev/null 2>&1 || presents+=("$v")
+# devzone workspace clean-docker [--yes]: removes devzone-* Docker volumes, after confirmation.
+clean_docker() {
+    local yes x v present=()
+    yes="$(read_flag --yes "clean-docker [--yes]" "$@")" || return 1
+    for x in "${DOCKER_VOLUMES[@]}"; do
+        v="$(docker_volume "$x")"
+        ! docker volume inspect "$v" >/dev/null 2>&1 || present+=("$v")
     done
-    if [ "${#presents[@]}" -eq 0 ]; then
-        echo "Aucun volume Docker devzone à supprimer."
+    if [ "${#present[@]}" -eq 0 ]; then
+        echo "No devzone Docker volume to remove."
         return 0
     fi
-    echo "Volumes Docker à supprimer (irréversible, « revenir » ne les retrouvera plus) :"
-    printf '  %s\n' "${presents[@]}"
-    confirmer "Supprimer ces ${#presents[@]} volume(s) ?" "$oui" || return 1
-    for v in "${presents[@]}"; do
-        docker volume rm "$v" >/dev/null || { echec "suppression de $v échouée"; return 1; }
-        echo "  ✔ $v supprimé"
+    echo "Docker volumes to remove (irreversible, \"revert\" will not find them again):"
+    printf '  %s\n' "${present[@]}"
+    confirm "Remove these ${#present[@]} volume(s)?" "$yes" || return 1
+    for v in "${present[@]}"; do
+        docker volume rm "$v" >/dev/null || { fail "failed to remove $v"; return 1; }
+        echo "  ✔ $v removed"
     done
 }
+
+# compatibility aliases, removed with lot 4 (#509)
+lire_option() { read_flag "$@"; }
+confirmer() { confirm "$@"; }
+noter_workspace() { record_workspace "$@"; }
+migrer() { migrate_workspace "$@"; }
+nettoyer_docker() { clean_docker "$@"; }
+echec() { fail "$@"; }

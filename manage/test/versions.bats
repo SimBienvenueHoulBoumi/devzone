@@ -1,18 +1,18 @@
 #!/usr/bin/env bats
-# Script versions.sh : comparaison des versions figées du conteneur avec npm
-# (simulé) et application ciblée d'une montée.
+# versions.sh script: compares pinned container versions with npm (mocked)
+# and applies a targeted upgrade.
 
 setup() {
-    RACINE="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
+    ROOT="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
     export HOME="$BATS_TEST_TMPDIR/home"
     mkdir -p "$HOME" "$BATS_TEST_TMPDIR/bin" \
         "$BATS_TEST_TMPDIR/dz/manage/scripts" "$BATS_TEST_TMPDIR/dz/.devcontainer"
-    cp "$RACINE/manage/scripts/versions.sh" "$BATS_TEST_TMPDIR/dz/manage/scripts/"
+    cp "$ROOT/manage/scripts/versions.sh" "$BATS_TEST_TMPDIR/dz/manage/scripts/"
     VERSIONS="$BATS_TEST_TMPDIR/dz/manage/scripts/versions.sh"
     VERSIONS_ENV="$BATS_TEST_TMPDIR/dz/.devcontainer/versions.env"
     DEVZONE="$BATS_TEST_TMPDIR/dz/.devcontainer/devzone"
     cat >"$VERSIONS_ENV" <<'EOFENV'
-# repowarden, version figée
+# repowarden, pinned version
 REPOWARDEN_VERSION=4.12.0
 EOFENV
     cat >"$DEVZONE" <<'EOFDZ'
@@ -26,12 +26,12 @@ IA_NOMS=("${IA_CLAUDE%@*}" "${IA_OPENCODE%@*}")
 EOFDZ
     chmod +x "$DEVZONE"
     export NPM_VERSIONS="$BATS_TEST_TMPDIR/versions"
-    export NPM_INSTALLEES="$BATS_TEST_TMPDIR/installees"
-    : >"$NPM_INSTALLEES"
+    export NPM_INSTALLED="$BATS_TEST_TMPDIR/installed"
+    : >"$NPM_INSTALLED"
     cat >"$BATS_TEST_TMPDIR/bin/npm" <<'EOFNPM'
 #!/usr/bin/env bash
 if [ "${1:-}" = view ] && [ "${3:-}" = version ]; then
-    awk -v p="$2" '$1 == p { print $2; trouve = 1 } END { exit trouve ? 0 : 1 }' "$NPM_VERSIONS"
+    awk -v p="$2" '$1 == p { print $2; found = 1 } END { exit found ? 0 : 1 }' "$NPM_VERSIONS"
 elif [ "${1:-}" = ls ] && [ "${2:-}" = -g ]; then
     printf '{"dependencies":{'
     sep=""
@@ -39,7 +39,7 @@ elif [ "${1:-}" = ls ] && [ "${2:-}" = -g ]; then
         [ -n "$p" ] || continue
         printf '%s"%s":{"version":"%s"}' "$sep" "$p" "$v"
         sep=","
-    done <"$NPM_INSTALLEES"
+    done <"$NPM_INSTALLED"
     printf '}}\n'
 else
     exit 2
@@ -75,91 +75,100 @@ npm_versions() {
     done
 }
 
-npm_installees() {
-    : >"$NPM_INSTALLEES"
+npm_installed() {
+    : >"$NPM_INSTALLED"
     while [ "$#" -gt 0 ]; do
-        printf '%s %s\n' "$1" "$2" >>"$NPM_INSTALLEES"
+        printf '%s %s\n' "$1" "$2" >>"$NPM_INSTALLED"
         shift 2
     done
 }
 
-tickets_ouverts() {
-    local separateur=""
+open_tickets() {
+    local sep=""
     printf '[' >"$GH_TICKETS"
     while [ "$#" -gt 0 ]; do
-        printf '%s{"number":%s,"title":"%s","author":{"login":"%s"}}' "$separateur" "$1" "$2" "$3" >>"$GH_TICKETS"
-        separateur=","
+        printf '%s{"number":%s,"title":"%s","author":{"login":"%s"}}' "$sep" "$1" "$2" "$3" >>"$GH_TICKETS"
+        sep=","
         shift 3
     done
     printf ']\n' >>"$GH_TICKETS"
 }
 
-@test "tout à jour : aucune ligne" {
+@test "all up to date: no line" {
     npm_versions repowarden 4.12.0 @anthropic-ai/claude-code 2.1.286 opencode-ai 1.18.34
     run bash "$VERSIONS"
     [ "$status" -eq 0 ]
     [ -z "$output" ]
 }
 
-@test "--installees tout à jour : aucune ligne" {
-    npm_installees repowarden 4.12.0 @anthropic-ai/claude-code 2.1.286 opencode-ai 1.18.34
-    run bash "$VERSIONS" --installees
+@test "--installed all up to date: no line" {
+    npm_installed repowarden 4.12.0 @anthropic-ai/claude-code 2.1.286 opencode-ai 1.18.34
+    run bash "$VERSIONS" --installed
     [ "$status" -eq 0 ]
     [ -z "$output" ]
 }
 
-@test "--installees repowarden en retard : une ligne paquet figée installée" {
-    npm_installees repowarden 4.9.2 @anthropic-ai/claude-code 2.1.286 opencode-ai 1.18.34
+@test "--installed and --installees are equivalent" {
+    npm_installed repowarden 4.9.2 @anthropic-ai/claude-code 2.1.286 opencode-ai 1.18.34
+    run bash "$VERSIONS" --installed
+    [ "$status" -eq 0 ]
+    [ "$output" = "repowarden 4.12.0 4.9.2" ]
     run bash "$VERSIONS" --installees
     [ "$status" -eq 0 ]
     [ "$output" = "repowarden 4.12.0 4.9.2" ]
 }
 
-@test "--installees outil IA non installé : pas listé" {
-    npm_installees repowarden 4.12.0
-    run bash "$VERSIONS" --installees
+@test "--installed: not installed AI tool not listed" {
+    npm_installed repowarden 4.12.0
+    run bash "$VERSIONS" --installed
     [ "$status" -eq 0 ]
     [ -z "$output" ]
 }
 
-@test "un paquet en retard : une ligne paquet ancienne nouvelle" {
+@test "one outdated package: one package old new line" {
     npm_versions repowarden 4.13.0 @anthropic-ai/claude-code 2.1.286 opencode-ai 1.18.34
     run bash "$VERSIONS"
     [ "$status" -eq 0 ]
     [ "$output" = "repowarden 4.12.0 4.13.0" ]
 }
 
-@test "paquet IA scopé en retard : reconnu sur sa ligne IA_CLAUDE" {
+@test "scoped AI package outdated: recognized on its IA_CLAUDE line" {
     npm_versions repowarden 4.12.0 @anthropic-ai/claude-code 2.2.0 opencode-ai 1.18.34
     run bash "$VERSIONS"
     [ "$status" -eq 0 ]
     [ "$output" = "@anthropic-ai/claude-code 2.1.286 2.2.0" ]
 }
 
-@test "paquet IA sans scope en retard : reconnu sur sa ligne IA_OPENCODE" {
+@test "unscoped AI package outdated: recognized on its IA_OPENCODE line" {
     npm_versions repowarden 4.12.0 @anthropic-ai/claude-code 2.1.286 opencode-ai 1.19.0
     run bash "$VERSIONS"
     [ "$status" -eq 0 ]
     [ "$output" = "opencode-ai 1.18.34 1.19.0" ]
 }
 
-@test "version npm plus ancienne que la version figée : pas de retour en arrière" {
+@test "npm version older than pinned version: no downgrade" {
     npm_versions repowarden 4.11.0 @anthropic-ai/claude-code 2.1.286 opencode-ai 1.18.34
     run bash "$VERSIONS"
     [ "$status" -eq 0 ]
     [ -z "$output" ]
 }
 
-@test "--appliquer repowarden : seule la version de versions.env change" {
-    avant="$(cat "$DEVZONE")"
-    run bash "$VERSIONS" --appliquer repowarden 4.13.0
+@test "--apply repowarden: only versions.env version changes" {
+    before="$(cat "$DEVZONE")"
+    run bash "$VERSIONS" --apply repowarden 4.13.0
     [ "$status" -eq 0 ]
     grep -qx 'REPOWARDEN_VERSION=4.13.0' "$VERSIONS_ENV"
-    [ "$(cat "$DEVZONE")" = "$avant" ]
+    [ "$(cat "$DEVZONE")" = "$before" ]
 }
 
-@test "--appliquer un paquet IA : seule sa version change, l'autre reste" {
-    run bash "$VERSIONS" --appliquer @anthropic-ai/claude-code 2.2.0
+@test "--apply and --appliquer are equivalent" {
+    run bash "$VERSIONS" --appliquer opencode-ai 1.19.0
+    [ "$status" -eq 0 ]
+    grep -qx 'IA_OPENCODE=opencode-ai@1.19.0' "$DEVZONE"
+}
+
+@test "--apply AI package: only its version changes, other stays" {
+    run bash "$VERSIONS" --apply @anthropic-ai/claude-code 2.2.0
     [ "$status" -eq 0 ]
     grep -qx 'IA_CLAUDE=@anthropic-ai/claude-code@2.2.0' "$DEVZONE"
     grep -qx 'IA_OPENCODE=opencode-ai@1.18.34' "$DEVZONE"
@@ -167,24 +176,24 @@ tickets_ouverts() {
     grep -qx 'REPOWARDEN_VERSION=4.12.0' "$VERSIONS_ENV"
 }
 
-@test "--appliquer opencode-ai : la version scopée reste intacte" {
-    run bash "$VERSIONS" --appliquer opencode-ai 1.19.0
+@test "--apply opencode-ai: scoped version remains intact" {
+    run bash "$VERSIONS" --apply opencode-ai 1.19.0
     [ "$status" -eq 0 ]
     grep -qx 'IA_CLAUDE=@anthropic-ai/claude-code@2.1.286' "$DEVZONE"
     grep -qx 'IA_OPENCODE=opencode-ai@1.19.0' "$DEVZONE"
 }
 
-@test "vrai fichier devzone : les deux assistants IA sont lus par versions.sh" {
+@test "real devzone file: both AI assistants read by versions.sh" {
     npm_versions repowarden 999.0.0 @anthropic-ai/claude-code 999.0.0 opencode-ai 999.0.0
-    run bash "$RACINE/manage/scripts/versions.sh"
+    run bash "$ROOT/manage/scripts/versions.sh"
     [ "$status" -eq 0 ]
     [[ "$output" == *"@anthropic-ai/claude-code "*" 999.0.0"* ]] || false
     [[ "$output" == *"opencode-ai "*" 999.0.0"* ]] || false
 }
 
-@test "deux montées simultanées (Claude Code, opencode) : fusionnées l'une après l'autre sans conflit" {
-    # Le vrai fichier devzone, pour vérifier sa disposition
-    cp "$RACINE/.devcontainer/devzone" "$DEVZONE"
+@test "two simultaneous upgrades (Claude Code, opencode): merged one after another without conflict" {
+    # Real devzone file, to check its layout
+    cp "$ROOT/.devcontainer/devzone" "$DEVZONE"
     export GIT_CONFIG_NOSYSTEM=1 GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@example.invalid \
         GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@example.invalid
     cd "$BATS_TEST_TMPDIR/dz"
@@ -193,91 +202,98 @@ tickets_ouverts() {
     git add .devcontainer manage
     git commit -qm base
     git checkout -qb claude
-    bash "$VERSIONS" --appliquer @anthropic-ai/claude-code 999.0.0
+    bash "$VERSIONS" --apply @anthropic-ai/claude-code 999.0.0
     git commit -qam claude
     git checkout -q "$base"
     git checkout -qb opencode
-    bash "$VERSIONS" --appliquer opencode-ai 999.1.0
+    bash "$VERSIONS" --apply opencode-ai 999.1.0
     git commit -qam opencode
     git checkout -q "$base"
-    git merge -q --no-ff -m "fusion claude" claude
-    run git merge --no-ff -m "fusion opencode" opencode
+    git merge -q --no-ff -m "merge claude" claude
+    run git merge --no-ff -m "merge opencode" opencode
     [ "$status" -eq 0 ]
     grep -qx 'IA_CLAUDE=@anthropic-ai/claude-code@999.0.0' "$DEVZONE"
     grep -qx 'IA_OPENCODE=opencode-ai@999.1.0' "$DEVZONE"
 }
 
-@test "--appliquer garde le droit d'exécution de devzone" {
+@test "--apply keeps devzone executable bit" {
     [ -x "$DEVZONE" ]
-    run bash "$VERSIONS" --appliquer opencode-ai 1.19.0
+    run bash "$VERSIONS" --apply opencode-ai 1.19.0
     [ "$status" -eq 0 ]
     [ -x "$DEVZONE" ]
 }
 
-@test "--appliquer : paquet inconnu refusé, fichiers intacts" {
-    avant_env="$(cat "$VERSIONS_ENV")"
-    avant_devzone="$(cat "$DEVZONE")"
-    run bash "$VERSIONS" --appliquer nexistepas 1.0.0
+@test "--apply: unknown package refused, files unchanged" {
+    before_env="$(cat "$VERSIONS_ENV")"
+    before_devzone="$(cat "$DEVZONE")"
+    run bash "$VERSIONS" --apply notfound 1.0.0
     [ "$status" -ne 0 ]
-    [[ "$output" == *"paquet inconnu"* ]] || false
-    [ "$(cat "$VERSIONS_ENV")" = "$avant_env" ]
-    [ "$(cat "$DEVZONE")" = "$avant_devzone" ]
+    [[ "$output" == *"unknown package"* ]] || false
+    [ "$(cat "$VERSIONS_ENV")" = "$before_env" ]
+    [ "$(cat "$DEVZONE")" = "$before_devzone" ]
 }
 
-@test "--appliquer sans version : usage rappelé" {
-    run bash "$VERSIONS" --appliquer repowarden
+@test "--apply without version: usage shown" {
+    run bash "$VERSIONS" --apply repowarden
     [ "$status" -ne 0 ]
-    [[ "$output" == *"--appliquer"* ]] || false
+    [[ "$output" == *"--apply"* ]] || false
 }
 
-@test "--ticket-existant : ticket de l'App trouvé (numéro et titre)" {
-    tickets_ouverts 42 "repowarden 9.9.9 dans le conteneur" "app/repowarden-devzone"
+@test "--existing-ticket: App ticket found (number and title)" {
+    open_tickets 42 "repowarden 9.9.9 in container" "app/repowarden-devzone"
+    run bash "$VERSIONS" --existing-ticket repowarden "app/repowarden-devzone"
+    [ "$status" -eq 0 ]
+    [ "$output" = $'42	repowarden 9.9.9 in container' ]
+}
+
+@test "--existing-ticket and --ticket-existant are equivalent" {
+    open_tickets 42 "repowarden 9.9.9 in container" "app/repowarden-devzone"
     run bash "$VERSIONS" --ticket-existant repowarden "app/repowarden-devzone"
     [ "$status" -eq 0 ]
-    [ "$output" = $'42	repowarden 9.9.9 dans le conteneur' ]
+    [ "$output" = $'42	repowarden 9.9.9 in container' ]
 }
 
-@test "--ticket-existant : même titre ouvert par un autre auteur ignoré" {
-    tickets_ouverts 43 "repowarden 9.9.9 dans le conteneur" "intrus"
-    run bash "$VERSIONS" --ticket-existant repowarden "app/repowarden-devzone"
-    [ "$status" -eq 0 ]
-    [ -z "$output" ]
-}
-
-@test "--ticket-existant : forme [bot] de l'auteur ignorée" {
-    tickets_ouverts 45 "repowarden 9.9.9 dans le conteneur" "repowarden-devzone[bot]"
-    run bash "$VERSIONS" --ticket-existant repowarden "app/repowarden-devzone"
-    [ "$status" -eq 0 ]
-    [ -z "$output" ]
-}
-
-@test "--ticket-existant : titre d'un autre paquet ignoré" {
-    tickets_ouverts 44 "opencode-ai 9.9.9 dans le conteneur" "app/repowarden-devzone"
-    run bash "$VERSIONS" --ticket-existant repowarden "app/repowarden-devzone"
+@test "--existing-ticket: same title opened by another author ignored" {
+    open_tickets 43 "repowarden 9.9.9 in container" "intruder"
+    run bash "$VERSIONS" --existing-ticket repowarden "app/repowarden-devzone"
     [ "$status" -eq 0 ]
     [ -z "$output" ]
 }
 
-@test "--ticket-existant : ticket déjà ouvert par l'App est mis à jour" {
-    tickets_ouverts 42 "repowarden 9.9.9 dans le conteneur" "app/repowarden-devzone"
-    run bash "$VERSIONS" --ticket-existant repowarden "app/repowarden-devzone"
+@test "--existing-ticket: [bot] author form ignored" {
+    open_tickets 45 "repowarden 9.9.9 in container" "repowarden-devzone[bot]"
+    run bash "$VERSIONS" --existing-ticket repowarden "app/repowarden-devzone"
     [ "$status" -eq 0 ]
-    [ "$output" = $'42	repowarden 9.9.9 dans le conteneur' ]
+    [ -z "$output" ]
 }
 
-@test "workflow versions : conception proposée, jamais retenue (le mainteneur la reprend)" {
-    workflow="$RACINE/.github/workflows/versions.yml"
-    grep -q '^ *## Conception proposée$' "$workflow"
+@test "--existing-ticket: title of another package ignored" {
+    open_tickets 44 "opencode-ai 9.9.9 in container" "app/repowarden-devzone"
+    run bash "$VERSIONS" --existing-ticket repowarden "app/repowarden-devzone"
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+}
+
+@test "--existing-ticket: ticket already opened by App is updated" {
+    open_tickets 42 "repowarden 9.9.9 in container" "app/repowarden-devzone"
+    run bash "$VERSIONS" --existing-ticket repowarden "app/repowarden-devzone"
+    [ "$status" -eq 0 ]
+    [ "$output" = $'42	repowarden 9.9.9 in container' ]
+}
+
+@test "versions workflow: proposed design, never retained (maintainer rewrites)" {
+    workflow="$ROOT/.github/workflows/versions.yml"
+    grep -q 'Conception propos' "$workflow"
     ! grep -q '^ *## Conception retenue' "$workflow" || false
 }
 
-@test "workflow versions : cron horaire et installation de repowarden conditionnée" {
-    workflow="$RACINE/.github/workflows/versions.yml"
+@test "versions workflow: hourly cron and conditional repowarden install" {
+    workflow="$ROOT/.github/workflows/versions.yml"
     grep -Eq 'cron: *"17 \* \* \* \*"' "$workflow"
     run awk '
-        /- name: Repowarden at the same pinned version as the container/ { dans = 1; next }
-        dans && /^      - / { exit }
-        dans { print }
+        /- name: Repowarden at the same pinned version as the container/ { in_step = 1; next }
+        in_step && /^      - / { exit }
+        in_step { print }
     ' "$workflow"
     [ "$status" -eq 0 ]
     [[ "$output" == *"if: steps.retards.outputs.present == 'true'"* ]] || false

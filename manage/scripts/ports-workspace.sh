@@ -1,61 +1,61 @@
 #!/usr/bin/env bash
-# Applications et services du workspace Kubernetes sur localhost du poste (#401).
-# Sourcé par manage/workspace.sh (fonctions ports_*) ; lancé directement avec
-# « boucle » ou « tour », il est le veilleur du poste : un seul, verrou mkdir et pid
-# dans .devzone.ports-workspace/. Il relaie par kubectl port-forward, sur 127.0.0.1
-# seulement, les ports TCP ≥ 1024 en écoute dans le pod, et les services de devzone
-# des modules actifs de .devzone.modules. Garde-fou : jamais sous bats sans
+# Applications and services of the Kubernetes workspace on workstation localhost (#401).
+# Sourced by manage/workspace.sh (ports_* functions); run directly with "loop" or
+# "round", it is the workstation watcher: only one, mkdir lock and pid in
+# .devzone.ports-workspace/. It relays with kubectl port-forward, on 127.0.0.1
+# only, TCP ports >= 1024 listening in the pod, and devzone services of active
+# modules in .devzone.modules. Guard: never under bats without
 # DEVZONE_PORTS_WORKSPACE_REEL=oui.
 
 PW_POD="devzone-workspace-0"
 PW_NS="devzone-workspace"
-# Ports internes du pod, jamais relayés : kubedock et buildkit.
-PW_INTERNES=" 2475 1234 "
-# Port du service pgAdmin : lu dans le service, sans lui rien n'est relayé.
+# Internal pod ports, never relayed: kubedock and buildkit.
+PW_INTERNAL=" 2475 1234 "
+# pgAdmin service port: read from the service, without it nothing is relayed.
 PW_JSONPATH='jsonpath={.spec.ports[0].port}'
 
-# Dossier d'état du veilleur : verrou, pid, relais, ports signalés, journal.
+# Watcher state folder: lock, pid, relays, reported ports, log.
 pw_dir() { printf '%s' "${DEVZONE_PORTS_WORKSPACE_DIR:-$PWD/.devzone.ports-workspace}"; }
 
-# Drapeau de contexte kubectl : devzone s'il existe, sinon le contexte courant.
+# kubectl context flag: devzone if it exists, otherwise current context.
 pw_ctx() {
     if kubectl config get-contexts -o name 2>/dev/null | grep -qx 'devzone'; then
         printf -- '--context devzone'
     fi
 }
 
-# kubectl du veilleur : contexte devzone s'il existe, puis les arguments reçus.
+# Watcher kubectl: devzone context if it exists, then given arguments.
 pw_kubectl() {
     # shellcheck disable=SC2046
     kubectl $(pw_ctx) "$@"
 }
 
-# Garde-fou : refuse sous bats sans DEVZONE_PORTS_WORKSPACE_REEL=oui (message si $1 vide).
-pw_garde() {
+# Guard: refuse under bats without DEVZONE_PORTS_WORKSPACE_REEL=oui (message if $1 empty).
+pw_guard() {
     if [ -n "${BATS_TEST_TMPDIR:-}" ] && [ "${DEVZONE_PORTS_WORKSPACE_REEL:-}" != oui ]; then
-        [ -n "${1:-}" ] || echo "✖ veilleur des ports refusé sous bats (DEVZONE_PORTS_WORKSPACE_REEL=oui requis)" >&2
+        [ -n "${1:-}" ] || echo "✖ port watcher refused under bats (DEVZONE_PORTS_WORKSPACE_REEL=oui required)" >&2
         return 2
     fi
 }
 
-# Le processus $1 est-il en vie ?
-pw_vivant() { [ -n "${1:-}" ] && kill -0 "$1" 2>/dev/null; }
+# Is process $1 alive?
+pw_alive() { [ -n "${1:-}" ] && kill -0 "$1" 2>/dev/null; }
 
-# Ports TCP ≥ 1024 en écoute dans le pod (ss -ltnH), hors ports internes, un par ligne.
-pw_ports_pod() {
+# TCP ports >= 1024 listening in the pod (ss -ltnH), excluding internal ports, one per line.
+pw_pod_ports() {
     local p
     pw_kubectl --namespace "$PW_NS" exec "$PW_POD" -c workspace -- ss -ltnH 2>/dev/null |
         awk '{n=split($4,a,":"); print a[n]}' | sort -un | while read -r p; do
         case "$p" in '' | *[!0-9]*) continue ;; esac
         [ "$p" -ge 1024 ] || continue
-        case "$PW_INTERNES" in *" $p "*) continue ;; esac
+        case "$PW_INTERNAL" in *" $p "*) continue ;; esac
         echo "$p"
     done
 }
 
-# Services de devzone à relayer, une ligne « port|namespace|cible[|port distant] »
-# par service des modules actifs : postgres (5432) et pgAdmin s'il existe dans le
-# namespace, mysql (3306), et l'interface d'Argo CD (8443 → 443) quand elle est là (#516).
+# devzone services to relay, one "port|namespace|target[|remote port]" line per
+# active module service: postgres (5432) and pgAdmin if present in namespace,
+# mysql (3306), and the Argo CD UI (8443 → 443) when present (#516).
 pw_services() {
     local port
     if grep -qxE 'postgres=(on|true|oui)' .devzone.modules 2>/dev/null; then
@@ -74,8 +74,8 @@ pw_services() {
     fi
 }
 
-# Le port $1 est-il déjà pris sur le poste ? (lsof, sinon nc -z)
-pw_pris() {
+# Is port $1 already in use on the workstation? (lsof, otherwise nc -z)
+pw_taken() {
     if command -v lsof >/dev/null 2>&1; then
         lsof -nP -iTCP:"$1" -sTCP:LISTEN >/dev/null 2>&1
     else
@@ -83,138 +83,143 @@ pw_pris() {
     fi
 }
 
-# Lance le relais du port $1 vers le port $4 (défaut : $1) de la cible $3 du namespace
-# $2, sauf s'il vit déjà ; port pris sur le poste : une seule ligne d'avertissement par port.
-pw_relayer() {
-    local port="$1" ns="$2" cible="$3" distant="${4:-$1}" d pid
+# Starts relay of port $1 to port $4 (default: $1) of target $3 in namespace $2,
+# unless already alive; port taken on workstation: only one warning line per port.
+pw_relay() {
+    local port="$1" ns="$2" target="$3" remote="${4:-$1}" d pid
     d="$(pw_dir)"
     pid="$(cat "$d/relais/$port" 2>/dev/null || true)"
-    pw_vivant "$pid" && return 0
-    if pw_pris "$port"; then
-        [ -e "$d/pris/$port" ] || { : >"$d/pris/$port"; echo "⚠ port $port déjà pris sur le poste, non relayé"; }
+    pw_alive "$pid" && return 0
+    if pw_taken "$port"; then
+        [ -e "$d/pris/$port" ] || { : >"$d/pris/$port"; echo "⚠ port $port already in use on the workstation, not relayed"; }
         return 0
     fi
     # shellcheck disable=SC2046
-    kubectl $(pw_ctx) --namespace "$ns" port-forward --address 127.0.0.1 "$cible" "$port:$distant" </dev/null >/dev/null 2>&1 &
+    kubectl $(pw_ctx) --namespace "$ns" port-forward --address 127.0.0.1 "$target" "$port:$remote" </dev/null >/dev/null 2>&1 &
     echo $! >"$d/relais/$port"
     rm -f "$d/pris/$port"
-    echo "→ port $port relayé sur 127.0.0.1"
+    echo "→ port $port relayed on 127.0.0.1"
 }
 
-# Arrête le relais du port $1 et oublie son avertissement.
-pw_retirer() {
+# Stops relay of port $1 and forgets its warning.
+pw_remove() {
     local d pid
     d="$(pw_dir)"
     pid="$(cat "$d/relais/$1" 2>/dev/null || true)"
-    if pw_vivant "$pid"; then kill "$pid" 2>/dev/null || true; fi
+    if pw_alive "$pid"; then kill "$pid" 2>/dev/null || true; fi
     rm -f "$d/relais/$1" "$d/pris/$1"
 }
 
-# Un tour du veilleur : relaie les nouveaux ports, retire ceux qui ont disparu.
-pw_tour() {
-    local d voulus="" p ns cible distant l f
+# One watcher round: relay new ports, remove those that disappeared.
+pw_round() {
+    local d wanted="" p ns target remote l f
     d="$(pw_dir)"
     mkdir -p "$d/relais" "$d/pris"
-    while IFS='|' read -r p ns cible distant; do
+    while IFS='|' read -r p ns target remote; do
         [ -n "$p" ] || continue
-        voulus="$voulus $p "
-        pw_relayer "$p" "$ns" "$cible" "${distant:-$p}"
+        wanted="$wanted $p "
+        pw_relay "$p" "$ns" "$target" "${remote:-$p}"
     done <<<"$(pw_services)"
-    for p in $(pw_ports_pod); do
-        case "$voulus" in *" $p "*) continue ;; esac
-        voulus="$voulus $p "
-        pw_relayer "$p" "$PW_NS" "pod/$PW_POD"
+    for p in $(pw_pod_ports); do
+        case "$wanted" in *" $p "*) continue ;; esac
+        wanted="$wanted $p "
+        pw_relay "$p" "$PW_NS" "pod/$PW_POD"
     done
     for f in "$d"/relais/* "$d"/pris/*; do
         [ -e "$f" ] || continue
         l="$(basename "$f")"
-        case "$voulus" in *" $l "*) ;; *) pw_retirer "$l" ;; esac
+        case "$wanted" in *" $l "*) ;; *) pw_remove "$l" ;; esac
     done
 }
 
-# Retire tous les relais du dossier d'état.
-pw_retirer_tout() {
+# Removes all relays from the state folder.
+pw_remove_all() {
     local f
     for f in "$(pw_dir)"/relais/*; do
-        if [ -e "$f" ]; then pw_retirer "$(basename "$f")"; fi
+        if [ -e "$f" ]; then pw_remove "$(basename "$f")"; fi
     done
 }
 
-# Boucle du veilleur : un tour toutes les 3 s ; à l'arrêt, retire ses relais et son verrou.
-pw_boucle() {
+# Watcher loop: one round every 3 s; on stop, removes its relays and lock.
+pw_loop() {
     local d
     d="$(pw_dir)"
-    trap 'pw_retirer_tout; rm -rf "$d/verrou" "$d/pid"; exit 0' TERM INT
+    trap 'pw_remove_all; rm -rf "$d/verrou" "$d/pid"; exit 0' TERM INT
     while :; do
-        pw_tour || true
+        pw_round || true
         sleep "${DEVZONE_PORTS_WORKSPACE_PAS:-3}" &
         wait $!
     done
 }
 
-# Démarre le veilleur, un seul : verrou mkdir, pid noté ; $1=silence : sans message de garde.
+# Starts the watcher, only one: mkdir lock, pid recorded; $1=silence: no guard message.
 # shellcheck disable=SC2120
-ports_demarrer() {
-    pw_garde "${1:-}" || return 0
+ports_start() {
+    pw_guard "${1:-}" || return 0
     local d pid
     d="$(pw_dir)"
     mkdir -p "$d"
     pid="$(cat "$d/pid" 2>/dev/null || true)"
-    if pw_vivant "$pid"; then
-        echo "Ports du workspace : veilleur déjà lancé (pid $pid)"
+    if pw_alive "$pid"; then
+        echo "Workspace ports: watcher already running (pid $pid)"
         return 0
     fi
     rm -rf "$d/verrou"
     mkdir "$d/verrou" 2>/dev/null || return 0
-    nohup bash "${BASH_SOURCE[0]}" boucle >>"$d/journal.log" 2>&1 &
+    nohup bash "${BASH_SOURCE[0]}" loop >>"$d/journal.log" 2>&1 &
     echo $! >"$d/pid"
     disown 2>/dev/null || true
-    echo "Ports du workspace : veilleur lancé, journal $d/journal.log"
+    echo "Workspace ports: watcher started, log $d/journal.log"
 }
 
-# Arrête le veilleur et tous ses port-forward ; sans veilleur, retire les restes.
-ports_arreter() {
+# Stops the watcher and all its port-forwards; without watcher, removes leftovers.
+ports_stop() {
     local d pid
     d="$(pw_dir)"
     pid="$(cat "$d/pid" 2>/dev/null || true)"
-    if pw_vivant "$pid"; then
+    if pw_alive "$pid"; then
         kill "$pid" 2>/dev/null || true
-        for _ in 1 2 3 4 5 6 7 8 9 10; do pw_vivant "$pid" || break; sleep 0.2; done
+        for _ in 1 2 3 4 5 6 7 8 9 10; do pw_alive "$pid" || break; sleep 0.2; done
     fi
-    pw_retirer_tout
+    pw_remove_all
     rm -rf "$d/verrou" "$d/pid"
 }
 
-# Affiche l'état : veilleur, ports relayés, ports pris signalés.
-ports_etat() {
+# Shows status: watcher, relayed ports, reported taken ports.
+ports_status() {
     local d pid f
     d="$(pw_dir)"
     pid="$(cat "$d/pid" 2>/dev/null || true)"
-    if pw_vivant "$pid"; then echo "Veilleur des ports : actif (pid $pid)"; else echo "Veilleur des ports : arrêté"; fi
+    if pw_alive "$pid"; then echo "Port watcher: running (pid $pid)"; else echo "Port watcher: stopped"; fi
     for f in "$d"/relais/*; do
-        if [ -e "$f" ] && pw_vivant "$(cat "$f")"; then echo "  127.0.0.1:$(basename "$f") relayé"; fi
+        if [ -e "$f" ] && pw_alive "$(cat "$f")"; then echo "  127.0.0.1:$(basename "$f") relayed"; fi
     done
     for f in "$d"/pris/*; do
-        if [ -e "$f" ]; then echo "  ⚠ port $(basename "$f") déjà pris sur le poste, non relayé"; fi
+        if [ -e "$f" ]; then echo "  ⚠ port $(basename "$f") already in use on the workstation, not relayed"; fi
     done
     return 0
 }
 
-# Sous-commande « devzone workspace ports [demarrer|arreter|etat] » (défaut : etat).
+# Subcommand "devzone workspace ports [start|stop|status]" (default: status).
 ports() {
-    case "${1:-etat}" in
-        demarrer) ports_demarrer ;;
-        arreter) ports_arreter ;;
-        etat) ports_etat ;;
-        *) echo "✖ devzone workspace ports demarrer|arreter|etat" >&2; return 1 ;;
+    case "${1:-status}" in
+        start | demarrer) ports_start ;;
+        stop | arreter) ports_stop ;;
+        status | etat) ports_status ;;
+        *) echo "✖ devzone workspace ports start|stop|status" >&2; return 1 ;;
     esac
 }
 
-# Lancé directement : la boucle du veilleur, ou un seul tour (tests).
+# compatibility aliases, removed with lot 4 (#509)
+ports_demarrer() { ports_start "$@"; }
+ports_arreter() { ports_stop "$@"; }
+ports_etat() { ports_status "$@"; }
+
+# Run directly: watcher loop, or a single round (tests).
 if [ "${BASH_SOURCE[0]}" = "$0" ]; then
-    pw_garde quiet || exit 2
+    pw_guard quiet || exit 2
     case "${1:-}" in
-        boucle) pw_boucle ;;
-        tour) pw_tour ;;
+        loop | boucle) pw_loop ;;
+        round | tour) pw_round ;;
     esac
 fi

@@ -1,16 +1,16 @@
 #!/usr/bin/env bats
-# mode du poste pour make up|shell|stop|rebuild et cible conseil (#472) : faux
-# npx, faux docker, faux kubectl et faux helm qui journalisent leurs arguments.
-# Aucun cluster, aucun Docker, aucun npx et aucun kubectl reel.
+# Workstation mode for make up|shell|stop|rebuild and advice target (#472): fake
+# npx, docker, kubectl and helm logging their arguments.
+# No real cluster, Docker, npx or kubectl.
 
 setup() {
     load commun
     T="$BATS_TEST_TMPDIR"
     RACINE="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
     POSTE="$RACINE/manage/scripts/poste.sh"
-    FAKE_LOG="$T/outils.log"
+    FAKE_LOG="$T/tools.log"
     export FAKE_LOG
-    mkdir -p "$T/bin" "$T/dossier"
+    mkdir -p "$T/bin" "$T/folder"
     cat >"$T/bin/npx" <<'NPX'
 #!/usr/bin/env bash
 echo "npx $*" >>"$FAKE_LOG"
@@ -25,18 +25,18 @@ DOCKER
     unset FAKE_KUBE_CLUSTER_INFO
 }
 
-# Faux manage/workspace.sh du dossier : journalise ses arguments.
-faux_workspace() {
-    mkdir -p "$T/dossier/manage"
-    cat >"$T/dossier/manage/workspace.sh" <<'WS'
+# Fake manage/workspace.sh in folder: logs its arguments.
+fake_workspace() {
+    mkdir -p "$T/folder/manage"
+    cat >"$T/folder/manage/workspace.sh" <<'WS'
 #!/usr/bin/env bash
 echo "workspace $*" >>"$FAKE_LOG"
 WS
 }
 
-# Faux kubectl et faux helm : kubectl journalise puis répond (FAKE_KUBE_
-# CLUSTER_INFO=echec → cluster-info en échec), get-contexts liste devzone.
-faux_kube() {
+# Fake kubectl and helm: kubectl logs then responds (FAKE_KUBE_CLUSTER_INFO=fail
+# -> cluster-info fails), get-contexts lists devzone.
+fake_kube() {
     cat >"$T/bin/kubectl" <<'KUBECTL'
 #!/usr/bin/env bash
 echo "kubectl $*" >>"$FAKE_LOG"
@@ -54,63 +54,66 @@ HELM
     export PATH
 }
 
-# Cible conseil d'après mise à jour (#472) : mode kubernetes → message du
-# prochain demarrer ; Docker avec Kubernetes joignable → migrer proposé ;
-# sinon rien. Toujours code 0.
+# Advice target after update (#472): kubernetes mode -> next start message;
+# Docker with reachable Kubernetes -> migrate suggested; otherwise nothing.
+# Always exit 0.
 
-@test "conseil : workspace kubernetes → message du prochain demarrer, sans kubectl" {
-    printf 'workspace=kubernetes\n' >"$T/dossier/.devzone.modules"
-    faux_kube
+@test "advice and conseil: kubernetes workspace -> next start message, no kubectl" {
+    printf 'workspace=kubernetes\n' >"$T/folder/.devzone.modules"
+    fake_kube
     : >"$FAKE_LOG"
-    run bash "$POSTE" conseil "$T/dossier"
+    run bash "$POSTE" advice "$T/folder"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"prochain devzone workspace demarrer"* ]] || false
+    [[ "$output" == *"next devzone workspace start"* ]] || false
     [ ! -s "$FAKE_LOG" ]
+    run bash "$POSTE" conseil "$T/folder"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"next devzone workspace start"* ]] || false
 }
 
-@test "conseil : docker, kubectl et helm, cluster-info ok → migrer proposé avec --context devzone" {
-    rm -f "$T/dossier/.devzone.modules"
-    faux_kube
+@test "advice: docker, kubectl and helm, cluster-info ok -> migrate suggested with --context devzone" {
+    rm -f "$T/folder/.devzone.modules"
+    fake_kube
     : >"$FAKE_LOG"
-    run bash "$POSTE" conseil "$T/dossier"
+    run bash "$POSTE" advice "$T/folder"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"devzone workspace migrer"* ]] || false
-    [[ "$output" == *"devzone workspace revenir"* ]] || false
+    [[ "$output" == *"devzone workspace migrate"* ]] || false
+    [[ "$output" == *"devzone workspace revert"* ]] || false
     [[ "$(cat "$FAKE_LOG")" == *"cluster-info --request-timeout=5s --context devzone"* ]] || false
 }
 
-@test "conseil : docker, cluster-info en échec → rien" {
-    rm -f "$T/dossier/.devzone.modules"
-    FAKE_KUBE_CLUSTER_INFO=echec
+@test "advice: docker, cluster-info fails -> nothing" {
+    rm -f "$T/folder/.devzone.modules"
+    FAKE_KUBE_CLUSTER_INFO=fail
     export FAKE_KUBE_CLUSTER_INFO
-    faux_kube
+    fake_kube
     : >"$FAKE_LOG"
-    run bash "$POSTE" conseil "$T/dossier"
+    run bash "$POSTE" advice "$T/folder"
     [ "$status" -eq 0 ]
     [ -z "$output" ]
 }
 
-@test "conseil : docker sans helm dans le PATH → rien" {
-    rm -f "$T/dossier/.devzone.modules"
-    faux_kube
+@test "advice: docker without helm in PATH -> nothing" {
+    rm -f "$T/folder/.devzone.modules"
+    fake_kube
     rm "$T/bin/helm"
     : >"$FAKE_LOG"
-    run bash "$POSTE" conseil "$T/dossier"
+    run bash "$POSTE" advice "$T/folder"
     [ "$status" -eq 0 ]
     [ -z "$output" ]
     [ ! -s "$FAKE_LOG" ]
 }
 
-@test "docker (ligne absente, workspace=docker, valeur inconnue) : code 3, rien affiche ni journalise" {
-    for contenu in "" "workspace=docker" "workspace=minikube"; do
-        if [ -n "$contenu" ]; then
-            printf '%s\n' "$contenu" >"$T/dossier/.devzone.modules"
+@test "docker (missing line, workspace=docker, unknown value): exit 3, nothing shown or logged" {
+    for content in "" "workspace=docker" "workspace=minikube"; do
+        if [ -n "$content" ]; then
+            printf '%s\n' "$content" >"$T/folder/.devzone.modules"
         else
-            rm -f "$T/dossier/.devzone.modules"
+            rm -f "$T/folder/.devzone.modules"
         fi
-        for cible in up shell stop rebuild; do
+        for target in up shell stop rebuild; do
             : >"$FAKE_LOG"
-            run bash "$POSTE" "$cible" "$T/dossier"
+            run bash "$POSTE" "$target" "$T/folder"
             [ "$status" -eq 3 ]
             [ -z "$output" ]
             [ ! -s "$FAKE_LOG" ]
@@ -118,53 +121,53 @@ HELM
     done
 }
 
-@test "workspace Kubernetes avec manage/workspace.sh : up, shell et stop pilotent le script" {
-    printf 'workspace=kubernetes\n' >"$T/dossier/.devzone.modules"
-    faux_workspace
+@test "kubernetes workspace with manage/workspace.sh: up, shell and stop drive the script" {
+    printf 'workspace=kubernetes\n' >"$T/folder/.devzone.modules"
+    fake_workspace
 
     : >"$FAKE_LOG"
-    run bash "$POSTE" up "$T/dossier"
+    run bash "$POSTE" up "$T/folder"
     [ "$status" -eq 0 ]
-    [ "$(cat "$FAKE_LOG")" = "workspace demarrer" ]
+    [ "$(cat "$FAKE_LOG")" = "workspace start" ]
 
     : >"$FAKE_LOG"
-    run bash "$POSTE" shell "$T/dossier"
+    run bash "$POSTE" shell "$T/folder"
     [ "$status" -eq 0 ]
-    [ "$(sed -n '1p' "$FAKE_LOG")" = "workspace demarrer" ]
+    [ "$(sed -n '1p' "$FAKE_LOG")" = "workspace start" ]
     [ "$(sed -n '2p' "$FAKE_LOG")" = "workspace shell" ]
     [ "$(wc -l <"$FAKE_LOG" | tr -d ' ')" = 2 ]
 
     : >"$FAKE_LOG"
-    run bash "$POSTE" stop "$T/dossier"
+    run bash "$POSTE" stop "$T/folder"
     [ "$status" -eq 0 ]
-    [ "$(cat "$FAKE_LOG")" = "workspace arreter" ]
+    [ "$(cat "$FAKE_LOG")" = "workspace stop" ]
 }
 
-@test "workspace Kubernetes : rebuild refuse et renvoie vers devzone workspace revenir" {
-    printf 'workspace=kubernetes\n' >"$T/dossier/.devzone.modules"
-    run bash "$POSTE" rebuild "$T/dossier"
+@test "kubernetes workspace: rebuild refused and points to devzone workspace revert" {
+    printf 'workspace=kubernetes\n' >"$T/folder/.devzone.modules"
+    run bash "$POSTE" rebuild "$T/folder"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"devzone workspace revenir"* ]] || false
+    [[ "$output" == *"devzone workspace revert"* ]] || false
     [ ! -s "$FAKE_LOG" ]
 }
 
-@test "workspace Kubernetes sans manage/workspace.sh : npx devzone@version du dossier" {
-    printf 'workspace=kubernetes\n' >"$T/dossier/.devzone.modules"
-    printf 'version 0.34.4\nabc  Makefile\n' >"$T/dossier/.devzone.version"
+@test "kubernetes workspace without manage/workspace.sh: npx devzone@version of folder" {
+    printf 'workspace=kubernetes\n' >"$T/folder/.devzone.modules"
+    printf 'version 0.34.4\nabc  Makefile\n' >"$T/folder/.devzone.version"
 
     : >"$FAKE_LOG"
-    run bash "$POSTE" up "$T/dossier"
+    run bash "$POSTE" up "$T/folder"
     [ "$status" -eq 0 ]
-    [ "$(cat "$FAKE_LOG")" = "npx -y devzone@0.34.4 workspace demarrer" ]
+    [ "$(cat "$FAKE_LOG")" = "npx -y devzone@0.34.4 workspace start" ]
 
-    rm -f "$T/dossier/.devzone.version"
+    rm -f "$T/folder/.devzone.version"
     : >"$FAKE_LOG"
-    run bash "$POSTE" up "$T/dossier"
+    run bash "$POSTE" up "$T/folder"
     [ "$status" -eq 0 ]
-    [ "$(cat "$FAKE_LOG")" = "npx -y devzone@latest workspace demarrer" ]
+    [ "$(cat "$FAKE_LOG")" = "npx -y devzone@latest workspace start" ]
 }
 
-@test "make -n up et make -n shell : la recette appelle poste.sh" {
+@test "make -n up and make -n shell: recipe calls poste.sh" {
     run make -n -C "$RACINE" up
     [ "$status" -eq 0 ]
     [[ "$output" == *"poste.sh up"* ]] || false
@@ -173,19 +176,19 @@ HELM
     [[ "$output" == *"poste.sh shell"* ]] || false
 }
 
-@test "poste.sh : lance sous bash 3.2 si disponible" {
+@test "poste.sh: runs under bash 3.2 if available" {
     bash32=""
     if command -v test-bash32 >/dev/null 2>&1; then
         bash32="test-bash32"
     elif [ -x /bin/bash ] && /bin/bash --version 2>/dev/null | grep -q 'version 3\.2\.'; then
         bash32="/bin/bash"
     fi
-    [ -n "$bash32" ] || skip "bash 3.2 absent"
+    [ -n "$bash32" ] || skip "bash 3.2 missing"
 
-    printf 'workspace=kubernetes\n' >"$T/dossier/.devzone.modules"
-    faux_workspace
+    printf 'workspace=kubernetes\n' >"$T/folder/.devzone.modules"
+    fake_workspace
     : >"$FAKE_LOG"
-    run "$bash32" "$POSTE" up "$T/dossier"
+    run "$bash32" "$POSTE" up "$T/folder"
     [ "$status" -eq 0 ]
-    [ "$(cat "$FAKE_LOG")" = "workspace demarrer" ]
+    [ "$(cat "$FAKE_LOG")" = "workspace start" ]
 }

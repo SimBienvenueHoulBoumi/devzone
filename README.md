@@ -331,7 +331,7 @@ Spring Boot écoute sur `0.0.0.0` par défaut : ne fixe pas `server.address` à 
 make desinstaller
 ```
 
-Cette commande supprime le conteneur, l'image `vsc-devzone-…`, les volumes `devzone-*`, les events du Docker de l'hôte et les clusters kind créés sur l'hôte, les namespaces `devzone-postgres` et les étiquettes `app.kubernetes.io/managed-by=devzone` sur les clusters de l'hôte, ainsi que les éventuels metrics-server installés par devzone. Les ressources sont filtrées par l'étiquette `devzone.instance` pour ne cibler que l'instance courante. Elle **ne touche jamais** à `workspace/` (tes projets). Pour garder tes connexions (GitHub, git, Claude Code, opencode et modules) : `make desinstaller GARDER=connexions`.
+Cette commande supprime le conteneur, l'image `vsc-devzone-…`, les volumes `devzone-*`, les events du Docker de l'hôte et les clusters kind créés sur l'hôte, les namespaces `devzone-postgres` et les étiquettes `app.kubernetes.io/managed-by=devzone` sur les clusters de l'hôte, ainsi que les éventuels metrics-server installés par devzone. Les ressources sont filtrées par l'étiquette `devzone.instance` pour ne cibler que l'instance courante. Elle **ne touche jamais** à `workspace/` (tes projets). Pour garder tes connexions (GitHub, git, Claude Code, opencode et modules) : `make desinstaller KEEP=logins` (ancien `GARDER=connexions` accepté).
 
 Avec la commande installée globalement (`npm install -g devzone`), tu peux aussi lancer, dans le dossier du devzone :
 
