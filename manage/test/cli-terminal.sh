@@ -147,7 +147,7 @@ echo "▶ Arrêt, redémarrage, reconstruction"
 mk stop 120 0 "devzone arrêté"
 mk status 60 0 "^Exited"
 mk up 600 0 "devzone started"
-verifier "make up : avancement affiché" grep -q "▶ Démarrage" <<<"$SORTIE"
+verifier "make up : avancement affiché" grep -q "▶ Starting" <<<"$SORTIE"
 mk rebuild 1800 0 "devzone rebuilt"
 verifier "make rebuild : avancement affiché" grep -q "▶ Installing in container" <<<"$SORTIE"
 mk down 120 0 "devzone supprimé"
@@ -155,11 +155,11 @@ mk status 60 0 "aucun conteneur"
 
 echo "▶ Désinstallation, confirmation tapée"
 avant="$(volumes)"
-mk desinstaller 300 0 "Abandon" --envoyer 'Taper oui' $'non\n'
+mk desinstaller 300 0 "Canceled" --envoyer 'Type yes' $'no\n'
 SORTIE="volumes : $avant → $(volumes)"
 verifier "réponse non : rien supprimé" test "$(volumes)" = "$avant" -a "$avant" -gt 0
 cd "$COPIE" || exit 1
-humain "devzone desinstaller : réponse oui" 300 0 "volume supprimé" --envoyer 'Taper oui' $'oui\n' -- bash "$RACINE/manage/devzone" desinstaller
+humain "devzone desinstaller : réponse oui" 300 0 "volume removed" --envoyer 'Type yes' $'yes\n' -- bash "$RACINE/manage/devzone" desinstaller
 cd "$RACINE" || exit 1
 SORTIE="volumes restants : $(volumes)"
 verifier "réponse oui : volumes supprimés" test "$(volumes)" = 0
