@@ -108,12 +108,12 @@ mkdir -p "$TMP/faux-bin"
 printf '#!/usr/bin/env bash\nprintf "Running the postCreateCommand from devcontainer.json...\\r\\nConfigurer les bots de ce dépôt ? [o/N] "\nsleep 600\n' >"$TMP/faux-bin/npx"
 chmod +x "$TMP/faux-bin/npx"
 # (code 2 : celui de make quand la recette échoue)
-humain "make up : question dans le conteneur signalée au lieu d'attendre" 90 2 "pose une question" \
+humain "make up : question dans le conteneur signalée au lieu d'attendre" 90 2 "asks a question" \
     -- env PATH="$TMP/faux-bin:$PATH" DEVZONE_ATTENTE_QUESTION=5 make -C "$FAUX" up
 
 echo "▶ Création et lancement : devzone <dossier> (npm)"
-humain "devzone <dossier> : créé et lancé, avancement affiché" 1800 0 "▶ Installation dans le conteneur" -- bash "$RACINE/manage/devzone" "$COPIE"
-if ! grep -q "devzone lancé" <<<"$SORTIE" || [ -z "$(docker ps -q --filter "label=devcontainer.local_folder=$COPIE")" ]; then
+humain "devzone <dossier> : créé et lancé, avancement affiché" 1800 0 "▶ Installing in container" -- bash "$RACINE/manage/devzone" "$COPIE"
+if ! grep -q "devzone started" <<<"$SORTIE" || [ -z "$(docker ps -q --filter "label=devcontainer.local_folder=$COPIE")" ]; then
     echo "✖ devzone non lancé : suite arrêtée"
     exit 1
 fi
@@ -146,20 +146,20 @@ rm -rf "$COPIE/.git"
 echo "▶ Arrêt, redémarrage, reconstruction"
 mk stop 120 0 "devzone arrêté"
 mk status 60 0 "^Exited"
-mk up 600 0 "devzone lancé"
-verifier "make up : avancement affiché" grep -q "▶ Démarrage" <<<"$SORTIE"
-mk rebuild 1800 0 "devzone reconstruit"
-verifier "make rebuild : avancement affiché" grep -q "▶ Installation dans le conteneur" <<<"$SORTIE"
+mk up 600 0 "devzone started"
+verifier "make up : avancement affiché" grep -q "▶ Starting" <<<"$SORTIE"
+mk rebuild 1800 0 "devzone rebuilt"
+verifier "make rebuild : avancement affiché" grep -q "▶ Installing in container" <<<"$SORTIE"
 mk down 120 0 "devzone supprimé"
 mk status 60 0 "aucun conteneur"
 
 echo "▶ Désinstallation, confirmation tapée"
 avant="$(volumes)"
-mk desinstaller 300 0 "Abandon" --envoyer 'Taper oui' $'non\n'
+mk desinstaller 300 0 "Canceled" --envoyer 'Type yes' $'no\n'
 SORTIE="volumes : $avant → $(volumes)"
 verifier "réponse non : rien supprimé" test "$(volumes)" = "$avant" -a "$avant" -gt 0
 cd "$COPIE" || exit 1
-humain "devzone desinstaller : réponse oui" 300 0 "volume supprimé" --envoyer 'Taper oui' $'oui\n' -- bash "$RACINE/manage/devzone" desinstaller
+humain "devzone desinstaller : réponse oui" 300 0 "volume removed" --envoyer 'Type yes' $'yes\n' -- bash "$RACINE/manage/devzone" desinstaller
 cd "$RACINE" || exit 1
 SORTIE="volumes restants : $(volumes)"
 verifier "réponse oui : volumes supprimés" test "$(volumes)" = 0

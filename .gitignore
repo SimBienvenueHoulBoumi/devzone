@@ -8,4 +8,5 @@ workspace/*
 .devzone.modules*
 .password
 .devcontainer/sans-docker-hote/
+.devcontainer/without-host-docker/
 .devzone.catalogue-veilleur/

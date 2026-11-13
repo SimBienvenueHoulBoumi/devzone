@@ -1,16 +1,16 @@
 #!/usr/bin/env bats
-# Projets du workspace dans un volume (#399) : montage sur /workspaces/projets,
-# workingDir, annotation helm.sh/resource-policy: keep et taille (workspace.size).
-# helm est le vrai helm (lint et template exigés par la conception, comme dans
-# workspace-sans-docker.bats) ; kubectl est un faux outil dans
-# $BATS_TEST_TMPDIR/bin : aucun cluster n'est touché.
+# Workspace projects in a volume (#399): mount on /workspaces/projets,
+# workingDir, helm.sh/resource-policy: keep annotation and size (workspace.size).
+# helm is real helm (lint and template required by design, like
+# the suite of the workspace with no Docker socket); kubectl is a fake tool there
+# $BATS_TEST_TMPDIR/bin: no cluster is touched.
 
 setup() {
     load commun
     relais_docker_isole
     kube_isole
-    RACINE="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
-    CHART="$RACINE/charts/devzone-workspace"
+    ROOT="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
+    CHART="$ROOT/charts/devzone-workspace"
     T="$BATS_TEST_TMPDIR"
     mkdir -p "$T/bin"
     cat >"$T/bin/kubectl" <<'KUBE'
@@ -20,57 +20,57 @@ exit 0
 KUBE
     chmod +x "$T/bin/kubectl"
     export PATH="$T/bin:$PATH"
-    command -v helm >/dev/null 2>&1 || skip "helm absent"
+    command -v helm >/dev/null 2>&1 || skip "helm missing"
 }
 
-# Rendu complet du chart, avec les options passees en arguments.
-rendu() {
+# Full chart render, with given options.
+render() {
     helm template t "$CHART" --namespace devzone-workspace "$@"
 }
 
-# Bloc volumeClaimTemplates (du mot-cle jusqu'a la fin du rendu).
-bloc_pvc() {
+# volumeClaimTemplates block (from keyword to end of render).
+pvc_block() {
     awk '/^  volumeClaimTemplates:/{p=1} p' <<<"$1"
 }
 
-@test "projets : helm lint du chart" {
+@test "projects: helm lint of chart" {
     run helm lint "$CHART"
     [ "$status" -eq 0 ]
 }
 
-@test "projets : le PVC workspace est monte sur /workspaces/projets" {
-    run rendu
+@test "projects: workspace PVC mounted on /workspaces/projets" {
+    run render
     [ "$status" -eq 0 ]
     grep -q -- "mountPath: /workspaces/projets" <<<"$output" || false
-    # L'ancien montage /workspace n'existe plus
+    # Old /workspace mount no longer exists
     ! grep -q -- "mountPath: /workspace$" <<<"$output" || false
 }
 
-@test "projets : le conteneur demarre dans /workspaces/projets (workingDir)" {
-    run rendu --show-only templates/statefulset.yaml
+@test "projects: container starts in /workspaces/projets (workingDir)" {
+    run render --show-only templates/statefulset.yaml
     [ "$status" -eq 0 ]
     grep -q -- "workingDir: /workspaces/projets" <<<"$output" || false
 }
 
-@test "projets : le PVC workspace porte l'annotation helm.sh/resource-policy: keep" {
-    run rendu --show-only templates/statefulset.yaml
+@test "projects: workspace PVC carries helm.sh/resource-policy: keep annotation" {
+    run render --show-only templates/statefulset.yaml
     [ "$status" -eq 0 ]
     local pvc
-    pvc="$(bloc_pvc "$output")"
+    pvc="$(pvc_block "$output")"
     grep -q -- "name: workspace" <<<"$pvc" || false
     grep -q -- "helm.sh/resource-policy: keep" <<<"$pvc" || false
 }
 
-@test "projets : taille du volume workspace, 20Gi par defaut et workspace.size reglable" {
-    run rendu --show-only templates/statefulset.yaml
+@test "projects: workspace volume size, 20Gi by default and workspace.size configurable" {
+    run render --show-only templates/statefulset.yaml
     [ "$status" -eq 0 ]
     grep -q -- "storage: 20Gi" <<<"$output" || false
-    run rendu --show-only templates/statefulset.yaml --set workspace.size=50Gi
+    run render --show-only templates/statefulset.yaml --set workspace.size=50Gi
     [ "$status" -eq 0 ]
     grep -q -- "storage: 50Gi" <<<"$output" || false
 }
 
-@test "projets : helm template complet passe" {
+@test "projects: full helm template passes" {
     run helm template devzone-workspace "$CHART" --namespace devzone-workspace
     [ "$status" -eq 0 ]
 }

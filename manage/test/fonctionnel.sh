@@ -157,7 +157,7 @@ reussit "activer kubernetes : metrics-server sur kind" "devzone activer kubernet
 reussit "métriques disponibles" "for i in \$(seq 1 36); do kubectl --context kind-$KIND_TEST top nodes >/dev/null 2>&1 && exit 0; sleep 5; done; exit 1"
 reussit "metrics-server marqué comme installé par devzone" "kubectl --context kind-$KIND_TEST -n kube-system get deployment metrics-server -o jsonpath='{.metadata.labels.devzone}'" "^installe$"
 # Désinstallation lancée dans le conteneur : seul le cluster kind-$KIND_TEST est vu
-reussit "désinstaller : retire le metrics-server de devzone" "CONFIRMER=oui bash manage/scripts/desinstaller.sh" "metrics-server retiré : kind-$KIND_TEST"
+reussit "désinstaller : retire le metrics-server de devzone" "CONFIRMER=oui bash manage/scripts/desinstaller.sh" "metrics-server removed: kind-$KIND_TEST"
 echoue "metrics-server absent après désinstallation" "kubectl --context kind-$KIND_TEST -n kube-system get deployment metrics-server"
 echoue "metrics-server.sh : contexte inconnu" "bash .devcontainer/metrics-server.sh nexistepas" "contexte inconnu"
 reussit "désactiver kubernetes" "devzone desactiver kubernetes" "kubernetes désactivé"

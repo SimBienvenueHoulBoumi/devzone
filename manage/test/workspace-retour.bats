@@ -1,110 +1,126 @@
 #!/usr/bin/env bats
-# Retour arriere et nettoyage Docker du workspace Kubernetes (#403). Faux docker et
-# kubectl (voir migration.bash) : aucun volume Docker ni cluster reel touche.
+# Rollback and Docker cleanup of the Kubernetes workspace (#403). Fake docker and
+# kubectl (see migration.bash): no real Docker volume or cluster is touched.
 
 setup() {
     load migration
-    migration_isole
+    migration_isolate
 }
 
-@test "revenir : workspace=docker, poste Docker intact, rappelle make shell" {
-    echo "workspace=kubernetes" >>"$T/poste/.devzone.modules"
-    ws revenir
+@test "revert: workspace=docker, Docker workstation intact, reminds make shell" {
+    echo "workspace=kubernetes" >>"$T/workstation/.devzone.modules"
+    ws revert
     [ "$status" -eq 0 ]
-    grep -qx "workspace=docker" "$T/poste/.devzone.modules" || false
-    ! grep -q "workspace=kubernetes" "$T/poste/.devzone.modules" || false
+    grep -qx "workspace=docker" "$T/workstation/.devzone.modules" || false
+    ! grep -q "workspace=kubernetes" "$T/workstation/.devzone.modules" || false
     [[ "$output" == *"make shell"* ]] || false
     [ ! -s "$T/docker.log" ]
     [ ! -s "$T/kubectl.log" ]
-    [ -f "$T/poste/workspace/alpha/a.txt" ]
+    [ -f "$T/workstation/workspace/alpha/a.txt" ]
 }
 
-@test "revenir --rapatrier : projets du pod recopies dans ./workspace" {
-    mkdir -p "$T/pod/workspaces/projets/gamma" "$T/pod/workspaces/projets/alpha"
+@test "revert and revenir with --bring-back/--rapatrier are equivalent" {
+    mkdir -p "$T/pod/workspaces/projets/gamma"
     echo "g" >"$T/pod/workspaces/projets/gamma/g.txt"
-    echo "modifie au pod" >"$T/pod/workspaces/projets/alpha/a.txt"
     ws revenir --rapatrier
     [ "$status" -eq 0 ]
-    [ "$(cat "$T/poste/workspace/alpha/a.txt")" = "modifie au pod" ]
-    [ -f "$T/poste/workspace/gamma/g.txt" ]
-    grep -qx "workspace=docker" "$T/poste/.devzone.modules" || false
+    [ -f "$T/workstation/workspace/gamma/g.txt" ]
+    grep -qx "workspace=docker" "$T/workstation/.devzone.modules" || false
+}
+
+@test "revert --bring-back: pod projects copied into ./workspace" {
+    mkdir -p "$T/pod/workspaces/projets/gamma" "$T/pod/workspaces/projets/alpha"
+    echo "g" >"$T/pod/workspaces/projets/gamma/g.txt"
+    echo "changed on pod" >"$T/pod/workspaces/projets/alpha/a.txt"
+    ws revert --bring-back
+    [ "$status" -eq 0 ]
+    [ "$(cat "$T/workstation/workspace/alpha/a.txt")" = "changed on pod" ]
+    [ -f "$T/workstation/workspace/gamma/g.txt" ]
+    grep -qx "workspace=docker" "$T/workstation/.devzone.modules" || false
     ! grep -q "volume rm" "$T/docker.log" || false
 }
 
-@test "revenir --rapatrier : version du poste sauvegardee avant d'etre remplacee" {
-    echo "travail local" >"$T/poste/workspace/alpha/local.txt"
+@test "revert --bring-back: workstation version saved before being replaced" {
+    echo "local work" >"$T/workstation/workspace/alpha/local.txt"
     mkdir -p "$T/pod/workspaces/projets/alpha"
-    echo "modifie au pod" >"$T/pod/workspaces/projets/alpha/a.txt"
-    ws revenir --rapatrier
+    echo "changed on pod" >"$T/pod/workspaces/projets/alpha/a.txt"
+    ws revert --bring-back
     [ "$status" -eq 0 ]
-    [[ "$output" == *"projet alpha : version du poste sauvegardée dans .devzone.sauvegarde/"* ]] || false
-    sauv="$(find "$T/poste/.devzone.sauvegarde" -mindepth 1 -maxdepth 1 -type d | head -1)"
-    [[ "$(basename "$sauv")" =~ ^[0-9]{8}-[0-9]{6}$ ]] || false
-    [ "$(cat "$sauv/workspace/alpha/local.txt")" = "travail local" ]
-    [ "$(cat "$sauv/workspace/alpha/a.txt")" = "a" ]
-    [ "$(cat "$T/poste/workspace/alpha/a.txt")" = "modifie au pod" ]
-    ! [ -e "$T/poste/workspace/alpha/local.txt" ] || false
-    [ -f "$T/poste/workspace/beta/b.txt" ]
+    [[ "$output" == *"project alpha: workstation version saved in .devzone.sauvegarde/"* ]] || false
+    backup="$(find "$T/workstation/.devzone.sauvegarde" -mindepth 1 -maxdepth 1 -type d | head -1)"
+    [[ "$(basename "$backup")" =~ ^[0-9]{8}-[0-9]{6}$ ]] || false
+    [ "$(cat "$backup/workspace/alpha/local.txt")" = "local work" ]
+    [ "$(cat "$backup/workspace/alpha/a.txt")" = "a" ]
+    [ "$(cat "$T/workstation/workspace/alpha/a.txt")" = "changed on pod" ]
+    ! [ -e "$T/workstation/workspace/alpha/local.txt" ] || false
+    [ -f "$T/workstation/workspace/beta/b.txt" ]
 }
 
-@test "revenir --rapatrier : copie echouee, pas de bascule" {
-    echo "workspace=kubernetes" >>"$T/poste/.devzone.modules"
+@test "revert --bring-back: copy failed, no switch" {
+    echo "workspace=kubernetes" >>"$T/workstation/.devzone.modules"
     mkdir -p "$T/pod/workspaces/projets/alpha"
-    export FAUX_CP_ECHEC=1
-    ws revenir --rapatrier
+    export FAKE_CP_FAIL=1
+    ws revert --bring-back
     [ "$status" -eq 1 ]
-    grep -qx "workspace=kubernetes" "$T/poste/.devzone.modules" || false
+    grep -qx "workspace=kubernetes" "$T/workstation/.devzone.modules" || false
 }
 
-@test "revenir : option inconnue refusee" {
-    ws revenir --tout
+@test "revert: unknown option refused" {
+    ws revert --all
     [ "$status" -eq 1 ]
-    [[ "$output" == *"option inconnue"* ]] || false
+    [[ "$output" == *"unknown option"* ]] || false
 }
 
-@test "nettoyer-docker : sans terminal ni --oui, refuse, aucun volume supprime" {
-    faux_volumes
-    ws nettoyer-docker </dev/null
+@test "clean-docker: without terminal or --yes, refuses, no volume removed" {
+    fake_volumes
+    ws clean-docker </dev/null
     [ "$status" -eq 1 ]
-    [[ "$output" == *"pas de terminal"* ]] || false
+    [[ "$output" == *"no terminal"* ]] || false
     [[ "$output" == *"devzone-gh"* ]] || false
     ! grep -q "volume rm" "$T/docker.log" || false
     [ -d "$T/volumes/devzone-gh" ]
     [ -d "$T/volumes/devzone-m2" ]
 }
 
-@test "nettoyer-docker --oui : supprime seulement les volumes devzone-*" {
-    faux_volumes
-    mkdir -p "$T/volumes/autre-volume"
-    ws nettoyer-docker --oui
+@test "clean-docker --yes: removes only devzone-* volumes" {
+    fake_volumes
+    mkdir -p "$T/volumes/other-volume"
+    ws clean-docker --yes
     [ "$status" -eq 0 ]
     [ ! -d "$T/volumes/devzone-gh" ]
     [ ! -d "$T/volumes/devzone-m2" ]
-    [ -d "$T/volumes/autre-volume" ]
-    ! grep -q "volume rm autre-volume" "$T/docker.log" || false
+    [ -d "$T/volumes/other-volume" ]
+    ! grep -q "volume rm other-volume" "$T/docker.log" || false
 }
 
-@test "nettoyer-docker : aucun volume, rien a faire" {
+@test "clean-docker and nettoyer-docker with --oui/--yes are equivalent" {
+    fake_volumes
     ws nettoyer-docker --oui
     [ "$status" -eq 0 ]
-    [[ "$output" == *"Aucun volume"* ]] || false
+    [ ! -d "$T/volumes/devzone-gh" ]
+}
+
+@test "clean-docker: no volume, nothing to do" {
+    ws clean-docker --yes
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"No devzone Docker volume to remove."* ]] || false
     ! grep -q "volume rm" "$T/docker.log" || false
 }
 
-@test "migrer, revenir : jamais d'appel destructif de docker ni de kubectl" {
-    faux_volumes
-    ws migrer --oui
+@test "migrate, revert: never call destructive docker or kubectl" {
+    fake_volumes
+    ws migrate --yes
     [ "$status" -eq 0 ]
-    ws revenir --rapatrier
+    ws revert --bring-back
     [ "$status" -eq 0 ]
     ! grep -qE "volume rm|volume prune|system prune|rm -f| rm " "$T/docker.log" || false
     ! grep -qE " delete |uninstall" "$T/kubectl.log" || false
 }
 
-@test "aide : migrer, revenir et nettoyer-docker listes" {
+@test "help: migrate, revert and clean-docker listed" {
     ws --help
     [ "$status" -eq 0 ]
-    [[ "$output" == *"migrer [--oui]"* ]] || false
-    [[ "$output" == *"revenir [--rapatrier]"* ]] || false
-    [[ "$output" == *"nettoyer-docker"* ]] || false
+    [[ "$output" == *"migrate [--yes]"* ]] || false
+    [[ "$output" == *"revert [--bring-back]"* ]] || false
+    [[ "$output" == *"clean-docker"* ]] || false
 }

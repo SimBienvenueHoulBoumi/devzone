@@ -1,43 +1,46 @@
 #!/usr/bin/env bash
-# Commandes du poste pour le workspace Kubernetes (#398, #399) : pilote le chart
-# charts/devzone-workspace avec helm et kubectl de l'hôte.
+# Workstation commands for the Kubernetes workspace (#398, #399): drives the
+# charts/devzone-workspace chart with host helm and kubectl.
 set -euo pipefail
 
-ICI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-RACINE="$(cd "$ICI/.." && pwd)"
-# Pod, namespace et dossier des projets dans le conteneur (#399).
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="$(cd "$HERE/.." && pwd)"
+# Pod, namespace and projects folder inside the container (#399).
 POD="devzone-workspace-0"
 NAMESPACE="devzone-workspace"
-DOSSIER_PROJETS="/workspaces/projets"
+PROJECTS_DIR="/workspaces/projets"
+# compatibility alias, removed with lot 4 (#509)
+# shellcheck disable=SC2034
+DOSSIER_PROJETS="$PROJECTS_DIR"
 
-# Drapeau helm : contexte devzone s'il existe, sinon le contexte courant (aucun drapeau).
-drapeau_helm() {
+# Helm flag: devzone context if it exists, otherwise current context (no flag).
+helm_flag() {
     if kubectl config get-contexts -o name 2>/dev/null | grep -qx 'devzone'; then
         printf -- '--kube-context devzone'
     fi
 }
 
-# Drapeau kubectl : contexte devzone s'il existe, sinon le contexte courant (aucun drapeau).
-drapeau_kubectl() {
+# kubectl flag: devzone context if it exists, otherwise current context (no flag).
+kubectl_flag() {
     if kubectl config get-contexts -o name 2>/dev/null | grep -qx 'devzone'; then
         printf -- '--context devzone'
     fi
 }
 
-# Chemin du chart dans le dépôt (ou le paquet installé).
-chemin_chart() {
-    printf '%s/charts/devzone-workspace' "$RACINE"
+# Chart path in the repository (or installed package).
+chart_path() {
+    printf '%s/charts/devzone-workspace' "$ROOT"
 }
 
-# Dépôt de l'image publiée à chaque livraison de devzone.
-IMAGE_DEPOT="ghcr.io/simbienvenuehoulboumi/devzone-workspace"
+# Repository of the image published at each devzone release.
+IMAGE_REPO="ghcr.io/simbienvenuehoulboumi/devzone-workspace"
 
-# Pourquoi : sans tag, le chart prend son appVersion (0.1.0), une image jamais
-# publiée ; la version du paquet est publiée à chaque livraison, et un clone de
-# développement (0.0.0) utilise latest.
-image_par_defaut() {
+# Why: without tag, the chart takes its appVersion (0.1.0), an image never
+# published; the package version is published at each release, and a
+# development clone (0.0.0) uses latest.
+default_image_tag() {
     local version
-    version="$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' "$RACINE/package.json" | head -1)"
+    version="$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' "$ROOT/package.json" | head -1)"
     if [ -z "$version" ] || [ "$version" = "0.0.0" ]; then
         echo "latest"
     else
@@ -45,53 +48,53 @@ image_par_defaut() {
     fi
 }
 
-# Installe ou met à jour le workspace dans le cluster.
-demarrer() {
-    local depot tag image avec_image="" args=()
-    depot="$IMAGE_DEPOT"
-    tag="$(image_par_defaut)"
+# Installs or upgrades the workspace in the cluster.
+start_workspace() {
+    local repo tag image with_image="" args=()
+    repo="$IMAGE_REPO"
+    tag="$(default_image_tag)"
     while [ $# -gt 0 ]; do
         case "$1" in
             --image)
                 if [ $# -lt 2 ] || [ -z "$2" ]; then
-                    echo "✖ option --image : indique une image <repository:tag> (devzone workspace demarrer --image <repository:tag>)" >&2
+                    echo "✖ option --image: provide an image <repository:tag> (devzone workspace start --image <repository:tag>)" >&2
                     return 1
                 fi
                 case "$2" in
                     *:*)
-                        depot="${2%:*}"
+                        repo="${2%:*}"
                         tag="${2##*:}"
-                        avec_image=oui
+                        with_image=yes
                         ;;
                     *)
-                        echo "✖ option --image : image sans tag, attendu <repository:tag> (devzone workspace demarrer --image <repository:tag>)" >&2
+                        echo "✖ option --image: image has no tag, expected <repository:tag> (devzone workspace start --image <repository:tag>)" >&2
                         return 1
                         ;;
                 esac
                 shift 2
                 ;;
             *)
-                echo "✖ option inconnue : $1 (devzone workspace demarrer [--image <repository:tag>])" >&2
+                echo "✖ unknown option: $1 (devzone workspace start [--image <repository:tag>])" >&2
                 return 1
                 ;;
         esac
     done
-    image="$depot:$tag"
+    image="$repo:$tag"
     # Argo CD first when wanted (#516): the workspace is then an Application
     argocd_ensure
-    workspace_deploy "$depot" "$tag" "$avec_image"
+    workspace_deploy "$repo" "$tag" "$with_image"
     # Projects of .argocd.conf held too (#516)
     argocd_reconcile || true
-    attendre_pod "$image" || return 1
-    ports_demarrer silence
+    wait_for_pod "$image" || return 1
+    ports_start silence
 }
 
 # helm direct: the chart of the package, image set by the options
 workspace_helm_deploy() {
-    local depot="$1" tag="$2" avec_image="$3" args=()
+    local repo="$1" tag="$2" with_image="$3" args=()
     args=(--namespace devzone-workspace --create-namespace)
-    if [ -n "$avec_image" ]; then
-        args+=(--set "image.repository=$depot" --set "image.tag=$tag")
+    if [ -n "$with_image" ]; then
+        args+=(--set "image.repository=$repo" --set "image.tag=$tag")
     else
         args+=(--set "image.tag=$tag")
     fi
@@ -101,129 +104,139 @@ workspace_helm_deploy() {
         args+=(--set "image.pullPolicy=Always")
     fi
     # shellcheck disable=SC2046
-    helm $(drapeau_helm) upgrade --install devzone-workspace "$(chemin_chart)" "${args[@]}"
+    helm $(helm_flag) upgrade --install devzone-workspace "$(chart_path)" "${args[@]}"
 }
 
-# Désinstalle le workspace du cluster (Application Argo CD ou release helm).
-arreter() {
-    ports_arreter
+# Uninstalls the workspace from the cluster (Argo CD Application or helm release).
+stop_workspace() {
+    ports_stop
     workspace_undeploy
 }
 
-# Affiche l'état des pods du workspace.
-etat() {
+# Shows workspace pod status.
+status_workspace() {
     # shellcheck disable=SC2046
-    kubectl $(drapeau_kubectl) get pods --namespace devzone-workspace
+    kubectl $(kubectl_flag) get pods --namespace devzone-workspace
 }
 
-# Ouvre un shell dans le conteneur workspace.
-shell() {
+# Opens a shell in the workspace container.
+shell_workspace() {
     # shellcheck disable=SC2046
-    kubectl $(drapeau_kubectl) exec -it devzone-workspace-0 \
+    kubectl $(kubectl_flag) exec -it devzone-workspace-0 \
         --namespace devzone-workspace -c workspace -- bash
 }
 
-# Marche à suivre VS Code (#399) : attachement au pod avec les extensions
-# Kubernetes et Dev Containers, sans autre commande que devzone.
-vscode() {
+# VS Code steps (#399): attach to the pod with Kubernetes and Dev Containers
+# extensions, without any command other than devzone.
+vscode_workspace() {
     cat <<EOF
-Attache VS Code au pod : extensions « Kubernetes » et « Dev Containers »
-  1. Contexte kubectl : devzone — namespace $NAMESPACE, pod $POD, conteneur workspace
-  2. Vue Kubernetes : clic droit sur le conteneur workspace,
-     « Attach to Running Kubernetes Container »
-     (avec l'extension Dev Containers : « Dev Containers: Attach to Running Container »)
-  3. Ouvre le dossier $DOSSIER_PROJETS dans la fenêtre attachée
-Pod non prêt : devzone workspace etat
+Attach VS Code to the pod: "Kubernetes" and "Dev Containers" extensions
+  1. kubectl context: devzone — namespace $NAMESPACE, pod $POD, container workspace
+  2. Kubernetes view: right-click the workspace container,
+     "Attach to Running Kubernetes Container"
+     (with Dev Containers extension: "Dev Containers: Attach to Running Container")
+  3. Open folder $PROJECTS_DIR in the attached window
+Pod not ready: devzone workspace status
 EOF
 }
 
-# Copie un dossier du poste vers $DOSSIER_PROJETS du pod (#399, kubectl cp) :
-# le projet reprend son nom de dossier dans le pod.
-copier_vers() {
-    local dossier="${1:-}"
-    if [ -z "$dossier" ]; then
-        echo "✖ indique un dossier du poste : devzone workspace copier-vers <dossier>" >&2
+# Copies a workstation folder to $PROJECTS_DIR in the pod (#399, kubectl cp):
+# the project keeps its folder name in the pod.
+copy_to() {
+    local folder="${1:-}"
+    if [ -z "$folder" ]; then
+        echo "✖ provide a workstation folder: devzone workspace copy-to <folder>" >&2
         exit 1
     fi
-    if [ ! -d "$dossier" ]; then
-        echo "✖ dossier introuvable : $dossier" >&2
+    if [ ! -d "$folder" ]; then
+        echo "✖ folder not found: $folder" >&2
         exit 1
     fi
-    dossier="$(cd "$dossier" && pwd)"
+    folder="$(cd "$folder" && pwd)"
     # shellcheck disable=SC2046
-    kubectl $(drapeau_kubectl) cp "$dossier" "$POD:$DOSSIER_PROJETS/$(basename "$dossier")" \
+    kubectl $(kubectl_flag) cp "$folder" "$POD:$PROJECTS_DIR/$(basename "$folder")" \
         --namespace "$NAMESPACE" -c workspace
 }
 
-# Copie un projet de $DOSSIER_PROJETS du pod vers le poste (#399, kubectl cp) :
-# le dossier du poste porte le nom du projet.
-copier_depuis() {
-    local dossier="${1:-}"
-    if [ -z "$dossier" ]; then
-        echo "✖ indique un dossier du poste : devzone workspace copier-depuis <dossier>" >&2
+# Copies a project from $PROJECTS_DIR in the pod to the workstation (#399, kubectl cp):
+# the workstation folder gets the project name.
+copy_from() {
+    local folder="${1:-}"
+    if [ -z "$folder" ]; then
+        echo "✖ provide a workstation folder: devzone workspace copy-from <folder>" >&2
         exit 1
     fi
-    # Chemin absolu : « copier-depuis . » donne le nom du dossier courant.
-    dossier="$(cd "$dossier" 2>/dev/null && pwd || echo "$dossier")"
+    # Absolute path: "copy-from ." gives the current folder name.
+    folder="$(cd "$folder" 2>/dev/null && pwd || echo "$folder")"
     # shellcheck disable=SC2046
-    kubectl $(drapeau_kubectl) cp "$POD:$DOSSIER_PROJETS/$(basename "$dossier")" "$dossier" \
+    kubectl $(kubectl_flag) cp "$POD:$PROJECTS_DIR/$(basename "$folder")" "$folder" \
         --namespace "$NAMESPACE" -c workspace
 }
 
-# shellcheck source=scripts/workspace-wait.sh
-. "$ICI/scripts/workspace-wait.sh"
-# shellcheck source=scripts/migrer.sh
-. "$ICI/scripts/migrer.sh"
-# shellcheck source=scripts/migrer-retour.sh
-. "$ICI/scripts/migrer-retour.sh"
-# shellcheck source=scripts/ports-workspace.sh
-. "$ICI/scripts/ports-workspace.sh"
-# shellcheck source=scripts/services-workspace.sh
-. "$ICI/scripts/services-workspace.sh"
-# shellcheck source=scripts/argocd-workspace.sh
-. "$ICI/scripts/argocd-workspace.sh"
-# shellcheck source=scripts/argocd-services.sh
-. "$ICI/scripts/argocd-services.sh"
+# French names of the command and compatibility aliases (lot 3, #508)
+# shellcheck source=manage/scripts/workspace-aliases.sh
+. "$HERE/scripts/workspace-aliases.sh"
+# shellcheck source=manage/scripts/workspace-wait.sh
+. "$HERE/scripts/workspace-wait.sh"
+# shellcheck source=manage/scripts/migrer.sh
+. "$HERE/scripts/migrer.sh"
+# shellcheck source=manage/scripts/migrer-retour.sh
+. "$HERE/scripts/migrer-retour.sh"
+# shellcheck source=manage/scripts/ports-workspace.sh
+. "$HERE/scripts/ports-workspace.sh"
+# shellcheck source=manage/scripts/services-workspace.sh
+. "$HERE/scripts/services-workspace.sh"
+# shellcheck source=manage/scripts/argocd-workspace.sh
+. "$HERE/scripts/argocd-workspace.sh"
+# shellcheck source=manage/scripts/argocd-services.sh
+. "$HERE/scripts/argocd-services.sh"
 
 # English command names are accepted, French ones unchanged (#502).
 # A copied devzone may miss the aliases file: then no normalization.
 # shellcheck source=../.devcontainer/command-aliases.sh
 # shellcheck disable=SC1091
-if [ -f "$RACINE/.devcontainer/command-aliases.sh" ]; then
-    . "$RACINE/.devcontainer/command-aliases.sh"
+if [ -f "$ROOT/.devcontainer/command-aliases.sh" ]; then
+    . "$ROOT/.devcontainer/command-aliases.sh"
     if [ "$#" -gt 0 ]; then
         set -- "$(command_canonical "$1")" "${@:2}"
     fi
 fi
 
+if [ "$#" -gt 0 ]; then
+    set -- "$(workspace_command "$1")" "${@:2}"
+fi
+if [ "${1:-}" = "ports" ] && [ "$#" -gt 1 ]; then
+    set -- "$1" "$(workspace_ports_command "$2")" "${@:3}"
+fi
+
 case "${1:-}" in
-    demarrer) demarrer "${@:2}" ;;
-    arreter) arreter ;;
-    etat) etat ;;
-    shell) shell ;;
-    vscode) vscode ;;
-    copier-vers) copier_vers "${@:2}" ;;
-    copier-depuis) copier_depuis "${@:2}" ;;
+    start) start_workspace "${@:2}" ;;
+    stop) stop_workspace ;;
+    status) status_workspace ;;
+    shell) shell_workspace ;;
+    vscode) vscode_workspace ;;
+    copy-to) copy_to "${@:2}" ;;
+    copy-from) copy_from "${@:2}" ;;
     ports) ports "${@:2}" ;;
-    migrer) migrer "${@:2}" ;;
-    revenir) revenir "${@:2}" ;;
-    nettoyer-docker) nettoyer_docker "${@:2}" ;;
+    migrate) migrate_workspace "${@:2}" ;;
+    revert) revert_workspace "${@:2}" ;;
+    clean-docker) clean_docker "${@:2}" ;;
     services) services "${@:2}" ;;
     argocd) argocd_cmd "${@:2}" ;;
     '' | -h | --help | aide)
-        echo "devzone workspace demarrer|arreter|etat|shell|vscode|copier-vers|copier-depuis|ports|services|argocd|migrer|revenir|nettoyer-docker"
-        echo "  demarrer [--image dépôt:tag]  installe le workspace (image de la version de devzone par défaut)"
-        echo "  ports [demarrer|arreter|etat] applications et services du pod sur localhost du poste"
+        echo "devzone workspace start|stop|status|shell|vscode|copy-to|copy-from|ports|services|argocd|migrate|revert|clean-docker"
+        echo "  start [--image repository:tag]  install workspace (image for devzone version by default)"
+        echo "  ports [start|stop|status]       applications and services from pod on workstation localhost"
         echo "  services enable|disable <service> [options] | status"
         echo "                        devzone services (gitlab, postgres, argocd) of the cluster, installed from the workstation"
-        echo "  argocd status | app add <repo url> [path] [--name N] [--revision R] | app list | app remove <N>"
-        echo "                        Argo CD of the workspace: deployments held in Git, your projects as Applications"
-        echo "  migrer [--oui]        copie le poste Docker vers le workspace Kubernetes (rien n'est supprimé)"
-        echo "  revenir [--rapatrier] retour au poste Docker ; --rapatrier : projets du pod recopiés d'abord"
-        echo "  nettoyer-docker       supprime les volumes Docker devzone-*, après confirmation [o/N] (--oui)"
+        echo "  argocd status | init [--repo <url>|--none] | apply | app add <repo url> [path] [--name N] [--revision R] | app list | app remove <N>"
+        echo "                        Argo CD of the workspace: .argocd.conf, GitOps repository, your projects as Applications"
+        echo "  migrate [--yes]        copy Docker workstation to Kubernetes workspace (nothing is deleted)"
+        echo "  revert [--bring-back]  back to Docker workstation; --bring-back: copy pod projects first"
+        echo "  clean-docker           remove devzone-* Docker volumes, after confirmation [y/N] (--yes)"
         ;;
     *)
-        echo "✖ sous-commande inconnue : $1 (devzone workspace demarrer|arreter|etat|shell|vscode|copier-vers|copier-depuis|ports|services|argocd|migrer|revenir|nettoyer-docker)" >&2
+        echo "✖ unknown subcommand: $1 (devzone workspace start|stop|status|shell|vscode|copy-to|copy-from|ports|services|argocd|migrate|revert|clean-docker)" >&2
         exit 1
         ;;
 esac

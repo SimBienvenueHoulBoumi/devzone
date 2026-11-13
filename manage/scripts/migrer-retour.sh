@@ -1,54 +1,57 @@
 #!/usr/bin/env bash
-# Retour arrière du workspace Kubernetes vers le poste Docker (#403) : devzone workspace
-# revenir [--rapatrier]. Sourcé par manage/workspace.sh après migrer.sh (utilise
-# copier_depuis, noter_workspace, echec et kc). Avec --rapatrier, la version du poste
-# d'un projet est déplacée dans .devzone.sauvegarde/<date>/ avant d'être remplacée.
+# Rollback from Kubernetes workspace to Docker workstation (#403): devzone workspace
+# revert [--bring-back]. Sourced by manage/workspace.sh after migrer.sh (uses
+# copy_from, record_workspace, fail and kc). With --bring-back, the workstation
+# version of a project is moved to .devzone.sauvegarde/<date>/ before being replaced.
 
-# Dossier de sauvegarde de cette exécution (relatif au devzone), même convention que
-# devzone mettre-a-jour : .devzone.sauvegarde/<AAAAMMJJ-HHMMSS>, suffixe -n si pris.
-dossier_sauvegarde() {
-    local base dossier n=1
+# Backup folder for this run (relative to devzone), same convention as
+# devzone update: .devzone.sauvegarde/<YYYYMMDD-HHMMSS>, -n suffix if taken.
+backup_folder() {
+    local base folder n=1
     base=".devzone.sauvegarde/$(date +%Y%m%d-%H%M%S)"
-    dossier="$base"
-    while [ -e "$dossier" ]; do
+    folder="$base"
+    while [ -e "$folder" ]; do
         n=$((n + 1))
-        dossier="$base-$n"
+        folder="$base-$n"
     done
-    printf '%s' "$dossier"
+    printf '%s' "$folder"
 }
 
-# Rapatrie le projet $1 du pod ; sa version du poste ($2 : dossier de sauvegarde) est
-# déplacée d'abord. Si le déplacement échoue, rien n'est écrasé.
-rapatrier_projet() {
-    local p="$1" sauvegarde="$2"
+# Brings project $1 back from the pod; its workstation version ($2: backup folder)
+# is moved first. If the move fails, nothing is overwritten.
+bring_back_project() {
+    local p="$1" backup="$2"
     if [ -e "workspace/$p" ]; then
-        mkdir -p "$sauvegarde/workspace" && mv "workspace/$p" "$sauvegarde/workspace/$p" || {
-            echec "sauvegarde de workspace/$p impossible : rien n'a été écrasé"
+        if ! mkdir -p "$backup/workspace" || ! mv "workspace/$p" "$backup/workspace/$p"; then
+            fail "backup of workspace/$p failed: nothing was overwritten"
             return 1
-        }
-        echo "projet $p : version du poste sauvegardée dans $sauvegarde/"
+        fi
+        echo "project $p: workstation version saved in $backup/"
     fi
-    copier_depuis "$PWD/workspace/$p" || {
-        echec "rapatriement de $p échoué (version du poste : $sauvegarde/workspace/$p)"
+    copy_from "$PWD/workspace/$p" || {
+        fail "bring-back of $p failed (workstation version: $backup/workspace/$p)"
         return 1
     }
 }
 
-# devzone workspace revenir [--rapatrier] : workspace=docker ; --rapatrier recopie d'abord les projets du pod.
-revenir() {
-    local rapatrier p liste sauvegarde
-    rapatrier="$(lire_option --rapatrier "revenir [--rapatrier]" "$@")" || return 1
-    if [ "$rapatrier" = 1 ]; then
-        echo "▶ rapatriement : projets du pod vers ./workspace (la version du poste est sauvegardée d'abord)"
-        liste="$(kc exec "$POD" -c workspace -- ls -1 "$DOSSIER_PROJETS")" || { echec "liste des projets du pod illisible"; return 1; }
+# devzone workspace revert [--bring-back]: workspace=docker; --bring-back copies projects from the pod first.
+revert_workspace() {
+    local bring_back p list backup
+    bring_back="$(read_flag --bring-back "revert [--bring-back]" "$@")" || return 1
+    if [ "$bring_back" = 1 ]; then
+        echo "▶ bring-back: projects from pod to ./workspace (workstation version is saved first)"
+        list="$(kc exec "$POD" -c workspace -- ls -1 "$PROJECTS_DIR")" || { fail "cannot read project list from pod"; return 1; }
         mkdir -p workspace
-        sauvegarde="$(dossier_sauvegarde)"
+        backup="$(backup_folder)"
         while IFS= read -r p; do
             [ -n "$p" ] || continue
             echo "  … $p"
-            rapatrier_projet "$p" "$sauvegarde" || return 1
-        done <<<"$liste"
+            bring_back_project "$p" "$backup" || return 1
+        done <<<"$list"
     fi
-    noter_workspace docker || { echec "écriture de .devzone.modules impossible"; return 1; }
-    echo "✔ workspace=docker : le poste Docker et ses volumes sont intacts. Relance-le : make shell"
+    record_workspace docker || { fail "cannot write .devzone.modules"; return 1; }
+    echo "✔ workspace=docker: Docker workstation and its volumes are intact. Start it again: make shell"
 }
+
+# compatibility alias, removed with lot 4 (#509)
+revenir() { revert_workspace "$@"; }
