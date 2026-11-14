@@ -184,6 +184,21 @@ GH
     [ "$(printf '%s\n' "$output" | jq -r '.docker_hote_actif')" = "false" ]
 }
 
+@test "etat-json : champ argocd_repo : le dépôt GitOps désigné" {
+    printf '[argocd]\n    repo = https://github.com/tester/devzone-argocd.git\n' >"$DEVZONE_RACINE/.argocd.conf"
+    run bash "$DEVZONE" etat --json
+    [ "$status" -eq 0 ]
+    printf '%s\n' "$output" | jq -e . >/dev/null
+    [ "$(printf '%s\n' "$output" | jq -r '.argocd_repo')" = "https://github.com/tester/devzone-argocd.git" ]
+}
+
+@test "etat-json : champ argocd_repo : aucun dépôt GitOps → null" {
+    run bash "$DEVZONE" etat --json
+    [ "$status" -eq 0 ]
+    printf '%s\n' "$output" | jq -e . >/dev/null
+    [ "$(printf '%s\n' "$output" | jq -r '.argocd_repo')" = "null" ]
+}
+
 @test "etat-json : texte non modifié (devzone sans --json)" {
     run bash "$DEVZONE"
     [ "$status" -eq 0 ]

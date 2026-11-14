@@ -22,9 +22,10 @@ setup() {
 
 fabriquer_paquet() {
     local nom="$1" v="$2" marque="$3" dossier="$T/$1"
-    mkdir -p "$dossier/.devcontainer" "$dossier/manage/scripts"
+    mkdir -p "$dossier/.devcontainer/argocd" "$dossier/.devcontainer" "$dossier/manage/scripts"
     cp "$CLI" "$dossier/manage/devzone"
     chmod +x "$dossier/manage/devzone"
+    cp "$RACINE/.devcontainer/argocd/conf.sh" "$dossier/.devcontainer/argocd/conf.sh"
     printf '{"name":"devzone","version":"%s"}\n' "$v" >"$dossier/package.json"
     printf '# makefile %s\n' "$marque" >"$dossier/Makefile"
     printf '*.sh text eol=lf\n' >"$dossier/.gitattributes"
@@ -151,6 +152,16 @@ pieger_manifeste() {
     [ "$(cat "$sauvegarde/Makefile")" = 'modifie a la main' ]
     [[ "$output" == *"Sauvegarde :"* ]] || false
     [ ! -e "$T/reconstruction.log" ]
+}
+
+@test "mettre-a-jour : .argocd.conf n'est jamais remplacé ni sauvegardé" {
+    creer_v1
+    printf '[argocd]\n    repo = https://github.com/tester/devzone-argocd.git\n' >"$DZ/.argocd.conf"
+    cd "$DZ"
+    run bash "$MAJ" mettre-a-jour --oui --sans-reconstruire
+    [ "$status" -eq 0 ]
+    grep -q '^    repo = https://github.com/tester/devzone-argocd.git$' "$DZ/.argocd.conf"
+    [ ! -e "$DZ/.devzone.sauvegarde/.argocd.conf" ]
 }
 
 @test "scripts/ créé par l'utilisateur avec manifeste : gardé intact" {

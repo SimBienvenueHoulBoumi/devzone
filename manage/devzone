@@ -421,7 +421,9 @@ aide() {
     cat <<EOF
 devzone $(version) : environnement de développement conteneurisé
 
-  devzone <dossier>        crée un devzone dans <dossier> puis le lance (make up)
+  devzone <dossier> [--gitops github|none|<url>]
+                           crée un devzone dans <dossier> puis le lance (make up) ;
+                           GitOps repository for Argo CD: github, or a URL, or none
   devzone update [--oui] [--sans-reconstruire]
                            dans un dossier devzone : passe à la version du paquet
                            (sauvegarde les fichiers remplacés, propose make rebuild)
@@ -439,11 +441,53 @@ devzone $(version) : environnement de développement conteneurisé
 EOF
 }
 
+gitops_saisir() {
+    # GitOps repository of Argo CD for the creation (#539): github, an
+    # existing URL, or none. Asked in a terminal (default: github when gh is
+    # connected), or none with a notice without one (the --gitops option names
+    # the choice).
+    local reponse defaut=""
+    if gh auth status >/dev/null 2>&1; then
+        defaut="github"
+    fi
+    printf 'GitOps repository for Argo CD? [G]itHub (created under your gh account at first start) / a URL / [n]one : ' >&2
+    read -r reponse || reponse=""
+    reponse="${reponse:-$defaut}"
+    case "$reponse" in
+        G | g | GitHub | github | Oui | oui | OUI) echo "github" ;;
+        n | N | none | None | Non | non | NON | aucun | Aucun) echo "none" ;;
+        *) echo "$reponse" ;;
+    esac
+}
+
 creer() {
-    local cible="$1"
+    local cible="$1" gitops="" expect="" arg valeur login nom instance
+    shift
+    for arg in "$@"; do
+        if [ "$expect" = gitops ]; then gitops="$arg"; expect=""; continue; fi
+        case "$arg" in
+            --gitops) expect=gitops ;;
+            --gitops=*) gitops="${arg#--gitops=}" ;;
+            *) echo "✖ option inconnue : $arg (devzone <dossier> [--gitops github|none|<url>])" >&2; exit 1 ;;
+        esac
+    done
+    if [ -n "$expect" ]; then
+        echo "✖ --gitops attend une valeur (github, none or a URL)" >&2
+        exit 1
+    fi
+
     if [ -e "$cible" ] && [ -n "$(ls -A "$cible" 2>/dev/null)" ]; then
         echo "✖ $cible existe et n'est pas vide : rien n'est écrasé. Choisis un autre dossier." >&2
         exit 1
+    fi
+
+    if [ -z "$gitops" ]; then
+        if [ -t 0 ]; then
+            gitops="$(gitops_saisir)"
+        else
+            echo "⚠ no GitOps repository for Argo CD: pass --gitops <github|none|https://github.com/<login>/<name>.git> to create a devzone without a terminal; using none" >&2
+            gitops="none"
+        fi
     fi
     mkdir -p "$cible/workspace" "$cible/manage"
     cp -R "${FICHIERS[@]/#/$PAQUET/}" "$cible/"
@@ -453,6 +497,40 @@ creer() {
     : >"$cible/.gitignore"
     completer_gitignore "$cible"
     chmod +x "$cible/manage/scripts/desinstaller.sh" "$cible/manage/scripts/lancer.sh"
+    # The GitOps repository of the new devzone (#539): github, an existing URL,
+    # or none, written in the .argocd.conf of the new devzone (conf.sh writes
+    # the header of the file when absent)
+    . "$PAQUET/.devcontainer/argocd/conf.sh"
+    # shellcheck disable=SC2034 # read by conf.sh
+    ARGOCD_CONF="$cible/.argocd.conf"
+    if [ "$gitops" = github ]; then
+        if ! gh auth status >/dev/null 2>&1; then
+            echo "⚠ GitHub not connected (gh auth login): no GitOps repository, the Applications are applied directly; pass --gitops none" >&2
+            valeur="none"
+        else
+            login="$(gh api user --jq .login 2>/dev/null)" || login=""
+            if [ -z "$login" ]; then
+                echo "⚠ GitHub login unreadable (gh api user): no GitOps repository, the Applications are applied directly; pass --gitops none" >&2
+                valeur="none"
+            else
+                nom="${DEVZONE_GITOPS_REPO_NAME:-devzone-argocd}"
+                instance="${DEVZONE_VOLUMES:-devzone}"
+                if [ "$instance" != "devzone" ]; then
+                    nom="$nom-$instance"
+                fi
+                valeur="https://github.com/$login/$nom.git"
+            fi
+        fi
+    elif [ "$gitops" = none ]; then
+        valeur="none"
+    else
+        valeur="$gitops"
+    fi
+    conf_set argocd "repo=$valeur"
+    case "$valeur" in
+        none) echo "✔ no GitOps repository: the Applications are applied directly (devzone workspace argocd init to change)" ;;
+        *) echo "✔ GitOps repository: $valeur ($cible/.argocd.conf)" ;;
+    esac
     cible="$(cd "$cible" && pwd)"
     ecrire_manifeste "$cible"
     echo "✔ devzone $(version) créé dans $cible"
@@ -543,6 +621,6 @@ case "${1:-}" in
             echo "✖ devzone $1 : commande du conteneur ; lance-la dans devzone (make shell), ou choisis un autre nom de dossier" >&2
             exit 2
         fi
-        creer "$1"
+        creer "$1" "${@:2}"
         ;;
 esac

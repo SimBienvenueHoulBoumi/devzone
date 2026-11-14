@@ -31,6 +31,14 @@ esac
 . "$(dirname "${BASH_SOURCE[0]}")/docker.sh"
 docker_ready "${DEVZONE_COMMANDE:-make desinstaller}" || exit 1
 
+# .argocd.conf of the devzone folder: the GitOps repository is never removed
+# with the devzone, only its designation can be changed later
+# shellcheck disable=SC2034 # read by conf.sh
+ARGOCD_CONF="$HERE/.argocd.conf"
+# shellcheck source=SCRIPTDIR/../.devcontainer/argocd/conf.sh
+# shellcheck disable=SC1091
+. "$HERE/.devcontainer/argocd/conf.sh"
+
 # Instance name: an instance name may contain a dash (my-devzone),
 # so DEVZONE_VOLUMES is never split
 DEVZONE_INSTANCE="${DEVZONE_VOLUMES:-devzone}"
@@ -220,4 +228,8 @@ command -v kubectl >/dev/null 2>&1 || echo "  metrics-server: kubectl not on hos
 echo "  base image mcr.microsoft.com/devcontainers/base (shared): docker rmi mcr.microsoft.com/devcontainers/base:ubuntu-24.04"
 echo "  devcontainer CLI npx cache: ~/.npm/_npx"
 echo "  \"GitHub CLI\" authorization on your account: GitHub → Settings → Applications"
+ARGOCD_REPO="$(conf_get argocd repo)"
+if [ -n "$ARGOCD_REPO" ] && [ "$ARGOCD_REPO" != none ]; then
+    echo "  GitOps repository not removed: $ARGOCD_REPO (delete it yourself if you want to)"
+fi
 echo "  this folder: $HERE"
