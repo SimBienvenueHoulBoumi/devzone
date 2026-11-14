@@ -768,7 +768,17 @@ outil peut relancer la consigne ensuite avec `devzone agent`.
 
 ## Anciens noms des commandes
 
-Les commandes de devzone s'écrivent en anglais (#502). Les anciens noms français restent acceptés et font exactement la même chose :
+Les commandes de devzone s'écrivent en anglais (#502). Les anciens noms français restent acceptés et font exactement la même chose, mais écrivent un avertissement sur la sortie d'erreur (#532) :
+
+```
+devzone: "activer" is deprecated, use "enable"
+```
+
+Ils seront retirés à la prochaine version majeure : écrivez les noms anglais. Pour taire l'avertissement dans un script tiers qui utilise encore les anciens noms, posez `DEVZONE_NO_DEPRECATION=1` devant la commande :
+
+```bash
+DEVZONE_NO_DEPRECATION=1 devzone activer ia
+```
 
 | Ancien nom | Nom actuel |
 |---|---|
