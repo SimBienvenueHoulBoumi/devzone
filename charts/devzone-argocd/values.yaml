@@ -1,0 +1,28 @@
+# Values of the Argo CD of devzone (#411), once the content of
+# .devcontainer/argocd/values.yaml, moved under the argo-cd key of the
+# wrapper (#538). Argo CD minimal: one replica per component, without Dex nor
+# notifications, server in ClusterIP (no Ingress, no LoadBalancer). The access
+# goes through the kubectl port-forward relay of the container (8443:443).
+argo-cd:
+  global:
+    domain: ""
+  # Aggregate ClusterRoles (#516): the Application resources join the edit role,
+  # so the limited devzone account (#430) manages the Applications of the
+  # projects in devzone-argocd (devzone argocd app ...)
+  createAggregateRoles: true
+  dex:
+    enabled: false
+  notifications:
+    enabled: false
+  server:
+    replicas: 1
+    service:
+      type: ClusterIP
+    ingress:
+      enabled: false
+  controller:
+    replicas: 1
+  repoServer:
+    replicas: 1
+  applicationSet:
+    replicas: 1

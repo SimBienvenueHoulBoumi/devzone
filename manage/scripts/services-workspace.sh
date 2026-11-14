@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # devzone workspace services (#528): installs or removes the devzone services
-# (gitlab, postgres, argocd) of a Kubernetes workspace from the workstation.
+# (gitlab, postgres, mysql, argocd) of a Kubernetes workspace from the workstation.
 # Sourced by manage/workspace.sh (drapeau_kubectl, POD, NAMESPACE).
 #   devzone workspace services enable <service> [options]
 #   devzone workspace services disable <service> [--yes]
@@ -19,12 +19,12 @@ SERVICES_ADMIN_SCRIPT="${DEVZONE_SERVICES_ADMIN_SCRIPT:-/usr/local/share/devzone
 SERVICES_TOKEN_DURATION="${DEVZONE_SERVICES_TOKEN_DURATION:-1h}"
 
 services_usage() {
-    echo "devzone workspace services enable|disable <gitlab|postgres|argocd> [options] | status"
+    echo "devzone workspace services enable|disable <gitlab|postgres|mysql|argocd> [options] | status"
 }
 
 services_known() {
     case "${1:-}" in
-        gitlab | postgres | argocd) return 0 ;;
+        gitlab | postgres | mysql | argocd) return 0 ;;
     esac
     return 1
 }
@@ -34,6 +34,7 @@ services_namespace() {
     case "$1" in
         gitlab) echo devzone-gitlab ;;
         postgres) echo devzone-postgres ;;
+        mysql) echo devzone-mysql ;;
         argocd) echo devzone-argocd ;;
     esac
 }
@@ -91,16 +92,20 @@ services_run() {
         echo "✖ unknown service: ${service:-(none)} ($(services_usage))" >&2
         return 1
     fi
-    # Argo CD itself, and postgres when Argo CD holds the devzone charts: done
-    # by the workstation, no installer in the pod (#516)
+    # Argo CD itself, and postgres and mysql when Argo CD holds the devzone
+    # charts: done by the workstation, no installer in the pod (#516, #538)
     if [ "$service" = argocd ]; then
         argocd_toggle "$action" "$@"
         return
     fi
-    if [ "$service" = postgres ] && argocd_holds_charts; then
-        postgres_argocd "$action" "$@"
-        return
-    fi
+    case "$service" in
+        postgres | mysql)
+            if argocd_holds_charts; then
+                services_argocd_toggle "$service" "$action" "$@"
+                return
+            fi
+            ;;
+    esac
     if ! services_pod_running; then
         echo "✖ workspace pod $POD not running: devzone workspace start" >&2
         return 1
@@ -137,7 +142,7 @@ services_run() {
 # One line per service: installed (namespace present) or not
 services_status() {
     local s ns
-    for s in gitlab postgres argocd; do
+    for s in gitlab postgres mysql argocd; do
         ns="$(services_namespace "$s")"
         # shellcheck disable=SC2046
         if kubectl $(drapeau_kubectl) get namespace "$ns" >/dev/null 2>&1; then

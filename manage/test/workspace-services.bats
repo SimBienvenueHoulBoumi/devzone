@@ -85,9 +85,9 @@ KUBE
 }
 
 @test "services enable: unknown service refused" {
-    run bash "$CLI" workspace services enable mysql
+    run bash "$CLI" workspace services enable redis
     [ "$status" -eq 1 ]
-    [[ "$output" == *"unknown service: mysql"* ]] || false
+    [[ "$output" == *"unknown service: redis"* ]] || false
     ! grep -q 'apply' "$T/kubectl.log" || false
 }
 
@@ -98,6 +98,7 @@ KUBE
     [[ "$output" == *"✔ postgres installed (namespace devzone-postgres)"* ]] || false
     [[ "$output" == *"○ gitlab not installed: devzone workspace services enable gitlab"* ]] || false
     [[ "$output" == *"○ argocd not installed"* ]] || false
+    [[ "$output" == *"○ mysql not installed: devzone workspace services enable mysql"* ]] || false
 }
 
 @test "services: unknown subcommand and help" {
