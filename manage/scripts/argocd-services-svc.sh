@@ -104,5 +104,7 @@ services_argocd_toggle() {
     esac
 }
 
+# Toggles postgres on/off as an Argo CD Application (charts/devzone-postgres).
+# Calls services_argocd_toggle to write the [services] section and reconcile.
 postgres_argocd() { services_argocd_toggle postgres "$@"; }
 

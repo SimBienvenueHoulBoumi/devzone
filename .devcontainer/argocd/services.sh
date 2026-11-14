@@ -30,6 +30,9 @@
 
 # Names of the Application and of the namespace of a service
 services_app_of() { printf 'devzone-%s' "$1"; }
+#
+# Returns the namespace name devzone-<svc> for a given service name.
+# Used by services_namespace_prepare and services_application_apply.
 services_ns_of() { printf 'devzone-%s' "$1"; }
 
 # State of a service: [services] of .argocd.conf first, then the line
