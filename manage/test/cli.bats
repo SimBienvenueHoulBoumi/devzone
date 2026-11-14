@@ -167,14 +167,9 @@ GH
     done
     run bash "$CLI" --help
     [ "$status" -eq 0 ]
-    # Citations de la commande npm dans le README : blocs bash et inline code
-    # `devzone <mot>`. Le récapitulatif (fence text) et la prose citent le
-    # devzone du conteneur, autre commande (.devcontainer/devzone).
-    # (aucune citation en ligne : cas normal)
-    citations="$(
-        awk '/^```bash$/ { dans = 1; next } /^```$/ { dans = 0 } dans' "$readme"
-        grep -oE '`devzone [A-Za-z0-9_-]+`' "$readme" || true
-    )"
+    # Commandes du poste citées dans les blocs bash du README. Les citations
+    # en ligne sont contrôlées par readme.bats (poste, conteneur, alias).
+    citations="$(awk '/^```bash$/ { dans = 1; next } /^```$/ { dans = 0 } dans' "$readme")"
     [ -n "$citations" ]
     # Tout mot cité aussi après npx devzone est le nom du dossier (argument
     # <dossier>), pas une sous-commande ; les options (--version, --help)
