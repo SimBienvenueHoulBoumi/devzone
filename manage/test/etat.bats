@@ -260,3 +260,15 @@ KUBE
     run test -e "$BATS_TEST_TMPDIR/relais/devzone-devzone-auto-8080"
     [ "$status" -ne 0 ]
 }
+
+@test "etat : aucune ligne deprecated sur stdout ni stderr (#532)" {
+    bats_require_minimum_version 1.5.0
+    printf 'ia=on\nports_auto=off\n' >"$DEVZONE_ETAT"
+    run --separate-stderr bash "$DEVZONE" status
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"deprecated"* ]] || false
+    [[ "$stderr" != *"deprecated"* ]] || false
+    run --separate-stderr bash "$DEVZONE" is-enabled ia
+    [ "$status" -eq 0 ]
+    [[ "$stderr" != *"deprecated"* ]] || false
+}
