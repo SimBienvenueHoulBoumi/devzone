@@ -99,7 +99,7 @@ humain "make help" 30 0 "make up .*Lance le conteneur" -- make -C "$RACINE" help
 humain "devzone --version" 30 0 "^$(node -p "require('$RACINE/package.json').version")$" -- bash "$RACINE/manage/devzone" --version
 humain "devzone --help" 30 0 "devzone <dossier>" -- bash "$RACINE/manage/devzone" --help
 cd "$TMP" || exit 1
-humain "devzone desinstaller hors d'un dossier devzone : refusé" 30 1 "dossier devzone" -- bash "$RACINE/manage/devzone" desinstaller
+humain "devzone uninstall hors d'un dossier devzone : refusé" 30 1 "dossier devzone" -- bash "$RACINE/manage/devzone" uninstall
 # Question posée pendant le lancement (CLI devcontainer simulé) : make up
 # doit la montrer et s'arrêter, pas attendre en silence
 FAUX="$TMP/faux-devzone"
@@ -126,11 +126,11 @@ mk shell 180 0 "○ module ia" --envoyer '\$ ' $'devzone\nexit\n'
 echo "▶ Commande devzone du conteneur"
 conteneur "devzone : état" 60 0 "○ module kubernetes" "devzone"
 conteneur "devzone --help" 60 0 "devzone activer <module>" "devzone --help"
-conteneur "devzone activer ia" 600 0 "ia actif" "devzone activer ia"
-conteneur "devzone desactiver ia" 300 0 "ia désactivé" "devzone desactiver ia"
-conteneur "devzone activer kubernetes (aucun cluster de l'hôte)" 180 0 "aucun cluster joignable" "devzone activer kubernetes"
-conteneur "devzone desactiver kubernetes" 60 0 "kubernetes désactivé" "devzone desactiver kubernetes"
-conteneur "devzone activer <module inconnu> : refusé" 60 1 "module inconnu" "devzone activer nexistepas"
+conteneur "devzone enable ia" 600 0 "ia actif" "devzone enable ia"
+conteneur "devzone disable ia" 300 0 "ia désactivé" "devzone disable ia"
+conteneur "devzone enable kubernetes (aucun cluster de l'hôte)" 180 0 "aucun cluster joignable" "devzone enable kubernetes"
+conteneur "devzone disable kubernetes" 60 0 "kubernetes désactivé" "devzone disable kubernetes"
+conteneur "devzone enable <module inconnu> : refusé" 60 1 "module inconnu" "devzone enable nexistepas"
 conteneur "devzone <commande inconnue> : refusée" 60 1 "commande inconnue" "devzone nexistepas"
 
 echo "▶ Scripts de démarrage, sous terminal"
@@ -162,7 +162,7 @@ mk desinstaller 300 0 "Canceled" --envoyer 'Type yes' $'no\n'
 SORTIE="volumes : $avant → $(volumes)"
 verifier "réponse non : rien supprimé" test "$(volumes)" = "$avant" -a "$avant" -gt 0
 cd "$COPIE" || exit 1
-humain "devzone desinstaller : réponse oui" 300 0 "volume removed" --envoyer 'Type yes' $'yes\n' -- bash "$RACINE/manage/devzone" desinstaller
+humain "devzone uninstall : réponse oui" 300 0 "volume removed" --envoyer 'Type yes' $'yes\n' -- bash "$RACINE/manage/devzone" uninstall
 cd "$RACINE" || exit 1
 SORTIE="volumes restants : $(volumes)"
 verifier "réponse oui : volumes supprimés" test "$(volumes)" = 0

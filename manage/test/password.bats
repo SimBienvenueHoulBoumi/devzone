@@ -76,7 +76,7 @@ setup() {
 }
 
 @test "devzone mots-de-passe : régénère et n'affiche que le chemin" {
-    run bash "$DEVZONE" mots-de-passe
+    run bash "$DEVZONE" passwords
     [ "$status" -eq 0 ]
     [ "$output" = "$RACINE/.password" ]
     [[ "$output" != *mdp-test-* ]] || false

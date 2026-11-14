@@ -106,13 +106,13 @@ NPM
 }
 
 @test "paquets : liste vide -> aucun paquet, et la commande pour en ajouter" {
-    run bash "$DEVZONE" paquets
+    run bash "$DEVZONE" packages
     [ "$status" -eq 0 ]
     [[ "$output" == *"aucun paquet"* ]] || false
 }
 
 @test "paquets : ajouter valide installe et ajoute a la liste" {
-    run bash "$DEVZONE" paquets ajouter tree
+    run bash "$DEVZONE" packages ajouter tree
     [ "$status" -eq 0 ]
     grep -q -- "apt-get install -y --no-install-recommends tree" "$BATS_TEST_TMPDIR/apt.log"
     [ -f "$DEVZONE_RACINE/.devzone.paquets" ]
@@ -120,24 +120,24 @@ NPM
 }
 
 @test "paquets : ajouter un nom inconnu est refuse, liste inchon due, code 1" {
-    run bash "$DEVZONE" paquets ajouter inconnome
+    run bash "$DEVZONE" packages ajouter inconnome
     [ "$status" -eq 1 ]
     [[ "$output" == *"paquet inconnu"* ]] || false
     [ ! -f "$DEVZONE_RACINE/.devzone.paquets" ]
 }
 
 @test "paquets : retirer retire la liste et desinstalle" {
-    run bash "$DEVZONE" paquets ajouter tree
+    run bash "$DEVZONE" packages ajouter tree
     [ "$status" -eq 0 ]
-    run bash "$DEVZONE" paquets retirer tree
+    run bash "$DEVZONE" packages retirer tree
     [ "$status" -eq 0 ]
     grep -q -- "apt-get remove -y tree" "$BATS_TEST_TMPDIR/apt.log"
-    run bash "$DEVZONE" paquets
+    run bash "$DEVZONE" packages
     [[ "$output" == *"aucun paquet"* ]] || false
 }
 
 @test "paquets : retirer un paquet non liste (fourni par l image) est refuse" {
-    run bash "$DEVZONE" paquets retirer tree
+    run bash "$DEVZONE" packages retirer tree
     [ "$status" -eq 1 ]
     [[ "$output" == *"paquet non list"* ]] || false
 }
@@ -147,7 +147,7 @@ NPM
     printf '# paquets ajoutes par devzone paquets ; reinstalle a chaque creation du conteneur\ntree\nhtop\n' >"$DEVZONE_RACINE/.devzone.paquets"
     printf 'tree\n' >"$BATS_TEST_TMPDIR/installe"
     : >"$BATS_TEST_TMPDIR/apt.log"
-    run bash "$DEVZONE" paquets appliquer
+    run bash "$DEVZONE" packages appliquer
     [ "$status" -eq 0 ]
     grep -q -- "apt-get install -y --no-install-recommends htop" "$BATS_TEST_TMPDIR/apt.log"
     [ ! -e "$DEVZONE_PAQUETS_MARQUE" ]
@@ -155,7 +155,7 @@ NPM
 
 @test "paquets : liste trie et sans doublon" {
     printf '# paquets ajoutes par devzone paquets ; reinstalle a chaque creation du conteneur\ntree\nhtop\ntree\n' >"$DEVZONE_RACINE/.devzone.paquets"
-    run bash "$DEVZONE" paquets
+    run bash "$DEVZONE" packages
     [ "$status" -eq 0 ]
     [ "$(grep -c "○ htop" <<<"$output")" -eq 1 ]
     [ "$(grep -c "○ tree" <<<"$output")" -eq 1 ]
@@ -164,7 +164,7 @@ NPM
 @test "paquets : paquet introuvable a l appliquer -> marque et ⚠ dans le recapitulatif" {
     printf '# paquets ajoutes par devzone paquets ; reinstalle a chaque creation du conteneur\nghost\n' >"$DEVZONE_RACINE/.devzone.paquets"
     printf 'ghost\n' >"$BATS_TEST_TMPDIR/apt-echoues"
-    run bash "$DEVZONE" paquets appliquer
+    run bash "$DEVZONE" packages appliquer
     [ "$status" -ne 0 ]
     [ -f "$DEVZONE_PAQUETS_MARQUE" ]
     run bash "$DEVZONE"
@@ -174,7 +174,7 @@ NPM
 }
 
 @test "paquets : ajouter valide fait apt-get update avant apt-get install" {
-    run bash "$DEVZONE" paquets ajouter tree
+    run bash "$DEVZONE" packages ajouter tree
     [ "$status" -eq 0 ]
     grep -q -- "apt-get update" "$BATS_TEST_TMPDIR/apt.log"
     grep -q -- "apt-get install -y --no-install-recommends tree" "$BATS_TEST_TMPDIR/apt.log"
@@ -186,7 +186,7 @@ NPM
 @test "paquets : appliquer fait apt-get update avant apt-get install pour un paquet manquant" {
     printf '# paquets ajoutes par devzone paquets ; reinstalle a chaque creation du conteneur\ntree\n' >"$DEVZONE_RACINE/.devzone.paquets"
     : >"$BATS_TEST_TMPDIR/installe"
-    run bash "$DEVZONE" paquets appliquer
+    run bash "$DEVZONE" packages appliquer
     [ "$status" -eq 0 ]
     grep -q -- "apt-get update" "$BATS_TEST_TMPDIR/apt.log"
     grep -q -- "apt-get install -y --no-install-recommends tree" "$BATS_TEST_TMPDIR/apt.log"
@@ -199,7 +199,7 @@ NPM
     printf '# paquets ajoutes par devzone paquets ; reinstalle a chaque creation du conteneur\ninconnu\ntree\n' >"$DEVZONE_RACINE/.devzone.paquets"
     printf 'inconnu\n' >"$BATS_TEST_TMPDIR/apt-echoues"
     : >"$BATS_TEST_TMPDIR/installe"
-    run bash "$DEVZONE" paquets appliquer
+    run bash "$DEVZONE" packages appliquer
     [ "$status" -ne 0 ]
     grep -q -- "apt-get update" "$BATS_TEST_TMPDIR/apt.log"
     grep -qx "tree" "$BATS_TEST_TMPDIR/installe"
@@ -211,25 +211,25 @@ NPM
 
 @test "paquets : paquet deja installe avant ajouter est marque, retirer ne le desinstalle pas" {
     printf 'tree\n' >"$BATS_TEST_TMPDIR/installe"
-    run bash "$DEVZONE" paquets ajouter tree
+    run bash "$DEVZONE" packages ajouter tree
     [ "$status" -eq 0 ]
     grep -qxF -e "tree # déjà présent" "$DEVZONE_RACINE/.devzone.paquets"
     : >"$BATS_TEST_TMPDIR/apt.log"
-    run bash "$DEVZONE" paquets retirer tree
+    run bash "$DEVZONE" packages retirer tree
     [ "$status" -eq 0 ]
     [[ "$output" == *"laissé installé"* ]] || false
     ! grep -q "apt-get remove" "$BATS_TEST_TMPDIR/apt.log" || false
     grep -qx "tree" "$BATS_TEST_TMPDIR/installe"
-    run bash "$DEVZONE" paquets
+    run bash "$DEVZONE" packages
     [[ "$output" == *"aucun paquet"* ]] || false
 }
 
 @test "paquets : apres ajouter a, ajouter b, retirer a, un seul en-tete et seulement b" {
-    run bash "$DEVZONE" paquets ajouter tree
+    run bash "$DEVZONE" packages ajouter tree
     [ "$status" -eq 0 ]
-    run bash "$DEVZONE" paquets ajouter htop
+    run bash "$DEVZONE" packages ajouter htop
     [ "$status" -eq 0 ]
-    run bash "$DEVZONE" paquets retirer tree
+    run bash "$DEVZONE" packages retirer tree
     [ "$status" -eq 0 ]
     [ "$(grep -c '^#' "$DEVZONE_RACINE/.devzone.paquets")" -eq 1 ]
     [ "$(grep -v '^#' "$DEVZONE_RACINE/.devzone.paquets")" = "htop" ]
@@ -239,11 +239,11 @@ NPM
     printf '# paquets ajoutes par devzone paquets ; reinstalle a chaque creation du conteneur\ntree # déjà présent\nhtop\n' >"$DEVZONE_RACINE/.devzone.paquets"
     printf 'tree\n' >"$BATS_TEST_TMPDIR/installe"
     : >"$BATS_TEST_TMPDIR/apt.log"
-    run bash "$DEVZONE" paquets
+    run bash "$DEVZONE" packages
     [ "$status" -eq 0 ]
     [[ "$output" == *"✔ tree"* ]] || false
     [[ "$output" != *"#"* ]] || false
-    run bash "$DEVZONE" paquets appliquer
+    run bash "$DEVZONE" packages appliquer
     [ "$status" -eq 0 ]
     ! grep -q "tree #" "$BATS_TEST_TMPDIR/apt.log" || false
 }

@@ -99,7 +99,7 @@ setup() {
 }
 
 @test "agent : ia désactivé → refuse de lancer, code 2, message pour l'activer" {
-    bash "$DEVZONE" desactiver ia
+    bash "$DEVZONE" disable ia
     agent_consigne
     agent_lance
     [ "$status" -eq 2 ]

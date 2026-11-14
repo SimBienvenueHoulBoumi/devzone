@@ -103,7 +103,7 @@ GH
 }
 
 @test "devzone desinstaller : refusé hors d'un dossier devzone" {
-    run bash "$CLI" desinstaller
+    run bash "$CLI" uninstall
     [ "$status" -eq 1 ]
     [[ "$output" == *"dossier devzone"* ]] || false
 }
@@ -115,7 +115,7 @@ GH
     printf '#!/usr/bin/env bash\necho ancien\n' >vieux/desinstaller.sh
     chmod +x vieux/desinstaller.sh
     cd vieux
-    run bash "$CLI" desinstaller
+    run bash "$CLI" uninstall
     [ "$status" -eq 0 ]
     [[ "$output" == *ancien* ]] || false
 }
@@ -127,7 +127,7 @@ GH
     printf '#!/usr/bin/env bash\necho avant-core\n' >avant-core/scripts/desinstaller.sh
     chmod +x avant-core/scripts/desinstaller.sh
     cd avant-core
-    run bash "$CLI" desinstaller
+    run bash "$CLI" uninstall
     [ "$status" -eq 0 ]
     [[ "$output" == *avant-core* ]] || false
 }
@@ -136,7 +136,7 @@ GH
     mkdir pas-devzone
     printf '#!/usr/bin/env bash\necho appele\n' >pas-devzone/desinstaller.sh
     cd pas-devzone
-    run bash "$CLI" desinstaller
+    run bash "$CLI" uninstall
     [ "$status" -eq 1 ]
     [[ "$output" != *appele* ]] || false
 }
@@ -266,7 +266,7 @@ faux_docker() {
     faux_cli 'exit 1'
     faux_docker arrete
     cd dz-des
-    run bash "$CLI" desinstaller
+    run bash "$CLI" uninstall
     [ "$status" -ne 0 ]
 }
 

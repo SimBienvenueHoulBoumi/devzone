@@ -86,7 +86,7 @@ GETENT
 @test "status --json in the pod: active with the service, or the workstation command, echec null" {
     printf 'gitlab=on\npostgres=on\n' >"$DEVZONE_ETAT"
     echo "postgres.devzone-postgres.svc" >"$T/dns"
-    run bash "$DEVZONE" etat --json
+    run bash "$DEVZONE" status --json
     [ "$status" -eq 0 ]
     [ "$(printf '%s\n' "$output" | jq -r '.modules[] | select(.nom=="postgres") | .etat')" = "active: postgres.devzone-postgres.svc" ]
     [ "$(printf '%s\n' "$output" | jq -r '.modules[] | select(.nom=="gitlab") | .etat')" = "not in the cluster" ]
@@ -98,7 +98,7 @@ GETENT
     printf 'gitlab=on\npostgres=on\nargocd=on\n' >"$DEVZONE_ETAT"
     echo gitlab >"$DEVZONE_ETAT-echec-gitlab"
     echo argocd >"$DEVZONE_ETAT-echec-argocd"
-    run bash "$DEVZONE" appliquer
+    run bash "$DEVZONE" apply
     [ "$status" -eq 0 ]
     [[ "$output" == *"gitlab is installed from the workstation (devzone workspace services enable gitlab)"* ]] || false
     [[ "$output" == *"postgres is installed from the workstation"* ]] || false
@@ -111,7 +111,7 @@ GETENT
 
 @test "enable gitlab in the pod: refused with the workstation command, state unchanged" {
     printf 'gitlab=off\n' >"$DEVZONE_ETAT"
-    run bash "$DEVZONE" activer gitlab
+    run bash "$DEVZONE" enable gitlab
     [ "$status" -eq 2 ]
     [[ "$output" == *"devzone workspace services enable gitlab"* ]] || false
     grep -qx 'gitlab=off' "$DEVZONE_ETAT"
@@ -129,7 +129,7 @@ GETENT
 @test "enable in the pod with DEVZONE_SERVICES_ADMIN=1: the installer runs" {
     printf 'postgres=off\n' >"$DEVZONE_ETAT"
     export DEVZONE_SERVICES_ADMIN=1
-    run bash "$DEVZONE" activer postgres --contexte nulle-part
+    run bash "$DEVZONE" enable postgres --contexte nulle-part
     [[ "$output" != *"devzone workspace services enable"* ]] || false
     # The installer itself was reached: the unknown cluster is refused by it
     [[ "$output" == *"cluster inconnu"* ]] || false
