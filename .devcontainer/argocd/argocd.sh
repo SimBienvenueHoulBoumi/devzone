@@ -139,15 +139,14 @@ installer() {
     echo "▶ Vérification de la mémoire allouable du cluster des services…"
     verifier_memoire || return 2
     preparer_namespace
-    echo "▶ Ajout du dépôt Helm Argo…"
-    helm repo add argo https://argoproj.github.io/argo-helm >/dev/null 2>&1 || true
-    helm repo update >/dev/null 2>&1 || true
-    echo "▶ Installation d'Argo CD $ARGOCD_VERSION dans $NS…"
-    compte_helm "$(compte_ctx)" upgrade --install argocd argo/argo-cd \
-        --version "$ARGOCD_VERSION" \
+    echo "▶ Installation d'Argo CD $ARGOCD_VERSION dans $NS (chart charts/devzone-argocd)…"
+    # Wrapper chart: the dependency argo-cd (pinned in Chart.yaml) is built
+    # first, then installed from the local chart (#538)
+    helm dependency build "$RACINE/charts/devzone-argocd" >/dev/null
+    compte_helm "$(compte_ctx)" upgrade --install argocd \
+        "$RACINE/charts/devzone-argocd" \
         --namespace "$NS" \
         --create-namespace \
-        -f "$ICI/values.yaml" \
         --timeout "${ARGOCD_ATTENTE}s" \
         --wait
     enregistrer_admin
