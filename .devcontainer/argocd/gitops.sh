@@ -67,6 +67,24 @@ gitops_init() {
             https://github.com/*/*) ;;
             *) echo "✖ GitHub repository URL expected (https://github.com/<owner>/<name>.git): $repo" >&2; return 2 ;;
         esac
+        slug="${repo#https://github.com/}"
+        slug="${slug%.git}"
+        if gh auth status >/dev/null 2>&1 && ! gh repo view "$slug" --json name >/dev/null 2>&1; then
+            # The designated GitHub repository does not exist yet: create it,
+            # then write the files of a creation
+            if ! gh repo create "$slug" --private --description "GitOps repository of devzone: the Applications Argo CD holds (workspace, services, projects)" >/dev/null; then
+                echo "✖ cannot create the GitOps repository $slug" >&2
+                return 1
+            fi
+            echo "✔ GitOps repository created: https://github.com/$slug (private)"
+            gitops_repo_note "$repo"
+            gitops_put_text README.md "# devzone-argocd
+
+GitOps repository of devzone, written by the devzone commands (never by hand): the Argo CD of devzone follows the apps/ folder, one Application per file (the workspace, the services, the projects added with argocd app add). Removing a file removes the Application and its resources.
+" "devzone: GitOps repository"
+            gitops_put_text apps/.gitkeep "" "devzone: apps folder"
+            return 0
+        fi
         gitops_repo_note "$repo"
         echo "✔ GitOps repository: $repo ($ARGOCD_CONF)"
         return 0
