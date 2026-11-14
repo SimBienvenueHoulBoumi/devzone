@@ -19,6 +19,7 @@
 #   devzone build <dossier> [--tag <nom>]  construit une image dans le workspace Kubernetes (BuildKit)
 #   devzone activer postgres [--contexte CTX] [--confirmer CTX]   PostgreSQL partagé, cluster au choix
 #   devzone postgres creer <projet>  base et utilisateur d'un projet (aussi : liste, psql, supprimer)
+#   devzone mysql creer <projet>    base et utilisateur d'un projet MySQL (aussi : liste, supprimer)
 #   devzone gitlab migrer [--oui]    GitLab dans le cluster des services, puis ancien cluster kind supprimé
 #   devzone gitlab nouveau-mdp [root|dev]  mot de passe aléatoire (root ou dev) régénéré
 #   devzone activer argocd           Argo CD dans le cluster des services, accès https://127.0.0.1:8443
