@@ -4,7 +4,7 @@ WS     := --workspace-folder $(CURDIR)
 FILTRE := --filter "label=devcontainer.local_folder=$(CURDIR)"
 
 .DEFAULT_GOAL := help
-.PHONY: help hors-conteneur up shell stop down rebuild status test-fonctionnel test-cli desinstaller
+.PHONY: help hors-conteneur up shell stop down rebuild status test-fonctionnel test-cli desinstaller uninstall
 
 # Ces commandes pilotent le conteneur depuis la machine : lancées dans le
 # conteneur (qui utilise le Docker de l'hôte, #291), elles créeraient un
@@ -48,4 +48,7 @@ test-cli: hors-conteneur ## Tests de la CLI dans un vrai terminal : devzone isol
 	@bash manage/test/cli-terminal.sh
 
 desinstaller: hors-conteneur ## Supprime tout ce que devzone a créé, après confirmation (GARDER=connexions : garde les connexions)
+	@GARDER="$(GARDER)" bash manage/scripts/desinstaller.sh
+
+uninstall: hors-conteneur ## Supprime tout ce que devzone a créé, après confirmation (alias de desinstaller)
 	@GARDER="$(GARDER)" bash manage/scripts/desinstaller.sh

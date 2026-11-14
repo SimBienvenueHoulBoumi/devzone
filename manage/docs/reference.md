@@ -225,7 +225,7 @@ devzone use <nom>       # bascule le cluster de travail de kubectl
 ```
 
 - **Cluster actif** : celui de l'hôte par défaut s'il répond (en pratique `docker-desktop`), sinon kind dédié `kind-devzone`. Un choix fait avec `devzone use` est gardé aux redémarrages.
-- **Clusters kind** : tournent sur le Docker de l'hôte (socket partagé, #291). Leur API écoute sur 127.0.0.1 **du poste**, jamais sur le réseau local ; `kind` (enveloppe de devzone) réécrit l'adresse en `host.docker.internal` dans le kubeconfig du conteneur, en gardant la vérification TLS : un cluster créé à la main par `kind create cluster` est joignable tout de suite. Nom suffixé par instance quand ce n'est pas l'instance par défaut. Ils redémarrent avec Docker Desktop, sont conservés par `make rebuild` et `make down`, et supprimés par `kind delete cluster` (ou `make desinstaller`).
+- **Clusters kind** : tournent sur le Docker de l'hôte (socket partagé, #291). Leur API écoute sur 127.0.0.1 **du poste**, jamais sur le réseau local ; `kind` (enveloppe de devzone) réécrit l'adresse en `host.docker.internal` dans le kubeconfig du conteneur, en gardant la vérification TLS : un cluster créé à la main par `kind create cluster` est joignable tout de suite. Nom suffixé par instance quand ce n'est pas l'instance par défaut. Ils redémarrent avec Docker Desktop, sont conservés par `make rebuild` et `make down`, et supprimés par `kind delete cluster` (ou `make uninstall`).
 - **Relais du socket Docker** ([#293](https://github.com/SimBienvenueHoulBoumi/devzone/issues/293)) : sous Docker Desktop, la feature `docker-outside-of-docker` relaie le socket de l'hôte par `socat` sans option `-t`. Un `docker exec` sans entrée standard (kind lance ainsi `kubeadm init`) y est coupé au bout de 0,5 s, avec une sortie tronquée et un code 0 : kind croit l'init réussi (« failed to remove control plane taint … connection refused »). Au démarrage, devzone remplace ce relais par le même avec `-t 86400`, puis vérifie qu'un `docker exec` long va au bout. En cas d'échec, une ligne `⚠ relais Docker` apparaît dans le récapitulatif `devzone`, avec la commande à relancer : `devzone repair`. Sous Linux (socket par groupe, sans socat), seul le contrôle est fait.
 - **CPU et RAM dans k9s** (`kubectl top`) : module `kubernetes` actif, metrics-server est installé au démarrage sur les clusters **locaux** qui ne l'ont pas (Docker Desktop, kind…), jamais sur un cluster distant. Après un `kind create cluster` : `devzone metrics` (ou `devzone metrics <contexte>` pour un cluster précis).
 - **Cluster de l'hôte** : `~/.kube` est monté en lecture seule, jamais modifié ; sa copie adaptée est `~/.kube/hote.config` (`127.0.0.1` remplacé par `host.docker.internal`). Après un changement de cluster sur l'hôte : `make stop && make up`.
@@ -423,7 +423,7 @@ devzone disable postgres                 # supprime PostgreSQL et TOUTES ses bas
 - **Accès** : un relais `kubectl port-forward` rend le service joignable sur `127.0.0.1:5432` **dans le conteneur** (`POSTGRES_PORT` pour un autre port) ; relancé à chaque démarrage et par `devzone apply`. PID et journal : `workspace/.postgres/relais.*`.
 - **Bases par projet** : nom en minuscules, chiffres et `_`. `creer` est idempotent : le mot de passe est gardé (sauf `--nouveau-mdp`) ; `REVOKE CONNECT … FROM PUBLIC` : un projet ne se connecte pas à la base d'un autre. Le fichier `<projet>.env` (600) contient `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` et `DB_URL` (JDBC).
 - **Secrets** : mot de passe du superutilisateur `postgres` dans le secret `postgres-admin` et `workspace/.postgres/admin-password` (600) ; jamais régénéré tant que le secret existe ; jamais affiché.
-- **Désactivation** : namespace supprimé (volume compris), `workspace/.postgres/` supprimé, kind dédié supprimé s'il ne porte plus aucun service. `make desinstaller` supprime aussi le namespace d'un cluster de l'hôte.
+- **Désactivation** : namespace supprimé (volume compris), `workspace/.postgres/` supprimé, kind dédié supprimé s'il ne porte plus aucun service. `make uninstall` supprime aussi le namespace d'un cluster de l'hôte.
 
 ## MySQL
 
@@ -556,7 +556,7 @@ devzone port inclure <n>      # réintègre un port à la liste automatique
 - **Refus, code 1** : port non numérique ou hors 1-65535 ; Docker de l'hôte injoignable ; port déjà pris sur le poste (échec de `docker run`, « port is already allocated » ou « address already in use »), l'état restant inchangé.
 - **Plusieurs instances** : le nom du relais et l'étiquette portent `DEVZONE_INSTANCE` ; deux instances qui veulent le même port du poste : la seconde reçoit le refus « déjà utilisé ».
 - **Récapitulatif** : ligne `ports vers le poste` avec `8080 ●, 3000 ○`, ou `aucun (devzone port <n>)`.
-- **Désinstallation** : `make desinstaller` retire les conteneurs étiquetés `devzone.instance` (voir README, « Désinstaller »).
+- **Désinstallation** : `make uninstall` retire les conteneurs étiquetés `devzone.instance` (voir README, « Désinstaller »).
 - **Spring Boot** : l'application doit écouter sur `0.0.0.0` (défaut). Un `server.address=127.0.0.1` la rend injoignable depuis le relais.
 
 ## Cluster de devzone
@@ -633,10 +633,10 @@ Un dossier devzone garde sa version dans `.devzone.version` : la version, puis u
 ```bash
 cd mon-devzone
 devzone update              # version du paquet installé
-npx devzone@latest mettre-a-jour   # dernière version publiée
+npx devzone@latest update   # dernière version publiée
 ```
 
-- **Déjà à jour** : version du dossier égale à celle du paquet et aucun fichier du paquet manquant → `déjà à jour`, code 0. Le message rappelle `npx devzone@latest mettre-a-jour` pour la dernière version publiée.
+- **Déjà à jour** : version du dossier égale à celle du paquet et aucun fichier du paquet manquant → `déjà à jour`, code 0. Le message rappelle `npx devzone@latest update` pour la dernière version publiée.
 - **Fichiers modifiés localement** : leur empreinte diffère de celle du manifeste (sans manifeste, de celle du paquet). Ils sont listés et une confirmation est demandée. `--oui` répond oui pour un script ; sans terminal et sans `--oui`, la commande refuse (code 1) et ne touche à rien.
 - **Sauvegarde** : tout fichier remplacé ou supprimé est copié dans `.devzone.sauvegarde/<AAAAMMJJ-HHMMSS>/`, avec la même arborescence. Ce dossier est ajouté au `.gitignore` du devzone.
 - **Remplacement** : les fichiers du paquet sont recopiés, les fichiers de l'ancien manifeste qui n'existent plus sont supprimés, ainsi que les anciennes arborescences `core/` et `scripts/` à la racine. `.gitignore` est complété des lignes manquantes, jamais écrasé.
@@ -645,7 +645,7 @@ npx devzone@latest mettre-a-jour   # dernière version publiée
 
 Un dossier créé avant ce manifeste a une version « inconnue » : tous les fichiers différents du paquet sont traités comme modifiés (sauvegarde, puis confirmation).
 
-Dans le conteneur, le récapitulatif `devzone` lit `$RACINE/.devzone.version` et la dernière version publiée (`npm view devzone version`, au plus une fois par jour, cache sous `~/.cache/devzone/`, délai de 5 s, silencieux hors ligne). Si elle est plus récente : `○ devzone X.Y.Z disponible : sur le poste, devzone mettre-a-jour`.
+Dans le conteneur, le récapitulatif `devzone` lit `$RACINE/.devzone.version` et la dernière version publiée (`npm view devzone version`, au plus une fois par jour, cache sous `~/.cache/devzone/`, délai de 5 s, silencieux hors ligne). Si elle est plus récente : `○ devzone X.Y.Z disponible : sur le poste, devzone update`.
 
 ## Mettre à jour un outil
 
@@ -744,7 +744,7 @@ outil peut relancer la consigne ensuite avec `devzone agent`.
 
 | Symptôme | Cause | Solution |
 |---|---|---|
-| `✖ Docker introuvable` (`npx devzone`, `make up`, `make rebuild`, `make desinstaller`) | Docker n'est pas installé | installer Docker Desktop (macOS, Windows, Linux : https://docs.docker.com/desktop/) ou, sous Linux, Docker Engine (https://docs.docker.com/engine/install/), puis relancer la commande |
+| `✖ Docker introuvable` (`npx devzone`, `make up`, `make rebuild`, `make uninstall`) | Docker n'est pas installé | installer Docker Desktop (macOS, Windows, Linux : https://docs.docker.com/desktop/) ou, sous Linux, Docker Engine (https://docs.docker.com/engine/install/), puis relancer la commande |
 | `✖ Docker est installé mais ne répond pas (arrêté ?)` | Docker Desktop fermé, ou service Docker arrêté (Linux) | démarrer Docker Desktop (Linux sans Docker Desktop : `sudo systemctl start docker`), puis relancer la commande. Après `npx devzone mon-devzone`, le dossier est déjà créé : `cd mon-devzone && make shell` |
 | `✖ Docker refuse l'accès` | Linux : compte hors du groupe `docker` | `sudo usermod -aG docker $USER`, puis une nouvelle session (ou `newgrp docker`), puis relancer la commande |
 | `make up` ou `make rebuild` semble figé | une étape longue (première construction de l'image : plusieurs minutes), ou une question posée dans le conteneur | `make` affiche un signe de vie avec la dernière ligne du journal au moins toutes les 30 s : suivre le détail avec `tail -f .devzone.log`. Une question (ligne finissant par `[o/N]`, `?`…) est signalée et le lancement arrêté : la [signaler](https://github.com/SimBienvenueHoulBoumi/devzone/issues), puis `make rebuild`. Version antérieure de devzone, figée sur « Configurer les bots … ? [o/N] » (invisible) : `Ctrl+C`, mettre devzone à jour puis `make rebuild` ; les bots se configurent à la main dans le conteneur : `repowarden bots` |
@@ -773,17 +773,13 @@ Les commandes de devzone s'écrivent en anglais (#502). Les anciens noms frança
 | Ancien nom | Nom actuel |
 |---|---|
 | `devzone actif` | `devzone is-enabled` |
-| `devzone activer` / `desactiver` | `devzone enable` / `disable` |
 | `devzone appliquer` | `devzone apply` |
 | `devzone aide` | `devzone help` |
 | `devzone catalogue` | `devzone catalog` |
 | `devzone demarrer` / `etat` | `devzone start` / `status` |
 | `devzone mots-de-passe` | `devzone passwords` |
-| `devzone paquets` | `devzone packages` |
-| `devzone plateforme` | `devzone platform` |
 | `devzone reparer` | `devzone repair` |
 | `devzone utiliser` | `devzone use` |
-| `devzone mettre-a-jour` / `desinstaller` | `devzone update` / `uninstall` |
 | `devzone workspace demarrer` / `arreter` / `etat` | `devzone workspace start` / `stop` / `status` |
 | `devzone workspace copier-vers` / `copier-depuis` | `devzone workspace copy-to` / `copy-from` |
 | `devzone workspace migrer` / `revenir` / `nettoyer-docker` | `devzone workspace migrate` / `revert` / `clean-docker` |
