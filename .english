@@ -16,6 +16,7 @@ manage/workspace.sh
 manage/scripts/workspace-aliases.sh
 manage/test/command-aliases.bats
 manage/test/check-english.bats
+manage/test/readme.bats
 manage/test/shard.sh
 manage/test/shard.bats
 manage/test/workspace.bats
