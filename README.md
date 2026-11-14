@@ -36,7 +36,7 @@ devzone prépare un devcontainer Ubuntu lancé par Docker, avec des versions d'o
 ### Prérequis
 
 - Docker Desktop (ou Docker Engine sous Linux). Pour Kubernetes (facultatif) : activer le cluster de Docker Desktop (*Settings → Kubernetes → Enable Kubernetes*).
-- Pour le [workspace Kubernetes](manage/docs/reference.md#workspace-kubernetes) (facultatif, `devzone workspace migrate` pour quitter le poste Docker, `revenir` pour y retourner) : un cluster Kubernetes 1.30 ou plus, `kubectl` et `helm` sur la machine, et Docker pour lire les volumes à migrer.
+- Pour le [workspace Kubernetes](manage/docs/reference.md#workspace-kubernetes) (facultatif, `devzone workspace migrate` pour quitter le poste Docker, `devzone workspace revert` pour y retourner) : un cluster Kubernetes 1.30 ou plus, `kubectl` et `helm` sur la machine, et Docker pour lire les volumes à migrer.
 - Node et npm (pour `npx` ou l'installation globale).
 - `make` (nécessaire pour `make shell` ; sous Windows sans `make`, voir le tableau « Au quotidien »).
 
@@ -130,7 +130,7 @@ Pour en savoir plus : [Mettre en route un projet](https://github.com/SimBienvenu
 
 ## Installer un outil qui reste
 
-Un outil mis a la main (sudo apt install tree) ne survit pas a un make rebuild : l'image est reconstruite de zero. Pour un outil qui doit rester, devzone packages garde la liste des paquets a reinstaller :
+Un outil mis à la main (`sudo apt install tree`) ne survit pas à un `make rebuild` : l'image est reconstruite de zéro. Pour un outil qui doit rester, `devzone packages` garde la liste des paquets à réinstaller :
 
 ```sh
 devzone packages
@@ -139,12 +139,12 @@ devzone packages retirer tree
 devzone packages appliquer
 ```
 
-- devzone packages affiche la liste : ✔ paquets installes, ○ paquets a installer ;
-- devzone packages ajouter <nom>… valide chaque paquet (apt-cache), installe puis l'ajoute a la liste ;
-- devzone packages retirer <nom> retire la liste et desinstalle ;
-- devzone packages appliquer installe les paquets manquants apres un rebuild.
+- `devzone packages` affiche la liste : ✔ paquets installés, ○ paquets à installer ;
+- `devzone packages ajouter <nom>…` valide chaque paquet (apt-cache), installe puis l'ajoute à la liste ;
+- `devzone packages retirer <nom>` retire la liste et désinstalle ;
+- `devzone packages appliquer` installe les paquets manquants après un rebuild.
 
-La liste vit dans .devzone.paquets a la racine du dossier devzone, hors du depot. Un paquet en echec est signale dans le recap (⚠ paquets : …) ; devzone packages appliquer peut alors etre relance.
+La liste vit dans `.devzone.paquets` à la racine du dossier devzone, hors du dépôt. Un paquet en échec est signalé dans le récapitulatif (⚠ paquets : …) ; `devzone packages appliquer` peut alors être relancé.
 
 ## Au quotidien
 
@@ -156,7 +156,7 @@ La liste vit dans .devzone.paquets a la racine du dossier devzone, hors du depot
 | Supprimer le conteneur | — | `make down` | — |
 | Reconstruire (après une modification de `.devcontainer/`) | *Dev Containers: Rebuild Container* | `make rebuild` | `npx @devcontainers/cli up --workspace-folder . --remove-existing-container` |
 | État | — | `make status` | — |
-| **Désinstaller** (tout ce que devzone a créé, après confirmation) | — | `make desinstaller` | `npx devzone uninstall` |
+| **Désinstaller** (tout ce que devzone a créé, après confirmation) | — | `make uninstall` | `npx devzone uninstall` |
 
 Après `devzone workspace migrate`, `make up`, `make shell` et `make stop` pilotent le workspace Kubernetes ; `devzone workspace revert` rend le poste Docker. Les services GitLab, PostgreSQL et Argo CD s'y installent depuis le poste : `devzone workspace services enable postgres` (voir [la référence](manage/docs/reference.md#services-de-devzone-dans-le-workspace-kubernetes)). Argo CD y est installé d'office et tient les déploiements : interface sur https://localhost:8443 (mot de passe `admin` dans `.password`), dépôt GitOps `<login>/devzone-argocd` créé sur ton GitHub, projets déclarés dans `.argocd.conf` (`devzone workspace argocd app add <dépôt>`) ; voir [Argo CD dans le workspace Kubernetes](manage/docs/reference.md#argo-cd-dans-le-workspace-kubernetes).
 
@@ -173,7 +173,7 @@ Pour la dernière version publiée, sans installation globale :
 
 ```bash
 cd mon-devzone
-npx devzone@latest mettre-a-jour
+npx devzone@latest update
 ```
 
 La commande affiche la version du dossier et celle du paquet, et ne fait rien si elles sont égales. Sinon, elle sauvegarde dans `.devzone.sauvegarde/<date>/` les fichiers remplacés ou supprimés, liste les fichiers modifiés localement et demande confirmation (`--oui` pour un script ; sans terminal, `--oui` est nécessaire), remplace les fichiers du paquet, retire les anciennes arborescences (`core/`, `scripts/`), complète `.gitignore` sans l'écraser, puis propose `make rebuild`. `--sans-reconstruire` saute cette proposition ; sans terminal, la reconstruction n'est jamais lancée.
@@ -182,7 +182,7 @@ La commande affiche la version du dossier et celle du paquet, et ne fait rien si
 
 La mise à jour ne change jamais le mode du poste ; sur un poste Docker avec Kubernetes joignable, elle propose `devzone workspace migrate`.
 
-Dans le conteneur, le récapitulatif `devzone` signale une version publiée plus récente (vérification npm au plus une fois par jour, sans bloquer hors ligne) : `○ devzone X.Y.Z disponible : sur le poste, devzone mettre-a-jour`.
+Dans le conteneur, le récapitulatif `devzone` signale une version publiée plus récente (vérification npm au plus une fois par jour, sans bloquer hors ligne) : `○ devzone X.Y.Z disponible : sur le poste, devzone update`.
 
 ## Options
 
@@ -197,6 +197,8 @@ Dans le conteneur, le récapitulatif `devzone` signale une version publiée plus
 **Module `argocd`** : Argo CD sur le cluster de devzone, interface sur https://127.0.0.1:8443 dans le conteneur (voir [Argo CD](manage/docs/reference.md#argo-cd)). Pour l'activer : `devzone enable argocd`.
 
 Ces modules sont désactivés par défaut, activables à la demande depuis le conteneur (sans rebuild), et leur choix est conservé d'un démarrage à l'autre.
+
+Les noms de premier niveau de la commande `devzone` sont en anglais (`enable`, `disable`, `platform`, `packages`, `update`, `uninstall`, `status`, `use`, `workspace …`) ; les sous-commandes (`postgres creer`, `packages ajouter`, `gitlab nouveau-mdp`, `port --fermer`, `cluster`…) gardent leur nom français jusqu'à leur bascule (#510, #532). Les anciens noms français de premier niveau restent acceptés.
 
 ## Où sont mes identifiants ?
 
@@ -311,13 +313,13 @@ devzone port --fermer <n> # retire un relais manuel et son port de l'état
 
 `devzone port <n>` ouvre aussi un relais manuel : même mécanisme côté poste, conteneur `alpine/socat`, nom `devzone-<instance>-port-<n>`.
 
-Depuis le poste : `http://localhost:8080`. Le relais manuel est recréé automatiquement au démarrage du conteneur, vers l'adresse actuelle du conteneur ; il est retiré par `make desinstaller` (étiquette `devzone.instance`). Le relais automatique disparaît avec l'application.
+Depuis le poste : `http://localhost:8080`. Le relais manuel est recréé automatiquement au démarrage du conteneur, vers l'adresse actuelle du conteneur ; il est retiré par `make uninstall` (étiquette `devzone.instance`). Le relais automatique disparaît avec l'application.
 
 Spring Boot écoute sur `0.0.0.0` par défaut : ne fixe pas `server.address` à `127.0.0.1`, sinon le relais ne peut pas joindre l'application. Un port déjà pris sur le poste, un port invalide ou un Docker de l'hôte injoignable sont refusés avec un code non nul. Détails dans [manage/docs/reference.md](manage/docs/reference.md#ports-vers-le-poste).
 
 ## Questions fréquentes
 
-- **Docker absent ou arrêté** : `npx devzone`, `make up`, `make rebuild` et `make desinstaller` vérifient Docker avant tout et disent quoi faire : l'installer (Docker Desktop, ou Docker Engine sous Linux), démarrer Docker Desktop, ou, sous Linux, ajouter ton compte au groupe `docker` (`sudo usermod -aG docker $USER`, puis une nouvelle session). Avec `npx devzone mon-devzone`, le dossier est créé quand même : une fois Docker démarré, `cd mon-devzone && make shell`.
+- **Docker absent ou arrêté** : `npx devzone`, `make up`, `make rebuild` et `make uninstall` vérifient Docker avant tout et disent quoi faire : l'installer (Docker Desktop, ou Docker Engine sous Linux), démarrer Docker Desktop, ou, sous Linux, ajouter ton compte au groupe `docker` (`sudo usermod -aG docker $USER`, puis une nouvelle session). Avec `npx devzone mon-devzone`, le dossier est créé quand même : une fois Docker démarré, `cd mon-devzone && make shell`.
 - **Accès au socket Docker de l'hôte** : le socket Docker de la machine hôte est monté dans le conteneur. Cela offre un accès administrateur au Docker de l'hôte, y compris pour les agents IA. C'est un compromis de sécurité assumé documenté dans la section Limites. Pour restreindre l'accès, utilisez les mécanismes propres à Docker Desktop/Linux.
 - **Le premier lancement est long** : c'est normal (construction de l'image, téléchargement des images de base). Il prend 4 à 5 min mesurées, plus le téléchargement des images de base sur une machine neuve.
 - **`make` est absent sous Windows** : tu peux utiliser `npx @devcontainers/cli` (voir le tableau « Au quotidien ») ou Git Bash. Les scripts sont compatibles (fins de ligne LF).
@@ -328,10 +330,10 @@ Spring Boot écoute sur `0.0.0.0` par défaut : ne fixe pas `server.address` à 
 ## Désinstaller
 
 ```bash
-make desinstaller
+make uninstall
 ```
 
-Cette commande supprime le conteneur, l'image `vsc-devzone-…`, les volumes `devzone-*`, les events du Docker de l'hôte et les clusters kind créés sur l'hôte, les namespaces `devzone-postgres` et les étiquettes `app.kubernetes.io/managed-by=devzone` sur les clusters de l'hôte, ainsi que les éventuels metrics-server installés par devzone. Les ressources sont filtrées par l'étiquette `devzone.instance` pour ne cibler que l'instance courante. Elle **ne touche jamais** à `workspace/` (tes projets). Pour garder tes connexions (GitHub, git, Claude Code, opencode et modules) : `make desinstaller KEEP=logins` (ancien `GARDER=connexions` accepté).
+Cette commande supprime le conteneur, l'image `vsc-devzone-…`, les volumes `devzone-*`, les events du Docker de l'hôte et les clusters kind créés sur l'hôte, les namespaces `devzone-postgres` et les étiquettes `app.kubernetes.io/managed-by=devzone` sur les clusters de l'hôte, ainsi que les éventuels metrics-server installés par devzone. Les ressources sont filtrées par l'étiquette `devzone.instance` pour ne cibler que l'instance courante. Elle **ne touche jamais** à `workspace/` (tes projets). Pour garder tes connexions (GitHub, git, Claude Code, opencode et modules) : `make uninstall KEEP=logins` (ancien `GARDER=connexions` accepté).
 
 Avec la commande installée globalement (`npm install -g devzone`), tu peux aussi lancer, dans le dossier du devzone :
 
@@ -339,13 +341,13 @@ Avec la commande installée globalement (`npm install -g devzone`), tu peux auss
 devzone uninstall
 ```
 
-Même effet que `make desinstaller`. Ensuite seulement, pour retirer la commande de ta machine :
+Même effet que `make uninstall`. Ensuite seulement, pour retirer la commande de ta machine :
 
 ```bash
 npm uninstall -g devzone
 ```
 
-Même effet que `make desinstaller`.
+Cette commande retire seulement la commande `devzone` de ta machine ; elle ne supprime ni conteneur, ni volume, ni dossier.
 ## Changer de cluster
 
 ```sh
