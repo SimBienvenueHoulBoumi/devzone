@@ -1405,9 +1405,10 @@ if [ -f "$ICI/etat-json.sh" ]; then
 fi
 
 # English command name of the first argument becomes the French one (#502);
-# without any argument, nothing changes
+# without any argument, nothing changes. The old French names warn (#532).
 if [ "$#" -gt 0 ]; then
     canon="$(command_canonical "$1" 2>/dev/null)" || canon="$1"
+    command_deprecated_warning "$1"
     set -- "$canon" "${@:2}"
 fi
 
