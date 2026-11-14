@@ -69,11 +69,7 @@ setup() {
         esac
     done < "$RACINE/Makefile"
 
-    # mysql is a top-level container command (dispatched by manage/devzone)
-    # absent from the host help and the help block.
-    add_word mysql
-
-    AUTHORIZED="$(cat "$BATS_TEST_TMPDIR/words.txt" | tr '\n' ' ')"
+    AUTHORIZED="$(tr '\n' ' ' < "$BATS_TEST_TMPDIR/words.txt")"
 }
 
 # Return 0 if $1 is an authorized word.
@@ -126,7 +122,8 @@ verify_command() {
         file="$1"
         : > "$BATS_TEST_TMPDIR/candidates.txt"
         # Inline code between backticks.
-        grep -oE '`[^`]+`' "$file" | while IFS= read -r span; do
+        pattern="\`[^\`]+\`"
+        grep -oE "$pattern" "$file" | while IFS= read -r span; do
             span="${span#\`}"
             span="${span%\`}"
             echo "$span" >> "$BATS_TEST_TMPDIR/candidates.txt"
