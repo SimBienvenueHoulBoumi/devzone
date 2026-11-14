@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ .Values.name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ .Values.name }}
+    app.kubernetes.io/managed-by: devzone
+spec:
+  serviceName: {{ .Values.name }}
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Values.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.name }}
+        app.kubernetes.io/managed-by: devzone
+    spec:
+      containers:
+        - name: {{ .Values.name }}
+          # Pinned version: update it here (same major: data kept)
+          image: {{ .Values.image }}
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.name }}-admin
+                  key: password
+          ports:
+            - containerPort: 3306
+              name: {{ .Values.name }}
+          readinessProbe:
+            exec:
+              command: ["/bin/sh", "-c", "mysql -uroot -p\"$MYSQL_ROOT_PASSWORD\" -e 'SELECT 1'"]
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: {{ .Values.resources.requests.cpu }}
+              memory: {{ .Values.memory }}
+          volumeMounts:
+            - name: {{ .Values.claim }}
+              mountPath: /var/lib/mysql
+  volumeClaimTemplates:
+    - metadata:
+        name: {{ .Values.claim }}
+        labels:
+          app.kubernetes.io/managed-by: devzone
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: {{ .Values.size }}

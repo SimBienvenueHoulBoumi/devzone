@@ -1,0 +1,6 @@
+apiVersion: v2
+name: devzone-mysql
+description: Shared MySQL of devzone, one database per project (#414), deployed by Argo CD (#538)
+type: application
+version: 0.1.0
+appVersion: "8.4"

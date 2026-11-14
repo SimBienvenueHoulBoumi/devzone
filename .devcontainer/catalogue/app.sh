@@ -1,7 +1,34 @@
 #!/usr/bin/env bash
 # Opérations d'installation du catalogue (#414) : sourcé par catalogue.sh.
+# Le module argocd actif : l'application installée est une Application Argo CD
+# devzone-<app> (chart charts/devzone-<app> du dépôt devzone, #538) au lieu du
+# manifeste de la voie helm direct.
 
 ATTENTE="${DEVZONE_CATALOGUE_ATTENTE:-300}"
+
+# shellcheck source=SCRIPTDIR/argocd/catalogue-argocd.sh
+# shellcheck disable=SC1091
+. "$ICI/argocd/catalogue-argocd.sh"
+
+# Attente du StatefulSet prêt : une seule commande rollout sur la voie
+# manifeste, sondée sur la voie Argo CD (la synchronisation est en tâche de
+# fond)
+app_attendre() {
+    local app="$1" ns="$2" argo="$3" fin=$((SECONDS + ATTENTE))
+    if [ "$argo" = 1 ]; then
+        while [ "$SECONDS" -lt "$fin" ]; do
+            kubectl --context devzone -n "$ns" rollout status "statefulset/$app" --timeout=10s >/dev/null 2>&1 && return 0
+            sleep 5
+        done
+        echo "devzone : catalogue : $app pas prêt après ${ATTENTE}s" >&2
+        return 1
+    fi
+    if ! kubectl --context devzone -n "$ns" rollout status "statefulset/$app" \
+        --timeout="${ATTENTE}s" >/dev/null; then
+        echo "devzone : catalogue : $app pas prêt après ${ATTENTE}s" >&2
+        return 1
+    fi
+}
 
 # Secret de l'application : mot de passe généré une fois, miroir local
 # (workspace/.$app/admin-password, 600, jamais affiché). Reprise : le mot de
@@ -35,10 +62,11 @@ regenerer_identifiants() {
 }
 
 # Installe une application : contexte devzone posé (#396), namespace créé et
-# isolé (#396), secret généré, manifeste appliqué, attente prête, relais lancé
-# vers 127.0.0.1:<port> du conteneur ; rend non nul en échec
+# isolé (#396), secret généré, puis Application Argo CD (module argocd actif,
+# #538) ou manifeste, attente prête, relais lancé vers 127.0.0.1:<port> du
+# conteneur ; rend non nul en échec
 app_installer() {
-    local app="$1" ns port image CTX man
+    local app="$1" ns port image CTX man extra="" argo=0
     ns="$(app_ns "$app")"
     port="$(app_lire "$app" port)"
     image="$(app_lire "$app" image)"
@@ -63,27 +91,32 @@ app_installer() {
         # shellcheck disable=SC1091
         . "$(dossier_catalogue)/mysql/volume.sh"
         claim="$(mysql_claim_choisir "$ns")" || return 2
+        [ "$claim" = donnees ] || extra="claim=$claim"
     fi
-    man="$(mktemp)"
-    sed -e "s|__APP__|$app|g" -e "s|__NS__|$ns|g" -e "s|__IMAGE__|$image|g" \
-        -e "s|__PORT__|$port|g" -e "s|__MEMOIRE__|$(app_lire "$app" memoire)|g" \
-        -e "s|__TAILLE__|$(app_lire "$app" taille)|g" -e "s|__CLAIM__|$claim|g" \
-        "$(dossier_catalogue)/$app/manifeste.yaml" >"$man" &&
-        kubectl --context devzone -n "$ns" apply -f "$man" >/dev/null
-    rm -f "$man"
-    if ! kubectl --context devzone -n "$ns" rollout status "statefulset/$app" \
-        --timeout="${ATTENTE}s" >/dev/null; then
-        echo "devzone : catalogue : $app pas prêt après ${ATTENTE}s" >&2
-        return 1
+    if catalogue_argocd_active "$app"; then
+        argo=1
+        echo "▶ Application $app par Argo CD (chart charts/devzone-$app)…"
+        catalogue_argocd_apply "$app" "$ns" "$image" "$port" \
+            "$(app_lire "$app" memoire)" "$(app_lire "$app" taille)" "$extra" || return 1
+    else
+        man="$(mktemp)"
+        sed -e "s|__APP__|$app|g" -e "s|__NS__|$ns|g" -e "s|__IMAGE__|$image|g" \
+            -e "s|__PORT__|$port|g" -e "s|__MEMOIRE__|$(app_lire "$app" memoire)|g" \
+            -e "s|__TAILLE__|$(app_lire "$app" taille)|g" -e "s|__CLAIM__|$claim|g" \
+            "$(dossier_catalogue)/$app/manifeste.yaml" >"$man" &&
+            kubectl --context devzone -n "$ns" apply -f "$man" >/dev/null
+        rm -f "$man"
     fi
+    app_attendre "$app" "$ns" "$argo" || return 1
     relais_lancer "$app" "$CTX" "$ns" "svc/$app" "$port:$port"
     echo "✔ $app prêt : 127.0.0.1:$port dans le conteneur"
     regenerer_identifiants
 }
 
-# Désinstalle une application : relais coupé, manifeste retiré, marque oubliée ;
-# le volume (PVC) et les données restent (#441) : la suppression des données est
-# confirmée à part (devzone mysql supprimer-donnees)
+# Désinstalle une application : relais coupé, Application Argo CD retirée
+# (module argocd actif, #538) ou manifeste, marque oubliée ; le volume (PVC)
+# et les données restent (#441) : la suppression des données est confirmée à
+# part (devzone mysql supprimer-donnees)
 app_desinstaller() {
     local app="$1" ns claim pvc CTX
     ns="$(app_ns "$app")"
@@ -97,6 +130,14 @@ app_desinstaller() {
     fi
     claim="$(kubectl --context devzone -n "$ns" get statefulset "$app" \
         -o jsonpath='{.spec.volumeClaimTemplates[0].metadata.name}' 2>/dev/null || true)"
+    if catalogue_argocd_application_exists "$app"; then
+        catalogue_argocd_delete "$app" >/dev/null 2>&1 || true
+        kubectl --context devzone -n "$ns" delete "secret/$app-admin" >/dev/null 2>&1 || true
+        pvc="${claim:-donnees}-$app-0"
+        echo "✔ $app retiré : Application supprimée ; volume $pvc et bases gardés : devzone $app volume"
+        regenerer_identifiants
+        return 0
+    fi
     kubectl --context devzone -n "$ns" delete "statefulset/$app" "service/$app" \
         "secret/$app-admin" >/dev/null 2>&1 || true
     pvc="${claim:-donnees}-$app-0"

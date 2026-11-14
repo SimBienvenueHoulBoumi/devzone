@@ -21,7 +21,8 @@ ARGOCD_WAIT="${ARGOCD_ATTENTE:-600}"
 ARGOCD_MIN_MEMORY_KI=1048576
 DEVZONE_REPO_URL="${DEVZONE_REPO_URL:-https://github.com/SimBienvenueHoulBoumi/devzone.git}"
 
-argocd_values() { printf '%s/.devcontainer/argocd/values.yaml' "$RACINE"; }
+# Wrapper chart installed by the workstation and by the container (#538)
+argocd_chart() { printf '%s/charts/devzone-argocd' "$RACINE"; }
 argocd_generator() { printf '%s/.devcontainer/argocd/application.sh' "$RACINE"; }
 argocd_secrets_dir() { printf '%s/workspace/.argocd' "$PWD"; }
 
@@ -140,12 +141,13 @@ argocd_install() {
     echo "▶ Argo CD $ARGOCD_CHART_VERSION in $ARGOCD_NS (helm, up to ${ARGOCD_WAIT}s)…"
     ak create namespace "$ARGOCD_NS" --dry-run=client -o yaml | ak apply -f - >/dev/null
     ak label namespace "$ARGOCD_NS" app.kubernetes.io/managed-by=devzone --overwrite >/dev/null
-    helm repo add argo https://argoproj.github.io/argo-helm >/dev/null 2>&1 || true
-    helm repo update >/dev/null 2>&1 || true
+    # Wrapper chart: the dependency argo-cd (pinned in Chart.yaml) is built
+    # first, then installed from the local chart (#538)
+    helm dependency build "$(argocd_chart)" >/dev/null
     # shellcheck disable=SC2046
-    helm $(drapeau_helm) upgrade --install argocd argo/argo-cd \
-        --version "$ARGOCD_CHART_VERSION" --namespace "$ARGOCD_NS" \
-        -f "$(argocd_values)" --timeout "${ARGOCD_WAIT}s" --wait || return 1
+    helm $(drapeau_helm) upgrade --install argocd "$(argocd_chart)" \
+        --namespace "$ARGOCD_NS" \
+        --timeout "${ARGOCD_WAIT}s" --wait || return 1
     argocd_save_admin_password
     echo "✔ Argo CD ready: https://localhost:$ARGOCD_LOCAL_PORT once devzone workspace ports runs; user admin, password in .password"
 }

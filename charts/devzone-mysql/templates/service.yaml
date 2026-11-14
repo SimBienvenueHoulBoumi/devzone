@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ .Values.name }}
+    app.kubernetes.io/managed-by: devzone
+spec:
+  selector:
+    app: {{ .Values.name }}
+  ports:
+    - name: {{ .Values.name }}
+      port: {{ .Values.port }}
+      targetPort: 3306

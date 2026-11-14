@@ -19,6 +19,10 @@ ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
 # shellcheck source=SCRIPTDIR/installer.sh
 # shellcheck disable=SC1091
 . "$ICI/installer.sh"
+# Le module argocd actif : MySQL installé par une Application (#538)
+# shellcheck source=SCRIPTDIR/../../argocd/catalogue-argocd.sh
+# shellcheck disable=SC1091
+. "$ICI/../../argocd/catalogue-argocd.sh"
 NS=devzone-mysql
 SECRETS="$RACINE/workspace/.mysql"
 MYSQL_PORT="${MYSQL_PORT:-3306}"
@@ -28,6 +32,8 @@ MYSQL_TAILLE="${MYSQL_TAILLE:-5Gi}"
 MYSQL_ATTENTE="${MYSQL_ATTENTE:-300}"
 # Refus standard avec message et code 2
 refuse() { echo "devzone : catalogue mysql : $*" >&2; exit 2; }
+# Secret mysql-admin du hook services.sh : le même que l'installation directe
+services_secret_mysql() { mysql_secret; }
 # Régénère la vue .password (échec non bloquant)
 regenerer_identifiants() {
     password_regenerer ||
@@ -82,6 +88,10 @@ installer() {
         return 1
     fi
     echo "▶ MySQL sur le cluster $CTX (namespace $NS)…"
+    if catalogue_argocd_active mysql; then
+        mysql_installer_argocd "$CTX"
+        return
+    fi
     compte_namespace "$CTX" "$NS"
     namespace_isoler "$NS" >/dev/null
     if k get statefulset mysql >/dev/null 2>&1; then
@@ -123,6 +133,8 @@ supprimer_donnees() {
     [ -n "$CTX" ] || refuse "aucun cluster choisi : devzone activer mysql"
     installe || refuse "module inactif : devzone activer mysql"
     echo "▶ Suppression de MySQL et de ses volumes sur $CTX…"
+    # L'Application part d'abord (#538) : sinon Argo CD recrée le namespace
+    catalogue_argocd_delete mysql >/dev/null 2>&1 || true
     # RoleBinding retiré puis namespace supprimé par l'administrateur (#430)
     compte_retirer "$CTX" "$NS" >/dev/null 2>&1 || true
     compte_admin "$CTX" delete namespace "$NS" --wait=true >/dev/null
