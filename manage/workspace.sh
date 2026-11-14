@@ -198,7 +198,9 @@ copy_from() {
 if [ -f "$ROOT/.devcontainer/command-aliases.sh" ]; then
     . "$ROOT/.devcontainer/command-aliases.sh"
     if [ "$#" -gt 0 ]; then
-        command_deprecated_warning "$1"
+        if command -v command_deprecated_warning >/dev/null 2>&1; then
+            command_deprecated_warning "$1"
+        fi
         set -- "$(command_canonical "$1")" "${@:2}"
     fi
 fi
