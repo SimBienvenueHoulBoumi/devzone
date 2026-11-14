@@ -112,7 +112,10 @@ humain "make up : question dans le conteneur signalée au lieu d'attendre" 90 2 
     -- env PATH="$TMP/faux-bin:$PATH" DEVZONE_ATTENTE_QUESTION=5 make -C "$FAUX" up
 
 echo "▶ Création et lancement : devzone <dossier> (npm)"
-humain "devzone <dossier> : créé et lancé, avancement affiché" 1800 0 "▶ Installing in container" -- bash "$RACINE/manage/devzone" "$COPIE"
+humain "devzone <dossier> : créé et lancé, avancement affiché" 1800 0 "▶ Installing in container" --envoyer 'GitOps repository for Argo CD\?' $'n\n' -- bash "$RACINE/manage/devzone" "$COPIE"
+# Question du dépôt GitOps (#539) : répondue « n » ci-dessus, le choix est écrit
+verifier "question GitOps : aucun dépôt, Applications appliquées directement" grep -q "no GitOps repository: the Applications are applied directly" <<<"$SORTIE"
+verifier ".argocd.conf du devzone créé : repo = none" grep -q "repo = none" "$COPIE/.argocd.conf"
 if ! grep -q "devzone started" <<<"$SORTIE" || [ -z "$(docker ps -q --filter "label=devcontainer.local_folder=$COPIE")" ]; then
     echo "✖ devzone non lancé : suite arrêtée"
     exit 1

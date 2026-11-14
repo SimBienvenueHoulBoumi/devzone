@@ -475,45 +475,19 @@ creer() {
         echo "✖ --gitops attend une valeur (github, none or a URL)" >&2
         exit 1
     fi
+
+    if [ -e "$cible" ] && [ -n "$(ls -A "$cible" 2>/dev/null)" ]; then
+        echo "✖ $cible existe et n'est pas vide : rien n'est écrasé. Choisis un autre dossier." >&2
+        exit 1
+    fi
+
     if [ -z "$gitops" ]; then
         if [ -t 0 ]; then
             gitops="$(gitops_saisir)"
         else
-            echo "✖ no GitOps repository for Argo CD: pass --gitops <github|none|https://github.com/<login>/<name>.git> to create a devzone without a terminal" >&2
+            echo "⚠ no GitOps repository for Argo CD: pass --gitops <github|none|https://github.com/<login>/<name>.git> to create a devzone without a terminal; using none" >&2
             gitops="none"
         fi
-    fi
-    # The GitOps repository of the new devzone (#539): github, an existing URL,
-    # or none, written in the .argocd.conf of the new devzone (conf.sh writes
-    # the header of the file when absent)
-    . "$PAQUET/.devcontainer/argocd/conf.sh"
-    ARGOCD_CONF="$cible/.argocd.conf"
-    if [ "$gitops" = github ]; then
-        if ! gh auth status >/dev/null 2>&1; then
-            echo "⚠ GitHub not connected (gh auth login): no GitOps repository, the Applications are applied directly; pass --gitops none" >&2
-            valeur="none"
-        else
-            login="$(gh api user --jq .login 2>/dev/null)" || login=""
-            if [ -z "$login" ]; then
-                echo "⚠ GitHub login unreadable (gh api user): no GitOps repository, the Applications are applied directly; pass --gitops none" >&2
-                valeur="none"
-            else
-                nom="${DEVZONE_GITOPS_REPO_NAME:-devzone-argocd}"
-                instance="${DEVZONE_VOLUMES:-devzone}"
-                if [ "$instance" != "devzone" ]; then
-                    nom="$nom-$instance"
-                fi
-                valeur="https://github.com/$login/$nom.git"
-            fi
-        fi
-    elif [ "$gitops" = none ]; then
-        valeur="none"
-    else
-        valeur="$gitops"
-    fi
-    if [ -e "$cible" ] && [ -n "$(ls -A "$cible" 2>/dev/null)" ]; then
-        echo "✖ $cible existe et n'est pas vide : rien n'est écrasé. Choisis un autre dossier." >&2
-        exit 1
     fi
     mkdir -p "$cible/workspace" "$cible/manage"
     cp -R "${FICHIERS[@]/#/$PAQUET/}" "$cible/"
