@@ -43,6 +43,8 @@ case "$*" in
     *"get namespaces -l"*) ;;
     *"create namespace"*) printf 'kind: Namespace\nmetadata:\n  name: devzone-llm\n' ;;
     *"apply -f -"*) cat >>"$T/apply.log"; touch "$T/ns" ;;
+    *"get job llm-bench"*) echo "${BENCH_STATUS:-1/}" ;;
+    *"logs job/llm-bench"*) cat "$T/bench.out" 2>/dev/null ;;
     *"rollout status"*) [ -z "${FAUX_PAS_PRET:-}" ]; exit $? ;;
     *"readyReplicas"*) echo 1 ;;
     *"limits.memory"*) echo 7Gi ;;
@@ -174,4 +176,103 @@ teardown() {
 @test "devzone llm status goes through llm.sh" {
     run bash "$DEVZONE" llm status
     [ "$output" = disabled ]
+}
+
+# Output of a llama-bench Job: loading noise on stderr, then the JSON array
+# (threads, prompt tok/s, generation tok/s)
+bench_logs() {
+    {
+        echo "load_backend: loaded CPU backend"
+        echo "["
+        local first=1 row
+        for row in "$@"; do
+            IFS=: read -r t pp tg <<<"$row"
+            [ "$first" = 1 ] || echo ","
+            first=0
+            printf '{"n_threads": %s, "n_prompt": 512, "n_gen": 0, "avg_ts": %s},\n' "$t" "$pp"
+            printf '{"n_threads": %s, "n_prompt": 0, "n_gen": 64, "avg_ts": %s}\n' "$t" "$tg"
+        done
+        echo "]"
+    } >"$BATS_TEST_TMPDIR/bench.out"
+}
+
+@test "llm bench: Job rendered on the full image, applied, table and recommendation, Job deleted" {
+    bash "$DEVZONE" enable llm --context docker-desktop </dev/null
+    : >"$BATS_TEST_TMPDIR/apply.log"
+    bench_logs 4:60.5:9.2 8:90.1:11.4
+    LLM_BENCH_POLL=0 run bash "$LLM" bench
+    [ "$status" -eq 0 ]
+    grep -q 'image: ghcr.io/ggml-org/llama.cpp:full-b' "$BATS_TEST_TMPDIR/apply.log"
+    grep -q 'kind: Job' "$BATS_TEST_TMPDIR/apply.log"
+    grep -q 'readOnly: true' "$BATS_TEST_TMPDIR/apply.log"
+    grep -q 'qwen2.5-coder-7b-instruct-q4_k_m.gguf' "$BATS_TEST_TMPDIR/apply.log"
+    [[ "$output" == *"threads"*"prompt (tok/s)"*"generation (tok/s)"* ]] || false
+    [[ "$output" == *"4 "*"60.5"*"9.2"* ]] || false
+    [[ "$output" == *"8 "*"90.1"*"11.4"* ]] || false
+    [[ "$output" == *"Recommended: threads=8"* ]] || false
+    [[ "$output" == *"Fast enough for opencode"* ]] || false
+    grep -q 'delete job llm-bench' "$BATS_TEST_TMPDIR/kubectl.log"
+    ! grep -q 'upgrade llm' "$BATS_TEST_TMPDIR/helm.log" || false
+}
+
+@test "llm bench: too slow for opencode (generation under 8 tok/s), thresholds from the environment" {
+    bash "$DEVZONE" enable llm --context docker-desktop </dev/null
+    bench_logs 4:60:3.1 8:70:4.2
+    LLM_BENCH_POLL=0 run bash "$LLM" bench
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Recommended: threads=8"* ]] || false
+    [[ "$output" == *"Too slow for opencode"* ]] || false
+    LLM_BENCH_MIN_TG=4 LLM_BENCH_POLL=0 run bash "$LLM" bench
+    [[ "$output" == *"Fast enough for opencode"* ]] || false
+}
+
+@test "llm bench: the smaller thread count wins a tie" {
+    bash "$DEVZONE" enable llm --context docker-desktop </dev/null
+    bench_logs 8:90:10 4:80:10
+    LLM_BENCH_POLL=0 run bash "$LLM" bench
+    [[ "$output" == *"Recommended: threads=4"* ]] || false
+}
+
+@test "llm bench --apply: helm upgrade of the release with threads=<best>, values kept" {
+    bash "$DEVZONE" enable llm --context docker-desktop </dev/null
+    bench_logs 4:60:9 8:90:11
+    LLM_BENCH_POLL=0 run bash "$LLM" bench --apply --threads 4,8 --prompt 256 --gen 32
+    [ "$status" -eq 0 ]
+    grep -qF 'bench.threads=4\,8' "$BATS_TEST_TMPDIR/helm.log"
+    grep -qF -- '- "4,8"' "$BATS_TEST_TMPDIR/apply.log"
+    grep -q 'bench.prompt=256' "$BATS_TEST_TMPDIR/helm.log"
+    grep -q 'bench.gen=32' "$BATS_TEST_TMPDIR/helm.log"
+    grep -q 'upgrade llm .*charts/devzone-llm -n devzone-llm --reset-then-reuse-values --set threads=8' "$BATS_TEST_TMPDIR/helm.log"
+    [[ "$output" == *"threads=8 applied"* ]] || false
+}
+
+@test "llm bench: Job failed, error shown and Job deleted; module off or bad argument refused" {
+    bash "$DEVZONE" enable llm --context docker-desktop </dev/null
+    echo "boom" >"$BATS_TEST_TMPDIR/bench.out"
+    BENCH_STATUS="/1" LLM_BENCH_POLL=0 run bash "$LLM" bench
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"bench Job failed or timed out"* ]] || false
+    grep -q 'delete job llm-bench' "$BATS_TEST_TMPDIR/kubectl.log"
+    run bash "$LLM" bench --oops
+    [ "$status" -eq 2 ]
+    run bash "$LLM" bench --threads
+    [ "$status" -eq 2 ]
+}
+
+@test "llm bench: timeout of the Job, Job deleted; not enabled refused" {
+    bash "$DEVZONE" enable llm --context docker-desktop </dev/null
+    BENCH_STATUS="/" LLM_BENCH_ATTENTE=2 LLM_BENCH_POLL=1 run bash "$LLM" bench
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"failed or timed out"* ]] || false
+    grep -q 'delete job llm-bench' "$BATS_TEST_TMPDIR/kubectl.log"
+    rm -f "$BATS_TEST_TMPDIR/ns"
+    run bash "$LLM" bench
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"not enabled"* ]] || false
+}
+
+@test "devzone llm bench goes through llm.sh" {
+    run bash "$DEVZONE" llm bench
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"not enabled"* ]] || false
 }

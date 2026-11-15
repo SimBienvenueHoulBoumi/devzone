@@ -25,6 +25,8 @@ case "${1:-}" in
     upgrade)
         shift
         [ "${1:-}" = --install ] && shift
+        # no previous release in the fake: the values flags of an upgrade are dropped
+        set -- $(printf '%s\n' "$@" | grep -vx -e --reset-then-reuse-values -e --reuse-values)
         # helm puts the objects without a namespace in the one of -n
         ns=""
         prev=""
