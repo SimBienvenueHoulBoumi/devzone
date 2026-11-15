@@ -21,3 +21,7 @@ Chaque service de devzone a un chart `charts/devzone-<service>` : nom du
 dossier, `Chart.yaml`, valeurs communes et étiquettes sont fixés par la
 convention de [manage/docs/reference.md](manage/docs/reference.md#convention-des-charts-devzone).
 Le contrôle `bash manage/scripts/check-charts.sh` la vérifie.
+
+## Variables des scripts shell
+
+Dans les scripts shell, une variable suivie d'un caractère non ASCII s'écrit `${NOM}` (sous macOS, `$NOM…` lit le caractère comme partie du nom). Le contrôle `bash manage/scripts/check-utf8-vars.sh` le vérifie (#591).
