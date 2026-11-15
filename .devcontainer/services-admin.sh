@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Installs or removes a devzone service (gitlab, postgres, argocd) from inside
+# Installs or removes a devzone service (gitlab, postgres, argocd, llm) from inside
 # the Kubernetes workspace pod, with a temporary administrator token (#528).
 #   services-admin.sh enable|disable <service> [options of devzone enable]
 #   services-admin.sh seed gitlab   data of gitlab seeded again, in the pod (#538)
@@ -41,11 +41,11 @@ case "$action" in
     enable | activer) action=enable ;;
     disable | desactiver) action=disable ;;
     seed) ;;
-    *) refuse "usage: services-admin.sh enable|disable|seed gitlab|postgres|argocd [options]" ;;
+    *) refuse "usage: services-admin.sh enable|disable|seed gitlab|postgres|argocd|llm [options]" ;;
 esac
 case "$service" in
-    gitlab | postgres | argocd) ;;
-    *) refuse "unknown service: ${service:-(none)} (gitlab, postgres, argocd)" ;;
+    gitlab | postgres | argocd | llm) ;;
+    *) refuse "unknown service: ${service:-(none)} (gitlab, postgres, argocd, llm)" ;;
 esac
 # The seed of the data (group, demo project, dev user, runner) is gitlab's (#538)
 if [ "$action" = seed ] && [ "$service" != gitlab ]; then

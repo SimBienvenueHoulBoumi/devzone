@@ -302,18 +302,17 @@ fichier_echec() {
     echo "$ETAT-echec-$1"
 }
 
-# Services in the Kubernetes workspace pod (#528): gitlab, postgres and argocd
-# live in the cluster and are installed from the workstation (devzone
-# workspace services). The pod has no kubeconfig and its service account is
-# limited (#430): their presence is the cluster DNS resolving the service,
-# like the catalogue (#515), never the failure marker of an installer.
+# Services in the Kubernetes workspace pod (#528): gitlab, postgres, argocd and
+# llm live in the cluster, installed from the workstation (devzone workspace
+# services). The pod has no kubeconfig and a limited account (#430): their
+# presence is the cluster DNS (like #515), never an installer failure marker.
 dans_pod() {
     [ "${DEVZONE_WORKSPACE:-}" = kubernetes ]
 }
 
 service_module() {
     case "$1" in
-        gitlab | postgres | argocd) return 0 ;;
+        gitlab | postgres | argocd | llm) return 0 ;;
     esac
     return 1
 }
@@ -324,6 +323,7 @@ service_dns() {
         gitlab) echo "gitlab-webservice-default.devzone-gitlab${INSTANCE_SUFFIX}.svc" ;;
         postgres) echo "postgres.devzone-postgres.svc" ;;
         argocd) echo "argocd-server.devzone-argocd.svc" ;;
+        llm) echo "llm.devzone-llm.svc" ;;
     esac
 }
 
