@@ -10,19 +10,24 @@ setup() {
     cat >"$T/bin/docker" <<'DOCKER'
 #!/usr/bin/env bash
 # Fake docker for docker-workstation.bats: running containers are poste1 (folder)
-# and relay1 (devzone.auto); stopped ones are the same when FAKE_EXITED is set.
+# and relay1 (devzone.auto, label devzone.instance=$FAKE_RELAY_INSTANCE, default
+# devzone); stopped ones are the same when FAKE_EXITED is set. A ps filter on
+# another devzone.instance matches nothing, as with the real docker.
 echo "docker $*" >>"$BATS_TEST_TMPDIR/docker.log"
 case "$1" in
     info) [ -z "${FAKE_DOWN:-}" ] ;;
     ps)
         case "$*" in
-            *devzone.auto=true*) id=relay1 ;;
+            *devzone.auto=true*)
+                id=relay1
+                [[ "$*" == *"devzone.instance=${FAKE_RELAY_INSTANCE:-devzone}"* ]] || id=""
+                ;;
             *) id=poste1 ;;
         esac
         if [[ "$*" == *status=exited* ]]; then
-            [ -n "${FAKE_EXITED:-}" ] && echo "$id"
+            [ -n "${FAKE_EXITED:-}" ] && [ -n "$id" ] && echo "$id"
         else
-            [ -n "${FAKE_RUNNING:-}" ] && echo "$id"
+            [ -n "${FAKE_RUNNING:-}" ] && [ -n "$id" ] && echo "$id"
         fi
         ;;
     stop | start) [ -z "${FAKE_OP_KO:-}" ] ;;
@@ -103,4 +108,23 @@ call_fn() {
     call_fn docker_workstation_start
     [ "$status" -eq 0 ]
     [[ "$output" == *"some containers could not be started"* ]] || false
+}
+
+@test "migrate: automatic relay of another instance not stopped" {
+    export FAKE_RELAY_INSTANCE=autre DEVZONE_VOLUMES=devzone
+    ws migrate --yes
+    [ "$status" -eq 0 ]
+    grep -qx "docker stop poste1" "$T/docker.log" || false
+    ! grep -q "docker stop.*relay1" "$T/docker.log" || false
+    grep -q "label=devzone.auto=true --filter label=devzone.instance=devzone" "$T/docker.log" || false
+}
+
+@test "revert: automatic relay of another instance not started again" {
+    echo "workspace=kubernetes" >>"$T/workstation/.devzone.modules"
+    export FAKE_EXITED=1 FAKE_RELAY_INSTANCE=autre DEVZONE_VOLUMES=devzone
+    ws revert
+    [ "$status" -eq 0 ]
+    grep -qx "docker start poste1" "$T/docker.log" || false
+    ! grep -q "docker start.*relay1" "$T/docker.log" || false
+    grep -q "label=devzone.instance=devzone" "$T/docker.log" || false
 }

@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Docker workstation put to sleep when the Kubernetes workspace takes over (#517).
 # Sourced by migrer.sh (stop) and migrer-retour.sh (start). Containers of the
-# workstation folder (label devcontainer.local_folder) and automatic port
-# relays (label devzone.auto=true) are stopped, never removed. Without Docker,
+# workstation folder (label devcontainer.local_folder) and the automatic port
+# relays of this instance (labels devzone.auto=true, devzone.instance) are
+# stopped, never removed. Without Docker,
 # only a warning: the migration does not fail for that.
 
 # Docker answers on the workstation (command present and daemon running).
@@ -10,19 +11,21 @@ docker_workstation_ready() {
     command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1
 }
 
-# Ids, one per line, of the containers of folder $1 and of the automatic relays.
+# Ids, one per line, of the containers of folder $1 and of the automatic relays
+# of this instance (DEVZONE_VOLUMES, default devzone, as in desinstaller.sh): the
+# relays of another devzone on the same machine are not touched.
 # $2 is "running" (docker ps) or "exited" (stopped containers, docker ps -a).
 docker_workstation_ids() {
-    local folder="$1" etat="$2"
+    local folder="$1" etat="$2" instance="${DEVZONE_VOLUMES:-devzone}"
     if [ "$etat" = exited ]; then
         {
             docker ps -aq --filter "label=devcontainer.local_folder=$folder" --filter status=exited
-            docker ps -aq --filter "label=devzone.auto=true" --filter status=exited
+            docker ps -aq --filter "label=devzone.auto=true" --filter "label=devzone.instance=$instance" --filter status=exited
         } 2>/dev/null | sort -u || true
     else
         {
             docker ps -q --filter "label=devcontainer.local_folder=$folder"
-            docker ps -q --filter "label=devzone.auto=true"
+            docker ps -q --filter "label=devzone.auto=true" --filter "label=devzone.instance=$instance"
         } 2>/dev/null | sort -u || true
     fi
 }
