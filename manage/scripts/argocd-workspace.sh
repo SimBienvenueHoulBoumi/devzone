@@ -153,10 +153,15 @@ argocd_install() {
 }
 
 # Installs it when wanted and missing (workspace start); a refusal (memory)
-# is told and the start goes on with helm direct
+# is told and the start goes on with helm direct. A cluster that does not
+# answer is not "helm direct": the start has already stopped on it (#565)
 argocd_ensure() {
     argocd_wanted || return 0
     argocd_installed && return 0
+    if ! kube_ready_reason >/dev/null; then
+        echo "⚠ Argo CD not checked: the cluster does not answer (devzone workspace services enable argocd once it does)" >&2
+        return 0
+    fi
     argocd_install || echo "⚠ Argo CD not installed: the workspace is deployed with helm directly (devzone workspace services enable argocd to retry)" >&2
     return 0
 }

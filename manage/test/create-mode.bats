@@ -20,7 +20,7 @@ case "$*" in
     *"get-contexts"*) [ "${FAKE_CONTEXTS-devzone}" = devzone ] && echo devzone ;;
     *"cluster-info"*) [ "${FAKE_KUBE_CLUSTER_INFO:-ok}" = ok ] ;;
     *"current-context"*) echo kind-poste ;;
-    *"jsonpath"*) echo https://127.0.0.1:6443 ;;
+    *"clusters[0].cluster.server"*) echo https://127.0.0.1:6443 ;;
     *"get application"*) [ "${FAKE_ARGO_APP:-absent}" = present ] ;;
 esac
 KUBECTL
