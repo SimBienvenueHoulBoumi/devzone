@@ -100,7 +100,7 @@ bench() {
         case "$arg" in
             --apply) apply=1 ;;
             --threads | --prompt | --gen) want="${arg#--}" ;;
-            *) refuse "unknown argument: $arg (devzone llm bench [--apply] [--threads 4,8] [--prompt 512] [--gen 64])" ;;
+            *) refuse "unknown argument: $arg (devzone llm bench [--apply] [--threads 4,8] [--prompt 128] [--gen 32])" ;;
         esac
     done
     [ -z "$want" ] || refuse "--$want needs a value"

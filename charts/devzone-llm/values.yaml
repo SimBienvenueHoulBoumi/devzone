@@ -58,9 +58,12 @@ resources:
 # pod, with the models volume read-only, and is removed after ttl seconds.
 bench:
   enabled: false
-  # Prompt tokens (-p), generated tokens (-n) and the thread counts tried (-t)
-  prompt: 512
-  gen: 64
+  # Prompt tokens (-p), generated tokens (-n), repetitions of each test (-r;
+  # llama-bench defaults to 5) and the thread counts tried (-t). Small values:
+  # the whole bench takes a few minutes, even on a slow machine.
+  prompt: 128
+  gen: 32
+  repetitions: 1
   threads: "4,8"
   # Seconds before the finished Job is garbage collected
   ttl: 600

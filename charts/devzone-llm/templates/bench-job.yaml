@@ -41,6 +41,8 @@ spec:
             - {{ .Values.bench.prompt | quote }}
             - -n
             - {{ .Values.bench.gen | quote }}
+            - -r
+            - {{ .Values.bench.repetitions | quote }}
             - -t
             - {{ .Values.bench.threads | quote }}
             - -o
