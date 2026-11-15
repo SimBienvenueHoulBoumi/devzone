@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
-# Installation MySQL (#440) : secret, manifeste et réinstallation sur un volume.
+# Installation MySQL (#440) : secret, chart et réinstallation sur un volume.
+# shellcheck source=SCRIPTDIR/../../chart-direct.sh
+# shellcheck disable=SC1091
+. "$ICI/../../chart-direct.sh"
 
 # Secret admin (mysql-admin) : root.env ou secret existant, jamais régénéré.
 mysql_secret() {
@@ -52,13 +55,11 @@ mysql_installer_argocd() {
     regenerer_identifiants
 }
 
-# Applique le manifeste avec le préfixe de claim choisi (#440)
-mysql_appliquer_manifeste() {
+# Installe le chart charts/devzone-mysql avec le claim choisi (#440, #559)
+mysql_appliquer_chart() {
     local ns="$1" claim="$2"
-    sed -e "s|__APP__|mysql|g" -e "s|__NS__|$ns|g" -e "s|__IMAGE__|$MYSQL_IMAGE|g" \
-        -e "s|__PORT__|$MYSQL_PORT|g" -e "s|__MEMOIRE__|$MYSQL_MEMOIRE|g" \
-        -e "s|__TAILLE__|$MYSQL_TAILLE|g" -e "s|__CLAIM__|$claim|g" \
-        "$ICI/manifeste.yaml" | kubectl --context devzone -n "$ns" apply -f - >/dev/null
+    chart_install mysql "$ns" "image=$MYSQL_IMAGE" "port=$MYSQL_PORT" \
+        "memory=$MYSQL_MEMOIRE" "size=$MYSQL_TAILLE" "claim=$claim"
 }
 
 # (Ré)installe MySQL sur le claim demandé, données du PVC gardées (#440)
@@ -74,7 +75,7 @@ mysql_installer_claim() {
     namespace_isoler "$ns" >/dev/null
     mysql_secret
     k delete statefulset mysql --ignore-not-found >/dev/null 2>&1 || true
-    mysql_appliquer_manifeste "$ns" "$claim"
+    mysql_appliquer_chart "$ns" "$claim" || return 1
     if ! k rollout status statefulset/mysql --timeout="${MYSQL_ATTENTE}s" >/dev/null; then
         echo "devzone : catalogue mysql : pas prêt après ${MYSQL_ATTENTE}s : kubectl --context $CTX -n $ns describe pod mysql-0" >&2
         return 1

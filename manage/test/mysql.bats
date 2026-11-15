@@ -5,6 +5,7 @@
 setup() {
     bats_require_minimum_version 1.5.0
     load commun
+    load commun-helm
     relais_docker_isole
     kube_isole
     # shellcheck disable=SC2034
@@ -81,6 +82,7 @@ if [ "${1:-}" = ls ] && [ "${2:-}" = -g ]; then echo '{"dependencies":{}}'; fi |
 exit 0
 NPM
     chmod +x "$BATS_TEST_TMPDIR"/bin/*
+    helm_fake_install
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
 }
 

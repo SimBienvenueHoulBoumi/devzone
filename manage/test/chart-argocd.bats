@@ -3,7 +3,7 @@
 # chart. The dependency (version pinned in Chart.yaml) is built with
 # `helm dependency build` before the installation; lint and template check
 # that the values of devzone land on the official chart. Skipped without helm,
-# like chart-postgres.bats.
+# like the other chart tests.
 
 setup() {
     RACINE="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"

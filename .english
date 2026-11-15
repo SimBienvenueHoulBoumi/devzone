@@ -21,6 +21,8 @@ manage/test/check-english.bats
 manage/test/readme.bats
 manage/test/services-hook.bats
 manage/test/gitops-gitlab.bats
+manage/test/chart-direct.bats
+manage/test/commun-helm.bash
 manage/test/shard.sh
 manage/test/shard.bats
 manage/test/workspace.bats
@@ -57,14 +59,12 @@ charts/devzone-postgres/values.yaml
 charts/devzone-postgres/templates/service.yaml
 charts/devzone-postgres/templates/statefulset.yaml
 manage/test/argocd-application.bats
-manage/test/chart-postgres.bats
 charts/devzone-mysql/Chart.yaml
 charts/devzone-mysql/values.yaml
 charts/devzone-mysql/templates/service.yaml
 charts/devzone-mysql/templates/statefulset.yaml
 charts/devzone-argocd/Chart.yaml
 charts/devzone-argocd/values.yaml
-manage/test/chart-mysql.bats
 manage/test/chart-argocd.bats
 manage/test/workspace-argocd.bats
 charts/devzone-workspace/Chart.yaml
@@ -85,6 +85,7 @@ charts/devzone-workspace/templates/statefulset.yaml
 .devcontainer/argocd/catalogue-argocd.sh
 .devcontainer/argocd/services-hook.sh
 .devcontainer/argocd/gitops-gitlab.sh
+.devcontainer/chart-direct.sh
 .devcontainer/ports-json.sh
 .devcontainer/help.sh
 manage/scripts/check-charts.sh

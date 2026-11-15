@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Catalogue d'applications (#414) : une application préconfigurée par dossier
-# .devcontainer/catalogue/<app>/ (app.conf, manifeste.yaml), installée dans le
+# .devcontainer/catalogue/<app>/ (app.conf ; le chart charts/devzone-<app>, #559), installée dans le
 # cluster des services de devzone sous son namespace de app.conf ; l'état
 # voulu est la ligne <app>=on|off de .devzone.modules.
 #   catalogue.sh sync | apply | list | resume | json | remove <app>
