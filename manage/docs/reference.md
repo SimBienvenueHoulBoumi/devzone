@@ -308,6 +308,16 @@ Apres `devzone workspace migrate`, `make up`, `make shell` et `make stop` pilote
 
 **Nettoyage** : les volumes Docker ne sont jamais supprimes par `migrer` ni `revenir`. `devzone workspace clean-docker` liste les volumes `devzone-*` presents puis demande [o/N] avant de les supprimer (`--oui` sans terminal ; sinon refus). Irreversible : apres, `revenir` repart de volumes vides.
 
+### Le cluster ne répond pas
+
+`devzone workspace start` (donc `make up` et `make shell`) vérifie le cluster en premier, avant Argo CD, helm et l'attente du pod (#565). Un cluster injoignable donne un seul message, code de sortie 1, et rien d'autre n'est lancé ; le workspace déjà installé n'est ni modifié ni supprimé. Le message dit la cause :
+
+- **Docker Desktop arrêté** : `✖ Docker Desktop is stopped: the Kubernetes cluster of this machine runs inside it. Start Docker Desktop, then: make shell`. C'est le cas quand le contexte est `docker-desktop` (ou que le cluster s'appelle `docker-desktop` et répond sur `127.0.0.1` ou `localhost`) et que `docker info` échoue. Le Kubernetes du poste tourne dans Docker Desktop : le lancer, puis `make shell`.
+- **Docker répond, pas le cluster** : `✖ Kubernetes cluster <contexte> unreachable (<serveur>): enable Kubernetes in Docker Desktop (Settings → Kubernetes) or check kubectl config get-contexts`. Activer Kubernetes dans Docker Desktop (Settings → Kubernetes), ou vérifier le contexte.
+- **Autre contexte** : `✖ Kubernetes cluster <contexte> unreachable (<serveur>)`, suivi de `Check the contexts: kubectl config get-contexts`.
+
+Pour que Docker Desktop démarre à chaque connexion : Settings → General → Start Docker Desktop when you sign in.
+
 ### Applications et services sur localhost du poste
 
 `devzone workspace start` lance un veilleur sur le poste (`manage/scripts/ports-workspace.sh`), `devzone workspace stop` l'arrête avec tous ses `kubectl port-forward`. `devzone workspace ports [start|stop|status]` drives it alone.
