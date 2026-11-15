@@ -206,3 +206,11 @@ KUBE
     [[ "$output" == *"cluster distant refusé : prod"* ]] || false
     [[ "$(cat "$T/kubectl.log")" != *"use-context"* ]] || false
 }
+
+@test "reparer : workspace Kubernetes, pas de veilleur de ports auto (#517)" {
+    DEVZONE_WORKSPACE=kubernetes run bash "$APP" reparer
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"veilleur ports auto"* ]] || false
+    [[ "$(cat "$T/actions.log")" != *"ports-auto demarrer"* ]] || false
+    [[ "$(cat "$T/actions.log")" == *"password regenerer"* ]] || false
+}

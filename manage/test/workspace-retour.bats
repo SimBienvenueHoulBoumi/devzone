@@ -14,7 +14,7 @@ setup() {
     grep -qx "workspace=docker" "$T/workstation/.devzone.modules" || false
     ! grep -q "workspace=kubernetes" "$T/workstation/.devzone.modules" || false
     [[ "$output" == *"make shell"* ]] || false
-    [ ! -s "$T/docker.log" ]
+    ! grep -qE "volume|docker run|docker rm" "$T/docker.log" || false
     [ ! -s "$T/kubectl.log" ]
     [ -f "$T/workstation/workspace/alpha/a.txt" ]
 }

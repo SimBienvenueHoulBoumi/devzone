@@ -33,6 +33,8 @@ kube_rejoindre_reseau() {
 kube_joignable_depuis_conteneur() {
     local fichier="${1:-}" nom serveur hote port noeud
     [ -n "$fichier" ] || return 0
+    # Kubernetes workspace (#517): the pod reaches the API through the cluster service, no docker call
+    if [ "${DEVZONE_WORKSPACE:-}" = kubernetes ]; then return 0; fi
     KUBECONFIG="$fichier" kubectl config view \
         -o jsonpath='{range .clusters[*]}{.name}{"\t"}{.cluster.server}{"\n"}{end}' 2>/dev/null |
         while IFS=$'\t' read -r nom serveur; do

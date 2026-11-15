@@ -92,3 +92,8 @@ manage/test/workspace-clone.bats
 manage/test/ticket.bats
 manage/scripts/workspace-copies.sh
 manage/test/workspace-copies.bats
+manage/scripts/docker-workstation.sh
+manage/test/docker-workstation.bats
+manage/test/kube-joignable.bats
+manage/test/test-gitlab-restes.bats
+.devcontainer/gitlab/test-gitlab-restes.sh
