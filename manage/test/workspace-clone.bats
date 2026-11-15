@@ -66,8 +66,11 @@ GIT
 }
 
 @test "clone: git identity of the workstation copied into the clone" {
+    export GIT_CONFIG_NOSYSTEM=1
     export GIT_CONFIG_GLOBAL="$T/gitconfig"
     printf '[user]\n\tname = Ada\n\temail = ada@example.org\n' >"$GIT_CONFIG_GLOBAL"
+    # The identity is read from the current folder: run it outside any repository.
+    cd "$T" || return 1
     run bash "$CLI" workspace clone https://github.com/acme/devzone.git
     [ "$status" -eq 0 ]
     grep -q "config user.name Ada" "$T/pod.log" || false
