@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Installs or removes a devzone service (gitlab, postgres, argocd) from inside
+# Installs or removes a devzone service (gitlab, postgres, argocd, llm) from inside
 # the Kubernetes workspace pod, with a temporary administrator token (#528).
 #   services-admin.sh enable|disable <service> [options of devzone enable]
 #   services-admin.sh seed gitlab   data of gitlab seeded again, in the pod (#538)
@@ -18,6 +18,9 @@
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# The devzone command beside this script, not the one of the PATH: the copy
+# that runs the installers is the one of this folder (#591)
+DEVZONE_CMD="$HERE/devzone"
 RACINE="${DEVZONE_RACINE:-$(dirname "$HERE")}"
 ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
 SA_DIR="${DEVZONE_SA_DIR:-/var/run/secrets/kubernetes.io/serviceaccount}"
@@ -41,11 +44,11 @@ case "$action" in
     enable | activer) action=enable ;;
     disable | desactiver) action=disable ;;
     seed) ;;
-    *) refuse "usage: services-admin.sh enable|disable|seed gitlab|postgres|argocd [options]" ;;
+    *) refuse "usage: services-admin.sh enable|disable|seed gitlab|postgres|argocd|llm [options]" ;;
 esac
 case "$service" in
-    gitlab | postgres | argocd) ;;
-    *) refuse "unknown service: ${service:-(none)} (gitlab, postgres, argocd)" ;;
+    gitlab | postgres | argocd | llm) ;;
+    *) refuse "unknown service: ${service:-(none)} (gitlab, postgres, argocd, llm)" ;;
 esac
 # The seed of the data (group, demo project, dev user, runner) is gitlab's (#538)
 if [ "$action" = seed ] && [ "$service" != gitlab ]; then
@@ -68,7 +71,7 @@ cluster_before="$(grep -E '^cluster=' "$ETAT" 2>/dev/null | tail -1 | cut -d= -f
 # cluster line of the state as before
 cleanup() {
     rm -f "$kubeconfig"
-    devzone "$service" relay-stop >/dev/null 2>&1 || true
+    "$DEVZONE_CMD" "$service" relay-stop >/dev/null 2>&1 || true
     if [ -n "$cluster_before" ]; then
         etat_ecrire cluster "$cluster_before" || true
     else
@@ -110,6 +113,6 @@ etat_ecrire cluster "$ADMIN_CONTEXT" || refuse "cannot write the state: $ETAT"
 echo "devzone services: $action $service in the cluster of the pod (temporary administrator)"
 case "$action" in
     # The seed is a module command: devzone gitlab seed (#538)
-    seed) devzone gitlab seed "${@:3}" ;;
-    *) devzone "$action" "$service" "${@:3}" ;;
+    seed) "$DEVZONE_CMD" gitlab seed "${@:3}" ;;
+    *) "$DEVZONE_CMD" "$action" "$service" "${@:3}" ;;
 esac

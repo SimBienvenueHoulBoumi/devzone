@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # devzone workspace services (#528): installs or removes the devzone services
-# (gitlab, postgres, mysql, argocd) of a Kubernetes workspace from the workstation.
+# (gitlab, postgres, mysql, argocd, llm) of a Kubernetes workspace from the workstation.
 # Sourced by manage/workspace.sh (drapeau_kubectl, POD, NAMESPACE).
 #   devzone workspace services enable <service> [options]
 #   devzone workspace services disable <service> [--yes]
@@ -19,12 +19,12 @@ SERVICES_ADMIN_SCRIPT="${DEVZONE_SERVICES_ADMIN_SCRIPT:-/usr/local/share/devzone
 SERVICES_TOKEN_DURATION="${DEVZONE_SERVICES_TOKEN_DURATION:-1h}"
 
 services_usage() {
-    echo "devzone workspace services enable|disable <gitlab|postgres|mysql|argocd> [options] | seed gitlab | status"
+    echo "devzone workspace services enable|disable <gitlab|postgres|mysql|argocd|llm> [options] | seed gitlab | status"
 }
 
 services_known() {
     case "${1:-}" in
-        gitlab | postgres | mysql | argocd) return 0 ;;
+        gitlab | postgres | mysql | argocd | llm) return 0 ;;
     esac
     return 1
 }
@@ -36,6 +36,7 @@ services_namespace() {
         postgres) echo devzone-postgres ;;
         mysql) echo devzone-mysql ;;
         argocd) echo devzone-argocd ;;
+        llm) echo devzone-llm ;;
     esac
 }
 
@@ -99,7 +100,7 @@ services_run() {
         return
     fi
     case "$service" in
-        postgres | mysql)
+        postgres | mysql | llm)
             if argocd_holds_charts; then
                 services_argocd_toggle "$service" "$action" "$@"
                 return
@@ -124,7 +125,7 @@ services_run() {
         trap - EXIT
         return 1
     fi
-    echo "▶ $action $service in the pod $POD…"
+    echo "▶ $action $service in the pod ${POD}…"
     # The installer of the pod takes --yes (#557) : no translation, no warning
     # shellcheck disable=SC2046
     printf '%s\n' "$token" | kubectl $(drapeau_kubectl) exec -i "$POD" --namespace "$NAMESPACE" \
@@ -141,7 +142,7 @@ services_run() {
 # One line per service: installed (namespace present) or not
 services_status() {
     local s ns
-    for s in gitlab postgres mysql argocd; do
+    for s in gitlab postgres mysql argocd llm; do
         ns="$(services_namespace "$s")"
         # shellcheck disable=SC2046
         if kubectl $(drapeau_kubectl) get namespace "$ns" >/dev/null 2>&1; then

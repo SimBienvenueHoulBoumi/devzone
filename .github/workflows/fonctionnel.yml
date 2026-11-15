@@ -231,6 +231,7 @@ jobs:
 
   # Code in English: files listed in .english are checked on every run (#502).
   # The charts convention (#554) is checked here too: manage/scripts/check-charts.sh
+  # and $NAME before a non-ASCII byte in the shell scripts (#591): check-utf8-vars.sh
   english:
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -244,6 +245,8 @@ jobs:
       # dependency pulled anonymously (OCI)
       - name: charts convention (manage/scripts/check-charts.sh)
         run: bash manage/scripts/check-charts.sh
+      - name: utf8 variables (manage/scripts/check-utf8-vars.sh)
+        run: bash manage/scripts/check-utf8-vars.sh
 
   # Summary required to merge (requiredChecks): always run, never "skipped"
   # (GitHub would count a skipped job as passed)

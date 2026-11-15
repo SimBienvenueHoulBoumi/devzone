@@ -144,7 +144,7 @@ supprimer_donnees() {
     CTX="$(cluster_lu)"
     [ -n "$CTX" ] || refuse "aucun cluster choisi : devzone enable mysql"
     installe || refuse "module inactif : devzone enable mysql"
-    echo "▶ Suppression de MySQL et de ses volumes sur $CTX…"
+    echo "▶ Suppression de MySQL et de ses volumes sur ${CTX}…"
     # L'Application part d'abord (#538) : sinon Argo CD recrée le namespace
     catalogue_argocd_delete mysql >/dev/null 2>&1 || true
     # RoleBinding retiré puis namespace supprimé par l'administrateur (#430)

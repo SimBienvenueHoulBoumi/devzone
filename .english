@@ -2,6 +2,8 @@
 # manage/scripts/check-english.sh. Add any new code file here.
 .devcontainer/command-aliases.sh
 manage/scripts/check-english.sh
+manage/scripts/check-utf8-vars.sh
+manage/test/check-utf8-vars.bats
 manage/scripts/ci-dns.sh
 manage/scripts/docker.sh
 manage/scripts/kube-ready.sh
@@ -106,3 +108,12 @@ manage/test/test-gitlab-restes.bats
 .devcontainer/gitlab/test-gitlab-restes.sh
 .devcontainer/gitlab/chart.sh
 .devcontainer/gitlab/argocd.sh
+manage/test/chart-llm.bats
+manage/test/llm.bats
+.devcontainer/llm/llm.sh
+.devcontainer/llm/presets.sh
+manage/test/llm-opencode.bats
+.devcontainer/llm/opencode.sh
+.devcontainer/agent-local.sh
+manage/test/agent-local.bats
+manage/test/services-pod-llm.bats

@@ -153,7 +153,7 @@ desinstaller() {
             echo "devzone : postgres : contexte devzone non posé sur $CTX ; nettoyage local seulement" >&2
     fi
     if [ -n "$CTX" ] && installe; then
-        echo "▶ Suppression de PostgreSQL et de toutes ses bases sur $CTX…"
+        echo "▶ Suppression de PostgreSQL et de toutes ses bases sur ${CTX}…"
         # RoleBinding retiré puis namespace supprimé par l'administrateur (#430)
         compte_retirer "$CTX" "$NS" >/dev/null 2>&1 || true
         compte_admin "$CTX" delete namespace "$NS" --wait=true >/dev/null
