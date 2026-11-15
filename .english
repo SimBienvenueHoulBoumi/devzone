@@ -110,3 +110,7 @@ manage/test/chart-llm.bats
 manage/test/llm.bats
 .devcontainer/llm/llm.sh
 .devcontainer/llm/presets.sh
+manage/test/llm-opencode.bats
+.devcontainer/llm/opencode.sh
+.devcontainer/agent-local.sh
+manage/test/agent-local.bats

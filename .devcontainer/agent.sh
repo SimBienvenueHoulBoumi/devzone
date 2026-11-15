@@ -23,21 +23,20 @@ ICI="$(cd -P "$(dirname "$SOURCE")" && pwd)"
 # shellcheck disable=SC2034 # lue par agent-session.sh
 RACINE="${DEVZONE_RACINE:-$(dirname "$ICI")}"
 # Écarts de modèles et attente du réseau (#328)
-# shellcheck source=agent-erreurs.sh
-# shellcheck disable=SC1091
+# shellcheck source=agent-erreurs.sh disable=SC1091
 . "$ICI/agent-erreurs.sh"
 # Fichiers de droits des agents protégés (#361)
-# shellcheck source=agent-droits.sh
-# shellcheck disable=SC1091
+# shellcheck source=agent-droits.sh disable=SC1091
 . "$ICI/agent-droits.sh"
 # Configuration, rang partagé, journal et état (#328)
-# shellcheck source=agent-session.sh
-# shellcheck disable=SC1091
+# shellcheck source=agent-session.sh disable=SC1091
 . "$ICI/agent-session.sh"
 # Workspace Kubernetes : projet et journal dans le pod (#431)
-# shellcheck source=agent-workspace.sh
-# shellcheck disable=SC1091
+# shellcheck source=agent-workspace.sh disable=SC1091
 . "$ICI/agent-workspace.sh"
+# Modèle local en dernier de la rotation (#586)
+# shellcheck source=agent-local.sh disable=SC1091
+. "$ICI/agent-local.sh"
 # Liste de secours si « opencode models opencode » ne répond pas : même ordre
 # que la configuration opencode livrée par devzone.
 FREE_MODELS=(big-pickle deepseek-v4.1-flash-free glm-5.3-flash-free nemotron-3.5-super-vl-free
@@ -78,6 +77,7 @@ agent_lancer() {
         if [ -n "$m" ]; then FREE_MODELS+=("$m"); fi
     done < <(liste_modeles)
     [ "${#FREE_MODELS[@]}" -gt 0 ] || refuse "aucun modèle gratuit disponible"
+    LOCAL_MODELE="$(local_pret)"
     verrou_prendre || refuse "rang des modèles verrouillé : réessayer"
     debut=$(( $(cat "$etat/rang" 2>/dev/null || echo 0) % ${#FREE_MODELS[@]} ))
     if [ "$PAUSE_RANG" -gt 0 ]; then sleep "$PAUSE_RANG"; fi
@@ -97,8 +97,8 @@ agent_lancer() {
         consigne_courante="$c"
     }
     i=0
-    while [ "$i" -lt "${#FREE_MODELS[@]}" ]; do
-        m="${FREE_MODELS[$(( (debut + i) % ${#FREE_MODELS[@]} ))]}"
+    while [ "$i" -lt "$(modeles_total)" ]; do
+        m="$(modele_au_rang "$i" "$debut")"
         if [ "$m" != "$reseau_pour" ]; then reseau_pour="$m"; reseau_n=0; fi
         if modele_ecarte "$m"; then
             i=$(( i + 1 ))

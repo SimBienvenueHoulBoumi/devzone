@@ -87,6 +87,7 @@ teardown() {
     grep -q 'devzone-llm svc/llm 8089:8080$' "$BATS_TEST_TMPDIR/nohup.log"
     [[ "$output" == *"http://llm.devzone-llm.svc.cluster.local:8080/v1"* ]] || false
     [ ! -f "$DEVZONE_ETAT-echec-llm" ]
+    [ "$(jq -r '.provider["devzone-llm"].options.baseURL' "$HOME/.config/opencode/config.json")" = "http://127.0.0.1:8089/v1" ]
 }
 
 @test "enable llm --preset light: the 3B model, 3Gi request and 4Gi limit" {
@@ -142,6 +143,7 @@ teardown() {
     ! grep -q 'delete namespace' "$BATS_TEST_TMPDIR/kubectl.log" || false
     [[ "$output" == *"volume llm-models kept"* ]] || false
     grep -qx 'llm=off' "$DEVZONE_ETAT"
+    [ ! -e "$HOME/.config/opencode/config.json" ]
 }
 
 @test "delete-data: without --yes and without a terminal, refused; with --yes the namespace goes" {

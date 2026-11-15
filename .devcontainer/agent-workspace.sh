@@ -27,7 +27,7 @@ opencode_lancer() {
     if agent_dans_pod; then
         # Dans le pod, le compte de service limité est le seul accès : aucun
         # kubeconfig du poste n'entre dans l'environnement d'opencode.
-        (cd "$dossier" && env -u KUBECONFIG DEVZONE_AGENT_SESSION=1 opencode run --print-logs --log-level ERROR --auto -m "opencode/$m" "$(cat "$consigne")" </dev/null >>"$journal" 2>&1) &
+        (cd "$dossier" && env -u KUBECONFIG DEVZONE_AGENT_SESSION=1 opencode run --print-logs --log-level ERROR --auto -m "$(modele_ref "$m")" "$(cat "$consigne")" </dev/null >>"$journal" 2>&1) &
     else
         if [ -f "$HOME/.kube/config" ]; then
             (umask 077; KUBECONFIG="$HOME/.kube/config" kubectl config view --minify --flatten --context devzone >"$agent_kube") 2>/dev/null || : >"$agent_kube"
@@ -36,7 +36,7 @@ opencode_lancer() {
         else
             : >"$agent_kube"
         fi
-        (cd "$dossier" && KUBECONFIG="$agent_kube" DEVZONE_AGENT_SESSION=1 opencode run --print-logs --log-level ERROR --auto -m "opencode/$m" "$(cat "$consigne")" </dev/null >>"$journal" 2>&1) &
+        (cd "$dossier" && KUBECONFIG="$agent_kube" DEVZONE_AGENT_SESSION=1 opencode run --print-logs --log-level ERROR --auto -m "$(modele_ref "$m")" "$(cat "$consigne")" </dev/null >>"$journal" 2>&1) &
     fi
 }
 

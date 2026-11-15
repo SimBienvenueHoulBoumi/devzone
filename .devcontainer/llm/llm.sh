@@ -3,14 +3,13 @@
 # cluster of the services, namespace devzone-llm, chart charts/devzone-llm.
 #   llm.sh install [--preset default|light] [--context CTX]
 #   llm.sh uninstall           release removed, the volume llm-models is kept
-#   llm.sh status | relay-start | relay-stop
+#   llm.sh status | relay-start | relay-stop | policy (ingress from devzone-workspace)
 #   llm.sh preset [--preset P] preset stored for the next install (Argo CD path)
-#   llm.sh policy              ingress allowed from the namespace devzone-workspace
 #   llm.sh apply on|off [...]  what `devzone enable|disable llm` runs
 #   llm.sh delete-data [--yes] namespace and volume removed (the model is downloaded again)
-# The first start downloads the model (several minutes): LLM_ATTENTE (seconds,
-# default 1800) is the wait. The relay LLM_PORT (default 8089) reaches the
-# service from the container. bash 3.2 (macOS).
+# First start = model download: LLM_ATTENTE (seconds, default 1800) is the wait.
+# The relay LLM_PORT (default 8089) reaches the service. The opencode provider is
+# opencode.sh. bash 3.2 (macOS).
 set -euo pipefail
 
 ICI="$(cd "$(dirname "$0")" && pwd)"
@@ -140,6 +139,7 @@ install() {
     wait_ready || return 1
     relais_arreter llm
     relais_lancer llm "$ctx" "$NS" svc/llm "$LLM_PORT:8080"
+    bash "$ICI/opencode.sh" set
     echo "✔ Local model ready: http://llm.$NS.svc.cluster.local:8080/v1 (127.0.0.1:$LLM_PORT here)"
 }
 
@@ -148,6 +148,7 @@ uninstall() {
     local ctx
     ctx="$(cluster_lu)"
     relais_arreter llm
+    bash "$ICI/opencode.sh" unset
     if [ -n "$ctx" ] && installed; then
         contexte_devzone_poser "$ctx" || true
         helm --kube-context devzone uninstall llm -n "$NS" >/dev/null 2>&1 || true
@@ -219,7 +220,7 @@ apply() {
             relay_start
             echo "devzone: llm: relay restarted"
         elif [[ "$current" == "ready on"* ]]; then
-            echo "devzone: llm already active, nothing to do."
+            bash "$ICI/opencode.sh" set && echo "devzone: llm already active, nothing to do."
         elif ! bash "${BASH_SOURCE[0]}" install "$@"; then
             state_off
             echo llm >"$marker"
