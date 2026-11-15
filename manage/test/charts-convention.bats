@@ -191,3 +191,10 @@ edit_demo() {
     [ "$status" -eq 1 ]
     [[ "$output" == *"folder not found"* ]] || false
 }
+
+@test "check-charts: the charts of the repository conform (helm not run here)" {
+    RACINE="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
+    run env -u CHARTS_DIR -u CHARTS_CODE_DIRS CHARTS_NO_HELM=1 bash "$RACINE/manage/scripts/check-charts.sh"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"✔ charts : 4 charts conformes"* ]] || false
+}

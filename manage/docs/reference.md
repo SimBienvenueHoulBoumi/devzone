@@ -488,6 +488,8 @@ La famille se déduit du chart : `dependencies:` présent = enveloppe, sinon ser
 | `claim` | nom du volume claim template mouté par le conteneur | `donnees` |
 | `resources` | autres ressources du conteneur (`requests`/`limits` de CPU, etc.) | `requests: {cpu: 100m}` |
 
+`devzone-workspace` fait exception : c'est le poste lui-même, dont les volumes se règlent par `workspace.size` et `persistence`, pas par ces clés.
+
 **Contrôle**
 
 Le script `manage/scripts/check-charts.sh` applique la convention à chaque dossier de `charts/` et à toute référence `charts/devzone-<x>` du code ; il lance `helm lint` et le rendu quand helm est présent. Un manquement s'affiche `✖ charts/<x> : <règle>` et fait échouer le contrôle. Avant d'appliquer un chart, devzone vérifie que `charts/devzone-<service>/Chart.yaml` existe et porte `name: devzone-<service>` ; sinon il s'arrête avant tout appel à `kubectl` ou `helm`, sort avec le code 2 et affiche `✖ <service> : chart charts/devzone-<service> missing or misnamed (manage/docs/reference.md#charts-de-devzone)`. Les appelants du catalogue (`app.sh`, `mysql.sh`) reçoivent cet échec comme un échec ordinaire et sortent en code 1.

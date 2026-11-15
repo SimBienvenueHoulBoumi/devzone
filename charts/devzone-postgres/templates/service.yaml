@@ -5,11 +5,13 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     app: postgres
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/part-of: devzone
     app.kubernetes.io/managed-by: devzone
 spec:
   selector:
     app: postgres
   ports:
     - name: postgres
-      port: 5432
+      port: {{ .Values.port }}
       targetPort: 5432

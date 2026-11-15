@@ -3,6 +3,10 @@ kind: RoleBinding
 metadata:
   name: devzone-workspace
   namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: {{ include "devzone-workspace.name" . }}
+    app.kubernetes.io/part-of: devzone
+    app.kubernetes.io/managed-by: devzone
 subjects:
   - kind: ServiceAccount
     name: {{ include "devzone-workspace.serviceAccountName" . }}

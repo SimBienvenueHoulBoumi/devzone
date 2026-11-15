@@ -3,6 +3,10 @@ kind: StatefulSet
 metadata:
   name: {{ include "devzone-workspace.fullname" . }}
   namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: {{ include "devzone-workspace.name" . }}
+    app.kubernetes.io/part-of: devzone
+    app.kubernetes.io/managed-by: devzone
 spec:
   serviceName: {{ include "devzone-workspace.fullname" . }}
   replicas: {{ .Values.replicaCount }}
