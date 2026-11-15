@@ -50,6 +50,7 @@ revert_workspace() {
         done <<<"$list"
     fi
     record_workspace docker || { fail "cannot write .devzone.modules"; return 1; }
+    docker_workstation_start "$PWD"
     echo "✔ workspace=docker: Docker workstation and its volumes are intact. Start it again: make shell"
 }
 

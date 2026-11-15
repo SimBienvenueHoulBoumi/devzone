@@ -192,9 +192,11 @@ record_workspace() {
 }
 
 # Step 5: switch, workspace=kubernetes recorded on workstation; nothing is deleted.
+# The Docker workstation containers and port relays are stopped, not removed (#517).
 step_switch() {
     echo "▶ [5/5] switch: workspace=kubernetes in .devzone.modules"
     record_workspace kubernetes || { fail "cannot write .devzone.modules"; return 1; }
+    docker_workstation_stop "$PWD"
     echo "  ✔ done; Docker workstation and its volumes are intact (rollback: devzone workspace revert)"
 }
 
