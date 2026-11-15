@@ -95,7 +95,7 @@ KUBE
         contenu="$(awk '/^## Pour les contributeurs/{exit} {print}' "$RACINE_TEST/$fichier")"
         [[ "$contenu" != *"bash .devcontainer/"* ]] || { echo "$fichier : script direct"; false; }
         [[ "$contenu" != *"kubectl config use-context"* ]] || { echo "$fichier : kubectl direct"; false; }
-        if grep -qE 'DEVZONE_[A-Z_]+=' <<<"${contenu//DEVZONE_NO_DEPRECATION=/}"; then
+        if grep -qE 'DEVZONE_[A-Z_]+=' <<<"$contenu"; then
             echo "$fichier : variable interne"
             false
         fi
