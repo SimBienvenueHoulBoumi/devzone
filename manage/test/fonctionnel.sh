@@ -101,7 +101,7 @@ done
 
 echo "▶ Module ia"
 reussit "enable ia" "devzone enable ia && claude --version && opencode --version" "Claude Code"
-reussit "ia : garde-fou repowarden branché (Claude Code, opencode)" "grep -q 'repowarden garde' ~/.claude/settings.json && test -f ~/.config/opencode/plugins/repowarden-garde.js"
+reussit "ia : garde-fou repowarden branché (Claude Code, opencode)" "grep -qE 'repowarden (garde|guard)' ~/.claude/settings.json && test -f ~/.config/opencode/plugins/repowarden-garde.js"
 reussit "ia : configuration opencode par défaut en place" "grep -q '^// devzone : configuration opencode par défaut' ~/.config/opencode/opencode.jsonc && grep -q '\"model\": \"opencode/big-pickle\"' ~/.config/opencode/opencode.jsonc"
 # Chaque modèle de la configuration doit être proposé par la version installée
 modeles="$(dz "grep -oE '\"opencode/[^\"]+\"' ~/.config/opencode/opencode.jsonc | tr -d '\"' | sort -u")"
@@ -126,7 +126,7 @@ else
 fi
 # Action d'agent sur main dans un dépôt neuf (hooks repowarden globaux) : refusée (code 2)
 # shellcheck disable=SC2016 # commande développée dans le conteneur
-echoue "ia : garde-fou : modification sur main refusée" 'd="$(mktemp -d)" && cd "$d" && git init -q -b main && printf "{\"tool_name\":\"Write\",\"tool_input\":{\"file_path\":\"%s/a.txt\"},\"cwd\":\"%s\"}" "$d" "$d" | repowarden garde --format claude' "branche protégée"
+echoue "ia : garde-fou : modification sur main refusée" 'd="$(mktemp -d)" && cd "$d" && git init -q -b main && printf "{\"tool_name\":\"Write\",\"tool_input\":{\"file_path\":\"%s/a.txt\"},\"cwd\":\"%s\"}" "$d" "$d" | repowarden guard --format claude' "branche protégée"
 reussit "disable ia" "devzone disable ia && ! command -v claude"
 echoue "module inconnu refusé" "devzone enable nexistepas" "module inconnu"
 
