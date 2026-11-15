@@ -36,7 +36,7 @@ devzone prépare un devcontainer Ubuntu lancé par Docker, avec des versions d'o
 ### Prérequis
 
 - Docker Desktop (ou Docker Engine sous Linux). Pour Kubernetes (facultatif) : activer le cluster de Docker Desktop (*Settings → Kubernetes → Enable Kubernetes*).
-- Pour le [workspace Kubernetes](manage/docs/reference.md#workspace-kubernetes) (facultatif, `devzone workspace migrate` pour quitter le poste Docker, `devzone workspace revert` pour y retourner) : un cluster Kubernetes 1.30 ou plus, `kubectl` et `helm` sur la machine, et Docker pour lire les volumes à migrer.
+- Pour le [workspace Kubernetes](manage/docs/reference.md#workspace-kubernetes), c'est le mode par défaut dès qu'un cluster répond à la création : un cluster Kubernetes 1.30 ou plus, `kubectl` et `helm` sur la machine. Docker n'est alors pas nécessaire ; il l'est pour le poste Docker, et pour lire les volumes à migrer (`devzone workspace migrate`, `devzone workspace revert` pour y retourner).
 - Node et npm (pour `npx` ou l'installation globale).
 - `make` (nécessaire pour `make shell` ; sous Windows sans `make`, voir le tableau « Au quotidien »).
 
@@ -91,6 +91,23 @@ devzone : état (devzone pour le réafficher)
 ```
 
 Le premier lancement prend 4 à 5 min mesurées, plus le téléchargement des images de base sur une machine neuve.
+
+### Kubernetes ou Docker à la création
+
+À la création, le poste suit le cluster : Kubernetes s'il répond, Docker sinon.
+
+```text
+devzone mon-devzone
+  │
+  ├─ cluster qui répond ──▶ workspace dans le cluster (Kubernetes)
+  │                         make shell ouvre le pod ; pas de migration
+  │
+  └─ sinon ───────────────▶ poste Docker
+                            make shell lance le conteneur ;
+                            plus tard : devzone workspace migrate
+```
+
+`devzone mon-devzone --kubernetes` exige le cluster : sans lui, rien n'est créé. `devzone mon-devzone --docker` garde le poste Docker sans contrôler le cluster. Détails dans [manage/docs/reference.md](manage/docs/reference.md#création-directe-dans-le-cluster).
 
 ### Vérifier que tout fonctionne
 
@@ -158,7 +175,7 @@ La liste vit dans `.devzone.paquets` à la racine du dossier devzone, hors du d�
 | État | — | `make status` | — |
 | **Désinstaller** (tout ce que devzone a créé, après confirmation) | — | `make uninstall` | `npx devzone uninstall` |
 
-Après `devzone workspace migrate`, `make up`, `make shell` et `make stop` pilotent le workspace Kubernetes ; `devzone workspace revert` rend le poste Docker. Les services GitLab, PostgreSQL et Argo CD s'y installent depuis le poste : `devzone workspace services enable postgres` (voir [la référence](manage/docs/reference.md#services-de-devzone-dans-le-workspace-kubernetes)). Argo CD y est installé d'office et tient les déploiements : interface sur https://localhost:8443 (mot de passe `admin` dans `.password`), dépôt GitOps `<login>/devzone-argocd` créé sur ton GitHub, projets déclarés dans `.argocd.conf` (`devzone workspace argocd app add <dépôt>`) ; voir [Argo CD dans le workspace Kubernetes](manage/docs/reference.md#argo-cd-dans-le-workspace-kubernetes).
+Après `devzone workspace migrate`, `make up`, `make shell` et `make stop` pilotent le workspace Kubernetes ; `devzone workspace revert` rend le poste Docker. Les services GitLab, PostgreSQL et Argo CD s'y installent depuis le poste : `devzone workspace services enable postgres` (voir [la référence](manage/docs/reference.md#services-de-devzone-dans-le-workspace-kubernetes)). Tu peux aussi y développer : `devzone workspace clone <url>` fait un clone de travail dans le pod, `devzone ticket <n>` y crée le worktree d'un ticket et `devzone agent` y lance opencode sans copie ([développer dans le pod](manage/docs/reference.md#développer-devzone-et-repowarden-dans-le-pod)). Argo CD y est installé d'office et tient les déploiements : interface sur https://localhost:8443 (mot de passe `admin` dans `.password`), dépôt GitOps `<login>/devzone-argocd` créé sur ton GitHub, projets déclarés dans `.argocd.conf` (`devzone workspace argocd app add <dépôt>`) ; voir [Argo CD dans le workspace Kubernetes](manage/docs/reference.md#argo-cd-dans-le-workspace-kubernetes).
 
 ### Mettre à jour devzone
 
@@ -185,6 +202,8 @@ La mise à jour ne change jamais le mode du poste ; sur un poste Docker avec Kub
 Dans le conteneur, le récapitulatif `devzone` signale une version publiée plus récente (vérification npm au plus une fois par jour, sans bloquer hors ligne) : `○ devzone X.Y.Z disponible : sur le poste, devzone update`.
 
 ## Options
+
+**Mode à la création** : `--kubernetes` (workspace dans le cluster, refusé sans cluster) ou `--docker` (poste Docker, sans contrôle du cluster). Sans option, le mode suit le cluster (voir [Kubernetes ou Docker à la création](#kubernetes-ou-docker-à-la-création)).
 
 **Module `ia`** : active Claude Code et opencode (versions figées), avec le garde-fou repowarden qui les arrête avant de modifier `main` ou `develop` ou de commiter sans `repowarden cc` (voir [manage/docs/reference.md](manage/docs/reference.md#garde-fou-des-assistants-ia)). Pour l'activer : `devzone enable ia`. Ils sont désinstallés quand le module est désactivé, mais tes connexions restent dans leurs volumes.
 

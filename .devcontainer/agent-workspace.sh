@@ -49,18 +49,31 @@ workspace_disponible() {
 }
 
 # Lance la consigne dans le pod, puis rapatrie son journal même en échec.
+# Un chemin /workspaces/projets/... absent du poste désigne un dossier du pod
+# (clone ou worktree de devzone ticket, #558) : rien n'est copié.
 agent_workspace() {
-    local dossier="$1" consigne="$2" nom journal code=0
+    local dossier="$1" consigne="$2" nom journal code=0 dans_pod=""
     local racine_pod=/home/vscode/.local/share/devzone
-    [ -d "$dossier" ] || refuse "dossier introuvable : $dossier (cherché depuis $(pwd))"
-    nom="$(basename "$(cd "$dossier" && pwd -P)")"
-    if ! agent_kc exec devzone-workspace-0 -c workspace -- test -d "/workspaces/projets/$nom" 2>/dev/null; then
-        refuse "projet $nom absent du workspace Kubernetes : devzone workspace copier-vers $dossier (sur la machine), ou --local"
+    case "$dossier" in
+        /workspaces/projets/*) [ -d "$dossier" ] || dans_pod="$dossier" ;;
+    esac
+    if [ -n "$dans_pod" ]; then
+        nom="$(basename "$dans_pod")"
+        if ! agent_kc exec devzone-workspace-0 -c workspace -- test -d "$dans_pod" 2>/dev/null; then
+            refuse "dossier introuvable dans le pod : $dans_pod (devzone workspace clone, puis devzone ticket <n> dans le pod)"
+        fi
+    else
+        [ -d "$dossier" ] || refuse "dossier introuvable : $dossier (cherché depuis $(pwd))"
+        nom="$(basename "$(cd "$dossier" && pwd -P)")"
+        dans_pod="/workspaces/projets/$nom"
+        if ! agent_kc exec devzone-workspace-0 -c workspace -- test -d "$dans_pod" 2>/dev/null; then
+            refuse "projet $nom absent du workspace Kubernetes : devzone workspace copier-vers $dossier (sur la machine), ou --local"
+        fi
     fi
-    echo "devzone agent : workspace Kubernetes (pod devzone-workspace-0, /workspaces/projets/$nom) ; --local pour le conteneur"
+    echo "devzone agent : workspace Kubernetes (pod devzone-workspace-0, $dans_pod) ; --local pour le conteneur"
     agent_kc cp "$consigne" "devzone-workspace-0:/tmp/devzone-agent-$nom.md" -c workspace
-    agent_kc exec devzone-workspace-0 -c workspace -- env DEVZONE_RACINE="$racine_pod" bash -lc 'devzone agent "$1" "$2"' _ "/workspaces/projets/$nom" "/tmp/devzone-agent-$nom.md" || code=$?
-    journal="$(journal_de "$dossier")"
+    agent_kc exec devzone-workspace-0 -c workspace -- env DEVZONE_RACINE="$racine_pod" bash -lc 'devzone agent "$1" "$2"' _ "$dans_pod" "/tmp/devzone-agent-$nom.md" || code=$?
+    journal="$(journal_de "$nom")"
     mkdir -p "$(dirname "$journal")"
     if ! agent_kc exec devzone-workspace-0 -c workspace -- cat "$racine_pod/workspace/.agents/$nom.log" >>"$journal"; then
         echo "=== journal du pod introuvable" >>"$journal"
@@ -73,6 +86,7 @@ agent_aide() {
 usage : devzone agent [--local] <dossier> <fichier-consigne>
         lance opencode sur la consigne, modèles gratuits en rotation
         workspace Kubernetes d'abord s'il tourne ; --local : ce conteneur
+        un chemin /workspaces/projets/... absent d'ici est un dossier du pod, sans copie
         devzone agent etat
         sessions connues et modèles écartés
         devzone agent liberer [<modèle>|--tous]

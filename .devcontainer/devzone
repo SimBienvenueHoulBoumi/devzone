@@ -1426,6 +1426,7 @@ case "${1:-}" in
     agent)
         bash "$ICI/agent.sh" "${@:2}"
         ;;
+    ticket) bash "$ICI/ticket.sh" "${@:2}" ;;
     build)
         bash "$ICI/workspace-build.sh" "${@:2}"
         ;;

@@ -279,6 +279,19 @@ L'image vient de ghcr.io, avec le tag de la version de devzone (`latest` depuis 
 - **Conservation** : le PVC porte l annotation `helm.sh/resource-policy: keep` et n est jamais supprime par `helm uninstall` : `devzone workspace stop` retire le pod, pas les projets. Le perdre demande une suppression a la main dans le cluster.
 - **Copies** : `devzone workspace copy-to <dossier>` copie le dossier du poste dans `/workspaces/projets/<nom du dossier>` ; `devzone workspace copy-from <dossier>` ramene `/workspaces/projets/<nom du dossier>` dans ce dossier du poste. Les deux passent par `kubectl cp` (tar est present dans l image).
 
+### Création directe dans le cluster
+
+`devzone <dossier>` choisit le mode du poste d'après le cluster (#497) :
+
+- **Kubernetes** si `kubectl` et `helm` sont là et que le cluster répond (contexte `devzone` s'il est déclaré, sinon le contexte courant, en 5 s). Le dossier est créé avec `workspace=kubernetes` dans `.devzone.modules`, puis le workspace est installé dans le cluster depuis le dossier (comme `devzone workspace start`). Pas de `devzone workspace migrate` : il n'y a pas de volumes Docker à copier.
+- **Docker** sinon : un avertissement dit pourquoi le cluster ne répond pas, et `workspace=docker` est écrit ; `devzone workspace migrate` reste possible plus tard.
+
+Options : `--kubernetes` exige le cluster et échoue sans rien créer (le contrôle se fait avant la copie des fichiers) ; `--docker` garde le poste Docker sans contrôler le cluster ; les deux ensemble sont refusés. Sans option, le mode suit le cluster.
+
+Dans ce mode, Docker n'est pas nécessaire sur le poste. Les connexions gh et opencode se font dans le pod, au premier `make shell`.
+
+Un workspace déjà installé dans le cluster (release helm `devzone-workspace`, ou Application Argo CD du même nom) est annoncé à la création : le nouveau dossier le pilote aussi, et `devzone workspace start` le met à jour par `helm upgrade`, sans perte (les volumes restent).
+
 ### Migration depuis le poste Docker
 
 `devzone workspace migrate [--oui]` se lance sur le poste, dans le dossier devzone. Il demande une confirmation [o/N] (`--oui` pour s'en passer ; sans terminal et sans `--oui`, il refuse), puis enchaine cinq etapes, chacune annoncee, et s'arrete a la premiere erreur avec un message clair. Il copie, il ne supprime rien.
@@ -294,6 +307,16 @@ Apres `devzone workspace migrate`, `make up`, `make shell` et `make stop` pilote
 **Retour arriere** : `devzone workspace revert` remet `workspace=docker` et rappelle `make shell`. Le poste Docker et ses volumes n'ont jamais ete touches par `migrate` : rien d'autre a faire. `--rapatrier` recopie d'abord tous les projets du pod dans `./workspace` (`copier-depuis`, les dossiers du poste du meme nom sont ecrases) ; en cas d'echec, la bascule n'a pas lieu.
 
 **Nettoyage** : les volumes Docker ne sont jamais supprimes par `migrate` ni `revenir`. `devzone workspace clean-docker` liste les volumes `devzone-*` presents puis demande [o/N] avant de les supprimer (`--oui` sans terminal ; sinon refus). Irreversible : apres, `revenir` repart de volumes vides.
+
+### Le cluster ne répond pas
+
+`devzone workspace start` (donc `make up` et `make shell`) vérifie le cluster en premier, avant Argo CD, helm et l'attente du pod (#565). Un cluster injoignable donne un seul message, code de sortie 1, et rien d'autre n'est lancé ; le workspace déjà installé n'est ni modifié ni supprimé. Le message dit la cause :
+
+- **Docker Desktop arrêté** : `✖ Docker Desktop is stopped: the Kubernetes cluster of this machine runs inside it. Start Docker Desktop, then: make shell`. C'est le cas quand le contexte est `docker-desktop` (ou que le cluster s'appelle `docker-desktop` et répond sur `127.0.0.1` ou `localhost`) et que `docker info` échoue. Le Kubernetes du poste tourne dans Docker Desktop : le lancer, puis `make shell`.
+- **Docker répond, pas le cluster** : `✖ Kubernetes cluster <contexte> unreachable (<serveur>): enable Kubernetes in Docker Desktop (Settings → Kubernetes) or check kubectl config get-contexts`. Activer Kubernetes dans Docker Desktop (Settings → Kubernetes), ou vérifier le contexte.
+- **Autre contexte** : `✖ Kubernetes cluster <contexte> unreachable (<serveur>)`, suivi de `Check the contexts: kubectl config get-contexts`.
+
+Pour que Docker Desktop démarre à chaque connexion : Settings → General → Start Docker Desktop when you sign in.
 
 ### Applications et services sur localhost du poste
 
@@ -338,6 +361,18 @@ Le cache d'images reste dans le système de fichiers du sidecar `buildkitd` : il
 2. Dossier ouvert par le backend : `/workspaces/projets/<projet>`.
 
 En attendant ces deux points, edite le projet sur le poste par les copies : `devzone workspace copy-to <dossier>` avant, `devzone workspace copy-from <dossier>` apres.
+
+### Développer devzone et repowarden dans le pod
+
+Les clones de travail, les worktrees des tickets et les agents vivent dans le pod ; le poste ne garde que le pilotage.
+
+1. **Cloner** (depuis le poste) : `devzone workspace clone <url> [<nom>]` fait un `git clone` HTTPS dans `/workspaces/projets/<nom>` du pod (le nom par défaut est celui du dépôt), branche les identifiants git du pod sur `gh`, copie ton identité git du poste dans le clone et y installe les hooks (`repowarden install`). Relancée, elle ne refait rien ; un dossier qui existe avec un autre remote est refusé. Exemples : `devzone workspace clone https://github.com/SimBienvenueHoulBoumi/devzone` et `…/repowarden`.
+2. **Un worktree par ticket** (dans le pod) : `devzone ticket <n> [--repo devzone|repowarden]` crée `/workspaces/projets/devzone-wt/dz-<n>` (ou `/workspaces/projets/repowarden-wt/rw-<n>`), y exécute `repowarden ticket <n>` (branche créée depuis develop et liée) et affiche le chemin. Une fois la PR fusionnée : `devzone ticket done <n>` retire le worktree et la branche locale ; il refuse si le worktree n'est pas propre ou si la branche existe encore sur origin. Dans le conteneur d'outils, la même commande utilise `/workspaces/devzone` et `workspace/wt/dz-<n>` (devzone seulement).
+3. **Agent** : `devzone agent /workspaces/projets/devzone-wt/dz-<n> <consigne>` depuis le poste lance opencode directement dans ce dossier du pod, sans copie (un chemin `/workspaces/projets/…` absent du poste désigne le pod) ; `--local` garde le conteneur d'outils. `devzone workspace start` exécute `repowarden agents init --global` dans le pod quand le module `ia` y est actif : un agent y est arrêté avant de modifier develop.
+4. **Pousser** : `git push` depuis le worktree, en HTTPS avec les identifiants de `gh` ; la PR se fait comme partout.
+5. **Copies obsolètes** : `devzone workspace copy-to` refuse d'écraser un dossier du pod qui est un clone git d'un autre remote ; `devzone workspace status` signale les anciennes copies `repogarde/` et `wt/` (leur `.git` pointe hors du pod) avec la commande pour les retirer, à lancer après sauvegarde.
+
+Reste sur le poste : `make up` et `make rebuild`, `devzone workspace start` et l'image du devcontainer.
 
 ### Testcontainers et docker dans le workspace
 
@@ -846,7 +881,7 @@ Les tests isolent le relais Docker (`DEVZONE_RELAIS_SOCKET=…`,
 `--confirmer CTX` et conserve `DEVZONE_CLUSTER_DISTANT=<contexte>` pour les
 tests et la CI. Un changement de contexte direct (`kubectl config
 use-context CTX`) ne doit être fait que dans un test isolé. L'isolation des
-volumes utilise `DEVZONE_VOLUMES=<préfixe>`.
+volumes utilise `DEVZONE_VOLUMES=<préfixe>`. `DEVZONE_SANS_DEMARRER=1` fait que `devzone <dossier>` crée le dossier sans lancer le workspace (la commande est affichée) : c'est le mode des tests et de la CI.
 
 ### Anciens noms de commandes : avertissement
 

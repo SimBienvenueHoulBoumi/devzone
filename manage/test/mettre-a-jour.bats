@@ -26,6 +26,8 @@ fabriquer_paquet() {
     cp "$CLI" "$dossier/manage/devzone"
     chmod +x "$dossier/manage/devzone"
     cp "$RACINE/.devcontainer/argocd/conf.sh" "$dossier/.devcontainer/argocd/conf.sh"
+    # creer sources the mode check (#497) from the package
+    cp "$RACINE/manage/scripts/create-mode.sh" "$RACINE/manage/scripts/kube-ready.sh" "$dossier/manage/scripts/"
     printf '{"name":"devzone","version":"%s"}\n' "$v" >"$dossier/package.json"
     printf '# makefile %s\n' "$marque" >"$dossier/Makefile"
     printf '*.sh text eol=lf\n' >"$dossier/.gitattributes"
@@ -311,7 +313,7 @@ echo moi' ]
 }
 
 @test "mode kubernetes : conseil affiché, make rebuild jamais proposé" {
-    cp "$RACINE/manage/scripts/poste.sh" "$T/v2/manage/scripts/poste.sh"
+    cp "$RACINE/manage/scripts/poste.sh" "$RACINE/manage/scripts/kube-ready.sh" "$T/v2/manage/scripts/"
     creer_v1
     printf 'workspace=kubernetes\n' >"$DZ/.devzone.modules"
     cd "$DZ"

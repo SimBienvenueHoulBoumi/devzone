@@ -20,6 +20,8 @@ T="$BATS_TEST_TMPDIR"
 echo "kubectl $*" >>"$T/kubectl.log"
 case "$*" in
     "config get-contexts -o name") echo docker-desktop ;;
+    "config current-context") echo docker-desktop ;;
+    *"cluster-info"*) [ -z "${FAKE_CLUSTER_DOWN:-}" ]; exit $? ;;
     *"get namespace devzone-argocd"*) [ -f "$T/argocd-ns" ]; exit $? ;;
     *"get nodes "*) echo "${FAKE_MEMORY:-4Gi}" ;;
     *"create namespace "*"--dry-run=client"*) echo "kind: Namespace" ;;
@@ -98,7 +100,12 @@ case "$all" in
 esac
 exit 0
 GH
-    chmod +x "$T/bin/kubectl" "$T/bin/helm" "$T/bin/gh"
+    # Fake docker (#565): Docker Desktop stopped when FAKE_DOCKER=down; never the real one
+    cat >"$T/bin/docker" <<'DOCKER'
+#!/usr/bin/env bash
+[ "${FAKE_DOCKER:-up}" = up ]
+DOCKER
+    chmod +x "$T/bin/kubectl" "$T/bin/helm" "$T/bin/gh" "$T/bin/docker"
     export PATH="$T/bin:$PATH"
     export DEVZONE_WORKSPACE_ATTENTE=1 DEVZONE_WORKSPACE_PAS=0.1
     export DEVZONE_ARGOCD_REVISION="feat/essai"
@@ -228,6 +235,16 @@ gitops_ready() {
     [ "$status" -eq 0 ]
     [[ "$output" == *"⚠ Argo CD not installed: the workspace is deployed with helm directly"* ]] || false
     grep -q 'upgrade --install devzone-workspace' "$T/helm.log"
+}
+
+@test "argocd_ensure: cluster stopped, no helm-direct notice, no helm (#565)" {
+    export FAKE_CLUSTER_DOWN=1 FAKE_DOCKER=down
+    # Sourced without arguments: workspace.sh would dispatch them as a subcommand
+    run bash -c 'f="$1"; set --; . "$f" >/dev/null 2>&1; argocd_ensure' _ "$RACINE/manage/workspace.sh"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"⚠ Argo CD not checked: the cluster does not answer"* ]] || false
+    [[ "$output" != *"helm directly"* ]] || false
+    [ ! -s "$T/helm.log" ]
 }
 
 @test "workspace stop: the Application is deleted when it exists, helm uninstall otherwise" {
