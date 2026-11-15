@@ -48,9 +48,15 @@ admin_setup() {
     mkdir -p "$DEVZONE_SA_DIR"
     printf -- '-----BEGIN CERTIFICATE-----\nCA\n-----END CERTIFICATE-----\n' >"$DEVZONE_SA_DIR/ca.crt"
     : >"$T/devzone.log"
-    # Fake devzone: logs its arguments, keeps a copy of the kubeconfig and of
-    # the state as seen during the run
-    cat >"$T/bin/devzone" <<'DZ'
+    # services-admin.sh runs the devzone beside it (#591): copy of the script
+    # and of its state helpers in $T/pod, fake devzone next to them
+    mkdir -p "$T/pod"
+    cp "$RACINE/.devcontainer/services-admin.sh" "$RACINE/.devcontainer/etat.sh" \
+        "$RACINE/.devcontainer/etat-verrou.sh" "$T/pod/"
+    ADMIN="$T/pod/services-admin.sh"
+    # Fake devzone beside the script: logs its arguments, keeps a copy of the
+    # kubeconfig and of the state as seen during the run
+    cat >"$T/pod/devzone" <<'DZ'
 #!/usr/bin/env bash
 T="$BATS_TEST_TMPDIR"
 echo "devzone $*" >>"$T/devzone.log"
@@ -62,6 +68,13 @@ if [ "${1:-}" != relay-stop ] && [ "${2:-}" != relay-stop ]; then
 fi
 exit 0
 DZ
+    chmod +x "$T/pod/devzone"
+    # Another fake devzone on the PATH: must never be called
+    cat >"$T/bin/devzone" <<'DZPATH'
+#!/usr/bin/env bash
+echo "PATH devzone $*" >>"$BATS_TEST_TMPDIR/path-devzone.log"
+exit 0
+DZPATH
     chmod +x "$T/bin/devzone"
 }
 
@@ -90,4 +103,5 @@ DZ
     [ "$status" -eq 0 ]
     grep -q '^devzone enable llm --preset light$' "$T/devzone.log"
     grep -q '^devzone llm relay-stop$' "$T/devzone.log"
+    [ ! -e "$T/path-devzone.log" ]
 }
