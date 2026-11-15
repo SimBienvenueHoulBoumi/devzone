@@ -286,7 +286,7 @@ L'image vient de ghcr.io, avec le tag de la version de devzone (`latest` depuis 
 - **Kubernetes** si `kubectl` et `helm` sont là et que le cluster répond (contexte `devzone` s'il est déclaré, sinon le contexte courant, en 5 s). Le dossier est créé avec `workspace=kubernetes` dans `.devzone.modules`, puis le workspace est installé dans le cluster depuis le dossier (comme `devzone workspace start`). Pas de `devzone workspace migrate` : il n'y a pas de volumes Docker à copier.
 - **Docker** sinon : un avertissement dit pourquoi le cluster ne répond pas, et `workspace=docker` est écrit ; `devzone workspace migrate` reste possible plus tard.
 
-Options : `--kubernetes` exige le cluster et échoue sans rien créer (le contrôle se fait avant la copie des fichiers) ; `--docker` garde le poste Docker sans contrôler le cluster ; les deux ensemble sont refusés. `DEVZONE_SANS_DEMARRER=1` crée le dossier sans lancer le workspace : la commande à lancer est affichée.
+Options : `--kubernetes` exige le cluster et échoue sans rien créer (le contrôle se fait avant la copie des fichiers) ; `--docker` garde le poste Docker sans contrôler le cluster ; les deux ensemble sont refusés. Sans option, le mode suit le cluster.
 
 Dans ce mode, Docker n'est pas nécessaire sur le poste. Les connexions gh et opencode se font dans le pod, au premier `make shell`.
 
@@ -832,7 +832,7 @@ Les tests isolent le relais Docker (`DEVZONE_RELAIS_SOCKET=…`,
 `--confirmer CTX` et conserve `DEVZONE_CLUSTER_DISTANT=<contexte>` pour les
 tests et la CI. Un changement de contexte direct (`kubectl config
 use-context CTX`) ne doit être fait que dans un test isolé. L'isolation des
-volumes utilise `DEVZONE_VOLUMES=<préfixe>`.
+volumes utilise `DEVZONE_VOLUMES=<préfixe>`. `DEVZONE_SANS_DEMARRER=1` fait que `devzone <dossier>` crée le dossier sans lancer le workspace (la commande est affichée) : c'est le mode des tests et de la CI.
 
 ### Anciens noms de commandes : avertissement
 
