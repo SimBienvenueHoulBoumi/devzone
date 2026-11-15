@@ -90,11 +90,12 @@ devzone disable <module>    # désactive et applique tout de suite
 | `kubernetes` | à chaque démarrage : connexion au cluster de ta machine et metrics-server sur les clusters locaux (CPU et RAM dans k9s) | aucune connexion au cluster de ta machine ; kubectl, helm, k9s et kind restent installés, un cluster kind créé à la main reste utilisable ; metrics-server est retiré des clusters où devzone l'a installé |
 | `gitlab` | GitLab CE de test dans le [cluster des services](#cluster-de-devzone), namespace `devzone-gitlab` (chart figé), runner Kubernetes, projet `devzone/demo` avec pipeline ; http://gitlab.localhost:8929 ; au moins 8 Go de RAM allouable (voir [GitLab](#gitlab)) | releases Helm et namespace `devzone-gitlab` retirés, secret Rails gardé (`workspace/.gitlab/rails-secret.yaml`) ; rien d'autre touché |
 | `postgres` | PostgreSQL 16 partagé sur le [cluster de devzone](#cluster-de-devzone), une base par projet (`devzone postgres create <projet>`), joignable sur `127.0.0.1:5432` dans le conteneur (voir [PostgreSQL](#postgresql)) | namespace `devzone-postgres` (toutes les bases) et secrets `workspace/.postgres/` supprimés, après confirmation en terminal ; kind dédié supprimé s'il ne sert plus |
+| `llm` | modèle de code local (llama.cpp, sur CPU) dans le [cluster de devzone](#cluster-de-devzone), namespace `devzone-llm` ; premier démarrage : téléchargement du modèle (voir [Modèle de code local](#modèle-de-code-local)) | release retirée ; le volume du modèle est gardé (pas de nouveau téléchargement), `devzone llm delete-data` le supprime |
 | `argocd` | Argo CD sur le [cluster de devzone](#cluster-de-devzone), namespace `devzone-argocd` (chart figé), serveur en `ClusterIP` ; https://127.0.0.1:8443 dans le conteneur ; au moins 1 Go de RAM allouable (voir [Argo CD](#argo-cd)) | release Helm et namespace `devzone-argocd` retirés, secret `workspace/.argocd/` supprimé ; les autres services restent, sous helm direct |
 
 Le choix est **propre à chaque devzone** (instance) et gardé dans le dossier `$RACINE/.devzone.modules` (monté de l'hôte, il survit aux rebuilds). Au premier démarrage d'une instance, si une connexion Claude Code ou opencode existe déjà dans les volumes, le module `ia` n'est pas activé : tout est désactivé par défaut et la connexion est signalée une seule fois (« devzone enable ia pour l'utiliser ici »), pas pour un état repris.
 
-Dans le [workspace Kubernetes](#services-de-devzone-dans-le-workspace-kubernetes), `gitlab`, `postgres` et `argocd` s'installent depuis le poste (`devzone workspace services enable <service>`) ; le pod n'affiche que leur présence dans le cluster.
+Dans le [workspace Kubernetes](#services-de-devzone-dans-le-workspace-kubernetes), `gitlab`, `postgres`, `argocd` et `llm` s'installent depuis le poste (`devzone workspace services enable <service>`) ; le pod n'affiche que leur présence dans le cluster.
 
 ### Socket Docker de l'hôte
 
@@ -259,7 +260,7 @@ devzone workspace vscode                  # marche a suivre : attache VS Code au
 devzone workspace copy-to <dossier>   # copie un dossier du poste vers les projets du pod
 devzone workspace copy-from <dossier> # copie un projet du pod vers le poste
 devzone workspace ports [start|stop|status] # applications and services from pod on workstation localhost
-devzone workspace services enable <service> [options]  # installe gitlab, postgres ou argocd dans le cluster
+devzone workspace services enable <service> [options]  # installe gitlab, postgres, argocd ou llm dans le cluster
 devzone workspace services disable <service> [--yes]   # les retire
 devzone workspace services status          # présents ou non, par namespace
 devzone workspace argocd status            # Argo CD et ses Applications (#516)
@@ -485,6 +486,26 @@ devzone mysql delete-data [--yes]  # supprime le namespace et les volumes (confi
 
 - **Volumes** : avant l'installation, si un seul PVC `*-mysql-0` existe dans le namespace, il est réutilisé ; aucun → claim `donnees` ; plusieurs → refus avec la liste et `devzone mysql volume <nom>`. `devzone mysql volume <nom>` réapplique le StatefulSet sur le PVC choisi sans supprimer les données. `--delete` demande confirmation `[o/N]` en terminal (`--yes` sans terminal) et refuse si le volume est monté. Le récapitulatif signale `⚠ volume <pvc> non utilisé : devzone mysql volume`.
 - **Désinstaller et supprimer les données** : `devzone disable mysql` retire le StatefulSet, le service et le secret, garde le volume (PVC) et les bases, et affiche `✔ mysql retiré du cluster ; volume <pvc> et bases gardés : devzone mysql volume`. En terminal, la question est « Désactiver mysql retire le serveur, le volume et les bases restent. Supprimer aussi le namespace devzone-mysql et ses volumes ? » : un `oui` (ou `--yes` sans terminal) supprime aussi le namespace `devzone-mysql` et ses volumes ; un refus garde le volume et les bases, le serveur part quand même ; sans terminal et sans `--yes`, les données restent. `devzone mysql delete-data [--yes]` fait cette suppression seule : confirmation `[o/N]` en terminal, `--yes` obligatoire sinon (sinon refus avec la commande exacte). Le namespace et les volumes partent, `workspace/.mysql/root.env` est gardé ; `devzone mysql volume` liste ensuite les volumes restants.
+
+## Modèle de code local
+
+Le module `llm` installe dans le [cluster de devzone](#cluster-de-devzone) un modèle de code qui tourne sur ta machine (llama.cpp, CPU, namespace `devzone-llm`) : opencode peut s'en servir quand les modèles en ligne sont épuisés ou injoignables, même hors connexion.
+
+```bash
+devzone enable llm                  # modèle par défaut : Qwen2.5-Coder 7B (Q4_K_M)
+devzone enable llm --preset light   # modèle léger : Qwen2.5-Coder 3B (Q4_K_M)
+devzone workspace services enable llm [--preset light]   # depuis le poste, pour le workspace Kubernetes
+devzone llm status                  # modèle, mémoire, joignable
+devzone disable llm                 # retire le serveur, garde le modèle
+devzone llm delete-data [--yes]     # supprime aussi le namespace et le modèle téléchargé
+```
+
+- **Premier téléchargement** : au premier démarrage, le modèle est téléchargé (environ 4,7 Go pour le 7B, moins de 2,5 Go pour le 3B) et sa somme sha256 est vérifiée ; un fichier incomplet ou différent est supprimé et l'activation échoue. Compte plusieurs minutes (l'attente va jusqu'à 30 minutes). Le téléchargement n'a lieu qu'une fois : le modèle reste dans un volume du cluster et le module marche ensuite hors connexion.
+- **Budget mémoire (machine de 16 Go)** : le serveur demande 6 Gi et plafonne à 7 Gi avec le 7B (3 Gi et 4 Gi avec le léger). Sur Docker Desktop, règle la mémoire allouée à Docker en conséquence : le workspace (4 Gi) + les services actifs + le modèle (7 Gi) doivent tenir. Si ça ne tient pas, ou si GitLab est aussi actif, prends `--preset light`. Le préréglage choisi est gardé pour les activations suivantes.
+- **Dans opencode** : à l'activation, devzone déclare le fournisseur `devzone-llm` (modèle `local`) dans `~/.config/opencode/config.json`, que opencode lit seul, y compris l'opencode interactif du pod ; la désactivation le retire sans toucher au reste de ce fichier. Adresse : `http://127.0.0.1:8089/v1` dans le conteneur (relais, `LLM_PORT` pour un autre port), `http://llm.devzone-llm.svc.cluster.local:8080/v1` dans le pod. Pour l'utiliser à la main : `opencode -m devzone-llm/local`.
+- **Dans `devzone agent`** : `devzone-llm/local` passe en dernier dans la rotation, seulement si le module est actif et si le serveur répond (`/health`). Il sert quand tous les modèles en ligne sont écartés (quota, réseau) ; il n'est jamais choisi en premier ni module désactivé.
+- **Désactivation** : `devzone disable llm` retire le serveur et le fournisseur opencode ; le modèle téléchargé reste dans son volume, la réactivation ne le retélécharge pas. `devzone llm delete-data` supprime le namespace et le modèle (confirmation en terminal, `--yes` sinon).
+- **Workspace Kubernetes** : le pod ne peut pas l'installer ; `devzone workspace services enable llm [--preset light]` le fait depuis le poste, et `devzone status` dans le pod en montre la présence (`llm.devzone-llm.svc`). Le namespace accepte les connexions venant de `devzone-workspace`.
 
 ## Charts de devzone
 

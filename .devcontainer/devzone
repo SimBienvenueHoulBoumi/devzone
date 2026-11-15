@@ -1237,8 +1237,8 @@ etat() {
         elif [ "$(valeur "$m")" = on ] && [ "$m" = gitlab ]; then
             # GitLab actif : son état réel (prêt, runner, en échec)
             printf '  ✔ module %-10s %s\n' "$m" "$(bash "$ICI/gitlab/gitlab.sh" status)"
-        elif [ "$(valeur "$m")" = on ] && [ "$m" = postgres ]; then
-            printf '  ✔ module %-10s %s\n' "$m" "$(bash "$ICI/postgres/postgres.sh" status)"
+        elif [ "$(valeur "$m")" = on ] && { [ "$m" = postgres ] || [ "$m" = llm ]; }; then
+            printf '  ✔ module %-10s %s\n' "$m" "$(bash "$ICI/$m/$m.sh" status)"
         elif [ "$(valeur "$m")" = on ] && [ "$m" = argocd ]; then
             printf '  ✔ module %-10s %s\n' "$m" "$(bash "$ICI/argocd/argocd.sh" status)"
         elif [ "$(valeur "$m")" = on ] && [ "$m" = mysql ]; then

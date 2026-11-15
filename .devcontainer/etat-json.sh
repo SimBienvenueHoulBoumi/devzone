@@ -132,12 +132,12 @@ etat_json() {
                     etat_val=""
                     ajouter_erreur modules "gitlab.sh status indisponible"
                 fi
-            elif [ "$m" = postgres ]; then
-                if s="$(bash "$ICI/postgres/postgres.sh" status 2>/dev/null)"; then
+            elif [ "$m" = postgres ] || [ "$m" = llm ]; then
+                if s="$(bash "$ICI/$m/$m.sh" status 2>/dev/null)"; then
                     etat_val="$s"
                 else
                     etat_val=""
-                    ajouter_erreur modules "postgres.sh etat indisponible"
+                    ajouter_erreur modules "$m.sh etat indisponible"
                 fi
             elif [ "$m" = argocd ]; then
                 if s="$(bash "$ICI/argocd/argocd.sh" status 2>/dev/null)"; then

@@ -126,6 +126,14 @@ teardown() {
     [[ "$output" == "ready on docker-desktop: qwen2.5-coder-7b-instruct-q4_k_m.gguf, memory limit 7Gi, reachable 127.0.0.1:8089" ]] || false
 }
 
+@test "devzone status: the llm line shows the model and whether it is reachable, in text and in JSON" {
+    bash "$DEVZONE" enable llm --context docker-desktop </dev/null
+    run bash "$DEVZONE" status
+    [[ "$output" == *"✔ module llm"*"ready on docker-desktop: qwen2.5-coder-7b-instruct-q4_k_m.gguf"*"reachable 127.0.0.1:8089"* ]] || false
+    run bash "$DEVZONE" status --json
+    [[ "$(printf '%s\n' "$output" | jq -r '.modules[] | select(.nom=="llm") | .etat')" == "ready on docker-desktop: qwen2.5-coder"* ]] || false
+}
+
 @test "enable llm twice: already active, nothing to do" {
     bash "$DEVZONE" enable llm --context docker-desktop </dev/null
     : >"$BATS_TEST_TMPDIR/helm.log"
