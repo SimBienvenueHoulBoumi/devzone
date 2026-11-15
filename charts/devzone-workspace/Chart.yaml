@@ -1,6 +1,6 @@
 apiVersion: v2
 name: devzone-workspace
-description: devzone development workstation in Kubernetes.
+description: devzone development workstation in Kubernetes, held by Argo CD (#516)
 type: application
 version: 0.1.0
 appVersion: "0.1.0"

@@ -3,6 +3,10 @@ kind: Role
 metadata:
   name: devzone-workspace
   namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: {{ include "devzone-workspace.name" . }}
+    app.kubernetes.io/part-of: devzone
+    app.kubernetes.io/managed-by: devzone
 # Rights of kubedock (0.23.0, read in its sources), limited to the namespace:
 # pods (create and delete the test containers, list and follow them),
 # pods/log, pods/exec and pods/portforward (logs, commands, ports), services and

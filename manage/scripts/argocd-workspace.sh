@@ -137,6 +137,7 @@ argocd_passwords_refresh() {
 
 # Installs Argo CD (pinned chart and values), idempotent (upgrade --install)
 argocd_install() {
+    chart_require argocd || return 2
     argocd_memory_ok || return 2
     echo "▶ Argo CD $ARGOCD_CHART_VERSION in $ARGOCD_NS (helm, up to ${ARGOCD_WAIT}s)…"
     ak create namespace "$ARGOCD_NS" --dry-run=client -o yaml | ak apply -f - >/dev/null

@@ -5,6 +5,8 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     app: postgres
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/part-of: devzone
     app.kubernetes.io/managed-by: devzone
 spec:
   serviceName: postgres
@@ -40,13 +42,13 @@ spec:
           resources:
             requests:
               cpu: {{ .Values.resources.requests.cpu }}
-              memory: {{ .Values.resources.requests.memory }}
+              memory: {{ .Values.memory }}
           volumeMounts:
-            - name: donnees
+            - name: {{ .Values.claim }}
               mountPath: /var/lib/postgresql/data
   volumeClaimTemplates:
     - metadata:
-        name: donnees
+        name: {{ .Values.claim }}
         labels:
           app.kubernetes.io/managed-by: devzone
       spec:
