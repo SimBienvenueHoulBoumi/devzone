@@ -9,6 +9,10 @@
 # Portable: bash 3.2 (macOS) and Linux.
 set -uo pipefail
 
+# kube_ready_reason: Kubernetes reachable check, shared with create-mode.sh (#497)
+# shellcheck source=manage/scripts/kube-ready.sh
+. "$(dirname "${BASH_SOURCE[0]}")/kube-ready.sh"
+
 usage() {
     echo "usage: bash manage/scripts/poste.sh up|shell|stop|rebuild|advice <folder>" >&2
 }
@@ -34,18 +38,6 @@ folder_version() {
         echo latest
     else
         echo "$version"
-    fi
-}
-
-# Kubernetes reachable: kubectl and helm present, and kubectl cluster-info
-# responds within 5 s (--context devzone if that context is declared).
-kube_ready() {
-    command -v kubectl >/dev/null 2>&1 || return 1
-    command -v helm >/dev/null 2>&1 || return 1
-    if kubectl config get-contexts -o name 2>/dev/null | grep -qx 'devzone'; then
-        kubectl cluster-info --request-timeout=5s --context devzone >/dev/null 2>&1
-    else
-        kubectl cluster-info --request-timeout=5s >/dev/null 2>&1
     fi
 }
 
@@ -80,7 +72,7 @@ fi
 if [ "$target" = "advice" ] || [ "$target" = "conseil" ]; then
     if [ "$(workspace_mode "$folder")" = kubernetes ]; then
         echo "Kubernetes workspace: the new image is used on the next devzone workspace start (or make up)."
-    elif kube_ready; then
+    elif kube_ready_reason >/dev/null; then
         echo "Kubernetes reachable: devzone workspace migrate moves this workstation to the cluster (nothing is deleted, rollback: devzone workspace revert)."
     fi
     exit 0

@@ -311,7 +311,7 @@ echo moi' ]
 }
 
 @test "mode kubernetes : conseil affiché, make rebuild jamais proposé" {
-    cp "$RACINE/manage/scripts/poste.sh" "$T/v2/manage/scripts/poste.sh"
+    cp "$RACINE/manage/scripts/poste.sh" "$RACINE/manage/scripts/kube-ready.sh" "$T/v2/manage/scripts/"
     creer_v1
     printf 'workspace=kubernetes\n' >"$DZ/.devzone.modules"
     cd "$DZ"
