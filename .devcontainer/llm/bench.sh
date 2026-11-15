@@ -6,8 +6,10 @@
 # the speed is enough for opencode.
 #   devzone llm bench [--apply] [--threads LIST] [--prompt N] [--gen N]
 # --apply sets threads=<best> on the release llm (helm upgrade, values kept).
-# Env: LLM_BENCH_ATTENTE (seconds, 900), LLM_BENCH_POLL (seconds, 5),
-# LLM_BENCH_MIN_PP (50 tok/s, prompt reading), LLM_BENCH_MIN_TG (8 tok/s,
+# Env: LLM_BENCH_ATTENTE (seconds, 1800: wait limit and activeDeadlineSeconds of
+# the Job, which stops by itself if the call is interrupted), LLM_BENCH_POLL
+# (seconds, 5), LLM_BENCH_SIGNE (seconds, 30: a progress line at least this
+# often, so that the connection of kubectl exec is not cut), LLM_BENCH_MIN_PP (50 tok/s, prompt reading), LLM_BENCH_MIN_TG (8 tok/s,
 # generation). The Job is deleted at the end, even on failure. bash 3.2 (macOS).
 
 BENCH_JOB=llm-bench
@@ -19,15 +21,29 @@ bench_present() { k get deployment llm >/dev/null 2>&1; }
 # Job deleted (no error when it is already gone)
 bench_cleanup() { k delete job "$BENCH_JOB" --ignore-not-found --wait=false >/dev/null 2>&1 || true; }
 
-# Waits for the Job: 0 done, 1 failed, 2 timeout
+# Phase of the Job for the progress line: the pod is Pending while the image
+# is pulled, Running while llama-bench measures
+bench_phase() {
+    case "$(k get pods -l app=llm-bench -o jsonpath='{.items[0].status.phase}' 2>/dev/null || true)" in
+        Running) echo "measuring" ;;
+        *) echo "pulling the image" ;;
+    esac
+}
+
+# Waits for the Job: 0 done, 1 failed, 2 timeout. Writes a line (phase,
+# elapsed time) at least every LLM_BENCH_SIGNE seconds
 bench_wait() {
-    local waited=0 poll="${LLM_BENCH_POLL:-5}" limit="${LLM_BENCH_ATTENTE:-900}" st
+    local waited=0 poll="${LLM_BENCH_POLL:-5}" limit="${LLM_BENCH_ATTENTE:-1800}" beat="${LLM_BENCH_SIGNE:-30}" st last=""
     while [ "$waited" -lt "$limit" ]; do
         st="$(k get job "$BENCH_JOB" -o jsonpath='{.status.succeeded}/{.status.failed}' 2>/dev/null || true)"
         case "$st" in
             1/*) return 0 ;;
             */[1-9]*) return 1 ;;
         esac
+        if [ -z "$last" ] || [ $((waited - last)) -ge "$beat" ]; then
+            echo "  … $(bench_phase), ${waited}s elapsed"
+            last=$waited
+        fi
         sleep "$poll"
         waited=$((waited + poll))
     done
@@ -98,6 +114,7 @@ bench() {
     [ -z "$threads" ] || sets="$sets bench.threads=${threads//,/\\,}" # helm --set: a comma separates keys
     [ -z "$prompt" ] || sets="$sets bench.prompt=$prompt"
     [ -z "$gen" ] || sets="$sets bench.gen=$gen"
+    sets="$sets bench.deadline=${LLM_BENCH_ATTENTE:-1800}"
     args=()
     for arg in $sets; do args+=(--set "$arg"); done
     trap bench_cleanup EXIT INT TERM
@@ -105,7 +122,7 @@ bench() {
     echo "▶ llama-bench in the namespace $NS (image full-<build>: larger than the server image, pulled on first use; the server keeps running, so the numbers are a bit low)…"
     helm template llm "$CHART_CODE/charts/devzone-llm" -n "$NS" "${args[@]}" --show-only templates/bench-job.yaml | k apply -f - >/dev/null || return 1
     bench_wait || {
-        echo "devzone: llm: bench Job failed or timed out (LLM_BENCH_ATTENTE=${LLM_BENCH_ATTENTE:-900}s): kubectl --context devzone -n $NS logs job/$BENCH_JOB" >&2
+        echo "devzone: llm: bench Job failed or timed out (LLM_BENCH_ATTENTE=${LLM_BENCH_ATTENTE:-1800}s): kubectl --context devzone -n $NS logs job/$BENCH_JOB" >&2
         k logs "job/$BENCH_JOB" --tail=5 >&2 2>/dev/null || true
         return 1
     }

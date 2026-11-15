@@ -64,5 +64,6 @@ bench:
   threads: "4,8"
   # Seconds before the finished Job is garbage collected
   ttl: 600
-  # Seconds before a stuck Job is stopped
-  deadline: 900
+  # Seconds before a stuck Job is stopped (activeDeadlineSeconds: the Job does
+  # not run forever if the call that started it is interrupted)
+  deadline: 1800
