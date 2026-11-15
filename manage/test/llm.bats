@@ -222,6 +222,7 @@ bench_logs() {
     [ "$status" -eq 0 ]
     [[ "$output" == *"Recommended: threads=8"* ]] || false
     [[ "$output" == *"Too slow for opencode"* ]] || false
+    [[ "$output" == *"devzone enable llm --preset light"* ]] || false
     LLM_BENCH_MIN_TG=4 LLM_BENCH_POLL=0 run bash "$LLM" bench
     [[ "$output" == *"Fast enough for opencode"* ]] || false
 }
@@ -275,4 +276,13 @@ bench_logs() {
     run bash "$DEVZONE" llm bench
     [ "$status" -eq 2 ]
     [[ "$output" == *"not enabled"* ]] || false
+}
+
+@test "llm bench: too slow with the light preset already installed proposes nothing more" {
+    bash "$DEVZONE" enable llm --context docker-desktop --preset light </dev/null
+    bench_logs 4:60:3.1
+    LLM_BENCH_POLL=0 run bash "$LLM" bench
+    [[ "$output" == *"Too slow for opencode"* ]] || false
+    [[ "$output" != *"--preset light"* ]] || false
+    grep -q 'model.file=qwen2.5-coder-3b' "$BATS_TEST_TMPDIR/helm.log"
 }

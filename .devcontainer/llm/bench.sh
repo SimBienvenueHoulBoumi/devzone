@@ -112,6 +112,9 @@ bench() {
         echo "✔ Fast enough for opencode (prompt >= ${LLM_BENCH_MIN_PP:-50} tok/s, generation >= ${LLM_BENCH_MIN_TG:-8} tok/s)"
     else
         echo "⚠ Too slow for opencode (needs prompt >= ${LLM_BENCH_MIN_PP:-50} tok/s and generation >= ${LLM_BENCH_MIN_TG:-8} tok/s)"
+        if [ "$(preset_read)" != light ]; then
+            echo "  Lighter model (3B, context 16k, 2.1 GB download): devzone disable llm && devzone enable llm --preset light"
+        fi
     fi
     if [ -n "$apply" ]; then
         bench_apply "$best" || return 1
