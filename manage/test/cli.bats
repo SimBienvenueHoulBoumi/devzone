@@ -274,6 +274,9 @@ faux_docker() {
     unset DEVZONE_SANS_DEMARRER
     faux_cli 'echo "{\"outcome\":\"error\"}"; exit 1'
     faux_docker arrete
+    # Cluster unreachable: the mode is Docker, whatever kubectl the host has (#497)
+    printf '#!/usr/bin/env bash\nexit 1\n' >"$BATS_TEST_TMPDIR/faux/kubectl"
+    chmod +x "$BATS_TEST_TMPDIR/faux/kubectl"
     printf '#!/usr/bin/env bash\necho "make $*" >>"%s/make.log"\n' "$BATS_TEST_TMPDIR" >"$BATS_TEST_TMPDIR/faux/make"
     chmod +x "$BATS_TEST_TMPDIR/faux/make"
     run bash "$CLI" mon-devzone

@@ -421,9 +421,12 @@ aide() {
     cat <<EOF
 devzone $(version) : environnement de développement conteneurisé
 
-  devzone <dossier> [--gitops github|none|<url>]
-                           crée un devzone dans <dossier> puis le lance (make up) ;
+  devzone <dossier> [--gitops github|none|<url>] [--kubernetes|--docker]
+                           crée un devzone dans <dossier> puis le lance ;
                            GitOps repository for Argo CD: github, or a URL, or none
+                           --kubernetes: workspace in the cluster (default when it answers;
+                           fails with nothing created without one)
+                           --docker: Docker workstation, no cluster check (migrate later)
   devzone update [--oui] [--sans-reconstruire]
                            dans un dossier devzone : passe à la version du paquet
                            (sauvegarde les fichiers remplacés, propose make rebuild)
@@ -461,14 +464,21 @@ gitops_saisir() {
 }
 
 creer() {
-    local cible="$1" gitops="" expect="" arg valeur login nom instance
+    local cible="$1" gitops="" expect="" option="" arg valeur login nom instance
     shift
     for arg in "$@"; do
         if [ "$expect" = gitops ]; then gitops="$arg"; expect=""; continue; fi
         case "$arg" in
             --gitops) expect=gitops ;;
             --gitops=*) gitops="${arg#--gitops=}" ;;
-            *) echo "✖ option inconnue : $arg (devzone <dossier> [--gitops github|none|<url>])" >&2; exit 1 ;;
+            --kubernetes | --docker)
+                if [ -n "$option" ] && [ "$option" != "${arg#--}" ]; then
+                    echo "✖ --kubernetes and --docker: choose one" >&2
+                    exit 1
+                fi
+                option="${arg#--}"
+                ;;
+            *) echo "✖ option inconnue : $arg (devzone <dossier> [--gitops github|none|<url>] [--kubernetes|--docker])" >&2; exit 1 ;;
         esac
     done
     if [ -n "$expect" ]; then
@@ -480,6 +490,11 @@ creer() {
         echo "✖ $cible existe et n'est pas vide : rien n'est écrasé. Choisis un autre dossier." >&2
         exit 1
     fi
+
+    # Mode before any copy: --kubernetes without a cluster creates nothing (#497)
+    # shellcheck source=SCRIPTDIR/scripts/create-mode.sh
+    . "$PAQUET/manage/scripts/create-mode.sh"
+    create_mode_choose "$option" || exit 1
 
     if [ -z "$gitops" ]; then
         if [ -t 0 ]; then
@@ -497,6 +512,7 @@ creer() {
     : >"$cible/.gitignore"
     completer_gitignore "$cible"
     chmod +x "$cible/manage/scripts/desinstaller.sh" "$cible/manage/scripts/lancer.sh"
+    create_mode_write "$cible" "$CREATE_MODE"
     # The GitOps repository of the new devzone (#539): github, an existing URL,
     # or none, written in the .argocd.conf of the new devzone (conf.sh writes
     # the header of the file when absent)
@@ -534,6 +550,12 @@ creer() {
     cible="$(cd "$cible" && pwd)"
     ecrire_manifeste "$cible"
     echo "✔ devzone $(version) créé dans $cible"
+    # Kubernetes: the workspace goes to the cluster, no Docker check (Docker
+    # Desktop hosts the cluster, but devzone does not need it directly)
+    if [ "$CREATE_MODE" = kubernetes ]; then
+        create_mode_start "$cible" "$PAQUET/manage/workspace.sh"
+        return
+    fi
     if [ -n "${DEVZONE_SANS_DEMARRER:-}" ]; then
         echo "Pour le lancer : cd $cible && make up"
         return 0

@@ -20,6 +20,19 @@ kube_isole() {
     mkdir -p "$HOME" "$BATS_TEST_TMPDIR" "$HOME/.kube"
 }
 
+# Aide des tests qui simulent un outil absent (#497) : crée <dossier> avec des
+# liens vers les seuls outils que les scripts et les tests appellent. À appeler
+# dans setup, avant de réduire PATH à <dossier> : jamais /usr/bin ni /bin entiers,
+# donc un kubectl ou un helm installé sur le poste ou le runner n'est pas joignable.
+outils_isoles() {
+    local dossier="$1" outil chemin
+    mkdir -p "$dossier"
+    for outil in bash env grep dirname mv cat rm mkdir; do
+        chemin="$(command -v "$outil")" || return 1
+        ln -s "$chemin" "$dossier/$outil"
+    done
+}
+
 # Aide du récapitulatif devzone (#396) : faux kind sous $BATS_TEST_TMPDIR/bin qui
 # ne liste aucun cluster, pour qu'un vrai cluster kind-gitlab du poste ne fasse
 # pas apparaître l'avertissement d'ancien cluster dans les tests.

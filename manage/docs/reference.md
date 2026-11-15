@@ -279,6 +279,19 @@ L'image vient de ghcr.io, avec le tag de la version de devzone (`latest` depuis 
 - **Conservation** : le PVC porte l annotation `helm.sh/resource-policy: keep` et n est jamais supprime par `helm uninstall` : `devzone workspace stop` retire le pod, pas les projets. Le perdre demande une suppression a la main dans le cluster.
 - **Copies** : `devzone workspace copy-to <dossier>` copie le dossier du poste dans `/workspaces/projets/<nom du dossier>` ; `devzone workspace copy-from <dossier>` ramene `/workspaces/projets/<nom du dossier>` dans ce dossier du poste. Les deux passent par `kubectl cp` (tar est present dans l image).
 
+### Création directe dans le cluster
+
+`devzone <dossier>` choisit le mode du poste d'après le cluster (#497) :
+
+- **Kubernetes** si `kubectl` et `helm` sont là et que le cluster répond (contexte `devzone` s'il est déclaré, sinon le contexte courant, en 5 s). Le dossier est créé avec `workspace=kubernetes` dans `.devzone.modules`, puis le workspace est installé dans le cluster depuis le dossier (comme `devzone workspace start`). Pas de `devzone workspace migrate` : il n'y a pas de volumes Docker à copier.
+- **Docker** sinon : un avertissement dit pourquoi le cluster ne répond pas, et `workspace=docker` est écrit ; `devzone workspace migrate` reste possible plus tard.
+
+Options : `--kubernetes` exige le cluster et échoue sans rien créer (le contrôle se fait avant la copie des fichiers) ; `--docker` garde le poste Docker sans contrôler le cluster ; les deux ensemble sont refusés. Sans option, le mode suit le cluster.
+
+Dans ce mode, Docker n'est pas nécessaire sur le poste. Les connexions gh et opencode se font dans le pod, au premier `make shell`.
+
+Un workspace déjà installé dans le cluster (release helm `devzone-workspace`, ou Application Argo CD du même nom) est annoncé à la création : le nouveau dossier le pilote aussi, et `devzone workspace start` le met à jour par `helm upgrade`, sans perte (les volumes restent).
+
 ### Migration depuis le poste Docker
 
 `devzone workspace migrate [--oui]` se lance sur le poste, dans le dossier devzone. Il demande une confirmation [o/N] (`--oui` pour s'en passer ; sans terminal et sans `--oui`, il refuse), puis enchaine cinq etapes, chacune annoncee, et s'arrete a la premiere erreur avec un message clair. Il copie, il ne supprime rien.
@@ -819,7 +832,7 @@ Les tests isolent le relais Docker (`DEVZONE_RELAIS_SOCKET=…`,
 `--confirmer CTX` et conserve `DEVZONE_CLUSTER_DISTANT=<contexte>` pour les
 tests et la CI. Un changement de contexte direct (`kubectl config
 use-context CTX`) ne doit être fait que dans un test isolé. L'isolation des
-volumes utilise `DEVZONE_VOLUMES=<préfixe>`.
+volumes utilise `DEVZONE_VOLUMES=<préfixe>`. `DEVZONE_SANS_DEMARRER=1` fait que `devzone <dossier>` crée le dossier sans lancer le workspace (la commande est affichée) : c'est le mode des tests et de la CI.
 
 ### Anciens noms de commandes : avertissement
 
