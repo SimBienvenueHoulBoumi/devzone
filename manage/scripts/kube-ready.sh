@@ -22,11 +22,11 @@ kube_ready_reason() {
     if kubectl config get-contexts -o name 2>/dev/null | grep -qx 'devzone'; then
         kubectl cluster-info --request-timeout=5s --context devzone >/dev/null 2>&1 && return 0
         context=devzone
-        server="$(kubectl config view --minify --context devzone -o 'jsonpath={.clusters[0].server}' 2>/dev/null || true)"
+        server="$(kubectl config view --minify --context devzone -o 'jsonpath={.clusters[0].cluster.server}' 2>/dev/null || true)"
     else
         kubectl cluster-info --request-timeout=5s >/dev/null 2>&1 && return 0
         context="$(kubectl config current-context 2>/dev/null || true)"
-        server="$(kubectl config view --minify -o 'jsonpath={.clusters[0].server}' 2>/dev/null || true)"
+        server="$(kubectl config view --minify -o 'jsonpath={.clusters[0].cluster.server}' 2>/dev/null || true)"
     fi
     if [ "$hint" = yes ]; then
         kube_unreachable_hint "${context:-none}" "${server:-unknown server}"

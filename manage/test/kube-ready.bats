@@ -21,7 +21,7 @@ case "$*" in
     *"cluster-info"*) [ "${FAKE_KUBE_CLUSTER_INFO:-ok}" = ok ] ;;
     *"current-context"*) echo "${FAKE_CURRENT-kind-poste}" ;;
     *"clusters[0].name"*) echo "${FAKE_CLUSTER-kind-poste}" ;;
-    *"jsonpath"*) echo "${FAKE_SERVER-https://127.0.0.1:6443}" ;;
+    *"clusters[0].cluster.server"*) echo "${FAKE_SERVER-https://127.0.0.1:6443}" ;;
 esac
 KUBECTL
     cat >"$T/bin/helm" <<'HELM'
