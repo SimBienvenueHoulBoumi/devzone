@@ -105,3 +105,18 @@ DZPATH
     grep -q '^devzone llm relay-stop$' "$T/devzone.log"
     [ ! -e "$T/path-devzone.log" ]
 }
+
+@test "services-admin.sh bench llm --apply: devzone llm bench with the options (#593)" {
+    admin_setup
+    printf 'cluster=kind-devzone\nllm=on\n' >"$DEVZONE_ETAT"
+    run bash -c 'printf "SECRET-TOKEN\n" | bash "$0" bench llm --apply --threads 4' "$ADMIN"
+    [ "$status" -eq 0 ]
+    grep -q '^devzone llm bench --apply --threads 4$' "$T/devzone.log"
+}
+
+@test "services-admin.sh bench postgres: refused (#593)" {
+    admin_setup
+    run bash -c 'printf "SECRET-TOKEN\n" | bash "$0" bench postgres' "$ADMIN"
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"bench: only llm"* ]] || false
+}
