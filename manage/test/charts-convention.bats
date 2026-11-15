@@ -196,5 +196,5 @@ edit_demo() {
     RACINE="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
     run env -u CHARTS_DIR -u CHARTS_CODE_DIRS CHARTS_NO_HELM=1 bash "$RACINE/manage/scripts/check-charts.sh"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"✔ charts : 5 charts conformes"* ]] || false
+    [[ "$output" == *"✔ charts : 6 charts conformes"* ]] || false
 }

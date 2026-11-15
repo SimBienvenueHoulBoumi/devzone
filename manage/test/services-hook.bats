@@ -124,3 +124,50 @@ setup() {
     [[ -s "$DEVZONE_RACINE/workspace/.postgres/admin-password" ]] || false
     [[ "$(stat -c %a "$DEVZONE_RACINE/workspace/.postgres/admin-password")" == 600 ]] || false
 }
+
+@test "llm on, module held: preset stored, Application, ingress policy, wait, relay, in order" {
+    hook_llm() { echo "llm $*" >>"$LOG"; }
+    run hook_main llm on --preset light
+    [[ "$status" -eq 0 ]] || false
+    [[ "$(cat "$LOG")" == "$(printf 'active llm\nllm preset --preset light\nnote llm on\nreconcile\nllm policy\nwait llm\nrelay llm')" ]] || false
+}
+
+@test "llm on, module not held: exit 3, helm direct as before" {
+    HELD=no
+    run hook_main llm on
+    [[ "$status" -eq 3 ]] || false
+    [[ "$(cat "$LOG")" == "active llm" ]] || false
+}
+
+@test "llm off with its Application: [services] off, Application deleted, exit 3" {
+    run hook_main llm off
+    [[ "$status" -eq 3 ]] || false
+    [[ "$(cat "$LOG")" == "$(printf 'note llm off\ndelete devzone-llm cascade')" ]] || false
+}
+
+@test "argocd off releases the llm Application too" {
+    APPS_PRESENT="devzone-llm"
+    run hook_main argocd off
+    [[ "$status" -eq 3 ]] || false
+    [[ "$(cat "$LOG")" == *"delete devzone-llm keep"* ]] || false
+    [[ "$(cat "$LOG")" == *"note llm off"* ]] || false
+}
+
+@test "services_chart_llm: default preset, then the stored light preset" {
+    run services_chart_llm
+    [[ "$status" -eq 0 ]] || false
+    [[ "$output" == *"model.file=qwen2.5-coder-7b-instruct-q4_k_m.gguf"* ]] || false
+    [[ "$output" != *"resources.limits.memory"* ]] || false
+
+    mkdir -p "$DEVZONE_RACINE/workspace/.llm"
+    echo light >"$DEVZONE_RACINE/workspace/.llm/preset"
+    run services_chart_llm
+    [[ "$output" == *"model.file=qwen2.5-coder-3b-instruct-q4_k_m.gguf"* ]] || false
+    [[ "$output" == *"memory=3Gi resources.limits.memory=4Gi"* ]] || false
+}
+
+@test "services_secret_llm: nothing to create" {
+    run services_secret_llm
+    [[ "$status" -eq 0 ]] || false
+    [[ ! -s "$LOG" ]] || false
+}

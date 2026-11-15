@@ -26,6 +26,7 @@ devzone_aide() {
   devzone enable postgres [--context CTX] [--confirm CTX]  shared PostgreSQL, cluster of choice
   devzone postgres create <project>        database and user of a project (also: list, psql, delete)
   devzone mysql create <project>           database and user of a MySQL project (also: list, delete)
+  devzone enable llm [--preset light]      local code model (llama.cpp), devzone llm status
   devzone gitlab migrate [--yes]           GitLab in the services cluster, then the old kind cluster deleted
   devzone gitlab new-password [root|dev]   random password (root or dev) regenerated
   devzone enable argocd                    Argo CD in the services cluster, access https://127.0.0.1:8443

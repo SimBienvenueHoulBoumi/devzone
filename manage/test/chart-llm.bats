@@ -71,6 +71,7 @@ render() {
     [[ "$output" == *"name: llm-models"* ]] || false
     [[ "$output" == *"storage: 8Gi"* ]] || false
     [[ "$output" == *"helm.sh/resource-policy: keep"* ]] || false
+    [[ "$output" == *"argocd.argoproj.io/sync-options: Delete=false"* ]] || false
 }
 
 @test "chart devzone-llm: the light preset (3B) comes from --set" {

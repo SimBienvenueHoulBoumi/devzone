@@ -107,3 +107,6 @@ manage/test/test-gitlab-restes.bats
 .devcontainer/gitlab/chart.sh
 .devcontainer/gitlab/argocd.sh
 manage/test/chart-llm.bats
+manage/test/llm.bats
+.devcontainer/llm/llm.sh
+.devcontainer/llm/presets.sh
