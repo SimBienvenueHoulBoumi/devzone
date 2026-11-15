@@ -17,6 +17,7 @@
 #   services_reconcile                 every service applied or released
 #   services_state_of <svc>            on | off | empty (not declared)
 #   services_note <svc> on|off         writes the [services] section
+#   chart_require <svc>                chart charts/devzone-<svc> named devzone-<svc>, or code 2
 # Sourced after conf.sh and gitops.sh by the workstation
 # (manage/scripts/argocd-services.sh) and by the container (argocd.sh). The
 # includer defines argocd_kubectl, APPS_GENERATOR, ARGOCD_CONF and
@@ -34,6 +35,18 @@ services_app_of() { printf 'devzone-%s' "$1"; }
 # Returns the namespace name devzone-<svc> for a given service name.
 # Used by services_namespace_prepare and services_application_apply.
 services_ns_of() { printf 'devzone-%s' "$1"; }
+
+# The chart of a service, charts/devzone-<svc> of RACINE (the package), must
+# exist and name itself devzone-<svc> in Chart.yaml. Otherwise a refusal, code
+# 2, before anything is applied (#554)
+chart_require() {
+    local svc="$1" chart="$RACINE/charts/devzone-$1"
+    if [ -f "$chart/Chart.yaml" ] && grep -qxF "name: devzone-$svc" "$chart/Chart.yaml"; then
+        return 0
+    fi
+    echo "✖ $svc : chart charts/devzone-$svc missing or misnamed (manage/docs/reference.md#charts-de-devzone)" >&2
+    return 2
+}
 
 # State of a service: [services] of .argocd.conf first, then the line
 # <svc>=on|off of .devzone.modules (compatibility, #538); empty when neither
@@ -92,6 +105,7 @@ EOF
 # repository at the revision; the parameters hook adds helm parameters
 services_application_apply() {
     local svc="$1" extra=""
+    chart_require "$svc" || return $?
     set -- "$(services_app_of "$svc")" service "$(services_ns_of "$svc")" \
         "$DEVZONE_REPO_URL" "$(argocd_revision)" "charts/devzone-$svc"
     if command -v "services_chart_$svc" >/dev/null 2>&1; then
@@ -118,6 +132,8 @@ services_reconcile() {
         state="$(services_state_of "$svc")"
         case "$state" in
             on)
+                # Before the namespace and the secret: a misnamed chart applies nothing
+                chart_require "$svc" || { code=2; continue; }
                 services_namespace_prepare "$svc" || code=1
                 if command -v "services_secret_$svc" >/dev/null 2>&1; then
                     "services_secret_$svc" || code=1

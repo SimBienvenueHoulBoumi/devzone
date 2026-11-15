@@ -490,7 +490,7 @@ La famille se déduit du chart : `dependencies:` présent = enveloppe, sinon ser
 
 **Contrôle**
 
-Le script `manage/scripts/check-charts.sh` applique la convention à chaque dossier de `charts/` et à toute référence `charts/devzone-<x>` du code ; il lance `helm lint` et le rendu quand helm est présent. Un manquement s'affiche `✖ charts/<x> : <règle>` et fait échouer le contrôle. Avant d'appliquer un chart, devzone vérifie que `charts/devzone-<service>/Chart.yaml` existe et porte `name: devzone-<service>` ; sinon il s'arrête avant tout appel à `kubectl` ou `helm`, avec `✖ <service> : chart charts/devzone-<service> absent ou mal nommé`.
+Le script `manage/scripts/check-charts.sh` applique la convention à chaque dossier de `charts/` et à toute référence `charts/devzone-<x>` du code ; il lance `helm lint` et le rendu quand helm est présent. Un manquement s'affiche `✖ charts/<x> : <règle>` et fait échouer le contrôle. Avant d'appliquer un chart, devzone vérifie que `charts/devzone-<service>/Chart.yaml` existe et porte `name: devzone-<service>` ; sinon il s'arrête avant tout appel à `kubectl` ou `helm`, sort avec le code 2 et affiche `✖ <service> : chart charts/devzone-<service> missing or misnamed (manage/docs/reference.md#charts-de-devzone)`. Les appelants du catalogue (`app.sh`, `mysql.sh`) reçoivent cet échec comme un échec ordinaire et sortent en code 1.
 
 **Ajouter un service** : créer `charts/devzone-<service>` selon la famille, ajouter les valeurs communes utiles, lancer `bash manage/scripts/check-charts.sh`, puis un test `chart-<service>.bats` (lint et rendu).
 
