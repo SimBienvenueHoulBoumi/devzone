@@ -1,0 +1,63 @@
+{{- if .Values.bench.enabled }}
+# One-off llama-bench of the model (#593), never rendered by default. The
+# volume is ReadWriteOnce: the pod must land on the node of the server pod.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: llm-bench
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: llm-bench
+    app.kubernetes.io/name: llm-bench
+    app.kubernetes.io/part-of: devzone
+    app.kubernetes.io/managed-by: devzone
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: {{ .Values.bench.deadline }}
+  ttlSecondsAfterFinished: {{ .Values.bench.ttl }}
+  template:
+    metadata:
+      labels:
+        app: llm-bench
+        app.kubernetes.io/managed-by: devzone
+    spec:
+      restartPolicy: Never
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchLabels:
+                  app: llm
+      containers:
+        - name: bench
+          image: {{ .Values.image }}:full-{{ .Values.llamaBuild }}
+          command:
+            - /app/llama-bench
+          args:
+            - -m
+            - /models/{{ .Values.model.file }}
+            - -p
+            - {{ .Values.bench.prompt | quote }}
+            - -n
+            - {{ .Values.bench.gen | quote }}
+            - -t
+            - {{ .Values.bench.threads | quote }}
+            - -o
+            - json
+          resources:
+            requests:
+              cpu: {{ .Values.resources.requests.cpu }}
+              memory: {{ .Values.memory }}
+            limits:
+              memory: {{ .Values.resources.limits.memory }}
+          volumeMounts:
+            - name: models
+              mountPath: /models
+              readOnly: true
+      volumes:
+        - name: models
+          persistentVolumeClaim:
+            claimName: {{ .Values.claim }}
+            readOnly: true
+{{- end }}

@@ -119,3 +119,43 @@ render() {
     [ "$(grep -c '^  namespace: team$' <<<"$output")" -eq 3 ]
     [[ "$output" != *"namespace: devzone"* ]] || false
 }
+
+@test "chart devzone-llm: the bench Job is not rendered by default" {
+    run render --show-only templates/bench-job.yaml
+    [ "$status" -ne 0 ] || [[ "$output" != *"kind: Job"* ]]
+    run render
+    [[ "$output" != *"llama-bench"* ]] || false
+    [[ "$output" != *"full-"* ]] || false
+}
+
+@test "chart devzone-llm: bench.enabled renders a Job on the full image of the same build, models read-only, node of the server" {
+    run render --set bench.enabled=true --show-only templates/bench-job.yaml
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"kind: Job"* ]] || false
+    [[ "$output" == *"image: ghcr.io/ggml-org/llama.cpp:full-b12407"* ]] || false
+    [[ "$output" == *"- /app/llama-bench"* ]] || false
+    [[ "$output" == *"- /models/qwen2.5-coder-7b-instruct-q4_k_m.gguf"* ]] || false
+    [[ "$output" == *'- "512"'* ]] || false
+    [[ "$output" == *'- "64"'* ]] || false
+    [[ "$output" == *'- "4,8"'* ]] || false
+    [[ "$output" == *"- json"* ]] || false
+    [[ "$output" == *"readOnly: true"* ]] || false
+    [ "$(grep -c 'readOnly: true' <<<"$output")" -eq 2 ]
+    [[ "$output" == *"claimName: llm-models"* ]] || false
+    [[ "$output" == *"podAffinity:"* ]] || false
+    [[ "$output" == *"topologyKey: kubernetes.io/hostname"* ]] || false
+    [[ "$output" == *"app: llm"$'\n'* ]] || false
+    [[ "$output" == *"ttlSecondsAfterFinished: 600"* ]] || false
+    [[ "$output" == *"restartPolicy: Never"* ]] || false
+    [[ "$output" == *"namespace: team"* ]] || false
+}
+
+@test "chart devzone-llm: bench values (prompt, gen, threads, build) are overridable" {
+    run render --set bench.enabled=true --set bench.prompt=256 --set bench.gen=32 \
+        --set bench.threads=2 --set llamaBuild=b99999 --show-only templates/bench-job.yaml
+    [ "$status" -eq 0 ]
+    [[ "$output" == *'- "256"'* ]] || false
+    [[ "$output" == *'- "32"'* ]] || false
+    [[ "$output" == *'- "2"'* ]] || false
+    [[ "$output" == *"llama.cpp:full-b99999"* ]] || false
+}

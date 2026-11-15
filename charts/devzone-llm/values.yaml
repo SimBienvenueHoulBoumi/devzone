@@ -52,3 +52,17 @@ resources:
     cpu: "2"
   limits:
     memory: 7Gi
+# llama-bench Job (templates/bench-job.yaml), rendered only when enabled=true,
+# which `devzone llm bench` sets. It runs the image full-<llamaBuild> (larger
+# than the server image, pulled only for the bench) on the node of the server
+# pod, with the models volume read-only, and is removed after ttl seconds.
+bench:
+  enabled: false
+  # Prompt tokens (-p), generated tokens (-n) and the thread counts tried (-t)
+  prompt: 512
+  gen: 64
+  threads: "4,8"
+  # Seconds before the finished Job is garbage collected
+  ttl: 600
+  # Seconds before a stuck Job is stopped
+  deadline: 900
