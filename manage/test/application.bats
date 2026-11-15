@@ -111,7 +111,7 @@ KUBE
     [[ "$output" == *"✔ veilleur ports auto"* ]] || false
     [[ "$output" == *"✔ identifiants"* ]] || false
     [[ "$(cat "$T/actions.log")" == *"relais oui"* ]] || false
-    [[ "$(cat "$T/actions.log")" == *"ports relancer"* ]] || false
+    [[ "$(cat "$T/actions.log")" == *"ports restart"* ]] || false
     [[ "$(cat "$T/actions.log")" == *"ports-auto demarrer"* ]] || false
     [[ "$(cat "$T/actions.log")" == *"password regenerer"* ]] || false
 }
@@ -153,7 +153,7 @@ KUBE
     run bash "$APP" reparer
     [ "$status" -eq 1 ]
     [[ "$output" == *"✖ identifiants : identifiants indisponibles"* ]] || false
-    [[ "$(cat "$T/actions.log")" == *"ports relancer"* ]] || false
+    [[ "$(cat "$T/actions.log")" == *"ports restart"* ]] || false
 }
 
 @test "demarrer : lance le démarrage complet" {
