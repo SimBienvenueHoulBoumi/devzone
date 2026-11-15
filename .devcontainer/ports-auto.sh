@@ -238,8 +238,8 @@ case "${1:-}" in
     arreter|stop) arreter_veilleur; echo "arrêté" ;;
     nettoyer|clean) nettoyer_auto_tout ;;
     auto) case "${2:-}" in on) ecrire ports_auto on; echo "✔ ports auto activés" ;; off) ecrire ports_auto off; arreter_veilleur; echo "✔ ports auto désactivés" ;; *) echo "devzone : port : auto on|off" >&2; exit 2 ;; esac ;;
-    exclure) ports_auto_exclure "${2:-}" ;;
-    inclure) ports_auto_inclure "${2:-}" ;;
+    exclude|exclure) ports_auto_exclure "${2:-}" ;;
+    include|inclure) ports_auto_inclure "${2:-}" ;;
     liste_auto) ports_auto_liste ;;
     liste_json_auto) ports_auto_liste_json ;;
     -h|--help|aide) sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//' ;;

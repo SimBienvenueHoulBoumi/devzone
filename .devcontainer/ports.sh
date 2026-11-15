@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Relais de ports (#290) : applications du conteneur devzone accessibles
 # depuis 127.0.0.1 du poste, un conteneur alpine/socat par port.
-#   ports.sh ouvrir <n>     ouvre le relais du port <n>
-#   ports.sh liste          relais de l'état : port, actif, application
-#   ports.sh fermer <n>     retire le relais et le port de l'état
-#   ports.sh relancer       recrée les relais de l'état vers l'IP actuelle
-#   ports.sh resume         résumé d'une ligne pour le récapitulatif devzone
+#   ports.sh open <n>       ouvre le relais du port <n>
+#   ports.sh list            relais de l'état : port, actif, application
+#   ports.sh close <n>       retire le relais et le port de l'état
+#   ports.sh restart         recrée les relais de l'état vers l'IP actuelle
+#   ports.sh resume          résumé d'une ligne pour le récapitulatif devzone
 # L'état est la ligne « ports=8080,3000 » de DEVZONE_ETAT (triée, sans doublon).
 # RACINE : un seul dirname depuis ICI (.devcontainer) → racine du dépôt devzone.
 if [ "${BASH_SOURCE[0]}" = "$0" ]; then set -euo pipefail; fi
@@ -21,6 +21,12 @@ INSTANCE="${DEVZONE_INSTANCE:-devzone}"
 # shellcheck source=SCRIPTDIR/etat.sh
 # shellcheck disable=SC1091
 . "$ICI/etat.sh"
+# English command names are accepted (#557) : a copied script may miss the file
+# shellcheck source=SCRIPTDIR/command-aliases.sh
+# shellcheck disable=SC1091
+if [ -f "$ICI/command-aliases.sh" ]; then
+    . "$ICI/command-aliases.sh"
+fi
 
 refuse() { echo "devzone : port : $*" >&2; exit 1; }
 
@@ -231,17 +237,23 @@ liste_json() {
 }
 
 if [ "${BASH_SOURCE[0]}" = "$0" ]; then
+    # Subcommand and options become their canonical English names ; the old
+    # French names warn on use (#557)
+    if command -v canonical_args >/dev/null 2>&1; then
+        canonical_args port "$@"
+        set -- "${ARGS_CANONICAL[@]+"${ARGS_CANONICAL[@]}"}"
+    fi
 case "${1:-}" in
-    '' | liste)
+    '' | list)
         if [ "${2:-}" = "--json" ]; then liste_json; else liste; fi
         ;;
-    ouvrir) ouvrir "${2:-}" ;;
-    fermer | --fermer) fermer "${2:-}" ;;
-    relancer) relancer ;;
+    open) ouvrir "${2:-}" ;;
+    close | --close) fermer "${2:-}" ;;
+    restart) relancer ;;
     resume) resume ;;
     auto) bash "$ICI/ports-auto.sh" auto "${2:-}" "${3:-}" ;;
-    exclure) bash "$ICI/ports-auto.sh" exclure "${2:-}" ;;
-    inclure) bash "$ICI/ports-auto.sh" inclure "${2:-}" ;;
+    exclude) bash "$ICI/ports-auto.sh" exclude "${2:-}" ;;
+    include) bash "$ICI/ports-auto.sh" include "${2:-}" ;;
     -h | --help | aide) sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//' ;;
     *) ouvrir "$1" ;;
 esac

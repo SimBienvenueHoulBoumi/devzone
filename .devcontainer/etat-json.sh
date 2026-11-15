@@ -207,7 +207,7 @@ etat_json() {
         clusters_commande="devzone utiliser $ctx_hote"
     fi
 
-    if ports_out="$(bash "$ICI/ports.sh" liste --json 2>/dev/null)"; then
+    if ports_out="$(bash "$ICI/ports.sh" list --json 2>/dev/null)"; then
         if printf '%s' "$ports_out" | jq -e . >/dev/null 2>&1; then
             ports_json="$ports_out"
         else
