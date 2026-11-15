@@ -120,3 +120,16 @@ DZPATH
     [ "$status" -eq 2 ]
     [[ "$output" == *"bench: only llm"* ]] || false
 }
+
+@test "llm bench in the pod outside devzone workspace services: code 2, run from the computer (#593)" {
+    run bash "$RACINE/.devcontainer/llm/llm.sh" bench
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"devzone: llm bench runs from your computer: devzone workspace services bench llm"* ]] || false
+    [[ "$output" != *"not enabled"* ]] || false
+    [ ! -s "$T/kubectl.log" ] || ! grep -q 'get deployment' "$T/kubectl.log"
+}
+
+@test "llm bench in the pod run by devzone workspace services: not refused (#593)" {
+    DEVZONE_SERVICES_ADMIN=1 run bash "$RACINE/.devcontainer/llm/llm.sh" bench
+    [[ "$output" != *"runs from your computer"* ]] || false
+}

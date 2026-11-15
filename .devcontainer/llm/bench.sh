@@ -88,6 +88,11 @@ bench() {
         esac
     done
     [ -z "$want" ] || refuse "--$want needs a value"
+    # In the pod only devzone workspace services (DEVZONE_SERVICES_ADMIN) has rights on the namespace
+    if [ "${DEVZONE_WORKSPACE:-}" = kubernetes ] && [ -z "${DEVZONE_SERVICES_ADMIN:-}" ]; then
+        echo "devzone: llm bench runs from your computer: devzone workspace services bench llm" >&2
+        exit 2
+    fi
     bench_present || refuse "bench: the module is not enabled (devzone enable llm)"
     sets="$(llm_preset_sets "$(preset_read)") bench.enabled=true"
     [ -z "$threads" ] || sets="$sets bench.threads=${threads//,/\\,}" # helm --set: a comma separates keys
