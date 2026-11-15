@@ -18,6 +18,12 @@ local_pret() {
     return 0
 }
 
+# Sets LOCAL_MODELE for this attempt (local_pret), read by modele_au_rang and
+# modeles_total
+local_charge() {
+    LOCAL_MODELE="$(local_pret)"
+}
+
 # Model reference given to opencode -m
 modele_ref() {
     if [ "$1" = "$LOCAL_NOM" ]; then echo devzone-llm/local; else echo "opencode/$1"; fi

@@ -77,7 +77,7 @@ agent_lancer() {
         if [ -n "$m" ]; then FREE_MODELS+=("$m"); fi
     done < <(liste_modeles)
     [ "${#FREE_MODELS[@]}" -gt 0 ] || refuse "aucun modèle gratuit disponible"
-    LOCAL_MODELE="$(local_pret)"
+    local_charge
     verrou_prendre || refuse "rang des modèles verrouillé : réessayer"
     debut=$(( $(cat "$etat/rang" 2>/dev/null || echo 0) % ${#FREE_MODELS[@]} ))
     if [ "$PAUSE_RANG" -gt 0 ]; then sleep "$PAUSE_RANG"; fi
