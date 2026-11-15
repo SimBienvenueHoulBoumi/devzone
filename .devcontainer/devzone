@@ -10,14 +10,14 @@
 #   devzone reparer                  répare relais Docker, gitlab, postgres, ports, identifiants
 #   devzone demarrer                 démarrage complet (scripts de démarrage et récapitulatif)
 #   devzone metrics [contexte…]      installe metrics-server (kubectl top, k9s)
-#   devzone utiliser CTX [--confirmer CTX]  bascule le cluster de travail de kubectl
+#   devzone utiliser CTX [--confirm CTX]  bascule le cluster de travail de kubectl
 #   devzone clusters                 vue des clusters connectés (travail et services)
 #   devzone actif <module>           code 0 si actif (scripts de démarrage)
 #   devzone test-bash32             lance les tests bats sous bash 3.2 (conteneur Docker)
 #   devzone test-gitlab             essai de bout en bout du module et de la plateforme GitLab
 #   devzone agent <dossier> <fichier-consigne>  dirige opencode sur une consigne
 #   devzone build <dossier> [--tag <nom>]  construit une image dans le workspace Kubernetes (BuildKit)
-#   devzone activer postgres [--contexte CTX] [--confirmer CTX]   PostgreSQL partagé, cluster au choix
+#   devzone activer postgres [--context CTX] [--confirm CTX]   PostgreSQL partagé, cluster au choix
 #   devzone postgres creer <projet>  base et utilisateur d'un projet (aussi : liste, psql, supprimer)
 #   devzone mysql creer <projet>    base et utilisateur d'un projet MySQL (aussi : liste, supprimer)
 #   devzone gitlab migrer [--oui]    GitLab dans le cluster des services, puis ancien cluster kind supprimé
@@ -25,7 +25,7 @@
 #   devzone activer argocd           Argo CD dans le cluster des services, accès https://127.0.0.1:8443
 #   devzone argocd etat|relais-lancer|relais-arreter  Argo CD (module argocd)
 #   devzone argocd app add <repo url> [path]|list|remove <N>  projets déployés par Argo CD (#516)
-#   devzone cluster [CTX] [--oui] [--confirmer CTX]  cluster des services de devzone, ou en changer
+#   devzone cluster [CTX] [--yes] [--confirm CTX]  cluster des services de devzone, ou en changer
 #   devzone port [<n>|--fermer <n>]  relais d'un port du conteneur vers le poste
 #   devzone mots-de-passe           régénère .password et affiche son chemin
 #   devzone paquets [ajouter|retirer|appliquer] …  paquets système gardés après un rebuild
@@ -534,7 +534,7 @@ appliquer_gitlab() {
 }
 
 # PostgreSQL partagé (#280) : installé sur le cluster de devzone, choisi à la
-# première activation (--contexte, menu en terminal, kind dédié sinon)
+# première activation (--context, menu en terminal, kind dédié sinon)
 appliquer_postgres() {
     local voulu="" confirmer="" attendre="" arg ctx actuel etat_courant
     if [ "$1" = on ]; then
@@ -548,9 +548,9 @@ appliquer_postgres() {
                 continue
             fi
             case "$arg" in
-                --contexte) attendre=contexte ;;
-                --confirmer) attendre=confirmer ;;
-                *) echo "devzone : argument inconnu : $arg (devzone activer postgres --contexte CTX [--confirmer CTX])" >&2; ecrire postgres off; return 2 ;;
+                --context) attendre=contexte ;;
+                --confirm) attendre=confirmer ;;
+                *) echo "devzone : argument inconnu : $arg (devzone enable postgres --context CTX [--confirm CTX])" >&2; ecrire postgres off; return 2 ;;
             esac
         done
         if [ -n "$attendre" ]; then
@@ -565,7 +565,7 @@ appliquer_postgres() {
             return 2
         fi
         if [ -n "$confirmer" ]; then
-            ctx="$(cluster_choisir "$voulu" --confirmer "$confirmer")" || { ecrire postgres off; return 2; }
+            ctx="$(cluster_choisir "$voulu" --confirm "$confirmer")" || { ecrire postgres off; return 2; }
         else
             ctx="$(cluster_choisir "$voulu")" || { ecrire postgres off; return 2; }
         fi
@@ -680,7 +680,7 @@ confirmer_suppression() {
     esac
 }
 
-# devzone cluster [CTX] [--oui] : affiche le cluster des services, ou les y
+# devzone cluster [CTX] [--yes] : affiche le cluster des services, ou les y
 # déplace (désinstallés de l'ancien, installés sur le nouveau : données non
 # migrées, d'où la confirmation)
 changer_cluster() {
@@ -693,20 +693,20 @@ changer_cluster() {
             continue
         fi
         case "$arg" in
-            --oui) oui=1 ;;
-            --confirmer) attendre=1 ;;
-            -*) echo "devzone : argument inconnu : $arg (devzone cluster [CTX] [--oui] [--confirmer CTX])" >&2; return 2 ;;
+            --yes) oui=1 ;;
+            --confirm) attendre=1 ;;
+            -*) echo "devzone : argument inconnu : $arg (devzone cluster [CTX] [--yes] [--confirm CTX])" >&2; return 2 ;;
             *) voulu="$arg" ;;
         esac
     done
     if [ -n "$attendre" ]; then
-        echo "devzone : --confirmer attend un contexte" >&2
+        echo "devzone : --confirm attend un contexte" >&2
         return 2
     fi
     actuel="$(cluster_lu)"
     if [ -z "$voulu" ]; then
         if [ -z "$actuel" ]; then
-            echo "devzone : aucun cluster choisi (fixé à l'activation d'un module : devzone activer postgres)"
+            echo "devzone : aucun cluster choisi (fixé à l'activation d'un module : devzone enable postgres)"
         elif cluster_est_dedie "$actuel"; then
             echo "devzone : cluster $actuel (kind dédié, dans le conteneur)"
         else
@@ -716,7 +716,7 @@ changer_cluster() {
         return 0
     fi
     if [ -n "$confirmer" ]; then
-        nouveau="$(cluster_choisir "$voulu" --confirmer "$confirmer")" || return 2
+        nouveau="$(cluster_choisir "$voulu" --confirm "$confirmer")" || return 2
     else
         nouveau="$(cluster_choisir "$voulu")" || return 2
     fi
@@ -729,7 +729,7 @@ changer_cluster() {
     if [ "$(valeur postgres)" = on ]; then
         if [ -z "$oui" ]; then
             if ! cluster_interactif; then
-                echo "devzone : les bases postgres seront supprimées de $ctx_ancien (non migrées) : devzone cluster $ctx_new --oui" >&2
+                echo "devzone : les bases postgres seront supprimées de $ctx_ancien (non migrées) : devzone cluster $ctx_new --yes" >&2
                 return 1
             fi
             printf 'postgres sera réinstallé sur %s, ses bases supprimées de %s (non migrées). Continuer ? [o/N] ' "$ctx_new" "$ctx_ancien" >&2
@@ -1128,22 +1128,22 @@ utiliser() {
                 shift
                 ;;
             --namespace=*) namespace="${arg#*=}" ;;
-            --confirmer)
+            --confirm)
                 if [ "$#" -eq 0 ]; then
-                    echo "devzone : --confirmer attend un contexte" >&2
+                    echo "devzone : --confirm attend un contexte" >&2
                     return 2
                 fi
                 confirmer="$1"
                 shift
                 ;;
-            --confirmer=*) confirmer="${arg#*=}" ;;
+            --confirm=*) confirmer="${arg#*=}" ;;
             -*)
-                echo "devzone : argument inconnu : $arg (devzone utiliser CTX [-n NS] [--confirmer CTX])" >&2
+                echo "devzone : argument inconnu : $arg (devzone utiliser CTX [-n NS] [--confirm CTX])" >&2
                 return 2
                 ;;
             *)
                 if [ -n "$ctx" ]; then
-                    echo "devzone : argument inconnu : $arg (devzone utiliser CTX [-n NS] [--confirmer CTX])" >&2
+                    echo "devzone : argument inconnu : $arg (devzone utiliser CTX [-n NS] [--confirm CTX])" >&2
                     return 2
                 fi
                 ctx="$arg"
@@ -1171,18 +1171,18 @@ utiliser() {
         if ! cluster_est_local "$ctx"; then
             if [ -n "$confirmer" ]; then
                 if [ "$confirmer" != "$ctx" ]; then
-                    echo "devzone : cluster distant refusé : $ctx (--confirmer $ctx)" >&2
+                    echo "devzone : cluster distant refusé : $ctx (--confirm $ctx)" >&2
                     return 2
                 fi
             elif cluster_interactif; then
                 printf 'cluster distant : %s ; tape son nom pour confirmer : ' "$ctx" >&2
                 read -r reponse || reponse=""
                 if [ "$reponse" != "$ctx" ]; then
-                    echo "devzone : cluster distant refusé : $ctx (--confirmer $ctx)" >&2
+                    echo "devzone : cluster distant refusé : $ctx (--confirm $ctx)" >&2
                     return 2
                 fi
             else
-                echo "devzone : cluster distant refusé : $ctx (--confirmer $ctx)" >&2
+                echo "devzone : cluster distant refusé : $ctx (--confirm $ctx)" >&2
                 return 2
             fi
         fi
@@ -1413,6 +1413,18 @@ if [ "$#" -gt 0 ]; then
     fi
     set -- "$canon" "${@:2}"
 fi
+
+# Options of activer, cluster and utiliser take their English names (#557) :
+# --context, --confirm, --yes ; the French ones warn. The other commands keep
+# their options (desactiver --oui, for one).
+case "${1:-}" in
+    activer | cluster | utiliser)
+        if command -v canonical_args >/dev/null 2>&1; then
+            canonical_args "$1" "${@:2}"
+            set -- "$1" "${ARGS_CANONICAL[@]+"${ARGS_CANONICAL[@]}"}"
+        fi
+        ;;
+esac
 
 case "${1:-}" in
     "" | etat | modules) if [ "${2:-}" = "--json" ]; then etat_json; else etat; fi ;;

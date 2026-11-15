@@ -9,7 +9,7 @@
 #   cluster_ecrire CTX               garde le choix dans l'état
 #   cluster_est_local CTX            0 si cluster local (config, sans réseau)
 #   cluster_candidats                locaux, puis kind dédié, puis distants
-#   cluster_choisir [CTX] [--confirmer CTX]
+#   cluster_choisir [CTX] [--confirm CTX]
 #                                    CTX validé (distant : confirmation),
 #                                    sinon choix gardé, sinon menu
 #                                    (terminal seulement), sinon défaut local
@@ -193,22 +193,22 @@ cluster_choisir() {
         arg="$1"
         shift
         case "$arg" in
-            --confirmer)
+            --confirm)
                 if [ "$#" -eq 0 ]; then
-                    echo "devzone : --confirmer attend un contexte" >&2
+                    echo "devzone : --confirm attend un contexte" >&2
                     return 2
                 fi
                 confirmer="$1"
                 shift
                 ;;
-            --confirmer=*) confirmer="${arg#*=}" ;;
+            --confirm=*) confirmer="${arg#*=}" ;;
             -*)
-                echo "devzone : argument inconnu : $arg (cluster_choisir [CTX] [--confirmer CTX])" >&2
+                echo "devzone : argument inconnu : $arg (cluster_choisir [CTX] [--confirm CTX])" >&2
                 return 2
                 ;;
             *)
                 if [ -n "$voulu" ]; then
-                    echo "devzone : argument inconnu : $arg (cluster_choisir [CTX] [--confirmer CTX])" >&2
+                    echo "devzone : argument inconnu : $arg (cluster_choisir [CTX] [--confirm CTX])" >&2
                     return 2
                 fi
                 voulu="$arg"
@@ -223,13 +223,13 @@ cluster_choisir() {
             echo "devzone : cluster inconnu ou injoignable : $voulu ; possibles : $(cluster_candidats | tr '\n' ' ')" >&2
             return 2
         fi
-        # Distant : confirmation requise. --confirmer ne vaut que s'il est
+        # Distant : confirmation requise. --confirm ne vaut que s'il est
         # exactement le contexte demandé ; DEVZONE_CLUSTER_DISTANT reste
         # accepté pour les tests et la CI.
         if ! cluster_est_local "$voulu"; then
             if [ -n "$confirmer" ]; then
                 if [ "$confirmer" != "$voulu" ]; then
-                    echo "devzone : cluster distant refusé : $voulu (--confirmer $voulu)" >&2
+                    echo "devzone : cluster distant refusé : $voulu (--confirm $voulu)" >&2
                     return 2
                 fi
             elif [ -n "${DEVZONE_CLUSTER_DISTANT:-}" ]; then
@@ -241,11 +241,11 @@ cluster_choisir() {
                 printf 'cluster distant : %s ; tape son nom pour confirmer : ' "$voulu" >&2
                 read -r reponse || reponse=""
                 if [ "$reponse" != "$voulu" ]; then
-                    echo "devzone : cluster distant refusé : $voulu (--confirmer $voulu)" >&2
+                    echo "devzone : cluster distant refusé : $voulu (--confirm $voulu)" >&2
                     return 2
                 fi
             else
-                echo "devzone : cluster distant refusé : $voulu (--confirmer $voulu)" >&2
+                echo "devzone : cluster distant refusé : $voulu (--confirm $voulu)" >&2
                 return 2
             fi
         fi

@@ -194,9 +194,9 @@ SETSID
     grep -Eq -- "--kubeconfig [^ ]+ upgrade --install gitlab gitlab/gitlab" "$BATS_TEST_TMPDIR/helm.log" || false
 }
 
-@test "gitlab migrate --oui : installe, refait le seed, puis supprime kind-gitlab" {
+@test "gitlab migrate --yes : installe, refait le seed, puis supprime kind-gitlab" {
     printf 'gitlab\n' >"$KIND_CLUSTERS"
-    run bash "$DEVZONE" gitlab migrate --oui
+    run bash "$DEVZONE" gitlab migrate --yes
     [ "$status" -eq 0 ] || false
     grep -Eq -- "--kubeconfig [^ ]+ upgrade --install gitlab gitlab/gitlab" "$BATS_TEST_TMPDIR/helm.log" || false
     grep -q "api/v4/projects" "$BATS_TEST_TMPDIR/curl.log" 2>/dev/null ||

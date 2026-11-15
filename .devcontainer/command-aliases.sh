@@ -34,7 +34,7 @@ command_canonical() {
         migrate) echo migrer ;;
         revert) echo revenir ;;
         clean-docker) echo nettoyer-docker ;;
-        *) echo "${1:-}" ;;
+        *) printf '%s\n' "${1:-}" ;;
     esac
 }
 
@@ -63,7 +63,7 @@ command_english() {
         migrer) echo migrate ;;
         revenir) echo revert ;;
         nettoyer-docker) echo clean-docker ;;
-        *) echo "${1:-}" ;;
+        *) printf '%s\n' "${1:-}" ;;
     esac
 }
 
@@ -101,7 +101,7 @@ subcommand_canonical() {
                 relais-arreter) echo relay-stop ;;
                 autoriser) echo authorize ;;
                 interdire) echo forbid ;;
-                *) echo "$word" ;;
+                *) printf '%s\n' "$word" ;;
             esac
             ;;
         gitlab)
@@ -114,7 +114,7 @@ subcommand_canonical() {
                 relais-lancer) echo relay-start ;;
                 relais-arreter) echo relay-stop ;;
                 relais-etat) echo relay-status ;;
-                *) echo "$word" ;;
+                *) printf '%s\n' "$word" ;;
             esac
             ;;
         argocd)
@@ -124,7 +124,7 @@ subcommand_canonical() {
                 desinstaller) echo uninstall ;;
                 relais-lancer) echo relay-start ;;
                 relais-arreter) echo relay-stop ;;
-                *) echo "$word" ;;
+                *) printf '%s\n' "$word" ;;
             esac
             ;;
         packages)
@@ -133,7 +133,7 @@ subcommand_canonical() {
                 retirer) echo remove ;;
                 appliquer) echo apply ;;
                 lister) echo list ;;
-                *) echo "$word" ;;
+                *) printf '%s\n' "$word" ;;
             esac
             ;;
         catalog)
@@ -142,7 +142,7 @@ subcommand_canonical() {
                 appliquer) echo apply ;;
                 lister) echo list ;;
                 desinstaller) echo remove ;;
-                *) echo "$word" ;;
+                *) printf '%s\n' "$word" ;;
             esac
             ;;
         port)
@@ -153,10 +153,10 @@ subcommand_canonical() {
                 relancer) echo restart ;;
                 exclure) echo exclude ;;
                 inclure) echo include ;;
-                *) echo "$word" ;;
+                *) printf '%s\n' "$word" ;;
             esac
             ;;
-        *) echo "$word" ;;
+        *) printf '%s\n' "$word" ;;
     esac
 }
 
@@ -170,7 +170,7 @@ option_canonical() {
         --oui) echo --yes ;;
         --confirmer) echo --confirm ;;
         --contexte) echo --context ;;
-        *) echo "${1:-}" ;;
+        *) printf '%s\n' "${1:-}" ;;
     esac
 }
 
@@ -210,7 +210,7 @@ canonical_args() {
     ARGS_CANONICAL=()
     for word in "$@"; do
         case "$word" in
-            --*)
+            -*)
                 option_deprecated_warning "$word"
                 ARGS_CANONICAL+=("$(option_canonical "$word")")
                 ;;

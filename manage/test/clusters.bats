@@ -131,7 +131,7 @@ KUBE
     faux_kubectl
     printf 'docker-desktop\nprod\n' >"$BATS_TEST_TMPDIR/contexts"
     printf 'docker-desktop\n' >"$BATS_TEST_TMPDIR/current"
-    run bash "$DEVZONE" use prod --confirmer prod -n gitlab
+    run bash "$DEVZONE" use prod --confirm prod -n gitlab
     [ "$status" -eq 0 ]
     grep -q "config use-context prod" "$BATS_TEST_TMPDIR/kubectl.log" || false
     grep -q "config set-context prod --namespace gitlab" "$BATS_TEST_TMPDIR/kubectl.log" || false
@@ -208,4 +208,14 @@ KUBE
     [ "$(grep -c '# >>> devzone invite >>>' "$script")" -eq 1 ] || false
     grep -q "invite-kube.sh" "$script" || false
     grep -q 'PS1=.*devzone_invite_kube' "$script" || false
+}
+
+@test "utiliser : --confirm silencieux, --confirmer avertit" {
+    faux_kubectl
+    printf 'docker-desktop\n' >"$BATS_TEST_TMPDIR/contexts"
+    printf 'docker-desktop\n' >"$BATS_TEST_TMPDIR/current"
+    run --separate-stderr bash "$DEVZONE" use docker-desktop --confirm docker-desktop
+    [[ "$stderr" != *"deprecated"* ]] || false
+    run --separate-stderr bash "$DEVZONE" use docker-desktop --confirmer docker-desktop
+    [[ "$stderr" == *"devzone: \"--confirmer\" is deprecated, use \"--confirm\""* ]] || false
 }

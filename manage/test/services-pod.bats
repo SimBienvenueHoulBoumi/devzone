@@ -129,7 +129,7 @@ GETENT
 @test "enable in the pod with DEVZONE_SERVICES_ADMIN=1: the installer runs" {
     printf 'postgres=off\n' >"$DEVZONE_ETAT"
     export DEVZONE_SERVICES_ADMIN=1
-    run bash "$DEVZONE" enable postgres --contexte nulle-part
+    run bash "$DEVZONE" enable postgres --context nulle-part
     [[ "$output" != *"devzone workspace services enable"* ]] || false
     # The installer itself was reached: the unknown cluster is refused by it
     [[ "$output" == *"cluster inconnu"* ]] || false
@@ -163,10 +163,10 @@ DZ
 @test "services-admin.sh enable: kubeconfig with the token, two contexts, installer run, everything cleaned" {
     admin_setup
     printf 'cluster=docker-desktop\npostgres=off\n' >"$DEVZONE_ETAT"
-    run bash -c 'printf "SECRET-TOKEN\n" | bash "$0" enable postgres --contexte x' "$ADMIN"
+    run bash -c 'printf "SECRET-TOKEN\n" | bash "$0" enable postgres --context x' "$ADMIN"
     [ "$status" -eq 0 ]
     [[ "$output" != *"SECRET-TOKEN"* ]] || false
-    grep -q '^devzone enable postgres --contexte x$' "$T/devzone.log"
+    grep -q '^devzone enable postgres --context x$' "$T/devzone.log"
     grep -q '^devzone postgres relay-stop$' "$T/devzone.log"
     grep -q 'token: SECRET-TOKEN' "$T/kubeconfig.copy"
     grep -q 'name: devzone-admin' "$T/kubeconfig.copy"

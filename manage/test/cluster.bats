@@ -395,7 +395,7 @@ KIND
     ) || false
 }
 
-@test "cluster_choisir : --confirmer exact accepté hors terminal" {
+@test "cluster_choisir : --confirm exact accepté hors terminal" {
     faux_kubectl
     faux_kind
     FAUX_INJOIGNABLE=aucun
@@ -406,13 +406,13 @@ KIND
         export ETAT="$BATS_TEST_TMPDIR/etat"
         export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
         source "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
-        run cluster_choisir cluster-prod --confirmer cluster-prod </dev/null
+        run cluster_choisir cluster-prod --confirm cluster-prod </dev/null
         [ "$status" -eq 0 ] || false
         [ "$output" = "cluster-prod" ] || false
     ) || false
 }
 
-@test "cluster_choisir : --confirmer autre refusé" {
+@test "cluster_choisir : --confirm autre refusé" {
     faux_kubectl
     faux_kind
     FAUX_INJOIGNABLE=aucun
@@ -423,13 +423,13 @@ KIND
         export ETAT="$BATS_TEST_TMPDIR/etat"
         export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
         source "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
-        run cluster_choisir cluster-prod --confirmer autre </dev/null
+        run cluster_choisir cluster-prod --confirm autre </dev/null
         [ "$status" -eq 2 ] || false
         [[ "$output" == *"cluster distant refusé"* ]] || false
     ) || false
 }
 
-@test "cluster_choisir : --confirmer sans valeur refusé" {
+@test "cluster_choisir : --confirm sans valeur refusé" {
     faux_kubectl
     faux_kind
     (
@@ -437,9 +437,9 @@ KIND
         export ETAT="$BATS_TEST_TMPDIR/etat"
         export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
         source "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
-        run cluster_choisir cluster-prod --confirmer </dev/null
+        run cluster_choisir cluster-prod --confirm </dev/null
         [ "$status" -eq 2 ] || false
-        [[ "$output" == *"--confirmer attend un contexte"* ]] || false
+        [[ "$output" == *"--confirm attend un contexte"* ]] || false
     ) || false
 }
 

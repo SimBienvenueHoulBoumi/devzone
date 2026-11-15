@@ -126,8 +126,8 @@ attendre_nohup() {
     [[ "$output" == *"127.0.0.1:5432"* ]] || false
 }
 
-@test "activer --contexte docker-desktop : pas de kind, tout sur ce contexte" {
-    run bash "$DEVZONE" enable postgres --contexte docker-desktop </dev/null
+@test "activer --context docker-desktop : pas de kind, tout sur ce contexte" {
+    run bash "$DEVZONE" enable postgres --context docker-desktop </dev/null
     [ "$status" -eq 0 ]
     grep -qx 'cluster=docker-desktop' "$DEVZONE_ETAT"
     ! grep -q 'create cluster' "$BATS_TEST_TMPDIR/kind.log" 2>/dev/null || false
@@ -136,21 +136,21 @@ attendre_nohup() {
     ! grep -q 'kind-devzone' "$BATS_TEST_TMPDIR/kubectl.log" || false
 }
 
-@test "activer --contexte inconnu ou injoignable : refus code 2, rien installé, module inactif" {
-    run bash "$DEVZONE" enable postgres --contexte inconnu </dev/null
+@test "activer --context inconnu ou injoignable : refus code 2, rien installé, module inactif" {
+    run bash "$DEVZONE" enable postgres --context inconnu </dev/null
     [ "$status" -eq 2 ]
     [[ "$output" == *"cluster inconnu ou injoignable : inconnu"* ]] || false
     grep -qx 'postgres=off' "$DEVZONE_ETAT"
     ! grep -q '^cluster=' "$DEVZONE_ETAT" || false
     [ ! -f "$BATS_TEST_TMPDIR/apply.log" ]
 
-    FAUX_INJOIGNABLE=docker-desktop run bash "$DEVZONE" enable postgres --contexte docker-desktop </dev/null
+    FAUX_INJOIGNABLE=docker-desktop run bash "$DEVZONE" enable postgres --context docker-desktop </dev/null
     [ "$status" -eq 2 ]
 }
 
 @test "activer sans module kubernetes : seul le kind dédié est possible" {
     rm -f "$DEVZONE_KUBE_HOTE"
-    run bash "$DEVZONE" enable postgres --contexte docker-desktop </dev/null
+    run bash "$DEVZONE" enable postgres --context docker-desktop </dev/null
     [ "$status" -eq 2 ]
 }
 
@@ -172,9 +172,9 @@ attendre_nohup() {
     grep -qx 'postgres=off' "$DEVZONE_ETAT"
 }
 
-@test "activer --contexte autre que le cluster choisi : refus, devzone cluster indiqué" {
+@test "activer --context autre que le cluster choisi : refus, devzone cluster indiqué" {
     printf 'cluster=kind-devzone\n' >"$DEVZONE_ETAT"
-    run bash "$DEVZONE" enable postgres --contexte docker-desktop </dev/null
+    run bash "$DEVZONE" enable postgres --context docker-desktop </dev/null
     [ "$status" -eq 2 ]
     [[ "$output" == *"devzone cluster docker-desktop"* ]] || false
 }
@@ -236,7 +236,7 @@ attendre_nohup() {
 }
 
 @test "installation, désinstallation : .password suit le compte admin" {
-    run bash "$DEVZONE" enable postgres --contexte docker-desktop </dev/null
+    run bash "$DEVZONE" enable postgres --context docker-desktop </dev/null
     [ "$status" -eq 0 ]
     grep -q $'^postgres\t127.0.0.1:5432\tpostgres\t' "$DEVZONE_RACINE/.password"
     run bash "$DEVZONE" disable postgres </dev/null
@@ -261,7 +261,7 @@ attendre_nohup() {
     [[ "$output" == *"taskmanager"*"propriétaire taskmanager"* ]] || false
 }
 
-@test "supprimer : sans terminal ni --oui refusé ; --oui : base, rôle et .env supprimés" {
+@test "supprimer : sans terminal ni --yes refusé ; --yes : base, rôle et .env supprimés" {
     actif_sur kind-devzone
     bash "$POSTGRES" create taskmanager
     : >"$BATS_TEST_TMPDIR/sql.log"
@@ -346,7 +346,7 @@ attendre_nohup() {
     [ ! -f "$SECRETS/relais.pid" ]
 }
 
-@test "cluster : affichage, refus sans --oui hors terminal, déplacement avec --oui" {
+@test "cluster : affichage, refus sans --yes hors terminal, déplacement avec --yes" {
     run bash "$DEVZONE" cluster
     [[ "$output" == *"aucun cluster choisi"* ]] || false
 
@@ -358,7 +358,7 @@ attendre_nohup() {
     [ "$status" -eq 1 ]
     grep -qx 'cluster=kind-devzone' "$DEVZONE_ETAT"
 
-    run bash "$DEVZONE" cluster docker-desktop --oui </dev/null
+    run bash "$DEVZONE" cluster docker-desktop --yes </dev/null
     [ "$status" -eq 0 ]
     grep -qx 'cluster=docker-desktop' "$DEVZONE_ETAT"
     # Suppression du namespace de l'ancien cluster par l'administrateur (#430)
@@ -415,4 +415,15 @@ attendre_nohup() {
     run --separate-stderr bash "$POSTGRES" delete taskmanager --yes
     [ "$status" -eq 0 ]
     [[ "$stderr" != *"deprecated"* ]] || false
+}
+
+@test "enable et cluster : options anglaises silencieuses, françaises avertissent" {
+    run --separate-stderr bash "$DEVZONE" enable postgres --context docker-desktop </dev/null
+    [ "$status" -eq 0 ]
+    [[ "$stderr" != *"deprecated"* ]] || false
+    run --separate-stderr bash "$DEVZONE" activer postgres --contexte docker-desktop </dev/null
+    [ "$status" -eq 0 ]
+    [[ "$stderr" == *"devzone: \"--contexte\" is deprecated, use \"--context\""* ]] || false
+    run --separate-stderr bash "$DEVZONE" cluster docker-desktop --oui </dev/null
+    [[ "$stderr" == *"devzone: \"--oui\" is deprecated, use \"--yes\""* ]] || false
 }

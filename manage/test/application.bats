@@ -193,14 +193,14 @@ KUBE
     [[ "$(cat "$T/kubectl.log")" != *"use-context"* ]] || false
 }
 
-@test "utiliser : --confirmer exact accepté, autre valeur refusée" {
+@test "utiliser : --confirm exact accepté, autre valeur refusée" {
     faux_kubectl
-    run bash "$APP" utiliser prod --confirmer prod
+    run bash "$APP" utiliser prod --confirm prod
     [ "$status" -eq 0 ]
     [[ "$(cat "$T/kubectl.log")" == *"config use-context prod"* ]] || false
 
     : >"$T/kubectl.log"
-    run bash "$APP" utiliser prod --confirmer autre
+    run bash "$APP" utiliser prod --confirm autre
     [ "$status" -eq 2 ]
     [[ "$output" == *"cluster distant refusé : prod"* ]] || false
     [[ "$(cat "$T/kubectl.log")" != *"use-context"* ]] || false
