@@ -15,9 +15,12 @@
 # Sourced by the tests with stubs; run as a script by devzone. bash 3.2.
 
 ICI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-RACINE="${DEVZONE_RACINE:-$(dirname "$(dirname "$ICI")")}"
+# RACINE: the code tree (libraries, charts); STATE_RACINE: the devzone folder
+# (workspace/ secrets, .argocd.conf), the same folder unless DEVZONE_RACINE says so
+RACINE="$(dirname "$(dirname "$ICI")")"
+STATE_RACINE="${DEVZONE_RACINE:-$RACINE}"
 # shellcheck disable=SC2034 # read by catalogue-argocd.sh
-ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
+ETAT="${DEVZONE_ETAT:-$STATE_RACINE/.devzone.modules}"
 APP_CONF="$RACINE/.devcontainer/catalogue/mysql/app.conf"
 HOOK_SERVICES="postgres mysql"
 
@@ -31,6 +34,8 @@ HOOK_SERVICES="postgres mysql"
 # Loads the Argo CD pieces (conf, gitops, services with the context devzone)
 # and the list of services reconciled here
 hook_load() {
+    DEVZONE_ARGOCD_CONF="${DEVZONE_ARGOCD_CONF:-$STATE_RACINE/.argocd.conf}"
+    export DEVZONE_ARGOCD_CONF
     catalogue_argocd_load
     # shellcheck disable=SC2034 # read by services.sh (services_reconcile)
     SERVICES_LIST="$HOOK_SERVICES"
@@ -69,7 +74,7 @@ hook_relay() {
 # printed. The same mirror the helm-direct installers read.
 services_secret_admin() {
     local svc="$1" ns="$2" secret="$3" dir file password=""
-    dir="$RACINE/workspace/.$svc"
+    dir="$STATE_RACINE/workspace/.$svc"
     file="$dir/admin-password"
     mkdir -p "$dir"
     chmod 700 "$dir"
@@ -85,7 +90,9 @@ services_secret_admin() {
     chmod 600 "$file"
 }
 
+# Secret hooks of services_reconcile: the superuser secret of each service
 services_secret_postgres() { services_secret_admin postgres devzone-postgres postgres-admin; }
+# The superuser secret of MySQL, the same way
 services_secret_mysql() { services_secret_admin mysql devzone-mysql mysql-admin; }
 
 # Value of a key of the MySQL application file (app.conf, read as text)

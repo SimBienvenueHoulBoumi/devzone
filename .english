@@ -20,6 +20,7 @@ manage/test/command-aliases.bats
 manage/test/check-english.bats
 manage/test/readme.bats
 manage/test/services-hook.bats
+manage/test/gitops-gitlab.bats
 manage/test/shard.sh
 manage/test/shard.bats
 manage/test/workspace.bats
@@ -83,6 +84,7 @@ charts/devzone-workspace/templates/statefulset.yaml
 .github/workflows/tickets.yml
 .devcontainer/argocd/catalogue-argocd.sh
 .devcontainer/argocd/services-hook.sh
+.devcontainer/argocd/gitops-gitlab.sh
 .devcontainer/ports-json.sh
 .devcontainer/help.sh
 manage/scripts/check-charts.sh

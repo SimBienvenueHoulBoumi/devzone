@@ -667,6 +667,15 @@ Les modules qui déploient un service (`postgres`, `gitlab`) s'installent sur **
 - **Cluster distant** : choisir un cluster distant nécessite une confirmation en terminal, ou `--confirmer CTX` sans terminal. Sans confirmation exacte, le choix est refusé. Quand le cluster de devzone est distant, le récapitulatif `devzone` affiche un avertissement `⚠ cluster distant : <contexte>`.
 - **Namespace** : pour un contexte du poste (ceux de `hote.config`, recopié depuis le poste à chaque démarrage), le namespace fixé par `devzone use -n` ne survit pas à un redémarrage ; pour les clusters kind du conteneur, il est gardé jusqu'au rebuild.
 
+### GitLab comme dépôt GitOps (conteneur)
+
+`devzone argocd init --gitlab` crée le projet `devzone/devzone-argocd` sur le GitLab de devzone, par l'API (pas de clone), privé, avec un premier commit. Il désigne le dépôt dans `[argocd]` (`repo` = URL interne, `provider = gitlab`) : le Secret de dépôt d'Argo CD reprend cette URL, avec l'utilisateur `oauth2` et le jeton root.
+
+- Le jeton root vient de `workspace/.gitlab/root-token`, passé à `curl` par un fichier de configuration de mode 600 (jamais en argument, jamais affiché).
+- Les fichiers `apps/<nom>.yaml` sont écrits par `PUT` (existant) ou `POST` (nouveau) sur `/projects/:id/repository/files/:chemin`, et retirés par `DELETE` ; un fichier au contenu identique n'est pas réécrit.
+- Le backend est `.devcontainer/argocd/gitops-gitlab.sh` ; `gitops.sh` le sélectionne quand `provider = gitlab`.
+- Non fait : la commande du poste (`devzone workspace argocd init --gitlab`, par `kubectl exec` dans le pod) reste à brancher.
+
 ### Services tenus par Argo CD dans le conteneur
 
 Avec le module `argocd` installé et joignable, `devzone enable postgres|mysql` déclare le service comme Application `devzone-<service>` (chart `charts/devzone-<service>` du dépôt devzone à la révision) : la section `[services]` de `.argocd.conf` passe à `on`, puis la réconciliation applique le namespace isolé, le secret administrateur (créé à part, miroir dans `workspace/.<service>/admin-password`, jamais affiché) et l'Application ; devzone attend les pods puis relance le relais.
