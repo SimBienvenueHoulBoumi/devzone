@@ -23,6 +23,10 @@ case "$*" in
     "config current-context")
         echo "${FAKE_CURRENT_CONTEXT:-docker-desktop}"
         ;;
+    *"cluster-info"*)
+        [ "${FAKE_KUBE_CLUSTER_INFO:-ok}" = ok ]
+        exit $?
+        ;;
     *"get statefulset devzone-workspace "*)
         echo "${FAKE_REVISION:-rev-1}"
         ;;
@@ -67,7 +71,13 @@ T="$BATS_TEST_TMPDIR"
 echo "helm $*" >>"$T/helm.log"
 exit 0
 HELM
-    chmod +x "$T/bin/kubectl" "$T/bin/helm"
+    # Fake docker (#565): Docker Desktop stopped when FAKE_DOCKER=down; never the real one
+    cat >"$T/bin/docker" <<'DOCKER'
+#!/usr/bin/env bash
+echo "docker $*" >>"$BATS_TEST_TMPDIR/docker.log"
+[ "${FAKE_DOCKER:-up}" = up ]
+DOCKER
+    chmod +x "$T/bin/kubectl" "$T/bin/helm" "$T/bin/docker"
     export PATH="$T/bin:$PATH"
     export DEVZONE_WORKSPACE_ATTENTE=1 DEVZONE_WORKSPACE_PAS=0.1
     # Devzone folder of the workstation: its state, never the real one; Argo CD
@@ -97,6 +107,20 @@ HELM
     run bash "$CLI" workspace demarrer
     [ "$status" -eq 0 ]
     [ "$(cat "$T/helm.log")" = "$(cat "$T/start.log")" ]
+}
+
+@test "workspace start: cluster stopped (Docker Desktop), one message, no helm, no Argo CD" {
+    export FAKE_KUBE_CLUSTER_INFO=fail FAKE_DOCKER=down FAKE_CONTEXTS=docker-desktop
+    export FAKE_CURRENT_CONTEXT=docker-desktop
+    : >"$T/helm.log"
+    : >"$T/kubectl.log"
+    run bash "$CLI" workspace start
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"✖ Docker Desktop is stopped: the Kubernetes cluster of this machine runs inside it. Start Docker Desktop, then: make shell"* ]] || false
+    [ "$(grep -c '^✖' <<<"$output")" -eq 1 ]
+    [[ "$output" != *"helm directly"* ]] || false
+    [ ! -s "$T/helm.log" ]
+    ! grep -q 'namespace\|get pod\|apply\|get statefulset' "$T/kubectl.log" || false
 }
 
 @test "workspace start: current context when devzone is missing" {

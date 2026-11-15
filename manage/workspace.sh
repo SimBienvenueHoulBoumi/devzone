@@ -51,6 +51,8 @@ default_image_tag() {
 # Installs or upgrades the workspace in the cluster.
 start_workspace() {
     local repo tag image with_image="" args=()
+    # Why (#565): the cluster first, so no Argo CD, helm or pod wait for a stopped one
+    kube_ready_reason --hint >&2 || return 1
     repo="$IMAGE_REPO"
     tag="$(default_image_tag)"
     while [ $# -gt 0 ]; do
@@ -176,6 +178,8 @@ copy_from() {
 # French names of the command and compatibility aliases (lot 3, #508)
 # shellcheck source=manage/scripts/workspace-aliases.sh
 . "$HERE/scripts/workspace-aliases.sh"
+# shellcheck source=manage/scripts/kube-ready.sh
+. "$HERE/scripts/kube-ready.sh"
 # shellcheck source=manage/scripts/workspace-wait.sh
 . "$HERE/scripts/workspace-wait.sh"
 # shellcheck source=manage/scripts/migrer.sh
