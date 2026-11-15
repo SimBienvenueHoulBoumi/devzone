@@ -309,22 +309,22 @@ CURL
     grep -qx 'ports=' "$DEVZONE_ETAT"
 }
 
-@test "devzone : récapitulatif ports vers le poste, actif puis aucun" {
+@test "devzone : récapitulatif ports vers le poste, actif puis none" {
     printf 'ports=8080\n' >"$DEVZONE_ETAT"
     : >"$BATS_TEST_TMPDIR/relais/devzone-devzone-port-8080"
     run bash "$DEVZONE"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"✔ ports vers le poste 8080 ●"* ]] || false
+    [[ "$output" == *"✔ ports to the workstation 8080 ●"* ]] || false
 
     printf 'ports=\n' >"$DEVZONE_ETAT"
     run bash "$DEVZONE"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"○ ports vers le poste aucun (devzone port <n>)"* ]] || false
+    [[ "$output" == *"○ ports to the workstation none (devzone port <n>)"* ]] || false
 }
 
 @test "devzone --help cite devzone port" {
     run bash "$DEVZONE" --help
-    [[ "$output" == *"devzone port [<n>|--fermer <n>]"* ]] || false
+    [[ "$output" == *"devzone port [<n>|--close <n>]"* ]] || false
 }
 
 @test "ouvrir sans DEVZONE_ETAT ni DEVZONE_RACINE" {

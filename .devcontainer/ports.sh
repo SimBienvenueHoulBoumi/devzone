@@ -175,7 +175,7 @@ resume() {
     local ports port sortie=""
     ports="$(trier_ports "$(lire_ports)")"
     if [ -z "$ports" ]; then
-        echo "aucun (devzone port <n>)"
+        echo "none (devzone port <n>)"
         return 0
     fi
     # shellcheck disable=SC2046 # liste de ports séparés par des virgules

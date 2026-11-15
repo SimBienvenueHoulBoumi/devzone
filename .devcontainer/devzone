@@ -1300,7 +1300,7 @@ etat() {
     fi
     ports_etat="$(bash "$ICI/ports.sh" resume 2>/dev/null || true)"
     case "$ports_etat" in
-        aucun*) printf '  ○ ports to the workstation %s\n' "$ports_etat" ;;
+        none*) printf '  ○ ports to the workstation %s\n' "$ports_etat" ;;
         *) printf '  ✔ ports to the workstation %s\n' "$ports_etat" ;;
     esac
     # Identifiants regroupés (#332) : le chemin seulement, jamais le contenu

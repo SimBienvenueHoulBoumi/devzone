@@ -196,8 +196,8 @@ NPM
     [ -f "$DEVZONE_PAQUETS_MARQUE" ]
     run bash "$DEVZONE"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"⚠ paquets"* ]] || false
-    [[ "$output" == *"devzone paquets"* ]] || false
+    [[ "$output" == *"⚠ packages"* ]] || false
+    [[ "$output" == *"devzone packages"* ]] || false
 }
 
 @test "paquets : ajouter valide fait apt-get update avant apt-get install" {

@@ -209,11 +209,11 @@ SETSID
     printf 'gitlab\n' >"$KIND_CLUSTERS"
     run bash "$DEVZONE"
     [ "$status" -eq 0 ] || false
-    [[ "$output" == *"⚠ ancien cluster kind-gitlab : devzone gitlab migrate"* ]] || false
+    [[ "$output" == *"⚠ old kind-gitlab cluster: devzone gitlab migrate"* ]] || false
 }
 
 @test "devzone : récapitulatif sans avertissement quand kind-gitlab a disparu" {
     run bash "$DEVZONE"
     [ "$status" -eq 0 ] || false
-    [[ "$output" != *"ancien cluster kind-gitlab"* ]] || false
+    [[ "$output" != *"old kind-gitlab cluster"* ]] || false
 }
