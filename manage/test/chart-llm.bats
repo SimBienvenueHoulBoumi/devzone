@@ -42,7 +42,13 @@ render() {
     [ "$(grep -c -- '- "q8_0"' <<<"$output")" -eq 2 ]
     [[ "$output" == *"--flash-attn"* ]] || false
     [[ "$output" == *'- "on"'* ]] || false
-    [[ "$output" == *'- "4"'* ]] || false
+    [[ "$output" == *'- name: THREADS'* ]] || false
+    [[ "$output" == *'value: "auto"'* ]] || false
+    [[ "$output" == *'value: "8"'* ]] || false
+    [[ "$output" == *'t="$(nproc)"'* ]] || false
+    [[ "$output" == *'exec /app/llama-server "$@" -t "$t" --threads-batch "$t"'* ]] || false
+    [[ "$output" == *'cpu: 2'* ]] || false
+    [[ "$output" != *"cpu: 500m"* ]] || false
     [[ "$output" == *"--host"* ]] || false
     [[ "$output" == *"0.0.0.0"* ]] || false
     [[ "$output" == *"resolve/13fb94bfda8c8cf22497dc57b78f391a9acb426a/qwen2.5-coder-7b-instruct-q4_k_m.gguf"* ]] || false
@@ -56,6 +62,15 @@ render() {
     [ "$status" -eq 0 ]
     [[ "$output" == *"image: ghcr.io/ggml-org/llama.cpp:server-b99999"* ]] || false
     [[ "$output" != *"b12407"* ]] || false
+}
+
+@test "chart devzone-llm: a numeric threads value and maxThreads are passed as is, CPU is a request only" {
+    run render --set threads=6 --set maxThreads=12 --set resources.requests.cpu=3 --show-only templates/deployment.yaml
+    [ "$status" -eq 0 ]
+    [[ "$output" == *'value: "6"'* ]] || false
+    [[ "$output" == *'value: "12"'* ]] || false
+    [[ "$output" == *"cpu: 3"* ]] || false
+    [ "$(grep -c 'cpu:' <<<"$output")" -eq 1 ]
 }
 
 @test "chart devzone-llm: readiness probe on GET /health, init container downloads only when missing and checks the sha256" {
