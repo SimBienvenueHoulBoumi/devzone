@@ -114,7 +114,7 @@ TABLE
     [ "$status" -eq 2 ]
     [[ "$stderr" == *"devzone: \"activer\" is deprecated, use \"enable\""* ]] || false
     [[ "$stderr" == *"commande du conteneur"* ]] || false
-    [[ "$stdout" != *"deprecated"* ]] || false
+    [[ "$output" != *"deprecated"* ]] || false
 }
 
 @test "English name is silent" {
@@ -122,7 +122,7 @@ TABLE
     [ "$status" -eq 2 ]
     [[ "$stderr" == *"commande du conteneur"* ]] || false
     [[ "$stderr" != *"deprecated"* ]] || false
-    [[ "$stdout" != *"deprecated"* ]] || false
+    [[ "$output" != *"deprecated"* ]] || false
 }
 
 @test "DEVZONE_NO_DEPRECATION=1 silences the warning" {
@@ -156,4 +156,126 @@ DOCKER
     run --separate-stderr bash "$WS" migrate
     [ "$status" -ne 0 ]
     [[ "$stderr" != *"deprecated"* ]] || false
+}
+
+@test "subcommand_canonical: every entry of the table maps to the English name" {
+    # shellcheck source=../.devcontainer/command-aliases.sh
+    # shellcheck disable=SC1090
+    . "$ALIASES"
+    while IFS='|' read -r command french english; do
+        [ -n "$command" ] || continue
+        [ "$(subcommand_canonical "$command" "$french")" = "$english" ] || {
+            echo "unexpected mapping: $command $french -> $(subcommand_canonical "$command" "$french") (expected $english)";
+            return 1;
+        }
+    done <<'TABLE'
+postgres|creer|create
+postgres|liste|list
+postgres|supprimer|delete
+postgres|supprimer-donnees|delete-data
+postgres|etat|status
+postgres|relais-lancer|relay-start
+postgres|relais-arreter|relay-stop
+mysql|creer|create
+mysql|liste|list
+mysql|supprimer|delete
+mysql|supprimer-donnees|delete-data
+gitlab|migrer|migrate
+gitlab|nouveau-mdp|new-password
+gitlab|relais-etat|relay-status
+argocd|etat|status
+argocd|relais-lancer|relay-start
+argocd|relais-arreter|relay-stop
+packages|ajouter|add
+packages|retirer|remove
+packages|appliquer|apply
+packages|lister|list
+catalog|lister|list
+port|ouvrir|open
+port|fermer|close
+port|liste|list
+port|relancer|restart
+port|exclure|exclude
+port|inclure|include
+TABLE
+}
+
+@test "subcommand_canonical: unknown subcommand and unknown command unchanged" {
+    # shellcheck source=../.devcontainer/command-aliases.sh
+    # shellcheck disable=SC1090
+    . "$ALIASES"
+    [ "$(subcommand_canonical postgres nexistepas)" = "nexistepas" ]
+    [ "$(subcommand_canonical nexistepas creer)" = "creer" ]
+    [ -z "$(subcommand_canonical postgres "")" ]
+}
+
+@test "option_canonical: every option of the table maps to the English name" {
+    # shellcheck source=../.devcontainer/command-aliases.sh
+    # shellcheck disable=SC1090
+    . "$ALIASES"
+    while IFS='|' read -r french english; do
+        [ -n "$french" ] || continue
+        [ "$(option_canonical "$french")" = "$english" ] || {
+            echo "unexpected mapping: $french -> $(option_canonical "$french") (expected $english)";
+            return 1;
+        }
+    done <<'TABLE'
+--fermer|--close
+--nouveau-mdp|--new-password
+--oui|--yes
+--confirmer|--confirm
+--contexte|--context
+TABLE
+    [ "$(option_canonical --nexistepas)" = "--nexistepas" ]
+    [ -z "$(option_canonical "")" ]
+}
+
+@test "the old French subcommand warns, the English one is silent" {
+    # shellcheck source=../.devcontainer/command-aliases.sh
+    # shellcheck disable=SC1090
+    . "$ALIASES"
+    run --separate-stderr subcommand_deprecated_warning postgres liste
+    [ "$status" -eq 0 ]
+    [[ "$stderr" == *"devzone: \"liste\" is deprecated, use \"list\""* ]] || false
+    run --separate-stderr subcommand_deprecated_warning postgres list
+    [ "$status" -eq 0 ]
+    [ -z "$stderr" ]
+    run --separate-stderr subcommand_deprecated_warning postgres nexistepas
+    [ "$status" -eq 0 ]
+    [ -z "$stderr" ]
+}
+
+@test "the old French option warns, the English one is silent" {
+    # shellcheck source=../.devcontainer/command-aliases.sh
+    # shellcheck disable=SC1090
+    . "$ALIASES"
+    run --separate-stderr option_deprecated_warning --oui
+    [ "$status" -eq 0 ]
+    [[ "$stderr" == *"devzone: \"--oui\" is deprecated, use \"--yes\""* ]] || false
+    run --separate-stderr option_deprecated_warning --yes
+    [ "$status" -eq 0 ]
+    [ -z "$stderr" ]
+}
+
+@test "DEVZONE_NO_DEPRECATION=1 silences the subcommand and option warnings" {
+    # shellcheck source=../.devcontainer/command-aliases.sh
+    # shellcheck disable=SC1090
+    . "$ALIASES"
+    run --separate-stderr env DEVZONE_NO_DEPRECATION=1 bash -c ". '$ALIASES'; subcommand_deprecated_warning postgres liste; option_deprecated_warning --oui"
+    [ "$status" -eq 0 ]
+    [ -z "$stderr" ]
+}
+
+@test "canonical_args: the subcommand and the options become English names" {
+    # shellcheck source=../.devcontainer/command-aliases.sh
+    # shellcheck disable=SC1090
+    . "$ALIASES"
+    run --separate-stderr bash -c ". '$ALIASES'; canonical_args postgres create proj --nouveau-mdp; printf '%s\n' \"\${ARGS_CANONICAL[*]}\""
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"create proj --new-password"* ]] || false
+    [[ "$stderr" == *"devzone: \"--nouveau-mdp\" is deprecated, use \"--new-password\""* ]] || false
+    run --separate-stderr bash -c ". '$ALIASES'; canonical_args use --confirmer ctx; printf '%s\n' \"\${ARGS_CANONICAL[*]}\""
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"--confirm ctx"* ]] || false
+    [[ "$stderr" == *"devzone: \"--confirmer\" is deprecated, use \"--confirm\""* ]] || false
 }

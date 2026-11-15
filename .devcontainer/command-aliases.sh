@@ -6,6 +6,10 @@
 #
 # command_canonical <name>: prints the current internal (French) name for an
 # English name; otherwise the name unchanged (empty stays empty).
+#
+# Subcommands and options follow the same rule (#557): the table below gives
+# the canonical English name of each French subcommand, per command, and the
+# canonical English name of each French option.
 
 command_canonical() {
     case "${1:-}" in
@@ -75,5 +79,139 @@ command_deprecated_warning() {
     if [ "${DEVZONE_NO_DEPRECATION:-}" != 1 ]; then
         echo "devzone: \"$word\" is deprecated, use \"$english\"" >&2
     fi
+    return 0
+}
+
+# subcommand_canonical <command> <word> : the canonical English name of a
+# subcommand of a command (#557). The French names are accepted and warn on
+# use; an unknown word is printed unchanged.
+subcommand_canonical() {
+    local command="${1:-}" word="${2:-}"
+    case "$command" in
+        postgres | mysql)
+            case "$word" in
+                creer) echo create ;;
+                liste) echo list ;;
+                supprimer) echo delete ;;
+                supprimer-donnees) echo delete-data ;;
+                etat) echo status ;;
+                relais-lancer) echo relay-start ;;
+                relais-arreter) echo relay-stop ;;
+                *) echo "$word" ;;
+            esac
+            ;;
+        gitlab)
+            case "$word" in
+                migrer) echo migrate ;;
+                nouveau-mdp) echo new-password ;;
+                etat) echo status ;;
+                relais-lancer) echo relay-start ;;
+                relais-arreter) echo relay-stop ;;
+                relais-etat) echo relay-status ;;
+                *) echo "$word" ;;
+            esac
+            ;;
+        argocd)
+            case "$word" in
+                etat) echo status ;;
+                relais-lancer) echo relay-start ;;
+                relais-arreter) echo relay-stop ;;
+                *) echo "$word" ;;
+            esac
+            ;;
+        packages)
+            case "$word" in
+                ajouter) echo add ;;
+                retirer) echo remove ;;
+                appliquer) echo apply ;;
+                lister) echo list ;;
+                *) echo "$word" ;;
+            esac
+            ;;
+        catalog)
+            case "$word" in
+                lister) echo list ;;
+                *) echo "$word" ;;
+            esac
+            ;;
+        port)
+            case "$word" in
+                ouvrir) echo open ;;
+                fermer) echo close ;;
+                liste) echo list ;;
+                relancer) echo restart ;;
+                exclure) echo exclude ;;
+                inclure) echo include ;;
+                *) echo "$word" ;;
+            esac
+            ;;
+        *) echo "$word" ;;
+    esac
+}
+
+# option_canonical <word> : the canonical English name of an option (#557);
+# an unknown option is printed unchanged.
+option_canonical() {
+    case "${1:-}" in
+        --fermer) echo --close ;;
+        --nouveau-mdp) echo --new-password ;;
+        --oui) echo --yes ;;
+        --confirmer) echo --confirm ;;
+        --contexte) echo --context ;;
+        *) echo "${1:-}" ;;
+    esac
+}
+
+# Deprecation warning for the old French subcommands (#557): same format and
+# same DEVZONE_NO_DEPRECATION as command_deprecated_warning.
+subcommand_deprecated_warning() {
+    local command="${1:-}" word="${2:-}" english
+    [ -n "$word" ] || return 0
+    english="$(subcommand_canonical "$command" "$word")"
+    [ "$english" != "$word" ] || return 0
+    if [ "${DEVZONE_NO_DEPRECATION:-}" != 1 ]; then
+        echo "devzone: \"$word\" is deprecated, use \"$english\"" >&2
+    fi
+    return 0
+}
+
+# Deprecation warning for the old French options (#557): same format and same
+# DEVZONE_NO_DEPRECATION as command_deprecated_warning.
+option_deprecated_warning() {
+    local word="${1:-}" english
+    [ -n "$word" ] || return 0
+    english="$(option_canonical "$word")"
+    [ "$english" != "$word" ] || return 0
+    if [ "${DEVZONE_NO_DEPRECATION:-}" != 1 ]; then
+        echo "devzone: \"$word\" is deprecated, use \"$english\"" >&2
+    fi
+    return 0
+}
+
+# canonical_args <command> <args...> : fills the global array ARGS_CANONICAL
+# with the canonical English names of the arguments: the first word that is
+# not an option is the subcommand, every option keeps its canonical English
+# name. The old French names warn on use (#557).
+canonical_args() {
+    local command="${1:-}" word canon premier=1
+    shift || true
+    ARGS_CANONICAL=()
+    for word in "$@"; do
+        case "$word" in
+            --*)
+                option_deprecated_warning "$word"
+                ARGS_CANONICAL+=("$(option_canonical "$word")")
+                ;;
+            *)
+                if [ "$premier" = 1 ]; then
+                    premier=0
+                    canon="$(subcommand_canonical "$command" "$word")"
+                    subcommand_deprecated_warning "$command" "$word"
+                    word="$canon"
+                fi
+                ARGS_CANONICAL+=("$word")
+                ;;
+        esac
+    done
     return 0
 }
