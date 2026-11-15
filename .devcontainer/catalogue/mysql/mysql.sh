@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# MySQL du catalogue (#414) : creer, liste, supprimer, etat, relais, installer, supprimer-donnees.
+# MySQL du catalogue (#414) : create, list, delete, status, relay-start, relay-stop, install, delete-data.
 set -euo pipefail
 ICI="$(cd "$(dirname "$0")" && pwd)"
 RACINE="${DEVZONE_RACINE:-$(dirname "$(dirname "$(dirname "$ICI")")")}"
@@ -23,6 +23,18 @@ ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
 # shellcheck source=SCRIPTDIR/../../argocd/catalogue-argocd.sh
 # shellcheck disable=SC1091
 . "$ICI/../../argocd/catalogue-argocd.sh"
+# English command names are accepted (#557) : a copied script may miss the file
+# shellcheck source=SCRIPTDIR/../../command-aliases.sh
+# shellcheck disable=SC1091
+if [ -f "$ICI/../../command-aliases.sh" ]; then
+    . "$ICI/../../command-aliases.sh"
+fi
+# Subcommand and options become their canonical English names ; the old
+# French names warn on use (#557)
+if command -v canonical_args >/dev/null 2>&1; then
+    canonical_args mysql "$@"
+    set -- "${ARGS_CANONICAL[@]+"${ARGS_CANONICAL[@]}"}"
+fi
 NS=devzone-mysql
 SECRETS="$RACINE/workspace/.mysql"
 MYSQL_PORT="${MYSQL_PORT:-3306}"
@@ -111,17 +123,17 @@ installer() {
     regenerer_identifiants
 }
 # Supprime le namespace (donc les PVC), garde workspace/.mysql (#441) :
-# confirmation en terminal [o/N], --oui obligatoire sinon (refus, code 2)
+# confirmation en terminal [o/N], --yes obligatoire sinon (refus, code 2)
 supprimer_donnees() {
     local CTX oui="" arg reponse
     for arg in "$@"; do
         case "$arg" in
-            --oui) oui=1 ;;
+            --yes) oui=1 ;;
             *) refuse "argument inconnu : $arg" ;;
         esac
     done
     if [ -z "$oui" ]; then
-        cluster_interactif || refuse "confirmation impossible sans terminal : devzone mysql supprimer-donnees --oui"
+        cluster_interactif || refuse "confirmation impossible sans terminal : devzone mysql delete-data --yes"
         printf 'Supprimer le namespace %s et tous ses volumes ? [o/N] ' "$NS" >&2
         read -r reponse || reponse=""
         case "$reponse" in
@@ -167,7 +179,7 @@ creer() {
     valider_projet "$projet"
     for arg in "${@:2}"; do
         case "$arg" in
-            --nouveau-mdp) nouveau=1 ;;
+            --new-password) nouveau=1 ;;
             *) refuse "argument inconnu : $arg" ;;
         esac
     done
@@ -207,22 +219,22 @@ liste() {
     installe || refuse "module inactif : devzone activer mysql"
     mysql_admin -N -B -e "SHOW DATABASES" 2>/dev/null |
         grep -vE '^(information_schema|mysql|performance_schema|sys)$' |
-        awk 'BEGIN { n = 0 } { printf "  %-30s\n", $1; n++ } END { if (n == 0) print "  (aucune base : devzone mysql creer <projet>)" }'
+        awk 'BEGIN { n = 0 } { printf "  %-30s\n", $1; n++ } END { if (n == 0) print "  (aucune base : devzone mysql create <projet>)" }'
 }
-# Supprime la base et l'utilisateur d'un projet (confirmation sans --oui)
+# Supprime la base et l'utilisateur d'un projet (confirmation sans --yes)
 supprimer() {
     local projet="${1:-}" oui="" arg reponse
     valider_projet "$projet"
     for arg in "${@:2}"; do
         case "$arg" in
-            --oui) oui=1 ;;
+            --yes) oui=1 ;;
             *) refuse "argument inconnu : $arg" ;;
         esac
     done
     CTX="$(contexte)"
     installe || refuse "module inactif : devzone activer mysql"
     if [ -z "$oui" ]; then
-        cluster_interactif || refuse "confirmation impossible sans terminal : devzone mysql supprimer $projet --oui"
+        cluster_interactif || refuse "confirmation impossible sans terminal : devzone mysql delete $projet --yes"
         printf 'Supprimer la base %s et son utilisateur ? [o/N] ' "$projet" >&2
         read -r reponse || reponse=""
         case "$reponse" in
@@ -245,17 +257,17 @@ relais() {
     [ -n "$CTX" ] && installe && relais_lancer mysql "$CTX" "$NS" svc/mysql 3306:3306
 }
 case "${1:-}" in
-    installer) installer ;;
-    supprimer-donnees) supprimer_donnees "${@:2}" ;;
-    etat) etat ;;
-    creer) creer "${@:2}" ;;
-    liste) liste ;;
-    supprimer) supprimer "${@:2}" ;;
+    install) installer ;;
+    delete-data) supprimer_donnees "${@:2}" ;;
+    status) etat ;;
+    create) creer "${@:2}" ;;
+    list) liste ;;
+    delete) supprimer "${@:2}" ;;
     volume) mysql_volume "$NS" "${@:2}" ;;
-    relais-lancer) relais ;;
-    relais-arreter) relais_arreter mysql ;;
+    relay-start) relais ;;
+    relay-stop) relais_arreter mysql ;;
     *)
-        echo "devzone : catalogue mysql : creer <projet> [--nouveau-mdp] | liste | supprimer <projet> [--oui] | volume [<nom>] [--supprimer <nom>] [--oui] | supprimer-donnees [--oui]" >&2
+        echo "devzone : catalogue mysql : create <projet> [--new-password] | list | delete <projet> [--yes] | volume [<nom>] [--delete <nom>] [--yes] | delete-data [--yes]" >&2
         exit 1
         ;;
 esac

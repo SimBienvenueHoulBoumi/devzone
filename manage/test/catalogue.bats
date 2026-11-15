@@ -105,7 +105,7 @@ GETENT
 }
 
 teardown() {
-    bash "$MYSQL" relais-arreter >/dev/null 2>&1 || true
+    bash "$MYSQL" relay-stop >/dev/null 2>&1 || true
 }
 
 attendre_nohup() {

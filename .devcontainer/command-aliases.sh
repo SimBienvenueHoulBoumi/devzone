@@ -165,6 +165,7 @@ subcommand_canonical() {
 option_canonical() {
     case "${1:-}" in
         --fermer) echo --close ;;
+        --supprimer) echo --delete ;;
         --nouveau-mdp) echo --new-password ;;
         --oui) echo --yes ;;
         --confirmer) echo --confirm ;;

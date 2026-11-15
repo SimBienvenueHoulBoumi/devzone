@@ -116,7 +116,7 @@ app_installer() {
 # Désinstalle une application : relais coupé, Application Argo CD retirée
 # (module argocd actif, #538) ou manifeste, marque oubliée ; le volume (PVC)
 # et les données restent (#441) : la suppression des données est confirmée à
-# part (devzone mysql supprimer-donnees)
+# part (devzone mysql delete-data)
 app_desinstaller() {
     local app="$1" ns claim pvc CTX
     ns="$(app_ns "$app")"

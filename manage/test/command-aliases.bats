@@ -236,6 +236,7 @@ TABLE
         }
     done <<'TABLE'
 --fermer|--close
+--supprimer|--delete
 --nouveau-mdp|--new-password
 --oui|--yes
 --confirmer|--confirm

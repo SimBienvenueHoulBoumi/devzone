@@ -69,7 +69,7 @@ NPM
 }
 
 teardown() {
-    bash "$BATS_TEST_DIRNAME/../../.devcontainer/catalogue/mysql/mysql.sh" relais-arreter >/dev/null 2>&1 || true
+    bash "$BATS_TEST_DIRNAME/../../.devcontainer/catalogue/mysql/mysql.sh" relay-stop >/dev/null 2>&1 || true
 }
 
 @test "veilleur : refuse sans DEVZONE_CATALOGUE_REEL" {

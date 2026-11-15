@@ -624,14 +624,14 @@ appliquer_mysql() {
             echo mysql >"$(fichier_echec mysql)"
             return 2
         fi
-        etat_courant="$(bash "$ICI/catalogue/mysql/mysql.sh" etat)"
+        etat_courant="$(bash "$ICI/catalogue/mysql/mysql.sh" status)"
         # « relais arrêté » d'abord : cette ligne commence aussi par « prêt sur »
         if [[ "$etat_courant" == *"relais arrêté"* ]]; then
-            bash "$ICI/catalogue/mysql/mysql.sh" relais-lancer
+            bash "$ICI/catalogue/mysql/mysql.sh" relay-start
             echo "devzone : mysql : relais relancé"
         elif [[ "$etat_courant" == "prêt sur"* ]]; then
             echo "devzone : mysql déjà actif, rien à faire."
-        elif ! bash "$ICI/catalogue/mysql/mysql.sh" installer; then
+        elif ! bash "$ICI/catalogue/mysql/mysql.sh" install; then
             echo mysql >"$(fichier_echec mysql)"
             return 1
         fi
@@ -641,7 +641,7 @@ appliquer_mysql() {
         # bases ne partent qu'avec un oui (confirmer_suppression)
         bash "$ICI/catalogue.sh" remove mysql
         if [ -n "${SUPPRIMER_DONNEES:-}" ]; then
-            bash "$ICI/catalogue/mysql/mysql.sh" supprimer-donnees --oui
+            bash "$ICI/catalogue/mysql/mysql.sh" delete-data --yes
         fi
         rm -f "$(fichier_echec mysql)"
     fi
@@ -1101,7 +1101,7 @@ reparer() {
         reparer_element "relais argocd" bash "$ICI/argocd/argocd.sh" relais-lancer
     fi
     if [ "$(valeur mysql)" = on ]; then
-        reparer_element "relais mysql" bash "$ICI/catalogue/mysql/mysql.sh" relais-lancer
+        reparer_element "relais mysql" bash "$ICI/catalogue/mysql/mysql.sh" relay-start
     fi
     reparer_element "relais de ports" bash "$ICI/ports.sh" restart
     reparer_element "veilleur ports auto" env DEVZONE_PORTS_AUTO_REEL=oui bash "$ICI/ports-auto.sh" demarrer
@@ -1260,7 +1260,7 @@ etat() {
         elif [ "$(valeur "$m")" = on ] && [ "$m" = argocd ]; then
             printf '  ✔ module %-10s %s\n' "$m" "$(bash "$ICI/argocd/argocd.sh" etat)"
         elif [ "$(valeur "$m")" = on ] && [ "$m" = mysql ]; then
-            printf '  ✔ module %-10s %s\n' "$m" "$(bash "$ICI/catalogue/mysql/mysql.sh" etat)"
+            printf '  ✔ module %-10s %s\n' "$m" "$(bash "$ICI/catalogue/mysql/mysql.sh" status)"
         elif [ "$(valeur "$m")" = on ]; then
             printf '  ✔ module %-10s actif : %s\n' "$m" "$(description "$m")"
         else

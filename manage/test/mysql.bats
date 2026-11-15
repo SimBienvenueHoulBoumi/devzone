@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# MySQL du catalogue (#414) : creer/liste/supprimer par projet, etat, relais.
+# MySQL du catalogue (#414) : create/list/delete par projet, status, relais.
 # Faux kubectl, openssl, nohup : aucun cluster touche.
 
 setup() {
@@ -84,27 +84,27 @@ NPM
 }
 
 teardown() {
-    bash "$MYSQL" relais-arreter >/dev/null 2>&1 || true
+    bash "$MYSQL" relay-stop >/dev/null 2>&1 || true
 }
 
 @test "creer : nom invalide ou reserve refuse (code 2)" {
     touch "$BATS_TEST_TMPDIR/ns"
     for nom in Task 1abc "a-b" "x;drop" mysql sys; do
-        run bash "$MYSQL" creer "$nom"
+        run bash "$MYSQL" create "$nom"
         [ "$status" -eq 2 ] || false
     done
     [ ! -s "$BATS_TEST_TMPDIR/sql.log" ] || false
 }
 
 @test "creer : module inactif refuse" {
-    run bash "$MYSQL" creer datayer
+    run bash "$MYSQL" create datayer
     [ "$status" -eq 2 ] || false
     [[ "$output" == *"devzone activer mysql"* ]] || false
 }
 
 @test "creer : utilisateur, base, .env 600, mot de passe jamais affiche, .password" {
     touch "$BATS_TEST_TMPDIR/ns"
-    run bash "$MYSQL" creer datayer
+    run bash "$MYSQL" create datayer
     [ "$status" -eq 0 ] || false
     grep -q "CREATE USER IF NOT EXISTS 'datayer'@'%'" "$BATS_TEST_TMPDIR/sql.log" || false
     grep -q "CREATE DATABASE IF NOT EXISTS datayer" "$BATS_TEST_TMPDIR/sql.log" || false
@@ -122,22 +122,22 @@ teardown() {
 
 @test "creer relance : mot de passe garde, --nouveau-mdp change" {
     touch "$BATS_TEST_TMPDIR/ns"
-    bash "$MYSQL" creer datayer
+    bash "$MYSQL" create datayer
     grep -qx 'MYSQL_PASSWORD=mdpmysql1' "$SECRETS/datayer.env" || false
-    bash "$MYSQL" creer datayer
+    bash "$MYSQL" create datayer
     grep -qx 'MYSQL_PASSWORD=mdpmysql1' "$SECRETS/datayer.env" || false
-    bash "$MYSQL" creer datayer --nouveau-mdp
+    bash "$MYSQL" create datayer --new-password
     grep -qx 'MYSQL_PASSWORD=mdpmysql2' "$SECRETS/datayer.env" || false
 }
 
 @test "supprimer : sans terminal refuse, --oui supprime base et utilisateur" {
     touch "$BATS_TEST_TMPDIR/ns"
-    bash "$MYSQL" creer datayer
+    bash "$MYSQL" create datayer
     : >"$BATS_TEST_TMPDIR/sql.log"
-    run bash "$MYSQL" supprimer datayer </dev/null
+    run bash "$MYSQL" delete datayer </dev/null
     [ "$status" -eq 2 ] || false
     [ ! -s "$BATS_TEST_TMPDIR/sql.log" ] || false
-    run bash "$MYSQL" supprimer datayer --oui
+    run bash "$MYSQL" delete datayer --yes
     [ "$status" -eq 0 ] || false
     grep -q "DROP DATABASE IF EXISTS datayer" "$BATS_TEST_TMPDIR/sql.log" || false
     grep -q "DROP USER IF EXISTS 'datayer'@'%'" "$BATS_TEST_TMPDIR/sql.log" || false
@@ -145,14 +145,14 @@ teardown() {
 }
 
 @test "etat : desactive, relais arrete, puis prêt" {
-    run bash "$MYSQL" etat
+    run bash "$MYSQL" status
     [ "$output" = "désactivé" ] || false
     touch "$BATS_TEST_TMPDIR/ns" "$BATS_TEST_TMPDIR/sts" "$BATS_TEST_TMPDIR/ready"
-    run bash "$MYSQL" etat
+    run bash "$MYSQL" status
     [ "$output" = "prêt sur kind-devzone, relais arrêté : devzone appliquer" ] || false
-    bash "$MYSQL" relais-lancer
+    bash "$MYSQL" relay-start
     attendre_nohup 'svc/mysql 3306:3306$'
-    run bash "$MYSQL" etat
+    run bash "$MYSQL" status
     [ "$output" = "prêt sur kind-devzone : 127.0.0.1:3306, 0 base(s)" ] || false
 }
 
@@ -160,7 +160,7 @@ teardown() {
     touch "$BATS_TEST_TMPDIR/ns" "$BATS_TEST_TMPDIR/sts" "$BATS_TEST_TMPDIR/ready"
     printf 'MYSQL_HOST=127.0.0.1\nMYSQL_PORT=3306\nMYSQL_USER=root\nMYSQL_PASSWORD=mdproot\n' >"$SECRETS/root.env"
     : >"$BATS_TEST_TMPDIR/apply.log"
-    run bash "$MYSQL" installer
+    run bash "$MYSQL" install
     [ "$status" -eq 0 ] || false
     [[ "$output" == *"adoptée"* ]] || false
     [ ! -s "$BATS_TEST_TMPDIR/apply.log" ] || false
@@ -171,7 +171,7 @@ teardown() {
 @test "supprimer-donnees --oui : namespace et volumes supprimes, root.env garde" {
     touch "$BATS_TEST_TMPDIR/ns"
     printf 'MYSQL_PASSWORD=mdproot\n' >"$SECRETS/root.env"
-    run bash "$MYSQL" supprimer-donnees --oui
+    run bash "$MYSQL" delete-data --yes
     [ "$status" -eq 0 ] || false
     grep -q 'delete namespace devzone-mysql' "$BATS_TEST_TMPDIR/kubectl.log" || false
     [ -f "$SECRETS/root.env" ] || false
@@ -180,15 +180,15 @@ teardown() {
 
 @test "supprimer-donnees : sans terminal ni --oui, refus et aucun delete" {
     touch "$BATS_TEST_TMPDIR/ns"
-    run bash "$MYSQL" supprimer-donnees </dev/null
+    run bash "$MYSQL" delete-data </dev/null
     [ "$status" -eq 2 ] || false
-    [[ "$output" == *"confirmation impossible sans terminal : devzone mysql supprimer-donnees --oui"* ]] || false
+    [[ "$output" == *"confirmation impossible sans terminal : devzone mysql delete-data --yes"* ]] || false
     ! grep -q 'delete' "$BATS_TEST_TMPDIR/kubectl.log" 2>/dev/null || false
 }
 
 @test "supprimer-donnees en terminal : Entrée = abandon, aucun delete" {
     touch "$BATS_TEST_TMPDIR/ns"
-    DEVZONE_INTERACTIF=1 run bash "$MYSQL" supprimer-donnees <<<""
+    DEVZONE_INTERACTIF=1 run bash "$MYSQL" delete-data <<<""
     [ "$status" -eq 0 ] || false
     [[ "$output" == *"Abandon"* ]] || false
     ! grep -q 'delete' "$BATS_TEST_TMPDIR/kubectl.log" 2>/dev/null || false
@@ -206,14 +206,14 @@ attendre_nohup() {
 }
 
 @test "installer : sans PVC existant, claim donnees" {
-    run bash "$MYSQL" installer
+    run bash "$MYSQL" install
     [ "$status" -eq 0 ] || false
     grep -q 'name: donnees' "$BATS_TEST_TMPDIR/apply.log" || false
 }
 
 @test "installer : un PVC existant, reutilise son prefixe" {
     printf 'data-mysql-0\n' >"$BATS_TEST_TMPDIR/pvcs"
-    run bash "$MYSQL" installer
+    run bash "$MYSQL" install
     [ "$status" -eq 0 ] || false
     grep -q '        name: data' "$BATS_TEST_TMPDIR/apply.log" || false
     grep -q 'volumeMounts:' "$BATS_TEST_TMPDIR/apply.log" || false
@@ -221,7 +221,7 @@ attendre_nohup() {
 
 @test "installer : plusieurs PVC, refus avec liste et commande" {
     printf 'data-mysql-0\ndonnees-mysql-0\n' >"$BATS_TEST_TMPDIR/pvcs"
-    run bash "$MYSQL" installer
+    run bash "$MYSQL" install
     [ "$status" -eq 2 ] || false
     [[ "$output" == *"data-mysql-0"* ]] || false
     [[ "$output" == *"donnees-mysql-0"* ]] || false
@@ -251,7 +251,7 @@ attendre_nohup() {
 @test "mysql volume --supprimer sans --oui ni terminal : aucun delete" {
     touch "$BATS_TEST_TMPDIR/ns"
     printf 'data' >"$BATS_TEST_TMPDIR/claim"
-    run bash "$MYSQL" volume --supprimer donnees </dev/null
+    run bash "$MYSQL" volume --delete donnees </dev/null
     [ "$status" -eq 2 ] || false
     [ ! -f "$BATS_TEST_TMPDIR/delete.log" ] || false
 }
@@ -259,7 +259,7 @@ attendre_nohup() {
 @test "mysql volume --supprimer refuse si volume monte" {
     touch "$BATS_TEST_TMPDIR/ns"
     printf 'data' >"$BATS_TEST_TMPDIR/claim"
-    run bash "$MYSQL" volume --supprimer data --oui
+    run bash "$MYSQL" volume --delete data --yes
     [ "$status" -eq 2 ] || false
     [ ! -f "$BATS_TEST_TMPDIR/delete.log" ] || false
 }
@@ -267,7 +267,7 @@ attendre_nohup() {
 @test "mysql volume --supprimer <nom> --oui : supprime le PVC" {
     touch "$BATS_TEST_TMPDIR/ns"
     printf 'data' >"$BATS_TEST_TMPDIR/claim"
-    run bash "$MYSQL" volume --supprimer donnees --oui
+    run bash "$MYSQL" volume --delete donnees --yes
     [ "$status" -eq 0 ] || false
     grep -q 'delete pvc donnees-mysql-0' "$BATS_TEST_TMPDIR/delete.log" || false
 }

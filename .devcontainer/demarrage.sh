@@ -42,7 +42,7 @@ fi
 # Module mysql actif : le relais 127.0.0.1:3306, relancé comme celui de
 # postgres après chaque démarrage
 if bash "$ICI/devzone" is-enabled mysql; then
-    bash "$ICI/catalogue/mysql/mysql.sh" relais-lancer || echo "démarrage : relais mysql non lancé (devzone reparer)"
+    bash "$ICI/catalogue/mysql/mysql.sh" relay-start || echo "démarrage : relais mysql non lancé (devzone reparer)"
 fi
 # Relais de ports vers le poste (#290) : l'IP du conteneur change à chaque
 # démarrage, chaque relais de l'état est recréé ; un échec n'empêche rien
