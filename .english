@@ -80,3 +80,5 @@ manage/scripts/workspace-clone.sh
 manage/test/workspace-clone.bats
 .devcontainer/ticket.sh
 manage/test/ticket.bats
+manage/scripts/workspace-copies.sh
+manage/test/workspace-copies.bats

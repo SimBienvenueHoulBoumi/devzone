@@ -114,12 +114,6 @@ stop_workspace() {
     workspace_undeploy
 }
 
-# Shows workspace pod status.
-status_workspace() {
-    # shellcheck disable=SC2046
-    kubectl $(kubectl_flag) get pods --namespace devzone-workspace
-}
-
 # Opens a shell in the workspace container.
 shell_workspace() {
     # shellcheck disable=SC2046
@@ -154,6 +148,7 @@ copy_to() {
         exit 1
     fi
     folder="$(cd "$folder" && pwd)"
+    copy_guard "$folder" || exit 1
     # shellcheck disable=SC2046
     kubectl $(kubectl_flag) cp "$folder" "$POD:$PROJECTS_DIR/$(basename "$folder")" \
         --namespace "$NAMESPACE" -c workspace
@@ -181,6 +176,8 @@ copy_from() {
 . "$HERE/scripts/workspace-wait.sh"
 # shellcheck source=manage/scripts/workspace-clone.sh
 . "$HERE/scripts/workspace-clone.sh"
+# shellcheck source=manage/scripts/workspace-copies.sh
+. "$HERE/scripts/workspace-copies.sh"
 # shellcheck source=manage/scripts/migrer.sh
 . "$HERE/scripts/migrer.sh"
 # shellcheck source=manage/scripts/migrer-retour.sh
