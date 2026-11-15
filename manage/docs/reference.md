@@ -667,6 +667,15 @@ Les modules qui déploient un service (`postgres`, `gitlab`) s'installent sur **
 - **Cluster distant** : choisir un cluster distant nécessite une confirmation en terminal, ou `--confirmer CTX` sans terminal. Sans confirmation exacte, le choix est refusé. Quand le cluster de devzone est distant, le récapitulatif `devzone` affiche un avertissement `⚠ cluster distant : <contexte>`.
 - **Namespace** : pour un contexte du poste (ceux de `hote.config`, recopié depuis le poste à chaque démarrage), le namespace fixé par `devzone use -n` ne survit pas à un redémarrage ; pour les clusters kind du conteneur, il est gardé jusqu'au rebuild.
 
+### Services tenus par Argo CD dans le conteneur
+
+Avec le module `argocd` installé et joignable, `devzone enable postgres|mysql` déclare le service comme Application `devzone-<service>` (chart `charts/devzone-<service>` du dépôt devzone à la révision) : la section `[services]` de `.argocd.conf` passe à `on`, puis la réconciliation applique le namespace isolé, le secret administrateur (créé à part, miroir dans `workspace/.<service>/admin-password`, jamais affiché) et l'Application ; devzone attend les pods puis relance le relais.
+
+- **`devzone disable postgres|mysql`** : l'Application part avec ses ressources ; le namespace et les volumes restent, puis le retrait habituel de l'service suit.
+- **`devzone disable argocd`** : les Applications de `postgres`, `mysql` et `gitlab` sont retirées *sans* leurs ressources (finalizer retiré d'abord, `gitops_delete_application … keep`) ; `[services]` passe à `off` pour postgres et mysql. Argo CD est ensuite désinstallé et les services restent, sous helm direct, sans être recréés (adoption par `kubectl apply`, voir `postgres.sh` et `mysql.sh`).
+- **GitLab** garde son Application de l'étape 4 (`gitlab/argocd.sh`) : son namespace peut porter un suffixe d'instance, que la réconciliation (`services_ns_of`) ne connaît pas.
+- Le hook est `.devcontainer/argocd/services-hook.sh`, appelé par `changer` de `devzone` ; code de retour 0 (fait par Argo CD), 3 (chemin helm direct), 1 (échec).
+
 ### Compte limité aux namespaces devzone
 
 Le contexte `devzone` n'agit qu'avec un compte limité : shell, relais et agents n'ont jamais le rôle d'administrateur du cluster ([#430](https://github.com/SimBienvenueHoulBoumi/devzone/issues/430)).
