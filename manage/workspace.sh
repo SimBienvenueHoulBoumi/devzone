@@ -86,6 +86,7 @@ start_workspace() {
     # Projects of .argocd.conf held too (#516)
     argocd_reconcile || true
     wait_for_pod "$image" || return 1
+    workspace_agents_guard || true
     ports_start silence
 }
 

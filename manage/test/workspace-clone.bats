@@ -113,3 +113,31 @@ GIT
     [[ "$output" == *"invalid folder name"* ]] || false
     [ ! -e "$T/kubectl.log" ] || ! grep -q " exec " "$T/kubectl.log"
 }
+
+# Guard of the agents (#558): function of the same script, fake kubectl.
+guard() {
+    run bash -c '
+        kubectl_flag() { :; }
+        POD=devzone-workspace-0 NAMESPACE=devzone-workspace
+        . "$1/manage/scripts/workspace-clone.sh"
+        workspace_agents_guard
+    ' _ "$ROOT"
+}
+
+@test "agents guard: runs repowarden agents init --global in the pod when ia is on" {
+    cat >"$T/bin/kubectl" <<'KUBE'
+#!/usr/bin/env bash
+echo "kubectl $*" >>"$BATS_TEST_TMPDIR/kubectl.log"
+KUBE
+    guard
+    [ "$status" -eq 0 ]
+    grep -q "exec devzone-workspace-0 .*devzone is-enabled ia && repowarden agents init --global" "$T/kubectl.log" || false
+    [[ "$output" == *"guard active"* ]] || false
+}
+
+@test "agents guard: silent and harmless when ia is off in the pod" {
+    printf '#!/usr/bin/env bash\nexit 1\n' >"$T/bin/kubectl"
+    guard
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+}
