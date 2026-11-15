@@ -199,7 +199,7 @@ ports_auto_liste() {
             [ -n "$port" ] || continue
             if grep -qxF "$port" "$OCCUPES" 2>/dev/null; then printf '  %-5s %s  auto\n' "$port" "occupé sur le poste"; continue; fi
             if relais_auto_actif "$port"; then marque="● actif"; else marque="○ arrêté"; fi
-            if application_repond "$port"; then app="application répond"; else app="aucune application"; fi
+            if application_repond "$port"; then app="$APP_REPOND"; else app="$APP_AUCUNE"; fi
             printf '  %-5s %s  auto  %s\n' "$port" "$marque" "$app"
         done <"$ACTIFS"
     fi
@@ -224,7 +224,7 @@ ports_auto_liste_json() {
             json="$(jq -c --argjson port "$port" '. + [{port:$port,actif:false,application:"occupé sur le poste",auto:true}]' <<<"$json")"; continue
         fi
         if relais_auto_actif "$port"; then actif=true; else actif=false; fi
-        if application_repond "$port"; then app="application répond"; else app="aucune application"; fi
+        if application_repond "$port"; then app="$APP_REPOND"; else app="$APP_AUCUNE"; fi
         json="$(jq -c --argjson port "$port" --argjson actif "$actif" --arg app "$app" '. + [{port:$port,actif:$actif,application:$app,auto:true}]' <<<"$json")"
     done <<<"$ports"
     printf '%s\n' "$json"
