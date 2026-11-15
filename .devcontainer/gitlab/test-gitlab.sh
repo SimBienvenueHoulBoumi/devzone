@@ -27,6 +27,9 @@ HOSTS="${DEVZONE_HOSTS:-/etc/hosts}"
 # shellcheck source=SCRIPTDIR/../cluster.sh
 # shellcheck disable=SC1091
 . "$ICI/../cluster.sh"
+# shellcheck source=SCRIPTDIR/test-gitlab-restes.sh
+# shellcheck disable=SC1091
+. "$ICI/test-gitlab-restes.sh"
 URL="${GITLAB_TEST_URL:-http://gitlab.localhost:8929}"
 # Délai d'attente du pipeline : 600 s par défaut, court dans les tests
 DELAI_PIPELINE="${GITLAB_TEST_PIPELINE:-600}"
@@ -347,9 +350,7 @@ etape_complet() {
     if kubectl --context devzone get namespace "$namespace" >/dev/null 2>&1; then
         restes="$restes namespace $namespace;"
     fi
-    conteneurs="$(docker ps -aq \
-        --filter "label=devzone.instance=$instance" \
-        2>/dev/null || true)"
+    conteneurs="$(gitlab_restes_conteneurs "$instance")"
     if [ -n "$conteneurs" ]; then
         restes="$restes conteneur(s) étiqueté(s) devzone.instance=$instance;"
     fi
