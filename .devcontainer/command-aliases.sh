@@ -95,8 +95,12 @@ subcommand_canonical() {
                 supprimer) echo delete ;;
                 supprimer-donnees) echo delete-data ;;
                 etat) echo status ;;
+                installer) echo install ;;
+                desinstaller) echo uninstall ;;
                 relais-lancer) echo relay-start ;;
                 relais-arreter) echo relay-stop ;;
+                autoriser) echo authorize ;;
+                interdire) echo forbid ;;
                 *) echo "$word" ;;
             esac
             ;;
@@ -105,6 +109,8 @@ subcommand_canonical() {
                 migrer) echo migrate ;;
                 nouveau-mdp) echo new-password ;;
                 etat) echo status ;;
+                installer) echo install ;;
+                desinstaller) echo uninstall ;;
                 relais-lancer) echo relay-start ;;
                 relais-arreter) echo relay-stop ;;
                 relais-etat) echo relay-status ;;
@@ -114,6 +120,8 @@ subcommand_canonical() {
         argocd)
             case "$word" in
                 etat) echo status ;;
+                installer) echo install ;;
+                desinstaller) echo uninstall ;;
                 relais-lancer) echo relay-start ;;
                 relais-arreter) echo relay-stop ;;
                 *) echo "$word" ;;

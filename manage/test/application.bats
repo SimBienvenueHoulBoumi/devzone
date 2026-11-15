@@ -121,7 +121,7 @@ KUBE
     [ "$status" -eq 0 ]
     [[ "$(cat "$T/actions.log")" == *"gitlab hote-poser"* ]] || false
     [[ "$(cat "$T/actions.log")" == *"gitlab relais-lancer"* ]] || false
-    [[ "$(cat "$T/actions.log")" == *"postgres relais-lancer"* ]] || false
+    [[ "$(cat "$T/actions.log")" == *"postgres relay-start"* ]] || false
 }
 
 @test "reparer : le jeton du compte kubernetes est renouvelé" {

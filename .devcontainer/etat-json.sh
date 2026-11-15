@@ -133,7 +133,7 @@ etat_json() {
                     ajouter_erreur modules "gitlab.sh etat indisponible"
                 fi
             elif [ "$m" = postgres ]; then
-                if s="$(bash "$ICI/postgres/postgres.sh" etat 2>/dev/null)"; then
+                if s="$(bash "$ICI/postgres/postgres.sh" status 2>/dev/null)"; then
                     etat_val="$s"
                 else
                     etat_val=""

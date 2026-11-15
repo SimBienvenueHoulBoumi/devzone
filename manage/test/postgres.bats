@@ -73,7 +73,7 @@ n="$(cat "$BATS_TEST_TMPDIR/openssl.n" 2>/dev/null || echo 0)"
 n=$((n + 1)); echo "$n" >"$BATS_TEST_TMPDIR/openssl.n"
 echo "mdpsecret$n"
 SSL
-    # nohup : le relais journalisé, puis un sleep tué par relais-arreter
+    # nohup : le relais journalisé, puis un sleep tué par relay-stop
     cat >"$BATS_TEST_TMPDIR/bin/nohup" <<'NOHUP'
 #!/usr/bin/env bash
 echo "nohup $*" >>"$BATS_TEST_TMPDIR/nohup.log"
@@ -84,7 +84,7 @@ NOHUP
 }
 
 teardown() {
-    bash "$POSTGRES" relais-arreter >/dev/null 2>&1 || true
+    bash "$POSTGRES" relay-stop >/dev/null 2>&1 || true
 }
 
 actif_sur() {
@@ -182,7 +182,7 @@ attendre_nohup() {
 @test "secret admin existant : jamais régénéré, copié en 600 sans être affiché" {
     touch "$BATS_TEST_TMPDIR/secret"
     printf 'cluster=kind-devzone\n' >"$DEVZONE_ETAT"
-    run bash "$POSTGRES" installer
+    run bash "$POSTGRES" install
     [ "$status" -eq 0 ]
     ! grep -q 'create secret' "$BATS_TEST_TMPDIR/kubectl.log" || false
     [ "$(cat "$SECRETS/admin-password")" = admin-existant ]
@@ -193,7 +193,7 @@ attendre_nohup() {
 @test "creer : nom invalide ou réservé refusé (code 2)" {
     actif_sur kind-devzone
     for nom in Task 1abc "a-b" "x;drop" postgres; do
-        run bash "$POSTGRES" creer "$nom"
+        run bash "$POSTGRES" create "$nom"
         [ "$status" -eq 2 ]
     done
     [ ! -f "$BATS_TEST_TMPDIR/sql.log" ]
@@ -201,7 +201,7 @@ attendre_nohup() {
 
 @test "creer : rôle, base, accès fermés aux autres, .env 600, mot de passe jamais affiché" {
     actif_sur docker-desktop
-    run bash "$POSTGRES" creer taskmanager
+    run bash "$POSTGRES" create taskmanager
     [ "$status" -eq 0 ]
     grep -q "CREATE ROLE taskmanager LOGIN" "$BATS_TEST_TMPDIR/sql.log"
     grep -q "CREATE DATABASE taskmanager OWNER taskmanager" "$BATS_TEST_TMPDIR/sql.log"
@@ -216,22 +216,22 @@ attendre_nohup() {
     [[ "$output" == *"$SECRETS/taskmanager.env"* ]] || false
 }
 
-@test "creer relancé : mot de passe gardé ; --nouveau-mdp : changé" {
+@test "creer relancé : mot de passe gardé ; --new-password : changé" {
     actif_sur kind-devzone
-    bash "$POSTGRES" creer taskmanager
-    bash "$POSTGRES" creer taskmanager
+    bash "$POSTGRES" create taskmanager
+    bash "$POSTGRES" create taskmanager
     grep -qx 'DB_PASSWORD=mdpsecret1' "$SECRETS/taskmanager.env"
-    bash "$POSTGRES" creer taskmanager --nouveau-mdp
+    bash "$POSTGRES" create taskmanager --new-password
     grep -qx 'DB_PASSWORD=mdpsecret2' "$SECRETS/taskmanager.env"
 }
 
-@test "creer, --nouveau-mdp, supprimer : .password suit les comptes" {
+@test "creer, --new-password, supprimer : .password suit les comptes" {
     actif_sur docker-desktop
-    bash "$POSTGRES" creer taskmanager
+    bash "$POSTGRES" create taskmanager
     grep -q $'^postgres:taskmanager\t127.0.0.1:5432/taskmanager\ttaskmanager\tmdpsecret1$' "$DEVZONE_RACINE/.password"
-    bash "$POSTGRES" creer taskmanager --nouveau-mdp
+    bash "$POSTGRES" create taskmanager --new-password
     grep -q $'^postgres:taskmanager\t127.0.0.1:5432/taskmanager\ttaskmanager\tmdpsecret2$' "$DEVZONE_RACINE/.password"
-    bash "$POSTGRES" supprimer taskmanager --oui
+    bash "$POSTGRES" delete taskmanager --yes
     [ ! -e "$DEVZONE_RACINE/.password" ]
 }
 
@@ -246,29 +246,29 @@ attendre_nohup() {
 
 @test "creer, liste, psql : module inactif → refus clair" {
     printf 'cluster=kind-devzone\n' >"$DEVZONE_ETAT"
-    run bash "$POSTGRES" creer taskmanager
+    run bash "$POSTGRES" create taskmanager
     [ "$status" -eq 2 ]
-    [[ "$output" == *"devzone activer postgres"* ]] || false
+    [[ "$output" == *"devzone enable postgres"* ]] || false
     rm -f "$DEVZONE_ETAT"
-    run bash "$POSTGRES" liste
+    run bash "$POSTGRES" list
     [ "$status" -eq 2 ]
 }
 
 @test "liste : bases et propriétaires" {
     actif_sur kind-devzone
-    run bash "$DEVZONE" postgres liste
+    run bash "$DEVZONE" postgres list
     [ "$status" -eq 0 ]
     [[ "$output" == *"taskmanager"*"propriétaire taskmanager"* ]] || false
 }
 
 @test "supprimer : sans terminal ni --oui refusé ; --oui : base, rôle et .env supprimés" {
     actif_sur kind-devzone
-    bash "$POSTGRES" creer taskmanager
+    bash "$POSTGRES" create taskmanager
     : >"$BATS_TEST_TMPDIR/sql.log"
-    run bash "$POSTGRES" supprimer taskmanager </dev/null
+    run bash "$POSTGRES" delete taskmanager </dev/null
     [ "$status" -eq 2 ]
     [ ! -s "$BATS_TEST_TMPDIR/sql.log" ]
-    run bash "$POSTGRES" supprimer taskmanager --oui
+    run bash "$POSTGRES" delete taskmanager --yes
     [ "$status" -eq 0 ]
     grep -q "DROP DATABASE IF EXISTS taskmanager WITH (FORCE)" "$BATS_TEST_TMPDIR/sql.log"
     grep -q "DROP ROLE IF EXISTS taskmanager" "$BATS_TEST_TMPDIR/sql.log"
@@ -277,7 +277,7 @@ attendre_nohup() {
 
 @test "supprimer en terminal : Entrée = abandon" {
     actif_sur kind-devzone
-    DEVZONE_INTERACTIF=1 run bash "$POSTGRES" supprimer taskmanager <<<""
+    DEVZONE_INTERACTIF=1 run bash "$POSTGRES" delete taskmanager <<<""
     [ "$status" -eq 0 ]
     [[ "$output" == *"Abandon"* ]] || false
     [ ! -f "$BATS_TEST_TMPDIR/sql.log" ]
@@ -320,27 +320,27 @@ attendre_nohup() {
 }
 
 @test "état : désactivé, prêt sur le cluster avec le nombre de bases, relais arrêté" {
-    run bash "$POSTGRES" etat
+    run bash "$POSTGRES" status
     [ "$output" = "désactivé" ]
     actif_sur docker-desktop
-    run bash "$POSTGRES" etat
-    [ "$output" = "prêt sur docker-desktop, relais arrêté : devzone appliquer" ]
-    bash "$POSTGRES" relais-lancer
-    run bash "$POSTGRES" etat
+    run bash "$POSTGRES" status
+    [ "$output" = "prêt sur docker-desktop, relais arrêté : devzone apply" ]
+    bash "$POSTGRES" relay-start
+    run bash "$POSTGRES" status
     [ "$output" = "prêt sur docker-desktop : 127.0.0.1:5432, 2 base(s)" ]
     run bash "$DEVZONE"
     [[ "$output" == *"✔ module postgres"*"prêt sur docker-desktop"* ]] || false
 }
 
-@test "relais : lancé une seule fois, arrêté par relais-arreter" {
+@test "relais : lancé une seule fois, arrêté par relay-stop" {
     actif_sur kind-devzone
-    bash "$POSTGRES" relais-lancer
-    bash "$POSTGRES" relais-lancer
+    bash "$POSTGRES" relay-start
+    bash "$POSTGRES" relay-start
     attendre_nohup 'port-forward'
     [ "$(grep -c port-forward "$BATS_TEST_TMPDIR/nohup.log")" -eq 1 ]
     pid="$(cat "$SECRETS/relais.pid")"
     kill -0 "$pid"
-    bash "$POSTGRES" relais-arreter
+    bash "$POSTGRES" relay-stop
     sleep 0.2
     ! kill -0 "$pid" 2>/dev/null || false
     [ ! -f "$SECRETS/relais.pid" ]
@@ -382,4 +382,37 @@ attendre_nohup() {
     run bash "$DEVZONE" apply
     [[ "$output" == *"relais relancé"* ]] || false
     [ ! -f "$BATS_TEST_TMPDIR/apply.log" ]
+}
+
+@test "postgres : l alias français donne le même résultat que le nom anglais, avec l avertissement" {
+    run --separate-stderr bash "$POSTGRES" status
+    [ "$status" -eq 0 ]
+    [[ "$stderr" != *"deprecated"* ]] || false
+    attendu="$output"
+    run --separate-stderr bash "$POSTGRES" etat
+    [ "$status" -eq 0 ]
+    [ "$output" = "$attendu" ]
+    [[ "$stderr" == *"devzone: \"etat\" is deprecated, use \"status\""* ]] || false
+}
+
+@test "postgres : sous-commande et option françaises : même effet, avec l avertissement" {
+    actif_sur docker-desktop
+    run --separate-stderr bash "$POSTGRES" creer taskmanager --nouveau-mdp
+    [ "$status" -eq 0 ]
+    [[ "$stderr" == *"devzone: \"creer\" is deprecated, use \"create\""* ]] || false
+    [[ "$stderr" == *"devzone: \"--nouveau-mdp\" is deprecated, use \"--new-password\""* ]] || false
+    grep -qx 'DB_PASSWORD=mdpsecret1' "$SECRETS/taskmanager.env"
+}
+
+@test "postgres : les noms anglais ne donnent aucun avertissement" {
+    actif_sur docker-desktop
+    run --separate-stderr bash "$POSTGRES" create taskmanager --new-password
+    [ "$status" -eq 0 ]
+    [[ "$stderr" != *"deprecated"* ]] || false
+    run --separate-stderr bash "$POSTGRES" list
+    [ "$status" -eq 0 ]
+    [[ "$stderr" != *"deprecated"* ]] || false
+    run --separate-stderr bash "$POSTGRES" delete taskmanager --yes
+    [ "$status" -eq 0 ]
+    [[ "$stderr" != *"deprecated"* ]] || false
 }

@@ -32,7 +32,7 @@ fi
 # Module postgres actif : le relais (port-forward vers 127.0.0.1:5432) ne
 # survit pas à l'arrêt du conteneur, relancé ici après les clusters
 if bash "$ICI/devzone" is-enabled postgres; then
-    bash "$ICI/postgres/postgres.sh" relais-lancer || echo "démarrage : relais postgres non lancé (devzone reparer)"
+    bash "$ICI/postgres/postgres.sh" relay-start || echo "démarrage : relais postgres non lancé (devzone reparer)"
 fi
 # Module argocd actif : relais (port-forward vers 127.0.0.1:8443), relancé
 # après les clusters comme celui de postgres

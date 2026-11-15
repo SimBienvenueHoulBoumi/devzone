@@ -571,20 +571,20 @@ appliquer_postgres() {
         fi
         # Choix gardé avant l'installation : une reprise vise le même cluster
         cluster_ecrire "$ctx"
-        etat_courant="$(bash "$ICI/postgres/postgres.sh" etat)"
+        etat_courant="$(bash "$ICI/postgres/postgres.sh" status)"
         # « relais arrêté » d'abord : cette ligne commence aussi par « prêt sur »
         if [[ "$etat_courant" == *"relais arrêté"* ]]; then
-            bash "$ICI/postgres/postgres.sh" relais-lancer
+            bash "$ICI/postgres/postgres.sh" relay-start
             echo "devzone : postgres : relais relancé"
         elif [[ "$etat_courant" == "prêt sur"* ]]; then
             echo "devzone : postgres déjà actif, rien à faire."
-        elif ! bash "$ICI/postgres/postgres.sh" installer; then
+        elif ! bash "$ICI/postgres/postgres.sh" install; then
             echo "postgres" >"$(fichier_echec postgres)"
             return 1
         fi
         rm -f "$(fichier_echec postgres)"
     else
-        bash "$ICI/postgres/postgres.sh" desinstaller
+        bash "$ICI/postgres/postgres.sh" uninstall
         rm -f "$(fichier_echec postgres)"
     fi
 }
@@ -754,7 +754,7 @@ changer_cluster() {
             return 1
         fi
         # Installe PostgreSQL sur le nouveau cluster (via --context devzone qui pointe maintenant dessus)
-        bash "$ICI/postgres/postgres.sh" installer
+        bash "$ICI/postgres/postgres.sh" install
     else
         cluster_ecrire "$ctx_new"
         # Pose le contexte devzone sur le nouveau cluster (cluster + user :
@@ -1095,7 +1095,7 @@ reparer() {
         reparer_element "relais gitlab" bash "$ICI/gitlab/gitlab.sh" relais-lancer
     fi
     if [ "$(valeur postgres)" = on ]; then
-        reparer_element "relais postgres" bash "$ICI/postgres/postgres.sh" relais-lancer
+        reparer_element "relais postgres" bash "$ICI/postgres/postgres.sh" relay-start
     fi
     if [ "$(valeur argocd)" = on ]; then
         reparer_element "relais argocd" bash "$ICI/argocd/argocd.sh" relais-lancer
@@ -1256,7 +1256,7 @@ etat() {
             # GitLab actif : son état réel (prêt, runner, en échec)
             printf '  ✔ module %-10s %s\n' "$m" "$(bash "$ICI/gitlab/gitlab.sh" etat)"
         elif [ "$(valeur "$m")" = on ] && [ "$m" = postgres ]; then
-            printf '  ✔ module %-10s %s\n' "$m" "$(bash "$ICI/postgres/postgres.sh" etat)"
+            printf '  ✔ module %-10s %s\n' "$m" "$(bash "$ICI/postgres/postgres.sh" status)"
         elif [ "$(valeur "$m")" = on ] && [ "$m" = argocd ]; then
             printf '  ✔ module %-10s %s\n' "$m" "$(bash "$ICI/argocd/argocd.sh" etat)"
         elif [ "$(valeur "$m")" = on ] && [ "$m" = mysql ]; then
