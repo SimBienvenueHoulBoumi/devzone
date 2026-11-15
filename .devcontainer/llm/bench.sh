@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# devzone llm bench (#593), sourced by llm.sh (uses its NS, k, installed,
-# preset_read and refuse): llama-bench of the model in a Kubernetes Job of the
+# devzone llm bench (#593), sourced by llm.sh (uses its NS, k, preset_read
+# and refuse): llama-bench of the model in a Kubernetes Job of the
 # namespace devzone-llm (image full-<llamaBuild> of the chart, same build as the
 # server, pulled only here), then a table, a threads recommendation and whether
 # the speed is enough for opencode.
@@ -11,6 +11,10 @@
 # generation). The Job is deleted at the end, even on failure. bash 3.2 (macOS).
 
 BENCH_JOB=llm-bench
+
+# Server present, read with the rights of the namespace (the account of the pod
+# cannot read a namespace, a cluster resource: installed would fail for it)
+bench_present() { k get deployment llm >/dev/null 2>&1; }
 
 # Job deleted (no error when it is already gone)
 bench_cleanup() { k delete job "$BENCH_JOB" --ignore-not-found --wait=false >/dev/null 2>&1 || true; }
@@ -84,7 +88,7 @@ bench() {
         esac
     done
     [ -z "$want" ] || refuse "--$want needs a value"
-    installed || refuse "bench: the module is not enabled (devzone enable llm)"
+    bench_present || refuse "bench: the module is not enabled (devzone enable llm)"
     sets="$(llm_preset_sets "$(preset_read)") bench.enabled=true"
     [ -z "$threads" ] || sets="$sets bench.threads=${threads//,/\\,}" # helm --set: a comma separates keys
     [ -z "$prompt" ] || sets="$sets bench.prompt=$prompt"

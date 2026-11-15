@@ -39,7 +39,7 @@ case "$*" in
     *"config view"*)
         if [[ "$*" == *'.cluster.server'* ]]; then echo "https://127.0.0.1:6443"; else echo docker-desktop; fi ;;
     *"get --raw /readyz"*) ;;
-    *"get namespace devzone-llm"*) [ -f "$T/ns" ]; exit $? ;;
+    *"get namespace devzone-llm"*) [ -z "${FAUX_REFUS_NS:-}" ] && [ -f "$T/ns" ]; exit $? ;;
     *"get namespaces -l"*) ;;
     *"create namespace"*) printf 'kind: Namespace\nmetadata:\n  name: devzone-llm\n' ;;
     *"apply -f -"*) cat >>"$T/apply.log"; touch "$T/ns" ;;
@@ -48,6 +48,7 @@ case "$*" in
     *"rollout status"*) [ -z "${FAUX_PAS_PRET:-}" ]; exit $? ;;
     *"readyReplicas"*) echo 1 ;;
     *"limits.memory"*) echo 7Gi ;;
+    *"get deployment llm"*) [ -f "$T/ns" ]; exit $? ;;
     *"delete namespace devzone-llm"*) rm -f "$T/ns" ;;
     *"port-forward"*) exec sleep 300 ;;
 esac
@@ -285,4 +286,14 @@ bench_logs() {
     [[ "$output" == *"Too slow for opencode"* ]] || false
     [[ "$output" != *"--preset light"* ]] || false
     grep -q 'model.file=qwen2.5-coder-3b' "$BATS_TEST_TMPDIR/helm.log"
+}
+
+@test "llm bench: the account of the pod cannot read the namespace, the server is read with the namespace rights and the bench goes on" {
+    bash "$DEVZONE" enable llm --context docker-desktop </dev/null
+    bench_logs 4:60:9 8:90:11
+    FAUX_REFUS_NS=1 LLM_BENCH_POLL=0 run bash "$LLM" bench
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Recommended: threads=8"* ]] || false
+    [[ "$output" != *"not enabled"* ]] || false
+    grep -q -- '-n devzone-llm get deployment llm' "$BATS_TEST_TMPDIR/kubectl.log"
 }
