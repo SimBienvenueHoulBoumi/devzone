@@ -37,3 +37,13 @@ objects() {
     [[ "$output" == *"image: postgres:17-alpine"* ]] || false
     [[ "$output" != *"kind: Secret"* ]] || false
 }
+
+@test "chart devzone-postgres: port, memory and claim come from the values" {
+    run helm template postgres "$CHART" --namespace devzone-postgres --set port=5433 --set memory=512Mi --set claim=data
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"port: 5433"* ]] || false
+    [[ "$output" == *"memory: 512Mi"* ]] || false
+    [[ "$output" == *"- name: data"* ]] || false
+    [[ "$output" == *"name: data"*"storage: 5Gi"* ]] || false
+    [[ "$output" != *"kind: Secret"* ]] || false
+}

@@ -14,3 +14,10 @@ Le passage du code en anglais se fait par lots. Le fichier `.english` à la
 racine recense les fichiers déjà écrits en anglais ; la CI les vérifie à
 chaque exécution (`bash manage/scripts/check-english.sh`). Tout nouveau
 fichier de code doit y être ajouté.
+
+## Charts des services
+
+Chaque service de devzone a un chart `charts/devzone-<service>` : nom du
+dossier, `Chart.yaml`, valeurs communes et étiquettes sont fixés par la
+convention de [manage/docs/reference.md](manage/docs/reference.md#convention-des-charts-devzone).
+Le contrôle `bash manage/scripts/check-charts.sh` la vérifie.

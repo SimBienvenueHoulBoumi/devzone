@@ -10,6 +10,8 @@ metadata:
   namespace: devzone-postgres
   labels:
     app: postgres
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/part-of: devzone
     app.kubernetes.io/managed-by: devzone
 spec:
   selector:
@@ -26,6 +28,8 @@ metadata:
   namespace: devzone-postgres
   labels:
     app: postgres
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/part-of: devzone
     app.kubernetes.io/managed-by: devzone
 spec:
   serviceName: postgres

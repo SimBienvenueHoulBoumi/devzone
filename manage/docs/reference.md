@@ -308,6 +308,16 @@ Apres `devzone workspace migrate`, `make up`, `make shell` et `make stop` pilote
 
 **Nettoyage** : les volumes Docker ne sont jamais supprimes par `migrer` ni `revenir`. `devzone workspace clean-docker` liste les volumes `devzone-*` presents puis demande [o/N] avant de les supprimer (`--oui` sans terminal ; sinon refus). Irreversible : apres, `revenir` repart de volumes vides.
 
+### Le cluster ne répond pas
+
+`devzone workspace start` (donc `make up` et `make shell`) vérifie le cluster en premier, avant Argo CD, helm et l'attente du pod (#565). Un cluster injoignable donne un seul message, code de sortie 1, et rien d'autre n'est lancé ; le workspace déjà installé n'est ni modifié ni supprimé. Le message dit la cause :
+
+- **Docker Desktop arrêté** : `✖ Docker Desktop is stopped: the Kubernetes cluster of this machine runs inside it. Start Docker Desktop, then: make shell`. C'est le cas quand le contexte est `docker-desktop` (ou que le cluster s'appelle `docker-desktop` et répond sur `127.0.0.1` ou `localhost`) et que `docker info` échoue. Le Kubernetes du poste tourne dans Docker Desktop : le lancer, puis `make shell`.
+- **Docker répond, pas le cluster** : `✖ Kubernetes cluster <contexte> unreachable (<serveur>): enable Kubernetes in Docker Desktop (Settings → Kubernetes) or check kubectl config get-contexts`. Activer Kubernetes dans Docker Desktop (Settings → Kubernetes), ou vérifier le contexte.
+- **Autre contexte** : `✖ Kubernetes cluster <contexte> unreachable (<serveur>)`, suivi de `Check the contexts: kubectl config get-contexts`.
+
+Pour que Docker Desktop démarre à chaque connexion : Settings → General → Start Docker Desktop when you sign in.
+
 ### Applications et services sur localhost du poste
 
 `devzone workspace start` lance un veilleur sur le poste (`manage/scripts/ports-workspace.sh`), `devzone workspace stop` l'arrête avec tous ses `kubectl port-forward`. `devzone workspace ports [start|stop|status]` drives it alone.
@@ -478,6 +488,48 @@ Les services de devzone ont chacun leur chart dans `charts/` (#538) : une seule 
 - `charts/devzone-argocd` : enveloppe du chart officiel `argo-cd` (version figée dans `Chart.yaml`, `Chart.lock` fige la version et le condensé de la dépendance), valeurs minimales de devzone dans `values.yaml`. La dépendance est construite avant l'installation (`helm dependency build`) ; le tgz ainsi construit n'est pas commité (`.gitignore`).
 
 Chaque chart se vérifie par `helm lint` et `helm template` (`manage/test/chart-*.bats`), sans cluster.
+
+### Convention des charts devzone
+
+Le code suppose que chaque service a un chart `charts/devzone-<service>` (#554) : les appels (`services.sh`, `catalogue-argocd.sh`, `argocd-services*.sh`, `argocd-workspace.sh`) construisent ce chemin à partir du nom du service. La convention ci-dessous est la règle que ces appels supposent.
+
+**Dossier et `Chart.yaml`**
+
+- Le dossier s'appelle `charts/devzone-<service>`, `<service>` en minuscules, chiffres et tirets (`[a-z0-9-]+`).
+- `name` vaut exactement le nom du dossier. `type: application`.
+- `version` est un semver (`0.1.0`). `appVersion` est la version du logiciel empaqueté, jamais vide.
+- `description` est en anglais et cite le ticket qui a introduit le chart (`#NNN`).
+
+**Deux familles**
+
+- **Service** : le chart porte ses propres templates (StatefulSet, Service, etc.). Ses règles :
+  - le namespace n'est jamais écrit en dur, seulement `{{ .Release.Namespace }}` ;
+  - chaque objet porte `app.kubernetes.io/name=<service>`, `app.kubernetes.io/part-of=devzone` et `app.kubernetes.io/managed-by=devzone` ;
+  - aucun `kind: Secret` dans les templates : les secrets sont créés à part, par devzone (#538) ;
+  - aucun `Ingress` ni `LoadBalancer` : l'accès passe par le relais `kubectl port-forward` du poste ;
+  - les valeurs communes ci-dessous sont présentes dans `values.yaml`.
+- **Enveloppe** : le chart n'a que des `dependencies:` (un chart officiel figé). Sa dépendance est une version exacte, de préférence en `oci://`, ses valeurs vivent sous la clé du chart officiel, et `Chart.lock` est commité. Le dépôt sans `oci://` produit un avertissement.
+
+La famille se déduit du chart : `dependencies:` présent = enveloppe, sinon service.
+
+**Clés de valeurs communes**
+
+| Clé | Sens | Exemple |
+|---|---|---|
+| `image` | image du conteneur principal, avec sa version figée | `mysql:8.4` |
+| `size` | taille du volume de données (PVC) | `5Gi` |
+| `memory` | mémoire demandée (`requests`) du conteneur principal | `1Gi` |
+| `port` | port du Service (le conteneur écoute sur son port propre) | `3306` |
+| `claim` | nom du volume claim template mouté par le conteneur | `donnees` |
+| `resources` | autres ressources du conteneur (`requests`/`limits` de CPU, etc.) | `requests: {cpu: 100m}` |
+
+`devzone-workspace` fait exception : c'est le poste lui-même, dont les volumes se règlent par `workspace.size` et `persistence`, pas par ces clés.
+
+**Contrôle**
+
+Le script `manage/scripts/check-charts.sh` applique la convention à chaque dossier de `charts/` et à toute référence `charts/devzone-<x>` du code ; il lance `helm lint` et le rendu quand helm est présent. Un manquement s'affiche `✖ charts/<x> : <règle>` et fait échouer le contrôle. Avant d'appliquer un chart, devzone vérifie que `charts/devzone-<service>/Chart.yaml` existe et porte `name: devzone-<service>` ; sinon il s'arrête avant tout appel à `kubectl` ou `helm`, sort avec le code 2 et affiche `✖ <service> : chart charts/devzone-<service> missing or misnamed (manage/docs/reference.md#charts-de-devzone)`. Les appelants du catalogue (`app.sh`, `mysql.sh`) reçoivent cet échec comme un échec ordinaire et sortent en code 1.
+
+**Ajouter un service** : créer `charts/devzone-<service>` selon la famille, ajouter les valeurs communes utiles, lancer `bash manage/scripts/check-charts.sh`, puis un test `chart-<service>.bats` (lint et rendu).
 
 ## Argo CD
 
