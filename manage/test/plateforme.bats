@@ -109,21 +109,21 @@ empreinte_etat() {
 }
 
 @test "plateforme : affiche la plateforme, github par défaut" {
-    run bash "$DEVZONE" plateforme
+    run bash "$DEVZONE" platform
     [ "$status" -eq 0 ]
     [[ "$output" == *"devzone : plateforme github (défaut)"* ]] || false
 }
 
 @test "plateforme : affiche gitlab et son URL une fois choisi" {
-    run bash "$DEVZONE" plateforme gitlab --url "$INSTANCE"
+    run bash "$DEVZONE" platform gitlab --url "$INSTANCE"
     [ "$status" -eq 0 ]
-    run bash "$DEVZONE" plateforme
+    run bash "$DEVZONE" platform
     [[ "$output" == *"devzone : plateforme gitlab : $INSTANCE, glab connecté"* ]] || false
 }
 
 @test "plateforme gitlab --url : glab installé de la release officielle, somme vérifiée" {
     rm -f "$HOME/.local/bin/glab"
-    run bash "$DEVZONE" plateforme gitlab --url "$INSTANCE"
+    run bash "$DEVZONE" platform gitlab --url "$INSTANCE"
     [ "$status" -eq 0 ]
     grep -q "gitlab.com/gitlab-org/cli/-/releases/v1.126.0/downloads/glab_1.126.0_linux" "$GLAB_CURL_LOG" || false
     [ "$(grep -c "glab_1.126.0_linux_" "$GLAB_CURL_LOG")" -eq 1 ]
@@ -131,7 +131,7 @@ empreinte_etat() {
 }
 
 @test "plateforme gitlab : autre instance, interactive (sans jeton), état correct" {
-    run bash "$DEVZONE" plateforme gitlab --url "$INSTANCE"
+    run bash "$DEVZONE" platform gitlab --url "$INSTANCE"
     [ "$status" -eq 0 ]
     grep -q "auth login --hostname example.gitlab:8443" "$GLAB_LOG" || false
     ! grep -q -- "--token" "$GLAB_LOG" || false
@@ -147,7 +147,7 @@ empreinte_etat() {
     printf 'gitlab=on\n' >"$DEVZONE_ETAT"
     mkdir -p "$DEVZONE_RACINE/workspace/.gitlab"
     printf 'jeton-root-secret' >"$DEVZONE_RACINE/workspace/.gitlab/root-token"
-    run bash "$DEVZONE" plateforme gitlab
+    run bash "$DEVZONE" platform gitlab
     [ "$status" -eq 0 ]
     [[ "$output" == *"plateforme gitlab : http://gitlab.localhost:8929, glab connecté"* ]] || false
     [[ "$output" != *"jeton-root-secret"* ]] || false
@@ -159,7 +159,7 @@ empreinte_etat() {
 
 @test "sans URL et sans module gitlab actif → refus, rien installé" {
     rm -f "$HOME/.local/bin/glab"
-    run bash "$DEVZONE" plateforme gitlab
+    run bash "$DEVZONE" platform gitlab
     [ "$status" -eq 1 ]
     [[ "$output" == *"URL manquante"* ]] || false
     [ ! -e "$HOME/.local/bin/glab" ]
@@ -168,14 +168,14 @@ empreinte_etat() {
 }
 
 @test "--url sans valeur → refus" {
-    run bash "$DEVZONE" plateforme gitlab --url
+    run bash "$DEVZONE" platform gitlab --url
     [ "$status" -eq 1 ]
     [[ "$output" == *"--url attend une URL"* ]] || false
 }
 
 @test "plateforme inconnue → refus, état intact" {
     rm -f "$HOME/.local/bin/glab"
-    run bash "$DEVZONE" plateforme machines
+    run bash "$DEVZONE" platform machines
     [ "$status" -eq 1 ]
     [[ "$output" == *"plateforme inconnue : machines"* ]] || false
     [ ! -e "$HOME/.local/bin/glab" ]
@@ -183,7 +183,7 @@ empreinte_etat() {
 
 @test "plateforme gitlab, module actif, jeton root absent → invitation, plateforme non retenue" {
     printf 'gitlab=on\n' >"$DEVZONE_ETAT"
-    run bash "$DEVZONE" plateforme gitlab
+    run bash "$DEVZONE" platform gitlab
     [ "$status" -ne 0 ]
     [[ "$output" == *"jeton root"*"devzone activer gitlab"* ]] || false
     [ -x "$HOME/.local/bin/glab" ]
@@ -195,7 +195,7 @@ empreinte_etat() {
     bash "$DEVZONE" >/dev/null
     rm -f "$HOME/.local/bin/glab"
     GLAB_SOMME_FAUX=0000000000000000000000000000000000000000000000000000000000000000 \
-        run bash "$DEVZONE" plateforme gitlab --url "$INSTANCE"
+        run bash "$DEVZONE" platform gitlab --url "$INSTANCE"
     [ "$status" -ne 0 ]
     [[ "$output" == *"somme SHA-256"* ]] || false
     [ ! -e "$HOME/.local/bin/glab" ]
@@ -205,7 +205,7 @@ empreinte_etat() {
 
 @test "téléchargement en échec → message, glab absent, plateforme non retenue" {
     rm -f "$HOME/.local/bin/glab"
-    FAUX_CURL_KO=1 run bash "$DEVZONE" plateforme gitlab --url "$INSTANCE"
+    FAUX_CURL_KO=1 run bash "$DEVZONE" platform gitlab --url "$INSTANCE"
     [ "$status" -ne 0 ]
     [[ "$output" == *"téléchargement de glab impossible"* ]] || false
     [ ! -e "$HOME/.local/bin/glab" ]
@@ -213,7 +213,7 @@ empreinte_etat() {
 }
 
 @test "connexion refusée par glab → échec, plateforme non retenue, rien à corriger" {
-    FAUX_GLAB_KO=1 run bash "$DEVZONE" plateforme gitlab --url "$INSTANCE"
+    FAUX_GLAB_KO=1 run bash "$DEVZONE" platform gitlab --url "$INSTANCE"
     [ "$status" -ne 0 ]
     [[ "$output" != *"glab connecté"* ]] || false
     [[ "$output" == *"glab auth login --hostname example.gitlab:8443"* ]] || false
@@ -225,11 +225,11 @@ empreinte_etat() {
     printf 'gitlab=on\nplateforme=gitlab\ngitlab_url=http://gitlab.localhost:8929\n' >"$DEVZONE_ETAT"
     mkdir -p "$DEVZONE_RACINE/workspace/.gitlab"
     printf 'jeton-root-secret' >"$DEVZONE_RACINE/workspace/.gitlab/root-token"
-    FAUX_GLAB_KO=1 run bash "$DEVZONE" plateforme gitlab
+    FAUX_GLAB_KO=1 run bash "$DEVZONE" platform gitlab
     [ "$status" -ne 0 ]
     [[ "$output" != *"glab connecté"* ]] || false
     grep -qx 'plateforme=gitlab' "$DEVZONE_ETAT" || false
-    run bash "$DEVZONE" plateforme
+    run bash "$DEVZONE" platform
     [ "$status" -eq 0 ]
     [[ "$output" == *"devzone : plateforme gitlab : http://gitlab.localhost:8929, glab non connecté : glab auth login --hostname gitlab.localhost:8929"* ]] || false
 }
@@ -237,11 +237,11 @@ empreinte_etat() {
 @test "retour github : glab et sa configuration retirés, état identique à avant" {
     bash "$DEVZONE" >/dev/null
     avant="$(empreinte_etat)"
-    run bash "$DEVZONE" plateforme gitlab --url "$INSTANCE"
+    run bash "$DEVZONE" platform gitlab --url "$INSTANCE"
     [ "$status" -eq 0 ]
     [ -x "$HOME/.local/bin/glab" ]
     [ -d "$HOME/.config/glab-cli" ]
-    run bash "$DEVZONE" plateforme github
+    run bash "$DEVZONE" platform github
     [ "$status" -eq 0 ]
     [ ! -e "$HOME/.local/bin/glab" ]
     [ ! -e "$HOME/.config/glab-cli" ]
@@ -253,10 +253,10 @@ empreinte_etat() {
 
 @test "choix gitlab répété : glab pas re-téléchargé, rien ne change" {
     rm -f "$HOME/.local/bin/glab"
-    run bash "$DEVZONE" plateforme gitlab --url "$INSTANCE"
+    run bash "$DEVZONE" platform gitlab --url "$INSTANCE"
     [ "$status" -eq 0 ]
     [ "$(grep -c "curl " "$GLAB_CURL_LOG")" -eq 1 ]
-    run bash "$DEVZONE" plateforme gitlab --url "$INSTANCE"
+    run bash "$DEVZONE" platform gitlab --url "$INSTANCE"
     [ "$status" -eq 0 ]
     [ "$(grep -c "curl " "$GLAB_CURL_LOG")" -eq 1 ]
 }

@@ -100,7 +100,7 @@ for message in "✖ identité git" "○ GitHub          facultatif" "○ module 
 done
 
 echo "▶ Module ia"
-reussit "activer ia" "devzone activer ia && claude --version && opencode --version" "Claude Code"
+reussit "enable ia" "devzone enable ia && claude --version && opencode --version" "Claude Code"
 reussit "ia : garde-fou repowarden branché (Claude Code, opencode)" "grep -q 'repowarden garde' ~/.claude/settings.json && test -f ~/.config/opencode/plugins/repowarden-garde.js"
 reussit "ia : configuration opencode par défaut en place" "grep -q '^// devzone : configuration opencode par défaut' ~/.config/opencode/opencode.jsonc && grep -q '\"model\": \"opencode/big-pickle\"' ~/.config/opencode/opencode.jsonc"
 # Chaque modèle de la configuration doit être proposé par la version installée
@@ -127,8 +127,8 @@ fi
 # Action d'agent sur main dans un dépôt neuf (hooks repowarden globaux) : refusée (code 2)
 # shellcheck disable=SC2016 # commande développée dans le conteneur
 echoue "ia : garde-fou : modification sur main refusée" 'd="$(mktemp -d)" && cd "$d" && git init -q -b main && printf "{\"tool_name\":\"Write\",\"tool_input\":{\"file_path\":\"%s/a.txt\"},\"cwd\":\"%s\"}" "$d" "$d" | repowarden garde --format claude' "branche protégée"
-reussit "désactiver ia" "devzone desactiver ia && ! command -v claude"
-echoue "module inconnu refusé" "devzone activer nexistepas" "module inconnu"
+reussit "disable ia" "devzone disable ia && ! command -v claude"
+echoue "module inconnu refusé" "devzone enable nexistepas" "module inconnu"
 
 echo "▶ Module kubernetes (cluster kind du test, jamais un cluster de l'hôte)"
 # #230 : avant de tenter le cluster kind, le daemon docker du conteneur doit répondre
@@ -153,14 +153,14 @@ fi
 # Enveloppe kind (#291) : l'adresse de l'API est rendue joignable du conteneur
 reussit "cluster créé à la main : adresse joignable du conteneur" "kubectl config view -o jsonpath='{.clusters[?(@.name==\"kind-$KIND_TEST\")].cluster.server}'" "$KIND_TEST-control-plane:6443|host.docker.internal"
 reussit "cluster créé à la main : kubectl lui parle" "kubectl --context kind-$KIND_TEST get nodes" "Ready"
-reussit "activer kubernetes : metrics-server sur kind" "devzone activer kubernetes" "metrics-server : installé .*kind-$KIND_TEST"
+reussit "enable kubernetes : metrics-server sur kind" "devzone enable kubernetes" "metrics-server : installé .*kind-$KIND_TEST"
 reussit "métriques disponibles" "for i in \$(seq 1 36); do kubectl --context kind-$KIND_TEST top nodes >/dev/null 2>&1 && exit 0; sleep 5; done; exit 1"
 reussit "metrics-server marqué comme installé par devzone" "kubectl --context kind-$KIND_TEST -n kube-system get deployment metrics-server -o jsonpath='{.metadata.labels.devzone}'" "^installe$"
 # Désinstallation lancée dans le conteneur : seul le cluster kind-$KIND_TEST est vu
 reussit "désinstaller : retire le metrics-server de devzone" "CONFIRMER=oui bash manage/scripts/desinstaller.sh" "metrics-server removed: kind-$KIND_TEST"
 echoue "metrics-server absent après désinstallation" "kubectl --context kind-$KIND_TEST -n kube-system get deployment metrics-server"
 echoue "metrics-server.sh : contexte inconnu" "bash .devcontainer/metrics-server.sh nexistepas" "contexte inconnu"
-reussit "désactiver kubernetes" "devzone desactiver kubernetes" "kubernetes désactivé"
+reussit "disable kubernetes" "devzone disable kubernetes" "kubernetes désactivé"
 reussit "cluster kind toujours utilisable" "kubectl --context kind-$KIND_TEST get nodes" "Ready"
 
 echo "▶ Git et hooks repowarden"
@@ -171,7 +171,7 @@ reussit "message conventionnel accepté" "$G && echo a >a && git add a && git co
 echoue "jeton GitHub refusé (gitleaks)" "$G && echo \"T='ghp_\$(head -c 300 /dev/urandom | tr -dc A-Za-z0-9 | head -c 36)'\" >c.py && git add c.py && git commit -m 'feat: config'" "Secret"
 
 echo "▶ Persistance"
-dz "devzone activer ia >/dev/null; echo témoin >~/.config/git/temoin" >/dev/null
+dz "devzone enable ia >/dev/null; echo témoin >~/.config/git/temoin" >/dev/null
 # Identité dans le volume, et volume « pollué » comme par une version
 # antérieure (réglages machine en double) : le rebuild doit réussir et le nettoyer
 dz "V=~/.config/git/config; git config --file \$V user.name Test; git config --file \$V user.email test@example.invalid; git config --file \$V --add credential.https://github.com.helper ''; git config --file \$V --add credential.https://github.com.helper '!gh auth git-credential'; git config --file \$V --add safe.directory /workspaces/devzone" >/dev/null

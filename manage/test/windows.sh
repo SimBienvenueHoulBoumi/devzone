@@ -93,8 +93,8 @@ echoue "dossier non vide refusé" "DEVZONE_SANS_DEMARRER=1 devzone '$TMP/plein'"
 reussit "fichier existant préservé" "[ \"\$(cat '$TMP/plein/fichier')\" = important ]"
 reussit "Makefile non créé" "[ ! -e '$TMP/plein/Makefile' ]"
 
-echo "▶ devzone desinstaller hors d'un dossier devzone"
-echoue "desinstaller refusé hors devzone" "cd '$TMP' && devzone desinstaller" "dossier devzone"
+echo "▶ devzone uninstall hors d'un dossier devzone"
+echoue "uninstall refusé hors devzone" "cd '$TMP' && devzone uninstall" "dossier devzone"
 
 echo
 echo "Résultat : $reussis réussi(s), $echecs échec(s)"

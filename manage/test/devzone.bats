@@ -181,7 +181,7 @@ GH
 }
 
 @test "docker-hote : desactiver écrit off, demande make rebuild, plus d'avertissement" {
-    run bash "$DEVZONE" desactiver docker-hote
+    run bash "$DEVZONE" disable docker-hote
     [ "$status" -eq 0 ]
     grep -qx 'docker-hote=off' "$DEVZONE_RACINE/.devzone.modules"
     [[ "$output" == *"make rebuild"* ]] || false
@@ -194,7 +194,7 @@ GH
 @test "docker-hote : desactiver concurrent avec une écriture d'état : aucune ligne perdue" {
     printf 'docker-hote=off\nia=on\n' >"$DEVZONE_RACINE/.devzone.modules"
     ETAT="$DEVZONE_RACINE/.devzone.modules" bash -c '. "$1"; etat_ecrire postgres on' _ "$BATS_TEST_DIRNAME/../../.devcontainer/etat.sh" & pid_w=$!
-    bash "$DEVZONE" desactiver docker-hote & pid_d=$!
+    bash "$DEVZONE" disable docker-hote & pid_d=$!
     wait "$pid_w"
     wait "$pid_d"
     grep -qx 'docker-hote=off' "$DEVZONE_RACINE/.devzone.modules"
@@ -203,7 +203,7 @@ GH
 
 @test "docker-hote : activer écrit on, demande make rebuild" {
     printf 'docker-hote=off\n' >"$DEVZONE_RACINE/.devzone.modules"
-    run bash "$DEVZONE" activer docker-hote
+    run bash "$DEVZONE" enable docker-hote
     [ "$status" -eq 0 ]
     grep -qx 'docker-hote=on' "$DEVZONE_RACINE/.devzone.modules"
     [[ "$output" == *"make rebuild"* ]] || false
@@ -293,22 +293,22 @@ GH
 }
 
 @test "état : module actif" {
-    bash "$DEVZONE" activer ia
+    bash "$DEVZONE" enable ia
     run bash "$DEVZONE"
     [[ "$output" == *"✔ module ia"*"actif"* ]] || false
 }
 
 @test "activer ia : installe les versions figées, état gardé" {
-    run bash "$DEVZONE" activer ia
+    run bash "$DEVZONE" enable ia
     [ "$status" -eq 0 ]
     grep -qE "install -g .* @anthropic-ai/claude-code@[0-9.]+$" "$BATS_TEST_TMPDIR/npm.log"
     grep -qE "install -g .* opencode-ai@[0-9.]+$" "$BATS_TEST_TMPDIR/npm.log"
-    run bash "$DEVZONE" actif ia
+    run bash "$DEVZONE" is-enabled ia
     [ "$status" -eq 0 ]
 }
 
 @test "activer ia : binaire optionnel abandonné par npm (opencode ne répond pas) → réinstallé" {
-    NPM_IA_SANS_BINAIRE=1 run bash "$DEVZONE" activer ia
+    NPM_IA_SANS_BINAIRE=1 run bash "$DEVZONE" enable ia
     [ "$status" -eq 0 ]
     [ "$(grep -c "^npm install -g .* opencode-ai@" "$BATS_TEST_TMPDIR/npm.log")" -eq 2 ]
     [[ "$output" == *"nouvel essai"* ]] || false
@@ -317,14 +317,14 @@ GH
 }
 
 @test "activer ia : npm en échec une fois → retenté, réussite" {
-    NPM_IA_ECHECS=1 run bash "$DEVZONE" activer ia
+    NPM_IA_ECHECS=1 run bash "$DEVZONE" enable ia
     [ "$status" -eq 0 ]
     [ "$(grep -c "^npm install -g .* opencode-ai@" "$BATS_TEST_TMPDIR/npm.log")" -eq 2 ]
     [[ "$output" == *"ia actif"* ]] || false
 }
 
 @test "activer ia : échec à chaque essai → 3 essais, code non nul, paquets et journal npm cités" {
-    NPM_IA_ECHECS=9 run bash "$DEVZONE" activer ia
+    NPM_IA_ECHECS=9 run bash "$DEVZONE" enable ia
     [ "$status" -ne 0 ]
     [ "$(grep -c "^npm install -g .* opencode-ai@" "$BATS_TEST_TMPDIR/npm.log")" -eq 3 ]
     [[ "$output" == *"opencode-ai@"* ]] || false
@@ -333,13 +333,13 @@ GH
 }
 
 @test "activer ia : installation lente → annoncée, progression pendant, résultat après" {
-    NPM_DUREE=3 DEVZONE_PROGRESSION=1 run bash "$DEVZONE" activer ia
+    NPM_DUREE=3 DEVZONE_PROGRESSION=1 run bash "$DEVZONE" enable ia
     [ "$status" -eq 0 ]
     [[ "$output" == *"installation de Claude Code et opencode (quelques minutes)"*"toujours en cours"*"Claude Code et opencode installés"* ]] || false
 }
 
 @test "activer ia : npm en échec → code non nul, paquet et journal npm cités, état en échec" {
-    NPM_ECHEC=1 run bash "$DEVZONE" activer ia
+    NPM_ECHEC=1 run bash "$DEVZONE" enable ia
     [ "$status" -ne 0 ]
     [[ "$output" == *"échec de l'installation"*"opencode-ai@"* ]] || false
     [[ "$output" != *"@anthropic-ai/claude-code@"* ]] || false
@@ -351,7 +351,7 @@ GH
 }
 
 @test "activer ia : npm en échec pour opencode seul → Claude Code installé, échec nomme opencode" {
-    NPM_ECHEC=1 run bash "$DEVZONE" activer ia
+    NPM_ECHEC=1 run bash "$DEVZONE" enable ia
     [ "$status" -ne 0 ]
     failure="$output"
     PATH="$BATS_TEST_TMPDIR/bin:/usr/bin:/bin" run claude --version
@@ -361,12 +361,12 @@ GH
 }
 
 @test "appliquer : échec ia → code non nul ; puis réussite → état actif, plus en échec" {
-    bash "$DEVZONE" activer ia
-    NPM_ECHEC=1 run bash "$DEVZONE" appliquer
+    bash "$DEVZONE" enable ia
+    NPM_ECHEC=1 run bash "$DEVZONE" apply
     [ "$status" -ne 0 ]
     run bash "$DEVZONE"
     [[ "$output" == *"✖ module ia"*"en échec"* ]] || false
-    run bash "$DEVZONE" appliquer
+    run bash "$DEVZONE" apply
     [ "$status" -eq 0 ]
     run bash "$DEVZONE"
     [[ "$output" == *"✔ module ia"*"actif"* ]] || false
@@ -374,10 +374,10 @@ GH
 }
 
 @test "désactiver ia après un échec : plus marqué en échec" {
-    NPM_ECHEC=1 run bash "$DEVZONE" activer ia
+    NPM_ECHEC=1 run bash "$DEVZONE" enable ia
     run bash "$DEVZONE"
     [[ "$output" == *"✖ module ia"*"en échec"* ]] || false
-    run bash "$DEVZONE" desactiver ia
+    run bash "$DEVZONE" disable ia
     [ "$status" -eq 0 ]
     run bash "$DEVZONE"
     [[ "$output" == *"○ module ia"* ]] || false
@@ -385,19 +385,19 @@ GH
 }
 
 @test "désactiver ia : désinstalle, état gardé" {
-    bash "$DEVZONE" activer ia
+    bash "$DEVZONE" enable ia
     mkdir -p "${DEVZONE_AGENT_ETAT:-$HOME/.local/state/oc-lancer}"
-    run bash "$DEVZONE" desactiver ia
+    run bash "$DEVZONE" disable ia
     [ "$status" -eq 0 ]
     grep -qx "npm uninstall -g @anthropic-ai/claude-code opencode-ai" "$BATS_TEST_TMPDIR/npm.log"
-    run bash "$DEVZONE" actif ia
+    run bash "$DEVZONE" is-enabled ia
     [ "$status" -ne 0 ]
     [ -d "${DEVZONE_AGENT_ETAT:-$HOME/.local/state/oc-lancer}" ]
 }
 
 @test "désactiver kubernetes : retire hote.config, sans rien lancer" {
     mkdir -p "$HOME/.kube" && touch "$HOME/.kube/hote.config"
-    run bash "$DEVZONE" desactiver kubernetes
+    run bash "$DEVZONE" disable kubernetes
     [ "$status" -eq 0 ]
     [ ! -e "$HOME/.kube/hote.config" ]
     [[ "$output" == *"kubernetes désactivé"* ]] || false
@@ -406,9 +406,9 @@ GH
 @test "désactiver ia : cycle activer + désactiver → empreinte des fichiers identique" {
     install_faux_repowarden
     empreinte_avant="$(empreinte)"
-    run bash "$DEVZONE" activer ia
+    run bash "$DEVZONE" enable ia
     [ "$status" -eq 0 ]
-    run bash "$DEVZONE" desactiver ia
+    run bash "$DEVZONE" disable ia
     [ "$status" -eq 0 ]
     [ "$(empreinte)" = "$empreinte_avant" ]
 }
@@ -435,7 +435,7 @@ GH
 }
 JSON
     printf '{"model":"mon-modele"}' >"$HOME/.config/opencode/opencode.jsonc"
-    run bash "$DEVZONE" desactiver ia
+    run bash "$DEVZONE" disable ia
     [ "$status" -eq 0 ]
     [ -f "$HOME/.claude/settings.json" ]
     grep -q "claude-personnel" "$HOME/.claude/settings.json"
@@ -503,7 +503,7 @@ KUBE
     export KUBE_MARKED_FILE="$BATS_TEST_TMPDIR/kube-marcus"
     export KUBE_DELETE_LOG="$BATS_TEST_TMPDIR/kube-delete.log"
     : >"$KUBE_DELETE_LOG"
-    run bash "$DEVZONE" desactiver kubernetes
+    run bash "$DEVZONE" disable kubernetes
     [ "$status" -eq 0 ]
     [ "$(cat "$KUBE_DELETE_LOG")" = "delete -f kind-dev" ]
     [[ "$output" == *"metrics-server présent sans repère devzone, laissé : kind-staging"* ]] || false
@@ -517,20 +517,20 @@ KUBE
     printf '#!/usr/bin/env bash\nexit 0\n' >"$BATS_TEST_TMPDIR/bin/kubectl"
     chmod +x "$BATS_TEST_TMPDIR/bin/kind" "$BATS_TEST_TMPDIR/bin/kubectl"
     kube_empreinte_avant="$(kube_empreinte)"
-    run bash "$DEVZONE" activer kubernetes
+    run bash "$DEVZONE" enable kubernetes
     [ "$status" -eq 0 ]
-    run bash "$DEVZONE" desactiver kubernetes
+    run bash "$DEVZONE" disable kubernetes
     [ "$status" -eq 0 ]
     [ "$(kube_empreinte)" = "$kube_empreinte_avant" ]
 }
 
 @test "module inconnu : message et erreur, état intact" {
-    run bash "$DEVZONE" activer nexistepas
+    run bash "$DEVZONE" enable nexistepas
     [ "$status" -eq 1 ]
     [[ "$output" == *"module inconnu : nexistepas"* ]] || false
-    run bash "$DEVZONE" activer
+    run bash "$DEVZONE" enable
     [ "$status" -eq 1 ]
-    run bash "$DEVZONE" actif nexistepas
+    run bash "$DEVZONE" is-enabled nexistepas
     [ "$status" -eq 2 ]
 }
 
@@ -549,34 +549,34 @@ KUBE
 }
 
 @test "actif : code 0 ou 1, sans rien écrire (test de scripts de démarrage)" {
-    run bash "$DEVZONE" actif ia
+    run bash "$DEVZONE" is-enabled ia
     [ "$status" -ne 0 ]
     [ -z "$output" ]
-    bash "$DEVZONE" activer ia >/dev/null
-    run bash "$DEVZONE" actif ia
+    bash "$DEVZONE" enable ia >/dev/null
+    run bash "$DEVZONE" is-enabled ia
     [ "$status" -eq 0 ]
     [ -z "$output" ]
-    run bash "$DEVZONE" actif kubernetes
+    run bash "$DEVZONE" is-enabled kubernetes
     [ "$status" -ne 0 ]
     [ -z "$output" ]
 }
 
 @test "connexion Claude partagée : signalée à la création de l'état, une seule fois" {
     mkdir -p "$HOME/.claude" && echo '{}' >"$HOME/.claude/.credentials.json"
-    run bash "$DEVZONE" actif ia
+    run bash "$DEVZONE" is-enabled ia
     [ "$status" -ne 0 ]
     [[ "$output" == *"connexion Claude Code/opencode partagée trouvée : devzone activer ia pour l'utiliser ici"* ]] || false
-    run bash "$DEVZONE" actif ia
+    run bash "$DEVZONE" is-enabled ia
     [ "$status" -ne 0 ]
     [ -z "$output" ]
 }
 
 @test "connexion opencode partagée : signalée à la création de l'état, une seule fois" {
     mkdir -p "$HOME/.local/share/opencode" && echo '{}' >"$HOME/.local/share/opencode/auth.json"
-    run bash "$DEVZONE" actif ia
+    run bash "$DEVZONE" is-enabled ia
     [ "$status" -ne 0 ]
     [[ "$output" == *"connexion Claude Code/opencode partagée trouvée"* ]] || false
-    run bash "$DEVZONE" actif ia
+    run bash "$DEVZONE" is-enabled ia
     [ "$status" -ne 0 ]
     [ -z "$output" ]
 }
@@ -585,7 +585,7 @@ KUBE
     mkdir -p "$HOME/.config/devzone" "$HOME/.claude"
     printf 'ia=on\nkubernetes=on\n' >"$HOME/.config/devzone/modules"
     echo '{}' >"$HOME/.claude/.credentials.json"
-    run bash "$DEVZONE" actif ia
+    run bash "$DEVZONE" is-enabled ia
     [ "$status" -eq 0 ]
     [ -z "$output" ]
 }
@@ -593,7 +593,7 @@ KUBE
 @test "migration : ancien état global repris une fois, source supprimée" {
     mkdir -p "$HOME/.config/devzone"
     printf 'ia=on\nkubernetes=on\n' >"$HOME/.config/devzone/modules"
-    run bash "$DEVZONE" actif ia
+    run bash "$DEVZONE" is-enabled ia
     [ "$status" -eq 0 ]
     [ -f "$DEVZONE_RACINE/.devzone.modules" ]
     [ ! -e "$HOME/.config/devzone/modules" ]
@@ -603,10 +603,10 @@ KUBE
 @test "migration : second devzone (source déjà déplacée) → valeurs par défaut" {
     mkdir -p "$HOME/.config/devzone"
     printf 'ia=on\nkubernetes=on\n' >"$HOME/.config/devzone/modules"
-    bash "$DEVZONE" actif ia
+    bash "$DEVZONE" is-enabled ia
     export DEVZONE_RACINE="$BATS_TEST_TMPDIR/racine2"
     mkdir -p "$DEVZONE_RACINE/workspace"
-    run bash "$DEVZONE" actif ia
+    run bash "$DEVZONE" is-enabled ia
     [ "$status" -ne 0 ]
     [ -f "$DEVZONE_RACINE/.devzone.modules" ]
     grep -qx 'ia=off' "$DEVZONE_RACINE/.devzone.modules"
@@ -614,18 +614,18 @@ KUBE
 }
 
 @test "appliquer : installe ia seulement s'il est actif" {
-    run bash "$DEVZONE" appliquer
+    run bash "$DEVZONE" apply
     [ "$status" -eq 0 ]
     ! grep -q "install -g" "$BATS_TEST_TMPDIR/npm.log" || false
-    bash "$DEVZONE" activer ia
+    bash "$DEVZONE" enable ia
     rm -f "$BATS_TEST_TMPDIR/npm.log"
-    run bash "$DEVZONE" appliquer
+    run bash "$DEVZONE" apply
     grep -q "install -g" "$BATS_TEST_TMPDIR/npm.log"
 }
 
 @test "appliquer : repowarden en retard → installé à la version figée" {
     printf 'repowarden 4.9.2\n' >"$NPM_INSTALLEES"
-    run bash "$DEVZONE" appliquer
+    run bash "$DEVZONE" apply
     [ "$status" -eq 0 ]
     RPW=repowarden
     grep -qx "npm install -g ${RPW}@$REPOWARDEN_FIGE" "$BATS_TEST_TMPDIR/npm.log"
@@ -634,35 +634,35 @@ KUBE
 }
 
 @test "activer ia : garde-fou repowarden branché pour Claude Code et opencode" {
-    run bash "$DEVZONE" activer ia
+    run bash "$DEVZONE" enable ia
     [ "$status" -eq 0 ]
     [[ "$output" == *"garde-fou repowarden actif"* ]] || false
     grep -qx "repowarden agents init --global" "$BATS_TEST_TMPDIR/repowarden.log"
 }
 
 @test "garde-fou : rebranché à chaque appliquer avec ia actif, jamais avec ia désactivé" {
-    bash "$DEVZONE" activer ia
+    bash "$DEVZONE" enable ia
     rm -f "$BATS_TEST_TMPDIR/repowarden.log"
-    bash "$DEVZONE" appliquer
+    bash "$DEVZONE" apply
     grep -qx "repowarden agents init --global" "$BATS_TEST_TMPDIR/repowarden.log"
     rm -f "$BATS_TEST_TMPDIR/repowarden.log"
-    bash "$DEVZONE" desactiver ia
+    bash "$DEVZONE" disable ia
     grep -qx "repowarden agents retirer --global" "$BATS_TEST_TMPDIR/repowarden.log"
     rm -f "$BATS_TEST_TMPDIR/repowarden.log"
-    bash "$DEVZONE" appliquer
+    bash "$DEVZONE" apply
     [ ! -e "$BATS_TEST_TMPDIR/repowarden.log" ]
 }
 
 @test "garde-fou : repowarden absent -> ia activé quand même, commande à lancer" {
     rm "$BATS_TEST_TMPDIR/bin/repowarden"
-    PATH="$BATS_TEST_TMPDIR/bin:/usr/bin:/bin" run bash "$DEVZONE" activer ia
+    PATH="$BATS_TEST_TMPDIR/bin:/usr/bin:/bin" run bash "$DEVZONE" enable ia
     [ "$status" -eq 0 ]
     [[ "$output" == *"garde-fou repowarden non branché"*"repowarden agents init --global"* ]] || false
     grep -q "install -g" "$BATS_TEST_TMPDIR/npm.log"
 }
 
 @test "activer ia : configuration opencode absente -> écrite depuis le modèle" {
-    run bash "$DEVZONE" activer ia
+    run bash "$DEVZONE" enable ia
     [ "$status" -eq 0 ]
     [ -f "$HOME/.config/opencode/opencode.jsonc" ]
     grep -q '^// devzone : configuration opencode par défaut' "$HOME/.config/opencode/opencode.jsonc"
@@ -674,7 +674,7 @@ KUBE
 @test "activer ia : configuration opencode avec le repère et différente -> mise à jour" {
     mkdir -p "$HOME/.config/opencode"
     printf '// devzone : configuration opencode par défaut (ancienne)\n{"model":"ancien"}\n' >"$HOME/.config/opencode/opencode.jsonc"
-    run bash "$DEVZONE" activer ia
+    run bash "$DEVZONE" enable ia
     [ "$status" -eq 0 ]
     grep -q '"model": "opencode/big-pickle"' "$HOME/.config/opencode/opencode.jsonc"
     [[ "$output" == *"opencode : configuration par défaut mise à jour"* ]] || false
@@ -683,7 +683,7 @@ KUBE
 @test "activer ia : configuration opencode avec seulement \$schema -> remplacée" {
     mkdir -p "$HOME/.config/opencode"
     printf '{\n  "$schema": "https://opencode.ai/config.json"\n}\n' >"$HOME/.config/opencode/opencode.jsonc"
-    run bash "$DEVZONE" activer ia
+    run bash "$DEVZONE" enable ia
     [ "$status" -eq 0 ]
     grep -q '^// devzone : configuration opencode par défaut' "$HOME/.config/opencode/opencode.jsonc"
     grep -q '"model": "opencode/big-pickle"' "$HOME/.config/opencode/opencode.jsonc"
@@ -693,14 +693,14 @@ KUBE
 @test "activer ia : configuration opencode sans le repère -> gardée" {
     mkdir -p "$HOME/.config/opencode"
     printf '{"model":"mon-modele"}\n' >"$HOME/.config/opencode/opencode.jsonc"
-    run bash "$DEVZONE" activer ia
+    run bash "$DEVZONE" enable ia
     [ "$status" -eq 0 ]
     [ "$(cat "$HOME/.config/opencode/opencode.jsonc")" = '{"model":"mon-modele"}' ]
     [[ "$output" == *"opencode : configuration personnalisée, gardée"* ]] || false
 }
 
 @test "activer ia : skill devzone posée dans les deux dossiers, avec en-tête YAML" {
-    run bash "$DEVZONE" activer ia
+    run bash "$DEVZONE" enable ia
     [ "$status" -eq 0 ]
     [ -f "$HOME/.claude/skills/devzone/SKILL.md" ]
     [ -f "$HOME/.config/opencode/skills/devzone/SKILL.md" ]
@@ -714,8 +714,8 @@ KUBE
 }
 
 @test "activer ia : skill déjà présente et identique -> pas de nouvelle pose ni mise à jour" {
-    bash "$DEVZONE" activer ia >/dev/null
-    run bash "$DEVZONE" activer ia
+    bash "$DEVZONE" enable ia >/dev/null
+    run bash "$DEVZONE" enable ia
     [ "$status" -eq 0 ]
     [[ "$output" != *"skill devzone posée"* ]] || false
     [[ "$output" != *"skill devzone mise à jour"* ]] || false
@@ -725,7 +725,7 @@ KUBE
     mkdir -p "$HOME/.claude/skills/devzone" "$HOME/.config/opencode/skills/devzone"
     printf '# ma skill personnelle\nmon réglage\n' >"$HOME/.claude/skills/devzone/SKILL.md"
     printf '# ma skill personnelle\nmon réglage\n' >"$HOME/.config/opencode/skills/devzone/SKILL.md"
-    run bash "$DEVZONE" activer ia
+    run bash "$DEVZONE" enable ia
     [ "$status" -eq 0 ]
     [ "$(cat "$HOME/.claude/skills/devzone/SKILL.md")" = '# ma skill personnelle
 mon réglage' ]
@@ -735,10 +735,10 @@ mon réglage' ]
 }
 
 @test "activer ia : skill modifiée mais gardant le repère -> gardée" {
-    bash "$DEVZONE" activer ia >/dev/null
+    bash "$DEVZONE" enable ia >/dev/null
     printf '\nmon réglage\n' >>"$HOME/.claude/skills/devzone/SKILL.md"
     printf '\nmon réglage\n' >>"$HOME/.config/opencode/skills/devzone/SKILL.md"
-    run bash "$DEVZONE" activer ia
+    run bash "$DEVZONE" enable ia
     [ "$status" -eq 0 ]
     [[ "$(cat "$HOME/.claude/skills/devzone/SKILL.md")" == *"mon réglage"* ]] || false
     [[ "$(cat "$HOME/.config/opencode/skills/devzone/SKILL.md")" == *"mon réglage"* ]] || false
@@ -746,8 +746,8 @@ mon réglage' ]
 }
 
 @test "desactiver ia : skill retirée si non modifiée" {
-    bash "$DEVZONE" activer ia >/dev/null
-    run bash "$DEVZONE" desactiver ia
+    bash "$DEVZONE" enable ia >/dev/null
+    run bash "$DEVZONE" disable ia
     [ "$status" -eq 0 ]
     [ ! -f "$HOME/.claude/skills/devzone/SKILL.md" ]
     [ ! -f "$HOME/.config/opencode/skills/devzone/SKILL.md" ]
@@ -755,10 +755,10 @@ mon réglage' ]
 }
 
 @test "desactiver ia : skill personnalisée -> gardée" {
-    bash "$DEVZONE" activer ia >/dev/null
+    bash "$DEVZONE" enable ia >/dev/null
     printf '# personnalisée\n' >"$HOME/.claude/skills/devzone/SKILL.md"
     printf '# personnalisée\n' >"$HOME/.config/opencode/skills/devzone/SKILL.md"
-    run bash "$DEVZONE" desactiver ia
+    run bash "$DEVZONE" disable ia
     [ "$status" -eq 0 ]
     [ -f "$HOME/.claude/skills/devzone/SKILL.md" ]
     [ -f "$HOME/.config/opencode/skills/devzone/SKILL.md" ]

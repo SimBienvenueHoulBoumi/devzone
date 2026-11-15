@@ -229,7 +229,7 @@ attendre_journal() {
     run bash "$DEVZONE"
     [ "$status" -eq 0 ]
     [[ "$output" == *"○ module gitlab"* ]] || false
-    run bash "$DEVZONE" actif gitlab
+    run bash "$DEVZONE" is-enabled gitlab
     [ "$status" -ne 0 ]
 }
 
@@ -480,7 +480,7 @@ attendre_journal() {
 @test "devzone : activer gitlab saute l'installation si prêt et runner en ligne" {
     touch "$BATS_TEST_TMPDIR/namespace"
     mkdir -p "$SECRETS" && echo jeton >"$SECRETS/root-token"
-    FAUX_RUNNERS='[{"id":1}]' run bash "$DEVZONE" activer gitlab
+    FAUX_RUNNERS='[{"id":1}]' run bash "$DEVZONE" enable gitlab
     [ "$status" -eq 0 ]
     [[ "$output" == *"déjà actif, rien à faire"* ]] || false
     ! grep -q "upgrade --install" "$BATS_TEST_TMPDIR/helm.log" || false
@@ -489,7 +489,7 @@ attendre_journal() {
 @test "devzone : activer gitlab : prêt sans runner en ligne → installer (seed, runner)" {
     touch "$BATS_TEST_TMPDIR/namespace"
     mkdir -p "$SECRETS" && echo jeton >"$SECRETS/root-token"
-    run bash "$DEVZONE" activer gitlab
+    run bash "$DEVZONE" enable gitlab
     [ "$status" -eq 0 ]
     [[ "$output" != *"déjà actif, rien à faire"* ]] || false
     grep -Eq -- "helm --kubeconfig [^ ]+ upgrade --install gitlab gitlab/gitlab --version 9.11.16 --namespace devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log"
@@ -499,7 +499,7 @@ attendre_journal() {
     printf 'gitlab=on\n' >"$DEVZONE_ETAT"
     touch "$BATS_TEST_TMPDIR/namespace"
     mkdir -p "$SECRETS" && echo jeton >"$SECRETS/root-token"
-    run bash "$DEVZONE" appliquer
+    run bash "$DEVZONE" apply
     [ "$status" -eq 0 ]
     grep -Eq -- "helm --kubeconfig [^ ]+ upgrade --install gitlab gitlab/gitlab --version 9.11.16 --namespace devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log"
 }
@@ -508,7 +508,7 @@ attendre_journal() {
     printf 'gitlab=on\n' >"$DEVZONE_ETAT"
     touch "$BATS_TEST_TMPDIR/namespace"
     mkdir -p "$SECRETS" && echo jeton >"$SECRETS/root-token"
-    FAUX_RUNNERS='[{"id":1}]' run bash "$DEVZONE" appliquer
+    FAUX_RUNNERS='[{"id":1}]' run bash "$DEVZONE" apply
     [ "$status" -eq 0 ]
     [[ "$output" == *"déjà actif, rien à faire"* ]] || false
     [ ! -e "$BATS_TEST_TMPDIR/helm.log" ]
@@ -516,7 +516,7 @@ attendre_journal() {
 
 @test "devzone appliquer : gitlab désactivé → rien" {
     printf 'gitlab=off\n' >"$DEVZONE_ETAT"
-    run bash "$DEVZONE" appliquer
+    run bash "$DEVZONE" apply
     [ "$status" -eq 0 ]
     [ ! -e "$BATS_TEST_TMPDIR/helm.log" ]
     [ ! -e "$BATS_TEST_TMPDIR/kind.log" ]
@@ -638,7 +638,7 @@ SUDO
     printf 'gitlab=on\n' >"$DEVZONE_ETAT"
     touch "$BATS_TEST_TMPDIR/namespace"
     mkdir -p "$SECRETS" && echo jeton >"$SECRETS/root-token"
-    FAUX_RUNNERS='[{"id":1}]' run bash "$DEVZONE" appliquer
+    FAUX_RUNNERS='[{"id":1}]' run bash "$DEVZONE" apply
     [ "$status" -eq 0 ]
     [[ "$output" == *"déjà actif, rien à faire"* ]] || false
     grep -q 'devzone:gitlab' "$DEVZONE_HOSTS"

@@ -15,7 +15,7 @@ ICI="$(dirname "$0")"
 # shellcheck source=SCRIPTDIR/cluster.sh
 . "$ICI/cluster.sh"
 module=off
-bash "$ICI/devzone" actif kubernetes && module=on
+bash "$ICI/devzone" is-enabled kubernetes && module=on
 
 # DEVZONE_KUBE_SOURCE : tests fonctionnels (jamais le cluster de l'hôte)
 SOURCE="${DEVZONE_KUBE_SOURCE:-$HOME/.kube-host/config}"

@@ -191,13 +191,16 @@ copy_from() {
 # shellcheck source=manage/scripts/argocd-services.sh
 . "$HERE/scripts/argocd-services.sh"
 
-# English command names are accepted, French ones unchanged (#502).
-# A copied devzone may miss the aliases file: then no normalization.
+# English command names are accepted, French ones unchanged and warned (#502,
+# #532). A copied devzone may miss the aliases file: then no normalization.
 # shellcheck source=../.devcontainer/command-aliases.sh
 # shellcheck disable=SC1091
 if [ -f "$ROOT/.devcontainer/command-aliases.sh" ]; then
     . "$ROOT/.devcontainer/command-aliases.sh"
     if [ "$#" -gt 0 ]; then
+        if command -v command_deprecated_warning >/dev/null 2>&1; then
+            command_deprecated_warning "$1"
+        fi
         set -- "$(command_canonical "$1")" "${@:2}"
     fi
 fi

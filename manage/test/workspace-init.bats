@@ -70,7 +70,7 @@ DEVZONE
     [ "$status" -eq 0 ]
     grep -qx "npm install -g ${RPW}@$REPOWARDEN_VERSION" "$JOURNAL"
     grep -qx "repowarden install --global --lang fr" "$JOURNAL"
-    grep -qx "devzone appliquer" "$JOURNAL"
+    grep -qx "devzone apply" "$JOURNAL"
     grep -qxF '/workspaces/projets/*' "$SAFE"
     grep -qF '# >>> devzone prompt >>>' "$HOME/.bashrc"
     grep -qF '# <<< devzone prompt <<<' "$HOME/.bashrc"
@@ -85,10 +85,10 @@ DEVZONE
     [ "$status" -eq 0 ]
     ! grep -q "npm install -g" "$JOURNAL" || false
     [ "$(grep -cF '# >>> devzone prompt >>>' "$HOME/.bashrc")" -eq 1 ]
-    grep -qx "devzone appliquer" "$JOURNAL"
+    grep -qx "devzone apply" "$JOURNAL"
 }
 
-@test "devzone appliquer en échec : les étapes suivantes tournent et done est écrit" {
+@test "devzone apply en échec : les étapes suivantes tournent et done est écrit" {
     export DEVZONE_ECHEC=1
     run bash "$SCRIPT"
     [ "$status" -eq 0 ]

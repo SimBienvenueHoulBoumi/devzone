@@ -87,7 +87,7 @@ GETENT
     printf '#!/usr/bin/env bash\nexit 0\n' >"$BATS_TEST_TMPDIR/bin/curl"
     chmod +x "$BATS_TEST_TMPDIR/bin/npm" "$BATS_TEST_TMPDIR/bin/getent" "$BATS_TEST_TMPDIR/bin/curl"
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
-    bash "$DEVZONE" activer ia >/dev/null 2>&1 || true
+    bash "$DEVZONE" enable ia >/dev/null 2>&1 || true
     cat >"$BATS_TEST_TMPDIR/bin/opencode" <<'OPCODEFAKE'
 #!/usr/bin/env bash
 # Faux opencode. FAKE_OP_ECHEC_MODELS : erreur $FAKE_OP_MESSAGE ; FAKE_OP_RESEAU_MODELS :

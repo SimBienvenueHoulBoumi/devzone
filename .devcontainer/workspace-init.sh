@@ -51,7 +51,7 @@ init_repowarden() {
 }
 
 init_modules() {
-    if devzone appliquer 2>&1; then
+    if devzone apply 2>&1; then
         log "modules applied"
     else
         log "modules incomplete"
