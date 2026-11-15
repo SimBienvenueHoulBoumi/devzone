@@ -31,6 +31,7 @@ create_mode_choose() {
     if reason="$(kube_ready_reason)"; then
         CREATE_MODE=kubernetes
         echo "✔ Kubernetes ready ($(kube_context)): workspace in the cluster"
+        create_mode_existing
         return 0
     fi
     if [ "$option" = kubernetes ]; then
@@ -39,6 +40,20 @@ create_mode_choose() {
     fi
     CREATE_MODE=docker
     echo "⚠ Kubernetes not reachable: $reason. Docker workstation; later: devzone workspace migrate"
+    return 0
+}
+
+# A workspace already installed in the cluster (helm release devzone-workspace,
+# or Argo CD Application devzone-workspace), from any folder: the new folder
+# drives it too, and creation goes on (the start is a helm upgrade, the volumes
+# stay). Notice only.
+create_mode_existing() {
+    local ctx
+    ctx="$(kube_context)"
+    if helm status devzone-workspace --namespace devzone-workspace --kube-context "$ctx" >/dev/null 2>&1 ||
+        kubectl get application.argoproj.io devzone-workspace --namespace devzone-argocd --context "$ctx" >/dev/null 2>&1; then
+        echo "ℹ a devzone workspace already runs in this cluster: this folder drives it too"
+    fi
     return 0
 }
 

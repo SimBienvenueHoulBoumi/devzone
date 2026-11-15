@@ -20,11 +20,15 @@ case "$*" in
     *"cluster-info"*) [ "${FAKE_KUBE_CLUSTER_INFO:-ok}" = ok ] ;;
     *"current-context"*) echo kind-poste ;;
     *"jsonpath"*) echo https://127.0.0.1:6443 ;;
+    *"get application"*) [ "${FAKE_ARGO_APP:-absent}" = present ] ;;
 esac
 KUBECTL
     cat >"$T/bin/helm" <<'HELM'
 #!/usr/bin/env bash
 echo "helm $*" >>"$FAKE_LOG"
+case "$1" in
+    status) [ "${FAKE_HELM_RELEASE:-absent}" = present ] ;;
+esac
 HELM
     chmod +x "$T/bin/kubectl" "$T/bin/helm"
     export PATH="$T/bin:/usr/bin:/bin"
@@ -91,6 +95,40 @@ choose() {
     run bash -c '. "$1"; create_mode_write "$2" kubernetes' _ "$CM" "$T/folder"
     [ "$status" -eq 0 ]
     [ "$(cat "$T/folder/.devzone.modules")" = "workspace=kubernetes" ]
+}
+
+@test "kubernetes chosen, helm release already installed: notice, mode kept" {
+    FAKE_HELM_RELEASE=present
+    export FAKE_HELM_RELEASE
+    choose ""
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"ℹ a devzone workspace already runs in this cluster"* ]] || false
+    [[ "$output" == *"mode=kubernetes"* ]] || false
+    [[ "$(cat "$FAKE_LOG")" == *"helm status devzone-workspace --namespace devzone-workspace --kube-context devzone"* ]] || false
+}
+
+@test "kubernetes chosen, Argo CD Application already there: notice" {
+    FAKE_ARGO_APP=present
+    export FAKE_ARGO_APP
+    choose kubernetes
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"ℹ a devzone workspace already runs in this cluster"* ]] || false
+    [[ "$output" == *"mode=kubernetes"* ]] || false
+}
+
+@test "kubernetes chosen, nothing installed: no notice" {
+    choose ""
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"already runs"* ]] || false
+}
+
+@test "--docker: no look at the workspace in the cluster" {
+    FAKE_HELM_RELEASE=present
+    export FAKE_HELM_RELEASE
+    choose docker
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"already runs"* ]] || false
+    [[ "$(cat "$FAKE_LOG")" != *"helm status"* ]] || false
 }
 
 @test "create_mode_write: earlier workspace= replaced, other lines kept" {

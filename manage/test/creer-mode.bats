@@ -20,11 +20,15 @@ case "$*" in
     *"cluster-info"*) [ "${FAKE_KUBE_CLUSTER_INFO:-ok}" = ok ] ;;
     *"current-context"*) echo kind-poste ;;
     *"jsonpath"*) echo https://127.0.0.1:6443 ;;
+    *"get application"*) [ "${FAKE_ARGO_APP:-absent}" = present ] ;;
 esac
 KUBECTL
     cat >"$T/bin/helm" <<'HELM'
 #!/usr/bin/env bash
 echo "helm $*" >>"$FAKE_LOG"
+case "$1" in
+    status) [ "${FAKE_HELM_RELEASE:-absent}" = present ] ;;
+esac
 HELM
     cat >"$T/bin/docker" <<'DOCKER'
 #!/usr/bin/env bash
@@ -104,4 +108,15 @@ WS
     [ "$status" -eq 1 ]
     [ -f mon/Makefile ]
     [[ "$output" == *"Workspace not started"*"devzone workspace start"* ]] || false
+}
+
+@test "workspace already in the cluster: notice, creation goes on in kubernetes mode" {
+    FAKE_HELM_RELEASE=present
+    export FAKE_HELM_RELEASE
+    run bash "$CLI" mon --gitops none
+    [ "$status" -eq 0 ]
+    [ "$(cat mon/.devzone.modules)" = "workspace=kubernetes" ]
+    [ -f mon/Makefile ]
+    [[ "$output" == *"ℹ a devzone workspace already runs in this cluster: this folder drives it too"* ]] || false
+    [[ "$output" == *"To start the workspace"* ]] || false
 }
