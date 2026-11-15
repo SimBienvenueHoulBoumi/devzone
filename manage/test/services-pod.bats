@@ -152,9 +152,15 @@ admin_setup() {
     mkdir -p "$DEVZONE_SA_DIR"
     printf -- '-----BEGIN CERTIFICATE-----\nCA\n-----END CERTIFICATE-----\n' >"$DEVZONE_SA_DIR/ca.crt"
     : >"$T/devzone.log"
-    # Fake devzone: logs its arguments, keeps a copy of the kubeconfig and of
-    # the state as seen during the run
-    cat >"$T/bin/devzone" <<'DZ'
+    # services-admin.sh runs the devzone beside it (#591): a copy of the script
+    # and of its state helpers in $T/pod, with a fake devzone next to them
+    mkdir -p "$T/pod"
+    cp "$RACINE/.devcontainer/services-admin.sh" "$RACINE/.devcontainer/etat.sh" \
+        "$RACINE/.devcontainer/etat-verrou.sh" "$T/pod/"
+    ADMIN="$T/pod/services-admin.sh"
+    # Fake devzone beside the script: logs its arguments, keeps a copy of the
+    # kubeconfig and of the state as seen during the run
+    cat >"$T/pod/devzone" <<'DZ'
 #!/usr/bin/env bash
 T="$BATS_TEST_TMPDIR"
 echo "devzone $*" >>"$T/devzone.log"
@@ -166,7 +172,24 @@ if [ "${1:-}" != relay-stop ] && [ "${2:-}" != relay-stop ]; then
 fi
 exit 0
 DZ
+    chmod +x "$T/pod/devzone"
+    # Another fake devzone on the PATH: must never be called
+    cat >"$T/bin/devzone" <<'DZPATH'
+#!/usr/bin/env bash
+echo "PATH devzone $*" >>"$BATS_TEST_TMPDIR/path-devzone.log"
+exit 0
+DZPATH
     chmod +x "$T/bin/devzone"
+}
+
+@test "services-admin.sh: the devzone beside the script is called, never the one of the PATH" {
+    admin_setup
+    printf 'cluster=kind-devzone\n' >"$DEVZONE_ETAT"
+    run bash -c 'printf "tok\n" | bash "$0" seed gitlab' "$ADMIN"
+    [ "$status" -eq 0 ]
+    grep -q '^devzone gitlab seed$' "$T/devzone.log"
+    grep -q '^devzone gitlab relay-stop$' "$T/devzone.log"
+    [ ! -e "$T/path-devzone.log" ]
 }
 
 @test "services-admin.sh enable: kubeconfig with the token, two contexts, installer run, everything cleaned" {
@@ -177,6 +200,7 @@ DZ
     [[ "$output" != *"SECRET-TOKEN"* ]] || false
     grep -q '^devzone enable postgres --context x$' "$T/devzone.log"
     grep -q '^devzone postgres relay-stop$' "$T/devzone.log"
+    [ ! -e "$T/path-devzone.log" ]
     grep -q 'token: SECRET-TOKEN' "$T/kubeconfig.copy"
     grep -q 'name: devzone-admin' "$T/kubeconfig.copy"
     grep -q 'name: devzone$' "$T/kubeconfig.copy"

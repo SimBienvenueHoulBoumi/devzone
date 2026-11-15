@@ -99,7 +99,7 @@ gitlab_installer() {
         gitlab_release_adopter
         gitlab_application_apply || return 1
     else
-        echo "▶ Installation du chart GitLab dans $GITLAB_NS…"
+        echo "▶ Installation du chart GitLab dans ${GITLAB_NS}…"
         gitlab_chart_depend
         gitlab_helm_pass 0 || return 1
     fi

@@ -2,6 +2,8 @@
 # manage/scripts/check-english.sh. Add any new code file here.
 .devcontainer/command-aliases.sh
 manage/scripts/check-english.sh
+manage/scripts/check-utf8-vars.sh
+manage/test/check-utf8-vars.bats
 manage/scripts/ci-dns.sh
 manage/scripts/docker.sh
 manage/scripts/kube-ready.sh
