@@ -181,8 +181,6 @@ copy_from() {
 . "$HERE/scripts/workspace-clone.sh"
 # shellcheck source=manage/scripts/workspace-copies.sh
 . "$HERE/scripts/workspace-copies.sh"
-# shellcheck source=manage/scripts/docker-workstation.sh
-. "$HERE/scripts/docker-workstation.sh"
 # shellcheck source=manage/scripts/migrer.sh
 . "$HERE/scripts/migrer.sh"
 # shellcheck source=manage/scripts/migrer-retour.sh

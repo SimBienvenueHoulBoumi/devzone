@@ -4,6 +4,10 @@
 # kubectl_flag, copy_to and copy_from. Nothing is ever deleted except by
 # clean-docker, after confirmation. Run from the devzone workstation folder.
 
+# Docker workstation sleep on migrate (stop here, start in migrer-retour.sh).
+# shellcheck source=manage/scripts/docker-workstation.sh
+. "$(dirname "${BASH_SOURCE[0]}")/docker-workstation.sh"
+
 # vscode home in the pod and image used to copy Docker volumes.
 POD_HOME="/home/vscode"
 COPY_IMAGE="${DEVZONE_IMAGE_COPIE:-busybox:1.36}"
