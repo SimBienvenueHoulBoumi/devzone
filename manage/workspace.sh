@@ -48,10 +48,9 @@ default_image_tag() {
     fi
 }
 
-# Installs or upgrades the workspace in the cluster.
+# Installs or upgrades the workspace in the cluster; the cluster is checked first (#565): no Argo CD, helm or pod wait for a stopped one.
 start_workspace() {
     local repo tag image with_image="" args=()
-    # Why (#565): the cluster first, so no Argo CD, helm or pod wait for a stopped one
     kube_ready_reason --hint >&2 || return 1
     repo="$IMAGE_REPO"
     tag="$(default_image_tag)"
