@@ -54,7 +54,7 @@ spec:
               mountPath: /models
       containers:
         - name: llm
-          image: {{ .Values.image }}
+          image: {{ .Values.image }}:server-{{ .Values.llamaBuild }}
           args:
             - --host
             - 0.0.0.0

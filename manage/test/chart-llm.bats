@@ -51,6 +51,13 @@ render() {
     [[ "$output" == *"memory: 7Gi"* ]] || false
 }
 
+@test "chart devzone-llm: one llamaBuild value gives the server image tag" {
+    run render --set llamaBuild=b99999 --show-only templates/deployment.yaml
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"image: ghcr.io/ggml-org/llama.cpp:server-b99999"* ]] || false
+    [[ "$output" != *"b12407"* ]] || false
+}
+
 @test "chart devzone-llm: readiness probe on GET /health, init container downloads only when missing and checks the sha256" {
     run render --show-only templates/deployment.yaml
     [ "$status" -eq 0 ]

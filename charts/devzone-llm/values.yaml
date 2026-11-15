@@ -1,8 +1,12 @@
 # The one definition of the local model: the helm-direct path installs this
 # chart (.devcontainer/llm/llm.sh) as the release llm. No Secret: the model is
 # public and checked by its sha256.
-# Official llama.cpp server image, CPU, pinned build
-image: ghcr.io/ggml-org/llama.cpp:server-b12407
+# Official llama.cpp image repository (CPU). The tag is derived from llamaBuild:
+# server-<llamaBuild> runs the model, full-<llamaBuild> (llama-bench, only for
+# the bench Job) comes from the same build.
+image: ghcr.io/ggml-org/llama.cpp
+# The one pinned llama.cpp build, shared by the server and the bench images
+llamaBuild: b12407
 # Image of the init container that downloads and checks the model
 fetchImage: curlimages/curl:8.11.1
 # Port of the Service and of llama-server
