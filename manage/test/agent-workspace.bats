@@ -6,6 +6,7 @@
 setup() {
     load commun
     agent_isole
+    unset DEVZONE_WORKSPACE
     faux_kubectl
 }
 
@@ -103,4 +104,23 @@ KUBECTL
     [ ! -s "$FAKE_KC_LOG" ] || false
     [ -z "$(cat "$FAKE_OP_KUBECONFIG_LOG")" ] || false
     [[ "$output" != *"workspace Kubernetes"* ]] || false
+}
+
+@test "agent-workspace : chemin du pod absent du poste -> lancé dans le pod, sans copie du projet" {
+    agent_consigne
+    run bash "$DEVZONE" agent /workspaces/projets/devzone-wt/dz-4242 "$DEVZONE_RACINE/workspace/consigne.txt"
+    [ "$status" -eq 0 ]
+    grep -q -- "test -d /workspaces/projets/devzone-wt/dz-4242" "$FAKE_KC_LOG" || false
+    grep -q -- "cp .*consigne.txt devzone-workspace-0:/tmp/devzone-agent-dz-4242.md" "$FAKE_KC_LOG" || false
+    grep -q -- "_ /workspaces/projets/devzone-wt/dz-4242 /tmp/devzone-agent-dz-4242.md" "$FAKE_KC_LOG" || false
+    [ ! -s "$FAKE_OP_LOG" ] || false
+}
+
+@test "agent-workspace : chemin du pod introuvable dans le pod -> code 2, rien lancé" {
+    agent_consigne
+    export FAKE_KC_TEST_CODE=1
+    run bash "$DEVZONE" agent /workspaces/projets/devzone-wt/dz-999 "$DEVZONE_RACINE/workspace/consigne.txt"
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"introuvable dans le pod"* ]] || false
+    ! grep -q -- "devzone agent" "$FAKE_KC_LOG" || false
 }
