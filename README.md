@@ -40,7 +40,7 @@ Dans les deux cas, rien n'est hébergé : tout tourne sur ta machine. `workspace
 
 ### Prérequis
 
-- **Kubernetes (mode par défaut)** : un cluster Kubernetes 1.30 ou plus qui répond, avec `kubectl` et `helm` sur la machine. Sur Mac et Windows, le plus simple est le cluster de Docker Desktop : *Settings → Kubernetes → Enable Kubernetes*. Dans ce mode, Docker n'est pas nécessaire sur le poste. Détails dans le [workspace Kubernetes](manage/docs/reference.md#workspace-kubernetes).
+- **Kubernetes (mode par défaut)** : un cluster Kubernetes 1.30 ou plus qui répond, avec `kubectl` et `helm` sur la machine. Sur Mac et Windows, le plus simple est le cluster de Docker Desktop : *Settings → Kubernetes → Enable Kubernetes*. devzone lui-même n'a pas besoin de Docker dans ce mode, mais le cluster de Docker Desktop s'arrête avec Docker Desktop (si le cluster ne répond pas, voir [Questions fréquentes](#questions-fréquentes)). Détails dans le [workspace Kubernetes](manage/docs/reference.md#workspace-kubernetes).
 - **Docker (repli)** : Docker Desktop (ou Docker Engine sous Linux). Il sert au poste Docker, qui prend le relais quand aucun cluster ne répond à la création, et il est nécessaire pour lire les volumes à migrer (`devzone workspace migrate`, `devzone workspace revert` pour y retourner).
 - Node et npm (pour `npx` ou l'installation globale).
 - `make` (nécessaire pour `make shell` ; sous Windows sans `make`, voir le tableau « Au quotidien »).
