@@ -561,7 +561,7 @@ commande_du_conteneur() {
         actif | activer | agent | appliquer | argocd | build | catalogue | cluster | clusters | \
             demarrer | desactiver | etat | gitlab | metrics | modules | mots-de-passe | \
             mysql | paquets | plateforme | port | postgres | reparer | test-bash32 | \
-            test-gitlab | utiliser) return 0 ;;
+            test-gitlab | ticket | utiliser) return 0 ;;
         # English names of the container commands (#502)
         is-enabled | enable | disable | apply | catalog | start | status | \
             passwords | packages | platform | repair | use) return 0 ;;
