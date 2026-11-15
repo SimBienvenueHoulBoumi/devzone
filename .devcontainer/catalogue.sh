@@ -203,7 +203,7 @@ catalogue_resume() {
     app_mysql_volumes_inutilises 2>/dev/null || true
 }
 
-# Rubrique applications de devzone etat --json : mêmes champs que modules
+# Rubrique applications de devzone status --json : mêmes champs que modules
 catalogue_json() {
     local app actif etat echec cmd json='[]'
     while IFS= read -r app; do

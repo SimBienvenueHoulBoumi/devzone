@@ -237,7 +237,7 @@ attendre_nohup() {
     [[ "$output" == *"devzone apply"* ]] || false
 }
 
-@test "resume : application installée, relais arrêté, avertit et propose devzone reparer" {
+@test "resume : application installée, relais arrêté, avertit et propose devzone repair" {
     touch "$BATS_TEST_TMPDIR/ns" "$BATS_TEST_TMPDIR/sts" "$BATS_TEST_TMPDIR/ready"
     printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_ETAT"
     run bash "$DEVZONE"
@@ -327,14 +327,14 @@ attendre_nohup() {
     grep -q 'image: mysql:8.4' "$BATS_TEST_TMPDIR/apply.log" || false
 }
 
-@test "devzone catalogue liste les applications" {
+@test "devzone catalog liste les applications" {
     run bash "$DEVZONE" catalog
     [ "$status" -eq 0 ] || false
     [[ "$output" == *"mysql"* ]] || false
     [[ "$output" == *"disponible"* ]] || false
 }
 
-@test "devzone catalogue : l ancien nom francais avertit et donne le meme resultat" {
+@test "devzone catalog : l ancien nom francais avertit et donne le meme resultat" {
     run --separate-stderr bash "$DEVZONE" catalog
     [ "$status" -eq 0 ] || false
     [[ "$stderr" != *"deprecated"* ]] || false

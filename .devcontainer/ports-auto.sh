@@ -36,7 +36,7 @@ garde_veilleur() {
         return 2
     fi
     [ "${DEVZONE_PORTS_AUTO_REEL:-}" = oui ] && return 0
-    echo "devzone : port : veilleur automatique refusé ici : lancer plutôt devzone reparer" >&2
+    echo "devzone : port : veilleur automatique refusé ici : lancer plutôt devzone repair" >&2
     return 2
 }
 

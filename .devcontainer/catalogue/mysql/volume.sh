@@ -64,7 +64,7 @@ mysql_volume() {
         return 0
     fi
     contexte >/dev/null
-    installe || refuse "module inactif : devzone activer mysql"
+    installe || refuse "module inactif : devzone enable mysql"
     claim="$nom"
     [[ "$claim" == *-mysql-0 ]] && claim="${claim%-mysql-0}"
     mysql_installer_claim "$ns" "$claim"

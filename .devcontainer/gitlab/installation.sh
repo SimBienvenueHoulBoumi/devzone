@@ -55,7 +55,7 @@ gitlab_verifier_memoire_cluster() {
         return 2
     fi
     if [ "$memoire" -lt 8388608 ]; then
-        echo "devzone : gitlab : il faut au moins 8 Go de mémoire allouable dans le cluster (disponible : $((memoire / 1048576)) Go) ; agrandir le cluster (Docker Desktop → Settings → Resources) puis relancer : devzone activer gitlab" >&2
+        echo "devzone : gitlab : il faut au moins 8 Go de mémoire allouable dans le cluster (disponible : $((memoire / 1048576)) Go) ; agrandir le cluster (Docker Desktop → Settings → Resources) puis relancer : devzone enable gitlab" >&2
         return 2
     fi
     return 0

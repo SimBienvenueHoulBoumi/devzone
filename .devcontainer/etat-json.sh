@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Sortie machine de devzone etat (--json) : objet JSON stable et versionné.
+# Sortie machine de devzone status (--json) : objet JSON stable et versionné.
 # Sourcé par devzone : réutilise ses fonctions (valeur, description, …), ne
 # réécrit pas etat(). Construit uniquement avec jq (échappement garanti).
 
@@ -91,7 +91,7 @@ etat_json() {
         done <<<"$retards_out"
         count="$(jq 'length' <<<"$outils_retards_json" 2>/dev/null || echo 0)"
         if [ "$count" -gt 0 ]; then
-            outils_commande="devzone appliquer"
+            outils_commande="devzone apply"
         fi
     else
         outils_retards_json="null"
@@ -124,7 +124,7 @@ etat_json() {
                 content="$(cat "$ef" 2>/dev/null || true)"
                 echec_val="$content"
                 etat_val="en échec"
-                commande_val="devzone appliquer"
+                commande_val="devzone apply"
             elif [ "$m" = gitlab ]; then
                 if s="$(bash "$ICI/gitlab/gitlab.sh" status 2>/dev/null)"; then
                     etat_val="$s"
@@ -158,7 +158,7 @@ etat_json() {
             fi
         else
             etat_val="facultatif"
-            commande_val="devzone activer $m"
+            commande_val="devzone enable $m"
         fi
         modules_json="$(jq -c \
             --arg nom "$m" \
@@ -204,7 +204,7 @@ etat_json() {
     esac
     clusters_travail_raw="$travail_ctx"
     if [ "$travail_interne" = true ]; then
-        clusters_commande="devzone utiliser $ctx_hote"
+        clusters_commande="devzone use $ctx_hote"
     fi
 
     if ports_out="$(bash "$ICI/ports.sh" list --json 2>/dev/null)"; then
@@ -232,7 +232,7 @@ etat_json() {
     relais_marque="${DEVZONE_RELAIS_MARQUE:-/tmp/devzone-relais-docker.echec}"
     if [ -f "$relais_marque" ]; then
         msg="$(head -1 "$relais_marque" 2>/dev/null || true)"
-        append_alerte relais_docker "$msg" "devzone reparer"
+        append_alerte relais_docker "$msg" "devzone repair"
     fi
     paquets_marque="${DEVZONE_PAQUETS_MARQUE:-/tmp/devzone-paquets.echec}"
     if [ -f "$paquets_marque" ]; then
@@ -241,7 +241,7 @@ etat_json() {
             [ -n "$n" ] || continue
             paquets_noms="${paquets_noms:+$paquets_noms, }$n"
         done < "$paquets_marque"
-        append_alerte paquets "$paquets_noms" "devzone paquets"
+        append_alerte paquets "$paquets_noms" "devzone packages"
     fi
     wt_out="$(worktrees_absents 2>/dev/null || true)"
     while IFS= read -r chemin; do
@@ -252,7 +252,7 @@ etat_json() {
         append_alerte cluster_distant "cluster distant : $services_cluster — services sur un cluster distant" ""
     fi
     if [ "$travail_interne" = true ]; then
-        append_alerte cluster_interne "cluster de travail : $travail_ctx (cluster interne de devzone)" "devzone utiliser $ctx_hote"
+        append_alerte cluster_interne "cluster de travail : $travail_ctx (cluster interne de devzone)" "devzone use $ctx_hote"
     fi
 
     argocd_repo="$(conf_get argocd repo)"

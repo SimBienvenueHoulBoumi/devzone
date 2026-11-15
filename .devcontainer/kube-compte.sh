@@ -4,7 +4,7 @@
 # ServiceAccount devzone-agent du namespace devzone-system, lié au ClusterRole
 # edit (ni RBAC ni quotas) dans chaque namespace de devzone par un RoleBinding,
 # avec un jeton TokenRequest de 24 h renouvelé au démarrage (demarrage.sh) et
-# par « devzone reparer ». Les installeurs utilisent seuls le contexte
+# par « devzone repair ». Les installeurs utilisent seuls le contexte
 # administrateur (contexte de l hôte dans ~/.kube/hote.config, cluster kind
 # dans ~/.kube/config) ; les shells et les agents n'ont que ~/.kube/config.
 # Bibliothèque sourcée par cluster.sh ; exécutable pour le jeton :
@@ -180,7 +180,7 @@ compte_jeton() {
 }
 
 # Exécution directe : jeton du compte renouvelé au démarrage (demarrage.sh) et
-# par « devzone reparer ». Sans cluster des services choisi : rien à faire.
+# par « devzone repair ». Sans cluster des services choisi : rien à faire.
 # Quand le fichier est sourcé, $0 diffère de BASH_SOURCE : rien ne s'exécute.
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
     if [ "${1:-}" != jeton ]; then

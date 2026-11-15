@@ -2,7 +2,7 @@
 # Rebuild et gitlab (#366, #396) : kind_sans_basculer et
 # kind_creer_sans_basculer (cluster.sh), installation dans le cluster des
 # services sans kind ni bascule de contexte, migration depuis kind-gitlab,
-# échec effacé quand gitlab est prêt (devzone appliquer).
+# échec effacé quand gitlab est prêt (devzone apply).
 # Faux kind, kubectl, helm, docker, curl, setsid et git dans $BATS_TEST_TMPDIR/bin :
 # aucun vrai cluster, aucun vrai kubeconfig. Chaque faux outil journalise ses
 # arguments dans $BATS_TEST_TMPDIR/<outil>.log.

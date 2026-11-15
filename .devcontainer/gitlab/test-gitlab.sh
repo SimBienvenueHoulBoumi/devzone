@@ -105,9 +105,9 @@ lire_jeton() {
 # plateforme de l'utilisateur changée.
 restaurer_plateforme() {
     if [ "$PLATEFORME_AVANT" = gitlab ] && [ -n "$URL_AVANT" ]; then
-        "$DEVZONE_BIN" plateforme gitlab --url "$URL_AVANT" >/dev/null 2>&1
+        "$DEVZONE_BIN" platform gitlab --url "$URL_AVANT" >/dev/null 2>&1
     else
-        "$DEVZONE_BIN" plateforme github >/dev/null 2>&1
+        "$DEVZONE_BIN" platform github >/dev/null 2>&1
     fi
 }
 
@@ -133,11 +133,11 @@ trap nettoyer EXIT
 
 # 1. Module : actif, sinon activé (l'activation installe aussi si besoin).
 etape_module() {
-    if "$DEVZONE_BIN" actif gitlab >/dev/null 2>&1; then
+    if "$DEVZONE_BIN" is-enabled gitlab >/dev/null 2>&1; then
         return 0
     fi
-    if ! "$DEVZONE_BIN" activer gitlab >/dev/null 2>&1; then
-        RAISON="devzone activer gitlab a échoué"
+    if ! "$DEVZONE_BIN" enable gitlab >/dev/null 2>&1; then
+        RAISON="devzone enable gitlab a échoué"
         return 1
     fi
     return 0
@@ -273,8 +273,8 @@ etape_plateforme() {
     }
     TMP_DIRS+=("$d")
     PLATEFORME_CHANGEE=1
-    if ! "$DEVZONE_BIN" plateforme gitlab >/dev/null 2>&1; then
-        RAISON="devzone plateforme gitlab a échoué"
+    if ! "$DEVZONE_BIN" platform gitlab >/dev/null 2>&1; then
+        RAISON="devzone platform gitlab a échoué"
         return 1
     fi
     if ! "$GLAB" repo clone devzone/demo "$d/demo" >/dev/null 2>&1; then
@@ -341,7 +341,7 @@ etape_complet() {
     local restes="" instance namespace conteneurs
     instance="${DEVZONE_INSTANCE:-devzone}"
     namespace="devzone-gitlab${INSTANCE_SUFFIX}"
-    if ! "$DEVZONE_BIN" desactiver gitlab >/dev/null 2>&1; then
+    if ! "$DEVZONE_BIN" disable gitlab >/dev/null 2>&1; then
         restes="$restes désactivation en échec;"
     fi
     if kubectl --context devzone get namespace "$namespace" >/dev/null 2>&1; then

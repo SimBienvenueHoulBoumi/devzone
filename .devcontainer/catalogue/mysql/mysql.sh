@@ -49,7 +49,7 @@ services_secret_mysql() { mysql_secret; }
 # Régénère la vue .password (échec non bloquant)
 regenerer_identifiants() {
     password_regenerer ||
-        echo "devzone : catalogue mysql : identifiants regroupés non mis à jour (devzone mots-de-passe)" >&2
+        echo "devzone : catalogue mysql : identifiants regroupés non mis à jour (devzone passwords)" >&2
 }
 # Raccourci kubectl dans le namespace devzone-mysql
 k() { kubectl --context devzone -n "$NS" "$@"; }
@@ -60,7 +60,7 @@ installe() { compte_admin "$(compte_ctx)" get namespace "$NS" >/dev/null 2>&1; }
 contexte() {
     local c
     c="$(cluster_lu)"
-    [ -n "$c" ] || refuse "aucun cluster choisi : devzone activer mysql"
+    [ -n "$c" ] || refuse "aucun cluster choisi : devzone enable mysql"
     echo "$c"
 }
 # Marque d'échec du module (même schéma que fichier_echec de devzone)
@@ -142,8 +142,8 @@ supprimer_donnees() {
         esac
     fi
     CTX="$(cluster_lu)"
-    [ -n "$CTX" ] || refuse "aucun cluster choisi : devzone activer mysql"
-    installe || refuse "module inactif : devzone activer mysql"
+    [ -n "$CTX" ] || refuse "aucun cluster choisi : devzone enable mysql"
+    installe || refuse "module inactif : devzone enable mysql"
     echo "▶ Suppression de MySQL et de ses volumes sur $CTX…"
     # L'Application part d'abord (#538) : sinon Argo CD recrée le namespace
     catalogue_argocd_delete mysql >/dev/null 2>&1 || true
@@ -164,11 +164,11 @@ etat() {
         return 0
     fi
     if [ "$(k get statefulset mysql -o jsonpath='{.status.readyReplicas}' 2>/dev/null || true)" != 1 ]; then
-        echo "en échec sur $CTX : devzone appliquer"
+        echo "en échec sur $CTX : devzone apply"
         return 0
     fi
     if ! relais_actif mysql; then
-        echo "prêt sur $CTX, relais arrêté : devzone appliquer"
+        echo "prêt sur $CTX, relais arrêté : devzone apply"
         return 0
     fi
     echo "prêt sur $CTX : 127.0.0.1:$MYSQL_PORT, $(nombre_bases) base(s)"
@@ -184,7 +184,7 @@ creer() {
         esac
     done
     CTX="$(contexte)"
-    installe || refuse "module inactif : devzone activer mysql"
+    installe || refuse "module inactif : devzone enable mysql"
     fichier="$SECRETS/$projet.env"
     if [ -z "$nouveau" ] && [ -s "$fichier" ]; then
         mdp="$(sed -n 's/^MYSQL_PASSWORD=//p' "$fichier" 2>/dev/null | tail -1)"
@@ -216,7 +216,7 @@ ENV
 liste() {
     local CTX
     CTX="$(contexte)"
-    installe || refuse "module inactif : devzone activer mysql"
+    installe || refuse "module inactif : devzone enable mysql"
     mysql_admin -N -B -e "SHOW DATABASES" 2>/dev/null |
         grep -vE '^(information_schema|mysql|performance_schema|sys)$' |
         awk 'BEGIN { n = 0 } { printf "  %-30s\n", $1; n++ } END { if (n == 0) print "  (aucune base : devzone mysql create <projet>)" }'
@@ -232,7 +232,7 @@ supprimer() {
         esac
     done
     CTX="$(contexte)"
-    installe || refuse "module inactif : devzone activer mysql"
+    installe || refuse "module inactif : devzone enable mysql"
     if [ -z "$oui" ]; then
         cluster_interactif || refuse "confirmation impossible sans terminal : devzone mysql delete $projet --yes"
         printf 'Supprimer la base %s et son utilisateur ? [o/N] ' "$projet" >&2

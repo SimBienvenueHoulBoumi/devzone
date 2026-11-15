@@ -72,7 +72,7 @@ GETENT
     [ "$status" -eq 0 ]
     [[ "$output" == *"○ module postgres"*"devzone workspace services enable postgres"* ]] || false
     [[ "$output" == *"○ module argocd"*"devzone workspace services enable argocd"* ]] || false
-    [[ "$output" != *"devzone activer postgres"* ]] || false
+    [[ "$output" != *"devzone enable postgres"* ]] || false
 }
 
 @test "status in the pod: postgres off but present in the cluster, active" {

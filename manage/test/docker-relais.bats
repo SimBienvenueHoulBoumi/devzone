@@ -167,5 +167,5 @@ relais_feature() {
     [[ "$output" != *"relais Docker"* ]] || false
     echo "docker exec long coupé (sortie : vide)" >"$DEVZONE_RELAIS_MARQUE"
     run bash "$DEVZONE"
-    [[ "$output" == *"⚠ relais Docker     docker exec long coupé"*"devzone reparer"* ]] || false
+    [[ "$output" == *"⚠ Docker relay     docker exec long coupé"*"devzone repair"* ]] || false
 }

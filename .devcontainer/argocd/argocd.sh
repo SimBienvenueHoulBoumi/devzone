@@ -182,7 +182,7 @@ etat() {
         return 0
     fi
     if ! relais_actif argocd; then
-        echo "prêt, relais arrêté : devzone appliquer"
+        echo "prêt, relais arrêté : devzone apply"
     else
         echo "prêt : https://127.0.0.1:$ARGOCD_PORT"
     fi

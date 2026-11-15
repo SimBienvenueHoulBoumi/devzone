@@ -107,7 +107,7 @@ attendre_nohup() {
 
 @test "postgres : module connu, désactivé par défaut" {
     run bash "$DEVZONE"
-    [[ "$output" == *"○ module postgres"*"devzone activer postgres"* ]] || false
+    [[ "$output" == *"○ module postgres"*"devzone enable postgres"* ]] || false
 }
 
 @test "activer sans terminal : kind dédié créé, PostgreSQL appliqué, relais lancé" {
@@ -421,7 +421,7 @@ attendre_nohup() {
     run --separate-stderr bash "$DEVZONE" enable postgres --context docker-desktop </dev/null
     [ "$status" -eq 0 ]
     [[ "$stderr" != *"deprecated"* ]] || false
-    run --separate-stderr bash "$DEVZONE" activer postgres --contexte docker-desktop </dev/null
+    run --separate-stderr bash "$DEVZONE" enable postgres --contexte docker-desktop </dev/null
     [ "$status" -eq 0 ]
     [[ "$stderr" == *"devzone: \"--contexte\" is deprecated, use \"--context\""* ]] || false
     run --separate-stderr bash "$DEVZONE" cluster docker-desktop --oui </dev/null

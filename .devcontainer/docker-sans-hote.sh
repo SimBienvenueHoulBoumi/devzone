@@ -7,6 +7,6 @@ cat >&2 <<'MESSAGE'
 ✖ Docker du poste non partagé (option docker-hote=off) : docker n'est pas disponible ici.
   Pour lancer des conteneurs, utilise le workspace Kubernetes : devzone workspace
   (docker et Testcontainers y parlent à kubedock, les images sont construites par BuildKit).
-  Pour partager le socket Docker de l'hôte : devzone activer docker-hote, puis make rebuild sur le poste.
+  Pour partager le socket Docker de l'hôte : devzone enable docker-hote, puis make rebuild sur le poste.
 MESSAGE
 exit 1

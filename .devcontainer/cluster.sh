@@ -167,7 +167,7 @@ cluster_menu() {
             i=$((i + 1))
         done
         [ -f "${DEVZONE_KUBE_HOTE:-$HOME/.kube/hote.config}" ] ||
-            echo "  (clusters de l'hôte invisibles : devzone activer kubernetes)"
+            echo "  (clusters de l'hôte invisibles : devzone enable kubernetes)"
     } >&2
     printf 'Numéro [1] : ' >&2
     read -r reponse || reponse=""

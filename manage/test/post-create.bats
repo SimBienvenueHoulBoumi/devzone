@@ -25,7 +25,7 @@ setup() {
 @test "échec de kube-config.sh : message sur la sortie d'erreur et création poursuivie" {
     ligne="$(grep -F 'bash /workspaces/devzone/.devcontainer/kube-config.sh' "$SCRIPT")"
     [[ "$ligne" == *' || '* ]] || false
-    [[ "$ligne" == *'devzone : configuration kube incomplète, réessayer : devzone demarrer'* ]] || false
+    [[ "$ligne" == *'devzone : configuration kube incomplète, réessayer : devzone start'* ]] || false
     [[ "$ligne" == *'>&2'* ]] || false
 }
 

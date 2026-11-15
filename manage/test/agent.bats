@@ -103,7 +103,7 @@ setup() {
     agent_consigne
     agent_lance
     [ "$status" -eq 2 ]
-    [[ "$output" == *"devzone activer ia"* ]] || false
+    [[ "$output" == *"devzone enable ia"* ]] || false
 }
 
 @test "agent : session opencode avec KUBECONFIG dédié, sans hote.config" {

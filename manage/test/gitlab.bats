@@ -158,7 +158,7 @@ CURL
 echo "git $*" >>"$BATS_TEST_TMPDIR/git.log"
 case "$*" in *" push "*) touch "$BATS_TEST_TMPDIR/pousse" ;; esac
 GIT
-    # npm : rien d'installé globalement (devzone appliquer vérifie repowarden)
+    # npm : rien d'installé globalement (devzone apply vérifie repowarden)
     cat >"$BATS_TEST_TMPDIR/bin/npm" <<'NPM'
 #!/usr/bin/env bash
 if [ "${1:-}" = ls ]; then printf '{"dependencies":{}}\n'; fi
@@ -495,7 +495,7 @@ attendre_journal() {
     grep -Eq -- "helm --kubeconfig [^ ]+ upgrade --install gitlab gitlab/gitlab --version 9.11.16 --namespace devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log"
 }
 
-@test "devzone appliquer : gitlab actif, prêt sans runner en ligne → installer" {
+@test "devzone apply : gitlab actif, prêt sans runner en ligne → installer" {
     printf 'gitlab=on\n' >"$DEVZONE_ETAT"
     touch "$BATS_TEST_TMPDIR/namespace"
     mkdir -p "$SECRETS" && echo jeton >"$SECRETS/root-token"
@@ -504,7 +504,7 @@ attendre_journal() {
     grep -Eq -- "helm --kubeconfig [^ ]+ upgrade --install gitlab gitlab/gitlab --version 9.11.16 --namespace devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log"
 }
 
-@test "devzone appliquer : gitlab actif, prêt runner en ligne → pas d'installer" {
+@test "devzone apply : gitlab actif, prêt runner en ligne → pas d'installer" {
     printf 'gitlab=on\n' >"$DEVZONE_ETAT"
     touch "$BATS_TEST_TMPDIR/namespace"
     mkdir -p "$SECRETS" && echo jeton >"$SECRETS/root-token"
@@ -514,7 +514,7 @@ attendre_journal() {
     [ ! -e "$BATS_TEST_TMPDIR/helm.log" ]
 }
 
-@test "devzone appliquer : gitlab désactivé → rien" {
+@test "devzone apply : gitlab désactivé → rien" {
     printf 'gitlab=off\n' >"$DEVZONE_ETAT"
     run bash "$DEVZONE" apply
     [ "$status" -eq 0 ]
@@ -634,7 +634,7 @@ SUDO
     grep -q '^127\.0\.0\.1 localhost$' "$DEVZONE_HOSTS"
 }
 
-@test "devzone appliquer : gitlab actif, prêt → ligne gitlab.localhost posée" {
+@test "devzone apply : gitlab actif, prêt → ligne gitlab.localhost posée" {
     printf 'gitlab=on\n' >"$DEVZONE_ETAT"
     touch "$BATS_TEST_TMPDIR/namespace"
     mkdir -p "$SECRETS" && echo jeton >"$SECRETS/root-token"

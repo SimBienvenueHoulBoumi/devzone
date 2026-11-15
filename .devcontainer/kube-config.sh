@@ -6,7 +6,7 @@
 #   tls-server-name garde le nom attendu par le certificat
 # - ~/.kube/config : clusters kind du conteneur, jamais touché ici
 # KUBECONFIG (devcontainer.json) combine les deux.
-# Module kubernetes (devzone activer kubernetes) : connexion au cluster de
+# Module kubernetes (devzone enable kubernetes) : connexion au cluster de
 # l'hôte et metrics-server seulement s'il est actif ; les contextes kind sont
 # toujours remis (un cluster créé à la main reste utilisable).
 set -euo pipefail

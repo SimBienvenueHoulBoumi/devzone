@@ -58,7 +58,7 @@ app_secret() {
 # Vue regroupée des identifiants : un échec n'empêche jamais l'opération
 regenerer_identifiants() {
     password_regenerer ||
-        echo "devzone : catalogue : identifiants regroupés non mis à jour (devzone mots-de-passe)" >&2
+        echo "devzone : catalogue : identifiants regroupés non mis à jour (devzone passwords)" >&2
 }
 
 # Installe une application : contexte devzone posé (#396), namespace créé et
@@ -71,7 +71,7 @@ app_installer() {
     port="$(app_lire "$app" port)"
     image="$(app_lire "$app" image)"
     CTX="$(cluster_lu)"
-    [ -n "$CTX" ] || refuse "aucun cluster choisi : devzone activer $app"
+    [ -n "$CTX" ] || refuse "aucun cluster choisi : devzone enable $app"
     if ! contexte_devzone_poser "$CTX"; then
         echo "devzone : catalogue : impossible de poser le contexte devzone sur $CTX" >&2
         return 1
@@ -185,7 +185,7 @@ catalogue_appliquer() {
         elif [ "$(voulu "$app")" = on ] && presente "$app"; then
             if ! app_prete "$app"; then
                 code=1
-                echo "devzone : catalogue : $app installé mais pas prêt : devzone appliquer" >&2
+                echo "devzone : catalogue : $app installé mais pas prêt : devzone apply" >&2
                 echo "pas prêt" >"$(fichier_echec "$app")"
             else
                 rm -f "$(fichier_echec "$app")"

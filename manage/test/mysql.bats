@@ -99,7 +99,7 @@ teardown() {
 @test "creer : module inactif refuse" {
     run bash "$MYSQL" create datayer
     [ "$status" -eq 2 ] || false
-    [[ "$output" == *"devzone activer mysql"* ]] || false
+    [[ "$output" == *"devzone enable mysql"* ]] || false
 }
 
 @test "creer : utilisateur, base, .env 600, mot de passe jamais affiche, .password" {
@@ -149,7 +149,7 @@ teardown() {
     [ "$output" = "désactivé" ] || false
     touch "$BATS_TEST_TMPDIR/ns" "$BATS_TEST_TMPDIR/sts" "$BATS_TEST_TMPDIR/ready"
     run bash "$MYSQL" status
-    [ "$output" = "prêt sur kind-devzone, relais arrêté : devzone appliquer" ] || false
+    [ "$output" = "prêt sur kind-devzone, relais arrêté : devzone apply" ] || false
     bash "$MYSQL" relay-start
     attendre_nohup 'svc/mysql 3306:3306$'
     run bash "$MYSQL" status

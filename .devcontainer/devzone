@@ -1,34 +1,5 @@
 #!/usr/bin/env bash
-# Modules facultatifs de devzone, activés à la demande, sans rebuild :
-#   devzone                          état des modules
-#   devzone plateforme               GitHub (défaut) ou GitLab
-#   devzone plateforme github        retour à GitHub : glab et config retirés
-#   devzone plateforme gitlab        GitLab, [--url URL] (défaut : module gitlab)
-#   devzone activer <module>         active et applique tout de suite
-#   devzone desactiver <module>      désactive et applique tout de suite
-#   devzone appliquer                installe ce qui est actif (post-create.sh)
-#   devzone reparer                  répare relais Docker, gitlab, postgres, ports, identifiants
-#   devzone demarrer                 démarrage complet (scripts de démarrage et récapitulatif)
-#   devzone metrics [contexte…]      installe metrics-server (kubectl top, k9s)
-#   devzone utiliser CTX [--confirm CTX]  bascule le cluster de travail de kubectl
-#   devzone clusters                 vue des clusters connectés (travail et services)
-#   devzone actif <module>           code 0 si actif (scripts de démarrage)
-#   devzone test-bash32             lance les tests bats sous bash 3.2 (conteneur Docker)
-#   devzone test-gitlab             essai de bout en bout du module et de la plateforme GitLab
-#   devzone agent <dossier> <fichier-consigne>  dirige opencode sur une consigne
-#   devzone build <dossier> [--tag <nom>]  construit une image dans le workspace Kubernetes (BuildKit)
-#   devzone activer postgres [--context CTX] [--confirm CTX]   PostgreSQL partagé, cluster au choix
-#   devzone postgres creer <projet>  base et utilisateur d'un projet (aussi : liste, psql, supprimer)
-#   devzone mysql creer <projet>    base et utilisateur d'un projet MySQL (aussi : liste, supprimer)
-#   devzone gitlab migrer [--oui]    GitLab dans le cluster des services, puis ancien cluster kind supprimé
-#   devzone gitlab nouveau-mdp [root|dev]  mot de passe aléatoire (root ou dev) régénéré
-#   devzone activer argocd           Argo CD dans le cluster des services, accès https://127.0.0.1:8443
-#   devzone argocd etat|relais-lancer|relais-arreter  Argo CD (module argocd)
-#   devzone argocd app add <repo url> [path]|list|remove <N>  projets déployés par Argo CD (#516)
-#   devzone cluster [CTX] [--yes] [--confirm CTX]  cluster des services de devzone, ou en changer
-#   devzone port [<n>|--fermer <n>]  relais d'un port du conteneur vers le poste
-#   devzone mots-de-passe           régénère .password et affiche son chemin
-#   devzone paquets [ajouter|retirer|appliquer] …  paquets système gardés après un rebuild
+# Aide de devzone (devzone --help) : .devcontainer/help.sh, sourcé ci-dessous.
 #
 # État propre à chaque instance : $RACINE/.devzone.modules (dossier monté
 # de l'hôte, survit aux rebuilds), une ligne « module=on|off » ; la plateforme
@@ -49,6 +20,9 @@ while [ -L "$SOURCE" ]; do
     esac
 done
 ICI="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+# shellcheck source=SCRIPTDIR/help.sh
+# shellcheck disable=SC1091
+. "$ICI/help.sh"
 VERSIONS="$ICI/../manage/scripts/versions.sh"
 # Dossier de devzone (/workspaces/devzone) ; DEVZONE_RACINE pour les tests
 RACINE="${DEVZONE_RACINE:-$(dirname "$ICI")}"
@@ -73,7 +47,7 @@ if [ -f "$ICI/argocd/conf.sh" ]; then
     . "$ICI/argocd/conf.sh"
 fi
 
-# Assistants IA, versions figées : mettre à jour ici, puis devzone appliquer
+# Assistants IA, versions figées : mettre à jour ici, puis devzone apply
 # (ou Rebuild Container). Une ligne par paquet, séparées par une ligne qui ne
 # change pas : deux montées simultanées (workflow versions) se fusionnent sans
 # conflit, git n'en signalant qu'entre lignes voisines modifiées.
@@ -217,7 +191,7 @@ retirer_config_opencode() {
 
 # Repère de la skill devzone : posée si absente, mise à jour si elle porte le
 # repère et n'a pas été modifiée, gardée si personnalisée (#161, règle opencode).
-SKILL_REPERE='<!-- devzone : skill posée par devzone activer ia -->'
+SKILL_REPERE='<!-- devzone : skill posée par devzone enable ia -->'
 # Empreinte de la version posée, à côté de SKILL.md : elle distingue une skill
 # non modifiée d'une skill personnalisée qui garde encore le repère.
 SKILL_EMPREINTE='.devzone-empreinte'
@@ -424,7 +398,7 @@ appliquer_ia() {
         if ! installer_ia; then
             journal="$(dernier_journal_npm)"
             echo "journal npm : $journal" >"$(fichier_echec ia)"
-            echo "devzone : échec de l'installation de ${IA_FAILED[*]} (npm install -g, 3 essais) ; journal npm : $journal ; réessayer : devzone appliquer" >&2
+            echo "devzone : échec de l'installation de ${IA_FAILED[*]} (npm install -g, 3 essais) ; journal npm : $journal ; réessayer : devzone apply" >&2
             return 1
         fi
         rm -f "$(fichier_echec ia)"
@@ -590,7 +564,7 @@ appliquer_postgres() {
 }
 
 # Argo CD (#411) : installé dans le cluster des services, accès par le relais
-# 127.0.0.1:8443 ; un échec est marqué dans l'état et repris par devzone appliquer
+# 127.0.0.1:8443 ; un échec est marqué dans l'état et repris par devzone apply
 appliquer_argocd() {
     local etat_courant
     if [ "$1" = on ]; then
@@ -619,7 +593,7 @@ appliquer_mysql() {
     if [ "$1" = on ]; then
         ctx="$(cluster_lu)"
         if [ -z "$ctx" ]; then
-            echo "devzone : mysql : aucun cluster choisi : devzone activer mysql" >&2
+            echo "devzone : mysql : aucun cluster choisi : devzone enable mysql" >&2
             ecrire mysql off
             echo mysql >"$(fichier_echec mysql)"
             return 2
@@ -812,7 +786,7 @@ ligne_plateforme() {
     fi
 }
 
-# Affichage simple de la plateforme (devzone plateforme)
+# Affichage simple de la plateforme (devzone platform)
 resume_plateforme() {
     local url hote
     if [ "$(plateforme_lue)" = gitlab ]; then
@@ -843,7 +817,7 @@ installer_glab() {
     archive="$(mktemp)"
     if ! curl -fsSL -o "$archive" "https://gitlab.com/gitlab-org/cli/-/releases/$GLAB_VERSION/downloads/glab_${GLAB_VERSION#v}_linux_${arch}.tar.gz"; then
         rm -f "$archive"
-        echo "devzone : téléchargement de glab impossible (release officielle de gitlab.com) ; réessayer : devzone plateforme gitlab --url URL" >&2
+        echo "devzone : téléchargement de glab impossible (release officielle de gitlab.com) ; réessayer : devzone platform gitlab --url URL" >&2
         return 1
     fi
     if [ "$(sha256sum "$archive" | cut -d' ' -f1)" != "$somme" ]; then
@@ -875,12 +849,12 @@ connexion_glab() {
     local hote="$1" url="$2" jeton
     if [ "$url" = "$GITLAB_URL_MODULE" ]; then
         if [ ! -f "$RACINE/workspace/.gitlab/root-token" ]; then
-            echo "devzone : jeton root du module gitlab introuvable ($RACINE/workspace/.gitlab/root-token) : devzone activer gitlab, ou à la main : glab auth login --hostname $hote" >&2
+            echo "devzone : jeton root du module gitlab introuvable ($RACINE/workspace/.gitlab/root-token) : devzone enable gitlab, ou à la main : glab auth login --hostname $hote" >&2
             return 1
         fi
         jeton="$(cat "$RACINE/workspace/.gitlab/root-token")"
         if ! "$GLAB" auth login --hostname "$hote" --api-protocol http --git-protocol http --token "$jeton"; then
-            echo "devzone : connexion à l'instance gitlab impossible : devzone activer gitlab, ou à la main : glab auth login --hostname $hote" >&2
+            echo "devzone : connexion à l'instance gitlab impossible : devzone enable gitlab, ou à la main : glab auth login --hostname $hote" >&2
             return 1
         fi
     elif ! "$GLAB" auth login --hostname "$hote"; then
@@ -912,7 +886,7 @@ changer_plateforme() {
                 if [ -n "$attendre" ]; then url="$arg"; attendre=""; continue; fi
                 case "$arg" in
                     --url) attendre=1 ;;
-                    *) echo "devzone : argument inconnu : $arg (devzone plateforme gitlab --url URL)" >&2; return 1 ;;
+                    *) echo "devzone : argument inconnu : $arg (devzone platform gitlab --url URL)" >&2; return 1 ;;
                 esac
             done
             if [ -n "$attendre" ]; then
@@ -923,7 +897,7 @@ changer_plateforme() {
                 if [ "$(valeur gitlab)" = on ]; then
                     url="$GITLAB_URL_MODULE"
                 else
-                    echo "devzone : URL manquante : devzone plateforme gitlab --url URL (ou un module gitlab actif pour l'instance locale)" >&2
+                    echo "devzone : URL manquante : devzone platform gitlab --url URL (ou un module gitlab actif pour l'instance locale)" >&2
                     return 1
                 fi
             fi
@@ -1060,7 +1034,7 @@ ligne_version_disponible() {
     publiee="${publiee#v}"
     [ -n "$publiee" ] || return 0
     if version_plus_recente "$publiee" "$dossier"; then
-        printf '  ○ devzone %s disponible : sur le poste, devzone mettre-a-jour\n' "$publiee"
+        printf '  ○ devzone %s available: on the workstation, devzone update\n' "$publiee"
     fi
 }
 
@@ -1138,12 +1112,12 @@ utiliser() {
                 ;;
             --confirm=*) confirmer="${arg#*=}" ;;
             -*)
-                echo "devzone : argument inconnu : $arg (devzone utiliser CTX [-n NS] [--confirm CTX])" >&2
+                echo "devzone : argument inconnu : $arg (devzone use CTX [-n NS] [--confirm CTX])" >&2
                 return 2
                 ;;
             *)
                 if [ -n "$ctx" ]; then
-                    echo "devzone : argument inconnu : $arg (devzone utiliser CTX [-n NS] [--confirm CTX])" >&2
+                    echo "devzone : argument inconnu : $arg (devzone use CTX [-n NS] [--confirm CTX])" >&2
                     return 2
                 fi
                 ctx="$arg"
@@ -1152,7 +1126,7 @@ utiliser() {
     done
     if [ -z "$ctx" ]; then
         if [ -z "$namespace" ]; then
-            echo "devzone : contexte manquant : devzone utiliser CTX" >&2
+            echo "devzone : contexte manquant : devzone use CTX" >&2
             return 2
         fi
         courant="$(kubectl config current-context 2>/dev/null || true)"
@@ -1199,14 +1173,14 @@ utiliser() {
 # point à faire avec sa commande (affiché à chaque démarrage)
 etat() {
     local nom email statut m retards chemin ports_etat relais_marque ctx_travail ctx_hote paquets_marque paquets_noms argocd_repo
-    echo "devzone : état (devzone pour le réafficher)"
+    echo "devzone: state (devzone to show it again)"
     ligne_version_disponible
     nom="$(git config --get user.name || true)"
     email="$(git config --get user.email || true)"
     if [ -n "$nom" ] && [ -n "$email" ]; then
-        echo "  ✔ identité git    $nom <$email>"
+        echo "  ✔ git identity    $nom <$email>"
     else
-        echo "  ✖ identité git    nécessaire pour commiter : gh auth login -s workflow (automatique),"
+        echo "  ✖ git identity    needed to commit: gh auth login -s workflow (automatic),"
         echo "                    ou git config --file ~/.config/git/config user.name \"<nom>\" et user.email \"<email>\""
     fi
     if [ "$(plateforme_lue)" = gitlab ]; then
@@ -1216,16 +1190,16 @@ etat() {
         ligne_plateforme
         url="$(url_gitlab_lue)"
         if git config --global --get "credential.$url.helper" 2>/dev/null | grep -q 'glab auth git-credential'; then
-            echo "  ✔ git par glab"
+            echo "  ✔ git via glab"
         else
-            echo "  ⚠ git par glab    à poser : devzone plateforme gitlab"
+            echo "  ⚠ git via glab    to set: devzone platform gitlab"
         fi
         echo "  ○ GitHub          inutile ici (plateforme gitlab choisie)"
         echo "  ⚠ repowarden      reste sur GitHub (bots et tickets) : support GitLab à venir (simdevWarden/repowarden#531)"
     else
         ligne_plateforme
         if ! statut="$(gh auth status 2>&1)"; then
-            echo "  ○ GitHub          facultatif (push et PR, tickets repowarden) : gh auth login -s workflow"
+            echo "  ○ GitHub          optional (push and PR, repowarden tickets) : gh auth login -s workflow"
         elif grep -q "Token scopes:" <<<"$statut" && ! grep -q "'workflow'" <<<"$statut"; then
             echo "  ⚠ GitHub          connecté, sans permission workflow (push de .github/workflows/ refusé) : gh auth refresh -h github.com -s workflow"
         else
@@ -1234,11 +1208,11 @@ etat() {
     fi
     if retards="$(outils_retard)"; then
         if [ -z "$retards" ]; then
-            echo "  ✔ outils          versions figées"
+            echo "  ✔ tools          pinned versions"
         else
             while read -r paquet figee installee; do
                 [ -n "$paquet" ] || continue
-                echo "  ⚠ outils          $paquet $installee installé, $figee figé : devzone appliquer"
+                echo "  ⚠ tools          $paquet $installee installed, $figee pinned: devzone apply"
             done <<<"$retards"
         fi
     fi
@@ -1251,7 +1225,7 @@ etat() {
             # Kubernetes workspace pod (#528): presence by the cluster DNS
             service_ligne_pod "$m"
         elif [ "$(valeur "$m")" = on ] && [ -f "$(fichier_echec "$m")" ]; then
-            printf '  ✖ module %-10s en échec : installation incomplète (%s) : devzone appliquer\n' "$m" "$(cat "$(fichier_echec "$m")")"
+            printf '  ✖ module %-10s failed: incomplete install (%s): devzone apply\n' "$m" "$(cat "$(fichier_echec "$m")")"
         elif [ "$(valeur "$m")" = on ] && [ "$m" = gitlab ]; then
             # GitLab actif : son état réel (prêt, runner, en échec)
             printf '  ✔ module %-10s %s\n' "$m" "$(bash "$ICI/gitlab/gitlab.sh" status)"
@@ -1262,9 +1236,9 @@ etat() {
         elif [ "$(valeur "$m")" = on ] && [ "$m" = mysql ]; then
             printf '  ✔ module %-10s %s\n' "$m" "$(bash "$ICI/catalogue/mysql/mysql.sh" status)"
         elif [ "$(valeur "$m")" = on ]; then
-            printf '  ✔ module %-10s actif : %s\n' "$m" "$(description "$m")"
+            printf '  ✔ module %-10s active: %s\n' "$m" "$(description "$m")"
         else
-            printf '  ○ module %-10s facultatif, %s : devzone activer %s\n' "$m" "$(description "$m")" "$m"
+            printf '  ○ module %-10s optional, %s: devzone enable %s\n' "$m" "$(description "$m")" "$m"
         fi
     done
     # GitOps repository of the instance (#539): the designation of .argocd.conf
@@ -1302,11 +1276,11 @@ etat() {
     # Cluster de devzone distant : avertissement dans le récapitulatif
     cluster_actuel="$(cluster_lu)"
     if [ -n "$cluster_actuel" ] && ! cluster_est_local "$cluster_actuel"; then
-        printf '  ⚠ cluster        distant : %s — services sur un cluster distant\n' "$cluster_actuel"
+        printf '  ⚠ cluster        remote: %s — services on a remote cluster\n' "$cluster_actuel"
     fi
     # Ancien cluster kind-gitlab encore présent : inviter à migrer (#396)
     if kind get clusters 2>/dev/null | grep -qx "gitlab${INSTANCE_SUFFIX}"; then
-        printf '  ⚠ ancien cluster kind-gitlab%s : devzone gitlab migrate\n' "$INSTANCE_SUFFIX"
+        printf '  ⚠ old kind-gitlab cluster%s: devzone gitlab migrate\n' "$INSTANCE_SUFFIX"
     fi
     # Cluster de travail interne (kind) : avertissement dans le recapitulatif
     ctx_travail="$(kubectl config current-context 2>/dev/null || true)"
@@ -1314,7 +1288,7 @@ etat() {
         kind-gitlab* | kind-devzone*)
             ctx_hote="$(KUBECONFIG="${DEVZONE_KUBE_HOTE:-$HOME/.kube/hote.config}" kubectl config current-context 2>/dev/null || true)"
             if [ -n "$ctx_hote" ] && cluster_joignable "$ctx_hote"; then
-                printf '  ⚠ cluster de travail : %s (cluster interne de devzone) ; revenir : devzone utiliser %s\n' "$ctx_travail" "$ctx_hote"
+                printf '  ⚠ cluster de travail : %s (cluster interne de devzone) ; revenir : devzone use %s\n' "$ctx_travail" "$ctx_hote"
             fi
             ;;
     esac
@@ -1325,18 +1299,18 @@ etat() {
     fi
     ports_etat="$(bash "$ICI/ports.sh" resume 2>/dev/null || true)"
     case "$ports_etat" in
-        aucun*) printf '  ○ ports vers le poste %s\n' "$ports_etat" ;;
-        *) printf '  ✔ ports vers le poste %s\n' "$ports_etat" ;;
+        aucun*) printf '  ○ ports to the workstation %s\n' "$ports_etat" ;;
+        *) printf '  ✔ ports to the workstation %s\n' "$ports_etat" ;;
     esac
     # Identifiants regroupés (#332) : le chemin seulement, jamais le contenu
     if [ -f "$RACINE/.password" ]; then
-        printf '  ○ identifiants : %s\n' "$RACINE/.password"
+        printf '  ○ credentials: %s\n' "$RACINE/.password"
     fi
     # Marque posée par docker-relais.sh au démarrage (#293) : docker exec
     # longs coupés, kind et modules en échec
     relais_marque="${DEVZONE_RELAIS_MARQUE:-/tmp/devzone-relais-docker.echec}"
     if [ -f "$relais_marque" ]; then
-        printf '  ⚠ relais Docker     %s : devzone reparer\n' "$(head -1 "$relais_marque")"
+        printf '  ⚠ Docker relay     %s: devzone repair\n' "$(head -1 "$relais_marque")"
     fi
     # Marque posee par paquets.sh a l echec de reapplication (351) : noms des paquets non installes
     paquets_marque="${DEVZONE_PAQUETS_MARQUE:-/tmp/devzone-paquets.echec}"
@@ -1347,7 +1321,7 @@ etat() {
                 paquets_noms="${paquets_noms:+$paquets_noms, }$n"
             fi
         done < "$paquets_marque"
-        echo "  ⚠ paquets         $paquets_noms : devzone paquets"
+        echo "  ⚠ packages         $paquets_noms: devzone packages"
     fi
 }
 
@@ -1473,7 +1447,7 @@ case "${1:-}" in
             echo "devzone : identifiants regroupés non mis à jour" >&2
         bash "$ICI/password.sh" chemin
         ;;
-    -h | --help | aide) awk 'NR==1{next} /^#$/{exit} /^#/{sub(/^# ?/,""); print; next} {exit}' "${BASH_SOURCE[0]}" ;;
+    -h | --help | aide) devzone_aide ;;
     test-bash32) bash "$RACINE/manage/test/bash32.sh" ;;
     test-gitlab) DEVZONE_ETAT="$ETAT" bash "$ICI/gitlab/test-gitlab.sh" "${@:2}" ;;
     plateforme)

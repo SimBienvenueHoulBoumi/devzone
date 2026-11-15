@@ -13,6 +13,7 @@ setup() {
     export DEVZONE_ETAT="$T/modules"
     mkdir -p "$T/app/gitlab" "$T/app/postgres" "$T/app/catalogue/mysql" "$T/bin" "$DEVZONE_RACINE"
     cp "$RACINE_TEST/.devcontainer/devzone" "$APP"
+    cp "$RACINE_TEST/.devcontainer/help.sh" "$T/app/help.sh"
     cp "$RACINE_TEST/.devcontainer/cluster.sh" "$T/app/cluster.sh"
     cp "$RACINE_TEST/.devcontainer/etat.sh" "$T/app/etat.sh"
     cp "$RACINE_TEST/.devcontainer/etat-verrou.sh" "$T/app/etat-verrou.sh"
@@ -88,7 +89,7 @@ KUBE
 
 @test "conception : devzone est l'application et la doc n'expose plus les scripts" {
     aide="$(bash "$APP" --help)"
-    for commande in reparer demarrer metrics utiliser; do
+    for commande in repair start metrics use; do
         [[ "$aide" == *"devzone $commande"* ]] || { echo "aide : $commande absente"; false; }
     done
     for fichier in README.md manage/docs/reference.md; do

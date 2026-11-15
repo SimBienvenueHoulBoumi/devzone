@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # JSON output of the port relays (#557) : the array
-# [{port,actif,application,auto}] read by the tools (devzone etat --json).
+# [{port,actif,application,auto}] read by the tools (devzone status --json).
 # Sourced by ports.sh, which holds the functions used here.
 
 # JSON list of the relays of the state : jq only

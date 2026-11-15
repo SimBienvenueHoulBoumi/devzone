@@ -39,17 +39,17 @@ setup() {
 #!/usr/bin/env bash
 echo "devzone $*" >>"$BATS_TEST_TMPDIR/devzone.log"
 case "$1 $2" in
-    "actif gitlab")
+    "is-enabled gitlab")
         [ -f "$BATS_TEST_TMPDIR/module_actif" ]
         exit $?
         ;;
-    "activer gitlab")
+    "enable gitlab")
         [ -n "${FAUX_ACTIVER_KO:-}" ] && exit 1
         touch "$BATS_TEST_TMPDIR/module_actif" "$BATS_TEST_TMPDIR/namespace"
         mkdir -p "$DEVZONE_RACINE/workspace/.gitlab"
         printf 'jeton-root-secret' >"$DEVZONE_RACINE/workspace/.gitlab/root-token"
         ;;
-    "desactiver gitlab")
+    "disable gitlab")
         [ -n "${FAUX_DESACTIVER_KO:-}" ] && exit 1
         rm -f "$BATS_TEST_TMPDIR/module_actif"
         if [ "${FAUX_DESACTIVER_LAISSE:-}" != namespace ]; then
@@ -63,7 +63,7 @@ case "$1 $2" in
             mv "$DEVZONE_HOSTS.tmp" "$DEVZONE_HOSTS"
         fi
         ;;
-    "plateforme gitlab")
+    "platform gitlab")
         [ -n "${FAUX_PLATEFORME_KO:-}" ] && exit 1
         mkdir -p "$HOME/.local/bin" "$HOME/.config/glab-cli"
         cp "$BATS_TEST_TMPDIR/bin/glab" "$HOME/.local/bin/glab"
@@ -72,7 +72,7 @@ case "$1 $2" in
         mv "$DEVZONE_ETAT.tmp" "$DEVZONE_ETAT"
         printf 'plateforme=gitlab\ngitlab_url=http://gitlab.localhost:8929\n' >>"$DEVZONE_ETAT"
         ;;
-    "plateforme github")
+    "platform github")
         rm -f "$HOME/.local/bin/glab"
         rm -rf "$HOME/.config/glab-cli"
         grep -vE '^(plateforme|gitlab_url)=' "$DEVZONE_ETAT" >"$DEVZONE_ETAT.tmp" 2>/dev/null || true
@@ -335,7 +335,7 @@ GETENT
     run bash "$SCRIPT"
     [ "$status" -ne 0 ]
     [[ "$output" == *"✖ 1. module"* ]] || false
-    [[ "$output" == *"devzone activer gitlab a échoué"* ]] || false
+    [[ "$output" == *"devzone enable gitlab a échoué"* ]] || false
 }
 
 @test "test-gitlab : étape 2 en échec (runner hors ligne) → ✖ avec la raison" {
@@ -461,7 +461,7 @@ GETENT
     run bash "$SCRIPT"
     [ "$status" -ne 0 ]
     [[ "$output" == *"✖ 6. plateforme"* ]] || false
-    [[ "$output" == *"devzone plateforme gitlab a échoué"* ]] || false
+    [[ "$output" == *"devzone platform gitlab a échoué"* ]] || false
 }
 
 @test "test-gitlab : étape 6, glab clone impossible → ✖, plateforme d'avant restaurée" {
@@ -512,7 +512,7 @@ GETENT
     run bash "$SCRIPT" --complet
     [ "$status" -eq 0 ]
     [[ "$output" == *"✔ 8. complet : désactivation"* ]] || false
-    grep -q "devzone desactiver gitlab" "$BATS_TEST_TMPDIR/devzone.log" || false
+    grep -q "devzone disable gitlab" "$BATS_TEST_TMPDIR/devzone.log" || false
     grep -q "label=devzone.instance=mon-devzone" "$BATS_TEST_TMPDIR/docker.log" || false
     grep -q "kubectl --context devzone get namespace devzone-gitlab-mon-devzone" "$BATS_TEST_TMPDIR/kubectl.log" || false
     [ -f "$BATS_TEST_TMPDIR/module_actif" ]

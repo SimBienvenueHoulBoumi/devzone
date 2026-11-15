@@ -3,11 +3,11 @@ name: devzone
 description: Utiliser pour travailler dans un conteneur devzone — modules et catalogue, devzone agent, worktrees, garde-fou.
 ---
 
-<!-- devzone : skill posée par devzone activer ia -->
+<!-- devzone : skill posée par devzone enable ia -->
 
 # Skill devzone (assistants IA)
 
-Cette skill est pour Claude Code (lead) et opencode (développeur) dans un conteneur devzone. Elle est posée par `devzone activer ia` dans `~/.claude/skills/devzone/` et `~/.config/opencode/skills/devzone/` (volumes, gardés aux rebuilds). Pour la personnaliser sans qu'elle soit remplacée, retirer la ligne repère ci-dessus.
+Cette skill est pour Claude Code (lead) et opencode (développeur) dans un conteneur devzone. Elle est posée par `devzone enable ia` dans `~/.claude/skills/devzone/` et `~/.config/opencode/skills/devzone/` (volumes, gardés aux rebuilds). Pour la personnaliser sans qu'elle soit remplacée, retirer la ligne repère ci-dessus.
 
 ## Règle d'or
 
@@ -23,20 +23,20 @@ Les projets vivent dans `workspace/` ; les worktrees des tickets sous `workspace
 
 Les modules sont désactivés par défaut, activés à la demande, sans rebuild :
 
-- `devzone activer ia` : Claude Code et opencode (versions figées), garde-fou repowarden, configuration opencode par défaut. Se connecter ensuite : `claude` (puis `/login`), `opencode auth login`.
-- `devzone desactiver ia` : désinstalle les assistants ; retire le garde-fou et la configuration opencode par défaut ; garde l'état de `devzone agent`, les journaux `workspace/.agents/` et les connexions.
-- `devzone activer kubernetes` : se connecte au cluster de la machine à chaque démarrage et installe metrics-server sur les clusters locaux.
-- `devzone activer gitlab` : installe GitLab de test dans le cluster des services (namespace `devzone-gitlab*`).
-- `devzone activer postgres` : PostgreSQL partagé, une base par projet (`devzone postgres creer <projet>`).
-- `devzone activer mysql` : MySQL partagé du catalogue, une base par projet.
-- `devzone activer argocd` : Argo CD du cluster des services, interface dans le conteneur sur https://127.0.0.1:8443.
-- `devzone desactiver docker-hote` : retire le socket Docker de l'hôte (puis `make rebuild` sur le poste) ; `devzone activer docker-hote` le remet.
-- `devzone desactiver <module>` : désactive et applique tout de suite.
-- `devzone appliquer` : installe ce qui est actif.
-- `devzone reparer` : relance relais Docker, gitlab, postgres, mysql, argocd, ports étiquetés et le veilleur du catalogue.
-- `devzone etat --json` : récapitulatif complet en JSON, pour les outils (aucun secret, commande à lancer par point à traiter).
+- `devzone enable ia` : Claude Code et opencode (versions figées), garde-fou repowarden, configuration opencode par défaut. Se connecter ensuite : `claude` (puis `/login`), `opencode auth login`.
+- `devzone disable ia` : désinstalle les assistants ; retire le garde-fou et la configuration opencode par défaut ; garde l'état de `devzone agent`, les journaux `workspace/.agents/` et les connexions.
+- `devzone enable kubernetes` : se connecte au cluster de la machine à chaque démarrage et installe metrics-server sur les clusters locaux.
+- `devzone enable gitlab` : installe GitLab de test dans le cluster des services (namespace `devzone-gitlab*`).
+- `devzone enable postgres` : PostgreSQL partagé, une base par projet (`devzone postgres create <projet>`).
+- `devzone enable mysql` : MySQL partagé du catalogue, une base par projet.
+- `devzone enable argocd` : Argo CD du cluster des services, interface dans le conteneur sur https://127.0.0.1:8443.
+- `devzone disable docker-hote` : retire le socket Docker de l'hôte (puis `make rebuild` sur le poste) ; `devzone enable docker-hote` le remet.
+- `devzone disable <module>` : désactive et applique tout de suite.
+- `devzone apply` : installe ce qui est actif.
+- `devzone repair` : relance relais Docker, gitlab, postgres, mysql, argocd, ports étiquetés et le veilleur du catalogue.
+- `devzone status --json` : récapitulatif complet en JSON, pour les outils (aucun secret, commande à lancer par point à traiter).
 
-Le catalogue d'applications se consulte avec `devzone catalogue` ; un veilleur applique à chaud les changements de `.devzone.modules`, et `devzone reparer` le relance. MySQL se pilote avec `devzone mysql creer <projet>`, `devzone mysql liste`, `devzone mysql supprimer <projet>`, `devzone mysql volume [<nom>|--supprimer <nom>]` et `devzone mysql supprimer-donnees` (données gardées par défaut).
+Le catalogue d'applications se consulte avec `devzone catalog` ; un veilleur applique à chaud les changements de `.devzone.modules`, et `devzone repair` le relance. MySQL se pilote avec `devzone mysql create <projet>`, `devzone mysql list`, `devzone mysql delete <projet>`, `devzone mysql volume [<nom>|--supprimer <nom>]` et `devzone mysql delete-data` (données gardées par défaut).
 
 Le choix est propre à chaque devzone, gardé dans `.devzone.modules` du dossier devzone.
 
