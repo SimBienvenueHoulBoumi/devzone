@@ -96,6 +96,7 @@ teardown() {
     grep -q 'qwen2.5-coder-3b-instruct-q4_k_m.gguf' "$BATS_TEST_TMPDIR/apply.log"
     grep -q 'memory: 4Gi' "$BATS_TEST_TMPDIR/apply.log"
     grep -q 'model.sha256=724fb256' "$BATS_TEST_TMPDIR/helm.log"
+    grep -q 'contextSize=16384' "$BATS_TEST_TMPDIR/helm.log"
     [ "$(cat "$DEVZONE_RACINE/workspace/.llm/preset")" = light ]
 }
 

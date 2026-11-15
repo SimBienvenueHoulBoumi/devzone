@@ -64,6 +64,12 @@ spec:
             - /models/{{ .Values.model.file }}
             - -c
             - {{ .Values.contextSize | quote }}
+            - --cache-type-k
+            - {{ .Values.cacheType | quote }}
+            - --cache-type-v
+            - {{ .Values.cacheType | quote }}
+            - --flash-attn
+            - {{ .Values.flashAttention | quote }}
             - -t
             - {{ .Values.threads | quote }}
           ports:

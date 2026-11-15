@@ -36,7 +36,7 @@ llm_preset_sets() {
                 509287f78cb4d4cf6b3843734733b914b2c158e43e22a7f4bf5e963800894d3c
             ;;
         light)
-            printf 'model.url=%s/%s model.file=%s model.sha256=%s memory=3Gi resources.limits.memory=4Gi' \
+            printf 'model.url=%s/%s model.file=%s model.sha256=%s memory=3Gi resources.limits.memory=4Gi contextSize=16384' \
                 "$LLM_HF_3B" "$file" "$file" 724fb256bec1ff062b2f65e4569e871ad2e95ab2a3989723d1769c54294730b7
             ;;
     esac

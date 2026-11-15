@@ -36,7 +36,12 @@ render() {
     [[ "$output" == *"image: ghcr.io/ggml-org/llama.cpp:server-b12407"* ]] || false
     [[ "$output" == *"replicas: 1"* ]] || false
     [[ "$output" == *"- /models/qwen2.5-coder-7b-instruct-q4_k_m.gguf"* ]] || false
-    [[ "$output" == *'- "8192"'* ]] || false
+    [[ "$output" == *'- "32768"'* ]] || false
+    [[ "$output" == *"--cache-type-k"* ]] || false
+    [[ "$output" == *"--cache-type-v"* ]] || false
+    [ "$(grep -c -- '- "q8_0"' <<<"$output")" -eq 2 ]
+    [[ "$output" == *"--flash-attn"* ]] || false
+    [[ "$output" == *'- "on"'* ]] || false
     [[ "$output" == *'- "4"'* ]] || false
     [[ "$output" == *"--host"* ]] || false
     [[ "$output" == *"0.0.0.0"* ]] || false
@@ -77,11 +82,12 @@ render() {
 @test "chart devzone-llm: the light preset (3B) comes from --set" {
     run render --set model.file=qwen2.5-coder-3b-instruct-q4_k_m.gguf \
         --set model.sha256=724fb256bec1ff062b2f65e4569e871ad2e95ab2a3989723d1769c54294730b7 \
-        --set memory=3Gi --set resources.limits.memory=4Gi --show-only templates/deployment.yaml
+        --set memory=3Gi --set resources.limits.memory=4Gi --set contextSize=16384 --show-only templates/deployment.yaml
     [ "$status" -eq 0 ]
     [[ "$output" == *"- /models/qwen2.5-coder-3b-instruct-q4_k_m.gguf"* ]] || false
     [[ "$output" == *"memory: 3Gi"* ]] || false
     [[ "$output" == *"memory: 4Gi"* ]] || false
+    [[ "$output" == *'- "16384"'* ]] || false
     [[ "$output" != *"memory: 7Gi"* ]] || false
 }
 
