@@ -81,6 +81,8 @@ services_argocd_toggle() {
                 echo "✖ $svc through Argo CD takes no option (got: $*)" >&2
                 return 1
             fi
+            # Before [services] is written: a refused chart leaves the state unchanged
+            chart_require "$svc" || return $?
             echo "▶ $svc as an Argo CD Application (charts/devzone-$svc at $(argocd_revision))…"
             services_note "$svc" on
             services_reconcile

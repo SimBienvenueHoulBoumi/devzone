@@ -88,6 +88,7 @@ catalogue_argocd_active() {
 catalogue_argocd_apply() {
     local app="$1" ns="$2" image="$3" port="$4" memory="$5" size="$6" params extra="${7:-}"
     catalogue_argocd_load
+    chart_require "$app" || return $?
     params="image=$image port=$port memory=$memory size=$size"
     [ -n "$extra" ] && params="$params $extra"
     # shellcheck disable=SC2086
