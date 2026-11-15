@@ -18,7 +18,7 @@ clusters_afficher() {
     done < <(kubectl config get-contexts -o name 2>/dev/null || true)
 
     if [ "${#contextes[@]}" -eq 0 ]; then
-        echo "aucun cluster : kind create cluster, ou devzone activer kubernetes"
+        echo "aucun cluster : kind create cluster, ou devzone enable kubernetes"
         return 0
     fi
 

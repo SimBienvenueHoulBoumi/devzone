@@ -111,6 +111,33 @@ NPM
     [[ "$output" == *"aucun paquet"* ]] || false
 }
 
+@test "paquets : l alias francais donne le meme resultat que le nom anglais, avec l avertissement" {
+    run --separate-stderr bash "$DEVZONE" packages add tree
+    [ "$status" -eq 0 ]
+    [[ "$stderr" != *"deprecated"* ]] || false
+    grep -qx "tree" "$DEVZONE_RACINE/.devzone.paquets"
+    run --separate-stderr bash "$DEVZONE" packages remove tree
+    [ "$status" -eq 0 ]
+    [[ "$stderr" != *"deprecated"* ]] || false
+    run --separate-stderr bash "$DEVZONE" packages ajouter tree
+    [ "$status" -eq 0 ]
+    [[ "$stderr" == *"devzone: \"ajouter\" is deprecated, use \"add\""* ]] || false
+    grep -qx "tree" "$DEVZONE_RACINE/.devzone.paquets"
+    run --separate-stderr bash "$DEVZONE" packages retirer tree
+    [ "$status" -eq 0 ]
+    [[ "$stderr" == *"devzone: \"retirer\" is deprecated, use \"remove\""* ]] || false
+    [ "$(grep -v '^#' "$DEVZONE_RACINE/.devzone.paquets")" = "" ]
+}
+
+@test "paquets : le nom anglais des sous-commandes ne donne aucun avertissement" {
+    run --separate-stderr bash "$DEVZONE" packages list
+    [ "$status" -eq 0 ]
+    [[ "$stderr" != *"deprecated"* ]] || false
+    run --separate-stderr bash "$DEVZONE" packages apply
+    [ "$status" -eq 0 ]
+    [[ "$stderr" != *"deprecated"* ]] || false
+}
+
 @test "paquets : ajouter valide installe et ajoute a la liste" {
     run bash "$DEVZONE" packages ajouter tree
     [ "$status" -eq 0 ]
@@ -169,8 +196,8 @@ NPM
     [ -f "$DEVZONE_PAQUETS_MARQUE" ]
     run bash "$DEVZONE"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"⚠ paquets"* ]] || false
-    [[ "$output" == *"devzone paquets"* ]] || false
+    [[ "$output" == *"⚠ packages"* ]] || false
+    [[ "$output" == *"devzone packages"* ]] || false
 }
 
 @test "paquets : ajouter valide fait apt-get update avant apt-get install" {

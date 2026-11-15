@@ -100,11 +100,11 @@ EOF
 }
 
 # Ingress of the GitLab namespace opened to the devzone namespaces (Argo CD
-# repo-server among them): same rule as devzone postgres autoriser
+# repo-server among them): same rule as devzone postgres authorize
 apps_gitlab_allow_argocd() {
     argocd_kubectl -n "$APPS_GITLAB_NS" patch networkpolicy devzone-meme-namespace --type merge \
         -p '{"spec":{"ingress":[{"from":[{"podSelector":{},"namespaceSelector":{"matchLabels":{"app.kubernetes.io/managed-by":"devzone"}}}]}]}}' >/dev/null 2>&1 ||
-        echo "⚠ NetworkPolicy of $APPS_GITLAB_NS not opened to Argo CD: devzone postgres autoriser $APPS_NS, or the sync will fail" >&2
+        echo "⚠ NetworkPolicy of $APPS_GITLAB_NS not opened to Argo CD: devzone postgres authorize $APPS_NS, or the sync will fail" >&2
 }
 
 # One [app N] of .argocd.conf applied: Secret when a token exists, then the Application

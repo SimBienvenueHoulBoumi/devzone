@@ -191,14 +191,14 @@ SS
     [ ! -s "$BATS_TEST_TMPDIR/socat.log" ]
 }
 
-@test "veilleur : refus sans le contexte réel, message devzone reparer (code 2)" {
+@test "veilleur : refus sans le contexte réel, message devzone repair (code 2)" {
     # bats posé aussi : garantit que le message de refus réel est atteignable
     run env -u BATS_TEST_TMPDIR bash "$PORTS_AUTO" boucle
     [ "$status" -eq 2 ]
-    [[ "$output" == *"devzone reparer"* ]] || false
+    [[ "$output" == *"devzone repair"* ]] || false
     run env -u BATS_TEST_TMPDIR bash "$PORTS_AUTO" demarrer
     [ "$status" -eq 2 ]
-    [[ "$output" == *"devzone reparer"* ]] || false
+    [[ "$output" == *"devzone repair"* ]] || false
     [ ! -e "$DEVZONE_PORTS_AUTO_DIR/devzone/verrou" ]
 }
 

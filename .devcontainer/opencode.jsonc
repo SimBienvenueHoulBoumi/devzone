@@ -1,4 +1,4 @@
-// devzone : configuration opencode par défaut (devzone activer ia la tient à jour ; retirer cette ligne pour la personnaliser)
+// devzone : configuration opencode par défaut (devzone enable ia la tient à jour ; retirer cette ligne pour la personnaliser)
 {
   "$schema": "https://opencode.ai/config.json",
   // Modèles gratuits de la version d'opencode fixée par devzone.

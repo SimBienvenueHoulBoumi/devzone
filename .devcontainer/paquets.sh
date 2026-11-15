@@ -4,10 +4,10 @@
 # par ligne, triés, sans doublon), réinstallée à chaque création du conteneur
 # (post-create.sh). Un paquet installé à la main est perdu par un rebuild, sauf
 # s'il est dans cette liste.
-#   paquets.sh ou paquets.sh lister      liste avec l'état de chaque paquet
-#   paquets.sh ajouter <nom>…            valide, installe, ajoute à la liste
-#   paquets.sh retirer <nom>…            retire de la liste et désinstalle (sauf paquet de l'image)
-#   paquets.sh appliquer                 installe tout ce qui manque (post-create.sh)
+#   paquets.sh ou paquets.sh list        liste avec l'état de chaque paquet
+#   paquets.sh add <nom>…                valide, installe, ajoute à la liste
+#   paquets.sh remove <nom>…             retire de la liste et désinstalle (sauf paquet de l'image)
+#   paquets.sh apply                     installe tout ce qui manque (post-create.sh)
 # L'état d'un paquet vient de dpkg-query -W -f='${Status}' ; les commandes
 # système passent par des variables surchargeables pour les tests (sudo, apt-get,
 # apt-cache, dpkg-query, marque, horodatage). Compatible bash 3.2 (macOS).
@@ -23,8 +23,21 @@ APT="${DEVZONE_PAQUETS_APT:-apt-get}"
 APTCACHE="${DEVZONE_PAQUETS_APTCACHE:-apt-cache}"
 DPKGQUERY="${DEVZONE_PAQUETS_DPKG_QUERY:-dpkg-query}"
 FORMAT="-f=\${Status}"
-ENTETE="# paquets ajoutés par devzone paquets ; réinstallés à chaque création du conteneur"
+ENTETE="# paquets ajoutés par devzone packages add ; réinstallés à chaque création du conteneur"
 PRESENT="# déjà présent"
+
+# English command names are accepted (#557) : a copied script may miss the file
+# shellcheck source=SCRIPTDIR/command-aliases.sh
+# shellcheck disable=SC1091
+if [ -f "$ICI/command-aliases.sh" ]; then
+    . "$ICI/command-aliases.sh"
+fi
+# Subcommand and options become their canonical English names ; the old
+# French names warn on use (#557)
+if command -v canonical_args >/dev/null 2>&1; then
+    canonical_args packages "$@"
+    set -- "${ARGS_CANONICAL[@]+"${ARGS_CANONICAL[@]}"}"
+fi
 
 refuse() { echo "devzone : paquets : $*" >&2; exit 1; }
 
@@ -91,7 +104,7 @@ lister() {
     local paquets paquet
     paquets="$(noms_liste)"
     if [ -z "$paquets" ]; then
-        echo "aucun paquet (devzone paquets ajouter <nom>)"
+        echo "aucun paquet (devzone packages add <nom>)"
         return 0
     fi
     while IFS= read -r paquet; do
@@ -110,11 +123,11 @@ ajouter() {
     local arg nom ligne deja=""
     for arg in "$@"; do
         case "$arg" in
-            -*) refuse "argument inconnu : $arg (devzone paquets ajouter <nom>…)" ;;
+            -*) refuse "argument inconnu : $arg (devzone packages add <nom>…)" ;;
             *) a+=("$arg") ;;
         esac
     done
-    [ "${#a[@]}" -gt 0 ] || refuse "ajouter attend au moins un nom : devzone paquets ajouter <nom>…"
+    [ "${#a[@]}" -gt 0 ] || refuse "ajouter attend au moins un nom : devzone packages add <nom>…"
     maj_index || echo "index apt non mis à jour" >&2
     for nom in "${a[@]}"; do
         if ! "$APTCACHE" show "$nom" >/dev/null 2>&1; then
@@ -138,7 +151,7 @@ ajouter() {
             case " $deja " in
                 *" $nom "*)
                     entrees+=("$nom $PRESENT")
-                    echo "$nom : déjà présent avant devzone paquets (marqué ; retirer le laissera installé)"
+                    echo "$nom : déjà présent avant devzone packages (marqué ; retirer le laissera installé)"
                     ;;
                 *) entrees+=("$nom") ;;
             esac
@@ -156,14 +169,14 @@ retirer() {
     local arg nom ligne nom_ligne
     for arg in "$@"; do
         case "$arg" in
-            -*) refuse "argument inconnu : $arg (devzone paquets retirer <nom>…)" ;;
+            -*) refuse "argument inconnu : $arg (devzone packages remove <nom>…)" ;;
             *) a+=("$arg") ;;
         esac
     done
-    [ "${#a[@]}" -gt 0 ] || refuse "retirer attend au moins un nom : devzone paquets retirer <nom>…"
+    [ "${#a[@]}" -gt 0 ] || refuse "retirer attend au moins un nom : devzone packages remove <nom>…"
     for nom in "${a[@]}"; do
         nom_listee "$nom" ||
-            refuse "paquet non listé : $nom (fourni par l'image ?) : devzone paquets retirer n'ajoute pas les paquets de l'image"
+            refuse "paquet non listé : $nom (fourni par l'image ?) : devzone packages remove n'ajoute pas les paquets de l'image"
         if ! marque_presente "$nom"; then
             desinstalles+=("$nom")
         fi
@@ -173,7 +186,7 @@ retirer() {
     fi
     for nom in "${a[@]}"; do
         if marque_presente "$nom"; then
-            echo "$nom : retiré de la liste, laissé installé (présent avant devzone paquets)"
+            echo "$nom : retiré de la liste, laissé installé (présent avant devzone packages)"
         fi
     done
     while IFS= read -r ligne; do
@@ -217,10 +230,10 @@ appliquer() {
 }
 
 case "${1:-}" in
-    '' | lister) lister ;;
-    ajouter) ajouter "${@:2}" ;;
-    retirer) retirer "${@:2}" ;;
-    appliquer) appliquer ;;
+    '' | list) lister ;;
+    add) ajouter "${@:2}" ;;
+    remove) retirer "${@:2}" ;;
+    apply) appliquer ;;
     -h | --help | aide) awk 'NR==1{next} /^#$/{exit} /^#/{sub(/^# ?/,""); print; next} {exit}' "${BASH_SOURCE[0]}" ;;
-    *) refuse "commande inconnue : ${1:-(aucune)} (devzone paquets --help)" ;;
+    *) refuse "commande inconnue : ${1:-(aucune)} (devzone packages --help)" ;;
 esac

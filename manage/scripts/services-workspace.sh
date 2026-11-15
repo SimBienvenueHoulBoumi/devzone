@@ -125,8 +125,7 @@ services_run() {
         return 1
     fi
     echo "▶ $action $service in the pod $POD…"
-    # The installer of the pod still spells --oui (#510): --yes translated
-    set -- "${@/--yes/--oui}"
+    # The installer of the pod takes --yes (#557) : no translation, no warning
     # shellcheck disable=SC2046
     printf '%s\n' "$token" | kubectl $(drapeau_kubectl) exec -i "$POD" --namespace "$NAMESPACE" \
         -c workspace -- bash "$SERVICES_ADMIN_SCRIPT" "$action" "$service" "$@" || code=$?

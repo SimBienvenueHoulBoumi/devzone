@@ -298,6 +298,13 @@ faux_docker() {
     [[ "$(cat "$BATS_TEST_TMPDIR/args")" == *"up --workspace-folder $PWD/dz"* ]] || false
 }
 
+@test "lancer.sh : récapitulatif « devzone: state » (forme anglaise) affiché" {
+    faux_cli 'printf "Running the postStartCommand from devcontainer.json...\r\ndevzone: state\r\n  ○ module ia        facultatif\r\n"'
+    run bash "$RACINE/manage/scripts/lancer.sh" up "$PWD/dz"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"devzone: state"*"○ module ia"* ]] || false
+}
+
 @test "lancer.sh rebuild : conteneur recréé" {
     faux_cli 'exit 0'
     run bash "$RACINE/manage/scripts/lancer.sh" rebuild "$PWD/dz"

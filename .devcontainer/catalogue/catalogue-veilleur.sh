@@ -53,7 +53,7 @@ tour() {
     local maintenant ancien
     [ -f "$ETAT" ] || return 0
     # État restauré ou reconstruit : le veilleur ne suit pas un état douteux,
-    # et ne désinstalle jamais tant que devzone appliquer ne l'a pas confirmé
+    # et ne désinstalle jamais tant que devzone apply ne l'a pas confirmé
     etat_recouvrement_attente && return 0
     etat_recouvrement_en_attente && return 0
     mkdir -p "$BASE"
@@ -63,7 +63,7 @@ tour() {
     if [ "$maintenant" != "$ancien" ]; then
         echo "$maintenant" >"$DERNIER"
         echo "devzone : catalogue-veilleur : .devzone.modules modifié, application" >&2
-        bash "$ICI/../catalogue.sh" appliquer
+        bash "$ICI/../catalogue.sh" apply
     fi
 }
 

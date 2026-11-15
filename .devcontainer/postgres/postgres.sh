@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Module postgres (#280) : PostgreSQL partagé dans le cluster de devzone
 # (cluster.sh), une base et un utilisateur par projet.
-#   postgres.sh installer | desinstaller | etat | relais-lancer | relais-arreter
-#   postgres.sh creer <projet> [--nouveau-mdp]   base, rôle, workspace/.postgres/<projet>.env
-#   postgres.sh liste                            bases et propriétaires
-#   postgres.sh psql [<projet>]                  console dans le pod
-#   postgres.sh supprimer <projet> [--oui]       base, rôle et fichier .env
+#   postgres.sh install | uninstall | status | relay-start | relay-stop
+#   postgres.sh create <projet> [--new-password]   base, rôle, workspace/.postgres/<projet>.env
+#   postgres.sh list                                bases et propriétaires
+#   postgres.sh psql [<projet>]                     console dans le pod
+#   postgres.sh delete <projet> [--yes]             base, rôle et fichier .env
 # Secrets dans workspace/.postgres/ (600, ignorés par git), jamais affichés.
 set -euo pipefail
 
@@ -22,6 +22,18 @@ ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
 # shellcheck source=SCRIPTDIR/../isolement.sh
 # shellcheck disable=SC1091
 . "$ICI/../isolement.sh"
+# English command names are accepted (#557) : a copied script may miss the file
+# shellcheck source=SCRIPTDIR/../command-aliases.sh
+# shellcheck disable=SC1091
+if [ -f "$ICI/../command-aliases.sh" ]; then
+    . "$ICI/../command-aliases.sh"
+fi
+# Subcommand and options become their canonical English names ; the old
+# French names warn on use (#557)
+if command -v canonical_args >/dev/null 2>&1; then
+    canonical_args postgres "$@"
+    set -- "${ARGS_CANONICAL[@]+"${ARGS_CANONICAL[@]}"}"
+fi
 
 NS=devzone-postgres
 SECRETS="$RACINE/workspace/.postgres"
@@ -35,15 +47,15 @@ refuse() { echo "devzone : postgres : $*" >&2; exit 2; }
 # Vue regroupée des identifiants : un échec n'empêche jamais l'opération
 regenerer_identifiants() {
     password_regenerer ||
-        echo "devzone : postgres : identifiants regroupés non mis à jour (devzone mots-de-passe)" >&2
+        echo "devzone : postgres : identifiants regroupés non mis à jour (devzone passwords)" >&2
 }
 
 # Contexte du module : celui du cluster de devzone ; sans choix, rien n'est
-# installé (devzone activer postgres le fixe)
+# installé (devzone enable postgres le fixe)
 contexte() {
     local c
     c="$(cluster_lu)"
-    [ -n "$c" ] || refuse "aucun cluster choisi : devzone activer postgres"
+    [ -n "$c" ] || refuse "aucun cluster choisi : devzone enable postgres"
     echo "$c"
 }
 
@@ -124,7 +136,7 @@ installer() {
     relais_arreter postgres
     relais_lancer postgres "$CTX" "$NS" svc/postgres "$POSTGRES_PORT:5432"
     echo "✔ PostgreSQL prêt : 127.0.0.1:$POSTGRES_PORT dans le conteneur"
-    echo "  Base d'un projet : devzone postgres creer <projet>"
+    echo "  Base d'un projet : devzone postgres create <projet>"
     regenerer_identifiants
 }
 
@@ -161,9 +173,9 @@ etat() {
         return 0
     fi
     if [ "$(k get statefulset postgres -o jsonpath='{.status.readyReplicas}' 2>/dev/null || true)" != 1 ]; then
-        echo "en échec sur $CTX : devzone appliquer"
+        echo "en échec sur $CTX : devzone apply"
     elif ! relais_actif postgres; then
-        echo "prêt sur $CTX, relais arrêté : devzone appliquer"
+        echo "prêt sur $CTX, relais arrêté : devzone apply"
     else
         echo "prêt sur $CTX : 127.0.0.1:$POSTGRES_PORT, $(nombre_bases) base(s)"
     fi
@@ -174,12 +186,12 @@ creer() {
     valider_projet "$projet"
     for arg in "${@:2}"; do
         case "$arg" in
-            --nouveau-mdp) nouveau=1 ;;
+            --new-password) nouveau=1 ;;
             *) refuse "argument inconnu : $arg" ;;
         esac
     done
     CTX="$(contexte)"
-    installe || refuse "module inactif : devzone activer postgres"
+    installe || refuse "module inactif : devzone enable postgres"
     fichier="$SECRETS/$projet.env"
     # Mot de passe gardé : une application déjà configurée continue de marcher
     mdp="$(sed -n 's/^DB_PASSWORD=//p' "$fichier" 2>/dev/null || true)"
@@ -213,15 +225,15 @@ ENV
 
 liste() {
     CTX="$(contexte)"
-    installe || refuse "module inactif : devzone activer postgres"
+    installe || refuse "module inactif : devzone enable postgres"
     psql_admin -At -F ' ' -c "SELECT datname, pg_get_userbyid(datdba) FROM pg_database WHERE datname NOT IN ('postgres','template0','template1') ORDER BY 1" |
-        awk 'BEGIN { n = 0 } { printf "  %-30s propriétaire %s\n", $1, $2; n++ } END { if (n == 0) print "  (aucune base : devzone postgres creer <projet>)" }'
+        awk 'BEGIN { n = 0 } { printf "  %-30s propriétaire %s\n", $1, $2; n++ } END { if (n == 0) print "  (aucune base : devzone postgres create <projet>)" }'
 }
 
 console() {
     local projet="${1:-}" tty=()
     CTX="$(contexte)"
-    installe || refuse "module inactif : devzone activer postgres"
+    installe || refuse "module inactif : devzone enable postgres"
     [ -t 0 ] && tty=(-t)
     if [ -n "$projet" ]; then
         valider_projet "$projet"
@@ -236,14 +248,14 @@ supprimer() {
     valider_projet "$projet"
     for arg in "${@:2}"; do
         case "$arg" in
-            --oui) oui=1 ;;
+            --yes) oui=1 ;;
             *) refuse "argument inconnu : $arg" ;;
         esac
     done
     CTX="$(contexte)"
-    installe || refuse "module inactif : devzone activer postgres"
+    installe || refuse "module inactif : devzone enable postgres"
     if [ -z "$oui" ]; then
-        cluster_interactif || refuse "confirmation impossible sans terminal : devzone postgres supprimer $projet --oui"
+        cluster_interactif || refuse "confirmation impossible sans terminal : devzone postgres delete $projet --yes"
         printf 'Supprimer la base %s et toutes ses données ? [o/N] ' "$projet" >&2
         read -r reponse || reponse=""
         case "$reponse" in
@@ -289,19 +301,19 @@ interdire() {
 }
 
 case "${1:-}" in
-    installer) installer ;;
-    desinstaller) desinstaller ;;
-    etat) etat ;;
-    creer) creer "${@:2}" ;;
-    liste) liste ;;
+    install) installer ;;
+    uninstall) desinstaller ;;
+    status) etat ;;
+    create) creer "${@:2}" ;;
+    list) liste ;;
     psql) console "${@:2}" ;;
-    supprimer) supprimer "${@:2}" ;;
-    relais-lancer) relais ;;
-    relais-arreter) relais_arreter postgres ;;
-    autoriser) autoriser "${@:2}" ;;
-    interdire) interdire "${@:2}" ;;
+    delete) supprimer "${@:2}" ;;
+    relay-start) relais ;;
+    relay-stop) relais_arreter postgres ;;
+    authorize) autoriser "${@:2}" ;;
+    forbid) interdire "${@:2}" ;;
     *)
-        echo "devzone postgres : creer <projet> [--nouveau-mdp] | liste | psql [<projet>] | supprimer <projet> [--oui]" >&2
+        echo "devzone postgres : create <projet> [--new-password] | list | psql [<projet>] | delete <projet> [--yes]" >&2
         exit 1
         ;;
 esac

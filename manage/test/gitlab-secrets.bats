@@ -142,7 +142,7 @@ GETENT
 }
 
 @test "gitlab : secret rails copié dans workspace/.gitlab (600), jamais affiché" {
-    run bash "$GITLAB" installer
+    run bash "$GITLAB" install
     [ "$status" -eq 0 ] || false
     [ -f "$SECRETS/rails-secret.yaml" ] || false
     [ "$(stat -c %a "$SECRETS/rails-secret.yaml" 2>/dev/null || stat -f %Lp "$SECRETS/rails-secret.yaml")" = 600 ]
@@ -156,7 +156,7 @@ GETENT
     echo "gitlab" >"$KIND_CLUSTERS"
     mkdir -p "$SECRETS"
     echo secret-local >"$SECRETS/rails-secret.yaml"
-    run bash "$GITLAB" installer
+    run bash "$GITLAB" install
     [ "$status" -eq 0 ] || false
     grep -q -- "-n devzone-gitlab apply -f .*rails-secret.yaml" "$BATS_TEST_TMPDIR/kubectl.log" || false
     grep -Eq -- "helm --kubeconfig [^ ]+ upgrade --install gitlab gitlab/gitlab" "$BATS_TEST_TMPDIR/helm.log" || false
@@ -164,14 +164,14 @@ GETENT
 
 @test "gitlab : secret rails absent → aucun fichier, pas de fichier vide" {
     export FAUX_SECRET_ABSENT=1
-    run bash "$GITLAB" installer
+    run bash "$GITLAB" install
     [ "$status" -eq 0 ] || false
     [ ! -e "$SECRETS/rails-secret.yaml" ] || false
 }
 
 @test "gitlab : nouveau-mdp root régénère le mot de passe, n'affiche que le chemin" {
     export FAUX_RUNNER_OK=1
-    run bash "$GITLAB" nouveau-mdp root
+    run bash "$GITLAB" new-password root
     [ "$status" -eq 0 ] || false
     [ "$output" = "$DEVZONE_RACINE/.password" ]
     grep -q "exec -i .*gitlab-rails runner -" "$BATS_TEST_TMPDIR/kubectl.log" || false
@@ -181,14 +181,14 @@ GETENT
 
 @test "gitlab : nouveau-mdp dev régénère le mot de passe dev" {
     export FAUX_RUNNER_OK=1
-    run bash "$GITLAB" nouveau-mdp dev
+    run bash "$GITLAB" new-password dev
     [ "$status" -eq 0 ] || false
     [ -f "$SECRETS/dev-password" ] || false
 }
 
 @test "gitlab : nouveau-mdp sans OK → fichier inchangé, code non nul" {
     printf 'ancien-mdp' >"$SECRETS/root-password"
-    run bash "$GITLAB" nouveau-mdp root
+    run bash "$GITLAB" new-password root
     [ "$status" -ne 0 ] || false
     [ "$(cat "$SECRETS/root-password")" = ancien-mdp ] || false
 }
@@ -196,7 +196,7 @@ GETENT
 @test "gitlab : nouveau-mdp avec OK → fichier mis à jour, mot de passe absent des arguments" {
     printf 'ancien-mdp' >"$SECRETS/root-password"
     export FAUX_RUNNER_OK=1
-    run bash "$GITLAB" nouveau-mdp root
+    run bash "$GITLAB" new-password root
     [ "$status" -eq 0 ] || false
     [ "$(cat "$SECRETS/root-password")" != ancien-mdp ] || false
     mdp="$(cat "$SECRETS/root-password")"
@@ -205,7 +205,7 @@ GETENT
 }
 
 @test "gitlab : nouveau-mdp : utilisateur inconnu -> code 2" {
-    run bash "$GITLAB" nouveau-mdp admin
+    run bash "$GITLAB" new-password admin
     [ "$status" -eq 2 ] || false
     [[ "$output" == *"utilisateur inconnu"* ]] || false
 }
@@ -213,7 +213,7 @@ GETENT
 @test "gitlab : désinstallation simple garde rails-secret.yaml" {
     printf '%s\n' '{"kind":"Secret","metadata":{"name":"gitlab-rails-secret"}}' >"$SECRETS/rails-secret.yaml"
     printf 'root' >"$SECRETS/root-password"
-    run bash "$GITLAB" desinstaller
+    run bash "$GITLAB" uninstall
     [ "$status" -eq 0 ] || false
     [ -f "$SECRETS/rails-secret.yaml" ] || false
     [ ! -e "$SECRETS/root-password" ] || false
@@ -222,7 +222,7 @@ GETENT
 
 @test "gitlab : désinstallation complète --oui supprime rails-secret.yaml" {
     printf '%s\n' '{"kind":"Secret","metadata":{"name":"gitlab-rails-secret"}}' >"$SECRETS/rails-secret.yaml"
-    run bash "$GITLAB" desinstaller --oui
+    run bash "$GITLAB" uninstall --yes
     [ "$status" -eq 0 ] || false
     [ ! -e "$SECRETS" ] || false
     [[ "$output" == *"secret Rails supprimé"* ]] || false

@@ -13,6 +13,7 @@ setup() {
     export DEVZONE_ETAT="$T/modules"
     mkdir -p "$T/app/gitlab" "$T/app/postgres" "$T/app/catalogue/mysql" "$T/bin" "$DEVZONE_RACINE"
     cp "$RACINE_TEST/.devcontainer/devzone" "$APP"
+    cp "$RACINE_TEST/.devcontainer/help.sh" "$T/app/help.sh"
     cp "$RACINE_TEST/.devcontainer/cluster.sh" "$T/app/cluster.sh"
     cp "$RACINE_TEST/.devcontainer/etat.sh" "$T/app/etat.sh"
     cp "$RACINE_TEST/.devcontainer/etat-verrou.sh" "$T/app/etat-verrou.sh"
@@ -88,7 +89,7 @@ KUBE
 
 @test "conception : devzone est l'application et la doc n'expose plus les scripts" {
     aide="$(bash "$APP" --help)"
-    for commande in reparer demarrer metrics utiliser; do
+    for commande in repair start metrics use; do
         [[ "$aide" == *"devzone $commande"* ]] || { echo "aide : $commande absente"; false; }
     done
     for fichier in README.md manage/docs/reference.md; do
@@ -110,7 +111,7 @@ KUBE
     [[ "$output" == *"✔ veilleur ports auto"* ]] || false
     [[ "$output" == *"✔ identifiants"* ]] || false
     [[ "$(cat "$T/actions.log")" == *"relais oui"* ]] || false
-    [[ "$(cat "$T/actions.log")" == *"ports relancer"* ]] || false
+    [[ "$(cat "$T/actions.log")" == *"ports restart"* ]] || false
     [[ "$(cat "$T/actions.log")" == *"ports-auto demarrer"* ]] || false
     [[ "$(cat "$T/actions.log")" == *"password regenerer"* ]] || false
 }
@@ -120,8 +121,8 @@ KUBE
     run bash "$APP" reparer
     [ "$status" -eq 0 ]
     [[ "$(cat "$T/actions.log")" == *"gitlab hote-poser"* ]] || false
-    [[ "$(cat "$T/actions.log")" == *"gitlab relais-lancer"* ]] || false
-    [[ "$(cat "$T/actions.log")" == *"postgres relais-lancer"* ]] || false
+    [[ "$(cat "$T/actions.log")" == *"gitlab relay-start"* ]] || false
+    [[ "$(cat "$T/actions.log")" == *"postgres relay-start"* ]] || false
 }
 
 @test "reparer : le jeton du compte kubernetes est renouvelé" {
@@ -152,7 +153,7 @@ KUBE
     run bash "$APP" reparer
     [ "$status" -eq 1 ]
     [[ "$output" == *"✖ identifiants : identifiants indisponibles"* ]] || false
-    [[ "$(cat "$T/actions.log")" == *"ports relancer"* ]] || false
+    [[ "$(cat "$T/actions.log")" == *"ports restart"* ]] || false
 }
 
 @test "demarrer : lance le démarrage complet" {
@@ -193,14 +194,14 @@ KUBE
     [[ "$(cat "$T/kubectl.log")" != *"use-context"* ]] || false
 }
 
-@test "utiliser : --confirmer exact accepté, autre valeur refusée" {
+@test "utiliser : --confirm exact accepté, autre valeur refusée" {
     faux_kubectl
-    run bash "$APP" utiliser prod --confirmer prod
+    run bash "$APP" utiliser prod --confirm prod
     [ "$status" -eq 0 ]
     [[ "$(cat "$T/kubectl.log")" == *"config use-context prod"* ]] || false
 
     : >"$T/kubectl.log"
-    run bash "$APP" utiliser prod --confirmer autre
+    run bash "$APP" utiliser prod --confirm autre
     [ "$status" -eq 2 ]
     [[ "$output" == *"cluster distant refusé : prod"* ]] || false
     [[ "$(cat "$T/kubectl.log")" != *"use-context"* ]] || false

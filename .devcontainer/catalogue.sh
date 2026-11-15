@@ -3,7 +3,7 @@
 # .devcontainer/catalogue/<app>/ (app.conf, manifeste.yaml), installée dans le
 # cluster des services de devzone sous son namespace de app.conf ; l'état
 # voulu est la ligne <app>=on|off de .devzone.modules.
-#   catalogue.sh synchroniser | appliquer | lister | resume | json | desinstaller <app>
+#   catalogue.sh sync | apply | list | resume | json | remove <app>
 set -euo pipefail
 
 ICI="$(cd "$(dirname "$0")" && pwd)"
@@ -24,6 +24,18 @@ ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
 # shellcheck source=SCRIPTDIR/catalogue/app.sh
 # shellcheck disable=SC1091
 . "$ICI/catalogue/app.sh"
+# English command names are accepted (#557) : a copied script may miss the file
+# shellcheck source=SCRIPTDIR/command-aliases.sh
+# shellcheck disable=SC1091
+if [ -f "$ICI/command-aliases.sh" ]; then
+    . "$ICI/command-aliases.sh"
+fi
+# Subcommand and options become their canonical English names ; the old
+# French names warn on use (#557)
+if command -v canonical_args >/dev/null 2>&1; then
+    canonical_args catalog "$@"
+    set -- "${ARGS_CANONICAL[@]+"${ARGS_CANONICAL[@]}"}"
+fi
 
 refuse() { echo "devzone : catalogue : $*" >&2; exit 2; }
 
@@ -98,7 +110,7 @@ app_prete() {
 catalogue_synchroniser() (
     local app entete manque="" tmp
     [ -f "$ETAT" ] || return 0
-    entete="# Applications du catalogue : passer à on pour installer (devzone catalogue)"
+    entete="# Applications du catalogue : passer à on pour installer (devzone catalog)"
     etat_verrou_prendre || return 1
     # Le verrou est rendu à la sortie, y compris sur une erreur sous set -e
     trap 'etat_verrou_lacher' EXIT
@@ -132,7 +144,7 @@ app_etat() {
     fi
 }
 
-# devzone catalogue : nom, état (off, on installée, on en échec), description
+# devzone catalog : nom, état (off, on installée, on en échec), description
 catalogue_lister() {
     local app etat etiquette
     while IFS= read -r app; do
@@ -163,24 +175,6 @@ app_relais_arrete() {
     ! relais_actif "$app"
 }
 
-# Avertit des PVC mysql non montés par le StatefulSet (#440). Lecture des
-# namespaces réservée à l'administrateur (#430).
-catalogue_mysql_volumes_inutilises() {
-    local ctx ns monte pvc liste
-    ctx="$(cluster_lu)"
-    [ -n "$ctx" ] || return 0
-    ns="$(app_ns mysql)"
-    compte_admin "$ctx" get namespace "$ns" >/dev/null 2>&1 || return 0
-    monte="$(kubectl --context devzone -n "$ns" get statefulset mysql -o jsonpath='{.spec.volumeClaimTemplates[0].metadata.name}' 2>/dev/null || true)"
-    [ -n "$monte" ] || return 0
-    liste="$(kubectl --context devzone -n "$ns" get pvc -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null | grep -E '\-mysql-0$' || true)"
-    while IFS= read -r pvc; do
-        [ -n "$pvc" ] || continue
-        [ "$pvc" != "${monte}-mysql-0" ] || continue
-        printf '  ⚠ volume %s non utilisé : devzone mysql volume\n' "$pvc"
-    done <<<"$liste"
-}
-
 # Lignes Applications du récapitulatif de devzone : ○ disponible, ✔ installée
 # (adresse du relais), ✖ en échec, ⚠ attendue
 catalogue_resume() {
@@ -188,11 +182,11 @@ catalogue_resume() {
     while IFS= read -r app; do
         [ -n "$app" ] || continue
         case "$(app_etat "$app")" in
-            disponible) printf '  ○ application %-12s disponible, %s : devzone activer %s\n' \
+            disponible) printf '  ○ application %-12s disponible, %s : devzone enable %s\n' \
                 "$app" "$(app_lire "$app" description)" "$app" ;;
             installée)
                 if app_relais_arrete "$app"; then
-                    printf '  ⚠ application %-12s installée, relais arrêté : devzone reparer\n' "$app"
+                    printf '  ⚠ application %-12s installée, relais arrêté : devzone repair\n' "$app"
                 else
                     if [ "${DEVZONE_WORKSPACE:-}" = kubernetes ]; then
                         printf '  ✔ application %-12s installée : local access: devzone workspace ports\n' "$app"
@@ -201,15 +195,15 @@ catalogue_resume() {
                             "$app" "$(app_lire "$app" port)"
                     fi
                 fi ;;
-            attendue) printf '  ⚠ application %-12s attendue : devzone appliquer\n' "$app" ;;
-            *) printf '  ✖ application %s en échec : %s : devzone appliquer\n' \
+            attendue) printf '  ⚠ application %-12s attendue : devzone apply\n' "$app" ;;
+            *) printf '  ✖ application %s en échec : %s : devzone apply\n' \
                 "$app" "$(head -1 "$(fichier_echec "$app")")" ;;
         esac
     done <<<"$(catalogue_apps)"
-    catalogue_mysql_volumes_inutilises 2>/dev/null || true
+    app_mysql_volumes_inutilises 2>/dev/null || true
 }
 
-# Rubrique applications de devzone etat --json : mêmes champs que modules
+# Rubrique applications de devzone status --json : mêmes champs que modules
 catalogue_json() {
     local app actif etat echec cmd json='[]'
     while IFS= read -r app; do
@@ -218,10 +212,10 @@ catalogue_json() {
         [ "$(voulu "$app")" = on ] && actif=true
         etat="$(app_etat "$app")"
         echec=""
-        cmd="devzone appliquer"
+        cmd="devzone apply"
         case "$etat" in
-            disponible) cmd="devzone activer $app" ;;
-            installée) cmd="devzone desactiver $app" ;;
+            disponible) cmd="devzone enable $app" ;;
+            installée) cmd="devzone disable $app" ;;
             echec) echec="$(head -1 "$(fichier_echec "$app")")" ;;
         esac
         json="$(jq -cn --argjson avant "$json" --arg nom "$app" --argjson actif "$actif" \
@@ -234,16 +228,16 @@ catalogue_json() {
 }
 
 case "${1:-}" in
-    synchroniser) catalogue_synchroniser ;;
-    appliquer) catalogue_appliquer ;;
-    lister) catalogue_lister ;;
+    sync) catalogue_synchroniser ;;
+    apply) catalogue_appliquer ;;
+    list) catalogue_lister ;;
     resume) catalogue_resume ;;
     json) catalogue_json ;;
     # Retrait d'une application : StatefulSet et service, volume gardé (#441)
-    desinstaller) app_desinstaller "$2" ;;
+    remove) app_desinstaller "$2" ;;
     -h | --help | aide) sed -n '2,6p' "$0" | sed 's/^# \{0,1\}//' ;;
     *)
-        echo "devzone : catalogue : synchroniser | appliquer | lister | resume | json | desinstaller <app>" >&2
+        echo "devzone : catalogue : sync | apply | list | resume | json | remove <app>" >&2
         exit 1
         ;;
 esac

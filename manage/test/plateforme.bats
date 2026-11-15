@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# Plateforme GitHub (défaut) ou GitLab (#240) : commande devzone plateforme,
+# Plateforme GitHub (défaut) ou GitLab (#240) : commande devzone platform,
 # glab installé depuis la release officielle (somme vérifiée), connexion et
 # état. Faux glab dans ~/.local/bin du HOME de test (hors PATH, comme le vrai
 # binaire), curl et sha256sum dans le PATH : aucun téléchargement réel.
@@ -185,7 +185,7 @@ empreinte_etat() {
     printf 'gitlab=on\n' >"$DEVZONE_ETAT"
     run bash "$DEVZONE" platform gitlab
     [ "$status" -ne 0 ]
-    [[ "$output" == *"jeton root"*"devzone activer gitlab"* ]] || false
+    [[ "$output" == *"jeton root"*"devzone enable gitlab"* ]] || false
     [ -x "$HOME/.local/bin/glab" ]
     ! grep -q '^plateforme=' "$DEVZONE_ETAT" || false
     ! grep -q '^gitlab_url=' "$DEVZONE_ETAT" || false
@@ -263,7 +263,7 @@ empreinte_etat() {
 
 @test "devzone --help cite la commande plateforme" {
     run bash "$DEVZONE" --help
-    [[ "$output" == *"devzone plateforme github"* ]] || false
-    [[ "$output" == *"devzone plateforme gitlab"* ]] || false
+    [[ "$output" == *"devzone platform github"* ]] || false
+    [[ "$output" == *"devzone platform gitlab"* ]] || false
     [[ "$output" == *"[--url URL]"* ]] || false
 }

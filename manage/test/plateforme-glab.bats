@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
-# Assistant git de glab (#278) : devzone plateforme gitlab pose, pour l'hôte de
+# Assistant git de glab (#278) : devzone platform gitlab pose, pour l'hôte de
 # l'instance seulement, credential.<URL>.helper = !glab auth git-credential ;
-# devzone plateforme github le retire ; le récapitulatif dit « ✔ git par glab ».
+# devzone platform github le retire ; le récapitulatif dit « ✔ git via glab ».
 # Faux glab (auth status, auth git-credential ok) et faux kind ; HOME et
 # GIT_CONFIG_GLOBAL sous $BATS_TEST_TMPDIR : git config --global n'écrit jamais
 # dans le vrai ~/.gitconfig.
@@ -101,13 +101,13 @@ nombre_reglages_credential() {
     [ "$(nombre_reglages_credential)" -eq 0 ]
 }
 
-@test "récapitulatif : « ✔ git par glab » une fois le réglage posé" {
+@test "récapitulatif : « ✔ git via glab » une fois le réglage posé" {
     run bash "$DEVZONE" platform gitlab --url "$INSTANCE"
     [ "$status" -eq 0 ]
     run bash "$DEVZONE"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"✔ git par glab"* ]] || false
-    [[ "$output" != *"à poser : devzone plateforme gitlab"* ]] || false
+    [[ "$output" == *"✔ git via glab"* ]] || false
+    [[ "$output" != *"to set: devzone platform gitlab"* ]] || false
 }
 
 @test "récapitulatif : « à poser » si le réglage a disparu, plateforme gitlab gardée" {
@@ -116,18 +116,18 @@ nombre_reglages_credential() {
     git config --global --unset-all "credential.$INSTANCE.helper"
     run bash "$DEVZONE"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"⚠ git par glab"*"à poser : devzone plateforme gitlab"* ]] || false
-    [[ "$output" != *"✔ git par glab"* ]] || false
+    [[ "$output" == *"⚠ git via glab"*"to set: devzone platform gitlab"* ]] || false
+    [[ "$output" != *"✔ git via glab"* ]] || false
 }
 
-@test "récapitulatif : pas de ligne « git par glab » sur github" {
+@test "récapitulatif : pas de ligne « git via glab » sur github" {
     run bash "$DEVZONE" platform gitlab --url "$INSTANCE"
     [ "$status" -eq 0 ]
     run bash "$DEVZONE" platform github
     [ "$status" -eq 0 ]
     run bash "$DEVZONE"
     [ "$status" -eq 0 ]
-    [[ "$output" != *"git par glab"* ]] || false
+    [[ "$output" != *"git via glab"* ]] || false
 }
 
 @test "réglage credential impossible (config globale non inscriptible) → échec, plateforme non retenue" {

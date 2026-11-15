@@ -160,7 +160,7 @@ CURL
 @test "ouvrir : port invalide refusé (code 1), aucun relais, état intact" {
     printf 'ports=3000\n' >"$DEVZONE_ETAT"
     for p in "" 0 65536 abc 80a -1 999999999999999999999; do
-        run bash "$PORTS" ouvrir "$p"
+        run bash "$PORTS" open "$p"
         [ "$status" -eq 1 ]
         [[ "$output" == *"port invalide"* ]] || false
     done
@@ -195,7 +195,7 @@ CURL
 @test "liste : triée sans doublon, ● actif, ○ arrêté, application derrière" {
     printf 'ports=3000,8080,8080\n' >"$DEVZONE_ETAT"
     : >"$BATS_TEST_TMPDIR/relais/devzone-devzone-port-8080"
-    FAUX_REPOND=8080 run bash "$PORTS" liste
+    FAUX_REPOND=8080 run bash "$PORTS" list
     [ "$status" -eq 0 ]
     [ "$(printf '%s\n' "$output" | grep -c '^')" -eq 2 ]
     printf '%s\n' "$output" | sed -n '1p' | grep -q '3000 *○ arrêté *aucune application'
@@ -213,27 +213,52 @@ CURL
 @test "fermer : relais supprimé, port retiré de l'état, autres ports gardés" {
     bash "$PORTS" 8080
     bash "$PORTS" 3000
-    run bash "$PORTS" --fermer 8080
+    run bash "$PORTS" --close 8080
     [ "$status" -eq 0 ]
     grep -q 'docker rm -f devzone-devzone-port-8080' "$BATS_TEST_TMPDIR/docker.log"
     [ ! -e "$BATS_TEST_TMPDIR/relais/devzone-devzone-port-8080" ]
     grep -qx 'ports=3000' "$DEVZONE_ETAT"
-    run bash "$PORTS" fermer 3000
+    run bash "$PORTS" close 3000
     [ "$status" -eq 0 ]
     grep -qx 'ports=' "$DEVZONE_ETAT"
 }
 
 @test "fermer : port invalide refusé (code 1)" {
-    run bash "$PORTS" --fermer 70000
+    run bash "$PORTS" --close 70000
     [ "$status" -eq 1 ]
     [[ "$output" == *"port invalide"* ]] || false
+}
+
+@test "fermer : l alias francais donne le meme resultat que le nom anglais, avec l avertissement" {
+    bash "$PORTS" 8080
+    run --separate-stderr bash "$PORTS" --close 8080
+    [ "$status" -eq 0 ]
+    [[ "$stderr" != *"deprecated"* ]] || false
+    grep -qx 'ports=' "$DEVZONE_ETAT"
+    bash "$PORTS" 8080
+    run --separate-stderr bash "$PORTS" --fermer 8080
+    [ "$status" -eq 0 ]
+    [[ "$stderr" == *"devzone: \"--fermer\" is deprecated, use \"--close\""* ]] || false
+    grep -qx 'ports=' "$DEVZONE_ETAT"
+}
+
+@test "liste : l alias francais liste donne le meme resultat que le nom anglais" {
+    printf 'ports=3000\n' >"$DEVZONE_ETAT"
+    run --separate-stderr bash "$PORTS" list
+    [ "$status" -eq 0 ]
+    [[ "$stderr" != *"deprecated"* ]] || false
+    [[ "$output" == *"3000"* ]] || false
+    run --separate-stderr bash "$PORTS" liste
+    [ "$status" -eq 0 ]
+    [[ "$stderr" == *"devzone: \"liste\" is deprecated, use \"list\""* ]] || false
+    [[ "$output" == *"3000"* ]] || false
 }
 
 @test "relancer : chaque relais recréé vers l'IP actuelle, état inchangé" {
     printf 'ports=3000,8080\n' >"$DEVZONE_ETAT"
     : >"$BATS_TEST_TMPDIR/relais/devzone-devzone-port-3000"
     : >"$BATS_TEST_TMPDIR/relais/devzone-devzone-port-8080"
-    run bash "$PORTS" relancer
+    run bash "$PORTS" restart
     [ "$status" -eq 0 ]
     grep -q 'docker rm -f devzone-devzone-port-3000' "$BATS_TEST_TMPDIR/docker.log"
     grep -q 'docker rm -f devzone-devzone-port-8080' "$BATS_TEST_TMPDIR/docker.log"
@@ -245,7 +270,7 @@ CURL
 
 @test "relancer : un échec avertit sans bloquer les autres, code 1" {
     printf 'ports=3000,8080\n' >"$DEVZONE_ETAT"
-    FAUX_ECHEC_PORT=3000 run bash "$PORTS" relancer
+    FAUX_ECHEC_PORT=3000 run bash "$PORTS" restart
     [ "$status" -eq 1 ]
     [[ "$output" == *"port déjà utilisé sur le poste : 3000"* ]] || false
     [ "$(grep -c 'docker run' "$BATS_TEST_TMPDIR/docker.log")" -eq 2 ]
@@ -255,7 +280,7 @@ CURL
 
 @test "relancer : conteneur introuvable → avertissement, code 1, état intact" {
     printf 'ports=8080\n' >"$DEVZONE_ETAT"
-    FAUX_SANS_CONTENEUR=1 run bash "$PORTS" relancer
+    FAUX_SANS_CONTENEUR=1 run bash "$PORTS" restart
     [ "$status" -eq 1 ]
     [[ "$output" == *"relais non relancés"* ]] || false
     grep -qx 'ports=8080' "$DEVZONE_ETAT"
@@ -279,27 +304,27 @@ CURL
     [ "$status" -eq 0 ]
     [[ "$output" == *"8080"*"● actif"* ]] || false
 
-    run bash "$DEVZONE" port --fermer 8080
+    run bash "$DEVZONE" port --close 8080
     [ "$status" -eq 0 ]
     grep -qx 'ports=' "$DEVZONE_ETAT"
 }
 
-@test "devzone : récapitulatif ports vers le poste, actif puis aucun" {
+@test "devzone : récapitulatif ports vers le poste, actif puis none" {
     printf 'ports=8080\n' >"$DEVZONE_ETAT"
     : >"$BATS_TEST_TMPDIR/relais/devzone-devzone-port-8080"
     run bash "$DEVZONE"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"✔ ports vers le poste 8080 ●"* ]] || false
+    [[ "$output" == *"✔ ports to the workstation 8080 ●"* ]] || false
 
     printf 'ports=\n' >"$DEVZONE_ETAT"
     run bash "$DEVZONE"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"○ ports vers le poste aucun (devzone port <n>)"* ]] || false
+    [[ "$output" == *"○ ports to the workstation none (devzone port <n>)"* ]] || false
 }
 
 @test "devzone --help cite devzone port" {
     run bash "$DEVZONE" --help
-    [[ "$output" == *"devzone port [<n>|--fermer <n>]"* ]] || false
+    [[ "$output" == *"devzone port [<n>|--close <n>]"* ]] || false
 }
 
 @test "ouvrir sans DEVZONE_ETAT ni DEVZONE_RACINE" {
@@ -323,7 +348,7 @@ CURL
     printf 'bloc\n' >"$BATS_TEST_TMPDIR/depot/bloc"
     export DEVZONE_ETAT="$BATS_TEST_TMPDIR/depot/bloc/.devzone.modules"
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
-    run bash "$BATS_TEST_TMPDIR/depot/.devcontainer/ports.sh" ouvrir 8080
+    run bash "$BATS_TEST_TMPDIR/depot/.devcontainer/ports.sh" open 8080
     [[ "$output" == *"devzone : port : état non enregistré"* ]] || false
     [ "$status" -eq 1 ]
 }

@@ -102,7 +102,7 @@ etat_recouvrement_en_attente() {
     [ -f "${ETAT}.recouvre" ]
 }
 
-# L'utilisateur a confirmé l'état (devzone appliquer) : plus de garde
+# L'utilisateur a confirmé l'état (devzone apply) : plus de garde
 etat_recouvrement_confirmer() {
     rm -f "${ETAT}.recouvre" 2>/dev/null || true
     return 0
@@ -162,7 +162,7 @@ etat_reconstruire() {
         fi
     fi
     if [ "$code" -eq 0 ] && [ "$vu" -eq 1 ] && etat_poser "$stage"; then
-        echo "devzone : état reconstruit depuis les namespaces du cluster des services : $ETAT (confirmez par devzone appliquer)" >&2
+        echo "devzone : état reconstruit depuis les namespaces du cluster des services : $ETAT (confirmez par devzone apply)" >&2
         [ -n "$cluster_hote" ] || echo "devzone : aucun contexte d'hôte ne pointe sur le cluster des services : pas de ligne cluster= dans $ETAT" >&2
         rm -f "$stage"
         return 0
@@ -193,7 +193,7 @@ etat_initialiser() {
     fi
     # 1. Copie de secours laissée par la dernière écriture (#417)
     if [ -f "${ETAT}.prec" ] && etat_poser "${ETAT}.prec"; then
-        echo "devzone : état restauré depuis la copie de secours : $ETAT (confirmez par devzone appliquer)" >&2
+        echo "devzone : état restauré depuis la copie de secours : $ETAT (confirmez par devzone apply)" >&2
         etat_recouvrement_marquer
         etat_verrou_lacher
         return 0
@@ -214,7 +214,7 @@ etat_initialiser() {
     # signalée une seule fois, à la création de l'état de cette instance ;
     # stderr : initialiser est aussi appelé dans $(valeur …)
     if [ -f "$HOME/.claude/.credentials.json" ] || [ -f "$HOME/.local/share/opencode/auth.json" ]; then
-        echo "devzone : connexion Claude Code/opencode partagée trouvée : devzone activer ia pour l'utiliser ici" >&2
+        echo "devzone : connexion Claude Code/opencode partagée trouvée : devzone enable ia pour l'utiliser ici" >&2
     fi
     return 0
 }

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Module gitlab : GitLab de test dans le cluster des services (#396).
-# Pour l'activer : devzone activer gitlab
-# Pour le désactiver : devzone desactiver gitlab
+# Pour l'activer : devzone enable gitlab
+# Pour le désactiver : devzone disable gitlab
 # set -euo pipefail pour ne rien lancer en erreur silencieuse.
 set -euo pipefail
 
@@ -17,6 +17,18 @@ RACINE="${DEVZONE_RACINE:-$(dirname "$(dirname "$ICI")")}"
 # shellcheck source=SCRIPTDIR/../isolement.sh
 # shellcheck disable=SC1091
 . "$ICI/../isolement.sh"
+# English command names are accepted (#557) : a copied script may miss the file
+# shellcheck source=SCRIPTDIR/../command-aliases.sh
+# shellcheck disable=SC1091
+if [ -f "$ICI/../command-aliases.sh" ]; then
+    . "$ICI/../command-aliases.sh"
+fi
+# Subcommand and options become their canonical English names ; the old
+# French names warn on use (#557)
+if command -v canonical_args >/dev/null 2>&1; then
+    canonical_args gitlab "$@"
+    set -- "${ARGS_CANONICAL[@]+"${ARGS_CANONICAL[@]}"}"
+fi
 
 # ---- Variables de délai (secondes) ----
 # GITLAB_ATTENTE : attente globale d'installation (défaut 1200)
@@ -29,7 +41,7 @@ GITLAB_SECRETS_DIR="$RACINE/workspace/.gitlab"
 # Vue regroupée des identifiants : un échec n'empêche jamais l'opération
 regenerer_identifiants() {
     password_regenerer ||
-        echo "devzone : gitlab : identifiants regroupés non mis à jour (devzone mots-de-passe)" >&2
+        echo "devzone : gitlab : identifiants regroupés non mis à jour (devzone passwords)" >&2
 }
 
 # ---- /etc/hosts du conteneur ----
@@ -301,23 +313,23 @@ gitlab_etat() {
         fi
         echo "prêt : http://gitlab.localhost:8929, runner ${runner_status}"
     else
-        echo "en échec : devzone appliquer"
+        echo "en échec : devzone apply"
     fi
     return 0
 }
 
 # Gestion des sous-commandes
 case "${1:-}" in
-    installer)    gitlab_installer ;;
-    desinstaller) gitlab_desinstaller "${@:2}" ;;
-    migrer)       shift; gitlab_migrer "$@" ;;
+    install)    gitlab_installer ;;
+    uninstall) gitlab_desinstaller "${@:2}" ;;
+    migrate)       shift; gitlab_migrer "$@" ;;
     installe)     gitlab_installe ;;
-    etat)         gitlab_etat ;;
+    status)         gitlab_etat ;;
     seed)         gitlab_seed ;;
-    nouveau-mdp)  gitlab_nouveau_mdp "${@:2}" ;;
-    relais-lancer) gitlab_relais_lancer ;;
-    relais-arreter) gitlab_relais_arreter ;;
-    relais-etat)  gitlab_relais_etat ;;
+    new-password)  gitlab_nouveau_mdp "${@:2}" ;;
+    relay-start) gitlab_relais_lancer ;;
+    relay-stop) gitlab_relais_arreter ;;
+    relay-status)  gitlab_relais_etat ;;
     hote-poser)   gitlab_hote_poser ;;
     hote-retirer) gitlab_hote_retirer ;;
     *)            echo "devzone : commande inconnue : ${1:-} (devzone gitlab --help)" >&2

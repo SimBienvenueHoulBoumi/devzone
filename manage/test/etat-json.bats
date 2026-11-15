@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# Sortie machine devzone etat --json (#308)
+# Sortie machine devzone status --json (#308)
 
 setup() {
     load commun
@@ -99,7 +99,7 @@ CURL
     run bash "$DEVZONE" status --json
     [ "$status" -eq 0 ]
     [ "$(printf '%s\n' "$output" | jq -r '.modules[] | select(.nom=="ia") | .echec')" = "echec npm" ]
-    [ "$(printf '%s\n' "$output" | jq -r '.modules[] | select(.nom=="ia") | .commande')" = "devzone appliquer" ]
+    [ "$(printf '%s\n' "$output" | jq -r '.modules[] | select(.nom=="ia") | .commande')" = "devzone apply" ]
 }
 
 @test "etat-json : faux gh qui échoue → github null et erreurs.github" {
@@ -202,5 +202,5 @@ GH
 @test "etat-json : texte non modifié (devzone sans --json)" {
     run bash "$DEVZONE"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"devzone : état"* ]] || false
+    [[ "$output" == *"devzone: state"* ]] || false
 }

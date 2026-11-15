@@ -13,51 +13,51 @@ exec </dev/null
 ICI="$(dirname "$0")"
 # Relais du socket Docker d'abord (#293) : sans lui, les docker exec longs
 # (kind, modules) sont coupés au bout de 0,5 s sous Docker Desktop
-DEVZONE_RELAIS_REEL=oui bash "$ICI/docker-relais.sh" || echo "démarrage : relais Docker non corrigé (devzone reparer)"
-bash "$ICI/git-identite.sh" || echo "démarrage : identité git non traitée (devzone demarrer)"
-bash "$ICI/kube-config.sh" || echo "démarrage : clusters non traités (devzone demarrer)"
+DEVZONE_RELAIS_REEL=oui bash "$ICI/docker-relais.sh" || echo "démarrage : relais Docker non corrigé (devzone repair)"
+bash "$ICI/git-identite.sh" || echo "démarrage : identité git non traitée (devzone start)"
+bash "$ICI/kube-config.sh" || echo "démarrage : clusters non traités (devzone start)"
 # Jeton du compte Kubernetes limité (#430) : 24 h, renouvelé à chaque
 # démarrage ; compte posé au passage s'il manque. Sans cluster des services
 # choisi, rien à faire
-bash "$ICI/kube-compte.sh" jeton || echo "démarrage : jeton du compte kubernetes non renouvelé (devzone reparer)"
+bash "$ICI/kube-compte.sh" jeton || echo "démarrage : jeton du compte kubernetes non renouvelé (devzone repair)"
 # Module gitlab actif : /etc/hosts est un montage Docker régénéré à chaque
 # démarrage, gitlab.localhost doit être re-pose (ssh, glab et getent passent
 # par le résolveur système) ; hote-poser n'échoue jamais (avertissement seul)
 if bash "$ICI/devzone" is-enabled gitlab; then
-    bash "$ICI/gitlab/gitlab.sh" hote-poser || echo "démarrage : nom gitlab.localhost non posé (devzone reparer)"
+    bash "$ICI/gitlab/gitlab.sh" hote-poser || echo "démarrage : nom gitlab.localhost non posé (devzone repair)"
     # Relais TCP 8929/2224 : curl et git en HTTP passent par la boucle locale
     # pour *.localhost, le relais doit être relancé après chaque démarrage
-    bash "$ICI/gitlab/gitlab.sh" relais-lancer || echo "démarrage : relais gitlab non lancé (devzone reparer)"
+    bash "$ICI/gitlab/gitlab.sh" relay-start || echo "démarrage : relais gitlab non lancé (devzone repair)"
 fi
 # Module postgres actif : le relais (port-forward vers 127.0.0.1:5432) ne
 # survit pas à l'arrêt du conteneur, relancé ici après les clusters
 if bash "$ICI/devzone" is-enabled postgres; then
-    bash "$ICI/postgres/postgres.sh" relais-lancer || echo "démarrage : relais postgres non lancé (devzone reparer)"
+    bash "$ICI/postgres/postgres.sh" relay-start || echo "démarrage : relais postgres non lancé (devzone repair)"
 fi
 # Module argocd actif : relais (port-forward vers 127.0.0.1:8443), relancé
 # après les clusters comme celui de postgres
 if bash "$ICI/devzone" is-enabled argocd; then
-    bash "$ICI/argocd/argocd.sh" relais-lancer || echo "démarrage : relais argocd non lancé (devzone reparer)"
+    bash "$ICI/argocd/argocd.sh" relay-start || echo "démarrage : relais argocd non lancé (devzone repair)"
 fi
 # Module mysql actif : le relais 127.0.0.1:3306, relancé comme celui de
 # postgres après chaque démarrage
 if bash "$ICI/devzone" is-enabled mysql; then
-    bash "$ICI/catalogue/mysql/mysql.sh" relais-lancer || echo "démarrage : relais mysql non lancé (devzone reparer)"
+    bash "$ICI/catalogue/mysql/mysql.sh" relay-start || echo "démarrage : relais mysql non lancé (devzone repair)"
 fi
 # Relais de ports vers le poste (#290) : l'IP du conteneur change à chaque
 # démarrage, chaque relais de l'état est recréé ; un échec n'empêche rien
-bash "$ICI/ports.sh" relancer || echo "démarrage : relais de ports non relancés (devzone reparer)"
+bash "$ICI/ports.sh" restart || echo "démarrage : relais de ports non relancés (devzone repair)"
 # Veilleur de ports automatiques vers le poste (#394, garde #293) : une seule
 # instance en arrière-plan, contexte réel posé pour cet appel seulement
-DEVZONE_PORTS_AUTO_REEL=oui bash "$ICI/ports-auto.sh" demarrer >/dev/null 2>&1 || echo "démarrage : veilleur de ports auto non lancé (devzone reparer)"
+DEVZONE_PORTS_AUTO_REEL=oui bash "$ICI/ports-auto.sh" demarrer >/dev/null 2>&1 || echo "démarrage : veilleur de ports auto non lancé (devzone repair)"
 # Catalogue d'applications : une ligne <app>=off par application absente,
 # écrite une fois, jamais une ligne existante modifiée (#414)
-bash "$ICI/catalogue.sh" synchroniser || echo "démarrage : catalogue non synchronisé (devzone reparer)"
+bash "$ICI/catalogue.sh" sync || echo "démarrage : catalogue non synchronisé (devzone repair)"
 # Veilleur du catalogue : réapplique à chaud dès que .devzone.modules change
-DEVZONE_CATALOGUE_REEL=oui bash "$ICI/catalogue/catalogue-veilleur.sh" demarrer >/dev/null 2>&1 || echo "démarrage : veilleur catalogue non lancé (devzone reparer)"
+DEVZONE_CATALOGUE_REEL=oui bash "$ICI/catalogue/catalogue-veilleur.sh" demarrer >/dev/null 2>&1 || echo "démarrage : veilleur catalogue non lancé (devzone repair)"
 
 # Vue regroupée des identifiants (#332), regénérée à chaque démarrage ; un
 # échec n'empêche rien et le contenu n'est jamais affiché
-bash "$ICI/password.sh" regenerer || echo "démarrage : identifiants regroupés non mis à jour (devzone reparer)"
+bash "$ICI/password.sh" regenerer || echo "démarrage : identifiants regroupés non mis à jour (devzone repair)"
 echo
 bash "$ICI/devzone"

@@ -7,7 +7,7 @@
 
 # Namespace isolé du module : un par instance, comme postgres
 GITLAB_NS="devzone-gitlab${INSTANCE_SUFFIX}"
-# Ancien cluster kind de GitLab, supprimé par « devzone gitlab migrer »
+# Ancien cluster kind de GitLab, supprimé par « devzone gitlab migrate »
 GITLAB_ANCIEN_CLUSTER="gitlab${INSTANCE_SUFFIX}"
 GITLAB_ANCIEN_CONTEXTE="kind-gitlab${INSTANCE_SUFFIX}"
 
@@ -55,7 +55,7 @@ gitlab_verifier_memoire_cluster() {
         return 2
     fi
     if [ "$memoire" -lt 8388608 ]; then
-        echo "devzone : gitlab : il faut au moins 8 Go de mémoire allouable dans le cluster (disponible : $((memoire / 1048576)) Go) ; agrandir le cluster (Docker Desktop → Settings → Resources) puis relancer : devzone activer gitlab" >&2
+        echo "devzone : gitlab : il faut au moins 8 Go de mémoire allouable dans le cluster (disponible : $((memoire / 1048576)) Go) ; agrandir le cluster (Docker Desktop → Settings → Resources) puis relancer : devzone enable gitlab" >&2
         return 2
     fi
     return 0
@@ -147,13 +147,13 @@ gitlab_installer() {
 
 # Retire GitLab : relais, releases Helm et namespace de l'instance seulement.
 # Le secret Rails est gardé (sessions du navigateur valides à la réinstallation),
-# sauf désinstallation complète voulue (--oui) : il part alors avec les données.
+# sauf désinstallation complète voulue (--yes) : il part alors avec les données.
 gitlab_desinstaller() {
     local supprimer_secret="" arg
     for arg in "$@"; do
         case "$arg" in
-            --oui) supprimer_secret=1 ;;
-            *) echo "devzone : gitlab desinstaller : argument inconnu : $arg" >&2; return 2 ;;
+            --yes) supprimer_secret=1 ;;
+            *) echo "devzone : gitlab uninstall : argument inconnu : $arg" >&2; return 2 ;;
         esac
     done
     echo "▶ Désinstallation de GitLab…"
@@ -180,13 +180,13 @@ gitlab_desinstaller() {
 }
 
 # Migration : installe et seed dans le cluster des services, puis supprime
-# l'ancien cluster kind-gitlab après confirmation (ou --oui).
+# l'ancien cluster kind-gitlab après confirmation (ou --yes).
 gitlab_migrer() {
     local oui="" arg reponse
     for arg in "$@"; do
         case "$arg" in
-            --oui) oui=1 ;;
-            *) echo "devzone : gitlab migrer : argument inconnu : $arg (devzone gitlab migrer [--oui])" >&2; return 2 ;;
+            --yes) oui=1 ;;
+            *) echo "devzone : gitlab migrate : argument inconnu : $arg (devzone gitlab migrate [--yes])" >&2; return 2 ;;
         esac
     done
 
@@ -201,7 +201,7 @@ gitlab_migrer() {
 
     if [ -z "$oui" ]; then
         if ! cluster_interactif; then
-            echo "devzone : gitlab : confirmation impossible sans terminal : devzone gitlab migrer --oui (ancien cluster $GITLAB_ANCIEN_CONTEXTE conservé)" >&2
+            echo "devzone : gitlab : confirmation impossible sans terminal : devzone gitlab migrate --yes (ancien cluster $GITLAB_ANCIEN_CONTEXTE conservé)" >&2
             return 2
         fi
         printf "Supprimer l'ancien cluster %s et ses données ? [o/N] " "$GITLAB_ANCIEN_CONTEXTE" >&2

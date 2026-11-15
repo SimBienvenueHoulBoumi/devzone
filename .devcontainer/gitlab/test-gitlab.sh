@@ -105,9 +105,9 @@ lire_jeton() {
 # plateforme de l'utilisateur changée.
 restaurer_plateforme() {
     if [ "$PLATEFORME_AVANT" = gitlab ] && [ -n "$URL_AVANT" ]; then
-        "$DEVZONE_BIN" plateforme gitlab --url "$URL_AVANT" >/dev/null 2>&1
+        "$DEVZONE_BIN" platform gitlab --url "$URL_AVANT" >/dev/null 2>&1
     else
-        "$DEVZONE_BIN" plateforme github >/dev/null 2>&1
+        "$DEVZONE_BIN" platform github >/dev/null 2>&1
     fi
 }
 
@@ -133,11 +133,11 @@ trap nettoyer EXIT
 
 # 1. Module : actif, sinon activé (l'activation installe aussi si besoin).
 etape_module() {
-    if "$DEVZONE_BIN" actif gitlab >/dev/null 2>&1; then
+    if "$DEVZONE_BIN" is-enabled gitlab >/dev/null 2>&1; then
         return 0
     fi
-    if ! "$DEVZONE_BIN" activer gitlab >/dev/null 2>&1; then
-        RAISON="devzone activer gitlab a échoué"
+    if ! "$DEVZONE_BIN" enable gitlab >/dev/null 2>&1; then
+        RAISON="devzone enable gitlab a échoué"
         return 1
     fi
     return 0
@@ -162,7 +162,7 @@ etape_etat() {
 # 3. Nom et relais : ssh et glab passent par le résolveur système ; curl et
 # git en HTTP résolvent *.localhost vers la boucle locale sans lire /etc/hosts.
 # gitlab.localhost doit donc pointer vers 127.0.0.1 ET les relais 8929/2224
-# doivent tourner dans le conteneur (gitlab.sh hote-poser, relais-lancer).
+# doivent tourner dans le conteneur (gitlab.sh hote-poser, relay-start).
 etape_nom() {
     local hote ip_nom relais
     hote="$(getent hosts gitlab.localhost 2>/dev/null || true)"
@@ -175,7 +175,7 @@ etape_nom() {
         RAISON="gitlab.localhost résolu vers $ip_nom, attendu 127.0.0.1"
         return 1
     fi
-    if ! relais="$(bash "$GITLAB" relais-etat 2>&1)"; then
+    if ! relais="$(bash "$GITLAB" relay-status 2>&1)"; then
         RAISON="gitlab.localhost pointe vers 127.0.0.1, mais ${relais:-relais gitlab arrêté}"
         return 1
     fi
@@ -273,8 +273,8 @@ etape_plateforme() {
     }
     TMP_DIRS+=("$d")
     PLATEFORME_CHANGEE=1
-    if ! "$DEVZONE_BIN" plateforme gitlab >/dev/null 2>&1; then
-        RAISON="devzone plateforme gitlab a échoué"
+    if ! "$DEVZONE_BIN" platform gitlab >/dev/null 2>&1; then
+        RAISON="devzone platform gitlab a échoué"
         return 1
     fi
     if ! "$GLAB" repo clone devzone/demo "$d/demo" >/dev/null 2>&1; then
@@ -341,7 +341,7 @@ etape_complet() {
     local restes="" instance namespace conteneurs
     instance="${DEVZONE_INSTANCE:-devzone}"
     namespace="devzone-gitlab${INSTANCE_SUFFIX}"
-    if ! "$DEVZONE_BIN" desactiver gitlab >/dev/null 2>&1; then
+    if ! "$DEVZONE_BIN" disable gitlab >/dev/null 2>&1; then
         restes="$restes désactivation en échec;"
     fi
     if kubectl --context devzone get namespace "$namespace" >/dev/null 2>&1; then

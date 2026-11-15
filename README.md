@@ -151,17 +151,17 @@ Un outil mis à la main (`sudo apt install tree`) ne survit pas à un `make rebu
 
 ```sh
 devzone packages
-devzone packages ajouter tree
-devzone packages retirer tree
-devzone packages appliquer
+devzone packages add tree
+devzone packages remove tree
+devzone packages apply
 ```
 
 - `devzone packages` affiche la liste : ✔ paquets installés, ○ paquets à installer ;
-- `devzone packages ajouter <nom>…` valide chaque paquet (apt-cache), installe puis l'ajoute à la liste ;
-- `devzone packages retirer <nom>` retire la liste et désinstalle ;
-- `devzone packages appliquer` installe les paquets manquants après un rebuild.
+- `devzone packages add <nom>…` valide chaque paquet (apt-cache), installe puis l'ajoute à la liste ;
+- `devzone packages remove <nom>` retire la liste et désinstalle ;
+- `devzone packages apply` installe les paquets manquants après un rebuild.
 
-La liste vit dans `.devzone.paquets` à la racine du dossier devzone, hors du dépôt. Un paquet en échec est signalé dans le récapitulatif (⚠ paquets : …) ; `devzone packages appliquer` peut alors être relancé.
+La liste vit dans `.devzone.paquets` à la racine du dossier devzone, hors du dépôt. Un paquet en échec est signalé dans le récapitulatif (⚠ paquets : …) ; `devzone packages apply` peut alors être relancé.
 
 ## Au quotidien
 
@@ -217,7 +217,7 @@ Dans le conteneur, le récapitulatif `devzone` signale une version publiée plus
 
 Ces modules sont désactivés par défaut, activables à la demande depuis le conteneur (sans rebuild), et leur choix est conservé d'un démarrage à l'autre.
 
-Les noms de premier niveau de la commande `devzone` sont en anglais (`enable`, `disable`, `platform`, `packages`, `update`, `uninstall`, `status`, `use`, `workspace …`) ; les sous-commandes (`postgres creer`, `packages ajouter`, `gitlab nouveau-mdp`, `port --fermer`, `cluster`…) gardent leur nom français jusqu'à leur bascule (#510, #532). Les anciens noms français de premier niveau restent acceptés.
+La commande `devzone` s'écrit en anglais, sous-commandes et options comprises (`enable`, `disable`, `platform`, `packages`, `update`, `uninstall`, `status`, `use` ; `postgres create`, `packages add`, `gitlab new-password`, `port --close`, `cluster --yes`). Les anciens noms français restent acceptés et écrivent un avertissement ; la table complète est dans [Anciens noms des commandes](manage/docs/reference.md#anciens-noms-des-commandes).
 
 ## Où sont mes identifiants ?
 
@@ -235,9 +235,9 @@ Le fichier est lisible par toi seul (600) et ignoré par git : ne le copie ni ne
 
 ```sh
 devzone passwords                  # régénère le fichier et affiche seulement son chemin
-devzone postgres creer <projet>         # création, ou nouveau mot de passe avec --nouveau-mdp
-devzone postgres supprimer <projet>     # suppression du compte et de sa ligne
-devzone gitlab nouveau-mdp [root|dev]  # mot de passe aléatoire (root ou dev) régénéré
+devzone postgres create <projet>         # création, ou nouveau mot de passe avec --new-password
+devzone postgres delete <projet>     # suppression du compte et de sa ligne
+devzone gitlab new-password [root|dev]  # mot de passe aléatoire (root ou dev) régénéré
 ```
 
 Les fichiers des modules restent la source : `workspace/.postgres/<projet>.env`, `workspace/.postgres/admin-password`, `workspace/.gitlab/root-password`, `workspace/.gitlab/dev-password` et `workspace/.argocd/admin.env`.
@@ -250,7 +250,7 @@ Le module `postgres` installe un PostgreSQL 16 partagé sur le cluster de devzon
 
 ```sh
 devzone enable postgres          # la première fois : choix du cluster (kind dédié ou cluster de l'hôte)
-devzone postgres creer monprojet  # base et utilisateur « monprojet »
+devzone postgres create monprojet  # base et utilisateur « monprojet »
 ```
 
 Les identifiants sont écrits dans `workspace/.postgres/monprojet.env` (lisible par toi seul, jamais commité) :
@@ -276,14 +276,14 @@ spring:
     password: ${DB_PASSWORD}
 ```
 
-Autres commandes : `devzone postgres liste`, `devzone postgres psql monprojet` (console), `devzone postgres supprimer monprojet`, `devzone cluster [CTX]` (voir ou changer de cluster). Détails dans [manage/docs/reference.md](manage/docs/reference.md#postgresql).
+Autres commandes : `devzone postgres list`, `devzone postgres psql monprojet` (console), `devzone postgres delete monprojet`, `devzone cluster [CTX]` (voir ou changer de cluster). Détails dans [manage/docs/reference.md](manage/docs/reference.md#postgresql).
 
 ### Voir le contenu de la base
 
 Dans le conteneur :
 
 ```sh
-devzone postgres liste              # les bases et leur propriétaire
+devzone postgres list              # les bases et leur propriétaire
 devzone postgres psql monprojet     # console SQL connectée à la base « monprojet », avec son utilisateur
 ```
 
@@ -312,11 +312,11 @@ kubectl --context docker-desktop -n devzone-postgres port-forward svc/postgres 5
 
 Puis, dans le client, une connexion PostgreSQL : hôte `localhost`, port `5432`, base, utilisateur et mot de passe lus dans `workspace/.postgres/monprojet.env` (`DB_NAME`, `DB_USER`, `DB_PASSWORD`). Dans IntelliJ : *View → Tool Windows → Database → + → Data Source → PostgreSQL*, puis *Test Connection* (fenêtre Database : IntelliJ Ultimate ; plugin *Database Navigator* sinon).
 
-« Connection refused » : le tunnel ne tourne pas, ou il a été lancé dans le conteneur. Une base recréée (`devzone postgres supprimer` puis `creer`, ou `creer --nouveau-mdp`) a un nouveau mot de passe : à reporter dans le client.
+« Connection refused » : le tunnel ne tourne pas, ou il a été lancé dans le conteneur. Une base recréée (`devzone postgres delete` puis `create`, ou `create --new-password`) a un nouveau mot de passe : à reporter dans le client.
 
 ### Droits : un utilisateur par base
 
-L'utilisateur d'un projet possède **sa** base (il y crée tables, index, données) et rien d'autre : il ne peut ni créer une base, ni se connecter à celle d'un autre projet. D'où, dans un client, `[42501] ERROR: permission denied to create database`. C'est voulu (les projets ne se voient pas). Pour une nouvelle base : `devzone postgres creer <projet>`, qui donne son propre utilisateur et son fichier `.env`.
+L'utilisateur d'un projet possède **sa** base (il y crée tables, index, données) et rien d'autre : il ne peut ni créer une base, ni se connecter à celle d'un autre projet. D'où, dans un client, `[42501] ERROR: permission denied to create database`. C'est voulu (les projets ne se voient pas). Pour une nouvelle base : `devzone postgres create <projet>`, qui donne son propre utilisateur et son fichier `.env`.
 
 > Le module `gitlab` a aussi son propre PostgreSQL (`gitlab-postgresql`) : il appartient à GitLab, n'y mets pas tes bases.
 
@@ -327,7 +327,7 @@ Une application lancée **dans** le conteneur (par exemple un Spring Boot avec `
 ```sh
 devzone port             # liste : relais manuels et automatiques, ● actif ou ○ arrêté
 devzone port auto off    # coupe le veilleur : plus de relais automatique
-devzone port --fermer <n> # retire un relais manuel et son port de l'état
+devzone port --close <n> # retire un relais manuel et son port de l'état
 ```
 
 `devzone port <n>` ouvre aussi un relais manuel : même mécanisme côté poste, conteneur `alpine/socat`, nom `devzone-<instance>-port-<n>`.
