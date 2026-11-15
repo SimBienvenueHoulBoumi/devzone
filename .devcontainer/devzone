@@ -944,7 +944,7 @@ appliquer_repowarden() {
     ligne="$(bash "$VERSIONS" --installees 2>/dev/null | awk '$1 == "repowarden"' || true)"
     [ -n "$ligne" ] || return 0
     read -r _ figee installee <<<"$ligne"
-    echo "devzone : installation de repowarden $figee…"
+    echo "devzone : installation de repowarden ${figee}…"
     npm install -g "$paquet@$figee" >/dev/null
     repowarden install --global --lang fr
     echo "devzone : repowarden $installee → $figee"

@@ -125,7 +125,7 @@ services_run() {
         trap - EXIT
         return 1
     fi
-    echo "▶ $action $service in the pod $POD…"
+    echo "▶ $action $service in the pod ${POD}…"
     # The installer of the pod takes --yes (#557) : no translation, no warning
     # shellcheck disable=SC2046
     printf '%s\n' "$token" | kubectl $(drapeau_kubectl) exec -i "$POD" --namespace "$NAMESPACE" \
