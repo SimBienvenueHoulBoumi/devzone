@@ -39,9 +39,9 @@ workspace_legacy_copies() {
     [ -n "$found" ] || return 0
     for d in $found; do dirs="$dirs $PROJECTS_DIR/$d"; done
     echo "⚠ legacy copies in the pod (their .git points outside the pod):$dirs"
-    echo "  save what you need first (devzone workspace copy-from <folder>), then remove them:"
-    # shellcheck disable=SC2046
-    echo "  kubectl $(kubectl_flag) exec $POD --namespace $NAMESPACE -c workspace -- rm -rf$dirs"
+    echo "  1. save what you need: devzone workspace copy-from <folder>"
+    echo "  2. remove them from the pod shell (devzone workspace shell), one folder at a time:"
+    for d in $found; do echo "       rm -rf $PROJECTS_DIR/$d"; done
 }
 
 # Script run in the pod: $1 pod folder, $2 remote of the workstation folder.

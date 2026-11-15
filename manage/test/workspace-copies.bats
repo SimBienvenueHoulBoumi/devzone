@@ -72,8 +72,11 @@ GIT
     run bash "$CLI" workspace status
     [ "$status" -eq 0 ]
     [[ "$output" == *"legacy copies in the pod"*"/workspaces/projets/repogarde /workspaces/projets/wt"* ]] || false
-    [[ "$output" == *"rm -rf /workspaces/projets/repogarde /workspaces/projets/wt"* ]] || false
+    [[ "$output" == *"rm -rf /workspaces/projets/repogarde"* ]] || false
+    [[ "$output" == *"rm -rf /workspaces/projets/wt"* ]] || false
     [[ "$output" == *"copy-from"* ]] || false
+    [[ "$output" == *"devzone workspace shell"* ]] || false
+    [[ "$output" != *"kubectl"* ]] || false
 }
 
 @test "status: healthy copies in the pod are not reported" {
