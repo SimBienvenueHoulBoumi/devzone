@@ -140,11 +140,11 @@ etat_json() {
                     ajouter_erreur modules "postgres.sh etat indisponible"
                 fi
             elif [ "$m" = argocd ]; then
-                if s="$(bash "$ICI/argocd/argocd.sh" etat 2>/dev/null)"; then
+                if s="$(bash "$ICI/argocd/argocd.sh" status 2>/dev/null)"; then
                     etat_val="$s"
                 else
                     etat_val=""
-                    ajouter_erreur modules "argocd.sh etat indisponible"
+                    ajouter_erreur modules "argocd.sh status indisponible"
                 fi
             elif [ "$m" = mysql ]; then
                 if s="$(bash "$ICI/catalogue/mysql/mysql.sh" status 2>/dev/null)"; then

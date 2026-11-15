@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Module argocd (#411) : Argo CD dans le cluster des services de devzone.
-#   argocd.sh installer | desinstaller | etat | relais-lancer | relais-arreter
+#   argocd.sh install | uninstall | status | relay-start | relay-stop
 #   argocd.sh app add <repo url> [path] [--name N] [--revision R] | app list | app remove <N>
 # Namespace devzone-argocd isolé, relais 127.0.0.1:8443 dans le conteneur.
 # Mot de passe admin dans workspace/.argocd/admin.env (600), repris dans
@@ -35,7 +35,7 @@ refuse() { echo "devzone : argocd : $*" >&2; exit 2; }
 # Vue regroupée des identifiants : un échec n'empêche jamais l'opération
 regenerer_identifiants() {
     password_regenerer ||
-        echo "devzone : argocd : identifiants regroupés non mis à jour (devzone mots-de-passe)" >&2
+        echo "devzone : argocd : identifiants regroupés non mis à jour (devzone passwords)" >&2
 }
 
 # Convertit une quantité de mémoire Kubernetes (Ki, Mi, Gi, K, M, G, octets)
@@ -83,7 +83,7 @@ verifier_memoire() {
         return 2
     fi
     if [ "$memoire" -lt 1048576 ]; then
-        echo "devzone : argocd : il faut au moins 1 Go de mémoire allouable dans le cluster (disponible : $((memoire / 1024)) Mo) ; agrandir le cluster (Docker Desktop → Settings → Resources) puis relancer : devzone activer argocd" >&2
+        echo "devzone : argocd : il faut au moins 1 Go de mémoire allouable dans le cluster (disponible : $((memoire / 1024)) Mo) ; agrandir le cluster (Docker Desktop → Settings → Resources) puis relancer : devzone enable argocd" >&2
         return 2
     fi
 }
@@ -221,13 +221,25 @@ ARGOCD_CONF="${DEVZONE_ARGOCD_CONF:-$RACINE/.argocd.conf}"
 # shellcheck disable=SC1091
 . "$ICI/apps.sh"
 argocd_kubectl() { kubectl --context devzone "$@"; }
+# English command names are accepted (#557) : a copied script may miss the file
+# shellcheck source=SCRIPTDIR/../command-aliases.sh
+# shellcheck disable=SC1091
+if [ -f "$ICI/../command-aliases.sh" ]; then
+    . "$ICI/../command-aliases.sh"
+fi
+# Subcommand and options become their canonical English names ; the old
+# French names warn on use (#557)
+if command -v canonical_args >/dev/null 2>&1; then
+    canonical_args argocd "$@"
+    set -- "${ARGS_CANONICAL[@]+"${ARGS_CANONICAL[@]}"}"
+fi
 
 case "${1:-}" in
-    installer) installer ;;
-    desinstaller) desinstaller ;;
-    etat) etat ;;
-    relais-lancer) relais ;;
-    relais-arreter) relais_arreter argocd ;;
+    install) installer ;;
+    uninstall) desinstaller ;;
+    status) etat ;;
+    relay-start) relais ;;
+    relay-stop) relais_arreter argocd ;;
     init)
         # GitOps repository of the user (#516): created or designated, then
         # the root Application when the module is installed
@@ -246,7 +258,7 @@ case "${1:-}" in
         argocd_app "${@:2}"
         ;;
     *)
-        echo "devzone argocd : installer | desinstaller | etat | init [--repo <url>|--none] | apply | app add|list|remove" >&2
+        echo "devzone argocd : install | uninstall | status | init [--repo <url>|--none] | apply | app add|list|remove" >&2
         exit 1
         ;;
 esac

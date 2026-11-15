@@ -70,7 +70,7 @@ NOHUP
 }
 
 teardown() {
-    bash "$ARGOCD" relais-arreter >/dev/null 2>&1 || true
+    bash "$ARGOCD" relay-stop >/dev/null 2>&1 || true
 }
 
 # Prépare un module déjà installé : namespace présent, admin.env et relais.
@@ -96,7 +96,7 @@ attendre_nohup() {
 @test "argocd : désactivé par défaut, état du module facultatif" {
     run bash "$DEVZONE" is-enabled argocd
     [ "$status" -ne 0 ]
-    run bash "$ARGOCD" etat
+    run bash "$ARGOCD" status
     [ "$status" -eq 0 ]
     [ "$output" = "désactivé" ]
 }
@@ -137,7 +137,7 @@ attendre_nohup() {
 
 @test "etat après installation : prêt, relais arrêté signalé" {
     argocd_installe
-    run bash "$ARGOCD" etat
+    run bash "$ARGOCD" status
     [ "$status" -eq 0 ]
     [[ "$output" == *"relais arrêté"* ]] || false
 }

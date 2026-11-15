@@ -594,20 +594,20 @@ appliquer_postgres() {
 appliquer_argocd() {
     local etat_courant
     if [ "$1" = on ]; then
-        etat_courant="$(bash "$ICI/argocd/argocd.sh" etat)"
+        etat_courant="$(bash "$ICI/argocd/argocd.sh" status)"
         # « relais arrêté » d'abord : cette ligne commence aussi par « prêt »
         if [[ "$etat_courant" == *"relais arrêté"* ]]; then
-            bash "$ICI/argocd/argocd.sh" relais-lancer
+            bash "$ICI/argocd/argocd.sh" relay-start
             echo "devzone : argocd : relais relancé"
         elif [[ "$etat_courant" == "prêt"* ]]; then
             echo "devzone : argocd déjà actif, rien à faire."
-        elif ! bash "$ICI/argocd/argocd.sh" installer; then
+        elif ! bash "$ICI/argocd/argocd.sh" install; then
             echo "argocd" >"$(fichier_echec argocd)"
             return 1
         fi
         rm -f "$(fichier_echec argocd)"
     else
-        bash "$ICI/argocd/argocd.sh" desinstaller
+        bash "$ICI/argocd/argocd.sh" uninstall
         rm -f "$(fichier_echec argocd)"
     fi
 }
@@ -1098,7 +1098,7 @@ reparer() {
         reparer_element "relais postgres" bash "$ICI/postgres/postgres.sh" relay-start
     fi
     if [ "$(valeur argocd)" = on ]; then
-        reparer_element "relais argocd" bash "$ICI/argocd/argocd.sh" relais-lancer
+        reparer_element "relais argocd" bash "$ICI/argocd/argocd.sh" relay-start
     fi
     if [ "$(valeur mysql)" = on ]; then
         reparer_element "relais mysql" bash "$ICI/catalogue/mysql/mysql.sh" relay-start
@@ -1258,7 +1258,7 @@ etat() {
         elif [ "$(valeur "$m")" = on ] && [ "$m" = postgres ]; then
             printf '  ✔ module %-10s %s\n' "$m" "$(bash "$ICI/postgres/postgres.sh" status)"
         elif [ "$(valeur "$m")" = on ] && [ "$m" = argocd ]; then
-            printf '  ✔ module %-10s %s\n' "$m" "$(bash "$ICI/argocd/argocd.sh" etat)"
+            printf '  ✔ module %-10s %s\n' "$m" "$(bash "$ICI/argocd/argocd.sh" status)"
         elif [ "$(valeur "$m")" = on ] && [ "$m" = mysql ]; then
             printf '  ✔ module %-10s %s\n' "$m" "$(bash "$ICI/catalogue/mysql/mysql.sh" status)"
         elif [ "$(valeur "$m")" = on ]; then

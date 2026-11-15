@@ -37,7 +37,7 @@ fi
 # Module argocd actif : relais (port-forward vers 127.0.0.1:8443), relancé
 # après les clusters comme celui de postgres
 if bash "$ICI/devzone" is-enabled argocd; then
-    bash "$ICI/argocd/argocd.sh" relais-lancer || echo "démarrage : relais argocd non lancé (devzone reparer)"
+    bash "$ICI/argocd/argocd.sh" relay-start || echo "démarrage : relais argocd non lancé (devzone reparer)"
 fi
 # Module mysql actif : le relais 127.0.0.1:3306, relancé comme celui de
 # postgres après chaque démarrage

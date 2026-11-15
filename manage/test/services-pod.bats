@@ -149,7 +149,7 @@ admin_setup() {
 #!/usr/bin/env bash
 T="$BATS_TEST_TMPDIR"
 echo "devzone $*" >>"$T/devzone.log"
-if [ "${1:-}" != relais-arreter ] && [ "${2:-}" != relais-arreter ]; then
+if [ "${1:-}" != relay-stop ] && [ "${2:-}" != relay-stop ]; then
     [ -n "${KUBECONFIG:-}" ] && [ -f "$KUBECONFIG" ] && cp "$KUBECONFIG" "$T/kubeconfig.copy"
     cp "$DEVZONE_ETAT" "$T/etat.during" 2>/dev/null || true
     printf 'admin=%s kube=%s\n' "${DEVZONE_SERVICES_ADMIN:-}" "${DEVZONE_KUBE_CONFIG:-}" >"$T/devzone.env"
@@ -167,7 +167,7 @@ DZ
     [ "$status" -eq 0 ]
     [[ "$output" != *"SECRET-TOKEN"* ]] || false
     grep -q '^devzone enable postgres --contexte x$' "$T/devzone.log"
-    grep -q '^devzone postgres relais-arreter$' "$T/devzone.log"
+    grep -q '^devzone postgres relay-stop$' "$T/devzone.log"
     grep -q 'token: SECRET-TOKEN' "$T/kubeconfig.copy"
     grep -q 'name: devzone-admin' "$T/kubeconfig.copy"
     grep -q 'name: devzone$' "$T/kubeconfig.copy"
@@ -195,7 +195,7 @@ DZ
     export FAKE_DEVZONE_FAIL=1
     run bash -c 'printf "tok\n" | bash "$0" enable gitlab' "$ADMIN"
     [ "$status" -eq 1 ]
-    grep -q '^devzone gitlab relais-arreter$' "$T/devzone.log"
+    grep -q '^devzone gitlab relay-stop$' "$T/devzone.log"
     grep -qx 'cluster=kind-devzone' "$DEVZONE_ETAT"
     [ -z "$(ls "${TMPDIR:-/tmp}"/devzone-services-admin.* 2>/dev/null)" ]
 }

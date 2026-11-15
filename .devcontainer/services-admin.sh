@@ -62,7 +62,7 @@ cluster_before="$(grep -E '^cluster=' "$ETAT" 2>/dev/null | tail -1 | cut -d= -f
 # cluster line of the state as before
 cleanup() {
     rm -f "$kubeconfig"
-    devzone "$service" relais-arreter >/dev/null 2>&1 || true
+    devzone "$service" relay-stop >/dev/null 2>&1 || true
     if [ -n "$cluster_before" ]; then
         etat_ecrire cluster "$cluster_before" || true
     else
