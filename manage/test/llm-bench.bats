@@ -42,7 +42,11 @@ case "$*" in
         # still running for BENCH_RUNS polls, then done
         n=$(($(cat "$T/polls" 2>/dev/null || echo 0) + 1)); echo "$n" >"$T/polls"
         if [ "$n" -gt "${BENCH_RUNS:-0}" ]; then echo "1/"; else echo "/"; fi ;;
-    *"get pods -l app=llm-bench"*) echo "${BENCH_PHASE:-Pending}" ;;
+    *"get pods -l app=llm-bench"*)
+        # one line of pods.seq per call (startedAt|terminated reason), the last one repeats
+        n=$(($(cat "$T/pods.n" 2>/dev/null || echo 0) + 1)); echo "$n" >"$T/pods.n"
+        line="$(sed -n "${n}p" "$T/pods.seq")"; [ -n "$line" ] || line="$(tail -n 1 "$T/pods.seq")"
+        echo "$line" ;;
     *"logs job/llm-bench"*) cat "$T/bench.out" 2>/dev/null ;;
     *"rollout status"*) ;;
     *"readyReplicas"*) echo 1 ;;
@@ -56,6 +60,7 @@ KUBE
 exec sleep 300
 NOHUP
     chmod +x "$BATS_TEST_TMPDIR"/bin/*
+    printf '|\n' >"$BATS_TEST_TMPDIR/pods.seq"
     helm_fake_install
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
     printf '[\n{"n_threads": 4, "n_prompt": 128, "n_gen": 0, "avg_ts": 60},\n{"n_threads": 4, "n_prompt": 0, "n_gen": 32, "avg_ts": 9}\n]\n' >"$BATS_TEST_TMPDIR/bench.out"
@@ -67,7 +72,7 @@ teardown() {
 }
 
 @test "llm bench: a progress line at the start, then one per interval, with the phase and the elapsed time" {
-    BENCH_RUNS=5 BENCH_PHASE=Pending LLM_BENCH_POLL=1 LLM_BENCH_SIGNE=2 run bash "$LLM" bench
+    BENCH_RUNS=5 LLM_BENCH_POLL=1 LLM_BENCH_SIGNE=2 run bash "$LLM" bench
     [ "$status" -eq 0 ]
     [[ "$output" == *"… pulling the image, 0s elapsed"* ]] || false
     [[ "$output" == *"… pulling the image, 2s elapsed"* ]] || false
@@ -75,10 +80,33 @@ teardown() {
     [[ "$output" != *"3s elapsed"* ]] || false
 }
 
-@test "llm bench: the progress line says measuring once the pod runs" {
-    BENCH_RUNS=2 BENCH_PHASE=Running LLM_BENCH_POLL=1 LLM_BENCH_SIGNE=1 run bash "$LLM" bench
+@test "llm bench: the progress line says measuring once the container runs" {
+    printf '2026-11-15T10:00:00Z|\n' >"$BATS_TEST_TMPDIR/pods.seq"
+    BENCH_RUNS=2 LLM_BENCH_POLL=1 LLM_BENCH_SIGNE=1 run bash "$LLM" bench
     [ "$status" -eq 0 ]
     [[ "$output" == *"… measuring, 1s elapsed"* ]] || false
+    [[ "$output" != *"pulling the image"* ]] || false
+}
+
+@test "llm bench: the phase never goes back to pulling once measuring" {
+    # ContainerCreating, then running, then waiting again (a stale or replaced pod)
+    printf '|\n2026-11-15T10:00:00Z|\n|\n' >"$BATS_TEST_TMPDIR/pods.seq"
+    BENCH_RUNS=6 LLM_BENCH_POLL=1 LLM_BENCH_SIGNE=1 run bash "$LLM" bench
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"… pulling the image, 0s elapsed"* ]] || false
+    [[ "$output" == *"… measuring, 1s elapsed"* ]] || false
+    [[ "$output" == *"… measuring, 5s elapsed"* ]] || false
+    [[ "$output" != *"pulling the image, 2s"* ]] || false
+    [[ "$output" != *"pulling the image, 3s"* ]] || false
+    [[ "$output" != *"pulling the image, 4s"* ]] || false
+    [ "$(cat "$BATS_TEST_TMPDIR/pods.n")" -eq 2 ]
+}
+
+@test "llm bench: a terminated container counts as measuring" {
+    printf '|Completed\n' >"$BATS_TEST_TMPDIR/pods.seq"
+    BENCH_RUNS=2 LLM_BENCH_POLL=1 LLM_BENCH_SIGNE=1 run bash "$LLM" bench
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"… measuring, 0s elapsed"* ]] || false
     [[ "$output" != *"pulling the image"* ]] || false
 }
 

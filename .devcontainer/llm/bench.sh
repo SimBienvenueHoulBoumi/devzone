@@ -21,19 +21,23 @@ bench_present() { k get deployment llm >/dev/null 2>&1; }
 # Job deleted (no error when it is already gone)
 bench_cleanup() { k delete job "$BENCH_JOB" --ignore-not-found --wait=false >/dev/null 2>&1 || true; }
 
-# Phase of the Job for the progress line: the pod is Pending while the image
-# is pulled, Running while llama-bench measures
+# Phase of the Job for the progress line, read from the state of the container
+# (not the phase of the pod): waiting (ContainerCreating, PullImage...) is
+# pulling, running or terminated is measuring. The caller keeps the phase
+# monotone: once measuring, it never goes back to pulling.
 bench_phase() {
-    case "$(k get pods -l app=llm-bench -o jsonpath='{.items[0].status.phase}' 2>/dev/null || true)" in
-        Running) echo "measuring" ;;
-        *) echo "pulling the image" ;;
+    local etat
+    etat="$(k get pods -l app=llm-bench -o jsonpath='{.items[0].status.containerStatuses[0].state.running.startedAt}|{.items[0].status.containerStatuses[0].state.terminated.reason}' 2>/dev/null || true)"
+    case "$etat" in
+        "|" | "") echo "pulling the image" ;;
+        *) echo "measuring" ;;
     esac
 }
 
 # Waits for the Job: 0 done, 1 failed, 2 timeout. Writes a line (phase,
 # elapsed time) at least every LLM_BENCH_SIGNE seconds
 bench_wait() {
-    local waited=0 poll="${LLM_BENCH_POLL:-5}" limit="${LLM_BENCH_ATTENTE:-1800}" beat="${LLM_BENCH_SIGNE:-30}" st last=""
+    local waited=0 poll="${LLM_BENCH_POLL:-5}" limit="${LLM_BENCH_ATTENTE:-1800}" beat="${LLM_BENCH_SIGNE:-30}" st last="" phase="pulling the image"
     while [ "$waited" -lt "$limit" ]; do
         st="$(k get job "$BENCH_JOB" -o jsonpath='{.status.succeeded}/{.status.failed}' 2>/dev/null || true)"
         case "$st" in
@@ -41,7 +45,9 @@ bench_wait() {
             */[1-9]*) return 1 ;;
         esac
         if [ -z "$last" ] || [ $((waited - last)) -ge "$beat" ]; then
-            echo "  … $(bench_phase), ${waited}s elapsed"
+            # Monotone: once measuring, the phase is not read again
+            [ "$phase" = measuring ] || phase="$(bench_phase)"
+            echo "  … $phase, ${waited}s elapsed"
             last=$waited
         fi
         sleep "$poll"
