@@ -4,6 +4,10 @@
 # kubectl_flag, copy_to and copy_from. Nothing is ever deleted except by
 # clean-docker, after confirmation. Run from the devzone workstation folder.
 
+# Docker workstation sleep on migrate (stop here, start in migrer-retour.sh).
+# shellcheck source=manage/scripts/docker-workstation.sh
+. "$(dirname "${BASH_SOURCE[0]}")/docker-workstation.sh"
+
 # vscode home in the pod and image used to copy Docker volumes.
 POD_HOME="/home/vscode"
 COPY_IMAGE="${DEVZONE_IMAGE_COPIE:-busybox:1.36}"
@@ -192,9 +196,11 @@ record_workspace() {
 }
 
 # Step 5: switch, workspace=kubernetes recorded on workstation; nothing is deleted.
+# The Docker workstation containers and port relays are stopped, not removed (#517).
 step_switch() {
     echo "▶ [5/5] switch: workspace=kubernetes in .devzone.modules"
     record_workspace kubernetes || { fail "cannot write .devzone.modules"; return 1; }
+    docker_workstation_stop "$PWD"
     echo "  ✔ done; Docker workstation and its volumes are intact (rollback: devzone workspace revert)"
 }
 

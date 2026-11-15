@@ -211,6 +211,16 @@ SS
     [ "$(grep -c 'docker run' "$BATS_TEST_TMPDIR/docker.log")" -eq 0 ]
 }
 
+@test "kubernetes : demarrer sort à 0 sans veilleur ni relais docker (#517)" {
+    # Avant le garde-fou : même sous bats, le mode Kubernetes ne refuse pas, il ne lance rien
+    DEVZONE_WORKSPACE=kubernetes run bash "$PORTS_AUTO" demarrer
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"ports go through devzone workspace ports"* ]] || false
+    [ ! -s "$BATS_TEST_TMPDIR/docker.log" ] || false
+    [ ! -s "$BATS_TEST_TMPDIR/socat.log" ] || false
+    [ ! -e "$DEVZONE_PORTS_AUTO_DIR/devzone/verrou" ] || false
+}
+
 @test "veilleur : verrou recyclé d'une instance morte, tenu par une vivante qui le rafraît, volé si rouillé" {
     run bash -c '
     . "$1"

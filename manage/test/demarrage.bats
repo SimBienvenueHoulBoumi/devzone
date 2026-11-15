@@ -54,3 +54,26 @@ setup() {
     [[ "$output" != *"deprecated"* ]] || false
     [[ "$stderr" != *"deprecated"* ]] || false
 }
+
+@test "demarrage : workspace Kubernetes, pas de veilleur de ports auto (#517)" {
+    # Même environnement factice que le test précédent. Sous bats le veilleur
+    # refuse (code 2) : le message « non lancé » ne paraît que hors Kubernetes.
+    mkdir -p "$BATS_TEST_TMPDIR/bin" "$BATS_TEST_TMPDIR/racine/workspace" \
+        "$BATS_TEST_TMPDIR/ports-auto" "$BATS_TEST_TMPDIR/home"
+    for outil in docker kubectl gh socat; do
+        printf '#!/usr/bin/env bash\nexit 1\n' >"$BATS_TEST_TMPDIR/bin/$outil"
+        chmod +x "$BATS_TEST_TMPDIR/bin/$outil"
+    done
+    export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
+    export DEVZONE_RACINE="$BATS_TEST_TMPDIR/racine"
+    export DEVZONE_ETAT="$BATS_TEST_TMPDIR/racine/.devzone.modules"
+    export DEVZONE_PORTS_AUTO_DIR="$BATS_TEST_TMPDIR/ports-auto"
+    export HOME="$BATS_TEST_TMPDIR/home"
+    export GIT_CONFIG_NOSYSTEM=1
+    DEVZONE_WORKSPACE=kubernetes run bash "$DEMARRAGE"
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"veilleur de ports auto non lancé"* ]] || false
+    run bash "$DEMARRAGE"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"veilleur de ports auto non lancé"* ]] || false
+}

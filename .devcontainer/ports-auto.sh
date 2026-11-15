@@ -234,7 +234,7 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
 case "${1:-}" in
     ''|boucle|loop) if ! garde_veilleur; then exit 2; fi; ports_auto_boucle ;;
     tour|one|un-tour) ports_auto_tour ;;
-    demarrer|start|lancer) if ! garde_veilleur; then exit 2; fi; if kill -0 "$(cat "$VERROU/pid" 2>/dev/null)" 2>/dev/null; then echo "déjà lancé"; else DEVZONE_PORTS_AUTO_REEL=oui bash "$0" boucle >/dev/null 2>&1 & echo "lancé"; fi ;;
+    demarrer|start|lancer) if [ "${DEVZONE_WORKSPACE:-}" = kubernetes ]; then echo "ports: Kubernetes workspace, ports go through devzone workspace ports"; exit 0; fi; if ! garde_veilleur; then exit 2; fi; if kill -0 "$(cat "$VERROU/pid" 2>/dev/null)" 2>/dev/null; then echo "déjà lancé"; else DEVZONE_PORTS_AUTO_REEL=oui bash "$0" boucle >/dev/null 2>&1 & echo "lancé"; fi ;;
     arreter|stop) arreter_veilleur; echo "arrêté" ;;
     nettoyer|clean) nettoyer_auto_tout ;;
     auto) case "${2:-}" in on) ecrire ports_auto on; echo "✔ ports auto activés" ;; off) ecrire ports_auto off; arreter_veilleur; echo "✔ ports auto désactivés" ;; *) echo "devzone : port : auto on|off" >&2; exit 2 ;; esac ;;
