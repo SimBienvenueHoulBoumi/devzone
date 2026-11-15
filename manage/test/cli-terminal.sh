@@ -134,7 +134,7 @@ conteneur "devzone enable <module inconnu> : refusé" 60 1 "module inconnu" "dev
 conteneur "devzone <commande inconnue> : refusée" 60 1 "commande inconnue" "devzone nexistepas"
 
 echo "▶ Scripts de démarrage, sous terminal"
-conteneur "demarrage.sh : sans question" 180 0 "devzone : état" "bash .devcontainer/demarrage.sh"
+conteneur "demarrage.sh : sans question" 180 0 "devzone: state" "bash .devcontainer/demarrage.sh"
 # Conditions de make rebuild figé : dépôt GitHub, gh connecté et administrateur
 # (simulé) ; repowarden install proposait alors les bots et attendait
 git -C "$COPIE" init -q
