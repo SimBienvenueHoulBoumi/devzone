@@ -20,7 +20,7 @@ case "$*" in
             if (.hooks.PreToolUse // null) != null then
                 .hooks.PreToolUse = [
                     .hooks.PreToolUse[] |
-                    .hooks = [ (.hooks // [])[] | select(((.command // "") | contains("repowarden garde")) | not) ] |
+                    .hooks = [ (.hooks // [])[] | select(((.command // "") | (contains("repowarden garde") or contains("repowarden guard"))) | not) ] |
                     select((.hooks | length) > 0)
                 ] |
                 if (.hooks.PreToolUse | length) == 0 then del(.hooks.PreToolUse) else . end |
@@ -442,6 +442,41 @@ JSON
     ! grep -q "repowarden" "$HOME/.claude/settings.json" || false
     [ -f "$HOME/.config/opencode/opencode.jsonc" ]
     [ "$(cat "$HOME/.config/opencode/opencode.jsonc")" = '{"model":"mon-modele"}' ]
+}
+
+@test "désactiver ia : hook « repowarden guard » (repowarden 4.17.3) retiré sans repowarden, réglages gardés" {
+    # Sans repowarden sur le PATH : c'est le retrait par jq de devzone qui s'exécute
+    install_faux_repowarden
+    rm -f "$BATS_TEST_TMPDIR/bin/repowarden"
+    mkdir -p "$HOME/.claude"
+    cat >"$HOME/.claude/settings.json" <<'JSON'
+{
+  "model": "claude-personnel",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "repowarden guard --format claude"
+          },
+          {
+            "type": "command",
+            "command": "outil-personnel"
+          }
+        ]
+      }
+    ]
+  }
+}
+JSON
+    PATH="$BATS_TEST_TMPDIR/bin:/usr/bin:/bin" run bash "$DEVZONE" disable ia
+    [ "$status" -eq 0 ]
+    [ -f "$HOME/.claude/settings.json" ]
+    grep -q "claude-personnel" "$HOME/.claude/settings.json"
+    grep -q "outil-personnel" "$HOME/.claude/settings.json"
+    ! grep -q "repowarden" "$HOME/.claude/settings.json" || false
 }
 
 @test "désactiver kubernetes : metrics-server retiré seulement du contexte marqué, les autres laissés" {

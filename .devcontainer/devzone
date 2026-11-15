@@ -421,8 +421,10 @@ appliquer_ia() {
         rm -f "$(fichier_echec ia)"
         # Garde-fou repowarden : retiré à la désactivation (symétrique de
         # l'activation). repowarden le fait lui-même s'il est présent ; sinon
-        # retrait par jq de la seule entrée PreToolUse qui appelle
-        # « repowarden garde », le reste de settings.json intact.
+        # retrait par jq des seules entrées PreToolUse qui appellent le garde-fou,
+        # le reste de settings.json intact. Le garde-fou s'appelle « repowarden
+        # guard » depuis repowarden 4.17.3 ; « repowarden garde » est son ancien
+        # nom, toujours alias côté repowarden et reconnu ici.
         if command -v repowarden >/dev/null 2>&1; then
             repowarden agents retirer --global >/dev/null 2>&1 || true
         elif [ -f "$HOME/.claude/settings.json" ]; then
@@ -432,10 +434,10 @@ appliquer_ia() {
                     .hooks.PreToolUse = [
                         .hooks.PreToolUse[] |
                         if (.hooks // null) != null then
-                            .hooks = [ .hooks[] | select(((.command // "") | contains("repowarden garde")) | not) ] |
+                            .hooks = [ .hooks[] | select(((.command // "") | (contains("repowarden garde") or contains("repowarden guard"))) | not) ] |
                             select((.hooks | length) > 0)
                         else
-                            select(((.command // "") | contains("repowarden garde")) | not)
+                            select(((.command // "") | (contains("repowarden garde") or contains("repowarden guard"))) | not)
                         end
                     ] |
                     if (.hooks.PreToolUse | length) == 0 then del(.hooks.PreToolUse) else . end |

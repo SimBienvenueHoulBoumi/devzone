@@ -29,7 +29,7 @@ ARG BUILDKIT_SHA256_ARM64=a4ad483a33b2f1544c5ccce1c5956c559e1a6e84b8bf6cedd847d6
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 # Contrôles shell de repowarden ; jq : lu par son garde-fou des agents IA
-# (repowarden garde, module ia), qui sans lui ne vérifie rien
+# (repowarden guard, module ia), qui sans lui ne vérifie rien
 # Python 3.12 d Ubuntu 24.04, paquets signés par apt, aucun serveur de clés (#464)
 RUN apt-get -o Acquire::Retries=5 update \
     && apt-get -o Acquire::Retries=5 install -y --no-install-recommends shellcheck bats jq python3 python3-venv python3-pip python-is-python3 \
