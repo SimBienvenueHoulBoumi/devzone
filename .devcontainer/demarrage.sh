@@ -48,8 +48,11 @@ fi
 # démarrage, chaque relais de l'état est recréé ; un échec n'empêche rien
 bash "$ICI/ports.sh" restart || echo "démarrage : relais de ports non relancés (devzone repair)"
 # Veilleur de ports automatiques vers le poste (#394, garde #293) : une seule
-# instance en arrière-plan, contexte réel posé pour cet appel seulement
-DEVZONE_PORTS_AUTO_REEL=oui bash "$ICI/ports-auto.sh" demarrer >/dev/null 2>&1 || echo "démarrage : veilleur de ports auto non lancé (devzone repair)"
+# instance en arrière-plan, contexte réel posé pour cet appel seulement.
+# Kubernetes workspace (#517): no watcher, ports go through devzone workspace ports
+if [ "${DEVZONE_WORKSPACE:-}" != kubernetes ]; then
+    DEVZONE_PORTS_AUTO_REEL=oui bash "$ICI/ports-auto.sh" demarrer >/dev/null 2>&1 || echo "démarrage : veilleur de ports auto non lancé (devzone repair)"
+fi
 # Catalogue d'applications : une ligne <app>=off par application absente,
 # écrite une fois, jamais une ligne existante modifiée (#414)
 bash "$ICI/catalogue.sh" sync || echo "démarrage : catalogue non synchronisé (devzone repair)"
