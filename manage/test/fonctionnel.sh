@@ -95,7 +95,7 @@ echo "▶ Premier démarrage (récapitulatif affiché au démarrage)"
 reussit "modules désactivés par défaut" "devzone" "○ module ia"
 reussit "kubernetes désactivé par défaut" "devzone" "○ module kubernetes"
 echoue "assistants IA absents" "command -v claude"
-for message in "✖ identité git" "○ GitHub          facultatif" "○ module ia"; do
+for message in "✖ git identity" "○ GitHub          optional" "○ module ia"; do
     if grep -q "$message" "$JOURNAL"; then ok "message : $message"; else ko "message : $message" "$(tail -5 "$JOURNAL")"; fi
 done
 

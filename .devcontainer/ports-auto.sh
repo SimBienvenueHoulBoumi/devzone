@@ -36,7 +36,7 @@ garde_veilleur() {
         return 2
     fi
     [ "${DEVZONE_PORTS_AUTO_REEL:-}" = oui ] && return 0
-    echo "devzone : port : veilleur automatique refusé ici : lancer plutôt devzone reparer" >&2
+    echo "devzone : port : veilleur automatique refusé ici : lancer plutôt devzone repair" >&2
     return 2
 }
 
@@ -199,7 +199,7 @@ ports_auto_liste() {
             [ -n "$port" ] || continue
             if grep -qxF "$port" "$OCCUPES" 2>/dev/null; then printf '  %-5s %s  auto\n' "$port" "occupé sur le poste"; continue; fi
             if relais_auto_actif "$port"; then marque="● actif"; else marque="○ arrêté"; fi
-            if application_repond "$port"; then app="application répond"; else app="aucune application"; fi
+            if application_repond "$port"; then app="$APP_REPOND"; else app="$APP_AUCUNE"; fi
             printf '  %-5s %s  auto  %s\n' "$port" "$marque" "$app"
         done <"$ACTIFS"
     fi
@@ -224,7 +224,7 @@ ports_auto_liste_json() {
             json="$(jq -c --argjson port "$port" '. + [{port:$port,actif:false,application:"occupé sur le poste",auto:true}]' <<<"$json")"; continue
         fi
         if relais_auto_actif "$port"; then actif=true; else actif=false; fi
-        if application_repond "$port"; then app="application répond"; else app="aucune application"; fi
+        if application_repond "$port"; then app="$APP_REPOND"; else app="$APP_AUCUNE"; fi
         json="$(jq -c --argjson port "$port" --argjson actif "$actif" --arg app "$app" '. + [{port:$port,actif:$actif,application:$app,auto:true}]' <<<"$json")"
     done <<<"$ports"
     printf '%s\n' "$json"
@@ -238,8 +238,8 @@ case "${1:-}" in
     arreter|stop) arreter_veilleur; echo "arrêté" ;;
     nettoyer|clean) nettoyer_auto_tout ;;
     auto) case "${2:-}" in on) ecrire ports_auto on; echo "✔ ports auto activés" ;; off) ecrire ports_auto off; arreter_veilleur; echo "✔ ports auto désactivés" ;; *) echo "devzone : port : auto on|off" >&2; exit 2 ;; esac ;;
-    exclure) ports_auto_exclure "${2:-}" ;;
-    inclure) ports_auto_inclure "${2:-}" ;;
+    exclude|exclure) ports_auto_exclure "${2:-}" ;;
+    include|inclure) ports_auto_inclure "${2:-}" ;;
     liste_auto) ports_auto_liste ;;
     liste_json_auto) ports_auto_liste_json ;;
     -h|--help|aide) sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//' ;;

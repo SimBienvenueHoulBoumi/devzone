@@ -105,7 +105,7 @@ GETENT
 }
 
 teardown() {
-    bash "$MYSQL" relais-arreter >/dev/null 2>&1 || true
+    bash "$MYSQL" relay-stop >/dev/null 2>&1 || true
 }
 
 attendre_nohup() {
@@ -121,11 +121,11 @@ attendre_nohup() {
 
 @test "synchroniser : mysql=off ajouté une fois, ligne existante respectée" {
     printf 'autre=off\n' >"$DEVZONE_ETAT"
-    run bash "$CATALOGUE" synchroniser
+    run bash "$CATALOGUE" sync
     [ "$status" -eq 0 ] || false
     grep -qx 'mysql=off' "$DEVZONE_ETAT" || false
-    grep -qF '# Applications du catalogue : passer à on pour installer (devzone catalogue)' "$DEVZONE_ETAT" || false
-    run bash "$CATALOGUE" synchroniser
+    grep -qF '# Applications du catalogue : passer à on pour installer (devzone catalog)' "$DEVZONE_ETAT" || false
+    run bash "$CATALOGUE" sync
     [ "$status" -eq 0 ] || false
     [ "$(grep -c '^mysql=' "$DEVZONE_ETAT")" -eq 1 ] || false
     [ "$(grep -cF '# Applications du catalogue' "$DEVZONE_ETAT")" -eq 1 ] || false
@@ -133,15 +133,15 @@ attendre_nohup() {
 
 @test "synchroniser respecte une ligne existante (mysql=on garde sa valeur)" {
     printf 'mysql=on\n' >"$DEVZONE_ETAT"
-    run bash "$CATALOGUE" synchroniser
+    run bash "$CATALOGUE" sync
     [ "$status" -eq 0 ] || false
     grep -qx 'mysql=on' "$DEVZONE_ETAT" || false
 }
 
 @test "synchroniser concurrent : mysql=off ajouté une fois, ligne existante respectée" {
     printf 'ia=on\nautre=off\n' >"$DEVZONE_ETAT"
-    bash "$CATALOGUE" synchroniser & pid_a=$!
-    bash "$CATALOGUE" synchroniser & pid_b=$!
+    bash "$CATALOGUE" sync & pid_a=$!
+    bash "$CATALOGUE" sync & pid_b=$!
     wait "$pid_a"
     wait "$pid_b"
     grep -qx 'mysql=off' "$DEVZONE_ETAT" || false
@@ -149,8 +149,20 @@ attendre_nohup() {
     [ "$(grep -c '^mysql=' "$DEVZONE_ETAT")" -eq 1 ] || false
 }
 
-@test "appliquer : mysql=on installe (manifest, secret, relais 127.0.0.1:3306)" {
-    printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_ETAT"
+@test "synchroniser : l alias francais donne le meme resultat que le nom anglais, avec l avertissement" {
+    printf 'autre=off\n' >"$DEVZONE_ETAT"
+    run --separate-stderr bash "$CATALOGUE" sync
+    [ "$status" -eq 0 ] || false
+    [[ "$stderr" != *"deprecated"* ]] || false
+    grep -qx 'mysql=off' "$DEVZONE_ETAT" || false
+    printf 'autre=off\n' >"$DEVZONE_ETAT"
+    run --separate-stderr bash "$CATALOGUE" synchroniser
+    [ "$status" -eq 0 ] || false
+    [[ "$stderr" == *"devzone: \"synchroniser\" is deprecated, use \"sync\""* ]] || false
+    grep -qx 'mysql=off' "$DEVZONE_ETAT" || false
+}
+
+@test "appliquer : mysql=on installe (manifest, secret, relais 127.0.0.1:3306)" {    printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_ETAT"
     run bash "$DEVZONE" apply
     [ "$status" -eq 0 ] || false
     grep -q 'image: mysql:8.4' "$BATS_TEST_TMPDIR/apply.log" || false
@@ -188,7 +200,7 @@ attendre_nohup() {
 @test "catalogue appliquer : mysql=on réutilise le PVC du namespace" {
     printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_ETAT"
     printf 'data-mysql-0\n' >"$BATS_TEST_TMPDIR/pvcs"
-    run bash "$CATALOGUE" appliquer
+    run bash "$CATALOGUE" apply
     [ "$status" -eq 0 ] || false
     grep -q 'name: data' "$BATS_TEST_TMPDIR/apply.log" || false
     [[ "$(cat "$BATS_TEST_TMPDIR/apply.log")" != *"name: donnees"* ]] || false
@@ -222,10 +234,10 @@ attendre_nohup() {
     [ "$status" -eq 0 ] || false
     [[ "$output" == *"✖ module mysql"* ]] || false
     [[ "$output" == *"✖ application mysql en échec"* ]] || false
-    [[ "$output" == *"devzone appliquer"* ]] || false
+    [[ "$output" == *"devzone apply"* ]] || false
 }
 
-@test "resume : application installée, relais arrêté, avertit et propose devzone reparer" {
+@test "resume : application installée, relais arrêté, avertit et propose devzone repair" {
     touch "$BATS_TEST_TMPDIR/ns" "$BATS_TEST_TMPDIR/sts" "$BATS_TEST_TMPDIR/ready"
     printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_ETAT"
     run bash "$DEVZONE"
@@ -233,7 +245,7 @@ attendre_nohup() {
     ligne="$(printf '%s\n' "$output" | grep 'application mysql' || true)"
     ligne="${ligne#"${ligne%%[![:space:]]*}"}"
     [[ "$ligne" == "⚠ application mysql"* ]] || false
-    [[ "$ligne" == *"devzone reparer"* ]] || false
+    [[ "$ligne" == *"devzone repair"* ]] || false
     [[ "$ligne" != *"✔"* ]] || false
 }
 
@@ -252,7 +264,7 @@ attendre_nohup() {
     printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_ETAT"
     run bash "$DEVZONE"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"attendue : devzone appliquer"* ]] || false
+    [[ "$output" == *"attendue : devzone apply"* ]] || false
     ! grep -q 'get statefulset' "$BATS_TEST_TMPDIR/kubectl.log" 2>/dev/null || false
 }
 
@@ -279,6 +291,18 @@ attendre_nohup() {
     grep -q 'delete namespace devzone-mysql' "$BATS_TEST_TMPDIR/kubectl.log" || false
     grep -qx 'mysql=off' "$DEVZONE_ETAT" || false
     [[ "$output" == *"✔ namespace devzone-mysql et volume supprimés ; workspace/.mysql/root.env gardé"* ]] || false
+    [[ "$output" == *"devzone: \"--oui\" is deprecated, use \"--yes\""* ]] || false
+}
+
+@test "desactiver mysql --yes : même suppression, sans avertissement (#557)" {
+    touch "$BATS_TEST_TMPDIR/ns" "$BATS_TEST_TMPDIR/sts" "$BATS_TEST_TMPDIR/secret"
+    printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_ETAT"
+    run --separate-stderr bash "$DEVZONE" disable mysql --yes
+    [ "$status" -eq 0 ] || false
+    grep -q 'delete namespace devzone-mysql' "$BATS_TEST_TMPDIR/kubectl.log" || false
+    grep -qx 'mysql=off' "$DEVZONE_ETAT" || false
+    [[ "$output" == *"✔ namespace devzone-mysql et volume supprimés ; workspace/.mysql/root.env gardé"* ]] || false
+    [[ "$stderr" != *"deprecated"* ]] || false
 }
 
 @test "desactiver mysql en terminal : N retire le serveur et garde le volume" {
@@ -315,11 +339,21 @@ attendre_nohup() {
     grep -q 'image: mysql:8.4' "$BATS_TEST_TMPDIR/apply.log" || false
 }
 
-@test "devzone catalogue liste les applications" {
+@test "devzone catalog liste les applications" {
     run bash "$DEVZONE" catalog
     [ "$status" -eq 0 ] || false
     [[ "$output" == *"mysql"* ]] || false
     [[ "$output" == *"disponible"* ]] || false
+}
+
+@test "devzone catalog : l ancien nom francais avertit et donne le meme resultat" {
+    run --separate-stderr bash "$DEVZONE" catalog
+    [ "$status" -eq 0 ] || false
+    [[ "$stderr" != *"deprecated"* ]] || false
+    run --separate-stderr bash "$DEVZONE" catalogue
+    [ "$status" -eq 0 ] || false
+    [[ "$stderr" == *"devzone: \"catalogue\" is deprecated, use \"catalog\""* ]] || false
+    [[ "$output" == *"mysql"* ]] || false
 }
 
 @test "etat --json contient une rubrique applications" {

@@ -72,7 +72,7 @@ GETENT
     [ "$status" -eq 0 ]
     [[ "$output" == *"○ module postgres"*"devzone workspace services enable postgres"* ]] || false
     [[ "$output" == *"○ module argocd"*"devzone workspace services enable argocd"* ]] || false
-    [[ "$output" != *"devzone activer postgres"* ]] || false
+    [[ "$output" != *"devzone enable postgres"* ]] || false
 }
 
 @test "status in the pod: postgres off but present in the cluster, active" {
@@ -120,16 +120,25 @@ GETENT
 
 @test "disable postgres in the pod: refused with the workstation command" {
     printf 'postgres=on\n' >"$DEVZONE_ETAT"
-    run bash "$DEVZONE" disable postgres --oui
+    run bash "$DEVZONE" disable postgres --yes
     [ "$status" -eq 2 ]
     [[ "$output" == *"devzone workspace services disable postgres"* ]] || false
+    grep -qx 'postgres=on' "$DEVZONE_ETAT"
+}
+
+@test "disable postgres --oui in the pod: same refusal, with the deprecation warning (#557)" {
+    printf 'postgres=on\n' >"$DEVZONE_ETAT"
+    run --separate-stderr bash "$DEVZONE" disable postgres --oui
+    [ "$status" -eq 2 ]
+    [[ "$stderr" == *"devzone: \"--oui\" is deprecated, use \"--yes\""* ]] || false
+    [[ "$stderr" == *"devzone workspace services disable postgres"* ]] || false
     grep -qx 'postgres=on' "$DEVZONE_ETAT"
 }
 
 @test "enable in the pod with DEVZONE_SERVICES_ADMIN=1: the installer runs" {
     printf 'postgres=off\n' >"$DEVZONE_ETAT"
     export DEVZONE_SERVICES_ADMIN=1
-    run bash "$DEVZONE" enable postgres --contexte nulle-part
+    run bash "$DEVZONE" enable postgres --context nulle-part
     [[ "$output" != *"devzone workspace services enable"* ]] || false
     # The installer itself was reached: the unknown cluster is refused by it
     [[ "$output" == *"cluster inconnu"* ]] || false
@@ -149,7 +158,7 @@ admin_setup() {
 #!/usr/bin/env bash
 T="$BATS_TEST_TMPDIR"
 echo "devzone $*" >>"$T/devzone.log"
-if [ "${1:-}" != relais-arreter ] && [ "${2:-}" != relais-arreter ]; then
+if [ "${1:-}" != relay-stop ] && [ "${2:-}" != relay-stop ]; then
     [ -n "${KUBECONFIG:-}" ] && [ -f "$KUBECONFIG" ] && cp "$KUBECONFIG" "$T/kubeconfig.copy"
     cp "$DEVZONE_ETAT" "$T/etat.during" 2>/dev/null || true
     printf 'admin=%s kube=%s\n' "${DEVZONE_SERVICES_ADMIN:-}" "${DEVZONE_KUBE_CONFIG:-}" >"$T/devzone.env"
@@ -163,11 +172,11 @@ DZ
 @test "services-admin.sh enable: kubeconfig with the token, two contexts, installer run, everything cleaned" {
     admin_setup
     printf 'cluster=docker-desktop\npostgres=off\n' >"$DEVZONE_ETAT"
-    run bash -c 'printf "SECRET-TOKEN\n" | bash "$0" enable postgres --contexte x' "$ADMIN"
+    run bash -c 'printf "SECRET-TOKEN\n" | bash "$0" enable postgres --context x' "$ADMIN"
     [ "$status" -eq 0 ]
     [[ "$output" != *"SECRET-TOKEN"* ]] || false
-    grep -q '^devzone enable postgres --contexte x$' "$T/devzone.log"
-    grep -q '^devzone postgres relais-arreter$' "$T/devzone.log"
+    grep -q '^devzone enable postgres --context x$' "$T/devzone.log"
+    grep -q '^devzone postgres relay-stop$' "$T/devzone.log"
     grep -q 'token: SECRET-TOKEN' "$T/kubeconfig.copy"
     grep -q 'name: devzone-admin' "$T/kubeconfig.copy"
     grep -q 'name: devzone$' "$T/kubeconfig.copy"
@@ -180,12 +189,12 @@ DZ
     [ -z "$(ls "${TMPDIR:-/tmp}"/devzone-services-admin.* 2>/dev/null)" ]
 }
 
-@test "services-admin.sh: no cluster line before, none after; disable passes --oui" {
+@test "services-admin.sh: no cluster line before, none after; disable passes --yes" {
     admin_setup
     printf 'argocd=on\n' >"$DEVZONE_ETAT"
-    run bash -c 'printf "tok\n" | bash "$0" disable argocd --oui' "$ADMIN"
+    run bash -c 'printf "tok\n" | bash "$0" disable argocd --yes' "$ADMIN"
     [ "$status" -eq 0 ]
-    grep -q '^devzone disable argocd --oui$' "$T/devzone.log"
+    grep -q '^devzone disable argocd --yes$' "$T/devzone.log"
     ! grep -q '^cluster=' "$DEVZONE_ETAT" || false
 }
 
@@ -195,7 +204,7 @@ DZ
     export FAKE_DEVZONE_FAIL=1
     run bash -c 'printf "tok\n" | bash "$0" enable gitlab' "$ADMIN"
     [ "$status" -eq 1 ]
-    grep -q '^devzone gitlab relais-arreter$' "$T/devzone.log"
+    grep -q '^devzone gitlab relay-stop$' "$T/devzone.log"
     grep -qx 'cluster=kind-devzone' "$DEVZONE_ETAT"
     [ -z "$(ls "${TMPDIR:-/tmp}"/devzone-services-admin.* 2>/dev/null)" ]
 }

@@ -59,15 +59,15 @@ repowarden install --global --lang fr
 sudo ln -sf /workspaces/devzone/.devcontainer/devzone /usr/local/bin/devzone
 # Accès au cluster du poste (hote.config) avant les modules qui en dépendent
 # (#370) ; un échec n'arrête pas la création, le démarrage la relance
-bash /workspaces/devzone/.devcontainer/kube-config.sh || echo "devzone : configuration kube incomplète, réessayer : devzone demarrer" >&2
+bash /workspaces/devzone/.devcontainer/kube-config.sh || echo "devzone : configuration kube incomplète, réessayer : devzone start" >&2
 # Sans la feature docker-outside-of-docker (option docker-hote=off, #432),
 # docker n'est pas installé : un message clair renvoie au workspace Kubernetes
 if ! command -v docker >/dev/null 2>&1; then
     sudo install -m 0755 /workspaces/devzone/.devcontainer/docker-sans-hote.sh /usr/local/bin/docker
 fi
-devzone apply || echo "devzone : modules incomplets (détail ci-dessus), réessayer : devzone appliquer" >&2
+devzone apply || echo "devzone : modules incomplets (détail ci-dessus), réessayer : devzone apply" >&2
 # Paquets systeme gardes (#351) : reinstallees a chaque creation ; un echec n arrete pas la creation
-devzone packages appliquer || echo "devzone : paquets en echec, reessayer : devzone paquets" >&2
+devzone packages apply || echo "devzone : paquets en echec, reessayer : devzone packages" >&2
 
 # Invite Kubernetes du shell (#337) : prefixe PS1, une seule fois
 if ! grep -qF 'invite-kube.sh' "$HOME/.bashrc" 2>/dev/null; then

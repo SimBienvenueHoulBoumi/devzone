@@ -58,7 +58,7 @@ app_secret() {
 # Vue regroupée des identifiants : un échec n'empêche jamais l'opération
 regenerer_identifiants() {
     password_regenerer ||
-        echo "devzone : catalogue : identifiants regroupés non mis à jour (devzone mots-de-passe)" >&2
+        echo "devzone : catalogue : identifiants regroupés non mis à jour (devzone passwords)" >&2
 }
 
 # Installe une application : contexte devzone posé (#396), namespace créé et
@@ -71,7 +71,7 @@ app_installer() {
     port="$(app_lire "$app" port)"
     image="$(app_lire "$app" image)"
     CTX="$(cluster_lu)"
-    [ -n "$CTX" ] || refuse "aucun cluster choisi : devzone activer $app"
+    [ -n "$CTX" ] || refuse "aucun cluster choisi : devzone enable $app"
     if ! contexte_devzone_poser "$CTX"; then
         echo "devzone : catalogue : impossible de poser le contexte devzone sur $CTX" >&2
         return 1
@@ -116,7 +116,7 @@ app_installer() {
 # Désinstalle une application : relais coupé, Application Argo CD retirée
 # (module argocd actif, #538) ou manifeste, marque oubliée ; le volume (PVC)
 # et les données restent (#441) : la suppression des données est confirmée à
-# part (devzone mysql supprimer-donnees)
+# part (devzone mysql delete-data)
 app_desinstaller() {
     local app="$1" ns claim pvc CTX
     ns="$(app_ns "$app")"
@@ -151,6 +151,24 @@ app_echec() {
     printf '%s\n' "$2" >&2
 }
 
+# Avertit des PVC mysql non montés par le StatefulSet (#440). Lecture des
+# namespaces réservée à l'administrateur (#430).
+app_mysql_volumes_inutilises() {
+    local ctx ns monte pvc liste
+    ctx="$(cluster_lu)"
+    [ -n "$ctx" ] || return 0
+    ns="$(app_ns mysql)"
+    compte_admin "$ctx" get namespace "$ns" >/dev/null 2>&1 || return 0
+    monte="$(kubectl --context devzone -n "$ns" get statefulset mysql -o jsonpath='{.spec.volumeClaimTemplates[0].metadata.name}' 2>/dev/null || true)"
+    [ -n "$monte" ] || return 0
+    liste="$(kubectl --context devzone -n "$ns" get pvc -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null | grep -E '\-mysql-0$' || true)"
+    while IFS= read -r pvc; do
+        [ -n "$pvc" ] || continue
+        [ "$pvc" != "${monte}-mysql-0" ] || continue
+        printf '  ⚠ volume %s non utilisé : devzone mysql volume\n' "$pvc"
+    done <<<"$liste"
+}
+
 # Comble l'écart entre le voulu et le réel : installe, retire, relance le
 # relais permanent ; marque l'échec au premier problème puis passe à la suite
 catalogue_appliquer() {
@@ -167,7 +185,7 @@ catalogue_appliquer() {
         elif [ "$(voulu "$app")" = on ] && presente "$app"; then
             if ! app_prete "$app"; then
                 code=1
-                echo "devzone : catalogue : $app installé mais pas prêt : devzone appliquer" >&2
+                echo "devzone : catalogue : $app installé mais pas prêt : devzone apply" >&2
                 echo "pas prêt" >"$(fichier_echec "$app")"
             else
                 rm -f "$(fichier_echec "$app")"

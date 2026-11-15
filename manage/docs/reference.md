@@ -89,7 +89,7 @@ devzone disable <module>    # désactive et applique tout de suite
 | `ia` | Claude Code et opencode installés (versions figées), réinstallés à chaque rebuild, avec le [garde-fou repowarden](#garde-fou-des-assistants-ia), une [configuration opencode par défaut](#configuration-dopencode) et la [skill devzone](#skill-devzone) posée dans `~/.claude/skills/devzone/` et `~/.config/opencode/skills/devzone/` ; se connecter : `claude` (puis `/login`), `opencode auth login` | désinstallés ; le garde-fou (hook et plugin), la configuration opencode par défaut et la skill devzone non modifiée sont retirés ; l'état de `devzone agent` (volume partagé), les journaux `workspace/.agents/` et les connexions restent | Python 3.12 d Ubuntu 24.04, installé par apt (plus de feature devcontainer, pas de serveur de clés, #464)
 | `kubernetes` | à chaque démarrage : connexion au cluster de ta machine et metrics-server sur les clusters locaux (CPU et RAM dans k9s) | aucune connexion au cluster de ta machine ; kubectl, helm, k9s et kind restent installés, un cluster kind créé à la main reste utilisable ; metrics-server est retiré des clusters où devzone l'a installé |
 | `gitlab` | GitLab CE de test dans le [cluster des services](#cluster-de-devzone), namespace `devzone-gitlab` (chart figé), runner Kubernetes, projet `devzone/demo` avec pipeline ; http://gitlab.localhost:8929 ; au moins 8 Go de RAM allouable (voir [GitLab](#gitlab)) | releases Helm et namespace `devzone-gitlab` retirés, secret Rails gardé (`workspace/.gitlab/rails-secret.yaml`) ; rien d'autre touché |
-| `postgres` | PostgreSQL 16 partagé sur le [cluster de devzone](#cluster-de-devzone), une base par projet (`devzone postgres creer <projet>`), joignable sur `127.0.0.1:5432` dans le conteneur (voir [PostgreSQL](#postgresql)) | namespace `devzone-postgres` (toutes les bases) et secrets `workspace/.postgres/` supprimés, après confirmation en terminal ; kind dédié supprimé s'il ne sert plus |
+| `postgres` | PostgreSQL 16 partagé sur le [cluster de devzone](#cluster-de-devzone), une base par projet (`devzone postgres create <projet>`), joignable sur `127.0.0.1:5432` dans le conteneur (voir [PostgreSQL](#postgresql)) | namespace `devzone-postgres` (toutes les bases) et secrets `workspace/.postgres/` supprimés, après confirmation en terminal ; kind dédié supprimé s'il ne sert plus |
 | `argocd` | Argo CD sur le [cluster de devzone](#cluster-de-devzone), namespace `devzone-argocd` (chart figé), serveur en `ClusterIP` ; https://127.0.0.1:8443 dans le conteneur ; au moins 1 Go de RAM allouable (voir [Argo CD](#argo-cd)) | release Helm et namespace `devzone-argocd` retirés, secret `workspace/.argocd/` supprimé ; les autres services restent, sous helm direct |
 
 Le choix est **propre à chaque devzone** (instance) et gardé dans le dossier `$RACINE/.devzone.modules` (monté de l'hôte, il survit aux rebuilds). Au premier démarrage d'une instance, si une connexion Claude Code ou opencode existe déjà dans les volumes, le module `ia` n'est pas activé : tout est désactivé par défaut et la connexion est signalée une seule fois (« devzone enable ia pour l'utiliser ici »), pas pour un état repris.
@@ -121,11 +121,11 @@ Les scripts internes de `.devcontainer/` ne sont pas des commandes utilisateur :
 devzone repair                 # relance relais Docker, gitlab, postgres, ports et identifiants
 devzone start                # démarrage complet (identité git, clusters, relais, récapitulatif)
 devzone metrics [contexte…]     # installe metrics-server sur un cluster local
-devzone use CTX [--confirmer CTX]  # bascule le cluster de travail de kubectl
+devzone use CTX [--confirm CTX]  # bascule le cluster de travail de kubectl
 devzone clusters                       # vue des clusters connectes (travail et services)
 ```
 
-`reparer` affiche `✔` ou `✖` par élément et rend le code 1 dès qu'un élément échoue. `utiliser` ne modifie jamais le [cluster des services](#cluster-de-devzone) (aucune ligne `cluster=`) : un cluster distant exige `--confirmer CTX` hors terminal.
+`repair` affiche `✔` ou `✖` par élément et rend le code 1 dès qu'un élément échoue. `use` ne modifie jamais le [cluster des services](#cluster-de-devzone) (aucune ligne `cluster=`) : un cluster distant exige `--confirmer CTX` hors terminal.
 
 ### Garde-fou des assistants IA
 
@@ -191,7 +191,7 @@ devzone passwords          # régénère le fichier et affiche seulement son che
 
 - **Format** : en-tête en commentaire, puis une ligne par compte, colonnes séparées par des tabulations : `service`, `adresse`, `utilisateur`, `mot de passe`. Tri stable par service puis utilisateur ; aucune ligne vide.
 - **Source** : les fichiers des modules restent la référence (`workspace/.gitlab/root-password`, `workspace/.gitlab/dev-password`, `workspace/.postgres/admin-password`, `workspace/.postgres/<projet>.env`, `workspace/.argocd/admin.env`). `.password` est une vue régénérée, jamais une seconde copie à tenir à jour.
-- **Mise à jour** : `password_regenerer` (`.devcontainer/password.sh`) est appelée à la fin de chaque création, suppression ou changement de compte : installation, `creer`, `supprimer` et `--nouveau-mdp` de postgres ; seed et désinstallation de gitlab ; installation et désinstallation d'argocd ; démarrage de devzone. Un échec n'empêche jamais l'opération, il affiche un avertissement.
+- **Mise à jour** : `password_regenerer` (`.devcontainer/password.sh`) est appelée à la fin de chaque création, suppression ou changement de compte : installation, `create`, `delete` et `--new-password` de postgres ; seed et désinstallation de gitlab ; installation et désinstallation d'argocd ; démarrage de devzone. Un échec n'empêche jamais l'opération, il affiche un avertissement.
 - **Protection** : fichier ignoré par git (`.gitignore`) et droits **600** posés avant l'écriture (`umask 077`, fichier temporaire dans le même dossier puis `mv`). Aucune commande ne lit ni n'affiche son contenu ; le récapitulatif et `devzone passwords` citent seulement le chemin. Sans aucun compte, le fichier est supprimé.
 
 
@@ -260,7 +260,7 @@ devzone workspace copy-to <dossier>   # copie un dossier du poste vers les proje
 devzone workspace copy-from <dossier> # copie un projet du pod vers le poste
 devzone workspace ports [start|stop|status] # applications and services from pod on workstation localhost
 devzone workspace services enable <service> [options]  # installe gitlab, postgres ou argocd dans le cluster
-devzone workspace services disable <service> [--oui]   # les retire
+devzone workspace services disable <service> [--yes]   # les retire
 devzone workspace services status          # présents ou non, par namespace
 devzone workspace argocd status            # Argo CD et ses Applications (#516)
 devzone workspace argocd app add <dépôt> [chemin] | app list | app remove <N>  # projets déployés par Argo CD
@@ -304,9 +304,9 @@ Un workspace déjà installé dans le cluster (release helm `devzone-workspace`,
 
 Apres `devzone workspace migrate`, `make up`, `make shell` et `make stop` pilotent le workspace Kubernetes ; `make rebuild` refuse ; `devzone workspace revert` rend le poste Docker.
 
-**Retour arriere** : `devzone workspace revert` remet `workspace=docker` et rappelle `make shell`. Le poste Docker et ses volumes n'ont jamais ete touches par `migrer` : rien d'autre a faire. `--rapatrier` recopie d'abord tous les projets du pod dans `./workspace` (`copier-depuis`, les dossiers du poste du meme nom sont ecrases) ; en cas d'echec, la bascule n'a pas lieu.
+**Retour arriere** : `devzone workspace revert` remet `workspace=docker` et rappelle `make shell`. Le poste Docker et ses volumes n'ont jamais ete touches par `migrate` : rien d'autre a faire. `--rapatrier` recopie d'abord tous les projets du pod dans `./workspace` (`copier-depuis`, les dossiers du poste du meme nom sont ecrases) ; en cas d'echec, la bascule n'a pas lieu.
 
-**Nettoyage** : les volumes Docker ne sont jamais supprimes par `migrer` ni `revenir`. `devzone workspace clean-docker` liste les volumes `devzone-*` presents puis demande [o/N] avant de les supprimer (`--oui` sans terminal ; sinon refus). Irreversible : apres, `revenir` repart de volumes vides.
+**Nettoyage** : les volumes Docker ne sont jamais supprimes par `migrate` ni `revenir`. `devzone workspace clean-docker` liste les volumes `devzone-*` presents puis demande [o/N] avant de les supprimer (`--oui` sans terminal ; sinon refus). Irreversible : apres, `revenir` repart de volumes vides.
 
 ### Le cluster ne répond pas
 
@@ -334,8 +334,8 @@ Les modules `gitlab`, `postgres` et `argocd` vivent dans le cluster, mais le pod
 
 - **État dans le pod** : `devzone status` juge la présence d'un service par le DNS du cluster (`gitlab-webservice-default.devzone-gitlab.svc`, `postgres.devzone-postgres.svc`, `argocd-server.devzone-argocd.svc`), comme le catalogue. Présent → `✔ module postgres active: … (postgres.devzone-postgres.svc)` ; absent → `⚠ module gitlab not in the cluster: on the workstation, devzone workspace services enable gitlab` (module actif dans `.devzone.modules`) ou `○ module … optional` (inactif). Aucun « en échec » venu d'un installeur : la marque d'échec n'est pas lue dans le pod. `devzone status --json` porte les mêmes valeurs (`etat`, `commande`, `echec` à `null`).
 - **Démarrage du pod** : `devzone apply` (lancé par `workspace-init.sh`) n'installe plus ces services ; il l'écrit (« installed from the workstation ») et efface les marques d'échec des anciens démarrages. Dans le pod, `devzone enable gitlab` ou `devzone disable postgres` refusent (code 2) et renvoient à la commande du poste, sans toucher l'état.
-- **Installation depuis le poste** : `devzone workspace services enable <service> [options]` (les options de `devzone enable`, par exemple `--contexte CTX` pour postgres) et `devzone workspace services disable <service> [--oui]` (`--oui` indispensable : pas de terminal dans le pod pour confirmer). Le poste crée un ServiceAccount `devzone-services-admin` dans `devzone-workspace`, lié à `cluster-admin` le temps de l'opération, lui demande un jeton d'une heure (`kubectl create token`, kubectl 1.24 ou plus) puis lance l'installeur habituel **dans le pod du workspace** (`kubectl exec`, script `.devcontainer/services-admin.sh`) : le jeton passe sur l'entrée standard, jamais en argument ni affiché, et ne vit que dans un kubeconfig temporaire du pod (droits 600, contextes `devzone-admin` et `devzone`), supprimé à la fin. L'état et les secrets (`workspace/.postgres/`, `workspace/.gitlab/`, `workspace/.argocd/` sous `/workspaces/projets`) restent dans le pod, comme sur le poste Docker. À la fin, même en échec : relais du pod arrêtés (l'accès passe par le DNS du cluster et `devzone workspace ports`), ligne `cluster=` de l'état remise comme avant, ServiceAccount et ClusterRoleBinding supprimés. `devzone workspace services status` dit, par namespace, ce qui est installé. Depuis #516, `argocd` est installé ou retiré par le poste lui-même (helm), et `postgres` passe par une Application Argo CD quand Argo CD est actif (voir [Argo CD dans le workspace Kubernetes](#argo-cd-dans-le-workspace-kubernetes)).
-- **Hors périmètre** : Argo CD comme source des services (#516) ; `mysql` et le catalogue (déjà par DNS, #515) ; les commandes `devzone postgres creer …` dans le pod, qui demandent encore un kubeconfig.
+- **Installation depuis le poste** : `devzone workspace services enable <service> [options]` (les options de `devzone enable`, par exemple `--contexte CTX` pour postgres) et `devzone workspace services disable <service> [--yes]` (`--yes` indispensable : pas de terminal dans le pod pour confirmer ; `--oui` est accepté avec avertissement). Le poste crée un ServiceAccount `devzone-services-admin` dans `devzone-workspace`, lié à `cluster-admin` le temps de l'opération, lui demande un jeton d'une heure (`kubectl create token`, kubectl 1.24 ou plus) puis lance l'installeur habituel **dans le pod du workspace** (`kubectl exec`, script `.devcontainer/services-admin.sh`) : le jeton passe sur l'entrée standard, jamais en argument ni affiché, et ne vit que dans un kubeconfig temporaire du pod (droits 600, contextes `devzone-admin` et `devzone`), supprimé à la fin. L'état et les secrets (`workspace/.postgres/`, `workspace/.gitlab/`, `workspace/.argocd/` sous `/workspaces/projets`) restent dans le pod, comme sur le poste Docker. À la fin, même en échec : relais du pod arrêtés (l'accès passe par le DNS du cluster et `devzone workspace ports`), ligne `cluster=` de l'état remise comme avant, ServiceAccount et ClusterRoleBinding supprimés. `devzone workspace services status` dit, par namespace, ce qui est installé. Depuis #516, `argocd` est installé ou retiré par le poste lui-même (helm), et `postgres` passe par une Application Argo CD quand Argo CD est actif (voir [Argo CD dans le workspace Kubernetes](#argo-cd-dans-le-workspace-kubernetes)).
+- **Hors périmètre** : Argo CD comme source des services (#516) ; `mysql` et le catalogue (déjà par DNS, #515) ; les commandes `devzone postgres create …` dans le pod, qui demandent encore un kubeconfig.
 
 ### Construire une image dans le workspace
 
@@ -402,9 +402,9 @@ Le module `gitlab` fournit une instance GitLab de test dans le [cluster des serv
 devzone                        # état : identité git, GitHub, outils, modules
 devzone enable gitlab         # active et installe GitLab dans le cluster des services
 devzone disable gitlab      # désinstalle GitLab et supprime son namespace
-devzone gitlab migrer          # installe, puis propose de supprimer l'ancien cluster kind
-devzone gitlab migrer --oui    # idem sans confirmation
-devzone gitlab nouveau-mdp [root|dev]  # mot de passe aléatoire (root ou dev) régénéré
+devzone gitlab migrate          # installe, puis propose de supprimer l'ancien cluster kind
+devzone gitlab migrate --yes    # idem sans confirmation
+devzone gitlab new-password [root|dev]  # mot de passe aléatoire (root ou dev) régénéré
 devzone apply              # applique les modules actifs
 devzone is-enabled gitlab           # code 0 si GitLab est actif
 ```
@@ -415,12 +415,12 @@ devzone is-enabled gitlab           # code 0 si GitLab est actif
 - **Données de test** : groupe `devzone`, projet `devzone/demo` (Python, pipeline ruff et pytest), utilisateur `dev`, runner enregistré. Sur une relance, rien n'est recréé.
 - **Accès dans le conteneur** : http://gitlab.localhost:8929, utilisateur `root`. Le nom `gitlab.localhost` pointe vers `127.0.0.1` dans `/etc/hosts` (entrée `127.0.0.1	gitlab.localhost # devzone:gitlab`, posée à l'activation et à chaque démarrage, remplacée si son adresse diffère, retirée à la désactivation). Deux relais `kubectl port-forward` écoutent sur `127.0.0.1:8929` et `127.0.0.1:2224` : `svc/gitlab-webservice-default` (8929→8181) et `svc/gitlab-gitlab-shell` (2224→22), dans le namespace de l'instance (PID et journal dans `workspace/.gitlab-web/` et `workspace/.gitlab-ssh/`). Ils sont indispensables à curl et à git en HTTP : libcurl résout tout nom `*.localhost` vers la boucle locale sans lire `/etc/hosts` (RFC 6761). ssh et glab lisent `/etc/hosts` et passent par le même relais.
 - **Accès depuis le poste** : GitLab n'est pas publié directement sur le réseau ; le port-forward écoute dans le conteneur. Depuis le poste, utiliser `devzone port 8929` (et `devzone port 2224` pour SSH) si nécessaire.
-- **Ancien cluster** : un cluster kind `gitlab<instance>` créé avant #396 n'est plus utilisé. Le récapitulatif `devzone` affiche `⚠ ancien cluster kind-gitlab<instance> : devzone gitlab migrer` tant qu'il existe. `devzone gitlab migrer` installe GitLab dans le cluster des services, puis supprime l'ancien cluster après confirmation (`--oui` sans terminal) ; sans terminal et sans `--oui`, l'installation se fait et l'ancien cluster est conservé (code 2). Les données de test de l'ancien cluster ne sont pas migrées.
+- **Ancien cluster** : un cluster kind `gitlab<instance>` créé avant #396 n'est plus utilisé. Le récapitulatif `devzone` affiche `⚠ old kind-gitlab cluster<instance>: devzone gitlab migrate` tant qu'il existe. `devzone gitlab migrate` installe GitLab dans le cluster des services, puis supprime l'ancien cluster après confirmation (`--yes` sans terminal) ; sans terminal et sans `--yes`, l'installation se fait et l'ancien cluster est conservé (code 2). Les données de test de l'ancien cluster ne sont pas migrées.
 - **Secrets** : mot de passe root, jeton root, mot de passe de `dev` et jeton du runner dans `workspace/.gitlab/` (droits 600, ignorés par git, jamais affichés). Mot de passe root : `cat workspace/.gitlab/root-password`.
 - **Secrets Rails** : le secret `gitlab-rails-secret` du namespace `devzone-gitlab` est conservé dans `workspace/.gitlab/rails-secret.yaml` (600, ignoré par git) à la première installation, puis réappliqué avant `helm upgrade --install` à une réinstallation : le chart le réutilise et les sessions du navigateur restent valides, sans 422.
 - **Réinstallation** : à défaut, si les secrets ont été perdus, la fin d'installation et le récapitulatif préviennent : « GitLab réinstallé : si le navigateur affiche 422, supprimez les données de site de gitlab.localhost ».
-- **Mot de passe régénérable** : `devzone gitlab nouveau-mdp [root|dev]` applique un mot de passe aléatoire par `gitlab-rails runner` dans le pod toolbox, puis met à jour le fichier source et le regroupé `.password` ; rien n'est affiché, seulement le chemin.
-- **Désactivation** : `devzone disable gitlab` arrête les deux relais, désinstalle les releases Helm `gitlab` et `gitlab-runner`, supprime le namespace `devzone-gitlab<instance>` et le reste de `workspace/.gitlab/`, mais **garde `rails-secret.yaml`** : « secret Rails gardé dans workspace/.gitlab/rails-secret.yaml (sessions du navigateur valides à la réinstallation) ». Le secret ne part qu'avec une désinstallation complète voulue (`devzone disable gitlab --oui`, ou la réponse `o` à la confirmation). Le cluster des services et son contexte courant ne sont pas touchés.
+- **Mot de passe régénérable** : `devzone gitlab new-password [root|dev]` applique un mot de passe aléatoire par `gitlab-rails runner` dans le pod toolbox, puis met à jour le fichier source et le regroupé `.password` ; rien n'est affiché, seulement le chemin.
+- **Désactivation** : `devzone disable gitlab` arrête les deux relais, désinstalle les releases Helm `gitlab` et `gitlab-runner`, supprime le namespace `devzone-gitlab<instance>` et le reste de `workspace/.gitlab/`, mais **garde `rails-secret.yaml`** : « secret Rails gardé dans workspace/.gitlab/rails-secret.yaml (sessions du navigateur valides à la réinstallation) ». Le secret ne part qu'avec une désinstallation complète voulue (`devzone disable gitlab --yes`, ou la réponse `o` à la confirmation). Le cluster des services et son contexte courant ne sont pas touchés.
 
 ### Essai de bout en bout : `devzone test-gitlab`
 
@@ -445,18 +445,18 @@ devzone test-gitlab --statut     # publie aussi le statut gitlab-integration sur
 Le module `postgres` fournit un PostgreSQL partagé : une base et un utilisateur par projet, sur le [cluster de devzone](#cluster-de-devzone).
 
 ```bash
-devzone enable postgres [--contexte CTX]   # installe (choix du cluster la première fois)
-devzone postgres creer <projet>             # base + utilisateur <projet>, identifiants dans workspace/.postgres/<projet>.env
-devzone postgres creer <projet> --nouveau-mdp
-devzone postgres liste                      # bases et propriétaires
+devzone enable postgres [--context CTX]   # installe (choix du cluster la première fois)
+devzone postgres create <projet>             # base + utilisateur <projet>, identifiants dans workspace/.postgres/<projet>.env
+devzone postgres create <projet> --new-password
+devzone postgres list                      # bases et propriétaires
 devzone postgres psql [<projet>]            # console psql dans le pod (superutilisateur sans projet)
-devzone postgres supprimer <projet> [--oui] # base, utilisateur et fichier .env
+devzone postgres delete <projet> [--yes] # base, utilisateur et fichier .env
 devzone disable postgres                 # supprime PostgreSQL et TOUTES ses bases
 ```
 
 - **Ce qui est installé** : `.devcontainer/postgres/postgres.yaml`, StatefulSet `postgres` (image `postgres:16.x-alpine` figée), volume persistant de 5 Gi (`POSTGRES_TAILLE`), Service `postgres:5432`, namespace `devzone-postgres` étiqueté `app.kubernetes.io/managed-by=devzone`. Pas de chart ni d'image Bitnami.
 - **Accès** : un relais `kubectl port-forward` rend le service joignable sur `127.0.0.1:5432` **dans le conteneur** (`POSTGRES_PORT` pour un autre port) ; relancé à chaque démarrage et par `devzone apply`. PID et journal : `workspace/.postgres/relais.*`.
-- **Bases par projet** : nom en minuscules, chiffres et `_`. `creer` est idempotent : le mot de passe est gardé (sauf `--nouveau-mdp`) ; `REVOKE CONNECT … FROM PUBLIC` : un projet ne se connecte pas à la base d'un autre. Le fichier `<projet>.env` (600) contient `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` et `DB_URL` (JDBC).
+- **Bases par projet** : nom en minuscules, chiffres et `_`. `create` est idempotent : le mot de passe est gardé (sauf `--new-password`) ; `REVOKE CONNECT … FROM PUBLIC` : un projet ne se connecte pas à la base d'un autre. Le fichier `<projet>.env` (600) contient `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` et `DB_URL` (JDBC).
 - **Secrets** : mot de passe du superutilisateur `postgres` dans le secret `postgres-admin` et `workspace/.postgres/admin-password` (600) ; jamais régénéré tant que le secret existe ; jamais affiché.
 - **Désactivation** : namespace supprimé (volume compris), `workspace/.postgres/` supprimé, kind dédié supprimé s'il ne porte plus aucun service. `make uninstall` supprime aussi le namespace d'un cluster de l'hôte.
 
@@ -466,18 +466,18 @@ Le catalogue `mysql` fournit un MySQL partagé (une base par projet), sur le [cl
 
 ```bash
 devzone enable mysql
-devzone mysql creer <projet> [--nouveau-mdp]
-devzone mysql liste
-devzone mysql supprimer <projet> [--oui]
+devzone mysql create <projet> [--new-password]
+devzone mysql list
+devzone mysql delete <projet> [--yes]
 devzone mysql volume                 # liste les PVC *-mysql-0, marque le monté
 devzone mysql volume <nom>           # réapplique le StatefulSet sur ce volume (données gardées)
-devzone mysql volume --supprimer <nom> [--oui]
+devzone mysql volume --delete <nom> [--yes]
 devzone disable mysql             # retire StatefulSet, service et secret ; volume gardé
-devzone mysql supprimer-donnees [--oui]  # supprime le namespace et les volumes (confirmé)
+devzone mysql delete-data [--yes]  # supprime le namespace et les volumes (confirmé)
 ```
 
-- **Volumes** : avant l'installation, si un seul PVC `*-mysql-0` existe dans le namespace, il est réutilisé ; aucun → claim `donnees` ; plusieurs → refus avec la liste et `devzone mysql volume <nom>`. `devzone mysql volume <nom>` réapplique le StatefulSet sur le PVC choisi sans supprimer les données. `--supprimer` demande confirmation `[o/N]` en terminal (`--oui` sans terminal) et refuse si le volume est monté. Le récapitulatif signale `⚠ volume <pvc> non utilisé : devzone mysql volume`.
-- **Désinstaller et supprimer les données** : `devzone disable mysql` retire le StatefulSet, le service et le secret, garde le volume (PVC) et les bases, et affiche `✔ mysql retiré du cluster ; volume <pvc> et bases gardés : devzone mysql volume`. En terminal, la question est « Désactiver mysql retire le serveur, le volume et les bases restent. Supprimer aussi le namespace devzone-mysql et ses volumes ? » : un `oui` (ou `--oui` sans terminal) supprime aussi le namespace `devzone-mysql` et ses volumes ; un refus garde le volume et les bases, le serveur part quand même ; sans terminal et sans `--oui`, les données restent. `devzone mysql supprimer-donnees [--oui]` fait cette suppression seule : confirmation `[o/N]` en terminal, `--oui` obligatoire sinon (sinon refus avec la commande exacte). Le namespace et les volumes partent, `workspace/.mysql/root.env` est gardé ; `devzone mysql volume` liste ensuite les volumes restants.
+- **Volumes** : avant l'installation, si un seul PVC `*-mysql-0` existe dans le namespace, il est réutilisé ; aucun → claim `donnees` ; plusieurs → refus avec la liste et `devzone mysql volume <nom>`. `devzone mysql volume <nom>` réapplique le StatefulSet sur le PVC choisi sans supprimer les données. `--delete` demande confirmation `[o/N]` en terminal (`--yes` sans terminal) et refuse si le volume est monté. Le récapitulatif signale `⚠ volume <pvc> non utilisé : devzone mysql volume`.
+- **Désinstaller et supprimer les données** : `devzone disable mysql` retire le StatefulSet, le service et le secret, garde le volume (PVC) et les bases, et affiche `✔ mysql retiré du cluster ; volume <pvc> et bases gardés : devzone mysql volume`. En terminal, la question est « Désactiver mysql retire le serveur, le volume et les bases restent. Supprimer aussi le namespace devzone-mysql et ses volumes ? » : un `oui` (ou `--yes` sans terminal) supprime aussi le namespace `devzone-mysql` et ses volumes ; un refus garde le volume et les bases, le serveur part quand même ; sans terminal et sans `--yes`, les données restent. `devzone mysql delete-data [--yes]` fait cette suppression seule : confirmation `[o/N]` en terminal, `--yes` obligatoire sinon (sinon refus avec la commande exacte). Le namespace et les volumes partent, `workspace/.mysql/root.env` est gardé ; `devzone mysql volume` liste ensuite les volumes restants.
 
 ## Charts de devzone
 
@@ -538,7 +538,7 @@ Le module `argocd` fournit Argo CD sur le [cluster de devzone](#cluster-de-devzo
 ```bash
 devzone enable argocd      # installe Argo CD dans le cluster des services
 devzone disable argocd   # désinstalle Argo CD, les autres services restent
-devzone argocd etat         # état du module
+devzone argocd status         # état du module
 devzone argocd init [--repo <url>|--none]  # dépôt GitOps (GitHub) : créé, désigné, ou aucun
 devzone <dossier> --gitops <github|none|<url>>  # création du dossier avec le dépôt GitOps (même dépôt que ci-dessus)
 devzone argocd apply        # applique .argocd.conf de l'instance
@@ -552,7 +552,7 @@ Les projets sont déclarés dans `.argocd.conf` à la racine de devzone et, s'il
 - **Ce qui est installé** : le [chart enveloppe `charts/devzone-argocd`](#charts-de-devzone), qui reprend le chart officiel `argo-cd` en version figée (`10.14.0`, dépendance déclarée dans `Chart.yaml`, `Chart.lock` commite l'empreinte), namespace `devzone-argocd` étiqueté `app.kubernetes.io/managed-by=devzone` et isolé par NetworkPolicy. Valeurs minimales (dans `charts/devzone-argocd/values.yaml`) : un réplica par composant, sans Dex ni notifications, serveur en `ClusterIP`, sans Ingress ni LoadBalancer. L'installation construit d'abord la dépendance (`helm dependency build`), puis installe le chart local, au poste comme dans le conteneur ; la même enveloppe sert à Argo CD lui-même quand il se déploie tout seul (#538).
 - **Mémoire** : l'installation est refusée sous environ 1 Go de mémoire allouable dans le cluster, avec le message pour l'agrandir.
 - **Accès** : un relais `kubectl port-forward` rend l'interface joignable sur https://127.0.0.1:8443 **dans le conteneur** (`ARGOCD_PORT` pour un autre port) ; relancé à chaque démarrage et par `devzone apply`. PID et journal : `workspace/.argocd/relais.*`.
-- **Projets** : `devzone argocd app add <dépôt> [chemin]` déclare une Application `app-<N>` (nom tiré du dépôt, ou `--name`), révision `HEAD` (ou `--revision`), ressources dans le namespace `devzone-app-<N>` (ou `--namespace`), synchronisation automatique avec `prune` et `selfHeal`. Un dépôt **GitHub public** ne demande rien d'autre ; un dépôt **privé** prend `--token T` (et `--username U`, `root` par défaut), rangés dans un Secret de dépôt `repo-<N>` de `devzone-argocd` (étiquette `argocd.argoproj.io/secret-type=repository`), jamais dans l'Application. Le **GitLab de devzone** s'indique avec son URL habituelle (`http://gitlab.localhost:8929/<groupe>/<projet>.git`) : elle est réécrite vers le service du cluster (`http://gitlab-webservice-default.devzone-gitlab.svc:8181/…`, la seule adresse qu'Argo CD atteint), le jeton root du module (`workspace/.gitlab/root-token`) sert sauf `--token`, et la NetworkPolicy de `devzone-gitlab` est ouverte aux namespaces devzone (même règle que `devzone postgres autoriser`). `app remove <N>` supprime l'Application, ses ressources, son Secret de dépôt et le namespace `devzone-app-<N>`. Le compte limité (#430) gère tout cela grâce aux rôles agrégés du chart (`createAggregateRoles`). Dépôt de démo : https://github.com/SimBienvenueHoulBoumi/devzone-argocd-demo (`k8s/`).
+- **Projets** : `devzone argocd app add <dépôt> [chemin]` déclare une Application `app-<N>` (nom tiré du dépôt, ou `--name`), révision `HEAD` (ou `--revision`), ressources dans le namespace `devzone-app-<N>` (ou `--namespace`), synchronisation automatique avec `prune` et `selfHeal`. Un dépôt **GitHub public** ne demande rien d'autre ; un dépôt **privé** prend `--token T` (et `--username U`, `root` par défaut), rangés dans un Secret de dépôt `repo-<N>` de `devzone-argocd` (étiquette `argocd.argoproj.io/secret-type=repository`), jamais dans l'Application. Le **GitLab de devzone** s'indique avec son URL habituelle (`http://gitlab.localhost:8929/<groupe>/<projet>.git`) : elle est réécrite vers le service du cluster (`http://gitlab-webservice-default.devzone-gitlab.svc:8181/…`, la seule adresse qu'Argo CD atteint), le jeton root du module (`workspace/.gitlab/root-token`) sert sauf `--token`, et la NetworkPolicy de `devzone-gitlab` est ouverte aux namespaces devzone (même règle que `devzone postgres authorize`). `app remove <N>` supprime l'Application, ses ressources, son Secret de dépôt et le namespace `devzone-app-<N>`. Le compte limité (#430) gère tout cela grâce aux rôles agrégés du chart (`createAggregateRoles`). Dépôt de démo : https://github.com/SimBienvenueHoulBoumi/devzone-argocd-demo (`k8s/`).
 - **Mot de passe** : lu dans le Secret `argocd-initial-admin-secret`, rangé dans `workspace/.argocd/admin.env` (600) puis repris dans [`.password`](#identifiants-regroupés) ; utilisateur `admin`, jamais affiché.
 - **Désactivation** : `helm uninstall` de la release et suppression du namespace `devzone-argocd`, puis de `workspace/.argocd/` ; **les autres services restent**, sous helm direct.
 
@@ -618,7 +618,7 @@ Les déclarations ne restent pas dans le cluster : elles vivent dans un **dépô
 ```bash
 devzone port <n>              # ouvre 127.0.0.1:<n> du poste → <n> du conteneur
 devzone port                  # liste : port, ● actif ou ○ arrêté, application derrière
-devzone port --fermer <n>     # retire le relais et le port de l'état
+devzone port --close <n>     # retire le relais et le port de l'état
 devzone port auto on|off     # active ou coupe le veilleur automatique
 devzone port exclure <n>      # retire un port de la liste automatique
 devzone port inclure <n>      # réintègre un port à la liste automatique
@@ -628,11 +628,11 @@ devzone port inclure <n>      # réintègre un port à la liste automatique
 - **Veilleur automatique (#394)** : `.devcontainer/ports-auto.sh` surveille les ports écoutés dans le conteneur toutes les 2 s (`ss -ltnH`). Un port non déjà relayé, non exclu, pas un service de devzone (5432, 8929, 2224) et pas un pont du veilleur est relayé : pont interne sur l'IP du conteneur si l'application n'écoute que sur `127.0.0.1`/`::1`, puis relais poste `devzone-<instance>-auto-<n>`. Le port disparu depuis plus de 10 s retire le pont et le relais. Un port déjà pris sur le poste est marqué occupé et n'est plus réessayé. Un seul veilleur tourne (verrou `mkdir` dans `/tmp/devzone-ports-auto/`, rafraîchi à chaque tour ; une instance morte est remplacée). Le veilleur s'arrête seul si le dossier d'état disparaît. Il ne tourne qu'à la demande des scripts de démarrage : tout autre appel est refusé (code 2), affiche la commande à faire (`devzone repair`).
 - **Désactivation** : `devzone port auto off` arrête le veilleur et retire les relais automatiques ; `devzone port auto on` le réactive : le veilleur repart au prochain démarrage du conteneur ou via `devzone repair`. Au démarrage, les relais automatiques d'une session précédente sont retirés.
 - **Réseau et IP** : lus par `docker inspect "$(hostname)"` sur le Docker de l'hôte ; le relais rejoint le conteneur par son IP sur son réseau Docker. Conteneur devzone introuvable (Docker de l'hôte absent) : refus clair, code 1.
-- **État** : ligne `ports=8080,3000` dans `$RACINE/.devzone.modules`, triée et sans doublon ; `--fermer` retire le port. Le relais déjà ouvert est idempotent (message, code 0).
+- **État** : ligne `ports=8080,3000` dans `$RACINE/.devzone.modules`, triée et sans doublon ; `--close` retire le port. Le relais déjà ouvert est idempotent (message, code 0).
 - **Démarrage** : `devzone start` relance chaque relais de l'état vers l'IP actuelle du conteneur (elle change à chaque redémarrage). Un échec affiche un avertissement sans bloquer le démarrage ; `devzone repair` le reprend sans redémarrer.
 - **Refus, code 1** : port non numérique ou hors 1-65535 ; Docker de l'hôte injoignable ; port déjà pris sur le poste (échec de `docker run`, « port is already allocated » ou « address already in use »), l'état restant inchangé.
 - **Plusieurs instances** : le nom du relais et l'étiquette portent `DEVZONE_INSTANCE` ; deux instances qui veulent le même port du poste : la seconde reçoit le refus « déjà utilisé ».
-- **Récapitulatif** : ligne `ports vers le poste` avec `8080 ●, 3000 ○`, ou `aucun (devzone port <n>)`.
+- **Récapitulatif** : ligne `ports to the workstation` avec `8080 ●, 3000 ○`, ou `none (devzone port <n>)`.
 - **Désinstallation** : `make uninstall` retire les conteneurs étiquetés `devzone.instance` (voir README, « Désinstaller »).
 - **Spring Boot** : l'application doit écouter sur `0.0.0.0` (défaut). Un `server.address=127.0.0.1` la rend injoignable depuis le relais.
 
@@ -643,7 +643,7 @@ Les modules qui déploient un service (`postgres`, `gitlab`) s'installent sur **
 - **Cluster local vs distant** : un cluster est considéré comme **local** quand son serveur écoute sur une adresse de boucle (`127.0.0.1`, `localhost`, `::1`, `host.docker.internal`) — lu dans la configuration kubeconfig, sans appel réseau. Le cluster kind dédié (`kind-devzone`) est toujours local. Tout autre cluster (serveur sur une adresse distante) est **distant**.
 - **Choix** : à la première activation. `--contexte CTX` d'abord ; sinon, dans un terminal, un menu : le cluster par défaut est le contexte courant du kubeconfig de l'hôte s'il répond et est local (en pratique `docker-desktop`), sinon kind dédié `kind-devzone`. Le choix est gardé dans l'état et repris aux redémarrages. Le menu propose les clusters **locaux** d'abord, puis le **cluster kind dédié**, enfin les clusters **distants** (marqués « distant ») ; sans terminal : `kind-devzone`. Les clusters de l'hôte n'apparaissent qu'avec le [module `kubernetes`](#kubernetes) actif.
 - **Cluster distant** : choisir un cluster distant nécessite une confirmation en terminal, ou `--confirmer CTX` sans terminal. Sans confirmation exacte, le choix est refusé. Quand le cluster de devzone est distant, le récapitulatif `devzone` affiche un avertissement `⚠ cluster distant : <contexte>`.
-- **Voir / changer** : `devzone cluster` affiche le cluster et les possibles ; `devzone cluster CTX [--confirmer CTX]` y déplace les services actifs (désinstallés de l'ancien, installés sur le nouveau). **Les données ne sont pas migrées** : confirmation en terminal, `--oui` sans terminal.
+- **Voir / changer** : `devzone cluster` affiche le cluster et les possibles ; `devzone cluster CTX [--confirm CTX]` y déplace les services actifs (désinstallés de l'ancien, installés sur le nouveau). **Les données ne sont pas migrées** : confirmation en terminal, `--yes` sans terminal.
 - **Cluster de l'hôte** : devzone n'y crée que ses namespaces étiquetés `app.kubernetes.io/managed-by=devzone`, et les supprime à la désactivation. Désactiver le module `kubernetes` rend ce cluster injoignable pour les services.
 - **Contexte courant** : les clusters kind sont créés sans basculer dessus ; `devzone use CTX` bascule seulement le cluster de travail de kubectl, jamais le cluster des services de devzone. Si tu te retrouves sur un cluster interne (kind-devzone), reviens avec `devzone use <ton cluster>`.
 - **Namespace** : pour un contexte du poste (ceux de `hote.config`, recopié depuis le poste à chaque démarrage), le namespace fixé par `devzone use -n` ne survit pas à un redémarrage ; pour les clusters kind du conteneur, il est gardé jusqu'au rebuild.
@@ -655,7 +655,7 @@ Les modules qui déploient un service (`postgres`, `gitlab`) s'installent sur **
 
 - **Cluster unique** : tous les services (PostgreSQL, GitLab, etc.) vivent sur un seul cluster choisi via `devzone cluster CTX`. Le choix est gardé dans l'état (`cluster=` dans `$RACINE/.devzone.modules`) et survivre aux redémarrages.
 - **Contexte devzone** : le contexte `devzone` de kubectl est posé sur le cluster des services (cluster + user extraits du contexte courant). Il est restauré sur le nouveau cluster quand `devzone cluster` déplace les services. Voir `changer_cluster` dans `cluster.sh`.
-- **Déplacement de cluster** : `devzone cluster CTX [--oui]` déplace PostgreSQL : suppression dans l'ancien cluster, installation dans le nouveau. Les données ne sont pas migrées, d'où la confirmation requise.
+- **Déplacement de cluster** : `devzone cluster CTX [--yes]` déplace PostgreSQL : suppression dans l'ancien cluster, installation dans le nouveau. Les données ne sont pas migrées, d'où la confirmation requise.
 - **Contextes locaux vs distants** : un cluster est local quand son serveur écoute sur une adresse de boucle (`127.0.0.1`, `localhost`, `::1`, `host.docker.internal`) — lu dans la configuration kubeconfig, sans appel réseau. Le cluster kind dédié (`kind-devzone`) est toujours local. Tout autre cluster (serveur sur une adresse distante) est distant. Le choix par défaut est d'abord le contexte courant de l'hôte (en pratique `docker-desktop`), puis kind dédié `kind-devzone`.
 - **Cluster distant** : choisir un cluster distant nécessite une confirmation en terminal, ou `--confirmer CTX` sans terminal. Sans confirmation exacte, le choix est refusé. Quand le cluster de devzone est distant, le récapitulatif `devzone` affiche un avertissement `⚠ cluster distant : <contexte>`.
 - **Namespace** : pour un contexte du poste (ceux de `hote.config`, recopié depuis le poste à chaque démarrage), le namespace fixé par `devzone use -n` ne survit pas à un redémarrage ; pour les clusters kind du conteneur, il est gardé jusqu'au rebuild.
@@ -671,7 +671,7 @@ Le contexte `devzone` n'agit qu'avec un compte limité : shell, relais et agents
 
 ### Isolement
 
-- **NetworkPolicy `devzone-meme-namespace`** : pose une règle isolante dans un namespace : seuls les pods du même namespace peuvent joindre les services devzone (PostgreSQL, etc.). Cette règle est gérée par `devzone postgres autoriser <ns>` et `devzone postgres interdire <ns>`.
+- **NetworkPolicy `devzone-meme-namespace`** : pose une règle isolante dans un namespace : seuls les pods du même namespace peuvent joindre les services devzone (PostgreSQL, etc.). Cette règle est gérée par `devzone postgres authorize <ns>` et `devzone postgres forbid <ns>`.
 - **Que couvre l'isolation** :
   - Empêche qu'une application dans un namespace extérieur n'accède aux services PostgreSQL ou autres services devzone.
   - Permet à une application dans le même namespace de joindre les services sans restriction.
@@ -679,7 +679,7 @@ Le contexte `devzone` n'agit qu'avec un compte limité : shell, relais et agents
 - **Limites de l'isolation** :
   - Ne contrôle pas l'accès au niveau des bases de données PostgreSQL (c'est géré par les rôles et mots de passe PostgreSQL).
   - Ne s'applique pas aux cluster de l'hôte sans configuration explicite.
-  - Les règles NetworkPolicy peuvent être retirées par `devzone postgres interdire <ns>`.
+  - Les règles NetworkPolicy peuvent être retirées par `devzone postgres forbid <ns>`.
 - **Vérification** : `devzone clusters` montre « isolé (NetworkPolicy) » pour le cluster des services, ⚠ si la règle manque dans un `devzone-*`.
 
 ## Données conservées
@@ -740,7 +740,7 @@ Empreinte d'une archive : `curl -fsSL <url> | shasum -a 256`.
 
 **Montées automatiques** : les versions de `repowarden` et des assistants IA (`IA_CLAUDE`, `IA_OPENCODE`) sont comparées toutes les heures à npm par le workflow `versions` (`.github/workflows/versions.yml`). Pour chaque paquet en retard, il ouvre ou met à jour un ticket, y propose une conception (« Conception proposée »), crée sa branche, applique la montée (`manage/scripts/versions.sh --appliquer`), commit et pousse : la PR brouillon s'ouvre et la CI teste le conteneur. Le mainteneur confirme la conception sur le ticket (« Conception retenue », attendue par la vérification `ticket`), puis passe la PR en ready. Une ligne par paquet : deux montées ouvertes en même temps (Claude Code et opencode) se fusionnent l'une après l'autre sans conflit. À la main : *Actions → versions → Run workflow* ; en local, `bash manage/scripts/versions.sh` liste les paquets en retard. Sans nouvelle version, le job s'arrête après la comparaison ; pas de déclenchement croisé depuis repowarden, qui demanderait un jeton d'un autre propriétaire.
 
-**Rattraper sans rebuild** : l'état affiché au démarrage (et par `devzone`) compare les outils installés à leur version figée. Une ligne `⚠ outils          repowarden 4.9.2 installé, 4.12.0 figé : devzone appliquer` signale un écart ; `devzone apply` réinstalle repowarden à la version figée et les modules actifs. `✔ outils          versions figées` indique que tout correspond. Les outils installés par `apt` ou l'image (Java, Node, Python, …) ne sont pas concernés.
+**Rattraper sans rebuild** : l'état affiché au démarrage (et par `devzone`) compare les outils installés à leur version figée. Une ligne `⚠ outils          repowarden 4.9.2 installé, 4.12.0 figé : devzone apply` signale un écart ; `devzone apply` réinstalle repowarden à la version figée et les modules actifs. `✔ outils          versions figées` indique que tout correspond. Les outils installés par `apt` ou l'image (Java, Node, Python, …) ne sont pas concernés.
 
 
 
@@ -751,11 +751,11 @@ Un paquet installe a la main (`sudo apt install tree`) est perdu au prochain reb
 | Action | Commande |
 |---|---|
 | Lister | `devzone packages` : ✔ paquets installes, ○ paquets a installer |
-| Ajouter | `devzone packages ajouter <nom>…` : valide (`apt-cache`), installe, ajoute a la liste |
-| Retirer | `devzone packages retirer <nom>` : retire la liste et desinstalle |
-| Appliquer | `devzone packages appliquer` : installe les paquets manquants |
+| Ajouter | `devzone packages add <nom>…` : valide (`apt-cache`), installe, ajoute a la liste |
+| Retirer | `devzone packages remove <nom>` : retire la liste et desinstalle |
+| Appliquer | `devzone packages apply` : installe les paquets manquants |
 
-La liste est relue au post-create et affiche dans le recap (`⚠ paquets : …`) l'etat des paquets non installes. `devzone packages appliquer` peut etre relance.
+La liste est relue au post-create et affiche dans le recap (`⚠ paquets : …`) l'etat des paquets non installes. `devzone packages apply` peut etre relance.
 
 ## Sortie machine
 
@@ -876,10 +876,37 @@ français affichent un avertissement ; utilise le nom anglais.
 | `GARDER=connexions` | `KEEP=logins` |
 | `CONFIRMER=oui` | `CONFIRM=yes` |
 
+### Sous-commandes et options de devzone
+
+Les sous-commandes des modules et des commandes ont le même traitement que les
+premiers niveaux (#557) : l'ancien nom écrit l'avertissement, le nom anglais non.
+`--oui` devient `--yes` partout (`activer`, `desactiver`, `cluster`, `utiliser`, `postgres`,
+`mysql`, `gitlab`) ; `devzone disable <module> --yes` confirme la suppression des données.
+
+| Commande | Ancien nom | Nouveau nom |
+|---|---|---|
+| `postgres`, `mysql` | `creer`, `liste`, `supprimer`, `supprimer-donnees`, `etat`, `installer`, `desinstaller` | `create`, `list`, `delete`, `delete-data`, `status`, `install`, `uninstall` |
+| `postgres`, `mysql` | `autoriser`, `interdire` | `authorize`, `forbid` |
+| `gitlab` | `migrer`, `nouveau-mdp`, `etat`, `installer`, `desinstaller`, `relais-etat` | `migrate`, `new-password`, `status`, `install`, `uninstall`, `relay-status` |
+| `argocd` | `etat`, `installer`, `desinstaller` | `status`, `install`, `uninstall` |
+| `postgres`, `mysql`, `gitlab`, `argocd` | `relais-lancer`, `relais-arreter` | `relay-start`, `relay-stop` |
+| `packages` | `ajouter`, `retirer`, `appliquer`, `lister` | `add`, `remove`, `apply`, `list` |
+| `catalog` | `lister`, `synchroniser`, `appliquer`, `desinstaller` | `list`, `sync`, `apply`, `remove` |
+| `port` | `ouvrir`, `fermer`, `liste`, `relancer`, `exclure`, `inclure` | `open`, `close`, `list`, `restart`, `exclude`, `include` |
+
+| Ancien | Nouveau |
+|---|---|
+| `--contexte` | `--context` |
+| `--confirmer` | `--confirm` |
+| `--oui` | `--yes` |
+| `--nouveau-mdp` | `--new-password` |
+| `--fermer` | `--close` |
+| `--supprimer` (`mysql volume`) | `--delete` |
+
 ## Pour les contributeurs
 
 Les commandes de l'application (`devzone repair`, `start`, `metrics`,
-`utiliser`) remplacent les scripts directs pour l'utilisateur. Les scripts
+`use`) remplacent les scripts directs pour l'utilisateur. Les scripts
 internes restent appelables pendant le développement et par les tests :
 
 ```bash

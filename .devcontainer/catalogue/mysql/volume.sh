@@ -34,19 +34,19 @@ mysql_volume() {
     shift
     for arg in "$@"; do
         case "$arg" in
-            --supprimer) supprimer=1 ;;
-            --oui) oui=1 ;;
+            --delete) supprimer=1 ;;
+            --yes) oui=1 ;;
             *) nom="$arg" ;;
         esac
     done
     if [ -n "$supprimer" ]; then
-        [ -n "$nom" ] || refuse "volume --supprimer : nom manquant"
+        [ -n "$nom" ] || refuse "volume --delete : nom manquant"
         pvc="$nom"
         [[ "$pvc" == *-mysql-0 ]] || pvc="$pvc-mysql-0"
         monte="$(mysql_claim_monte "$ns")"
         [ "${pvc%-mysql-0}" != "$monte" ] || refuse "volume monté, suppression refusée : $nom"
         if [ -z "$oui" ]; then
-            cluster_interactif || refuse "confirmation impossible sans terminal : devzone mysql volume --supprimer $nom --oui"
+            cluster_interactif || refuse "confirmation impossible sans terminal : devzone mysql volume --delete $nom --yes"
             printf 'Supprimer le volume %s ? [o/N] ' "$pvc" >&2
             read -r reponse || reponse=""
             case "$reponse" in
@@ -64,7 +64,7 @@ mysql_volume() {
         return 0
     fi
     contexte >/dev/null
-    installe || refuse "module inactif : devzone activer mysql"
+    installe || refuse "module inactif : devzone enable mysql"
     claim="$nom"
     [[ "$claim" == *-mysql-0 ]] && claim="${claim%-mysql-0}"
     mysql_installer_claim "$ns" "$claim"

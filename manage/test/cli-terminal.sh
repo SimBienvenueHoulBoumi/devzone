@@ -125,7 +125,7 @@ mk shell 180 0 "○ module ia" --envoyer '\$ ' $'devzone\nexit\n'
 
 echo "▶ Commande devzone du conteneur"
 conteneur "devzone : état" 60 0 "○ module kubernetes" "devzone"
-conteneur "devzone --help" 60 0 "devzone activer <module>" "devzone --help"
+conteneur "devzone --help" 60 0 "devzone enable <module>" "devzone --help"
 conteneur "devzone enable ia" 600 0 "ia actif" "devzone enable ia"
 conteneur "devzone disable ia" 300 0 "ia désactivé" "devzone disable ia"
 conteneur "devzone enable kubernetes (aucun cluster de l'hôte)" 180 0 "aucun cluster joignable" "devzone enable kubernetes"
@@ -134,7 +134,7 @@ conteneur "devzone enable <module inconnu> : refusé" 60 1 "module inconnu" "dev
 conteneur "devzone <commande inconnue> : refusée" 60 1 "commande inconnue" "devzone nexistepas"
 
 echo "▶ Scripts de démarrage, sous terminal"
-conteneur "demarrage.sh : sans question" 180 0 "devzone : état" "bash .devcontainer/demarrage.sh"
+conteneur "demarrage.sh : sans question" 180 0 "devzone: state" "bash .devcontainer/demarrage.sh"
 # Conditions de make rebuild figé : dépôt GitHub, gh connecté et administrateur
 # (simulé) ; repowarden install proposait alors les bots et attendait
 git -C "$COPIE" init -q

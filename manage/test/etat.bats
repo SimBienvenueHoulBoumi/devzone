@@ -245,7 +245,7 @@ KUBE
     [ -e "$BATS_TEST_TMPDIR/relais/devzone-devzone-auto-8080" ]
 }
 
-@test "devzone appliquer confirme l'état : la désinstallation reprend" {
+@test "devzone apply confirme l'état : la désinstallation reprend" {
     printf 'ia=off\ngitlab=off\npostgres=off\nkubernetes=off\nports_auto=off\n' >"$DEVZONE_ETAT"
     echo $(( $(date +%s) - 120 )) >"$DEVZONE_ETAT.recouvre"
     mkdir -p "$DEVZONE_PORTS_AUTO_DIR/devzone"

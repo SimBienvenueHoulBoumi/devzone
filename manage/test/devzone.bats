@@ -153,8 +153,8 @@ GH
 @test "par défaut : tous les modules désactivés, avec la commande pour les activer" {
     run bash "$DEVZONE"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"○ module ia"*"devzone activer ia"* ]] || false
-    [[ "$output" == *"○ module kubernetes"*"devzone activer kubernetes"* ]] || false
+    [[ "$output" == *"○ module ia"*"devzone enable ia"* ]] || false
+    [[ "$output" == *"○ module kubernetes"*"devzone enable kubernetes"* ]] || false
 }
 
 @test "docker-hote : partagé par défaut, avertissement dans l'état" {
@@ -220,19 +220,19 @@ GH
 
 @test "état : identité git absente → nécessaire, avec les deux voies" {
     run bash "$DEVZONE"
-    [[ "$output" == *"✖ identité git"*"gh auth login -s workflow"* ]] || false
+    [[ "$output" == *"✖ git identity"*"gh auth login -s workflow"* ]] || false
     [[ "$output" == *"git config --file ~/.config/git/config user.name"* ]] || false
 }
 
 @test "état : identité git présente" {
     git config --global user.name "Test" && git config --global user.email "t@example.invalid"
     run bash "$DEVZONE"
-    [[ "$output" == *"✔ identité git    Test <t@example.invalid>"* ]] || false
+    [[ "$output" == *"✔ git identity    Test <t@example.invalid>"* ]] || false
 }
 
 @test "état : GitHub non connecté → facultatif" {
     run bash "$DEVZONE"
-    [[ "$output" == *"○ GitHub          facultatif"* ]] || false
+    [[ "$output" == *"○ GitHub          optional"* ]] || false
 }
 
 @test "état : GitHub connecté sans permission workflow → à corriger" {
@@ -245,11 +245,11 @@ GH
     [[ "$output" == *"✔ GitHub          connecté"* ]] || false
 }
 
-@test "état : outil en retard → ⚠ avec la commande devzone appliquer" {
+@test "état : outil en retard → ⚠ avec la commande devzone apply" {
     printf 'repowarden 4.9.2\n' >"$NPM_INSTALLEES"
     run bash "$DEVZONE"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"⚠ outils          repowarden 4.9.2 installé, $REPOWARDEN_FIGE figé : devzone appliquer"* ]] || false
+    [[ "$output" == *"⚠ tools          repowarden 4.9.2 installed, $REPOWARDEN_FIGE pinned: devzone apply"* ]] || false
 }
 
 @test "état : versions figées installées → ✔ outils" {
@@ -257,7 +257,7 @@ GH
     printf 'repowarden %s\n%s\n' "$REPOWARDEN_FIGE" "$IA_FIGES" >"$NPM_INSTALLEES"
     run bash "$DEVZONE"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"✔ outils          versions figées"* ]] || false
+    [[ "$output" == *"✔ tools          pinned versions"* ]] || false
 }
 
 @test "état : worktree au chemin absent (créé de l'autre côté) → ⚠, rien supprimé" {
@@ -295,7 +295,7 @@ GH
 @test "état : module actif" {
     bash "$DEVZONE" enable ia
     run bash "$DEVZONE"
-    [[ "$output" == *"✔ module ia"*"actif"* ]] || false
+    [[ "$output" == *"✔ module ia"*"active"* ]] || false
 }
 
 @test "activer ia : installe les versions figées, état gardé" {
@@ -346,7 +346,7 @@ GH
     [[ "$output" == *"$HOME/.npm/_logs/2026-10-24T11_46_18_245Z-debug-0.log"* ]] || false
     [[ "$output" != *"ia actif"* ]] || false
     run bash "$DEVZONE"
-    [[ "$output" == *"✖ module ia"*"en échec"*"devzone appliquer"* ]] || false
+    [[ "$output" == *"✖ module ia"*"failed"*"devzone apply"* ]] || false
     [[ "$output" != *"✔ module ia"* ]] || false
 }
 
@@ -365,18 +365,18 @@ GH
     NPM_ECHEC=1 run bash "$DEVZONE" apply
     [ "$status" -ne 0 ]
     run bash "$DEVZONE"
-    [[ "$output" == *"✖ module ia"*"en échec"* ]] || false
+    [[ "$output" == *"✖ module ia"*"failed"* ]] || false
     run bash "$DEVZONE" apply
     [ "$status" -eq 0 ]
     run bash "$DEVZONE"
-    [[ "$output" == *"✔ module ia"*"actif"* ]] || false
+    [[ "$output" == *"✔ module ia"*"active"* ]] || false
     [[ "$output" != *"en échec"* ]] || false
 }
 
 @test "désactiver ia après un échec : plus marqué en échec" {
     NPM_ECHEC=1 run bash "$DEVZONE" enable ia
     run bash "$DEVZONE"
-    [[ "$output" == *"✖ module ia"*"en échec"* ]] || false
+    [[ "$output" == *"✖ module ia"*"failed"* ]] || false
     run bash "$DEVZONE" disable ia
     [ "$status" -eq 0 ]
     run bash "$DEVZONE"
@@ -543,7 +543,7 @@ KUBE
     mkdir -p "$HOME/.claude" && echo '{}' >"$HOME/.claude/.credentials.json"
     run bash "$DEVZONE"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"○ module ia"*"devzone activer ia"* ]] || false
+    [[ "$output" == *"○ module ia"*"devzone enable ia"* ]] || false
     [[ "$output" == *"○ module kubernetes"* ]] || false
     [[ "$output" != *"✔ module ia"* ]] || false
 }
@@ -565,7 +565,7 @@ KUBE
     mkdir -p "$HOME/.claude" && echo '{}' >"$HOME/.claude/.credentials.json"
     run bash "$DEVZONE" is-enabled ia
     [ "$status" -ne 0 ]
-    [[ "$output" == *"connexion Claude Code/opencode partagée trouvée : devzone activer ia pour l'utiliser ici"* ]] || false
+    [[ "$output" == *"connexion Claude Code/opencode partagée trouvée : devzone enable ia pour l'utiliser ici"* ]] || false
     run bash "$DEVZONE" is-enabled ia
     [ "$status" -ne 0 ]
     [ -z "$output" ]
@@ -708,8 +708,8 @@ KUBE
     [ "$(head -n 1 "$HOME/.config/opencode/skills/devzone/SKILL.md")" = '---' ]
     grep -q '^name: devzone$' "$HOME/.claude/skills/devzone/SKILL.md"
     grep -q '^name: devzone$' "$HOME/.config/opencode/skills/devzone/SKILL.md"
-    grep -qF '<!-- devzone : skill posée par devzone activer ia -->' "$HOME/.claude/skills/devzone/SKILL.md"
-    grep -qF '<!-- devzone : skill posée par devzone activer ia -->' "$HOME/.config/opencode/skills/devzone/SKILL.md"
+    grep -qF '<!-- devzone : skill posée par devzone enable ia -->' "$HOME/.claude/skills/devzone/SKILL.md"
+    grep -qF '<!-- devzone : skill posée par devzone enable ia -->' "$HOME/.config/opencode/skills/devzone/SKILL.md"
     [[ "$output" == *"skill devzone posée"* ]] || false
 }
 
@@ -807,11 +807,11 @@ mon réglage' ]
     [ -z "$(grep "\.devzone\.modules" <<<"$output")" ]
 }
 
-@test "état : version publiée plus récente → ligne devzone mettre-a-jour" {
+@test "état : version publiée plus récente → ligne devzone update" {
     printf 'version 0.19.0\n' >"$DEVZONE_RACINE/.devzone.version"
     NPM_PUBLIEE=0.20.0 run bash "$DEVZONE"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"○ devzone 0.20.0 disponible : sur le poste, devzone mettre-a-jour"* ]] || false
+    [[ "$output" == *"○ devzone 0.20.0 available: on the workstation, devzone update"* ]] || false
 }
 
 @test "état : version publiée identique ou plus ancienne → aucune ligne" {
@@ -830,7 +830,7 @@ mon réglage' ]
     [ "$(grep -c '^npm view devzone version' "$NPM_LOG")" -eq 1 ]
     NPM_PUBLIEE=0.21.0 run bash "$DEVZONE"
     [ "$(grep -c '^npm view devzone version' "$NPM_LOG")" -eq 1 ]
-    [[ "$output" == *"devzone 0.20.0 disponible"* ]] || false
+    [[ "$output" == *"devzone 0.20.0 available"* ]] || false
     [[ "$output" != *"devzone 0.21.0"* ]] || false
 }
 
@@ -884,7 +884,7 @@ KUBE
     run bash "$DEVZONE"
     [ "$status" -eq 0 ] || false
     [[ "$output" == *"⚠ cluster de travail : kind-gitlab"* ]] || false
-    [[ "$output" == *"devzone utiliser docker-desktop"* ]] || false
+    [[ "$output" == *"devzone use docker-desktop"* ]] || false
 }
 
 @test "état : contexte docker-desktop → pas d'avertissement de cluster de travail" {

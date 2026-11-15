@@ -66,6 +66,13 @@ KUBE
     grep -q 'services-admin.sh disable postgres --oui$' "$T/kubectl.log"
 }
 
+@test "services disable postgres --yes: reaches the installer as --yes, no deprecation (#557)" {
+    run --separate-stderr bash "$CLI" workspace services disable postgres --yes
+    [ "$status" -eq 0 ]
+    grep -q 'services-admin.sh disable postgres --yes$' "$T/kubectl.log"
+    [[ "$stderr" != *"deprecated"* ]] || false
+}
+
 @test "services enable: pod not running, nothing applied" {
     export FAUX_POD=Pending
     run bash "$CLI" workspace services enable gitlab

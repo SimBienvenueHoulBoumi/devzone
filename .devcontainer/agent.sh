@@ -65,7 +65,7 @@ agent_lancer() {
     consigne="$(cd "$(dirname "$consigne")" && pwd -P)/$(basename "$consigne")"
     # Module ia requis : sans assistants, rien à diriger.
     if ! bash "$ICI/devzone" is-enabled ia >/dev/null 2>&1; then
-        refuse "module ia désactivé : devzone activer ia"
+        refuse "module ia désactivé : devzone enable ia"
     fi
     configurer
     journal="$(journal_de "$dossier")"

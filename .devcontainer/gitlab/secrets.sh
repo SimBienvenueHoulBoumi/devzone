@@ -62,7 +62,7 @@ gitlab_nouveau_mdp() {
     case "$utilisateur" in
         root | dev) ;;
         *)
-            echo "devzone : gitlab : utilisateur inconnu : ${utilisateur:-(absent)} (devzone gitlab nouveau-mdp [root|dev])" >&2
+            echo "devzone : gitlab : utilisateur inconnu : ${utilisateur:-(absent)} (devzone gitlab new-password [root|dev])" >&2
             return 2
             ;;
     esac
@@ -90,6 +90,6 @@ puts \"OK\""
     (umask 077 && printf '%s' "$mdp" >"$fichier") || return 1
     chmod 600 "$fichier"
     password_regenerer ||
-        echo "devzone : gitlab : identifiants regroupés non mis à jour (devzone mots-de-passe)" >&2
+        echo "devzone : gitlab : identifiants regroupés non mis à jour (devzone passwords)" >&2
     printf '%s\n' "$RACINE/.password"
 }

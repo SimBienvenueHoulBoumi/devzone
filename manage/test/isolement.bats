@@ -145,7 +145,7 @@ SLEEP
     printf 'kind-devzone\n' >"$BATS_TEST_TMPDIR/ctx"
     actif_sur kind-devzone
 
-    run bash "$DEVZONE" cluster docker-desktop --oui </dev/null
+    run bash "$DEVZONE" cluster docker-desktop --yes </dev/null
     [ "$status" -eq 0 ]
     # Le choix de cluster est enregistré
     grep -qx 'cluster=docker-desktop' "$DEVZONE_ETAT"

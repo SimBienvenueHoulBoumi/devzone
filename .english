@@ -81,6 +81,8 @@ charts/devzone-workspace/templates/statefulset.yaml
 .github/workflows/repowarden.yml
 .github/workflows/tickets.yml
 .devcontainer/argocd/catalogue-argocd.sh
+.devcontainer/ports-json.sh
+.devcontainer/help.sh
 manage/scripts/check-charts.sh
 manage/test/charts-convention.bats
 manage/test/chart-require.bats

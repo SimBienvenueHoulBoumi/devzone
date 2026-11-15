@@ -3,7 +3,7 @@
 # (devzone, make, npx devzone) must use a known CLI command name.
 # The authorized names are built by the test itself from:
 #   - bash manage/devzone --help
-#   - the #   devzone help block of .devcontainer/devzone
+#   - the "  devzone" lines of the help text of .devcontainer/help.sh (#557)
 #   - the keys and values of command_canonical in .devcontainer/command-aliases.sh
 #   - the Makefile targets
 
@@ -31,10 +31,10 @@ setup() {
         esac
     done
 
-    # 2. .devcontainer/devzone : lines beginning with "#   devzone"
+    # 2. .devcontainer/help.sh : lines beginning with "  devzone" (the help text)
     while IFS= read -r line; do
         case "$line" in
-            '#   devzone'*)
+            '  devzone'*)
                 word="${line#*devzone }"
                 word="${word%% *}"
                 case "$word" in
@@ -45,7 +45,7 @@ setup() {
                 esac
                 ;;
         esac
-    done < "$RACINE/.devcontainer/devzone"
+    done < "$RACINE/.devcontainer/help.sh"
 
     # 3. command_canonical : keys and values
     while IFS= read -r line; do

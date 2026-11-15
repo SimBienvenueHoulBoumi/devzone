@@ -75,7 +75,7 @@ setup() {
     [ ! -e "$RACINE/.password" ]
 }
 
-@test "devzone mots-de-passe : régénère et n'affiche que le chemin" {
+@test "devzone passwords : régénère et n'affiche que le chemin" {
     run bash "$DEVZONE" passwords
     [ "$status" -eq 0 ]
     [ "$output" = "$RACINE/.password" ]
