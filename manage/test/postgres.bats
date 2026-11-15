@@ -8,6 +8,7 @@
 
 setup() {
     load commun
+    load commun-helm
     kind_vide
     kube_isole
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
@@ -80,6 +81,7 @@ echo "nohup $*" >>"$BATS_TEST_TMPDIR/nohup.log"
 exec sleep 300
 NOHUP
     chmod +x "$BATS_TEST_TMPDIR"/bin/*
+    helm_fake_install
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
 }
 
@@ -132,7 +134,7 @@ attendre_nohup() {
     grep -qx 'cluster=docker-desktop' "$DEVZONE_ETAT"
     ! grep -q 'create cluster' "$BATS_TEST_TMPDIR/kind.log" 2>/dev/null || false
     grep -q 'kubectl config set-context devzone --cluster=docker-desktop --user=docker-desktop' "$BATS_TEST_TMPDIR/kubectl.log"
-    grep -q 'kubectl --context devzone apply -f -' "$BATS_TEST_TMPDIR/kubectl.log"
+    grep -q 'kubectl --context devzone -n devzone-postgres apply -f -' "$BATS_TEST_TMPDIR/kubectl.log"
     ! grep -q 'kind-devzone' "$BATS_TEST_TMPDIR/kubectl.log" || false
 }
 
@@ -365,7 +367,7 @@ attendre_nohup() {
     grep -q -- '--context kind-devzone delete namespace devzone-postgres' "$BATS_TEST_TMPDIR/kubectl.log"
     # L'installation dans le nouveau cluster passe par le contexte devzone, relié à docker-desktop
     grep -q 'kubectl config set-context devzone --cluster=docker-desktop --user=docker-desktop' "$BATS_TEST_TMPDIR/kubectl.log"
-    grep -q 'kubectl --context devzone apply -f -' "$BATS_TEST_TMPDIR/kubectl.log"
+    grep -q 'kubectl --context devzone -n devzone-postgres apply -f -' "$BATS_TEST_TMPDIR/kubectl.log"
 }
 
 @test "cluster : module inactif → choix seulement enregistré ; même cluster → rien" {

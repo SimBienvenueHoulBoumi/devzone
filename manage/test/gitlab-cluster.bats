@@ -130,8 +130,11 @@ SETSID
 @test "gitlab : helm dans le contexte devzone et le namespace devzone-gitlab, aucun kind créé" {
     run bash "$GITLAB" install
     [ "$status" -eq 0 ] || false
-    grep -Eq -- "--kubeconfig [^ ]+ upgrade --install gitlab gitlab/gitlab --version 9.11.16 --namespace devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log" || false
-    grep -Eq -- "--kubeconfig [^ ]+ upgrade --install gitlab-runner gitlab/gitlab-runner --version 0.88.2 --namespace devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log" || false
+    # Wrapper chart charts/devzone-gitlab (#538): dependencies built, then one
+    # pass with the runner held back and a second once the seed wrote its Secret
+    grep -q "dependency build" "$BATS_TEST_TMPDIR/helm.log" || false
+    grep -Eq -- "--kubeconfig [^ ]+ upgrade --install gitlab [^ ]*charts/devzone-gitlab --namespace devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log" || false
+    grep -Eq -- "--kubeconfig [^ ]+ upgrade --install gitlab [^ ]*charts/devzone-gitlab .*--set gitlab-runner.replicas=1" "$BATS_TEST_TMPDIR/helm.log" || false
     ! grep -q "create cluster" "$BATS_TEST_TMPDIR/kind.log" || false
 }
 
@@ -144,7 +147,7 @@ SETSID
 }
 
 @test "gitlab : valeurs ClusterIP sans NodePort, LoadBalancer ni Ingress ouvert" {
-    local values="$BATS_TEST_DIRNAME/../../.devcontainer/gitlab/values.yaml"
+    local values="$BATS_TEST_DIRNAME/../../charts/devzone-gitlab/values.yaml"
     grep -q "type: ClusterIP" "$values" || false
     grep -q "nginx-ingress:" "$values" || false
     grep -A1 "nginx-ingress:" "$values" | grep -q "enabled: false" || false
@@ -191,14 +194,14 @@ SETSID
     grep -qx "gitlab" "$KIND_CLUSTERS" || false
     ! grep -q "delete cluster" "$BATS_TEST_TMPDIR/kind.log" || false
     # L'installation dans le cluster des services a bien eu lieu avant la question
-    grep -Eq -- "--kubeconfig [^ ]+ upgrade --install gitlab gitlab/gitlab" "$BATS_TEST_TMPDIR/helm.log" || false
+    grep -Eq -- "--kubeconfig [^ ]+ upgrade --install gitlab [^ ]*charts/devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log" || false
 }
 
 @test "gitlab migrate --yes : installe, refait le seed, puis supprime kind-gitlab" {
     printf 'gitlab\n' >"$KIND_CLUSTERS"
     run bash "$DEVZONE" gitlab migrate --yes
     [ "$status" -eq 0 ] || false
-    grep -Eq -- "--kubeconfig [^ ]+ upgrade --install gitlab gitlab/gitlab" "$BATS_TEST_TMPDIR/helm.log" || false
+    grep -Eq -- "--kubeconfig [^ ]+ upgrade --install gitlab [^ ]*charts/devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log" || false
     grep -q "api/v4/projects" "$BATS_TEST_TMPDIR/curl.log" 2>/dev/null ||
         grep -q "gitlab-rails runner" "$BATS_TEST_TMPDIR/kubectl.log" || false
     grep -q "kind delete cluster --name gitlab" "$BATS_TEST_TMPDIR/kind.log" || false

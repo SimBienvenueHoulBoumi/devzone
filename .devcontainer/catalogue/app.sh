@@ -9,6 +9,9 @@ ATTENTE="${DEVZONE_CATALOGUE_ATTENTE:-300}"
 # shellcheck source=SCRIPTDIR/argocd/catalogue-argocd.sh
 # shellcheck disable=SC1091
 . "$ICI/argocd/catalogue-argocd.sh"
+# shellcheck source=SCRIPTDIR/chart-direct.sh
+# shellcheck disable=SC1091
+. "$ICI/chart-direct.sh"
 
 # Attente du StatefulSet prêt : une seule commande rollout sur la voie
 # manifeste, sondée sur la voie Argo CD (la synchronisation est en tâche de
@@ -66,7 +69,7 @@ regenerer_identifiants() {
 # #538) ou manifeste, attente prête, relais lancé vers 127.0.0.1:<port> du
 # conteneur ; rend non nul en échec
 app_installer() {
-    local app="$1" ns port image CTX man extra="" argo=0
+    local app="$1" ns port image CTX extra="" argo=0
     ns="$(app_ns "$app")"
     port="$(app_lire "$app" port)"
     image="$(app_lire "$app" image)"
@@ -99,13 +102,9 @@ app_installer() {
         catalogue_argocd_apply "$app" "$ns" "$image" "$port" \
             "$(app_lire "$app" memoire)" "$(app_lire "$app" taille)" "$extra" || return 1
     else
-        man="$(mktemp)"
-        sed -e "s|__APP__|$app|g" -e "s|__NS__|$ns|g" -e "s|__IMAGE__|$image|g" \
-            -e "s|__PORT__|$port|g" -e "s|__MEMOIRE__|$(app_lire "$app" memoire)|g" \
-            -e "s|__TAILLE__|$(app_lire "$app" taille)|g" -e "s|__CLAIM__|$claim|g" \
-            "$(dossier_catalogue)/$app/manifeste.yaml" >"$man" &&
-            kubectl --context devzone -n "$ns" apply -f "$man" >/dev/null
-        rm -f "$man"
+        # Helm direct: the chart charts/devzone-<app>, the one definition (#559)
+        chart_install "$app" "$ns" "image=$image" "port=$port" \
+            "memory=$(app_lire "$app" memoire)" "size=$(app_lire "$app" taille)" "claim=$claim" || return 1
     fi
     app_attendre "$app" "$ns" "$argo" || return 1
     relais_lancer "$app" "$CTX" "$ns" "svc/$app" "$port:$port"

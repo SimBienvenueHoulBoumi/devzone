@@ -23,9 +23,14 @@ GITOPS_NS="devzone-argocd"
 GITOPS_ROOT_APP="devzone"
 GITOPS_REPO_NAME="${DEVZONE_GITOPS_REPO_NAME:-devzone-argocd}"
 : "${GITOPS_CMD:=devzone argocd init}"
+# shellcheck source=SCRIPTDIR/gitops-gitlab.sh
+# shellcheck disable=SC1091
+. "$(dirname "${BASH_SOURCE[0]}")/gitops-gitlab.sh"
 
 gitops_repo() { conf_get argocd repo; }
 gitops_repo_note() { conf_set argocd "repo=$1"; }
+# GitLab designated (provider = gitlab, #559): the files go through its API
+gitops_is_gitlab() { [ "$(conf_get argocd provider)" = gitlab ]; }
 
 gitops_enabled() {
     local r
@@ -49,6 +54,7 @@ gitops_init() {
     for arg in "$@"; do
         if [ "$expect" = repo ]; then repo="$arg"; expect=""; continue; fi
         case "$arg" in
+            --gitlab) gitlab_gitops_init; return ;;
             --none)
                 gitops_repo_note none
                 echo "✔ no GitOps repository: the Applications are applied directly ($GITOPS_CMD to change)"
@@ -121,12 +127,14 @@ GitOps repository of devzone, written by the devzone commands (never by hand): t
 gitops_blob() { git hash-object "$1" 2>/dev/null || true; }
 
 gitops_sha() {
+    if gitops_is_gitlab; then gitlab_gitops_sha "$@"; return; fi
     gh api "repos/$(gitops_slug)/contents/$1" --jq .sha 2>/dev/null || true
 }
 
 # Writes <file> at <path> of the repository (create or update), <message>
 gitops_put() {
     local path="$1" file="$2" message="$3" slug sha content
+    if gitops_is_gitlab; then gitlab_gitops_put "$@"; return; fi
     slug="$(gitops_slug)"
     sha="$(gitops_sha "$path")"
     if [ -n "$sha" ] && [ "$sha" = "$(gitops_blob "$file")" ]; then
@@ -150,6 +158,7 @@ gitops_put_text() {
 
 gitops_delete() {
     local path="$1" message="$2" sha
+    if gitops_is_gitlab; then gitlab_gitops_delete "$@"; return; fi
     sha="$(gitops_sha "$path")"
     [ -n "$sha" ] || return 0
     gh api -X DELETE "repos/$(gitops_slug)/contents/$path" -f message="$message" -f sha="$sha" >/dev/null
@@ -157,10 +166,11 @@ gitops_delete() {
 
 # Repository Secret (token of gh) and root Application "devzone" on apps/
 gitops_root() {
-    local url token
+    local url token user=devzone
     gitops_enabled || return 0
     url="$(gitops_repo)"
     token="${DEVZONE_GITOPS_TOKEN:-$(gh auth token 2>/dev/null || true)}"
+    if gitops_is_gitlab; then user=oauth2; token="$(gitlab_gitops_root_token 2>/dev/null || true)"; fi
     if [ -n "$token" ]; then
         argocd_kubectl -n "$GITOPS_NS" apply -f - >/dev/null <<EOF
 apiVersion: v1
@@ -175,7 +185,7 @@ type: Opaque
 stringData:
   type: git
   url: $url
-  username: devzone
+  username: $user
   password: $token
 EOF
     else

@@ -111,7 +111,7 @@ installer() {
     else
         mysql_secret
         claim="$(mysql_claim_choisir "$NS")" || return 2
-        mysql_appliquer_manifeste "$NS" "$claim"
+        mysql_appliquer_chart "$NS" "$claim" || return 1
         if ! k rollout status statefulset/mysql --timeout="${MYSQL_ATTENTE}s" >/dev/null; then
             echo "devzone : catalogue mysql : pas prêt après ${MYSQL_ATTENTE}s : kubectl --context $CTX -n $NS describe pod mysql-0" >&2
             return 1

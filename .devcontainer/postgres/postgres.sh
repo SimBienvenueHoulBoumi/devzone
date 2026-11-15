@@ -18,6 +18,9 @@ ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
 # shellcheck source=SCRIPTDIR/../password.sh
 # shellcheck disable=SC1091
 . "$ICI/../password.sh"
+# shellcheck source=SCRIPTDIR/../chart-direct.sh
+# shellcheck disable=SC1091
+. "$ICI/../chart-direct.sh"
 # Isolation réseau : namespace_isoler, d'où viennent les NetworkPolicies
 # shellcheck source=SCRIPTDIR/../isolement.sh
 # shellcheck disable=SC1091
@@ -126,8 +129,7 @@ installer() {
     # Compte limité autorisé dans le namespace : RoleBinding vers edit
     compte_autoriser "$CTX" "$NS"
     secret_admin
-    sed "s/__TAILLE__/$POSTGRES_TAILLE/" "$ICI/postgres.yaml" |
-        kubectl --context devzone apply -f - >/dev/null
+    chart_install postgres "$NS" "size=$POSTGRES_TAILLE" || return 1
     echo "▶ Attente de PostgreSQL (timeout ${POSTGRES_ATTENTE}s)…"
     if ! k rollout status statefulset/postgres --timeout="${POSTGRES_ATTENTE}s" >/dev/null; then
         echo "devzone : postgres : pas prêt après ${POSTGRES_ATTENTE}s : kubectl --context $CTX -n $NS describe pod postgres-0" >&2
