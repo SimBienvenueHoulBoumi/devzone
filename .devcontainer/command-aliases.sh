@@ -130,7 +130,10 @@ subcommand_canonical() {
             ;;
         catalog)
             case "$word" in
+                synchroniser) echo sync ;;
+                appliquer) echo apply ;;
                 lister) echo list ;;
+                desinstaller) echo remove ;;
                 *) echo "$word" ;;
             esac
             ;;

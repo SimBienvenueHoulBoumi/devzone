@@ -639,7 +639,7 @@ appliquer_mysql() {
     else
         # Retrait sans suppression des données : volume gardé (#441) ; les
         # bases ne partent qu'avec un oui (confirmer_suppression)
-        bash "$ICI/catalogue.sh" desinstaller mysql
+        bash "$ICI/catalogue.sh" remove mysql
         if [ -n "${SUPPRIMER_DONNEES:-}" ]; then
             bash "$ICI/catalogue/mysql/mysql.sh" supprimer-donnees --oui
         fi
@@ -1374,7 +1374,7 @@ changer() {
         # Une application du catalogue : on écrit la ligne, on applique
         if [ -f "$ICI/catalogue/$m/app.conf" ]; then
             ecrire "$m" "$1"
-            bash "$ICI/catalogue.sh" appliquer
+            bash "$ICI/catalogue.sh" apply
             return
         fi
         echo "devzone : module inconnu : $m ; modules : ${MODULES[*]}" >&2
@@ -1452,7 +1452,7 @@ case "${1:-}" in
     postgres) DEVZONE_ETAT="$ETAT" bash "$ICI/postgres/postgres.sh" "${@:2}" ;;
     mysql) DEVZONE_ETAT="$ETAT" bash "$ICI/catalogue/mysql/mysql.sh" "${@:2}" ;;
     gitlab) DEVZONE_ETAT="$ETAT" bash "$ICI/gitlab/gitlab.sh" "${@:2}" ;;
-    catalogue) DEVZONE_ETAT="$ETAT" bash "$ICI/catalogue.sh" lister ;;
+    catalogue) DEVZONE_ETAT="$ETAT" bash "$ICI/catalogue.sh" list ;;
     argocd) DEVZONE_ETAT="$ETAT" bash "$ICI/argocd/argocd.sh" "${@:2}" ;;
     port) DEVZONE_ETAT="$ETAT" bash "$ICI/ports.sh" "${@:2}" ;;
     paquets) bash "$ICI/paquets.sh" "${@:2}" ;;

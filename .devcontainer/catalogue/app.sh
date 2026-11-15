@@ -151,6 +151,24 @@ app_echec() {
     printf '%s\n' "$2" >&2
 }
 
+# Avertit des PVC mysql non montés par le StatefulSet (#440). Lecture des
+# namespaces réservée à l'administrateur (#430).
+app_mysql_volumes_inutilises() {
+    local ctx ns monte pvc liste
+    ctx="$(cluster_lu)"
+    [ -n "$ctx" ] || return 0
+    ns="$(app_ns mysql)"
+    compte_admin "$ctx" get namespace "$ns" >/dev/null 2>&1 || return 0
+    monte="$(kubectl --context devzone -n "$ns" get statefulset mysql -o jsonpath='{.spec.volumeClaimTemplates[0].metadata.name}' 2>/dev/null || true)"
+    [ -n "$monte" ] || return 0
+    liste="$(kubectl --context devzone -n "$ns" get pvc -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null | grep -E '\-mysql-0$' || true)"
+    while IFS= read -r pvc; do
+        [ -n "$pvc" ] || continue
+        [ "$pvc" != "${monte}-mysql-0" ] || continue
+        printf '  ⚠ volume %s non utilisé : devzone mysql volume\n' "$pvc"
+    done <<<"$liste"
+}
+
 # Comble l'écart entre le voulu et le réel : installe, retire, relance le
 # relais permanent ; marque l'échec au premier problème puis passe à la suite
 catalogue_appliquer() {

@@ -63,7 +63,7 @@ tour() {
     if [ "$maintenant" != "$ancien" ]; then
         echo "$maintenant" >"$DERNIER"
         echo "devzone : catalogue-veilleur : .devzone.modules modifié, application" >&2
-        bash "$ICI/../catalogue.sh" appliquer
+        bash "$ICI/../catalogue.sh" apply
     fi
 }
 

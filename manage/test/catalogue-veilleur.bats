@@ -99,7 +99,7 @@ CATALOGUE
     run bash "$depot/.devcontainer/catalogue/catalogue-veilleur.sh" tour
     [ "$status" -eq 0 ] || false
     [ -f "$depot/.devzone.catalogue-veilleur/dernier" ] || false
-    [ "$(cat "$BATS_TEST_TMPDIR/catalogue.log")" = "appliquer" ] || false
+    [ "$(cat "$BATS_TEST_TMPDIR/catalogue.log")" = "apply" ] || false
 }
 
 @test "veilleur : demarrer dont la boucle meurt tout de suite rend un code non nul" {

@@ -190,7 +190,10 @@ packages|ajouter|add
 packages|retirer|remove
 packages|appliquer|apply
 packages|lister|list
+catalog|synchroniser|sync
+catalog|appliquer|apply
 catalog|lister|list
+catalog|desinstaller|remove
 port|ouvrir|open
 port|fermer|close
 port|liste|list

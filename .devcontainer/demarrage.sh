@@ -52,7 +52,7 @@ bash "$ICI/ports.sh" restart || echo "démarrage : relais de ports non relancés
 DEVZONE_PORTS_AUTO_REEL=oui bash "$ICI/ports-auto.sh" demarrer >/dev/null 2>&1 || echo "démarrage : veilleur de ports auto non lancé (devzone reparer)"
 # Catalogue d'applications : une ligne <app>=off par application absente,
 # écrite une fois, jamais une ligne existante modifiée (#414)
-bash "$ICI/catalogue.sh" synchroniser || echo "démarrage : catalogue non synchronisé (devzone reparer)"
+bash "$ICI/catalogue.sh" sync || echo "démarrage : catalogue non synchronisé (devzone reparer)"
 # Veilleur du catalogue : réapplique à chaud dès que .devzone.modules change
 DEVZONE_CATALOGUE_REEL=oui bash "$ICI/catalogue/catalogue-veilleur.sh" demarrer >/dev/null 2>&1 || echo "démarrage : veilleur catalogue non lancé (devzone reparer)"
 
