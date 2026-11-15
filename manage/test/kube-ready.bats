@@ -1,7 +1,8 @@
 #!/usr/bin/env bats
 # Shared cluster check (#497): kube_ready_reason in manage/scripts/kube-ready.sh.
-# Fake kubectl and helm under $BATS_TEST_TMPDIR/bin, PATH isolated from the
-# real tools (kubectl lives in /usr/local/bin on this machine). No real cluster.
+# Fake kubectl and helm under $BATS_TEST_TMPDIR/bin; PATH holds only those and
+# a folder of links to bash and grep (outils_isoles), never /usr/bin or /bin:
+# the real kubectl or helm of the machine is not reachable. No real cluster.
 
 setup() {
     load commun
@@ -27,7 +28,8 @@ KUBECTL
 echo "helm $*" >>"$FAKE_LOG"
 HELM
     chmod +x "$T/bin/kubectl" "$T/bin/helm"
-    export PATH="$T/bin:/usr/bin:/bin"
+    outils_isoles "$T/outils"
+    export PATH="$T/bin:$T/outils"
     : >"$FAKE_LOG"
     unset FAKE_KUBE_CLUSTER_INFO FAKE_CONTEXTS
 }
@@ -71,8 +73,7 @@ reason() {
 }
 
 @test "kubectl missing: reason kubectl missing, status 1" {
-    mkdir -p "$T/vide"
-    run env PATH="$T/vide:/usr/bin:/bin" bash -c '. "$1"; kube_ready_reason' _ "$KR"
+    run env PATH="$T/outils" bash -c '. "$1"; kube_ready_reason' _ "$KR"
     [ "$status" -eq 1 ]
     [ "$output" = "kubectl missing" ]
 }

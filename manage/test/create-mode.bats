@@ -1,7 +1,8 @@
 #!/usr/bin/env bats
 # Mode at creation (#497): create_mode_choose and create_mode_write in
 # manage/scripts/create-mode.sh. Fake kubectl and helm under
-# $BATS_TEST_TMPDIR/bin, PATH isolated from the real tools. No real cluster.
+# $BATS_TEST_TMPDIR/bin; PATH holds only those and a folder of links to the
+# tools the scripts call (outils_isoles), never /usr/bin or /bin. No real cluster.
 
 setup() {
     load commun
@@ -31,7 +32,8 @@ case "$1" in
 esac
 HELM
     chmod +x "$T/bin/kubectl" "$T/bin/helm"
-    export PATH="$T/bin:/usr/bin:/bin"
+    outils_isoles "$T/outils"
+    export PATH="$T/bin:$T/outils"
     : >"$FAKE_LOG"
     unset FAKE_KUBE_CLUSTER_INFO FAKE_CONTEXTS
 }
