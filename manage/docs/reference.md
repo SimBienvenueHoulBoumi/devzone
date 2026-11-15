@@ -768,7 +768,14 @@ outil peut relancer la consigne ensuite avec `devzone agent`.
 
 ## Anciens noms des commandes
 
-Les commandes de devzone s'écrivent en anglais (#502). Les anciens noms français restent acceptés et font exactement la même chose :
+Les commandes de devzone s'écrivent en anglais (#502). Les anciens noms français restent acceptés et font exactement la même chose, mais écrivent un avertissement sur la sortie d'erreur (#532) :
+
+```
+devzone: "activer" is deprecated, use "enable"
+```
+
+Ils seront retirés à la prochaine version majeure : les anciens noms
+français affichent un avertissement ; utilise le nom anglais.
 
 | Ancien nom | Nom actuel |
 |---|---|
@@ -813,4 +820,16 @@ Les tests isolent le relais Docker (`DEVZONE_RELAIS_SOCKET=…`,
 tests et la CI. Un changement de contexte direct (`kubectl config
 use-context CTX`) ne doit être fait que dans un test isolé. L'isolation des
 volumes utilise `DEVZONE_VOLUMES=<préfixe>`.
+
+### Anciens noms de commandes : avertissement
+
+Les anciens noms français écrivent l'avertissement
+`devzone: "activer" is deprecated, use "enable"` sur la sortie d'erreur et
+seront retirés à la prochaine version majeure. Un script tiers qui les
+utilise encore peut taire l'avertissement en posant `DEVZONE_NO_DEPRECATION=1`
+devant la commande :
+
+```bash
+DEVZONE_NO_DEPRECATION=1 devzone activer ia
+```
 

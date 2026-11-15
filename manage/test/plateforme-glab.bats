@@ -49,7 +49,7 @@ nombre_reglages_credential() {
 }
 
 @test "plateforme gitlab pose le réglage credential pour l'hôte de l'instance seulement" {
-    run bash "$DEVZONE" plateforme gitlab --url "$INSTANCE"
+    run bash "$DEVZONE" platform gitlab --url "$INSTANCE"
     [ "$status" -eq 0 ]
     [ "$(reglage "$INSTANCE")" = "!$HOME/.local/bin/glab auth git-credential" ]
     [ "$(nombre_reglages_credential)" -eq 1 ]
@@ -60,7 +60,7 @@ nombre_reglages_credential() {
     git config --global "credential.$AUTRE.helper" store
     git config --global "credential.$AUTRE.username" bob
     avant="$(git config --global --get-regexp '^credential\.' | sort)"
-    run bash "$DEVZONE" plateforme gitlab --url "$INSTANCE"
+    run bash "$DEVZONE" platform gitlab --url "$INSTANCE"
     [ "$status" -eq 0 ]
     [ "$(reglage "$AUTRE")" = "store" ]
     [ "$(git config --global "credential.$AUTRE.username")" = "bob" ]
@@ -72,19 +72,19 @@ nombre_reglages_credential() {
 }
 
 @test "plateforme gitlab répétée : un seul réglage, pas de doublon" {
-    run bash "$DEVZONE" plateforme gitlab --url "$INSTANCE"
+    run bash "$DEVZONE" platform gitlab --url "$INSTANCE"
     [ "$status" -eq 0 ]
-    run bash "$DEVZONE" plateforme gitlab --url "$INSTANCE"
+    run bash "$DEVZONE" platform gitlab --url "$INSTANCE"
     [ "$status" -eq 0 ]
     [ "$(git config --global --get-all "credential.$INSTANCE.helper" | wc -l)" -eq 1 ]
 }
 
 @test "retour à github : plus aucun réglage pour l'instance, les autres intacts" {
     git config --global "credential.$AUTRE.helper" store
-    run bash "$DEVZONE" plateforme gitlab --url "$INSTANCE"
+    run bash "$DEVZONE" platform gitlab --url "$INSTANCE"
     [ "$status" -eq 0 ]
     [ "$(reglage "$INSTANCE")" != "" ]
-    run bash "$DEVZONE" plateforme github
+    run bash "$DEVZONE" platform github
     [ "$status" -eq 0 ]
     [ -z "$(reglage "$INSTANCE")" ]
     [ "$(reglage "$AUTRE")" = "store" ]
@@ -93,16 +93,16 @@ nombre_reglages_credential() {
 }
 
 @test "retour à github sans réglage posé : aucune erreur, rien ajouté" {
-    run bash "$DEVZONE" plateforme gitlab --url "$INSTANCE"
+    run bash "$DEVZONE" platform gitlab --url "$INSTANCE"
     [ "$status" -eq 0 ]
     git config --global --unset-all "credential.$INSTANCE.helper"
-    run bash "$DEVZONE" plateforme github
+    run bash "$DEVZONE" platform github
     [ "$status" -eq 0 ]
     [ "$(nombre_reglages_credential)" -eq 0 ]
 }
 
 @test "récapitulatif : « ✔ git par glab » une fois le réglage posé" {
-    run bash "$DEVZONE" plateforme gitlab --url "$INSTANCE"
+    run bash "$DEVZONE" platform gitlab --url "$INSTANCE"
     [ "$status" -eq 0 ]
     run bash "$DEVZONE"
     [ "$status" -eq 0 ]
@@ -111,7 +111,7 @@ nombre_reglages_credential() {
 }
 
 @test "récapitulatif : « à poser » si le réglage a disparu, plateforme gitlab gardée" {
-    run bash "$DEVZONE" plateforme gitlab --url "$INSTANCE"
+    run bash "$DEVZONE" platform gitlab --url "$INSTANCE"
     [ "$status" -eq 0 ]
     git config --global --unset-all "credential.$INSTANCE.helper"
     run bash "$DEVZONE"
@@ -121,9 +121,9 @@ nombre_reglages_credential() {
 }
 
 @test "récapitulatif : pas de ligne « git par glab » sur github" {
-    run bash "$DEVZONE" plateforme gitlab --url "$INSTANCE"
+    run bash "$DEVZONE" platform gitlab --url "$INSTANCE"
     [ "$status" -eq 0 ]
-    run bash "$DEVZONE" plateforme github
+    run bash "$DEVZONE" platform github
     [ "$status" -eq 0 ]
     run bash "$DEVZONE"
     [ "$status" -eq 0 ]
@@ -133,7 +133,7 @@ nombre_reglages_credential() {
 @test "réglage credential impossible (config globale non inscriptible) → échec, plateforme non retenue" {
     # git config échoue si le fichier de config global n'est pas inscriptible
     mkdir -p "$GIT_CONFIG_GLOBAL"
-    run bash "$DEVZONE" plateforme gitlab --url "$INSTANCE"
+    run bash "$DEVZONE" platform gitlab --url "$INSTANCE"
     [ "$status" -ne 0 ]
     [[ "$output" == *"réglage git credential impossible"* ]] || false
     ! grep -q '^plateforme=' "$DEVZONE_ETAT" 2>/dev/null || false

@@ -23,7 +23,7 @@ bash "$ICI/kube-compte.sh" jeton || echo "démarrage : jeton du compte kubernete
 # Module gitlab actif : /etc/hosts est un montage Docker régénéré à chaque
 # démarrage, gitlab.localhost doit être re-pose (ssh, glab et getent passent
 # par le résolveur système) ; hote-poser n'échoue jamais (avertissement seul)
-if bash "$ICI/devzone" actif gitlab; then
+if bash "$ICI/devzone" is-enabled gitlab; then
     bash "$ICI/gitlab/gitlab.sh" hote-poser || echo "démarrage : nom gitlab.localhost non posé (devzone reparer)"
     # Relais TCP 8929/2224 : curl et git en HTTP passent par la boucle locale
     # pour *.localhost, le relais doit être relancé après chaque démarrage
@@ -31,17 +31,17 @@ if bash "$ICI/devzone" actif gitlab; then
 fi
 # Module postgres actif : le relais (port-forward vers 127.0.0.1:5432) ne
 # survit pas à l'arrêt du conteneur, relancé ici après les clusters
-if bash "$ICI/devzone" actif postgres; then
+if bash "$ICI/devzone" is-enabled postgres; then
     bash "$ICI/postgres/postgres.sh" relais-lancer || echo "démarrage : relais postgres non lancé (devzone reparer)"
 fi
 # Module argocd actif : relais (port-forward vers 127.0.0.1:8443), relancé
 # après les clusters comme celui de postgres
-if bash "$ICI/devzone" actif argocd; then
+if bash "$ICI/devzone" is-enabled argocd; then
     bash "$ICI/argocd/argocd.sh" relais-lancer || echo "démarrage : relais argocd non lancé (devzone reparer)"
 fi
 # Module mysql actif : le relais 127.0.0.1:3306, relancé comme celui de
 # postgres après chaque démarrage
-if bash "$ICI/devzone" actif mysql; then
+if bash "$ICI/devzone" is-enabled mysql; then
     bash "$ICI/catalogue/mysql/mysql.sh" relais-lancer || echo "démarrage : relais mysql non lancé (devzone reparer)"
 fi
 # Relais de ports vers le poste (#290) : l'IP du conteneur change à chaque

@@ -131,7 +131,7 @@ KUBE
     faux_kubectl
     printf 'docker-desktop\nprod\n' >"$BATS_TEST_TMPDIR/contexts"
     printf 'docker-desktop\n' >"$BATS_TEST_TMPDIR/current"
-    run bash "$DEVZONE" utiliser prod --confirmer prod -n gitlab
+    run bash "$DEVZONE" use prod --confirmer prod -n gitlab
     [ "$status" -eq 0 ]
     grep -q "config use-context prod" "$BATS_TEST_TMPDIR/kubectl.log" || false
     grep -q "config set-context prod --namespace gitlab" "$BATS_TEST_TMPDIR/kubectl.log" || false
@@ -141,7 +141,7 @@ KUBE
     faux_kubectl
     printf 'docker-desktop\n' >"$BATS_TEST_TMPDIR/contexts"
     printf 'docker-desktop\n' >"$BATS_TEST_TMPDIR/current"
-    run bash "$DEVZONE" utiliser -n dev
+    run bash "$DEVZONE" use -n dev
     [ "$status" -eq 0 ]
     grep -q "config set-context docker-desktop --namespace dev" "$BATS_TEST_TMPDIR/kubectl.log" || false
     ! grep -q "use-context" "$BATS_TEST_TMPDIR/kubectl.log" || false
@@ -151,7 +151,7 @@ KUBE
     faux_kubectl
     printf 'prod\n' >"$BATS_TEST_TMPDIR/contexts"
     printf 'docker-desktop\n' >"$BATS_TEST_TMPDIR/current"
-    run bash "$DEVZONE" utiliser prod
+    run bash "$DEVZONE" use prod
     [ "$status" -eq 2 ]
     [[ "$output" == *"cluster distant refusé"* ]] || false
 }

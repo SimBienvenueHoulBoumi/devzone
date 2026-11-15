@@ -218,7 +218,7 @@ contexte_courant() {
     printf 'gitlab=on\n' >"$DEVZONE_ETAT"
     mkdir -p "$SECRETS" && echo jeton >"$SECRETS/root-token"
     echo gitlab >"$DEVZONE_ETAT-echec-gitlab"
-    FAUX_RUNNERS='[{"id":1}]' run bash "$DEVZONE" appliquer
+    FAUX_RUNNERS='[{"id":1}]' run bash "$DEVZONE" apply
     [ "$status" -eq 0 ] || false
     [[ "$output" == *"déjà actif, rien à faire"* ]] || false
     [ ! -e "$DEVZONE_ETAT-echec-gitlab" ] || false

@@ -147,7 +147,7 @@ lecteur() {
 @test "état supprimé avec copie de secours : restauré" {
     printf 'ia=on\nkubernetes=off\ngitlab=on\npostgres=on\n' >"$DEVZONE_ETAT.prec"
     rm -f "$DEVZONE_ETAT"
-    run bash "$DEVZONE" actif postgres
+    run bash "$DEVZONE" is-enabled postgres
     [ "$status" -eq 0 ]
     [[ "$output" == *"restauré depuis la copie de secours"* ]] || false
     grep -qx 'postgres=on' "$DEVZONE_ETAT"
@@ -158,7 +158,7 @@ lecteur() {
 @test "état supprimé sans copie de secours, namespaces devzone : reconstruit" {
     printf 'ia=on\n' >"$DEVZONE_ETAT"
     rm -f "$DEVZONE_ETAT"
-    FAUX_NS="devzone-postgres devzone-gitlab devzone-mysql" run bash "$DEVZONE" actif postgres
+    FAUX_NS="devzone-postgres devzone-gitlab devzone-mysql" run bash "$DEVZONE" is-enabled postgres
     [ "$status" -eq 0 ]
     [[ "$output" == *"reconstruit depuis les namespaces"* ]] || false
     grep -qx 'postgres=on' "$DEVZONE_ETAT"
@@ -179,7 +179,7 @@ KUBE
     chmod +x "$BATS_TEST_TMPDIR/bin/kubectl"
     printf 'ia=on\n' >"$DEVZONE_ETAT"
     rm -f "$DEVZONE_ETAT"
-    FAUX_NS="devzone-postgres devzone-gitlab" run bash "$DEVZONE" actif postgres
+    FAUX_NS="devzone-postgres devzone-gitlab" run bash "$DEVZONE" is-enabled postgres
     [ "$status" -eq 0 ]
     [[ "$output" == *"reconstruit depuis les namespaces"* ]] || false
     [[ "$output" == *"aucun contexte d'hôte"* ]] || false
@@ -189,7 +189,7 @@ KUBE
 }
 
 @test "première installation : état par défaut, sans copie de secours" {
-    run bash "$DEVZONE" actif ia
+    run bash "$DEVZONE" is-enabled ia
     [ "$status" -eq 1 ]
     grep -qx 'ia=off' "$DEVZONE_ETAT"
     grep -qx 'kubernetes=off' "$DEVZONE_ETAT"
@@ -209,13 +209,13 @@ KUBE
 
 @test "etat : ligne argocd GitOps repository designates the URL" {
     printf '[argocd]\n    repo = https://github.com/tester/devzone-argocd.git\n' >"$DEVZONE_RACINE/.argocd.conf"
-    run bash "$DEVZONE" etat
+    run bash "$DEVZONE" status
     [ "$status" -eq 0 ]
     [[ "$output" == *"  ○ argocd          GitOps repository: https://github.com/tester/devzone-argocd.git"* ]] || false
 }
 
 @test "etat : ligne argocd sans dépôt GitOps : notice init" {
-    run bash "$DEVZONE" etat
+    run bash "$DEVZONE" status
     [ "$status" -eq 0 ]
     [[ "$output" == *"  ○ argocd          no GitOps repository: devzone argocd init"* ]] || false
 }
@@ -223,7 +223,7 @@ KUBE
 @test "restauration fraîche : le veilleur de ports ne fait rien 60 s" {
     printf 'ia=on\nports_auto=on\n' >"$DEVZONE_ETAT.prec"
     rm -f "$DEVZONE_ETAT"
-    run bash "$DEVZONE" actif ia
+    run bash "$DEVZONE" is-enabled ia
     [ "$status" -eq 0 ]
     [ -f "$DEVZONE_ETAT.recouvre" ]
     # Port que le veilleur relaierait d'ordinaire (0.0.0.0, pas l'IP du conteneur)
@@ -251,7 +251,7 @@ KUBE
     mkdir -p "$DEVZONE_PORTS_AUTO_DIR/devzone"
     printf '8080\n' >"$DEVZONE_PORTS_AUTO_DIR/devzone/actifs"
     : >"$BATS_TEST_TMPDIR/relais/devzone-devzone-auto-8080"
-    run bash "$DEVZONE" appliquer
+    run bash "$DEVZONE" apply
     [ "$status" -eq 0 ]
     run test -e "$DEVZONE_ETAT.recouvre"
     [ "$status" -ne 0 ]
@@ -259,4 +259,16 @@ KUBE
     [ "$status" -eq 0 ]
     run test -e "$BATS_TEST_TMPDIR/relais/devzone-devzone-auto-8080"
     [ "$status" -ne 0 ]
+}
+
+@test "etat : aucune ligne deprecated sur stdout ni stderr (#532)" {
+    bats_require_minimum_version 1.5.0
+    printf 'ia=on\nports_auto=off\n' >"$DEVZONE_ETAT"
+    run --separate-stderr bash "$DEVZONE" status
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"deprecated"* ]] || false
+    [[ "$stderr" != *"deprecated"* ]] || false
+    run --separate-stderr bash "$DEVZONE" is-enabled ia
+    [ "$status" -eq 0 ]
+    [[ "$stderr" != *"deprecated"* ]] || false
 }

@@ -4,6 +4,7 @@
 # host scripts normalize their first argument.
 
 setup() {
+    bats_require_minimum_version 1.5.0
     load commun
     relais_docker_isole
     kube_isole
@@ -106,4 +107,53 @@ TABLE
     [ "$status" -eq 0 ]
     [ -d stop ]
     [ ! -e arreter ]
+}
+
+@test "old French name warns on stderr and still runs" {
+    run --separate-stderr bash "$CLI" activer ia
+    [ "$status" -eq 2 ]
+    [[ "$stderr" == *"devzone: \"activer\" is deprecated, use \"enable\""* ]] || false
+    [[ "$stderr" == *"commande du conteneur"* ]] || false
+    [[ "$stdout" != *"deprecated"* ]] || false
+}
+
+@test "English name is silent" {
+    run --separate-stderr bash "$CLI" enable ia
+    [ "$status" -eq 2 ]
+    [[ "$stderr" == *"commande du conteneur"* ]] || false
+    [[ "$stderr" != *"deprecated"* ]] || false
+    [[ "$stdout" != *"deprecated"* ]] || false
+}
+
+@test "DEVZONE_NO_DEPRECATION=1 silences the warning" {
+    DEVZONE_NO_DEPRECATION=1 run --separate-stderr bash "$CLI" activer ia
+    [ "$status" -eq 2 ]
+    [[ "$stderr" == *"commande du conteneur"* ]] || false
+    [[ "$stderr" != *"deprecated"* ]] || false
+}
+
+@test "devzone mettre-a-jour warns, update is silent" {
+    run --separate-stderr bash "$CLI" mettre-a-jour
+    [ "$status" -eq 1 ]
+    [[ "$stderr" == *"devzone: \"mettre-a-jour\" is deprecated, use \"update\""* ]] || false
+    run --separate-stderr bash "$CLI" update
+    [ "$status" -eq 1 ]
+    [[ "$stderr" == *".devcontainer introuvable"* ]] || false
+    [[ "$stderr" != *"deprecated"* ]] || false
+}
+
+@test "workspace migrer warns, migrate is silent" {
+    # fake docker: the migration stops at its first check, nothing is touched
+    cat >"$T/bin/docker" <<'DOCKER'
+#!/usr/bin/env bash
+echo "docker $*" >>"$T/docker.log"
+exit 1
+DOCKER
+    chmod +x "$T/bin/docker"
+    run --separate-stderr bash "$WS" migrer
+    [ "$status" -ne 0 ]
+    [[ "$stderr" == *"devzone: \"migrer\" is deprecated, use \"migrate\""* ]] || false
+    run --separate-stderr bash "$WS" migrate
+    [ "$status" -ne 0 ]
+    [[ "$stderr" != *"deprecated"* ]] || false
 }

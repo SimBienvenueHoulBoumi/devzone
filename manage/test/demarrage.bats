@@ -31,3 +31,26 @@ setup() {
         false
     }
 }
+
+@test "demarrage : aucune ligne deprecated sur stdout ni stderr (#532)" {
+    # Environnement factice : aucun docker, kubectl, gh ni socat réels ; l'état
+    # et le HOME restent sous $BATS_TEST_TMPDIR. Chaque étape en échec passe
+    # à la suivante (demarrage.sh), le récapitulatif termine.
+    bats_require_minimum_version 1.5.0
+    mkdir -p "$BATS_TEST_TMPDIR/bin" "$BATS_TEST_TMPDIR/racine/workspace" \
+        "$BATS_TEST_TMPDIR/ports-auto" "$BATS_TEST_TMPDIR/home"
+    for outil in docker kubectl gh socat; do
+        printf '#!/usr/bin/env bash\nexit 1\n' >"$BATS_TEST_TMPDIR/bin/$outil"
+        chmod +x "$BATS_TEST_TMPDIR/bin/$outil"
+    done
+    export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
+    export DEVZONE_RACINE="$BATS_TEST_TMPDIR/racine"
+    export DEVZONE_ETAT="$BATS_TEST_TMPDIR/racine/.devzone.modules"
+    export DEVZONE_PORTS_AUTO_DIR="$BATS_TEST_TMPDIR/ports-auto"
+    export HOME="$BATS_TEST_TMPDIR/home"
+    export GIT_CONFIG_NOSYSTEM=1
+    run --separate-stderr bash "$DEMARRAGE"
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"deprecated"* ]] || false
+    [[ "$stderr" != *"deprecated"* ]] || false
+}

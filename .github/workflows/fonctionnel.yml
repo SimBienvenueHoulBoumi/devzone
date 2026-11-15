@@ -154,7 +154,7 @@ jobs:
           if %SORTIE% equ 0 exit /b 1
           if exist %RUNNER_TEMP%\plein\Makefile exit /b 1
           cd /d %RUNNER_TEMP% || exit /b 1
-          call devzone desinstaller > %RUNNER_TEMP%\sortie.txt 2>&1
+          call devzone uninstall > %RUNNER_TEMP%\sortie.txt 2>&1
           set SORTIE=%errorlevel%
           type %RUNNER_TEMP%\sortie.txt
           if %SORTIE% equ 0 exit /b 1

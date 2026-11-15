@@ -65,9 +65,9 @@ bash /workspaces/devzone/.devcontainer/kube-config.sh || echo "devzone : configu
 if ! command -v docker >/dev/null 2>&1; then
     sudo install -m 0755 /workspaces/devzone/.devcontainer/docker-sans-hote.sh /usr/local/bin/docker
 fi
-devzone appliquer || echo "devzone : modules incomplets (détail ci-dessus), réessayer : devzone appliquer" >&2
+devzone apply || echo "devzone : modules incomplets (détail ci-dessus), réessayer : devzone appliquer" >&2
 # Paquets systeme gardes (#351) : reinstallees a chaque creation ; un echec n arrete pas la creation
-devzone paquets appliquer || echo "devzone : paquets en echec, reessayer : devzone paquets" >&2
+devzone packages appliquer || echo "devzone : paquets en echec, reessayer : devzone paquets" >&2
 
 # Invite Kubernetes du shell (#337) : prefixe PS1, une seule fois
 if ! grep -qF 'invite-kube.sh' "$HOME/.bashrc" 2>/dev/null; then

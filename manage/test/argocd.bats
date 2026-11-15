@@ -94,7 +94,7 @@ attendre_nohup() {
 }
 
 @test "argocd : désactivé par défaut, état du module facultatif" {
-    run bash "$DEVZONE" actif argocd
+    run bash "$DEVZONE" is-enabled argocd
     [ "$status" -ne 0 ]
     run bash "$ARGOCD" etat
     [ "$status" -eq 0 ]
@@ -102,7 +102,7 @@ attendre_nohup() {
 }
 
 @test "activer argocd : namespace isolé, chart figé, mot de passe rangé, relais lancé" {
-    run bash "$DEVZONE" activer argocd </dev/null
+    run bash "$DEVZONE" enable argocd </dev/null
     [ "$status" -eq 0 ]
     grep -qx 'argocd=on' "$DEVZONE_ETAT"
     grep -q 'kind: NetworkPolicy' "$BATS_TEST_TMPDIR/apply.log"
@@ -128,7 +128,7 @@ attendre_nohup() {
 }
 
 @test "activer argocd : moins de 1 Go de mémoire allouable → refus, rien installé" {
-    run env FAUX_MEMOIRE_CLUSTER=512Mi bash "$DEVZONE" activer argocd </dev/null
+    run env FAUX_MEMOIRE_CLUSTER=512Mi bash "$DEVZONE" enable argocd </dev/null
     [ "$status" -ne 0 ]
     [[ "$output" == *"au moins 1 Go de mémoire allouable"* ]] || false
     [ ! -f "$BATS_TEST_TMPDIR/ns" ]
@@ -145,7 +145,7 @@ attendre_nohup() {
 @test "activer argocd déjà installé : relais relancé, pas de nouvelle installation" {
     argocd_installe
     rm -f "$BATS_TEST_TMPDIR/helm.log"
-    run bash "$DEVZONE" activer argocd </dev/null
+    run bash "$DEVZONE" enable argocd </dev/null
     [ "$status" -eq 0 ]
     [[ "$output" == *"relais relancé"* ]] || false
     [ ! -f "$BATS_TEST_TMPDIR/helm.log" ]
@@ -190,7 +190,7 @@ attendre_nohup() {
 
 @test "desactiver argocd : helm uninstall, namespace supprimé, services conservés" {
     argocd_installe
-    run bash "$DEVZONE" desactiver argocd
+    run bash "$DEVZONE" disable argocd
     [ "$status" -eq 0 ]
     grep -qx 'argocd=off' "$DEVZONE_ETAT"
     grep -Eq 'helm --kubeconfig [^ ]+ --kube-context docker-desktop uninstall argocd -n devzone-argocd' "$BATS_TEST_TMPDIR/helm.log"

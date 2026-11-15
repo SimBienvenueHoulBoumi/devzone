@@ -14,9 +14,9 @@ setup() {
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
 }
 
-@test "kube-config.sh est lancé avant devzone appliquer" {
+@test "kube-config.sh est lancé avant devzone apply" {
     kube="$(grep -nF 'bash /workspaces/devzone/.devcontainer/kube-config.sh' "$SCRIPT" | head -1 | cut -d: -f1)"
-    appliquer="$(grep -nF 'devzone appliquer' "$SCRIPT" | head -1 | cut -d: -f1)"
+    appliquer="$(grep -nF 'devzone apply' "$SCRIPT" | head -1 | cut -d: -f1)"
     [ -n "$kube" ]
     [ -n "$appliquer" ]
     [ "$kube" -lt "$appliquer" ]
