@@ -6,6 +6,9 @@
 # logged in helm.log. helm_fake_install is called in setup, before PATH gets the
 # test bin folder; the real helm is looked up then and nowhere else.
 
+# helm_fake_install records the real helm path in HELM_REAL and writes a helm
+# wrapper into $BATS_TEST_TMPDIR/bin that logs each call and forwards `template`
+# to the real binary, so the test never reaches a cluster.
 helm_fake_install() {
     local real
     real="$(command -v helm 2>/dev/null)" || { echo "helm missing: the test cannot run" >&2; return 1; }
