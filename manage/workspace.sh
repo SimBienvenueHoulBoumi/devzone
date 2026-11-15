@@ -86,6 +86,7 @@ start_workspace() {
     # Projects of .argocd.conf held too (#516)
     argocd_reconcile || true
     wait_for_pod "$image" || return 1
+    workspace_agents_guard || true
     ports_start silence
 }
 
@@ -111,12 +112,6 @@ workspace_helm_deploy() {
 stop_workspace() {
     ports_stop
     workspace_undeploy
-}
-
-# Shows workspace pod status.
-status_workspace() {
-    # shellcheck disable=SC2046
-    kubectl $(kubectl_flag) get pods --namespace devzone-workspace
 }
 
 # Opens a shell in the workspace container.
@@ -153,6 +148,7 @@ copy_to() {
         exit 1
     fi
     folder="$(cd "$folder" && pwd)"
+    copy_guard "$folder" || exit 1
     # shellcheck disable=SC2046
     kubectl $(kubectl_flag) cp "$folder" "$POD:$PROJECTS_DIR/$(basename "$folder")" \
         --namespace "$NAMESPACE" -c workspace
@@ -178,6 +174,10 @@ copy_from() {
 . "$HERE/scripts/workspace-aliases.sh"
 # shellcheck source=manage/scripts/workspace-wait.sh
 . "$HERE/scripts/workspace-wait.sh"
+# shellcheck source=manage/scripts/workspace-clone.sh
+. "$HERE/scripts/workspace-clone.sh"
+# shellcheck source=manage/scripts/workspace-copies.sh
+. "$HERE/scripts/workspace-copies.sh"
 # shellcheck source=manage/scripts/migrer.sh
 . "$HERE/scripts/migrer.sh"
 # shellcheck source=manage/scripts/migrer-retour.sh
@@ -220,6 +220,7 @@ case "${1:-}" in
     vscode) vscode_workspace ;;
     copy-to) copy_to "${@:2}" ;;
     copy-from) copy_from "${@:2}" ;;
+    clone) workspace_clone "${@:2}" ;;
     ports) ports "${@:2}" ;;
     migrate) migrate_workspace "${@:2}" ;;
     revert) revert_workspace "${@:2}" ;;
@@ -227,8 +228,9 @@ case "${1:-}" in
     services) services "${@:2}" ;;
     argocd) argocd_cmd "${@:2}" ;;
     '' | -h | --help | aide)
-        echo "devzone workspace start|stop|status|shell|vscode|copy-to|copy-from|ports|services|argocd|migrate|revert|clean-docker"
+        echo "devzone workspace start|stop|status|shell|vscode|copy-to|copy-from|clone|ports|services|argocd|migrate|revert|clean-docker"
         echo "  start [--image repository:tag]  install workspace (image for devzone version by default)"
+        echo "  clone <url> [<name>]   git clone into the pod projects folder (gh credentials, identity, repowarden hooks)"
         echo "  ports [start|stop|status]       applications and services from pod on workstation localhost"
         echo "  services enable|disable <service> [options] | status"
         echo "                        devzone services (gitlab, postgres, argocd) of the cluster, installed from the workstation"
@@ -239,7 +241,7 @@ case "${1:-}" in
         echo "  clean-docker           remove devzone-* Docker volumes, after confirmation [y/N] (--yes)"
         ;;
     *)
-        echo "✖ unknown subcommand: $1 (devzone workspace start|stop|status|shell|vscode|copy-to|copy-from|ports|services|argocd|migrate|revert|clean-docker)" >&2
+        echo "✖ unknown subcommand: $1 (devzone workspace start|stop|status|shell|vscode|copy-to|copy-from|clone|ports|services|argocd|migrate|revert|clean-docker)" >&2
         exit 1
         ;;
 esac

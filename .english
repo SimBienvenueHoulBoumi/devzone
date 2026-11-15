@@ -4,6 +4,8 @@
 manage/scripts/check-english.sh
 manage/scripts/ci-dns.sh
 manage/scripts/docker.sh
+manage/scripts/kube-ready.sh
+manage/scripts/create-mode.sh
 manage/scripts/workspace-wait.sh
 manage/scripts/migrer-retour.sh
 manage/scripts/poste.sh
@@ -27,6 +29,9 @@ manage/test/workspace-projets.bats
 manage/test/workspace-identites.bats
 manage/test/workspace-sans-docker.bats
 manage/test/poste.bats
+manage/test/kube-ready.bats
+manage/test/create-mode.bats
+manage/test/creer-mode.bats
 manage/test/versions.bats
 manage/test/ci-dns.bats
 manage/test/migration.bash
@@ -79,3 +84,9 @@ charts/devzone-workspace/templates/statefulset.yaml
 manage/scripts/check-charts.sh
 manage/test/charts-convention.bats
 manage/test/chart-require.bats
+manage/scripts/workspace-clone.sh
+manage/test/workspace-clone.bats
+.devcontainer/ticket.sh
+manage/test/ticket.bats
+manage/scripts/workspace-copies.sh
+manage/test/workspace-copies.bats
