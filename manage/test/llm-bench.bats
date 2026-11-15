@@ -126,3 +126,22 @@ teardown() {
     [ "$status" -eq 0 ]
     grep -q 'activeDeadlineSeconds: 600' "$BATS_TEST_TMPDIR/apply.log"
 }
+
+@test "llm bench: too slow in the Docker container, the commands are devzone llm" {
+    printf '[\n{"n_threads": 4, "n_prompt": 128, "n_gen": 0, "avg_ts": 60},\n{"n_threads": 4, "n_prompt": 0, "n_gen": 32, "avg_ts": 3}\n]\n' >"$BATS_TEST_TMPDIR/bench.out"
+    LLM_BENCH_POLL=0 run bash "$LLM" bench
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"⚠ Too slow for opencode"* ]] || false
+    [[ "$output" == *"devzone disable llm && devzone enable llm --preset light"* ]] || false
+    [[ "$output" == *"devzone llm bench --apply  sets threads=4 on the release"* ]] || false
+    [[ "$output" != *"workspace services"* ]] || false
+}
+
+@test "llm bench: too slow in the Kubernetes workspace, the commands are devzone workspace services" {
+    printf '[\n{"n_threads": 4, "n_prompt": 128, "n_gen": 0, "avg_ts": 60},\n{"n_threads": 4, "n_prompt": 0, "n_gen": 32, "avg_ts": 3}\n]\n' >"$BATS_TEST_TMPDIR/bench.out"
+    DEVZONE_WORKSPACE=kubernetes DEVZONE_SERVICES_ADMIN=1 LLM_BENCH_POLL=0 run bash "$LLM" bench
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"devzone workspace services disable llm && devzone workspace services enable llm --preset light"* ]] || false
+    [[ "$output" == *"devzone workspace services bench llm --apply  sets threads=4 on the release"* ]] || false
+    [[ "$output" != *"devzone llm bench --apply"* ]] || false
+}

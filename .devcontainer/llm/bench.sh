@@ -85,6 +85,19 @@ bench_report() {
         }'
 }
 
+# Commands proposed to the user, by place: the Kubernetes workspace runs the
+# bench through devzone workspace services (DEVZONE_SERVICES_ADMIN, set by
+# services-admin.sh); the Docker container keeps devzone llm
+bench_cmds() {
+    if [ -n "${DEVZONE_SERVICES_ADMIN:-}" ]; then
+        CMD_APPLY="devzone workspace services bench llm --apply"
+        CMD_LIGHT="devzone workspace services disable llm && devzone workspace services enable llm --preset light"
+    else
+        CMD_APPLY="devzone llm bench --apply"
+        CMD_LIGHT="devzone disable llm && devzone enable llm --preset light"
+    fi
+}
+
 bench_apply() {
     helm --kube-context devzone upgrade llm "$CHART_CODE/charts/devzone-llm" -n "$NS" --reset-then-reuse-values --set "threads=$1" >/dev/null || return 1
     wait_ready
@@ -140,18 +153,19 @@ bench() {
     best="$(printf '%s\n' "$report" | sed -n 's/^best=//p')"
     ok="$(printf '%s\n' "$report" | sed -n 's/^ok=//p')"
     echo "▶ Recommended: threads=$best"
+    bench_cmds
     if [ "$ok" = 1 ]; then
         echo "✔ Fast enough for opencode (prompt >= ${LLM_BENCH_MIN_PP:-50} tok/s, generation >= ${LLM_BENCH_MIN_TG:-8} tok/s)"
     else
         echo "⚠ Too slow for opencode (needs prompt >= ${LLM_BENCH_MIN_PP:-50} tok/s and generation >= ${LLM_BENCH_MIN_TG:-8} tok/s)"
         if [ "$(preset_read)" != light ]; then
-            echo "  Lighter model (3B, context 16k, 2.1 GB download): devzone disable llm && devzone enable llm --preset light"
+            echo "  Lighter model (3B, context 16k, 2.1 GB download): $CMD_LIGHT"
         fi
     fi
     if [ -n "$apply" ]; then
         bench_apply "$best" || return 1
         echo "✔ threads=$best applied to the release llm"
     else
-        echo "  devzone llm bench --apply  sets threads=$best on the release"
+        echo "  $CMD_APPLY  sets threads=$best on the release"
     fi
 }
