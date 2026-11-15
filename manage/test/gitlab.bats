@@ -6,6 +6,7 @@
 # $BATS_TEST_TMPDIR/<outil>.log.
 
 setup() {
+    bats_require_minimum_version 1.5.0
     load commun
     kind_vide
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
@@ -709,4 +710,78 @@ marque_reelle() {
     [[ "$webservice" == *"name: GITLAB_PORT"* ]] || false
     [[ "$webservice" == *'value: "8929"'* ]] || false
     ! printf '%s\n' "$rendu" | grep -q "nodePort: 2224" || false
+}
+
+# ---- Noms français (#557) : même résultat que le nom anglais, avec l avertissement ----
+
+@test "gitlab : etat et relais-etat français : même résultat que status et relay-status, avec l avertissement" {
+    run --separate-stderr bash "$GITLAB" status
+    [ "$status" -eq 0 ] || false
+    [ "$output" = "désactivé" ] || false
+    [[ "$stderr" != *"deprecated"* ]] || false
+    run --separate-stderr bash "$GITLAB" etat
+    [ "$status" -eq 0 ] || false
+    [ "$output" = "désactivé" ] || false
+    [[ "$stderr" == *"devzone: \"etat\" is deprecated, use \"status\""* ]] || false
+    run --separate-stderr bash "$GITLAB" relay-status
+    attendu_code="$status"
+    attendu="$output"
+    run --separate-stderr bash "$GITLAB" relais-etat
+    [ "$status" -eq "$attendu_code" ] || false
+    [ "$output" = "$attendu" ] || false
+    [[ "$stderr" == *"devzone: \"relais-etat\" is deprecated, use \"relay-status\""* ]] || false
+}
+
+@test "gitlab : relais-lancer et relais-arreter français : mêmes relais, avec l avertissement" {
+    run --separate-stderr bash "$GITLAB" relais-lancer
+    [ "$status" -eq 0 ] || false
+    [[ "$stderr" == *"devzone: \"relais-lancer\" is deprecated, use \"relay-start\""* ]] || false
+    grep -q "devzone devzone-gitlab svc/gitlab-webservice-default 8929:8181" "$BATS_TEST_TMPDIR/setsid.log" || false
+    grep -q "devzone devzone-gitlab svc/gitlab-gitlab-shell 2224:22" "$BATS_TEST_TMPDIR/setsid.log" || false
+    run --separate-stderr bash "$GITLAB" relais-arreter
+    [ "$status" -eq 0 ] || false
+    [[ "$stderr" == *"devzone: \"relais-arreter\" is deprecated, use \"relay-stop\""* ]] || false
+}
+
+@test "gitlab : installer, desinstaller --oui, migrer --oui : même effet, avec l avertissement" {
+    run --separate-stderr bash "$GITLAB" installer
+    [ "$status" -eq 0 ] || false
+    [[ "$stderr" == *"devzone: \"installer\" is deprecated, use \"install\""* ]] || false
+    grep -Eq -- "helm --kubeconfig [^ ]+ upgrade --install gitlab gitlab/gitlab --version 9.11.16 --namespace devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log" || false
+    printf '%s\n' '{"kind":"Secret","metadata":{"name":"gitlab-rails-secret"}}' >"$SECRETS/rails-secret.yaml"
+    run --separate-stderr bash "$GITLAB" desinstaller --oui
+    [ "$status" -eq 0 ] || false
+    [[ "$stderr" == *"devzone: \"desinstaller\" is deprecated, use \"uninstall\""* ]] || false
+    [[ "$stderr" == *"devzone: \"--oui\" is deprecated, use \"--yes\""* ]] || false
+    [ ! -e "$SECRETS" ] || false
+    [[ "$output" == *"secret Rails supprimé"* ]] || false
+    run --separate-stderr bash "$GITLAB" migrer --oui
+    [ "$status" -eq 0 ] || false
+    [[ "$stderr" == *"devzone: \"migrer\" is deprecated, use \"migrate\""* ]] || false
+    [[ "$stderr" == *"devzone: \"--oui\" is deprecated, use \"--yes\""* ]] || false
+    [[ "$output" == *"Aucun ancien cluster"* ]] || false
+}
+
+@test "gitlab : nouveau-mdp français : même refus que new-password, avec l avertissement" {
+    run --separate-stderr bash "$GITLAB" new-password autre
+    [ "$status" -eq 2 ] || false
+    [[ "$stderr" == *"utilisateur inconnu"* ]] || false
+    run --separate-stderr bash "$GITLAB" nouveau-mdp autre
+    [ "$status" -eq 2 ] || false
+    [[ "$stderr" == *"utilisateur inconnu"* ]] || false
+    [[ "$stderr" == *"devzone: \"nouveau-mdp\" is deprecated, use \"new-password\""* ]] || false
+}
+
+@test "gitlab : les noms anglais ne donnent aucun avertissement" {
+    mkdir -p "$SECRETS"
+    printf '{}\n' >"$SECRETS/rails-secret.yaml"
+    run --separate-stderr bash "$GITLAB" status
+    [ "$status" -eq 0 ] || false
+    [[ "$stderr" != *"deprecated"* ]] || false
+    run --separate-stderr bash "$GITLAB" relay-start
+    [ "$status" -eq 0 ] || false
+    [[ "$stderr" != *"deprecated"* ]] || false
+    run --separate-stderr bash "$GITLAB" uninstall --yes
+    [ "$status" -eq 0 ] || false
+    [[ "$stderr" != *"deprecated"* ]] || false
 }

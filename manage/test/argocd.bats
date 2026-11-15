@@ -3,6 +3,7 @@
 # relais. Faux helm, kubectl et nohup dans le PATH : aucun cluster touché.
 
 setup() {
+    bats_require_minimum_version 1.5.0
     load commun
     relais_docker_isole
     kube_isole
@@ -198,4 +199,52 @@ attendre_nohup() {
     grep -q -- '--context docker-desktop delete namespace devzone-argocd' "$BATS_TEST_TMPDIR/kubectl.log"
     [ ! -e "$SECRETS" ]
     [[ "$output" == *"les services restent, sous helm direct"* ]] || false
+}
+
+# ---- Noms français (#557) : même résultat que le nom anglais, avec l'avertissement ----
+# argocd n'a aucune option française (sa table ne contient que des sous-commandes)
+
+@test "argocd : etat et relais français : même résultat que status et relay-*, avec l avertissement" {
+    argocd_installe
+    run --separate-stderr bash "$ARGOCD" status
+    [ "$status" -eq 0 ] || false
+    [[ "$stderr" != *"deprecated"* ]] || false
+    attendu="$output"
+    run --separate-stderr bash "$ARGOCD" etat
+    [ "$status" -eq 0 ] || false
+    [ "$output" = "$attendu" ] || false
+    [[ "$stderr" == *"devzone: \"etat\" is deprecated, use \"status\""* ]] || false
+    run --separate-stderr bash "$ARGOCD" relais-lancer
+    [ "$status" -eq 0 ] || false
+    [[ "$stderr" == *"devzone: \"relais-lancer\" is deprecated, use \"relay-start\""* ]] || false
+    attendre_nohup 'svc/argocd-server'
+    run --separate-stderr bash "$ARGOCD" relais-arreter
+    [ "$status" -eq 0 ] || false
+    [[ "$stderr" == *"devzone: \"relais-arreter\" is deprecated, use \"relay-stop\""* ]] || false
+}
+
+@test "argocd : installer et desinstaller français : même effet, avec l avertissement" {
+    run --separate-stderr bash "$ARGOCD" installer
+    [ "$status" -eq 0 ] || false
+    [[ "$stderr" == *"devzone: \"installer\" is deprecated, use \"install\""* ]] || false
+    grep -q 'upgrade --install argocd' "$BATS_TEST_TMPDIR/helm.log" || false
+    argocd_installe
+    run --separate-stderr bash "$ARGOCD" desinstaller
+    [ "$status" -eq 0 ] || false
+    [[ "$stderr" == *"devzone: \"desinstaller\" is deprecated, use \"uninstall\""* ]] || false
+    grep -q 'uninstall argocd' "$BATS_TEST_TMPDIR/helm.log" || false
+    [ ! -e "$SECRETS" ] || false
+}
+
+@test "argocd : les noms anglais ne donnent aucun avertissement" {
+    argocd_installe
+    run --separate-stderr bash "$ARGOCD" status
+    [ "$status" -eq 0 ] || false
+    [[ "$stderr" != *"deprecated"* ]] || false
+    run --separate-stderr bash "$ARGOCD" relay-start
+    [ "$status" -eq 0 ] || false
+    [[ "$stderr" != *"deprecated"* ]] || false
+    run --separate-stderr bash "$ARGOCD" relay-stop
+    [ "$status" -eq 0 ] || false
+    [[ "$stderr" != *"deprecated"* ]] || false
 }

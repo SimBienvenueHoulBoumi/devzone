@@ -120,9 +120,18 @@ GETENT
 
 @test "disable postgres in the pod: refused with the workstation command" {
     printf 'postgres=on\n' >"$DEVZONE_ETAT"
-    run bash "$DEVZONE" disable postgres --oui
+    run bash "$DEVZONE" disable postgres --yes
     [ "$status" -eq 2 ]
     [[ "$output" == *"devzone workspace services disable postgres"* ]] || false
+    grep -qx 'postgres=on' "$DEVZONE_ETAT"
+}
+
+@test "disable postgres --oui in the pod: same refusal, with the deprecation warning (#557)" {
+    printf 'postgres=on\n' >"$DEVZONE_ETAT"
+    run --separate-stderr bash "$DEVZONE" disable postgres --oui
+    [ "$status" -eq 2 ]
+    [[ "$stderr" == *"devzone: \"--oui\" is deprecated, use \"--yes\""* ]] || false
+    [[ "$stderr" == *"devzone workspace services disable postgres"* ]] || false
     grep -qx 'postgres=on' "$DEVZONE_ETAT"
 }
 
@@ -180,12 +189,12 @@ DZ
     [ -z "$(ls "${TMPDIR:-/tmp}"/devzone-services-admin.* 2>/dev/null)" ]
 }
 
-@test "services-admin.sh: no cluster line before, none after; disable passes --oui" {
+@test "services-admin.sh: no cluster line before, none after; disable passes --yes" {
     admin_setup
     printf 'argocd=on\n' >"$DEVZONE_ETAT"
-    run bash -c 'printf "tok\n" | bash "$0" disable argocd --oui' "$ADMIN"
+    run bash -c 'printf "tok\n" | bash "$0" disable argocd --yes' "$ADMIN"
     [ "$status" -eq 0 ]
-    grep -q '^devzone disable argocd --oui$' "$T/devzone.log"
+    grep -q '^devzone disable argocd --yes$' "$T/devzone.log"
     ! grep -q '^cluster=' "$DEVZONE_ETAT" || false
 }
 

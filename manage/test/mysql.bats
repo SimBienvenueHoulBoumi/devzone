@@ -3,6 +3,7 @@
 # Faux kubectl, openssl, nohup : aucun cluster touche.
 
 setup() {
+    bats_require_minimum_version 1.5.0
     load commun
     relais_docker_isole
     kube_isole
@@ -270,4 +271,106 @@ attendre_nohup() {
     run bash "$MYSQL" volume --delete donnees --yes
     [ "$status" -eq 0 ] || false
     grep -q 'delete pvc donnees-mysql-0' "$BATS_TEST_TMPDIR/delete.log" || false
+}
+
+# ---- Noms français (#557) : même résultat que le nom anglais, avec l'avertissement ----
+
+@test "mysql : etat et relais français : même résultat que status et relay-*, avec l avertissement" {
+    touch "$BATS_TEST_TMPDIR/ns" "$BATS_TEST_TMPDIR/sts" "$BATS_TEST_TMPDIR/ready"
+    run --separate-stderr bash "$MYSQL" status
+    [ "$status" -eq 0 ] || false
+    [[ "$stderr" != *"deprecated"* ]] || false
+    attendu="$output"
+    run --separate-stderr bash "$MYSQL" etat
+    [ "$status" -eq 0 ] || false
+    [ "$output" = "$attendu" ] || false
+    [[ "$stderr" == *"devzone: \"etat\" is deprecated, use \"status\""* ]] || false
+    run --separate-stderr bash "$MYSQL" relais-lancer
+    [ "$status" -eq 0 ] || false
+    [[ "$stderr" == *"devzone: \"relais-lancer\" is deprecated, use \"relay-start\""* ]] || false
+    attendre_nohup 'svc/mysql 3306:3306$'
+    run --separate-stderr bash "$MYSQL" relais-arreter
+    [ "$status" -eq 0 ] || false
+    [[ "$stderr" == *"devzone: \"relais-arreter\" is deprecated, use \"relay-stop\""* ]] || false
+}
+
+@test "mysql : creer, liste, supprimer et --nouveau-mdp, --oui : même effet, avec l avertissement" {
+    touch "$BATS_TEST_TMPDIR/ns"
+    printf 'MYSQL_PASSWORD=mdproot\n' >"$SECRETS/root.env"
+    run --separate-stderr bash "$MYSQL" creer datayer --nouveau-mdp
+    [ "$status" -eq 0 ] || false
+    [[ "$stderr" == *"devzone: \"creer\" is deprecated, use \"create\""* ]] || false
+    [[ "$stderr" == *"devzone: \"--nouveau-mdp\" is deprecated, use \"--new-password\""* ]] || false
+    grep -qx 'MYSQL_PASSWORD=mdpmysql1' "$SECRETS/datayer.env" || false
+    run --separate-stderr bash "$MYSQL" list
+    [ "$status" -eq 0 ] || false
+    attendu="$output"
+    run --separate-stderr bash "$MYSQL" liste
+    [ "$status" -eq 0 ] || false
+    [ "$output" = "$attendu" ] || false
+    [[ "$stderr" == *"devzone: \"liste\" is deprecated, use \"list\""* ]] || false
+    run --separate-stderr bash "$MYSQL" supprimer datayer --oui
+    [ "$status" -eq 0 ] || false
+    [[ "$stderr" == *"devzone: \"supprimer\" is deprecated, use \"delete\""* ]] || false
+    [[ "$stderr" == *"devzone: \"--oui\" is deprecated, use \"--yes\""* ]] || false
+    grep -q "DROP DATABASE IF EXISTS datayer" "$BATS_TEST_TMPDIR/sql.log" || false
+    [ ! -f "$SECRETS/datayer.env" ] || false
+}
+
+@test "mysql : installer, supprimer-donnees et volume --supprimer : même effet, avec l avertissement" {
+    touch "$BATS_TEST_TMPDIR/ns" "$BATS_TEST_TMPDIR/sts" "$BATS_TEST_TMPDIR/ready"
+    printf 'MYSQL_HOST=127.0.0.1\nMYSQL_PORT=3306\nMYSQL_USER=root\nMYSQL_PASSWORD=mdproot\n' >"$SECRETS/root.env"
+    : >"$BATS_TEST_TMPDIR/apply.log"
+    run --separate-stderr bash "$MYSQL" installer
+    [ "$status" -eq 0 ] || false
+    [[ "$output" == *"adoptée"* ]] || false
+    [[ "$stderr" == *"devzone: \"installer\" is deprecated, use \"install\""* ]] || false
+    [ ! -s "$BATS_TEST_TMPDIR/apply.log" ] || false
+    printf 'data' >"$BATS_TEST_TMPDIR/claim"
+    run --separate-stderr bash "$MYSQL" volume --supprimer donnees --oui
+    [ "$status" -eq 0 ] || false
+    [[ "$stderr" == *"devzone: \"--supprimer\" is deprecated, use \"--delete\""* ]] || false
+    grep -q 'delete pvc donnees-mysql-0' "$BATS_TEST_TMPDIR/delete.log" || false
+    run --separate-stderr bash "$MYSQL" supprimer-donnees --oui
+    [ "$status" -eq 0 ] || false
+    [[ "$stderr" == *"devzone: \"supprimer-donnees\" is deprecated, use \"delete-data\""* ]] || false
+    grep -q 'delete namespace devzone-mysql' "$BATS_TEST_TMPDIR/kubectl.log" || false
+    [ -f "$SECRETS/root.env" ] || false
+}
+
+@test "mysql : desinstaller, autoriser, interdire : même refus que le nom anglais, avec l avertissement" {
+    # mysql.sh n'implémente ni uninstall, ni authorize, ni forbid : le nom anglais
+    # et le nom français refusent de la même façon (usage, code 1)
+    local paire fr en
+    for paire in desinstaller:uninstall autoriser:authorize interdire:forbid; do
+        fr="${paire%%:*}"
+        en="${paire##*:}"
+        run --separate-stderr bash "$MYSQL" "$en"
+        [ "$status" -eq 1 ] || false
+        [[ "$stderr" == *"devzone : catalogue mysql : create <projet>"* ]] || false
+        run --separate-stderr bash "$MYSQL" "$fr"
+        [ "$status" -eq 1 ] || false
+        [[ "$stderr" == *"devzone : catalogue mysql : create <projet>"* ]] || false
+        [[ "$stderr" == *"devzone: \"$fr\" is deprecated, use \"$en\""* ]] || false
+    done
+}
+
+@test "mysql : les noms anglais ne donnent aucun avertissement" {
+    touch "$BATS_TEST_TMPDIR/ns" "$BATS_TEST_TMPDIR/sts" "$BATS_TEST_TMPDIR/ready"
+    printf 'MYSQL_PASSWORD=mdproot\n' >"$SECRETS/root.env"
+    run --separate-stderr bash "$MYSQL" create datayer --new-password
+    [ "$status" -eq 0 ] || false
+    [[ "$stderr" != *"deprecated"* ]] || false
+    run --separate-stderr bash "$MYSQL" status
+    [ "$status" -eq 0 ] || false
+    [[ "$stderr" != *"deprecated"* ]] || false
+    run --separate-stderr bash "$MYSQL" list
+    [ "$status" -eq 0 ] || false
+    [[ "$stderr" != *"deprecated"* ]] || false
+    run --separate-stderr bash "$MYSQL" delete datayer --yes
+    [ "$status" -eq 0 ] || false
+    [[ "$stderr" != *"deprecated"* ]] || false
+    run --separate-stderr bash "$MYSQL" delete-data --yes
+    [ "$status" -eq 0 ] || false
+    [[ "$stderr" != *"deprecated"* ]] || false
 }

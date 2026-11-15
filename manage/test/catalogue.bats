@@ -291,6 +291,18 @@ attendre_nohup() {
     grep -q 'delete namespace devzone-mysql' "$BATS_TEST_TMPDIR/kubectl.log" || false
     grep -qx 'mysql=off' "$DEVZONE_ETAT" || false
     [[ "$output" == *"✔ namespace devzone-mysql et volume supprimés ; workspace/.mysql/root.env gardé"* ]] || false
+    [[ "$output" == *"devzone: \"--oui\" is deprecated, use \"--yes\""* ]] || false
+}
+
+@test "desactiver mysql --yes : même suppression, sans avertissement (#557)" {
+    touch "$BATS_TEST_TMPDIR/ns" "$BATS_TEST_TMPDIR/sts" "$BATS_TEST_TMPDIR/secret"
+    printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_ETAT"
+    run --separate-stderr bash "$DEVZONE" disable mysql --yes
+    [ "$status" -eq 0 ] || false
+    grep -q 'delete namespace devzone-mysql' "$BATS_TEST_TMPDIR/kubectl.log" || false
+    grep -qx 'mysql=off' "$DEVZONE_ETAT" || false
+    [[ "$output" == *"✔ namespace devzone-mysql et volume supprimés ; workspace/.mysql/root.env gardé"* ]] || false
+    [[ "$stderr" != *"deprecated"* ]] || false
 }
 
 @test "desactiver mysql en terminal : N retire le serveur et garde le volume" {

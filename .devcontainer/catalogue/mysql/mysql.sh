@@ -217,8 +217,9 @@ liste() {
     local CTX
     CTX="$(contexte)"
     installe || refuse "module inactif : devzone enable mysql"
+    # grep -v sort 1 sans base utilisateur : sous pipefail, liste reste à 0
     mysql_admin -N -B -e "SHOW DATABASES" 2>/dev/null |
-        grep -vE '^(information_schema|mysql|performance_schema|sys)$' |
+        { grep -vE '^(information_schema|mysql|performance_schema|sys)$' || true; } |
         awk 'BEGIN { n = 0 } { printf "  %-30s\n", $1; n++ } END { if (n == 0) print "  (aucune base : devzone mysql create <projet>)" }'
 }
 # Supprime la base et l'utilisateur d'un projet (confirmation sans --yes)

@@ -622,14 +622,15 @@ appliquer_mysql() {
 }
 
 # Toutes les bases disparaissent : confirmation en terminal (sans terminal, la
-# commande est explicite) ; un oui ou --oui marque SUPPRIMER_DONNEES, lu par
-# appliquer_mysql pour lancer supprimer-donnees (#441)
+# commande est explicite) ; un oui ou --yes marque SUPPRIMER_DONNEES, lu par
+# appliquer_mysql pour lancer supprimer-donnees (#441). Les arguments passent
+# par canonical_args : --oui arrive ici déjà traduit en --yes (#557).
 confirmer_suppression() {
     local app="$1" reponse arg
     SUPPRIMER_DONNEES=""
     [ "$(valeur "$app")" = on ] || return 0
     for arg in "${@:2}"; do
-        case "$arg" in --oui) SUPPRIMER_DONNEES=1 ;; esac
+        case "$arg" in --yes) SUPPRIMER_DONNEES=1 ;; esac
     done
     [ -z "$SUPPRIMER_DONNEES" ] || return 0
     cluster_interactif || return 0
@@ -1388,11 +1389,10 @@ if [ "$#" -gt 0 ]; then
     set -- "$canon" "${@:2}"
 fi
 
-# Options of activer, cluster and utiliser take their English names (#557) :
-# --context, --confirm, --yes ; the French ones warn. The other commands keep
-# their options (desactiver --oui, for one).
+# Options of activer, desactiver, cluster and utiliser take their English names
+# (#557) : --context, --confirm, --yes ; the French ones warn (--oui included).
 case "${1:-}" in
-    activer | cluster | utiliser)
+    activer | desactiver | cluster | utiliser)
         if command -v canonical_args >/dev/null 2>&1; then
             canonical_args "$1" "${@:2}"
             set -- "$1" "${ARGS_CANONICAL[@]+"${ARGS_CANONICAL[@]}"}"

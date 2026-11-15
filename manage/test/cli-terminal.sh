@@ -125,7 +125,7 @@ mk shell 180 0 "○ module ia" --envoyer '\$ ' $'devzone\nexit\n'
 
 echo "▶ Commande devzone du conteneur"
 conteneur "devzone : état" 60 0 "○ module kubernetes" "devzone"
-conteneur "devzone --help" 60 0 "devzone activer <module>" "devzone --help"
+conteneur "devzone --help" 60 0 "devzone enable <module>" "devzone --help"
 conteneur "devzone enable ia" 600 0 "ia actif" "devzone enable ia"
 conteneur "devzone disable ia" 300 0 "ia désactivé" "devzone disable ia"
 conteneur "devzone enable kubernetes (aucun cluster de l'hôte)" 180 0 "aucun cluster joignable" "devzone enable kubernetes"
