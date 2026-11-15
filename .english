@@ -114,3 +114,4 @@ manage/test/llm-opencode.bats
 .devcontainer/llm/opencode.sh
 .devcontainer/agent-local.sh
 manage/test/agent-local.bats
+manage/test/services-pod-llm.bats

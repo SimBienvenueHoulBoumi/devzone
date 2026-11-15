@@ -75,24 +75,6 @@ GETENT
     [[ "$output" != *"devzone enable postgres"* ]] || false
 }
 
-@test "status in the pod: llm off, optional; present in the cluster, active" {
-    printf 'llm=off\n' >"$DEVZONE_ETAT"
-    : >"$T/dns"
-    run bash "$DEVZONE"
-    [[ "$output" == *"○ module llm"*"devzone workspace services enable llm"* ]] || false
-    echo "llm.devzone-llm.svc" >"$T/dns"
-    run bash "$DEVZONE"
-    [[ "$output" == *"✔ module llm"*"active:"*"llm.devzone-llm.svc"* ]] || false
-}
-
-@test "enable llm in the pod: refused with the workstation command" {
-    printf 'llm=off\n' >"$DEVZONE_ETAT"
-    run bash "$DEVZONE" enable llm
-    [ "$status" -eq 2 ]
-    [[ "$output" == *"devzone workspace services enable llm"* ]] || false
-    grep -qx 'llm=off' "$DEVZONE_ETAT"
-}
-
 @test "status in the pod: postgres off but present in the cluster, active" {
     printf 'postgres=off\n' >"$DEVZONE_ETAT"
     echo "postgres.devzone-postgres.svc" >"$T/dns"
@@ -225,15 +207,6 @@ DZ
     grep -q '^devzone gitlab relay-stop$' "$T/devzone.log"
     grep -qx 'cluster=kind-devzone' "$DEVZONE_ETAT"
     [ -z "$(ls "${TMPDIR:-/tmp}"/devzone-services-admin.* 2>/dev/null)" ]
-}
-
-@test "services-admin.sh enable llm --preset light: devzone enable llm, relay stopped" {
-    admin_setup
-    printf 'cluster=kind-devzone\nllm=off\n' >"$DEVZONE_ETAT"
-    run bash -c 'printf "SECRET-TOKEN\n" | bash "$0" enable llm --preset light' "$ADMIN"
-    [ "$status" -eq 0 ]
-    grep -q '^devzone enable llm --preset light$' "$T/devzone.log"
-    grep -q '^devzone llm relay-stop$' "$T/devzone.log"
 }
 
 @test "services-admin.sh: refused outside the pod, for an unknown service, with an empty token" {
