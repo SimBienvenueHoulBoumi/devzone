@@ -105,6 +105,12 @@ KUBE
     grep -q 'delete serviceaccount devzone-services-admin' "$T/kubectl.log"
 }
 
+@test "services enable llm --preset light: the options reach the installer in the pod" {
+    run bash "$CLI" workspace services enable llm --preset light
+    [ "$status" -eq 0 ]
+    grep -q 'services-admin.sh enable llm --preset light$' "$T/kubectl.log"
+}
+
 @test "services enable: unknown service refused" {
     run bash "$CLI" workspace services enable redis
     [ "$status" -eq 1 ]
@@ -113,12 +119,13 @@ KUBE
 }
 
 @test "services status: installed or not, by namespace" {
-    export FAUX_NS="devzone-postgres"
+    export FAUX_NS="devzone-postgres devzone-llm"
     run bash "$CLI" workspace services status
     [ "$status" -eq 0 ]
     [[ "$output" == *"✔ postgres installed (namespace devzone-postgres)"* ]] || false
     [[ "$output" == *"○ gitlab not installed: devzone workspace services enable gitlab"* ]] || false
     [[ "$output" == *"○ argocd not installed"* ]] || false
+    [[ "$output" == *"✔ llm installed (namespace devzone-llm)"* ]] || false
     [[ "$output" == *"○ mysql not installed: devzone workspace services enable mysql"* ]] || false
 }
 

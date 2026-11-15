@@ -230,6 +230,8 @@ Dans le conteneur, le récapitulatif `devzone` signale une version publiée plus
 
 **Module `postgres`** : un PostgreSQL partagé, une base par projet (voir [Accéder à PostgreSQL](#accéder-à-postgresql)). Pour l'activer : `devzone enable postgres`.
 
+**Module `llm`** : un modèle de code local (Qwen2.5-Coder, sur CPU) dans le cluster de devzone, utilisé par opencode quand les modèles en ligne sont épuisés ou injoignables ; premier téléchargement de plusieurs Go (voir [manage/docs/reference.md](manage/docs/reference.md#modèle-de-code-local)). Pour l'activer : `devzone enable llm` (`--preset light` sur une machine juste en mémoire).
+
 **Module `argocd`** : Argo CD sur le cluster de devzone, interface sur https://127.0.0.1:8443 dans le conteneur (voir [Argo CD](manage/docs/reference.md#argo-cd)). Pour l'activer : `devzone enable argocd`.
 
 Ces modules sont désactivés par défaut, activables à la demande depuis le conteneur (sans rebuild), et leur choix est conservé d'un démarrage à l'autre.
