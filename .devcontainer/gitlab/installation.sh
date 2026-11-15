@@ -3,7 +3,8 @@
 # Sourcé par gitlab.sh : namespace devzone-gitlab (suffixé par instance),
 # vérification de la mémoire allouable, Helm avec le contexte devzone,
 # relais port-forward, runner et migration depuis l'ancien cluster kind.
-# Les valeurs Helm (values.yaml, runner-values.yaml) restent à côté.
+# Le chart enveloppe charts/devzone-gitlab (#538) porte les dépendances et les
+# valeurs ; chart.sh (helm direct) et argocd.sh (Application) l'installent.
 
 # Namespace isolé du module : un par instance, comme postgres
 GITLAB_NS="devzone-gitlab${INSTANCE_SUFFIX}"
@@ -84,26 +85,23 @@ gitlab_installer() {
     mkdir -p "$GITLAB_SECRETS_DIR"
     gitlab_namespace_preparer
 
-    # Dépôt Helm GitLab (idempotent)
-    echo "▶ Ajout du dépôt Helm GitLab…"
-    helm repo add gitlab https://charts.gitlab.io 2>/dev/null || true
-    helm repo update >/dev/null 2>&1 || true
-
-    # Installation des services en ClusterIP, sans exposition directe :
-    # l'accès passe uniquement par le relais port-forward du conteneur
-    echo "▶ Installation du chart GitLab dans $GITLAB_NS…"
     # Secret Rails (#347) : réinstallation -> réappliquer le secret conservé avant
-    # le helm upgrade --install (le chart le réutilise, sessions navigateur valides)
+    # l'installation (le chart le réutilise, sessions navigateur valides)
     gitlab_secrets_appliquer
-    compte_helm "$(compte_ctx)" upgrade --install gitlab gitlab/gitlab \
-        --version 9.11.16 \
-        --namespace "$GITLAB_NS" \
-        --create-namespace \
-        -f "$ICI/values.yaml" \
-        --timeout "${GITLAB_ATTENTE}s" \
-        --wait
-    if [ ! -f "$GITLAB_RAILS_FICHIER" ]; then
-        gitlab_secrets_copier
+    gitlab_runner_ancien_retirer
+
+    # Argo CD holds the chart when the module is on (#538): the Application
+    # syncs it and the seed runs once GitLab answers. Otherwise the wrapper chart
+    # is installed by helm, the runner held back until the seed wrote its Secret
+    local par_argocd=0
+    if gitlab_argocd_active; then
+        par_argocd=1
+        gitlab_release_adopter
+        gitlab_application_apply || return 1
+    else
+        echo "▶ Installation du chart GitLab dans $GITLAB_NS…"
+        gitlab_chart_depend
+        gitlab_helm_pass 0 || return 1
     fi
 
     # Relais avant l'attente : curl et git en HTTP résolvent *.localhost vers
@@ -116,26 +114,13 @@ gitlab_installer() {
 
     gitlab_attendre_pret
     gitlab_seed
-
-    # Runner : son URL interne et le clone des jobs pointent vers le namespace
-    # de l'instance (jamais le namespace fixe « gitlab » d'avant #396)
-    echo "▶ Installation de l'exécuteur GitLab Runner…"
-    local runner_token="" valeurs_runner
-    if [ -f "$GITLAB_SECRETS_DIR/runner-token" ]; then
-        runner_token="$(cat "$GITLAB_SECRETS_DIR/runner-token")"
+    if [ ! -f "$GITLAB_RAILS_FICHIER" ]; then
+        gitlab_secrets_copier
     fi
-    if [ -z "$runner_token" ]; then
-        echo "devzone : seed GitLab : jeton de runner introuvable (seed incomplet), arrêt du seed." >&2
-        return 1
+    if [ "$par_argocd" = 0 ]; then
+        echo "▶ Exécuteur GitLab Runner…"
+        gitlab_helm_pass 1 || return 1
     fi
-    valeurs_runner="$(mktemp)"
-    sed "s/__NAMESPACE__/$GITLAB_NS/g" "$ICI/runner-values.yaml" >"$valeurs_runner"
-    compte_helm "$(compte_ctx)" upgrade --install gitlab-runner gitlab/gitlab-runner \
-        --version 0.88.2 \
-        --namespace "$GITLAB_NS" \
-        -f "$valeurs_runner" \
-        --set "runnerToken=${runner_token}"
-    rm -f "$valeurs_runner"
 
     gitlab_secrets_avertir
 
@@ -160,8 +145,10 @@ gitlab_desinstaller() {
     gitlab_relais_arreter
     rm -rf "$(relais_dossier gitlab-web)" "$(relais_dossier gitlab-ssh)" \
         "$(relais_dossier gitlab-8929)" "$(relais_dossier gitlab-2224)"
+    # Application tenue par Argo CD (#538) : ses ressources partent avec elle
+    gitlab_application_retirer || true
     compte_helm "$(compte_ctx)" uninstall gitlab --namespace "$GITLAB_NS" >/dev/null 2>&1 || true
-    compte_helm "$(compte_ctx)" uninstall gitlab-runner --namespace "$GITLAB_NS" >/dev/null 2>&1 || true
+    gitlab_runner_ancien_retirer
     # RoleBinding retiré puis namespace supprimé par l'administrateur (#430)
     compte_retirer "$(compte_ctx)" "$GITLAB_NS" >/dev/null 2>&1 || true
     compte_admin "$(compte_ctx)" delete namespace "$GITLAB_NS" --ignore-not-found >/dev/null 2>&1 || true

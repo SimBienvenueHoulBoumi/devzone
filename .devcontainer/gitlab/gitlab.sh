@@ -61,173 +61,16 @@ GITLAB_HOTE_MARQUE="# devzone:gitlab"
 # shellcheck source=SCRIPTDIR/installation.sh
 # shellcheck disable=SC1091
 . "$ICI/installation.sh"
-
-# ---- Helper : attendre que GitLab soit prêt ----
-gitlab_attendre_pret() {
-    local debut
-    debut=$(date +%s)
-    echo "▶ Attente de GitLab prêt (timeout ${GITLAB_ATTENTE}s)…"
-    while [ $(( $(date +%s) - debut )) -lt "$GITLAB_ATTENTE" ]; do
-        if curl -sf http://gitlab.localhost:8929/-/readiness >/dev/null 2>&1 || curl -sf http://gitlab.localhost:8929/users/sign_in >/dev/null 2>&1; then
-            echo "▶ GitLab prêt."
-            return 0
-        fi
-        sleep 5
-    done
-    echo "devzone : timeout attente GitLab." >&2
-    return 1
-}
-
-# ---- seed : peupler GitLab de données de base ----
-gitlab_seed() {
-    echo "▶ Seed de GitLab…"
-
-    mkdir -p "$GITLAB_SECRETS_DIR"
-
-    # Mot de passe root lu dans le secret gitlab-gitlab-initial-root-password
-    local mot_de_passe
-    mot_de_passe="$(kubectl --context devzone get secret -n "$GITLAB_NS" gitlab-gitlab-initial-root-password -o jsonpath='{.data.password}' 2>/dev/null | base64 -d 2>/dev/null || true)"
-    if [ -z "$mot_de_passe" ]; then
-        echo "devzone : seed GitLab : secret root (gitlab-gitlab-initial-root-password) introuvable, arrêt du seed." >&2
-        return 1
-    fi
-    printf '%s' "$mot_de_passe" > "$GITLAB_SECRETS_DIR/root-password"
-    chmod 600 "$GITLAB_SECRETS_DIR/root-password"
-
-    # Token d'accès root créé par kubectl exec dans le pod toolbox avec gitlab-rails runner
-    local toolbox_pod root_token
-    toolbox_pod="$(kubectl --context devzone get pod -n "$GITLAB_NS" -l app=toolbox -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)"
-    if [ -z "$toolbox_pod" ]; then
-        echo "devzone : seed GitLab : pod toolbox (label app=toolbox) introuvable, arrêt du seed." >&2
-        return 1
-    fi
-    root_token="$(kubectl --context devzone exec -n "$GITLAB_NS" "$toolbox_pod" -- gitlab-rails runner 'puts User.find_by_username("root").personal_access_tokens.create(name: "devzone", scopes: ["api", "write_repository"], expires_at: 30.days.from_now).token' 2>/dev/null | tail -n 1 || true)"
-    if [ -z "$root_token" ]; then
-        echo "devzone : seed GitLab : création du jeton root (gitlab-rails runner) échouée, arrêt du seed." >&2
-        return 1
-    fi
-    printf '%s' "$root_token" > "$GITLAB_SECRETS_DIR/root-token"
-    chmod 600 "$GITLAB_SECRETS_DIR/root-token"
-
-    # Via l'API curl avec le token (jamais affiché en clair)
-    local token groupe_id
-    token="$(cat "$GITLAB_SECRETS_DIR/root-token")"
-
-    # Groupe devzone (testé avant création)
-    if ! curl -sf --header "PRIVATE-TOKEN: $token" "http://gitlab.localhost:8929/api/v4/groups/devzone" >/dev/null 2>&1; then
-        if ! curl -sf --header "PRIVATE-TOKEN: $token" --request POST "http://gitlab.localhost:8929/api/v4/groups" --data "name=devzone&path=devzone&visibility=private" >/dev/null 2>&1; then
-            echo "devzone : seed GitLab : création du groupe devzone échouée, arrêt du seed." >&2
-            return 1
-        fi
-    fi
-    groupe_id="$(curl -s --header "PRIVATE-TOKEN: $token" "http://gitlab.localhost:8929/api/v4/groups/devzone" | jq -r '.id // empty')"
-    if [ -z "$groupe_id" ]; then
-        echo "devzone : seed GitLab : lecture de l'identifiant numérique du groupe devzone échouée, arrêt du seed." >&2
-        return 1
-    fi
-
-    # Projet devzone/demo (testé avant création, namespace_id = ID numérique du groupe)
-    if ! curl -sf --header "PRIVATE-TOKEN: $token" "http://gitlab.localhost:8929/api/v4/projects/devzone%2Fdemo" >/dev/null 2>&1; then
-        if ! curl -sf --header "PRIVATE-TOKEN: $token" --request POST "http://gitlab.localhost:8929/api/v4/projects" --data "name=demo&namespace_id=$groupe_id" >/dev/null 2>&1; then
-            echo "devzone : seed GitLab : création du projet devzone/demo échouée, arrêt du seed." >&2
-            return 1
-        fi
-    fi
-
-    # Utilisateur dev (testé avant création, mot de passe généré aléatoirement) :
-    # un dev-password existant n'est réutilisé que si l'utilisateur dev existe
-    # encore (vérifié via l'API) ; sinon il est recréé avec un utilisateur nouveau.
-    local users_json devpass
-    users_json="$(curl -s --header "PRIVATE-TOKEN: $token" "http://gitlab.localhost:8929/api/v4/users?username=dev")"
-    if [ "$(jq length <<<"$users_json")" -eq 0 ]; then
-        devpass="$(openssl rand -base64 18 | tr -d '\n')"
-        if ! curl -sf --header "PRIVATE-TOKEN: $token" --request POST "http://gitlab.localhost:8929/api/v4/users" --data "email=dev@gitlab.localhost&username=dev&name=dev&skip_confirmation=true" --data-urlencode "password=$devpass" >/dev/null 2>&1; then
-            echo "devzone : seed GitLab : création de l'utilisateur dev échouée, arrêt du seed." >&2
-            return 1
-        fi
-        printf '%s' "$devpass" > "$GITLAB_SECRETS_DIR/dev-password"
-        chmod 600 "$GITLAB_SECRETS_DIR/dev-password"
-    fi
-
-    # Token de runner : vérifié via POST /api/v4/runners/verify ; un jeton valide
-    # est gardé, un jeton refusé (403/404) est recréé, GitLab injoignable arrête le seed.
-    local rt_jeton rt_code rt_token
-    if [ -f "$GITLAB_SECRETS_DIR/runner-token" ]; then
-        rt_jeton="$(cat "$GITLAB_SECRETS_DIR/runner-token")"
-        rt_code="$(curl -s -o /dev/null -w '%{http_code}' --header "PRIVATE-TOKEN: $token" --request POST "http://gitlab.localhost:8929/api/v4/runners/verify" --data "token=${rt_jeton}" || true)"
-        if [ "$rt_code" = "200" ]; then
-            echo "✔ Jeton de runner valide : gardé."
-        elif [ "$rt_code" = "403" ] || [ "$rt_code" = "404" ]; then
-            echo "devzone : jeton de runner d'une installation précédente refusé : recréé."
-            rt_token="$(curl -s --header "PRIVATE-TOKEN: $token" --request POST "http://gitlab.localhost:8929/api/v4/user/runners" --data "runner_type=instance_type" 2>/dev/null | jq -r '.token // empty' || true)"
-            if [ -z "$rt_token" ]; then
-                echo "devzone : seed GitLab : création du jeton de runner (POST /api/v4/user/runners) échouée, arrêt du seed." >&2
-                return 1
-            fi
-            printf '%s' "$rt_token" > "$GITLAB_SECRETS_DIR/runner-token"
-            chmod 600 "$GITLAB_SECRETS_DIR/runner-token"
-        else
-            echo "devzone : seed GitLab : vérification du jeton de runner impossible (code ${rt_code}), arrêt du seed." >&2
-            return 1
-        fi
-    else
-        rt_token="$(curl -s --header "PRIVATE-TOKEN: $token" --request POST "http://gitlab.localhost:8929/api/v4/user/runners" --data "runner_type=instance_type" 2>/dev/null | jq -r '.token // empty' || true)"
-        if [ -z "$rt_token" ]; then
-            echo "devzone : seed GitLab : création du jeton de runner (POST /api/v4/user/runners) échouée, arrêt du seed." >&2
-            return 1
-        fi
-        printf '%s' "$rt_token" > "$GITLAB_SECRETS_DIR/runner-token"
-        chmod 600 "$GITLAB_SECRETS_DIR/runner-token"
-    fi
-
-    # Push du contenu de demo/ dans devzone/demo (dépôt git temporaire, remote http avec le jeton dans l'URL, jamais affiché ; branche main)
-    # Le push utilise le jeton root (write_repository) : le jeton de runner ne peut pas pousser.
-    local push_token=""
-    push_token="$(cat "$GITLAB_SECRETS_DIR/root-token")"
-    if [ -z "$push_token" ]; then
-        echo "devzone : seed GitLab : jeton root introuvable, arrêt du seed." >&2
-        return 1
-    fi
-    # Déjà poussé (installation relancée) : rien à refaire
-    if curl -sf --header "PRIVATE-TOKEN: $push_token" "http://gitlab.localhost:8929/api/v4/projects/devzone%2Fdemo/repository/branches/main" >/dev/null 2>&1; then
-        echo "✔ Seed GitLab terminé (projet demo déjà poussé)."
-        regenerer_identifiants
-        return 0
-    fi
-    if [ -d "$ICI/demo" ]; then
-        local tmpdir
-        tmpdir="$(mktemp -d)"
-        cp -r "$ICI/demo/." "$tmpdir/"
-        if (
-            cd "$tmpdir"
-            # Dépôt jetable du script : les hooks git globaux (repowarden) n'ont
-            # rien à vérifier ici et refuseraient le commit
-            export GIT_CONFIG_PARAMETERS="'core.hooksPath=/dev/null'"
-            git init -q -b main
-            git add -A
-            git -c user.email=dev@gitlab.localhost -c user.name=dev commit -q -m "chore: projet de démonstration"
-            # gitlab.localhost n'est pas toujours résolu par git : adresse
-            # locale, et l'hôte attendu par l'ingress passé en en-tête
-            git remote add origin "http://oauth2:${push_token}@127.0.0.1:8929/devzone/demo.git"
-            git -c http.extraHeader="Host: gitlab.localhost" push -q -u origin main >/dev/null 2>&1
-        ); then
-            # Vérifie le push : la branche main existe bien sur le projet
-            if ! curl -sf --header "PRIVATE-TOKEN: $push_token" "http://gitlab.localhost:8929/api/v4/projects/devzone%2Fdemo/repository/branches/main" >/dev/null 2>&1; then
-                echo "devzone : seed GitLab : push du projet demo sur /devzone/demo.git réussi mais branche main absente, arrêt du seed." >&2
-                rm -rf "$tmpdir"
-                return 1
-            fi
-        else
-            echo "devzone : seed GitLab : push du projet demo sur /devzone/demo.git échoué, arrêt du seed." >&2
-            rm -rf "$tmpdir"
-            return 1
-        fi
-        rm -rf "$tmpdir"
-    fi
-
-    echo "✔ Seed GitLab terminé."
-    regenerer_identifiants
-}
+# Chart enveloppe (helm direct, chart.sh), Argo CD (argocd.sh), seed (seed.sh) (#538)
+# shellcheck source=SCRIPTDIR/chart.sh
+# shellcheck disable=SC1091
+. "$ICI/chart.sh"
+# shellcheck source=SCRIPTDIR/argocd.sh
+# shellcheck disable=SC1091
+. "$ICI/argocd.sh"
+# shellcheck source=SCRIPTDIR/seed.sh
+# shellcheck disable=SC1091
+. "$ICI/seed.sh"
 
 # ---- hote-poser / hote-retirer : gitlab.localhost dans /etc/hosts ----
 # Pourquoi : ssh (clone ssh://git@gitlab.localhost:2224/…), glab et getent
@@ -325,7 +168,7 @@ case "${1:-}" in
     migrate)       shift; gitlab_migrer "$@" ;;
     installe)     gitlab_installe ;;
     status)         gitlab_etat ;;
-    seed)         gitlab_seed ;;
+    seed)         gitlab_seed_commande ;;
     new-password)  gitlab_nouveau_mdp "${@:2}" ;;
     relay-start) gitlab_relais_lancer ;;
     relay-stop) gitlab_relais_arreter ;;

@@ -73,6 +73,20 @@ KUBE
     [[ "$stderr" != *"deprecated"* ]] || false
 }
 
+@test "services seed gitlab: the seed runs in the pod through services-admin.sh seed (#538)" {
+    export FAUX_CONTEXTES="devzone"
+    run bash "$CLI" workspace services seed gitlab
+    [ "$status" -eq 0 ]
+    grep -q 'services-admin.sh seed gitlab$' "$T/kubectl.log"
+}
+
+@test "services seed postgres: refused, nothing run in the pod (#538)" {
+    run bash "$CLI" workspace services seed postgres
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"seed: only gitlab"* ]] || false
+    ! grep -q 'exec -i' "$T/kubectl.log" || false
+}
+
 @test "services enable: pod not running, nothing applied" {
     export FAUX_POD=Pending
     run bash "$CLI" workspace services enable gitlab

@@ -1,0 +1,15 @@
+apiVersion: v2
+name: devzone-gitlab
+description: GitLab of devzone, minimal and pinned (#396, #538): a wrapper of the official GitLab charts
+type: application
+version: 0.1.0
+appVersion: "18.11.6"
+dependencies:
+  # Versions pinned: the Application and the helm-direct install take this
+  # chart (#538). Run `helm dependency build` before the installation.
+  - name: gitlab
+    version: 9.11.16
+    repository: https://charts.gitlab.io
+  - name: gitlab-runner
+    version: 0.88.2
+    repository: https://charts.gitlab.io

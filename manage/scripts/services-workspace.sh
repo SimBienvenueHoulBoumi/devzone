@@ -19,7 +19,7 @@ SERVICES_ADMIN_SCRIPT="${DEVZONE_SERVICES_ADMIN_SCRIPT:-/usr/local/share/devzone
 SERVICES_TOKEN_DURATION="${DEVZONE_SERVICES_TOKEN_DURATION:-1h}"
 
 services_usage() {
-    echo "devzone workspace services enable|disable <gitlab|postgres|mysql|argocd> [options] | status"
+    echo "devzone workspace services enable|disable <gitlab|postgres|mysql|argocd> [options] | seed gitlab | status"
 }
 
 services_known() {
@@ -157,6 +157,15 @@ services() {
     case "$sub" in
         enable | activer) services_run enable "${2:-}" "${@:3}" ;;
         disable | desactiver) services_run disable "${2:-}" "${@:3}" ;;
+        # The data of gitlab (group, demo project, dev user, runner) seeded
+        # again, in the pod (#538): the only seed of the services
+        seed)
+            if [ "${2:-}" != gitlab ]; then
+                echo "✖ seed: only gitlab ($(services_usage))" >&2
+                return 1
+            fi
+            services_run seed gitlab
+            ;;
         status | etat | '') services_status ;;
         *)
             echo "✖ unknown subcommand: $sub ($(services_usage))" >&2

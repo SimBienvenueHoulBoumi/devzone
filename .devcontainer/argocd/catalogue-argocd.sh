@@ -44,6 +44,10 @@ argocd_revision() {
 # container (limited devzone context)
 catalogue_argocd_load() {
     [ -n "$CATALOGUE_ARGOCD_WIRED" ] && return 0
+    # The Applications are applied with the devzone context, the only one the
+    # container holds (services.sh and gitops.sh call argocd_kubectl)
+    # shellcheck disable=SC2317 # called by services.sh and gitops.sh
+    argocd_kubectl() { kubectl --context devzone "$@"; }
     # shellcheck disable=SC2034 # read by apps.sh
     APPS_CMD="devzone argocd app"
     # shellcheck disable=SC2034 # read by apps.sh and services.sh
