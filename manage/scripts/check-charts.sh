@@ -188,16 +188,19 @@ EOF
     done
 }
 
-if [ ! -d "$CHARTS_DIR" ]; then
-    echo "✖ charts : folder not found: $CHARTS_DIR"
-    exit 1
+# Run as a script only: sourced (tests), it just defines the functions
+if [ "${BASH_SOURCE[0]}" = "$0" ]; then
+    if [ ! -d "$CHARTS_DIR" ]; then
+        echo "✖ charts : folder not found: $CHARTS_DIR"
+        exit 1
+    fi
+    for dir in "$CHARTS_DIR"/*/; do
+        [ -d "$dir" ] || continue
+        charts_check_dir "${dir%/}"
+    done
+    charts_check_references
+    if [ "$FAULTS" -ne 0 ]; then
+        exit 1
+    fi
+    echo "✔ charts : $COUNT charts conformes"
 fi
-for dir in "$CHARTS_DIR"/*/; do
-    [ -d "$dir" ] || continue
-    charts_check_dir "${dir%/}"
-done
-charts_check_references
-if [ "$FAULTS" -ne 0 ]; then
-    exit 1
-fi
-echo "✔ charts : $COUNT charts conformes"

@@ -7,6 +7,12 @@
 setup() {
     RACINE="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
     command -v helm >/dev/null 2>&1 || skip "helm missing"
+    # Config helm propre au test : le dépôt de la dépendance est déclaré ici
+    # (comme check-charts), le runner n'a pas besoin de l'avoir en local
+    export HELM_REPOSITORY_CONFIG="$BATS_TEST_TMPDIR/helm/repositories.yaml" \
+        HELM_REPOSITORY_CACHE="$BATS_TEST_TMPDIR/helm/cache"
+    source "$RACINE/manage/scripts/check-charts.sh"
+    charts_helm_repos "$RACINE/charts/devzone-gitlab/Chart.yaml" "$BATS_TEST_TMPDIR/helm" || return 1
     CHART="$BATS_TEST_TMPDIR/devzone-gitlab"
     cp -R "$RACINE/charts/devzone-gitlab" "$CHART"
 }
