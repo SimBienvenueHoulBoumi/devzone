@@ -31,6 +31,7 @@ manage/test/workspace-sans-docker.bats
 manage/test/poste.bats
 manage/test/kube-ready.bats
 manage/test/create-mode.bats
+manage/test/creer-mode.bats
 manage/test/versions.bats
 manage/test/ci-dns.bats
 manage/test/migration.bash
