@@ -352,6 +352,18 @@ Le cache d'images reste dans le système de fichiers du sidecar `buildkitd` : il
 
 En attendant ces deux points, edite le projet sur le poste par les copies : `devzone workspace copy-to <dossier>` avant, `devzone workspace copy-from <dossier>` apres.
 
+### Développer devzone et repowarden dans le pod
+
+Les clones de travail, les worktrees des tickets et les agents vivent dans le pod ; le poste ne garde que le pilotage.
+
+1. **Cloner** (depuis le poste) : `devzone workspace clone <url> [<nom>]` fait un `git clone` HTTPS dans `/workspaces/projets/<nom>` du pod (le nom par défaut est celui du dépôt), branche les identifiants git du pod sur `gh`, copie ton identité git du poste dans le clone et y installe les hooks (`repowarden install`). Relancée, elle ne refait rien ; un dossier qui existe avec un autre remote est refusé. Exemples : `devzone workspace clone https://github.com/SimBienvenueHoulBoumi/devzone` et `…/repowarden`.
+2. **Un worktree par ticket** (dans le pod) : `devzone ticket <n> [--repo devzone|repowarden]` crée `/workspaces/projets/devzone-wt/dz-<n>` (ou `/workspaces/projets/repowarden-wt/rw-<n>`), y exécute `repowarden ticket <n>` (branche créée depuis develop et liée) et affiche le chemin. Une fois la PR fusionnée : `devzone ticket done <n>` retire le worktree et la branche locale ; il refuse si le worktree n'est pas propre ou si la branche existe encore sur origin. Dans le conteneur d'outils, la même commande utilise `/workspaces/devzone` et `workspace/wt/dz-<n>` (devzone seulement).
+3. **Agent** : `devzone agent /workspaces/projets/devzone-wt/dz-<n> <consigne>` depuis le poste lance opencode directement dans ce dossier du pod, sans copie (un chemin `/workspaces/projets/…` absent du poste désigne le pod) ; `--local` garde le conteneur d'outils. `devzone workspace start` exécute `repowarden agents init --global` dans le pod quand le module `ia` y est actif : un agent y est arrêté avant de modifier develop.
+4. **Pousser** : `git push` depuis le worktree, en HTTPS avec les identifiants de `gh` ; la PR se fait comme partout.
+5. **Copies obsolètes** : `devzone workspace copy-to` refuse d'écraser un dossier du pod qui est un clone git d'un autre remote ; `devzone workspace status` signale les anciennes copies `repogarde/` et `wt/` (leur `.git` pointe hors du pod) avec la commande pour les retirer, à lancer après sauvegarde.
+
+Reste sur le poste : `make up` et `make rebuild`, `devzone workspace start` et l'image du devcontainer.
+
 ### Testcontainers et docker dans le workspace
 
 - `docker` et Testcontainers parlent a kubedock (`DOCKER_HOST=tcp://127.0.0.1:2475`) : rien a configurer, et le socket Docker du poste n'est pas monte.

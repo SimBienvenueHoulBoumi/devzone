@@ -433,7 +433,7 @@ devzone $(version) : environnement de développement conteneurisé
   devzone uninstall        dans un dossier devzone : retire conteneur, image, volumes
                            (à lancer avant npm uninstall -g devzone)
   devzone workspace start|stop|status|shell
-  devzone workspace vscode|copy-to|copy-from|migrate|revert|clean-docker
+  devzone workspace vscode|copy-to|copy-from|clone|migrate|revert|clean-docker
                            poste Kubernetes : pilote le chart devzone-workspace
   devzone workspace services enable|disable <service>|status
                            services (gitlab, postgres, argocd) du workspace Kubernetes
@@ -583,7 +583,7 @@ commande_du_conteneur() {
         actif | activer | agent | appliquer | argocd | build | catalogue | cluster | clusters | \
             demarrer | desactiver | etat | gitlab | metrics | modules | mots-de-passe | \
             mysql | paquets | plateforme | port | postgres | reparer | test-bash32 | \
-            test-gitlab | utiliser) return 0 ;;
+            test-gitlab | ticket | utiliser) return 0 ;;
         # English names of the container commands (#502)
         is-enabled | enable | disable | apply | catalog | start | status | \
             passwords | packages | platform | repair | use) return 0 ;;
