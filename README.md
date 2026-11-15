@@ -29,14 +29,19 @@ devzone les évite : le même environnement sur chaque poste, sur ta machine.
 
 ## Comment ça marche
 
-devzone prépare un devcontainer Ubuntu lancé par Docker, avec des versions d'outils figées. Rien n'est hébergé : tout tourne sur ta machine, et `workspace/` est conservé entre les rebuilds.
+devzone prépare un environnement Ubuntu aux versions d'outils figées, et le lance à l'un de ces deux endroits :
+
+- **dans le cluster Kubernetes** de ta machine, par défaut, dès qu'un cluster répond à la création : le poste est un pod `devzone-workspace-0` (namespace `devzone-workspace`) ;
+- **dans un conteneur Docker** sinon : un devcontainer lancé par Docker sur ton poste (mode « poste Docker »).
+
+Dans les deux cas, rien n'est hébergé : tout tourne sur ta machine. `workspace/` est conservé entre les rebuilds, et les projets d'un poste Kubernetes restent dans le volume du pod. Le mode de chaque poste est écrit dans `.devzone.modules` (`workspace=kubernetes` ou `workspace=docker`) ; le détail est dans la [référence](manage/docs/reference.md#workspace-kubernetes).
 
 ## Démarrage rapide
 
 ### Prérequis
 
-- Docker Desktop (ou Docker Engine sous Linux). Pour Kubernetes (facultatif) : activer le cluster de Docker Desktop (*Settings → Kubernetes → Enable Kubernetes*).
-- Pour le [workspace Kubernetes](manage/docs/reference.md#workspace-kubernetes), c'est le mode par défaut dès qu'un cluster répond à la création : un cluster Kubernetes 1.30 ou plus, `kubectl` et `helm` sur la machine. Docker n'est alors pas nécessaire ; il l'est pour le poste Docker, et pour lire les volumes à migrer (`devzone workspace migrate`, `devzone workspace revert` pour y retourner).
+- **Kubernetes (mode par défaut)** : un cluster Kubernetes 1.30 ou plus qui répond, avec `kubectl` et `helm` sur la machine. Sur Mac et Windows, le plus simple est le cluster de Docker Desktop : *Settings → Kubernetes → Enable Kubernetes*. devzone lui-même n'a pas besoin de Docker dans ce mode, mais le cluster de Docker Desktop s'arrête avec Docker Desktop (si le cluster ne répond pas, voir [Questions fréquentes](#questions-fréquentes)). Détails dans le [workspace Kubernetes](manage/docs/reference.md#workspace-kubernetes).
+- **Docker (repli)** : Docker Desktop (ou Docker Engine sous Linux). Il sert au poste Docker, qui prend le relais quand aucun cluster ne répond à la création, et il est nécessaire pour lire les volumes à migrer (`devzone workspace migrate`, `devzone workspace revert` pour y retourner).
 - Node et npm (pour `npx` ou l'installation globale).
 - `make` (nécessaire pour `make shell` ; sous Windows sans `make`, voir le tableau « Au quotidien »).
 
@@ -79,16 +84,20 @@ make shell
 
 Tu peux aussi utiliser VS Code : ouvre le dossier `mon-devzone` (ou `devzone`), puis *Dev Containers: Reopen in Container*.
 
-À chaque démarrage, un récapitulatif t'indique ce qui est prêt ou ce qu'il te reste à faire (extrait) :
+À chaque démarrage, un récapitulatif t'indique ce qui est prêt ou ce qu'il te reste à faire. Ses libellés sont en anglais, et `devzone` le réaffiche à la demande. Extrait, sans identité git configurée :
 
 ```text
-devzone : état (devzone pour le réafficher)
-  ✖ identité git    nécessaire pour commiter : gh auth login -s workflow (automatique),
+devzone: state (devzone to show it again)
+  ✖ git identity    needed to commit: gh auth login -s workflow (automatic),
                     ou git config --file ~/.config/git/config user.name "<nom>" et user.email "<email>"
-  ○ GitHub          facultatif (push et PR, tickets repowarden) : gh auth login -s workflow
-  ○ module ia         facultatif, assistants IA : Claude Code, opencode : devzone enable ia
-  ○ module kubernetes facultatif, connexion au cluster de l'hôte et metrics-server au démarrage : devzone enable kubernetes
+  ✔ plateforme     github
+  ✔ GitHub          connecté
+  ○ module ia         optional, assistants IA : Claude Code, opencode: devzone enable ia
+  ○ module kubernetes optional, connexion au cluster de l'hôte et metrics-server au démarrage: devzone enable kubernetes
+  ○ module gitlab     optional, GitLab de test dans le cluster des services: devzone enable gitlab
 ```
+
+Une ligne `○ GitHub … optional` remplace `✔ GitHub connecté` tant que `gh` n'est pas connecté. La liste complète des commandes est dans `devzone --help`.
 
 Le premier lancement prend 4 à 5 min mesurées, plus le téléchargement des images de base sur une machine neuve.
 
@@ -142,7 +151,7 @@ Pour en savoir plus : [Mettre en route un projet](https://github.com/SimBienvenu
 |---|---|
 | Langages | Java 21 + Maven + Gradle, Node LTS + pnpm, Python 3.12 (apt) + uv |
 | Conteneurs, Kubernetes | Docker de l'hôte (socket partagé), kubectl, helm, k9s, kind ; connexion au cluster de l'hôte (module `kubernetes`) ; Testcontainers (`TESTCONTAINERS_HOST_OVERRIDE`) ; montages (`$LOCAL_WORKSPACE_FOLDER`) |
-| GitHub (ou GitLab), qualité | gh, ou glab connecté à une instance GitLab (`devzone platform gitlab` dans le conteneur, [manage/docs/reference.md](manage/docs/reference.md#plateforme-github-ou-gitlab)) ; repowarden (hooks git globaux), shellcheck, bats, actionlint, gitleaks, ruff, vulture, pytest |
+| GitHub (ou GitLab), qualité | gh, ou glab connecté à une instance GitLab (`devzone platform gitlab` dans le conteneur, [manage/docs/reference.md](manage/docs/reference.md#plateforme--github-ou-gitlab)) ; repowarden (hooks git globaux), shellcheck, bats, actionlint, gitleaks, ruff, vulture, pytest |
 | Assistants IA | Claude Code, opencode (module `ia`, désactivé par défaut) |
 
 ## Installer un outil qui reste
@@ -175,7 +184,15 @@ La liste vit dans `.devzone.paquets` à la racine du dossier devzone, hors du d�
 | État | — | `make status` | — |
 | **Désinstaller** (tout ce que devzone a créé, après confirmation) | — | `make uninstall` | `npx devzone uninstall` |
 
-Après `devzone workspace migrate`, `make up`, `make shell` et `make stop` pilotent le workspace Kubernetes ; `devzone workspace revert` rend le poste Docker. Les services GitLab, PostgreSQL et Argo CD s'y installent depuis le poste : `devzone workspace services enable postgres` (voir [la référence](manage/docs/reference.md#services-de-devzone-dans-le-workspace-kubernetes)). Tu peux aussi y développer : `devzone workspace clone <url>` fait un clone de travail dans le pod, `devzone ticket <n>` y crée le worktree d'un ticket et `devzone agent` y lance opencode sans copie ([développer dans le pod](manage/docs/reference.md#développer-devzone-et-repowarden-dans-le-pod)). Argo CD y est installé d'office et tient les déploiements : interface sur https://localhost:8443 (mot de passe `admin` dans `.password`), dépôt GitOps `<login>/devzone-argocd` créé sur ton GitHub, projets déclarés dans `.argocd.conf` (`devzone workspace argocd app add <dépôt>`) ; voir [Argo CD dans le workspace Kubernetes](manage/docs/reference.md#argo-cd-dans-le-workspace-kubernetes).
+Dans le mode Kubernetes (poste créé alors que le cluster répondait, ou après `devzone workspace migrate`), le même tableau s'applique au pod `devzone-workspace-0` : `make up`, `make shell` et `make stop` le pilotent, et `make rebuild` est refusé, car rien n'est à reconstruire sur la machine. `devzone workspace revert` rend le poste Docker. Les services GitLab, PostgreSQL et Argo CD s'installent depuis le poste : `devzone workspace services enable postgres` (voir [la référence](manage/docs/reference.md#services-de-devzone-dans-le-workspace-kubernetes)). Tu peux aussi y développer : `devzone workspace clone <url>` fait un clone de travail dans le pod, `devzone ticket <n>` y crée le worktree d'un ticket et `devzone agent` y lance opencode sans copie ([développer dans le pod](manage/docs/reference.md#développer-devzone-et-repowarden-dans-le-pod)). Argo CD y est installé d'office et tient les déploiements : interface sur https://localhost:8443 (mot de passe `admin` dans `.password`), dépôt GitOps `<login>/devzone-argocd` créé sur ton GitHub, projets déclarés dans `.argocd.conf` (`devzone workspace argocd app add <dépôt>`) ; voir [Argo CD dans le workspace Kubernetes](manage/docs/reference.md#argo-cd-dans-le-workspace-kubernetes).
+
+Dans le conteneur, `devzone --help` liste toutes les commandes. Extrait :
+
+```text
+  devzone enable <module>                  enable and apply at once
+  devzone use CTX [--confirm CTX]          switch the kubectl working cluster
+  devzone port [<n>|--close <n>]           relay of a container port to the workstation
+```
 
 ### Mettre à jour devzone
 
@@ -209,7 +226,7 @@ Dans le conteneur, le récapitulatif `devzone` signale une version publiée plus
 
 **Module `kubernetes`** : active à chaque démarrage la connexion au cluster de l'hôte et l'installation de metrics-server sur les clusters locaux (pour voir le CPU et la RAM dans k9s). Pour l'activer : `devzone enable kubernetes`. Sans ce module, kubectl, helm, k9s et kind restent installés.
 
-**Plateforme GitHub ou GitLab** : GitHub par défaut (nouvelle architecture). Pour servir une équipe sur GitLab : `devzone platform gitlab --url URL` (ou sans `--url` quand le module `gitlab` est activé, pour l'instance de test) : glab est installé (version figée, somme vérifiée) et connecté à l'instance, et `devzone` l'affiche à la place des contrôles `gh`. `devzone platform github` revient en arrière (glab retiré). GitLab est accessible directement depuis le poste sans relais temporaire. Détails dans [manage/docs/reference.md](manage/docs/reference.md#plateforme-github-ou-gitlab).
+**Plateforme GitHub ou GitLab** : GitHub par défaut (nouvelle architecture). Pour servir une équipe sur GitLab : `devzone platform gitlab --url URL` (ou sans `--url` quand le module `gitlab` est activé, pour l'instance de test) : glab est installé (version figée, somme vérifiée) et connecté à l'instance, et `devzone` l'affiche à la place des contrôles `gh`. `devzone platform github` revient en arrière (glab retiré). GitLab est accessible directement depuis le poste sans relais temporaire. Détails dans [manage/docs/reference.md](manage/docs/reference.md#plateforme--github-ou-gitlab).
 
 **Module `postgres`** : un PostgreSQL partagé, une base par projet (voir [Accéder à PostgreSQL](#accéder-à-postgresql)). Pour l'activer : `devzone enable postgres`.
 
@@ -322,7 +339,9 @@ L'utilisateur d'un projet possède **sa** base (il y crée tables, index, donné
 
 ## Voir mon application dans le navigateur
 
-Une application lancée **dans** le conteneur (par exemple un Spring Boot avec `./gradlew bootRun` sur le port 8080) n'est pas joignable depuis le poste : le conteneur devzone ne publie aucun port. Dès qu'elle écoute dans le conteneur, le **veilleur de ports automatiques** (`.devcontainer/ports-auto.sh`) pose un relais `alpine/socat` (version figée) sur le Docker de l'hôte, de `127.0.0.1:<port>` du poste vers le port du conteneur : `http://localhost:<port>` **sans commande**. Le relais disparaît quand l'application s'arrête.
+Sur le poste Kubernetes, `devzone workspace start` lance un veilleur de ports : chaque port TCP ≥ 1024 qui écoute dans le pod est relayé sur `127.0.0.1` du poste, au même numéro, par `kubectl port-forward`. Un serveur lancé dans le pod (`npm run dev`, port 5173) répond donc sur `http://localhost:5173`, sans commande. Les services activés (PostgreSQL, MySQL, Argo CD) sont relayés aussi, sur leur port habituel. Le veilleur se pilote avec `devzone workspace ports start|stop|status` ; détails dans la [référence](manage/docs/reference.md#applications-et-services-sur-localhost-du-poste).
+
+Sur le poste Docker, une application lancée **dans** le conteneur (par exemple un Spring Boot avec `./gradlew bootRun` sur le port 8080) n'est pas joignable depuis le poste : le conteneur devzone ne publie aucun port. Dès qu'elle écoute dans le conteneur, le **veilleur de ports automatiques** (`.devcontainer/ports-auto.sh`) pose un relais `alpine/socat` (version figée) sur le Docker de l'hôte, de `127.0.0.1:<port>` du poste vers le port du conteneur : `http://localhost:<port>` **sans commande**. Le relais disparaît quand l'application s'arrête.
 
 ```sh
 devzone port             # liste : relais manuels et automatiques, ● actif ou ○ arrêté
@@ -342,9 +361,31 @@ Spring Boot écoute sur `0.0.0.0` par défaut : ne fixe pas `server.address` à 
 - **Accès au socket Docker de l'hôte** : le socket Docker de la machine hôte est monté dans le conteneur. Cela offre un accès administrateur au Docker de l'hôte, y compris pour les agents IA. C'est un compromis de sécurité assumé documenté dans la section Limites. Pour restreindre l'accès, utilisez les mécanismes propres à Docker Desktop/Linux.
 - **Le premier lancement est long** : c'est normal (construction de l'image, téléchargement des images de base). Il prend 4 à 5 min mesurées, plus le téléchargement des images de base sur une machine neuve.
 - **`make` est absent sous Windows** : tu peux utiliser `npx @devcontainers/cli` (voir le tableau « Au quotidien ») ou Git Bash. Les scripts sont compatibles (fins de ligne LF).
-- **Pas de cluster Kubernetes visible** : devzone ne crée jamais de cluster. Avec le module `kubernetes` actif, il tente de se connecter au cluster de l'hôte (via `host.docker.internal`). Sinon, crée un cluster local avec `kind create cluster`.
+- **Le cluster Kubernetes ne répond pas** : devzone ne crée jamais de cluster. À la création, sans cluster qui répond (en 5 s), le poste devient un poste Docker et l'annonce :
+
+  ```text
+  ⚠ Kubernetes not reachable: cluster <contexte> unreachable (<serveur>). Docker workstation; later: devzone workspace migrate
+  ```
+
+  Avec `--kubernetes`, rien n'est créé et la commande échoue. Ensuite, `devzone workspace start` (donc `make up` et `make shell`) vérifie le cluster en premier et s'arrête sans rien modifier. Le message dit la cause :
+
+  - **Docker Desktop arrêté** : `✖ Docker Desktop is stopped: the Kubernetes cluster of this machine runs inside it. Start Docker Desktop, then: make shell`. Lance Docker Desktop, puis `make shell`. Pour qu'il démarre à chaque connexion : *Settings → General → Start Docker Desktop when you sign in*.
+  - **Docker répond, pas le cluster** : `✖ Kubernetes cluster <contexte> unreachable (<serveur>): enable Kubernetes in Docker Desktop (Settings → Kubernetes) or check kubectl config get-contexts`. Active Kubernetes dans Docker Desktop (*Settings → Kubernetes → Enable Kubernetes*).
+  - **Autre cluster** : `✖ Kubernetes cluster <contexte> unreachable (<serveur>)`, suivi de `Check the contexts: kubectl config get-contexts`. Vérifie le contexte choisi, ou change-le avec `devzone use CTX`.
+
+  Détails dans la [référence](manage/docs/reference.md#le-cluster-ne-répond-pas).
 - **Problème d'identité git pour commiter** : règle-la une seule fois. Avec GitHub : `gh auth login -s workflow` (l'identité est déduite automatiquement). Sans GitHub : `git config --file ~/.config/git/config user.name "<nom>"` et `git config --file ~/.config/git/config user.email "<email>"`.
 - **`make up` semble bloqué** : il affiche ses étapes et un signe de vie au moins toutes les 30 s ; le journal complet est dans `.devzone.log`.
+
+## Changer de cluster
+
+```sh
+devzone clusters                    # vue : contextes, type, état, namespace
+devzone use CTX [-n NS]        # bascule le cluster de travail de kubectl
+devzone use -n NS              # change seulement le namespace du cluster courant
+```
+
+L'invite du shell affiche `⎈ ctx/ns` (cyan si local, rouge gras avec distant sinon). Un rebuild repart sur le cluster de l'hôte : le choix de kubectl est écrit dans `~/.kube/config`, qui n'est pas dans un volume.
 
 ## Désinstaller
 
@@ -367,15 +408,6 @@ npm uninstall -g devzone
 ```
 
 Cette commande retire seulement la commande `devzone` de ta machine ; elle ne supprime ni conteneur, ni volume, ni dossier.
-## Changer de cluster
-
-```sh
-devzone clusters                    # vue : contextes, type, etat, namespace
-devzone use CTX [-n NS]        # bascule le cluster de travail de kubectl
-devzone use -n NS              # change seulement le namespace du cluster courant
-```
-
-L invite du shell affiche `⎈ ctx/ns` (cyan si local, rouge gras avec distant sinon). Un rebuild repart sur le cluster de l hote : le choix de kubectl ecrit dans `~/.kube/config`, qui n est pas dans un volume.
 
 ## Pour aller plus loin
 
