@@ -128,7 +128,7 @@ SETSID
 }
 
 @test "gitlab : helm dans le contexte devzone et le namespace devzone-gitlab, aucun kind créé" {
-    run bash "$GITLAB" installer
+    run bash "$GITLAB" install
     [ "$status" -eq 0 ] || false
     grep -Eq -- "--kubeconfig [^ ]+ upgrade --install gitlab gitlab/gitlab --version 9.11.16 --namespace devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log" || false
     grep -Eq -- "--kubeconfig [^ ]+ upgrade --install gitlab-runner gitlab/gitlab-runner --version 0.88.2 --namespace devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log" || false
@@ -136,7 +136,7 @@ SETSID
 }
 
 @test "gitlab : namespace devzone-gitlab étiqueté et isolé par NetworkPolicy" {
-    run bash "$GITLAB" installer
+    run bash "$GITLAB" install
     [ "$status" -eq 0 ] || false
     grep -q "label namespace devzone-gitlab app.kubernetes.io/managed-by=devzone" "$BATS_TEST_TMPDIR/kubectl.log" || false
     grep -q "devzone-meme-namespace" "$BATS_TEST_TMPDIR/apply.log" || false
@@ -155,21 +155,21 @@ SETSID
 }
 
 @test "gitlab : runner pointe vers le namespace de l'instance" {
-    run bash "$GITLAB" installer
+    run bash "$GITLAB" install
     [ "$status" -eq 0 ] || false
     grep -q "gitlab-webservice-default.devzone-gitlab.svc:8181" "$BATS_TEST_TMPDIR/helm.log" || false
     ! grep -q "__NAMESPACE__" "$BATS_TEST_TMPDIR/helm.log" || false
 }
 
 @test "gitlab : moins de 8 Go de mémoire allouable dans le cluster → refus, rien lancé" {
-    FAUX_MEMOIRE_CLUSTER='4000000Ki' run bash "$GITLAB" installer
+    FAUX_MEMOIRE_CLUSTER='4000000Ki' run bash "$GITLAB" install
     [ "$status" -eq 2 ] || false
     [[ "$output" == *"8 Go"* ]] || false
     [ ! -e "$BATS_TEST_TMPDIR/helm.log" ] || false
 }
 
 @test "gitlab : relais web et SSH en port-forward vers les services du namespace" {
-    run bash "$GITLAB" relais-lancer
+    run bash "$GITLAB" relay-start
     [ "$status" -eq 0 ] || false
     grep -q "devzone devzone-gitlab svc/gitlab-webservice-default 8929:8181" "$BATS_TEST_TMPDIR/setsid.log" || false
     grep -q "devzone devzone-gitlab svc/gitlab-gitlab-shell 2224:22" "$BATS_TEST_TMPDIR/setsid.log" || false
@@ -178,15 +178,15 @@ SETSID
 }
 
 @test "gitlab : instance suffixée → namespace devzone-gitlab-<instance>" {
-    DEVZONE_INSTANCE=autre run bash "$GITLAB" installer
+    DEVZONE_INSTANCE=autre run bash "$GITLAB" install
     [ "$status" -eq 0 ] || false
     grep -q -- "--namespace devzone-gitlab-autre" "$BATS_TEST_TMPDIR/helm.log" || false
     grep -q "label namespace devzone-gitlab-autre" "$BATS_TEST_TMPDIR/kubectl.log" || false
 }
 
-@test "gitlab migrer : sans confirmation, ancien cluster kind-gitlab gardé" {
+@test "gitlab migrate : sans confirmation, ancien cluster kind-gitlab gardé" {
     printf 'gitlab\n' >"$KIND_CLUSTERS"
-    run bash "$DEVZONE" gitlab migrer </dev/null
+    run bash "$DEVZONE" gitlab migrate </dev/null
     [ "$status" -eq 2 ] || false
     grep -qx "gitlab" "$KIND_CLUSTERS" || false
     ! grep -q "delete cluster" "$BATS_TEST_TMPDIR/kind.log" || false
@@ -194,9 +194,9 @@ SETSID
     grep -Eq -- "--kubeconfig [^ ]+ upgrade --install gitlab gitlab/gitlab" "$BATS_TEST_TMPDIR/helm.log" || false
 }
 
-@test "gitlab migrer --oui : installe, refait le seed, puis supprime kind-gitlab" {
+@test "gitlab migrate --oui : installe, refait le seed, puis supprime kind-gitlab" {
     printf 'gitlab\n' >"$KIND_CLUSTERS"
-    run bash "$DEVZONE" gitlab migrer --oui
+    run bash "$DEVZONE" gitlab migrate --oui
     [ "$status" -eq 0 ] || false
     grep -Eq -- "--kubeconfig [^ ]+ upgrade --install gitlab gitlab/gitlab" "$BATS_TEST_TMPDIR/helm.log" || false
     grep -q "api/v4/projects" "$BATS_TEST_TMPDIR/curl.log" 2>/dev/null ||
@@ -209,7 +209,7 @@ SETSID
     printf 'gitlab\n' >"$KIND_CLUSTERS"
     run bash "$DEVZONE"
     [ "$status" -eq 0 ] || false
-    [[ "$output" == *"⚠ ancien cluster kind-gitlab : devzone gitlab migrer"* ]] || false
+    [[ "$output" == *"⚠ ancien cluster kind-gitlab : devzone gitlab migrate"* ]] || false
 }
 
 @test "devzone : récapitulatif sans avertissement quand kind-gitlab a disparu" {

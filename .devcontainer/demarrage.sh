@@ -27,7 +27,7 @@ if bash "$ICI/devzone" is-enabled gitlab; then
     bash "$ICI/gitlab/gitlab.sh" hote-poser || echo "démarrage : nom gitlab.localhost non posé (devzone reparer)"
     # Relais TCP 8929/2224 : curl et git en HTTP passent par la boucle locale
     # pour *.localhost, le relais doit être relancé après chaque démarrage
-    bash "$ICI/gitlab/gitlab.sh" relais-lancer || echo "démarrage : relais gitlab non lancé (devzone reparer)"
+    bash "$ICI/gitlab/gitlab.sh" relay-start || echo "démarrage : relais gitlab non lancé (devzone reparer)"
 fi
 # Module postgres actif : le relais (port-forward vers 127.0.0.1:5432) ne
 # survit pas à l'arrêt du conteneur, relancé ici après les clusters

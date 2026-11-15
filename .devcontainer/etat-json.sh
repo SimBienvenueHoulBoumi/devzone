@@ -126,11 +126,11 @@ etat_json() {
                 etat_val="en échec"
                 commande_val="devzone appliquer"
             elif [ "$m" = gitlab ]; then
-                if s="$(bash "$ICI/gitlab/gitlab.sh" etat 2>/dev/null)"; then
+                if s="$(bash "$ICI/gitlab/gitlab.sh" status 2>/dev/null)"; then
                     etat_val="$s"
                 else
                     etat_val=""
-                    ajouter_erreur modules "gitlab.sh etat indisponible"
+                    ajouter_erreur modules "gitlab.sh status indisponible"
                 fi
             elif [ "$m" = postgres ]; then
                 if s="$(bash "$ICI/postgres/postgres.sh" status 2>/dev/null)"; then

@@ -503,7 +503,7 @@ appliquer_gitlab() {
     local etat_courant
     if [ "$1" = on ]; then
         # Saut si l'état est prêt et le runner en ligne ; sinon installer reprend
-        etat_courant="$(bash "$ICI/gitlab/gitlab.sh" etat)"
+        etat_courant="$(bash "$ICI/gitlab/gitlab.sh" status)"
         if [[ "$etat_courant" == *"prêt"* && "$etat_courant" == *"runner en ligne"* ]]; then
             echo "devzone : gitlab déjà actif, rien à faire."
             # /etc/hosts régénéré par Docker : gitlab.localhost re-pose ici aussi
@@ -512,7 +512,7 @@ appliquer_gitlab() {
             rm -f "$(fichier_echec gitlab)"
         else
             echo "devzone : gitlab activation via installer…"
-            if ! bash "$ICI/gitlab/gitlab.sh" installer; then
+            if ! bash "$ICI/gitlab/gitlab.sh" install; then
                 echo "gitlab" > "$(fichier_echec gitlab)"
                 return 1
             fi
@@ -523,9 +523,9 @@ appliquer_gitlab() {
         if bash "$ICI/gitlab/gitlab.sh" installe; then
             echo "devzone : gitlab désactivation…"
             if [ -n "${SUPPRIMER_DONNEES:-}" ]; then
-                bash "$ICI/gitlab/gitlab.sh" desinstaller --oui
+                bash "$ICI/gitlab/gitlab.sh" uninstall --yes
             else
-                bash "$ICI/gitlab/gitlab.sh" desinstaller
+                bash "$ICI/gitlab/gitlab.sh" uninstall
             fi
         else
             echo "devzone : gitlab déjà désactivé (aucun namespace devzone-gitlab)."
@@ -1092,7 +1092,7 @@ reparer() {
     fi
     if [ "$(valeur gitlab)" = on ]; then
         reparer_element "nom gitlab" bash "$ICI/gitlab/gitlab.sh" hote-poser
-        reparer_element "relais gitlab" bash "$ICI/gitlab/gitlab.sh" relais-lancer
+        reparer_element "relais gitlab" bash "$ICI/gitlab/gitlab.sh" relay-start
     fi
     if [ "$(valeur postgres)" = on ]; then
         reparer_element "relais postgres" bash "$ICI/postgres/postgres.sh" relay-start
@@ -1254,7 +1254,7 @@ etat() {
             printf '  ✖ module %-10s en échec : installation incomplète (%s) : devzone appliquer\n' "$m" "$(cat "$(fichier_echec "$m")")"
         elif [ "$(valeur "$m")" = on ] && [ "$m" = gitlab ]; then
             # GitLab actif : son état réel (prêt, runner, en échec)
-            printf '  ✔ module %-10s %s\n' "$m" "$(bash "$ICI/gitlab/gitlab.sh" etat)"
+            printf '  ✔ module %-10s %s\n' "$m" "$(bash "$ICI/gitlab/gitlab.sh" status)"
         elif [ "$(valeur "$m")" = on ] && [ "$m" = postgres ]; then
             printf '  ✔ module %-10s %s\n' "$m" "$(bash "$ICI/postgres/postgres.sh" status)"
         elif [ "$(valeur "$m")" = on ] && [ "$m" = argocd ]; then
@@ -1306,7 +1306,7 @@ etat() {
     fi
     # Ancien cluster kind-gitlab encore présent : inviter à migrer (#396)
     if kind get clusters 2>/dev/null | grep -qx "gitlab${INSTANCE_SUFFIX}"; then
-        printf '  ⚠ ancien cluster kind-gitlab%s : devzone gitlab migrer\n' "$INSTANCE_SUFFIX"
+        printf '  ⚠ ancien cluster kind-gitlab%s : devzone gitlab migrate\n' "$INSTANCE_SUFFIX"
     fi
     # Cluster de travail interne (kind) : avertissement dans le recapitulatif
     ctx_travail="$(kubectl config current-context 2>/dev/null || true)"

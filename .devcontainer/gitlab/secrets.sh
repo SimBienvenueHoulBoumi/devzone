@@ -62,7 +62,7 @@ gitlab_nouveau_mdp() {
     case "$utilisateur" in
         root | dev) ;;
         *)
-            echo "devzone : gitlab : utilisateur inconnu : ${utilisateur:-(absent)} (devzone gitlab nouveau-mdp [root|dev])" >&2
+            echo "devzone : gitlab : utilisateur inconnu : ${utilisateur:-(absent)} (devzone gitlab new-password [root|dev])" >&2
             return 2
             ;;
     esac

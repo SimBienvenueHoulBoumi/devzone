@@ -162,7 +162,7 @@ etape_etat() {
 # 3. Nom et relais : ssh et glab passent par le résolveur système ; curl et
 # git en HTTP résolvent *.localhost vers la boucle locale sans lire /etc/hosts.
 # gitlab.localhost doit donc pointer vers 127.0.0.1 ET les relais 8929/2224
-# doivent tourner dans le conteneur (gitlab.sh hote-poser, relais-lancer).
+# doivent tourner dans le conteneur (gitlab.sh hote-poser, relay-start).
 etape_nom() {
     local hote ip_nom relais
     hote="$(getent hosts gitlab.localhost 2>/dev/null || true)"
@@ -175,7 +175,7 @@ etape_nom() {
         RAISON="gitlab.localhost résolu vers $ip_nom, attendu 127.0.0.1"
         return 1
     fi
-    if ! relais="$(bash "$GITLAB" relais-etat 2>&1)"; then
+    if ! relais="$(bash "$GITLAB" relay-status 2>&1)"; then
         RAISON="gitlab.localhost pointe vers 127.0.0.1, mais ${relais:-relais gitlab arrêté}"
         return 1
     fi

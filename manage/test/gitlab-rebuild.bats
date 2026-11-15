@@ -185,7 +185,7 @@ contexte_courant() {
 @test "installer : cluster des services, aucun kind, contexte courant gardé" {
     echo gitlab >"$KIND_CLUSTERS"
     poser_contexte_courant docker-desktop
-    run bash "$GITLAB" installer
+    run bash "$GITLAB" install
     [ "$status" -eq 0 ] || false
     ! grep -q 'kind create' "$BATS_TEST_TMPDIR/kind.log" || false
     ! grep -q 'export kubeconfig' "$BATS_TEST_TMPDIR/kind.log" || false
@@ -196,7 +196,7 @@ contexte_courant() {
 @test "migrer sans terminal → ancien cluster conservé, contexte gardé" {
     echo gitlab >"$KIND_CLUSTERS"
     poser_contexte_courant docker-desktop
-    run bash "$GITLAB" migrer
+    run bash "$GITLAB" migrate
     [ "$status" -eq 2 ] || false
     [[ "$output" == *"confirmation impossible sans terminal"* ]] || false
     [ "$(cat "$KIND_CLUSTERS")" = gitlab ] || false
@@ -206,7 +206,7 @@ contexte_courant() {
 
 @test "installer : mémoire du cluster des services insuffisante → refus, contexte gardé" {
     poser_contexte_courant docker-desktop
-    FAUX_KUBE_MEMOIRE=4Gi run bash "$GITLAB" installer
+    FAUX_KUBE_MEMOIRE=4Gi run bash "$GITLAB" install
     [ "$status" -eq 2 ] || false
     [[ "$output" == *"au moins 8 Go"* ]] || false
     [ ! -e "$BATS_TEST_TMPDIR/helm.log" ] || false
