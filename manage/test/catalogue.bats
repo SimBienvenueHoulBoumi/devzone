@@ -4,6 +4,7 @@
 
 setup() {
     load commun
+    load commun-helm
     relais_docker_isole
     kube_isole
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
@@ -101,6 +102,7 @@ esac
 exit 2
 GETENT
     chmod +x "$BATS_TEST_TMPDIR"/bin/*
+    helm_fake_install
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
 }
 
@@ -167,7 +169,7 @@ attendre_nohup() {
     [ "$status" -eq 0 ] || false
     grep -q 'image: mysql:8.4' "$BATS_TEST_TMPDIR/apply.log" || false
     grep -q 'storage: 5Gi' "$BATS_TEST_TMPDIR/apply.log" || false
-    grep -q 'namespace devzone-mysql' "$BATS_TEST_TMPDIR/apply.log" || false
+    grep -q -- '-n devzone-mysql apply -f -' "$BATS_TEST_TMPDIR/kubectl.log" || false
     grep -q 'create secret generic mysql-admin' "$BATS_TEST_TMPDIR/kubectl.log" || false
     attendre_nohup 'svc/mysql 3306:3306$'
     grep -q 'svc/mysql 3306:3306$' "$BATS_TEST_TMPDIR/nohup.log" || false

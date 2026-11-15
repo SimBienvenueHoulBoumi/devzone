@@ -7,6 +7,7 @@
 source "$BATS_TEST_DIRNAME/../../.devcontainer/isolement.sh"
 
 load commun
+load commun-helm
 
 setup() {
     relais_docker_isole
@@ -20,6 +21,7 @@ setup() {
     mkdir -p "$HOME" "$BATS_TEST_TMPDIR/bin" "$DEVZONE_RACINE/workspace"
     : >"$DEVZONE_KUBE_HOTE"
     : >"$DEVZONE_ETAT"
+    helm_fake_install
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
     actif_sur() {
         local c="${1:-}"
@@ -151,7 +153,7 @@ SLEEP
     grep -qx 'cluster=docker-desktop' "$DEVZONE_ETAT"
     # L'installation dans le nouveau cluster passe par le contexte devzone
     grep -q 'kubectl config set-context devzone --cluster=docker-desktop --user=docker-desktop' "$BATS_TEST_TMPDIR/kubectl.log"
-    grep -q 'kubectl --context devzone apply -f -' "$BATS_TEST_TMPDIR/kubectl.log"
+    grep -q 'kubectl --context devzone -n devzone-postgres apply -f -' "$BATS_TEST_TMPDIR/kubectl.log"
     # Le contexte utilisateur n'a pas été basculé : aucun use-context, ni unset
     ! grep -q 'config use-context' "$BATS_TEST_TMPDIR/kubectl.log" || false
     ! grep -q 'config unset current-context' "$BATS_TEST_TMPDIR/kubectl.log" || false

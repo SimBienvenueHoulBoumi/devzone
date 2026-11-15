@@ -246,7 +246,7 @@ attendre_journal() {
     echo "dev" >"$KIND_CLUSTERS"
     run bash "$GITLAB" install
     [ "$status" -eq 0 ] || false
-    grep -Eq -- "helm --kubeconfig [^ ]+ upgrade --install gitlab gitlab/gitlab --version 9.11.16 --namespace devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log" || false
+    grep -Eq -- "helm --kubeconfig [^ ]+ upgrade --install gitlab [^ ]*charts/devzone-gitlab --namespace devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log" || false
     ! grep -q "create cluster" "$BATS_TEST_TMPDIR/kind.log" || false
 }
 
@@ -265,11 +265,11 @@ attendre_journal() {
     run bash "$GITLAB" install
     [ "$status" -eq 0 ] || false
     ! grep -q "create cluster" "$BATS_TEST_TMPDIR/kind.log" || false
-    grep -Eq -- "helm --kubeconfig [^ ]+ upgrade --install gitlab gitlab/gitlab" "$BATS_TEST_TMPDIR/helm.log" || false
+    grep -Eq -- "helm --kubeconfig [^ ]+ upgrade --install gitlab [^ ]*charts/devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log" || false
 }
 
 @test "gitlab : values.yaml configure le clone SSH (port 2224) et des services ClusterIP" {
-    local values="$BATS_TEST_DIRNAME/../../.devcontainer/gitlab/values.yaml"
+    local values="$BATS_TEST_DIRNAME/../../charts/devzone-gitlab/values.yaml"
     grep -q "port: 2224" "$values" || false
     grep -q "type: ClusterIP" "$values" || false
     grep -q "nginx-ingress:" "$values" || false
@@ -277,12 +277,12 @@ attendre_journal() {
 }
 
 @test "gitlab : values.yaml fixe les HPA à 1 réplica (#490)" {
-    local values="$BATS_TEST_DIRNAME/../../.devcontainer/gitlab/values.yaml"
+    local values="$BATS_TEST_DIRNAME/../../charts/devzone-gitlab/values.yaml"
     local name bloc
     for name in webservice sidekiq gitlab-shell; do
         bloc="$(awk -v n="$name" '
-            $0 == "  " n ":" { dans=1; next }
-            dans && /^  [^ ]/ { dans=0 }
+            $0 == "    " n ":" { dans=1; next }
+            dans && /^    [^ ]/ { dans=0 }
             dans { print }
         ' "$values")"
         [[ "$bloc" == *"minReplicas: 1"* ]] || false
@@ -296,7 +296,7 @@ attendre_journal() {
 }
 
 @test "gitlab : valeurs sans NodePort, LoadBalancer ni hostPort" {
-    local values="$BATS_TEST_DIRNAME/../../.devcontainer/gitlab/values.yaml"
+    local values="$BATS_TEST_DIRNAME/../../charts/devzone-gitlab/values.yaml"
     ! grep -q "NodePort" "$values" || false
     ! grep -q "LoadBalancer" "$values" || false
     ! grep -q "hostPort" "$values" || false
@@ -309,7 +309,7 @@ attendre_journal() {
     local helm_bin="${HELM_BIN:-$(command -v helm)}"
     [ -x "$helm_bin" ] || skip "helm indisponible (DEVZONE_GITLAB_CHART ou helm)"
     local sortie
-    sortie="$("$helm_bin" template gitlab "${DEVZONE_GITLAB_CHART:-/tmp/gl/gitlab}" --version 9.11.16 -f "$BATS_TEST_DIRNAME/../../.devcontainer/gitlab/values.yaml" 2>&1)"
+    sortie="$("$helm_bin" template gitlab "${DEVZONE_GITLAB_CHART:-/tmp/gl/devzone-gitlab}" 2>&1)"
     [[ "$sortie" == *"ssh_port: 2224"* ]] || false
     [[ "$sortie" != *"nodePort: 32022"* ]] || false
     [[ "$sortie" != *"nodePort: 2224"* ]] || false
@@ -333,8 +333,8 @@ attendre_journal() {
 @test "gitlab : charts figés, contexte devzone et namespace de l'instance" {
     run bash "$GITLAB" install
     [ "$status" -eq 0 ]
-    grep -Eq -- "helm --kubeconfig [^ ]+ upgrade --install gitlab gitlab/gitlab --version 9.11.16 --namespace devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log"
-    grep -Eq -- "helm --kubeconfig [^ ]+ upgrade --install gitlab-runner gitlab/gitlab-runner --version 0.88.2 --namespace devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log"
+    grep -Eq -- "helm --kubeconfig [^ ]+ upgrade --install gitlab [^ ]*charts/devzone-gitlab --namespace devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log"
+    grep -Eq -- "helm --kubeconfig [^ ]+ upgrade --install gitlab [^ ]*charts/devzone-gitlab .*replicas=1" "$BATS_TEST_TMPDIR/helm.log"
 }
 
 @test "gitlab : secrets dans workspace/.gitlab (600), jamais dans le dépôt ni affichés" {
@@ -493,7 +493,7 @@ attendre_journal() {
     run bash "$DEVZONE" enable gitlab
     [ "$status" -eq 0 ]
     [[ "$output" != *"déjà actif, rien à faire"* ]] || false
-    grep -Eq -- "helm --kubeconfig [^ ]+ upgrade --install gitlab gitlab/gitlab --version 9.11.16 --namespace devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log"
+    grep -Eq -- "helm --kubeconfig [^ ]+ upgrade --install gitlab [^ ]*charts/devzone-gitlab --namespace devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log"
 }
 
 @test "devzone apply : gitlab actif, prêt sans runner en ligne → installer" {
@@ -502,7 +502,7 @@ attendre_journal() {
     mkdir -p "$SECRETS" && echo jeton >"$SECRETS/root-token"
     run bash "$DEVZONE" apply
     [ "$status" -eq 0 ]
-    grep -Eq -- "helm --kubeconfig [^ ]+ upgrade --install gitlab gitlab/gitlab --version 9.11.16 --namespace devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log"
+    grep -Eq -- "helm --kubeconfig [^ ]+ upgrade --install gitlab [^ ]*charts/devzone-gitlab --namespace devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log"
 }
 
 @test "devzone apply : gitlab actif, prêt runner en ligne → pas d'installer" {
@@ -680,7 +680,7 @@ marque_reelle() {
 }
 
 @test "gitlab : valeurs — host sans port, port externe par GITLAB_PORT" {
-    local values="$BATS_TEST_DIRNAME/../../.devcontainer/gitlab/values.yaml"
+    local values="$BATS_TEST_DIRNAME/../../charts/devzone-gitlab/values.yaml"
     grep -Eq 'name: gitlab\.localhost([[:space:]]|$)' "$values"
     grep -q 'GITLAB_PORT: "8929"' "$values"
     ! grep -q "hostnameOverride" "$values" || false
@@ -694,8 +694,7 @@ marque_reelle() {
     [ -n "$helm_bin" ] || skip "helm absent"
     local chart="$DEVZONE_GITLAB_CHART"
     [ -d "$chart" ] || skip "chart absent"
-    local values="$BATS_TEST_DIRNAME/../../.devcontainer/gitlab/values.yaml"
-    run "$helm_bin" template gitlab "$chart" -f "$values" --namespace gitlab
+    run "$helm_bin" template gitlab "$chart" --namespace gitlab
     [ "$status" -eq 0 ]
     local rendu="$output"
     printf '%s\n' "$rendu" | grep -qE '^[[:space:]]*host: gitlab\.localhost$' || false
@@ -747,7 +746,7 @@ marque_reelle() {
     run --separate-stderr bash "$GITLAB" installer
     [ "$status" -eq 0 ] || false
     [[ "$stderr" == *"devzone: \"installer\" is deprecated, use \"install\""* ]] || false
-    grep -Eq -- "helm --kubeconfig [^ ]+ upgrade --install gitlab gitlab/gitlab --version 9.11.16 --namespace devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log" || false
+    grep -Eq -- "helm --kubeconfig [^ ]+ upgrade --install gitlab [^ ]*charts/devzone-gitlab --namespace devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log" || false
     printf '%s\n' '{"kind":"Secret","metadata":{"name":"gitlab-rails-secret"}}' >"$SECRETS/rails-secret.yaml"
     run --separate-stderr bash "$GITLAB" desinstaller --oui
     [ "$status" -eq 0 ] || false

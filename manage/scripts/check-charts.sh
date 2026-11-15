@@ -6,7 +6,9 @@
 # (templates without a hard-coded namespace, Secret, Ingress or LoadBalancer,
 # the three labels on each object; the common keys in values.yaml). Every
 # charts/devzone-<x> named by the code must be a folder. helm lint and helm
-# template run when helm is installed. A fault is printed as
+# template run when helm is installed; before a wrapper's helm dependency
+# build, its http(s) repositories are declared in a temporary helm config (the
+# user's own is untouched). A fault is printed as
 # "✖ charts/<x> : <rule>" and the run exits 1; otherwise
 # "✔ charts : N charts conformes". Tests: CHARTS_DIR, CHARTS_CODE_DIRS and
 # CHARTS_NO_HELM=1. bash 3.2 (macOS).
@@ -83,23 +85,66 @@ charts_check_values() {
     done
 }
 
-# helm lint and template, on a copy: the wrapper gets its dependency built
-# first, with an empty DOCKER_CONFIG (anonymous pull)
+# Http(s) repositories of the dependencies of a Chart.yaml, each once
+# (oci:// and file:// are not repositories)
+charts_http_repos() {
+    awk '
+        /^dependencies:/ { dep = 1; next }
+        /^[A-Za-z]/ { dep = 0 }
+        dep && /repository:/ {
+            sub(/.*repository:[ \t]*/, "")
+            gsub(/["\047\r ]/, "")
+            if ($0 ~ /^https?:\/\//) print
+        }' "$1" | sort -u
+}
+
+# Declares those repositories in the temporary helm configuration $2 under a
+# stable name (devzone- and the URL without its scheme, each character but
+# letters and digits as a dash), then updates only them
+charts_helm_repos() {
+    local chart="$1" cfg="$2" urls url name names=""
+    urls="$(charts_http_repos "$chart")"
+    [ -n "$urls" ] || return 0
+    mkdir -p "$cfg/cache"
+    while IFS= read -r url; do
+        name="devzone-$(printf '%s' "${url#*://}" | tr -c 'A-Za-z0-9' '-' | tr 'A-Z' 'a-z' |
+            tr -s '-' | sed -e 's/^-//' -e 's/-$//')"
+        HELM_REPOSITORY_CONFIG="$cfg/repositories.yaml" HELM_REPOSITORY_CACHE="$cfg/cache" \
+            helm repo add "$name" "$url" --force-update >/dev/null || return 1
+        names="$names $name"
+    done <<EOF
+$urls
+EOF
+    HELM_REPOSITORY_CONFIG="$cfg/repositories.yaml" HELM_REPOSITORY_CACHE="$cfg/cache" \
+        helm repo update $names >/dev/null
+}
+
+# helm lint and template, on a copy. A wrapper first gets its http(s)
+# repositories declared and its dependencies built in a temporary helm
+# configuration (the user's own helm config is not touched, and a runner
+# needs no repository declared); oci:// dependencies are pulled anonymously
+# (empty DOCKER_CONFIG)
 charts_check_helm() {
-    local dir="$1" name="$2" tmp conf
+    local dir="$1" name="$2" tmp conf cfg
     [ "${CHARTS_NO_HELM:-0}" = 1 ] && return 0
     command -v helm >/dev/null 2>&1 || return 0
     tmp="$(mktemp -d)" || return 0
     conf="$(mktemp -d)"
+    cfg="$(mktemp -d)"
     cp -R "$dir" "$tmp/$name"
     if grep -q '^dependencies:' "$dir/Chart.yaml"; then
-        DOCKER_CONFIG="$conf" helm dependency build "$tmp/$name" >"$tmp/log" 2>&1 ||
-            fault "$name" "helm dependency build fails: $(tail -1 "$tmp/log")"
+        if charts_helm_repos "$dir/Chart.yaml" "$cfg" >"$tmp/log" 2>&1; then
+            HELM_REPOSITORY_CONFIG="$cfg/repositories.yaml" HELM_REPOSITORY_CACHE="$cfg/cache" \
+                DOCKER_CONFIG="$conf" helm dependency build "$tmp/$name" >"$tmp/log" 2>&1 ||
+                fault "$name" "helm dependency build fails: $(tail -1 "$tmp/log")"
+        else
+            fault "$name" "helm repo add fails: $(tail -1 "$tmp/log")"
+        fi
     fi
     helm lint --quiet "$tmp/$name" >"$tmp/log" 2>&1 || fault "$name" "helm lint fails: $(tail -1 "$tmp/log")"
     DOCKER_CONFIG="$conf" helm template "$name" "$tmp/$name" >/dev/null 2>"$tmp/log" ||
         fault "$name" "helm template fails: $(tail -1 "$tmp/log")"
-    rm -rf "$tmp" "$conf"
+    rm -rf "$tmp" "$conf" "$cfg"
 }
 
 # One folder of charts/
@@ -143,16 +188,19 @@ EOF
     done
 }
 
-if [ ! -d "$CHARTS_DIR" ]; then
-    echo "✖ charts : folder not found: $CHARTS_DIR"
-    exit 1
+# Run as a script only: sourced (tests), it just defines the functions
+if [ "${BASH_SOURCE[0]}" = "$0" ]; then
+    if [ ! -d "$CHARTS_DIR" ]; then
+        echo "✖ charts : folder not found: $CHARTS_DIR"
+        exit 1
+    fi
+    for dir in "$CHARTS_DIR"/*/; do
+        [ -d "$dir" ] || continue
+        charts_check_dir "${dir%/}"
+    done
+    charts_check_references
+    if [ "$FAULTS" -ne 0 ]; then
+        exit 1
+    fi
+    echo "✔ charts : $COUNT charts conformes"
 fi
-for dir in "$CHARTS_DIR"/*/; do
-    [ -d "$dir" ] || continue
-    charts_check_dir "${dir%/}"
-done
-charts_check_references
-if [ "$FAULTS" -ne 0 ]; then
-    exit 1
-fi
-echo "✔ charts : $COUNT charts conformes"

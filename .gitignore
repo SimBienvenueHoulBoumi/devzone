@@ -11,6 +11,8 @@ workspace/*
 .devcontainer/without-host-docker/
 .devzone.catalogue-veilleur/
 
-# Dependency of the wrapper chart devzone-argocd, built by helm dependency
-# build before the installation; its lock (Chart.lock) is committed
+# Dependencies of the wrapper charts devzone-argocd and devzone-gitlab, built
+# by helm dependency build before the installation; their locks (Chart.lock)
+# are committed
 charts/devzone-argocd/charts/
+charts/devzone-gitlab/charts/
