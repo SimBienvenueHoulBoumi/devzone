@@ -1,7 +1,11 @@
 #!/usr/bin/env bats
-# Common memory check (#608): verifier_memoire_module refuses under the minimum,
-# passes above it, reports an unreachable cluster, and the llm light preset has
-# a lower minimum. Fake kubectl in the PATH: no cluster is touched.
+# Common memory check (#608, #612): verifier_memoire_module refuses under the
+# minimum, passes above it, reports an unreachable cluster, and the llm light
+# preset has a lower minimum. The cluster rule (#612): the nodes of a kind
+# cluster share one VM, so memoire_cluster_ki returns their greatest memory
+# instead of their sum; any other cluster keeps the sum, and the refusal
+# message says when a single node was measured. Fake kubectl in the PATH: no
+# cluster is touched.
 
 setup() {
     bats_require_minimum_version 1.5.0
@@ -16,6 +20,8 @@ setup() {
 case "$*" in
     *"get nodes -o jsonpath"*)
         [ -n "${FAUX_MEMOIRE_CLUSTER:-}" ] || exit 1
+        # Payload of the providerID|memory jsonpath (#612): one line per node,
+        # a line without "|" is the memory of a node without providerID.
         printf '%s\n' "$FAUX_MEMOIRE_CLUSTER" ;;
 esac
 exit 0
@@ -27,6 +33,11 @@ KUBE
     compte_ctx() { echo docker-desktop; }
     compte_admin() { kubectl --context "$1" "${@:2}"; }
     . "$MEMOIRE"
+    # One "<providerID>|<memory>" line per node, exported for the fake kubectl.
+    faux_noeuds() {
+        FAUX_MEMOIRE_CLUSTER="$(printf '%s\n' "$@")"
+        export FAUX_MEMOIRE_CLUSTER
+    }
 }
 
 @test "assez de mémoire : 16 Go allouables, minimum 8 Go → 0, rien dit" {
@@ -65,4 +76,60 @@ KUBE
     [[ "$output" == *"12 Go"* ]] || false
     [[ "$output" == *"disponible : 8 Go"* ]] || false
     [[ "$output" == *"--preset light"* ]] || false
+}
+
+@test "4 nœuds kind identiques : maximum et non somme, règle maximum posée" {
+    faux_noeuds 'kind://docker/desktop/kind-control-plane|20449328Ki' \
+        'kind://docker/desktop/kind-worker|20449328Ki' \
+        'kind://docker/desktop/kind-worker2|20449328Ki' \
+        'kind://docker/desktop/kind-worker3|20449328Ki'
+    run memoire_cluster_ki
+    [ "$status" -eq 0 ]
+    [ "$output" = "20449328" ]
+    memoire_cluster_ki >/dev/null
+    [ "$MEMOIRE_REGLE" = "maximum" ]
+    [ "$MEMOIRE_KI" = "20449328" ]
+}
+
+@test "3 nœuds hors kind de tailles différentes : somme, règle somme posée" {
+    faux_noeuds 'aws:///eu-west-1a/i-01|4000000Ki' \
+        'gce://europe-west1-b/g-02|2000000Ki' \
+        'openstack://ex/n-03|1000000Ki'
+    run memoire_cluster_ki
+    [ "$status" -eq 0 ]
+    [ "$output" = "7000000" ]
+    memoire_cluster_ki >/dev/null
+    [ "$MEMOIRE_REGLE" = "somme" ]
+    [ "$MEMOIRE_KI" = "7000000" ]
+}
+
+@test "mélange de nœuds kind et hors kind : somme" {
+    faux_noeuds 'kind://docker/desktop/n1|4000000Ki' \
+        'kind://docker/desktop/n2|4000000Ki' \
+        'aws:///eu-west-1a/i-01|4000000Ki'
+    run memoire_cluster_ki
+    [ "$status" -eq 0 ]
+    [ "$output" = "12000000" ]
+    memoire_cluster_ki >/dev/null
+    [ "$MEMOIRE_REGLE" = "somme" ]
+}
+
+@test "providerID vide sur tous les nœuds : somme" {
+    faux_noeuds '|4000000Ki' '|4000000Ki' '|4000000Ki'
+    run memoire_cluster_ki
+    [ "$status" -eq 0 ]
+    [ "$output" = "12000000" ]
+    memoire_cluster_ki >/dev/null
+    [ "$MEMOIRE_REGLE" = "somme" ]
+}
+
+@test "refus sur un cluster kind : le message dit mémoire d'un seul nœud" {
+    faux_noeuds 'kind://docker/desktop/n1|4000000Ki' \
+        'kind://docker/desktop/n2|4000000Ki' \
+        'kind://docker/desktop/n3|4000000Ki' \
+        'kind://docker/desktop/n4|4000000Ki'
+    run verifier_memoire_module gitlab 8
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"disponible : 3 Go"* ]] || false
+    [[ "$output" == *"mémoire d'un seul nœud : cluster kind, VM partagée"* ]] || false
 }
