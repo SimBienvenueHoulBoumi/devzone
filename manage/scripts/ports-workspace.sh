@@ -13,6 +13,9 @@ PW_NS="devzone-workspace"
 PW_INTERNAL=" 2475 1234 "
 # pgAdmin service port: read from the service, without it nothing is relayed.
 PW_JSONPATH='jsonpath={.spec.ports[0].port}'
+# Cluster Services relayed as applications (#611).
+# shellcheck source=manage/scripts/ports-apps.sh
+. "$(dirname "${BASH_SOURCE[0]}")/ports-apps.sh"
 
 # Watcher state folder: lock, pid, relays, reported ports, log.
 pw_dir() { printf '%s' "${DEVZONE_PORTS_WORKSPACE_DIR:-$PWD/.devzone.ports-workspace}"; }
@@ -125,6 +128,11 @@ pw_round() {
         wanted="$wanted $p "
         pw_relay "$p" "$PW_NS" "pod/$PW_POD"
     done
+    while IFS='|' read -r p ns target remote; do
+        [ -n "$p" ] || continue
+        wanted="$wanted $p "
+        pw_relay "$p" "$ns" "$target" "$remote"
+    done <<<"$(pa_round "$wanted")"
     for f in "$d"/relais/* "$d"/pris/*; do
         [ -e "$f" ] || continue
         l="$(basename "$f")"
@@ -197,6 +205,7 @@ ports_status() {
     for f in "$d"/pris/*; do
         if [ -e "$f" ]; then echo "  ⚠ port $(basename "$f") already in use on the workstation, not relayed"; fi
     done
+    pa_status
     return 0
 }
 
