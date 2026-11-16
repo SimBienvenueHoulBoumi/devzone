@@ -60,6 +60,8 @@ Mesures du 16/11/2026. Le chiffre LLM vient des valeurs du chart (non mesuré en
 | LLM modèle 7B (7 milliards de paramètres, fichier Q4_K_M) | 6 Gi | 12 Go |
 | LLM --preset light (modèle 3B) | 3 Gi demandés, 4 Gi en limite | 8 Go |
 
+Sur Docker Desktop (kind), le contrôle compare le minimum à la mémoire d'un seul nœud, donc à la VM ; sur un cluster de vraies machines, à la somme des nœuds.
+
 - **Réglage de la RAM** :
   - **Mac** (Docker Desktop) : *Settings → Resources > Memory*. Autre méthode : modifier `MemoryMiB` dans le fichier `settings-store.json` de Docker Desktop (Docker totalement quitté sinon il réécrit la valeur).
   - **Windows** : fichier `%UserProfile%\.wslconfig` avec `[wsl2]` et `memory=<N>GB`, puis `wsl --shutdown`. WSL2 prend 50 % de la RAM par défaut.
