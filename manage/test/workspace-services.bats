@@ -152,3 +152,51 @@ KUBE
     [[ "$output" == *"bench: only llm"* ]] || false
     ! grep -q 'exec -i' "$T/kubectl.log" || false
 }
+
+@test "services enable gitlab: gitlab=on written in .devzone.modules (#605)" {
+    run bash "$CLI" workspace services enable gitlab
+    [ "$status" -eq 0 ]
+    grep -qx 'gitlab=on' "$T/.devzone.modules"
+}
+
+@test "services disable postgres: postgres=off written in .devzone.modules (#605)" {
+    run bash "$CLI" workspace services disable postgres
+    [ "$status" -eq 0 ]
+    grep -qx 'postgres=off' "$T/.devzone.modules"
+}
+
+@test "services enable: installer failure, .devzone.modules untouched (#605)" {
+    run env FAUX_EXEC_ECHEC=1 bash "$CLI" workspace services enable gitlab
+    [ "$status" -eq 3 ]
+    ! grep -q '^gitlab=' "$T/.devzone.modules" || false
+    [ "$(cat "$T/.devzone.modules")" = "$(printf 'workspace=kubernetes\nargocd=off')" ]
+}
+
+@test "services enable llm: the other lines of .devzone.modules are kept (#605)" {
+    printf 'workspace=kubernetes\nfoo=bar\nargocd=off\n' >"$T/.devzone.modules"
+    run bash "$CLI" workspace services enable llm
+    [ "$status" -eq 0 ]
+    grep -qx 'llm=on' "$T/.devzone.modules"
+    grep -qx 'foo=bar' "$T/.devzone.modules"
+    grep -qx 'workspace=kubernetes' "$T/.devzone.modules"
+    grep -qx 'argocd=off' "$T/.devzone.modules"
+}
+
+@test "services disable mysql: an absent .devzone.modules is created (#605)" {
+    rm -f "$T/.devzone.modules"
+    run bash "$CLI" workspace services disable mysql
+    [ "$status" -eq 0 ]
+    [ -f "$T/.devzone.modules" ]
+    grep -qx 'mysql=off' "$T/.devzone.modules"
+}
+
+@test "services seed, bench and status leave .devzone.modules untouched (#605)" {
+    run bash "$CLI" workspace services seed gitlab
+    [ "$status" -eq 0 ]
+    run bash "$CLI" workspace services bench llm
+    [ "$status" -eq 0 ]
+    run bash "$CLI" workspace services status
+    [ "$status" -eq 0 ]
+    ! grep -q '^gitlab=' "$T/.devzone.modules" || false
+    ! grep -q '^llm=' "$T/.devzone.modules" || false
+}
