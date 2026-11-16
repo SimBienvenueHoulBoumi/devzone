@@ -34,6 +34,7 @@ case "$*" in
     *"config view"*)
         if [[ "$*" == *'.cluster.server'* ]]; then echo "https://127.0.0.1:6443"; else echo docker-desktop; fi ;;
     *"get --raw /readyz"*) ;;
+    *"get nodes -o jsonpath"*) printf '%s\n' "${FAUX_MEMOIRE_CLUSTER:-16777216Ki}" ;;
     *"get namespace devzone-llm"*) [ -f "$T/ns" ]; exit $? ;;
     *"get namespaces -l"*) ;;
     *"create namespace"*) printf 'kind: Namespace\nmetadata:\n  name: devzone-llm\n' ;;

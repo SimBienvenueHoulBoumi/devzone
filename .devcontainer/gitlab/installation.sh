@@ -6,61 +6,17 @@
 # Le chart enveloppe charts/devzone-gitlab (#538) porte les dépendances et les
 # valeurs ; chart.sh (helm direct) et argocd.sh (Application) l'installent.
 
+# Shared memory check of the services cluster (#608): quantite_ki,
+# memoire_cluster_ki and verifier_memoire_module.
+# shellcheck source=SCRIPTDIR/../memoire.sh
+# shellcheck disable=SC1091
+. "$ICI/../memoire.sh"
+
 # Namespace isolé du module : un par instance, comme postgres
 GITLAB_NS="devzone-gitlab${INSTANCE_SUFFIX}"
 # Ancien cluster kind de GitLab, supprimé par « devzone gitlab migrate »
 GITLAB_ANCIEN_CLUSTER="gitlab${INSTANCE_SUFFIX}"
 GITLAB_ANCIEN_CONTEXTE="kind-gitlab${INSTANCE_SUFFIX}"
-
-# Convertit une quantité de mémoire Kubernetes (Ki, Mi, Gi, K, M, G, octets)
-# en Kio, pour additionner la mémoire allouable des nœuds.
-quantite_ki() {
-    local q="${1:-}" nombre
-    case "$q" in
-        *Ki) nombre="${q%Ki}"; echo $((nombre)) ;;
-        *Mi) nombre="${q%Mi}"; echo $((nombre * 1024)) ;;
-        *Gi) nombre="${q%Gi}"; echo $((nombre * 1024 * 1024)) ;;
-        *Ti) nombre="${q%Ti}"; echo $((nombre * 1024 * 1024 * 1024)) ;;
-        *K | *k) nombre="${q%[Kk]}"; echo $((nombre * 1000 / 1024)) ;;
-        *M) nombre="${q%M}"; echo $((nombre * 1000 * 1000 / 1024)) ;;
-        *G) nombre="${q%G}"; echo $((nombre * 1000 * 1000 * 1000 / 1024)) ;;
-        *)
-            case "$q" in
-                '' | *[!0-9]*) echo 0 ;;
-                *) echo $((q / 1024)) ;;
-            esac
-            ;;
-    esac
-}
-
-# Somme des mémoires allouables des nœuds du cluster des services, en Kio.
-# Lecture des nœuds réservée à l'administrateur (#430).
-gitlab_memoire_cluster_ki() {
-    local sortie valeur total=0
-    sortie="$(compte_admin "$(compte_ctx)" get nodes \
-        -o jsonpath='{range .items[*]}{.status.allocatable.memory}{"\n"}{end}' 2>/dev/null)" || return 1
-    [ -n "$sortie" ] || return 1
-    while IFS= read -r valeur; do
-        [ -n "$valeur" ] || continue
-        total=$((total + $(quantite_ki "$valeur")))
-    done <<<"$sortie"
-    echo "$total"
-}
-
-# Refuse l'installation sous 8 Go de mémoire allouable dans le cluster.
-# Le message indique où agrandir le cluster (Docker Desktop) et la commande.
-gitlab_verifier_memoire_cluster() {
-    local memoire
-    if ! memoire="$(gitlab_memoire_cluster_ki)"; then
-        echo "devzone : gitlab : cluster des services injoignable : devzone cluster" >&2
-        return 2
-    fi
-    if [ "$memoire" -lt 8388608 ]; then
-        echo "devzone : gitlab : il faut au moins 8 Go de mémoire allouable dans le cluster (disponible : $((memoire / 1048576)) Go) ; agrandir le cluster (Docker Desktop → Settings → Resources) puis relancer : devzone enable gitlab" >&2
-        return 2
-    fi
-    return 0
-}
 
 # Namespace présent dans le cluster des services : GitLab est installé.
 # Lecture des namespaces réservée à l'administrateur (#430).
@@ -80,7 +36,7 @@ gitlab_namespace_preparer() {
 # l'accès (relais web/SSH, /etc/hosts) et le seed des données de test.
 gitlab_installer() {
     echo "▶ Vérification de la mémoire allouable du cluster des services…"
-    gitlab_verifier_memoire_cluster || return 2
+    verifier_memoire_module gitlab 8 || return 2
 
     mkdir -p "$GITLAB_SECRETS_DIR"
     gitlab_namespace_preparer
