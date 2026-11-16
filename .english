@@ -120,3 +120,8 @@ manage/test/llm-opencode.bats
 manage/test/agent-local.bats
 manage/test/services-pod-llm.bats
 manage/test/llm-bench.bats
+
+.devcontainer/agent-pod.sh
+.devcontainer/agent-pod-manifest.sh
+manage/test/agent-pod.bats
+manage/test/agent-pod-env.bats
