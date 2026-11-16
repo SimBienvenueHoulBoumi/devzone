@@ -47,6 +47,24 @@ Dans les deux cas, rien n'est hébergé : tout tourne sur ta machine. `workspace
 
 Sous Windows : il est recommandé de cloner avec Git for Windows (les scripts restent en fins de ligne LF grâce à `.gitattributes`, et la commande npm trouve le `bash` qu'elle exige).
 
+#### Mémoire minimale par module
+
+Mesures du 16/11/2026. Le chiffre LLM vient des valeurs du chart (non mesuré en service).
+
+| Module | Consommation mesurée | Mémoire allouable exigée par devzone |
+|---|---|---|
+| Cluster de base | ~4 Go | aucune |
+| GitLab | ~3,6 Go | 8 Go |
+| MySQL | ~0,5 Go | aucune |
+| Argo CD | ~0,6 Go | 1 Go |
+| LLM modèle 7B (7 milliards de paramètres, fichier Q4_K_M) | 6 Gi | 12 Go |
+| LLM --preset light (modèle 3B) | 3 Gi demandés, 4 Gi en limite | 8 Go |
+
+- **Réglage de la RAM** :
+  - **Mac** (Docker Desktop) : *Settings → Resources > Memory*. Autre méthode : modifier `MemoryMiB` dans le fichier `settings-store.json` de Docker Desktop (Docker totalement quitté sinon il réécrit la valeur).
+  - **Windows** : fichier `%UserProfile%\.wslconfig` avec `[wsl2]` et `memory=<N>GB`, puis `wsl --shutdown`. WSL2 prend 50 % de la RAM par défaut.
+  - **Linux** : rien à régler : pas de VM, la RAM de l'hôte sert.
+
 ### Lancer en une commande
 
 Deux façons via npm. Sans installation, à chaque usage :

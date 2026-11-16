@@ -31,6 +31,10 @@ ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
 # shellcheck source=SCRIPTDIR/bench.sh
 # shellcheck disable=SC1091
 . "$ICI/bench.sh"
+# Memory check of the services cluster, shared with the other modules (#608)
+# shellcheck source=SCRIPTDIR/../memoire.sh
+# shellcheck disable=SC1091
+. "$ICI/../memoire.sh"
 
 NS=devzone-llm
 STATE_DIR="$RACINE/workspace/.llm"
@@ -122,9 +126,18 @@ wait_ready() {
 }
 
 install() {
-    local ctx sets
+    local ctx sets minimum_go=12 astuce=""
     local -a args
+
     preset_store "$@"
+    # The light preset (3B) asks for 8 Gi, the 7B model for 12 Gi
+    if [ "$(preset_read)" = light ]; then
+        minimum_go=8
+    else
+        astuce="--preset light (8 Go)"
+    fi
+    verifier_memoire_module llm "$minimum_go" "$astuce" || return 2
+
     ctx="$(cluster_lu)"
     if [ -z "$ctx" ]; then
         ctx="$(cluster_choisir "$WANTED_CTX")" || return 2
