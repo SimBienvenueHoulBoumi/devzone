@@ -21,6 +21,11 @@ ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
 # shellcheck source=SCRIPTDIR/../isolement.sh
 # shellcheck disable=SC1091
 . "$ICI/../isolement.sh"
+# Shared memory check of the services cluster (#608): quantite_ki and
+# memoire_cluster_ki.
+# shellcheck source=SCRIPTDIR/../memoire.sh
+# shellcheck disable=SC1091
+. "$ICI/../memoire.sh"
 
 NS=devzone-argocd
 SECRETS="$RACINE/workspace/.argocd"
@@ -36,42 +41,6 @@ refuse() { echo "devzone : argocd : $*" >&2; exit 2; }
 regenerer_identifiants() {
     password_regenerer ||
         echo "devzone : argocd : identifiants regroupés non mis à jour (devzone passwords)" >&2
-}
-
-# Convertit une quantité de mémoire Kubernetes (Ki, Mi, Gi, K, M, G, octets)
-# en Kio, pour additionner la mémoire allouable des nœuds.
-quantite_ki() {
-    local q="${1:-}" nombre
-    case "$q" in
-        *Ki) nombre="${q%Ki}"; echo $((nombre)) ;;
-        *Mi) nombre="${q%Mi}"; echo $((nombre * 1024)) ;;
-        *Gi) nombre="${q%Gi}"; echo $((nombre * 1024 * 1024)) ;;
-        *Ti) nombre="${q%Ti}"; echo $((nombre * 1024 * 1024 * 1024)) ;;
-        *K | *k) nombre="${q%[Kk]}"; echo $((nombre * 1000 / 1024)) ;;
-        *M) nombre="${q%M}"; echo $((nombre * 1000 * 1000 / 1024)) ;;
-        *G) nombre="${q%G}"; echo $((nombre * 1000 * 1000 * 1000 / 1024)) ;;
-        *)
-            case "$q" in
-                '' | *[!0-9]*) echo 0 ;;
-                *) echo $((q / 1024)) ;;
-            esac
-            ;;
-    esac
-}
-
-# Somme des mémoires allouables des nœuds du cluster des services, en Kio ;
-# échoue si le cluster ne répond pas. Lecture des nœuds réservée à
-# l'administrateur (#430).
-memoire_cluster_ki() {
-    local sortie valeur total=0
-    sortie="$(compte_admin "$(compte_ctx)" get nodes \
-        -o jsonpath='{range .items[*]}{.status.allocatable.memory}{"\n"}{end}' 2>/dev/null)" || return 1
-    [ -n "$sortie" ] || return 1
-    while IFS= read -r valeur; do
-        [ -n "$valeur" ] || continue
-        total=$((total + $(quantite_ki "$valeur")))
-    done <<<"$sortie"
-    echo "$total"
 }
 
 # Refuse l'installation sous 1 Go de mémoire allouable dans le cluster ; le

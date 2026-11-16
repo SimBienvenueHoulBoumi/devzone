@@ -39,6 +39,7 @@ case "$*" in
     *"config view"*)
         if [[ "$*" == *'.cluster.server'* ]]; then echo "https://127.0.0.1:6443"; else echo docker-desktop; fi ;;
     *"get --raw /readyz"*) ;;
+    *"get nodes -o jsonpath"*) printf '%s\n' "${FAUX_MEMOIRE_CLUSTER:-16777216Ki}" ;;
     *"get namespace devzone-llm"*) [ -z "${FAUX_REFUS_NS:-}" ] && [ -f "$T/ns" ]; exit $? ;;
     *"get namespaces -l"*) ;;
     *"create namespace"*) printf 'kind: Namespace\nmetadata:\n  name: devzone-llm\n' ;;
@@ -100,6 +101,16 @@ teardown() {
     grep -q 'memory: 4Gi' "$BATS_TEST_TMPDIR/apply.log"
     grep -q 'model.sha256=724fb256' "$BATS_TEST_TMPDIR/helm.log"
     grep -q 'contextSize=16384' "$BATS_TEST_TMPDIR/helm.log"
+    [ "$(cat "$DEVZONE_RACINE/workspace/.llm/preset")" = light ]
+}
+
+@test "enable llm: 8 GiB allocatable refused without a preset, accepted with --preset light" {
+    FAUX_MEMOIRE_CLUSTER=8388608Ki run bash "$DEVZONE" enable llm --context docker-desktop </dev/null
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"12 Go"* ]] || false
+    [[ "$output" == *"--preset light"* ]] || false
+    FAUX_MEMOIRE_CLUSTER=8388608Ki run bash "$DEVZONE" enable llm --context docker-desktop --preset light </dev/null
+    [ "$status" -eq 0 ]
     [ "$(cat "$DEVZONE_RACINE/workspace/.llm/preset")" = light ]
 }
 

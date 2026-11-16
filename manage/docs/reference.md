@@ -93,6 +93,25 @@ devzone disable <module>    # désactive et applique tout de suite
 | `llm` | modèle de code local (llama.cpp, sur CPU) dans le [cluster de devzone](#cluster-de-devzone), namespace `devzone-llm` ; premier démarrage : téléchargement du modèle (voir [Modèle de code local](#modèle-de-code-local)) | release retirée ; le volume du modèle est gardé (pas de nouveau téléchargement), `devzone llm delete-data` le supprime |
 | `argocd` | Argo CD sur le [cluster de devzone](#cluster-de-devzone), namespace `devzone-argocd` (chart figé), serveur en `ClusterIP` ; https://127.0.0.1:8443 dans le conteneur ; au moins 1 Go de RAM allouable (voir [Argo CD](#argo-cd)) | release Helm et namespace `devzone-argocd` retirés, secret `workspace/.argocd/` supprimé ; les autres services restent, sous helm direct |
 
+### Mémoire minimale par module
+
+Mesures du 16/11/2026. Le chiffre LLM vient des valeurs du chart (non mesuré en service).
+
+| Module | Consommation mesurée | Mémoire allouable exigée par devzone |
+|---|---|---|
+| Cluster de base | ~4 Go | aucune |
+| GitLab | ~3,6 Go | 8 Go |
+| MySQL | ~0,5 Go | aucune |
+| Argo CD | ~0,6 Go | 1 Go |
+| LLM modèle 7B (7 milliards de paramètres, fichier Q4_K_M) | 6 Gi | 12 Go |
+| LLM --preset light (modèle 3B) | 3 Gi demandés, 4 Gi en limite | 8 Go |
+
+### Réglage de la RAM
+
+- **Mac** (Docker Desktop) : *Settings → Resources > Memory*. Autre méthode : modifier `MemoryMiB` dans le fichier `settings-store.json` de Docker Desktop (Docker totalement quitté sinon il réécrit la valeur).
+- **Windows** : fichier `%UserProfile%\.wslconfig` avec `[wsl2]` et `memory=<N>GB`, puis `wsl --shutdown`. WSL2 prend 50 % de la RAM par défaut.
+- **Linux** : rien à régler : pas de VM, la RAM de l'hôte sert.
+
 Le choix est **propre à chaque devzone** (instance) et gardé dans le dossier `$RACINE/.devzone.modules` (monté de l'hôte, il survit aux rebuilds). Au premier démarrage d'une instance, si une connexion Claude Code ou opencode existe déjà dans les volumes, le module `ia` n'est pas activé : tout est désactivé par défaut et la connexion est signalée une seule fois (« devzone enable ia pour l'utiliser ici »), pas pour un état repris.
 
 Dans le [workspace Kubernetes](#services-de-devzone-dans-le-workspace-kubernetes), `gitlab`, `postgres`, `argocd` et `llm` s'installent depuis le poste (`devzone workspace services enable <service>`) ; le pod n'affiche que leur présence dans le cluster.
