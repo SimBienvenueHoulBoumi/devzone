@@ -137,3 +137,18 @@ KUBE
     [ "$status" -eq 0 ]
     [[ "$output" == *"services enable|disable <service>"* ]] || false
 }
+
+@test "services bench llm: options passed to the pod through services-admin.sh bench, Argo CD not asked (#593)" {
+    export FAUX_CONTEXTES="devzone"
+    run bash "$CLI" workspace services bench llm --apply --threads 4,8 --prompt 256 --gen 32
+    [ "$status" -eq 0 ]
+    grep -q 'services-admin.sh bench llm --apply --threads 4,8 --prompt 256 --gen 32$' "$T/kubectl.log"
+    grep -q 'delete clusterrolebinding devzone-services-admin' "$T/kubectl.log"
+}
+
+@test "services bench postgres: refused, nothing run in the pod (#593)" {
+    run bash "$CLI" workspace services bench postgres
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"bench: only llm"* ]] || false
+    ! grep -q 'exec -i' "$T/kubectl.log" || false
+}

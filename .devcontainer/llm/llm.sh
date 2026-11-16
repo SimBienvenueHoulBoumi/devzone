@@ -7,9 +7,9 @@
 #   llm.sh preset [--preset P] preset stored for the next install (Argo CD path)
 #   llm.sh apply on|off [...]  what `devzone enable|disable llm` runs
 #   llm.sh delete-data [--yes] namespace and volume removed (the model is downloaded again)
+#   llm.sh bench [--apply]     llama-bench Job and threads recommendation (bench.sh)
 # First start = model download: LLM_ATTENTE (seconds, default 1800) is the wait.
-# The relay LLM_PORT (default 8089) reaches the service. The opencode provider is
-# opencode.sh. bash 3.2 (macOS).
+# Relay LLM_PORT (default 8089); opencode provider: opencode.sh. bash 3.2 (macOS).
 set -euo pipefail
 
 ICI="$(cd "$(dirname "$0")" && pwd)"
@@ -28,6 +28,9 @@ ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
 # shellcheck source=SCRIPTDIR/presets.sh
 # shellcheck disable=SC1091
 . "$ICI/presets.sh"
+# shellcheck source=SCRIPTDIR/bench.sh
+# shellcheck disable=SC1091
+. "$ICI/bench.sh"
 
 NS=devzone-llm
 STATE_DIR="$RACINE/workspace/.llm"
@@ -196,9 +199,7 @@ status() {
 relay_start() {
     local ctx
     ctx="$(cluster_lu)"
-    if [ -n "$ctx" ] && installed; then
-        relais_lancer llm "$ctx" "$NS" svc/llm "$LLM_PORT:8080"
-    fi
+    [ -z "$ctx" ] || ! installed || relais_lancer llm "$ctx" "$NS" svc/llm "$LLM_PORT:8080"
 }
 
 # Writes llm=off in the state file (bad argument, no cluster)
@@ -241,10 +242,8 @@ case "${1:-}" in
     policy) policy ;;
     apply) apply "${@:2}" ;;
     delete-data) delete_data "${2:-}" ;;
+    bench) bench "${@:2}" ;;
     relay-start) relay_start ;;
     relay-stop) relais_arreter llm ;;
-    *)
-        echo "devzone llm: status | delete-data [--yes]" >&2
-        exit 1
-        ;;
+    *) echo "devzone llm: status | bench [--apply] | delete-data [--yes]" >&2; exit 1 ;;
 esac

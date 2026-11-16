@@ -4,6 +4,7 @@
 # Sourced by manage/workspace.sh (drapeau_kubectl, POD, NAMESPACE).
 #   devzone workspace services enable <service> [options]
 #   devzone workspace services disable <service> [--yes]
+#   devzone workspace services bench llm [--apply] [--threads …] [--prompt …] [--gen …]
 #   devzone workspace services status
 # Why: the pod has no administrator access to the cluster (#430), while the
 # installers need one. The workstation creates a ServiceAccount bound to
@@ -19,7 +20,7 @@ SERVICES_ADMIN_SCRIPT="${DEVZONE_SERVICES_ADMIN_SCRIPT:-/usr/local/share/devzone
 SERVICES_TOKEN_DURATION="${DEVZONE_SERVICES_TOKEN_DURATION:-1h}"
 
 services_usage() {
-    echo "devzone workspace services enable|disable <gitlab|postgres|mysql|argocd|llm> [options] | seed gitlab | status"
+    echo "devzone workspace services enable|disable <gitlab|postgres|mysql|argocd|llm> [options] | seed gitlab | bench llm [--apply] [--threads …] [--prompt …] [--gen …] | status"
 }
 
 services_known() {
@@ -99,9 +100,10 @@ services_run() {
         argocd_toggle "$action" "$@"
         return
     fi
+    # bench is a measure, not a change of state: never taken by Argo CD
     case "$service" in
         postgres | mysql | llm)
-            if argocd_holds_charts; then
+            if [ "$action" != bench ] && argocd_holds_charts; then
                 services_argocd_toggle "$service" "$action" "$@"
                 return
             fi
@@ -166,6 +168,14 @@ services() {
                 return 1
             fi
             services_run seed gitlab
+            ;;
+        # The speed of the model measured from the workstation, in the pod (#593)
+        bench)
+            if [ "${2:-}" != llm ]; then
+                echo "✖ bench: only llm ($(services_usage))" >&2
+                return 1
+            fi
+            services_run bench llm "${@:3}"
             ;;
         status | etat | '') services_status ;;
         *)

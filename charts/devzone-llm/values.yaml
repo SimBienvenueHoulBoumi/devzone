@@ -1,8 +1,12 @@
 # The one definition of the local model: the helm-direct path installs this
 # chart (.devcontainer/llm/llm.sh) as the release llm. No Secret: the model is
 # public and checked by its sha256.
-# Official llama.cpp server image, CPU, pinned build
-image: ghcr.io/ggml-org/llama.cpp:server-b12407
+# Official llama.cpp image repository (CPU). The tag is derived from llamaBuild:
+# server-<llamaBuild> runs the model, full-<llamaBuild> (llama-bench, only for
+# the bench Job) comes from the same build.
+image: ghcr.io/ggml-org/llama.cpp
+# The one pinned llama.cpp build, shared by the server and the bench images
+llamaBuild: b12407
 # Image of the init container that downloads and checks the model
 fetchImage: curlimages/curl:8.11.1
 # Port of the Service and of llama-server
@@ -13,8 +17,8 @@ memory: 6Gi
 claim: llm-models
 # Size of the models volume
 size: 8Gi
-# Context size (-c) and threads (-t) of llama-server. 32768 is the native
-# window of Qwen2.5; the light preset uses 16384 (--set contextSize=16384).
+# Context size (-c) of llama-server. 32768 is the native window of Qwen2.5; the
+# light preset uses 16384 (--set contextSize=16384).
 contextSize: 32768
 # KV cache type for K and V (--cache-type-k / --cache-type-v): q8_0 costs about
 # 1 GB at 32k for the 7B (f16 about 1.9 GB). A quantized V cache needs flash
@@ -22,7 +26,10 @@ contextSize: 32768
 cacheType: q8_0
 # Flash attention (--flash-attn on|off|auto in server-b12407)
 flashAttention: "on"
-threads: 4
+# Threads (-t and --threads-batch): auto = the CPUs seen by the container
+# (nproc), capped by maxThreads; a number is used as is.
+threads: auto
+maxThreads: 8
 # The model: downloaded only when the file is missing, then its sha256 is
 # checked (the file is removed and the pod fails when it differs). The URL is
 # pinned to a Hugging Face commit (resolve/<commit>).
@@ -39,8 +46,27 @@ model:
   url: https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct-GGUF/resolve/13fb94bfda8c8cf22497dc57b78f391a9acb426a/qwen2.5-coder-7b-instruct-q4_k_m.gguf
   file: qwen2.5-coder-7b-instruct-q4_k_m.gguf
   sha256: 509287f78cb4d4cf6b3843734733b914b2c158e43e22a7f4bf5e963800894d3c
+# CPU: a request only (no CPU limit, so the threads are not throttled)
 resources:
   requests:
-    cpu: 500m
+    cpu: "2"
   limits:
     memory: 7Gi
+# llama-bench Job (templates/bench-job.yaml), rendered only when enabled=true,
+# which `devzone llm bench` sets. It runs the image full-<llamaBuild> (larger
+# than the server image, pulled only for the bench) on the node of the server
+# pod, with the models volume read-only, and is removed after ttl seconds.
+bench:
+  enabled: false
+  # Prompt tokens (-p), generated tokens (-n), repetitions of each test (-r;
+  # llama-bench defaults to 5) and the thread counts tried (-t). Small values:
+  # the whole bench takes a few minutes, even on a slow machine.
+  prompt: 128
+  gen: 32
+  repetitions: 1
+  threads: "4,8"
+  # Seconds before the finished Job is garbage collected
+  ttl: 600
+  # Seconds before a stuck Job is stopped (activeDeadlineSeconds: the Job does
+  # not run forever if the call that started it is interrupted)
+  deadline: 1800

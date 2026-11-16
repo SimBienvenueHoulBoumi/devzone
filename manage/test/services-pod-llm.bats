@@ -105,3 +105,31 @@ DZPATH
     grep -q '^devzone llm relay-stop$' "$T/devzone.log"
     [ ! -e "$T/path-devzone.log" ]
 }
+
+@test "services-admin.sh bench llm --apply: devzone llm bench with the options (#593)" {
+    admin_setup
+    printf 'cluster=kind-devzone\nllm=on\n' >"$DEVZONE_ETAT"
+    run bash -c 'printf "SECRET-TOKEN\n" | bash "$0" bench llm --apply --threads 4' "$ADMIN"
+    [ "$status" -eq 0 ]
+    grep -q '^devzone llm bench --apply --threads 4$' "$T/devzone.log"
+}
+
+@test "services-admin.sh bench postgres: refused (#593)" {
+    admin_setup
+    run bash -c 'printf "SECRET-TOKEN\n" | bash "$0" bench postgres' "$ADMIN"
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"bench: only llm"* ]] || false
+}
+
+@test "llm bench in the pod outside devzone workspace services: code 2, run from the computer (#593)" {
+    run bash "$RACINE/.devcontainer/llm/llm.sh" bench
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"devzone: llm bench runs from your computer: devzone workspace services bench llm"* ]] || false
+    [[ "$output" != *"not enabled"* ]] || false
+    [ ! -s "$T/kubectl.log" ] || ! grep -q 'get deployment' "$T/kubectl.log"
+}
+
+@test "llm bench in the pod run by devzone workspace services: not refused (#593)" {
+    DEVZONE_SERVICES_ADMIN=1 run bash "$RACINE/.devcontainer/llm/llm.sh" bench
+    [[ "$output" != *"runs from your computer"* ]] || false
+}

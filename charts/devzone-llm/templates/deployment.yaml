@@ -54,7 +54,25 @@ spec:
               mountPath: /models
       containers:
         - name: llm
-          image: {{ .Values.image }}
+          image: {{ .Values.image }}:server-{{ .Values.llamaBuild }}
+          env:
+            - name: THREADS
+              value: {{ .Values.threads | quote }}
+            - name: MAX_THREADS
+              value: {{ .Values.maxThreads | quote }}
+          command:
+            - sh
+            - -c
+            - |
+              set -eu
+              t="$THREADS"
+              if [ "$t" = auto ]; then
+                t="$(nproc)"
+                [ "$t" -le "$MAX_THREADS" ] || t="$MAX_THREADS"
+              fi
+              echo "llama-server: $t threads"
+              exec /app/llama-server "$@" -t "$t" --threads-batch "$t"
+            - llama-server
           args:
             - --host
             - 0.0.0.0
@@ -70,8 +88,6 @@ spec:
             - {{ .Values.cacheType | quote }}
             - --flash-attn
             - {{ .Values.flashAttention | quote }}
-            - -t
-            - {{ .Values.threads | quote }}
           ports:
             - containerPort: 8080
               name: http
