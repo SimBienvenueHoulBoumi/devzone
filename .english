@@ -15,6 +15,7 @@ manage/scripts/lancer.sh
 manage/scripts/versions.sh
 manage/scripts/desinstaller.sh
 manage/scripts/migrer.sh
+manage/scripts/ports-apps.sh
 manage/scripts/ports-workspace.sh
 manage/workspace.sh
 manage/scripts/workspace-aliases.sh
@@ -28,6 +29,7 @@ manage/test/commun-helm.bash
 manage/test/shard.sh
 manage/test/shard.bats
 manage/test/workspace.bats
+manage/test/workspace-ports-apps.bats
 manage/test/workspace-ports.bats
 manage/test/workspace-migration.bats
 manage/test/workspace-retour.bats
