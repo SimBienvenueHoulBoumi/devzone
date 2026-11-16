@@ -30,6 +30,16 @@ services_known() {
     return 1
 }
 
+# A successful enable/disable is kept in .devzone.modules of the workstation so
+# that a new devcontainer does not reinstall what was removed (#605). state_note
+# (argocd-workspace.sh) updates the line and keeps the other ones intact.
+services_state_note() {
+    case "$1" in
+        enable) state_note "$2" on ;;
+        disable) state_note "$2" off ;;
+    esac
+}
+
 # Namespace of a service in the cluster (gitlab: default instance)
 services_namespace() {
     case "$1" in
@@ -98,14 +108,20 @@ services_run() {
     # charts: done by the workstation, no installer in the pod (#516, #538)
     if [ "$service" = argocd ]; then
         argocd_toggle "$action" "$@"
-        return
+        code=$?
+        [ "$code" -eq 0 ] || return "$code"
+        services_state_note "$action" "$service"
+        return 0
     fi
     # bench is a measure, not a change of state: never taken by Argo CD
     case "$service" in
         postgres | mysql | llm)
             if [ "$action" != bench ] && argocd_holds_charts; then
                 services_argocd_toggle "$service" "$action" "$@"
-                return
+                code=$?
+                [ "$code" -eq 0 ] || return "$code"
+                services_state_note "$action" "$service"
+                return 0
             fi
             ;;
     esac
@@ -138,6 +154,7 @@ services_run() {
         echo "✖ $action $service failed (code $code); in the pod: devzone status" >&2
         return "$code"
     fi
+    services_state_note "$action" "$service"
     echo "✔ $action $service done; in the pod: devzone status; local access: devzone workspace ports"
 }
 
