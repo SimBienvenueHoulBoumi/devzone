@@ -133,3 +133,6 @@ manage/test/agent-pod-egress.bats
 manage/test/chart-egress-proxy.bats
 manage/scripts/workspace-update.sh
 manage/test/workspace-update.bats
+manage/scripts/workspace-egress.sh
+manage/test/workspace-egress.bats
+manage/test/workspace-egress-wait.bats

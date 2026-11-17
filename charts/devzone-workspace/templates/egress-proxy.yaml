@@ -20,6 +20,12 @@ data:
 {{- range .Values.egressProxy.allowedDomains }}
     acl allowed dstdomain {{ . }}
 {{- end }}
+{{- range splitList "," (default "" .Values.egressProxy.extraDomains) }}
+{{- $domain := trim . }}
+{{- if $domain }}
+    acl allowed dstdomain {{ $domain }}
+{{- end }}
+{{- end }}
     acl SSL_ports port 443
     acl CONNECT method CONNECT
     http_access allow CONNECT SSL_ports allowed

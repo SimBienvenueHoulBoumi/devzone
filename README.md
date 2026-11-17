@@ -454,3 +454,5 @@ Limite le réseau sortant des sessions lancées avec `devzone agent --pod` via u
 - **Lire les contacts** : `kubectl logs deploy/devzone-workspace-egress-proxy -c access-log -n <namespace>`.
 - **Garde (strict)** : une fenêtre de 1 à 2 s existe au démarrage avant que la restriction soit programmée ; un conteneur d’initialisation attend que l’accès direct soit fermé (20 essais, 1 s) et refuse la session si la restriction ne devient jamais effective.
 - **Limites** : le workspace lui-même reste ouvert ; seules les sessions `devzone agent --pod` sont filtrées ; les outils qui ignorent `HTTPS_PROXY` sont bloqués en mode strict.
+- **Commandes** (#633) : `devzone workspace egress observation|strict|off`, `egress status` (domaines contactés et leur état), `egress allow|deny <domaine>`. Le réglage est gardé dans `.devzone.modules` et rejoué à chaque `workspace start` et `workspace update` ; le pod n'est pas recréé.
+- **Parcours** : `devzone workspace egress observation`, puis `egress status` pour voir les domaines contactés, `egress allow <domaine>` pour ceux qui manquent, et enfin `devzone workspace egress strict`.

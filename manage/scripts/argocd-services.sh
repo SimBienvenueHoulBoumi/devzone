@@ -109,6 +109,8 @@ workspace_deploy() {
     params="image.tag=$tag"
     [ -z "$with_image" ] || params="$params image.repository=$repository"
     [ "$tag" != latest ] || params="$params image.pullPolicy=Always"
+    # egress proxy settings of .devzone.modules (#633): replayed at each start and update
+    params="$params $(egress_params)"
     chart_require workspace || return $?
     # GitOps repository created or designated first, with its root Application
     gitops_init || return 1
