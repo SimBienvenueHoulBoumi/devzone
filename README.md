@@ -444,3 +444,13 @@ Cette commande retire seulement la commande `devzone` de ta machine ; elle ne su
 
 devzone est un logiciel libre, distribué sous la [GNU General Public License version 3](https://github.com/SimBienvenueHoulBoumi/devzone/blob/main/LICENSE).
 
+
+### Mandataire de sortie des sessions d’agent (désactivé par défaut)
+
+Limite le réseau sortant des sessions lancées avec `devzone agent --pod` via un mandataire HTTP(S) (Squid) dans le namespace du workspace. Tout est désactivé par défaut : sans activation, le rendu du chart et le manifeste des pods de session restent identiques.
+
+- **Modes** : `observation` (le mandataire accepte tout et journalise, aucune coupure, pour construire la liste) ; `strict` (seule la liste de domaines est autorisée, et une NetworkPolicy limite la sortie des pods de session au mandataire et au DNS).
+- **Activer** (Helm) : `egressProxy.enabled=true` et `egressProxy.mode=observation` ou `strict` (liste : `egressProxy.allowedDomains`, par défaut `.opencode.ai`, `.npmjs.org`, `.github.com`).
+- **Lire les contacts** : `kubectl logs deploy/devzone-workspace-egress-proxy -c access-log -n <namespace>`.
+- **Garde (strict)** : une fenêtre de 1 à 2 s existe au démarrage avant que la restriction soit programmée ; un conteneur d’initialisation attend que l’accès direct soit fermé (20 essais, 1 s) et refuse la session si la restriction ne devient jamais effective.
+- **Limites** : le workspace lui-même reste ouvert ; seules les sessions `devzone agent --pod` sont filtrées ; les outils qui ignorent `HTTPS_PROXY` sont bloqués en mode strict.

@@ -97,3 +97,19 @@ networkPolicy:
   # workstation needs the Internet (Maven, npm, Docker images). true limits the
   # egress to the namespace and to DNS (kube-system). The egress allow list is #220.
   restrictEgress: false
+
+egressProxy:
+  enabled: false
+  mode: observation
+  allowedDomains:
+    - .opencode.ai
+    - .npmjs.org
+    - .github.com
+  image: ubuntu/squid@sha256:6a097f68bae708cedbabd6188d68c7e2e7a38cedd05a176e1cc0ba29e3bbe029
+  resources:
+    requests:
+      memory: 64Mi
+      cpu: 50m
+    limits:
+      memory: 256Mi
+      cpu: "1"
