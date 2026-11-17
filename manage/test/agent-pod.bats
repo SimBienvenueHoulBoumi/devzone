@@ -1,12 +1,15 @@
 #!/usr/bin/env bats
 # devzone agent --pod: one ephemeral pod per agent session (#222).
-# Tests use a fake kubectl: no real cluster is touched.
+# Tests use a fake kubectl and a test projects root (DEVZONE_RACINE under
+# BATS_TEST_TMPDIR): no real cluster is touched, /workspaces is never used.
 
 load commun
+load agent-pod-racine
 
 setup() {
     load commun
     agent_isole
+    racine_test
     unset DEVZONE_WORKSPACE
     export DEVZONE_WORKSPACE=kubernetes
     export DEVZONE_AGENT_POD_TIMEOUT=1
@@ -53,30 +56,22 @@ KUBE
 
     printf 'build the feature\n' >"$T/consigne.txt"
 
-    export FOLDER=/workspaces/projets/devzone-wt/dz-222
-    export OUTSIDE=/tmp/dz-222-outside-workspace
-    export NO_GIT=/workspaces/projets/dz-222-no-git
-    mkdir -p "$NO_GIT"
-    export SPACE_FOLDER="/workspaces/projets/devzone-wt/dz 222"
-    export SEMI_FOLDER="/workspaces/projets/devzone-wt/dz;222"
-}
-
-teardown() {
-    rm -rf "$NO_GIT" 2>/dev/null || true
+    FOLDER="$(faux_worktree devzone dz-222)"
+    export FOLDER
 }
 
 source_agent_pod() {
     source "$BATS_TEST_DIRNAME/../../.devcontainer/agent-pod.sh"
 }
 
-@test "agent-pod : folder under /workspaces/projets/ with .git is valid" {
+@test "agent-pod : folder under the projects root with .git is valid" {
     source_agent_pod
     agent_pod_validate_folder "$FOLDER"
     [ "$?" -eq 0 ]
     [ "$AGENT_POD_WORKTREE_SUBPATH" = "devzone-wt/dz-222" ]
     [ "$AGENT_POD_WORKTREE_MOUNTPATH" = "$FOLDER" ]
     [ "$AGENT_POD_GIT_SUBPATH" = "devzone/.git" ]
-    [ "$AGENT_POD_GIT_MOUNTPATH" = "/workspaces/projets/devzone/.git" ]
+    [ "$AGENT_POD_GIT_MOUNTPATH" = "$DEVZONE_RACINE/devzone/.git" ]
     [ "$AGENT_POD_SESSION_LABEL" = "dz-222" ]
     [ "$AGENT_POD_TICKET" = "222" ]
 }
@@ -94,7 +89,7 @@ source_agent_pod() {
     agent_pod_validate_folder "$FOLDER" >/dev/null
     manifest="$(agent_pod_build_manifest "$FOLDER" "$T/consigne.txt" "agent-dz-222-test")"
     grep -q "subPath: devzone-wt/dz-222" "$manifest" || false
-    grep -q "mountPath: /workspaces/projets/devzone-wt/dz-222" "$manifest" || false
+    grep -qF "mountPath: $FOLDER" "$manifest" || false
     rm -f "$manifest"
 }
 
@@ -103,7 +98,7 @@ source_agent_pod() {
     agent_pod_validate_folder "$FOLDER" >/dev/null
     manifest="$(agent_pod_build_manifest "$FOLDER" "$T/consigne.txt" "agent-dz-222-test")"
     grep -q "subPath: devzone/.git" "$manifest" || false
-    grep -q "mountPath: /workspaces/projets/devzone/.git" "$manifest" || false
+    grep -qF "mountPath: $DEVZONE_RACINE/devzone/.git" "$manifest" || false
     rm -f "$manifest"
 }
 
@@ -149,7 +144,7 @@ source_agent_pod() {
     grep -q "configMap:" "$manifest" || false
     grep -q "name: agent-dz-222-test-consigne" "$manifest" || false
     grep -q "mountPath: /agent-consigne" "$manifest" || false
-    grep -q "devzone agent --local /workspaces/projets/devzone-wt/dz-222 /agent-consigne/consigne.md" "$manifest" || false
+    grep -qF "devzone agent --local $FOLDER /agent-consigne/consigne.md" "$manifest" || false
     rm -f "$manifest"
 }
 
@@ -160,42 +155,6 @@ source_agent_pod() {
     manifest="$(agent_pod_build_manifest "$FOLDER" "$T/consigne2.txt" "agent-dz-222-test")"
     ! grep -q "secret consigne" "$manifest" || false
     rm -f "$manifest"
-}
-
-@test "agent-pod : folder outside /workspaces/projets/ is refused without a pod" {
-    source_agent_pod
-    run agent_pod_validate_folder "$OUTSIDE"
-    [ "$status" -ne 0 ]
-    [[ "$output" == *"outside /workspaces/projets/"* ]] || false
-}
-
-@test "agent-pod : folder without .git is refused without a pod" {
-    source_agent_pod
-    run agent_pod_validate_folder "$NO_GIT"
-    [ "$status" -ne 0 ]
-    [[ "$output" == *"no .git file"* ]] || false
-}
-
-@test "agent-pod : path with space is refused" {
-    source_agent_pod
-    run agent_pod_validate_folder "$SPACE_FOLDER"
-    [ "$status" -ne 0 ]
-}
-
-@test "agent-pod : path with semicolon is refused" {
-    source_agent_pod
-    run agent_pod_validate_folder "$SEMI_FOLDER"
-    [ "$status" -ne 0 ]
-}
-
-@test "agent-pod : two folders give different names and labels" {
-    source_agent_pod
-    mkdir -p /workspaces/projets/other-wt/foo
-    printf 'gitdir: /workspaces/projets/other/.git/worktrees/foo\n' > /workspaces/projets/other-wt/foo/.git
-    agent_pod_validate_folder /workspaces/projets/other-wt/foo
-    [ "$?" -eq 0 ]
-    [ "$AGENT_POD_SESSION_LABEL" = "foo" ]
-    rm -rf /workspaces/projets/other-wt /workspaces/projets/other
 }
 
 @test "agent-pod --pod : runs the session and deletes the pod at the end" {
@@ -234,17 +193,18 @@ source_agent_pod() {
 
 @test "agent-pod : without --pod, behavior unchanged (local)" {
     unset DEVZONE_WORKSPACE
+    printf 'ia=on\n' >"$DEVZONE_RACINE/.devzone.modules"
     run bash "$DEVZONE" agent --local "$FOLDER" "$T/consigne.txt"
     [ "$status" -eq 0 ]
     ! grep -q "create -f" "$T/kubectl.log" || false
 }
 
 @test "agent-pod : manifest valid via real kubectl dry-run" {
+    [ -n "$REAL_KUBECTL" ] || skip "kubectl absent : dry-run client not run"
     source_agent_pod
     agent_pod_validate_folder "$FOLDER" >/dev/null
     manifest="$(agent_pod_build_manifest "$FOLDER" "$T/consigne.txt" "agent-dz-222-test")"
-    /usr/local/bin/kubectl create --dry-run=client --validate=false -f "$manifest" -o name >/dev/null 2>&1
+    "$REAL_KUBECTL" create --dry-run=client --validate=false -f "$manifest" -o name >/dev/null 2>&1
     [ "$?" -eq 0 ]
     rm -f "$manifest"
 }
-

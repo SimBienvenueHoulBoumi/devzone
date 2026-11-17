@@ -141,7 +141,7 @@ agent_pod_lancer() {
         exit 1
     fi
 
-    if ! printf '%s' "$folder_raw" | grep -Eq '^/workspaces/projets/[A-Za-z0-9._/-]+$'; then
+    if ! agent_pod_path_ok "$folder_raw"; then
         echo "devzone agent --pod : invalid folder path : ${folder_raw:-}" >&2
         exit 1
     fi

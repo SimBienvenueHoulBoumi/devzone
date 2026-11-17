@@ -125,3 +125,5 @@ manage/test/llm-bench.bats
 .devcontainer/agent-pod-manifest.sh
 manage/test/agent-pod.bats
 manage/test/agent-pod-env.bats
+manage/test/agent-pod-root.bats
+manage/test/agent-pod-racine.bash

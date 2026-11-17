@@ -9,9 +9,22 @@ DEVZONE_AGENT_POD_ACTIVE_DEADLINE_SECONDS="${DEVZONE_AGENT_POD_ACTIVE_DEADLINE_S
 DEVZONE_AGENT_POD_CPU_LIMIT="${DEVZONE_AGENT_POD_CPU_LIMIT:-2}"
 DEVZONE_AGENT_POD_MEM_LIMIT="${DEVZONE_AGENT_POD_MEM_LIMIT:-4Gi}"
 DEVZONE_AGENT_POD_TIMEOUT="${DEVZONE_AGENT_POD_TIMEOUT:-$((DEVZONE_AGENT_POD_ACTIVE_DEADLINE_SECONDS + 120))}"
+# Projects root, read by the launcher only (no trailing slash). The pod keeps
+# /workspaces/projets in its own environment (DEVZONE_RACINE in the manifest).
+AGENT_POD_ROOT="${DEVZONE_RACINE:-/workspaces/projets}"
 # Module state file on the workspace volume (subPath .devzone.modules, read-only in the pod).
 # shellcheck disable=SC2034 # read by agent-pod.sh
-AGENT_POD_MODULES_FILE="${DEVZONE_AGENT_POD_MODULES_FILE:-/workspaces/projets/.devzone.modules}"
+AGENT_POD_MODULES_FILE="${DEVZONE_AGENT_POD_MODULES_FILE:-${AGENT_POD_ROOT}/.devzone.modules}"
+
+# --- Path check : under AGENT_POD_ROOT, only [A-Za-z0-9._/-], no . or .. part ---
+
+agent_pod_path_ok() {
+    printf '%s' "$AGENT_POD_ROOT" | grep -Eq '^/[A-Za-z0-9._/-]*[A-Za-z0-9._-]$' || return 1
+    case "$1" in "$AGENT_POD_ROOT"/*) ;; *) return 1 ;; esac
+    printf '%s' "$1" | grep -Eq '^[A-Za-z0-9._/-]+$' || return 1
+    case "$1/" in */./* | */../* | *//*) return 1 ;; esac
+    return 0
+}
 
 # --- State filled by agent_pod_validate_folder ---
 
@@ -57,13 +70,13 @@ agent_pod_validate_folder() {
         return 1
     fi
     case "$folder" in
-        /workspaces/projets/*) ;;
+        "$AGENT_POD_ROOT"/*) ;;
         *)
-            echo "devzone agent --pod : folder outside /workspaces/projets/ : $folder" >&2
+            echo "devzone agent --pod : folder outside the projects root $AGENT_POD_ROOT : $folder" >&2
             return 1
             ;;
     esac
-    if ! printf '%s' "$folder" | grep -Eq '^/workspaces/projets/[A-Za-z0-9._/-]+$'; then
+    if ! agent_pod_path_ok "$folder"; then
         echo "devzone agent --pod : invalid folder path : $folder" >&2
         return 1
     fi
@@ -85,13 +98,13 @@ agent_pod_validate_folder() {
             ;;
     esac
     case "$common" in
-        /workspaces/projets/*) ;;
+        "$AGENT_POD_ROOT"/*) ;;
         *)
-            echo "devzone agent --pod : worktree depot outside /workspaces/projets/ : $common" >&2
+            echo "devzone agent --pod : worktree depot outside the projects root $AGENT_POD_ROOT : $common" >&2
             return 1
             ;;
     esac
-    if ! printf '%s' "$common" | grep -Eq '^/workspaces/projets/[A-Za-z0-9._/-]+$'; then
+    if ! agent_pod_path_ok "$common"; then
         echo "devzone agent --pod : invalid depot path : $common" >&2
         return 1
     fi
@@ -105,9 +118,9 @@ agent_pod_validate_folder() {
         return 1
     fi
     AGENT_POD_WORKTREE_MOUNTPATH="$folder"
-    AGENT_POD_WORKTREE_SUBPATH="${folder#/workspaces/projets/}"
+    AGENT_POD_WORKTREE_SUBPATH="${folder#"$AGENT_POD_ROOT"/}"
     AGENT_POD_GIT_MOUNTPATH="$common"
-    AGENT_POD_GIT_SUBPATH="${common#/workspaces/projets/}"
+    AGENT_POD_GIT_SUBPATH="${common#"$AGENT_POD_ROOT"/}"
     AGENT_POD_SESSION_LABEL="$base"
     # Keep the ticket only for an exact dz-<number> name.
     if ! printf '%s' "$base" | grep -Eq '^dz-[0-9]+$'; then
@@ -134,7 +147,7 @@ agent_pod_build_manifest() {
         ticket_block="    devzone.io/agent-ticket: \"${AGENT_POD_TICKET}\""
     fi
 
-    manifest_file="$(mktemp /tmp/devzone-agent-pod-manifest.XXXXXX.yaml)"
+    manifest_file="$(mktemp "${TMPDIR:-/tmp}/devzone-agent-pod-manifest.XXXXXX.yaml")"
 
     {
         printf '%s\n' "apiVersion: v1"

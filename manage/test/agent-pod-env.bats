@@ -1,12 +1,15 @@
 #!/usr/bin/env bats
 # devzone agent --pod: environment, modules file, log, signals (#222).
-# Second file, so agent-pod.bats stays at 250 lines. Fake kubectl only.
+# Second file, so agent-pod.bats stays at 250 lines. Fake kubectl only, and a
+# test projects root under BATS_TEST_TMPDIR (no /workspaces).
 
 load commun
+load agent-pod-racine
 
 setup() {
     load commun
     agent_isole
+    racine_test
     unset DEVZONE_WORKSPACE
     export DEVZONE_WORKSPACE=kubernetes
     export DEVZONE_AGENT_POD_TIMEOUT=1
@@ -48,8 +51,9 @@ exit 0
 KUBE
     chmod +x "$T/bin/kubectl"
     printf 'build the feature\n' >"$T/consigne.txt"
-    export FOLDER=/workspaces/projets/devzone-wt/dz-222
-    export SEMI_FOLDER="/workspaces/projets/devzone-wt/dz;222"
+    FOLDER="$(faux_worktree devzone dz-222)"
+    export FOLDER
+    export SEMI_FOLDER="$DEVZONE_RACINE/devzone-wt/dz;222"
     export PATH="$T/bin:$PATH"
 }
 
@@ -115,10 +119,10 @@ source_agent_pod() {
 @test "agent-pod-env : two folders give two pod names, pod name is lowercase" {
     source_agent_pod
     first="$(agent_pod_name "$FOLDER")"
-    second="$(agent_pod_name "/workspaces/projets/devzone-wt/dz-223")"
+    second="$(agent_pod_name "$DEVZONE_RACINE/devzone-wt/dz-223")"
     [[ "$first" == agent-dz-222-* ]] || false
     [[ "$second" == agent-dz-223-* ]] || false
-    name="$(agent_pod_name "/workspaces/projets/Dz-Foo")"
+    name="$(agent_pod_name "$DEVZONE_RACINE/Dz-Foo")"
     [[ "$name" == agent-dz-foo-* ]] || false
 }
 
@@ -174,11 +178,12 @@ source_agent_pod() {
 }
 
 @test "agent-pod-env : manifest with quotes, colons and newlines in the consigne is valid" {
+    [ -n "$REAL_KUBECTL" ] || skip "kubectl absent : dry-run client not run"
     printf 'say "hi" : it'\''s\nline2: "x"\n' >"$T/consigne3.txt"
     source_agent_pod
     agent_pod_validate_folder "$FOLDER" >/dev/null
     manifest="$(agent_pod_build_manifest "$FOLDER" "$T/consigne3.txt" "agent-dz-222-test")"
-    /usr/local/bin/kubectl create --dry-run=client --validate=false -f "$manifest" -o name >/dev/null 2>&1
+    "$REAL_KUBECTL" create --dry-run=client --validate=false -f "$manifest" -o name >/dev/null 2>&1
     [ "$?" -eq 0 ]
     rm -f "$manifest"
 }
