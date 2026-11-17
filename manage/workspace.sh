@@ -28,9 +28,7 @@ kubectl_flag() {
 }
 
 # Chart path in the repository (or installed package).
-chart_path() {
-    printf '%s/charts/devzone-workspace' "$ROOT"
-}
+chart_path() { printf '%s/charts/devzone-workspace' "$ROOT"; }
 
 # Repository of the image published at each devzone release.
 IMAGE_REPO="ghcr.io/simbienvenuehoulboumi/devzone-workspace"
@@ -99,9 +97,9 @@ workspace_helm_deploy() {
     args+=(--set "image.tag=$tag")
     # latest moves at every release: an image already on the node would stay
     # the old one with IfNotPresent (#515)
-    if [ "$tag" = latest ]; then
-        args+=(--set "image.pullPolicy=Always")
-    fi
+    [ "$tag" != latest ] || args+=(--set "image.pullPolicy=Always")
+    # egress proxy settings (#633), replayed at each start: commas escaped for helm
+    for p in $(egress_params | sed 's/,/\\,/g'); do args+=(--set "$p"); done
     # shellcheck disable=SC2046
     helm $(helm_flag) upgrade --install devzone-workspace "$(chart_path)" "${args[@]}"
 }
@@ -191,6 +189,8 @@ copy_from() {
 . "$HERE/scripts/argocd-services.sh"
 # shellcheck source=manage/scripts/workspace-update.sh
 . "$HERE/scripts/workspace-update.sh"
+# shellcheck source=manage/scripts/workspace-egress.sh
+. "$HERE/scripts/workspace-egress.sh"
 
 # English command names are accepted, French ones unchanged and warned (#502,
 # #532). A copied devzone may miss the aliases file: then no normalization.
@@ -206,9 +206,7 @@ if [ -f "$ROOT/.devcontainer/command-aliases.sh" ]; then
     fi
 fi
 
-if [ "$#" -gt 0 ]; then
-    set -- "$(workspace_command "$1")" "${@:2}"
-fi
+if [ "$#" -gt 0 ]; then set -- "$(workspace_command "$1")" "${@:2}"; fi
 if [ "${1:-}" = "ports" ] && [ "$#" -gt 1 ]; then
     set -- "$1" "$(workspace_ports_command "$2")" "${@:3}"
 fi
@@ -229,8 +227,9 @@ case "${1:-}" in
     clean-docker) clean_docker "${@:2}" ;;
     services) services "${@:2}" ;;
     argocd) argocd_cmd "${@:2}" ;;
+    egress) egress_workspace "${@:2}" ;;
     '' | -h | --help | aide)
-        echo "devzone workspace start|stop|status|shell|vscode|copy-to|copy-from|clone|ports|services|argocd|migrate|revert|clean-docker|update"
+        echo "devzone workspace start|stop|status|shell|vscode|copy-to|copy-from|clone|ports|services|argocd|migrate|revert|clean-docker|update|egress"
         echo "  start [--image repository:tag]  install workspace (image for devzone version by default)"
         echo "  update [--version X.Y.Z] [--yes]  move to the latest stable release (or X.Y.Z); the pod is recreated"
         echo "  clone <url> [<name>]   git clone into the pod projects folder (gh credentials, identity, repowarden hooks)"
@@ -242,6 +241,7 @@ case "${1:-}" in
         echo "  migrate [--yes]        copy Docker workstation to Kubernetes workspace (nothing is deleted)"
         echo "  revert [--bring-back]  back to Docker workstation; --bring-back: copy pod projects first"
         echo "  clean-docker           remove devzone-* Docker volumes, after confirmation [y/N] (--yes)"
+        echo "  egress observation|strict|off|status|allow <domain>|deny <domain>   egress proxy of the agent sessions (--pod)"
         ;;
     *)
         echo "✖ unknown subcommand: $1 (devzone workspace start|stop|status|shell|vscode|copy-to|copy-from|clone|ports|services|argocd|migrate|revert|clean-docker|update)" >&2

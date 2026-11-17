@@ -105,6 +105,9 @@ egressProxy:
     - .opencode.ai
     - .npmjs.org
     - .github.com
+  # Domains added to the strict list (comma-separated, no space), set by
+  # devzone workspace egress allow (#633); empty by default
+  extraDomains: ""
   image: ubuntu/squid@sha256:6a097f68bae708cedbabd6188d68c7e2e7a38cedd05a176e1cc0ba29e3bbe029
   resources:
     requests:
