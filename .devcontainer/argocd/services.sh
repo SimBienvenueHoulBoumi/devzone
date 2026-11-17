@@ -125,7 +125,8 @@ services_application_delete() {
 
 # Every service of the list applied or released: on → namespace, secret and
 # Application; off → Application removed (namespace and volumes kept); not
-# declared: untouched. One failing service does not stop the others
+# declared: untouched. One failing service does not stop the others; a step
+# prints its ✔ only when it succeeded and its ✖ names the service and the step
 services_reconcile() {
     local svc state code=0
     for svc in $SERVICES_LIST; do
@@ -134,18 +135,35 @@ services_reconcile() {
             on)
                 # Before the namespace and the secret: a misnamed chart applies nothing
                 chart_require "$svc" || { code=2; continue; }
-                services_namespace_prepare "$svc" || code=1
+                services_namespace_prepare "$svc" || {
+                    echo "✖ $svc: namespace step failed" >&2
+                    code=1
+                    continue
+                }
                 if command -v "services_secret_$svc" >/dev/null 2>&1; then
-                    "services_secret_$svc" || code=1
+                    "services_secret_$svc" || {
+                        echo "✖ $svc: secret step failed" >&2
+                        code=1
+                        continue
+                    }
                 else
                     echo "✖ no secret hook for $svc (services_secret_$svc): the sync will fail" >&2
                     code=1
+                    continue
                 fi
-                services_application_apply "$svc" || code=1
+                services_application_apply "$svc" || {
+                    echo "✖ $svc: declare step failed" >&2
+                    code=1
+                    continue
+                }
                 echo "✔ Application $(services_app_of "$svc") declared (chart charts/devzone-$svc)"
                 ;;
             off)
-                services_application_delete "$svc" || code=1
+                services_application_delete "$svc" || {
+                    echo "✖ $svc: remove step failed" >&2
+                    code=1
+                    continue
+                }
                 echo "✔ Application $(services_app_of "$svc") removed (namespace and volumes kept)"
                 ;;
         esac
