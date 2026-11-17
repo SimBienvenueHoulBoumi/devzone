@@ -128,3 +128,5 @@ manage/test/agent-pod-env.bats
 manage/test/agent-pod-root.bats
 manage/test/agent-pod-racine.bash
 manage/test/agent-pod-yaml.bats
+manage/scripts/workspace-update.sh
+manage/test/workspace-update.bats

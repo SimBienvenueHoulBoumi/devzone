@@ -95,11 +95,8 @@ start_workspace() {
 workspace_helm_deploy() {
     local repo="$1" tag="$2" with_image="$3" args=()
     args=(--namespace devzone-workspace --create-namespace)
-    if [ -n "$with_image" ]; then
-        args+=(--set "image.repository=$repo" --set "image.tag=$tag")
-    else
-        args+=(--set "image.tag=$tag")
-    fi
+    [ -z "$with_image" ] || args+=(--set "image.repository=$repo")
+    args+=(--set "image.tag=$tag")
     # latest moves at every release: an image already on the node would stay
     # the old one with IfNotPresent (#515)
     if [ "$tag" = latest ]; then
@@ -118,8 +115,7 @@ stop_workspace() {
 # Opens a shell in the workspace container.
 shell_workspace() {
     # shellcheck disable=SC2046
-    kubectl $(kubectl_flag) exec -it devzone-workspace-0 \
-        --namespace devzone-workspace -c workspace -- bash
+    kubectl $(kubectl_flag) exec -it devzone-workspace-0 --namespace devzone-workspace -c workspace -- bash
 }
 
 # VS Code steps (#399): attach to the pod with Kubernetes and Dev Containers
@@ -193,6 +189,8 @@ copy_from() {
 . "$HERE/scripts/argocd-workspace.sh"
 # shellcheck source=manage/scripts/argocd-services.sh
 . "$HERE/scripts/argocd-services.sh"
+# shellcheck source=manage/scripts/workspace-update.sh
+. "$HERE/scripts/workspace-update.sh"
 
 # English command names are accepted, French ones unchanged and warned (#502,
 # #532). A copied devzone may miss the aliases file: then no normalization.
@@ -217,6 +215,7 @@ fi
 
 case "${1:-}" in
     start) start_workspace "${@:2}" ;;
+    update) update_workspace "${@:2}" ;;
     stop) stop_workspace ;;
     status) status_workspace ;;
     shell) shell_workspace ;;
@@ -231,8 +230,9 @@ case "${1:-}" in
     services) services "${@:2}" ;;
     argocd) argocd_cmd "${@:2}" ;;
     '' | -h | --help | aide)
-        echo "devzone workspace start|stop|status|shell|vscode|copy-to|copy-from|clone|ports|services|argocd|migrate|revert|clean-docker"
+        echo "devzone workspace start|stop|status|shell|vscode|copy-to|copy-from|clone|ports|services|argocd|migrate|revert|clean-docker|update"
         echo "  start [--image repository:tag]  install workspace (image for devzone version by default)"
+        echo "  update [--version X.Y.Z] [--yes]  move to the latest stable release (or X.Y.Z); the pod is recreated"
         echo "  clone <url> [<name>]   git clone into the pod projects folder (gh credentials, identity, repowarden hooks)"
         echo "  ports [start|stop|status]       applications and services from pod on workstation localhost"
         echo "  services enable|disable <service> [options] | status"
@@ -244,7 +244,7 @@ case "${1:-}" in
         echo "  clean-docker           remove devzone-* Docker volumes, after confirmation [y/N] (--yes)"
         ;;
     *)
-        echo "✖ unknown subcommand: $1 (devzone workspace start|stop|status|shell|vscode|copy-to|copy-from|clone|ports|services|argocd|migrate|revert|clean-docker)" >&2
+        echo "✖ unknown subcommand: $1 (devzone workspace start|stop|status|shell|vscode|copy-to|copy-from|clone|ports|services|argocd|migrate|revert|clean-docker|update)" >&2
         exit 1
         ;;
 esac

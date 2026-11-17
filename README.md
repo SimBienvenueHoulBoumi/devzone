@@ -236,6 +236,8 @@ La commande affiche la version du dossier et celle du paquet, et ne fait rien si
 
 La mise à jour ne change jamais le mode du poste ; sur un poste Docker avec Kubernetes joignable, elle propose `devzone workspace migrate`.
 
+Le workspace Kubernetes se met à jour à part : `devzone workspace update` le fait passer à la dernière release stable (ou `--version X.Y.Z`), image, charts et Argo CD au même tag. **Le pod `devzone-workspace-0` est recréé** : les fenêtres VS Code attachées au pod se coupent. L'image est vérifiée sur ghcr.io avant toute écriture, et rien ne change si elle n'existe pas encore. Détails dans la [référence](manage/docs/reference.md#mettre-à-jour-le-workspace).
+
 Dans le conteneur, le récapitulatif `devzone` signale une version publiée plus récente (vérification npm au plus une fois par jour, sans bloquer hors ligne) : `○ devzone X.Y.Z disponible : sur le poste, devzone update`.
 
 ## Options

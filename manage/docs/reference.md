@@ -274,6 +274,7 @@ Depuis le poste :
 
 ```bash
 devzone workspace start                # installe ou met a jour le workspace
+devzone workspace update [--version X.Y.Z] [--yes]  # passe a la derniere release stable (pod recree, #622)
 devzone workspace start --image dépôt:tag   # image construite à la main
 devzone workspace stop                 # desinstalle le workspace
 devzone workspace status                    # etat des pods
@@ -295,6 +296,28 @@ devzone workspace clean-docker [--oui] # supprime les volumes Docker devzone-* (
 Les commandes utilisent helm et kubectl du poste, avec le contexte devzone s il existe, sinon le contexte courant. L image est construite par la CI a chaque PR et publiee sur ghcr.io a la livraison.
 
 L'image vient de ghcr.io, avec le tag de la version de devzone (`latest` depuis un clone du dépôt) ; if missing, start reports it and uninstalls the workspace.
+
+### Mettre à jour le workspace
+
+`devzone workspace update` fait passer le workspace à la dernière release stable du dépôt devzone (tags `vX.Y.Z` ; les pré-releases comme `v0.48.0-next.1` sont ignorées), ou à la version donnée avec `--version X.Y.Z`. Il met au même tag l'image, les charts et l'Application Argo CD `devzone-workspace` (sans Argo CD, le chart local est redéployé avec la nouvelle image), puis réconcilie les services tenus par Argo CD (postgres, mysql).
+
+Quand l'utiliser : après une nouvelle release de devzone, ou quand le pod tourne sur une ancienne image. Les projets (volume `workspace`) et l'état sont conservés.
+
+Ordre des opérations :
+
+1. la version cible est lue dans les tags du dépôt (`git ls-remote`, sans gh ni Docker) ; aucune release trouvée, ou dépôt injoignable : message, code de sortie non nul, rien modifié ;
+2. l'image `ghcr.io/simbienvenuehoulboumi/devzone-workspace:<version>` est vérifiée avant toute écriture (jeton anonyme du registre, puis le manifeste). Absente ou registre injoignable : message, rien modifié. La release vient peut-être d'être publiée : réessayer plus tard. Le jeton n'est jamais affiché ;
+3. si l'Application est déjà à cette version, la commande affiche `already up to date` et sort avec 0, sans rien écrire ;
+4. sinon elle avertit et demande confirmation `[o/N]`. Sans terminal, `--yes` est obligatoire, sinon la commande est refusée.
+
+**Avertissement : le pod `devzone-workspace-0` est recréé.** Les fenêtres VS Code attachées au pod se coupent, et les processus lancés dans le pod s'arrêtent. Si les ports du pod ne répondent plus après la mise à jour, `devzone workspace ports start` les relance.
+
+```bash
+devzone workspace update                  # dernière release stable, avec confirmation
+devzone workspace update --yes            # sans question (obligatoire sans terminal)
+devzone workspace update --version 0.48.0 # une version précise
+devzone workspace status                  # suivre le déploiement ; la dernière ligne indique la version atteinte
+```
 
 ### Projets dans un volume
 
