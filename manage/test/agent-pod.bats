@@ -199,12 +199,17 @@ source_agent_pod() {
     ! grep -q "create -f" "$T/kubectl.log" || false
 }
 
-@test "agent-pod : manifest valid via real kubectl dry-run" {
-    [ -n "$REAL_KUBECTL" ] || skip "kubectl absent : dry-run client not run"
+@test "agent-pod : manifest is a valid Pod (yaml_valid, no cluster)" {
     source_agent_pod
     agent_pod_validate_folder "$FOLDER" >/dev/null
     manifest="$(agent_pod_build_manifest "$FOLDER" "$T/consigne.txt" "agent-dz-222-test")"
-    "$REAL_KUBECTL" create --dry-run=client --validate=false -f "$manifest" -o name >/dev/null 2>&1
-    [ "$?" -eq 0 ]
+    run yaml_valid "$manifest"
+    [ "$status" -ne 3 ] || skip "neither ruby nor PyYAML : YAML not checked"
+    [ "$status" -eq 0 ]
+    # Control only: the real kubectl dry-run runs when a cluster answers.
+    if kubectl_dry_run_ok; then
+        run "$REAL_KUBECTL" create --dry-run=client --validate=false -f "$manifest" -o name
+        [ "$status" -eq 0 ]
+    fi
     rm -f "$manifest"
 }

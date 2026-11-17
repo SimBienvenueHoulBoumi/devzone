@@ -178,12 +178,17 @@ source_agent_pod() {
 }
 
 @test "agent-pod-env : manifest with quotes, colons and newlines in the consigne is valid" {
-    [ -n "$REAL_KUBECTL" ] || skip "kubectl absent : dry-run client not run"
     printf 'say "hi" : it'\''s\nline2: "x"\n' >"$T/consigne3.txt"
     source_agent_pod
     agent_pod_validate_folder "$FOLDER" >/dev/null
     manifest="$(agent_pod_build_manifest "$FOLDER" "$T/consigne3.txt" "agent-dz-222-test")"
-    "$REAL_KUBECTL" create --dry-run=client --validate=false -f "$manifest" -o name >/dev/null 2>&1
-    [ "$?" -eq 0 ]
+    run yaml_valid "$manifest"
+    [ "$status" -ne 3 ] || skip "neither ruby nor PyYAML : YAML not checked"
+    [ "$status" -eq 0 ]
+    # Control only: the real kubectl dry-run runs when a cluster answers.
+    if kubectl_dry_run_ok; then
+        run "$REAL_KUBECTL" create --dry-run=client --validate=false -f "$manifest" -o name
+        [ "$status" -eq 0 ]
+    fi
     rm -f "$manifest"
 }
