@@ -10,6 +10,7 @@
 workspace_command() {
     case "${1:-}" in
         demarrer) echo start ;;
+        mettre-a-jour) echo update ;;
         arreter) echo stop ;;
         etat) echo status ;;
         copier-vers) echo copy-to ;;

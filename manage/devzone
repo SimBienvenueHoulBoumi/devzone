@@ -432,7 +432,7 @@ devzone $(version) : environnement de développement conteneurisé
                            (sauvegarde les fichiers remplacés, propose make rebuild)
   devzone uninstall        dans un dossier devzone : retire conteneur, image, volumes
                            (à lancer avant npm uninstall -g devzone)
-  devzone workspace start|stop|status|shell
+  devzone workspace start|stop|status|shell|update
   devzone workspace vscode|copy-to|copy-from|clone|migrate|revert|clean-docker
                            poste Kubernetes : pilote le chart devzone-workspace
   devzone workspace services enable|disable <service>|status
