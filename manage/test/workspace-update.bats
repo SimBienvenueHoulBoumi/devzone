@@ -87,7 +87,7 @@ GH
 nothing_written() {
     [ ! -s "$T/helm.log" ] || return 1
     [ ! -s "$T/applied.yaml" ] || return 1
-    ! grep -q -e 'apply -f' -e 'upgrade' "$T/kubectl.log"
+    ! grep -q -e 'apply -f' -e 'upgrade' "$T/kubectl.log" || false
 }
 
 @test "update: the latest stable release is chosen by version order, pre-releases and v0.9.0 ignored" {
