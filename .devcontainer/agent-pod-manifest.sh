@@ -2,6 +2,8 @@
 # Manifest and validation helpers for the ephemeral session pod (#222).
 # Sourced by agent-pod.sh.
 # bash 3.2 compatible ; shellcheck -x clean.
+# shellcheck disable=SC1091
+. "$(dirname "${BASH_SOURCE[0]}")/agent-pod-egress.sh"
 
 # --- Defaults ---
 
@@ -147,7 +149,7 @@ agent_pod_build_manifest() {
         ticket_block="    devzone.io/agent-ticket: \"${AGENT_POD_TICKET}\""
     fi
 
-    manifest_file="$(mktemp "${TMPDIR:-/tmp}/devzone-agent-pod-manifest.XXXXXX.yaml")"
+    manifest_file="$(mktemp "${TMPDIR:-/tmp}/devzone-agent-pod-manifest.XXXXXX.yaml")"; egress_mode="$(agent_pod_egress_mode)"
 
     {
         printf '%s\n' "apiVersion: v1"
@@ -160,6 +162,7 @@ agent_pod_build_manifest() {
             printf '%s\n' "$ticket_block"
         fi
         printf '%s\n' "spec:"
+        agent_pod_egress_init_lines "$egress_mode" "$ws_image"
         printf '%s\n' "  restartPolicy: Never"
         printf '%s\n' "  activeDeadlineSeconds: ${DEVZONE_AGENT_POD_ACTIVE_DEADLINE_SECONDS}"
         printf '%s\n' "  automountServiceAccountToken: false"
@@ -191,7 +194,7 @@ agent_pod_build_manifest() {
         printf '%s\n' "    - name: DEVZONE_WORKSPACE"
         printf '%s\n' "      value: \"kubernetes\""
         printf '%s\n' "    - name: DEVZONE_RACINE"
-        printf '%s\n' "      value: \"/workspaces/projets\""
+        printf '%s\n' "      value: \"/workspaces/projets\""; agent_pod_egress_manifest_lines "$egress_mode"
         printf '%s\n' "    resources:"
         printf '%s\n' "      limits:"
         printf '%s\n' "        cpu: ${DEVZONE_AGENT_POD_CPU_LIMIT}"
