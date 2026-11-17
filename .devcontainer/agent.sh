@@ -1,12 +1,6 @@
 #!/usr/bin/env bash
-# Dirige opencode sur une consigne : rotation des modèles gratuits (quota,
-# filtre de contenu, modèle indisponible), silence au départ, session figée
-# reprise sur une session neuve, permissions sûres. Module ia (#221).
-#   devzone agent <dossier> <fichier-consigne>
-#   devzone agent etat
-#   devzone agent liberer [<modèle>|--tous]
-# Au premier plan ; & ou nohup pour plusieurs sessions en parallèle, une par
-# dossier (le journal et le rang des modèles sont partagés par instance).
+# Dirige opencode sur une consigne : rotation, silence au depart, reprise.
+# Module ia (#221). devzone agent <dossier> <consigne> | etat | liberer.
 set -euo pipefail
 # Dossier du script, liens symboliques suivis à la main : readlink -f n'existe
 # pas sur macOS (tests sous bash 3.2).
@@ -22,25 +16,21 @@ done
 ICI="$(cd -P "$(dirname "$SOURCE")" && pwd)"
 # shellcheck disable=SC2034 # lue par agent-session.sh
 RACINE="${DEVZONE_RACINE:-$(dirname "$ICI")}"
-# Écarts de modèles et attente du réseau (#328)
 # shellcheck source=agent-erreurs.sh disable=SC1091
 . "$ICI/agent-erreurs.sh"
-# Fichiers de droits des agents protégés (#361)
 # shellcheck source=agent-droits.sh disable=SC1091
 . "$ICI/agent-droits.sh"
-# Configuration, rang partagé, journal et état (#328)
 # shellcheck source=agent-session.sh disable=SC1091
 . "$ICI/agent-session.sh"
-# Workspace Kubernetes : projet et journal dans le pod (#431)
 # shellcheck source=agent-workspace.sh disable=SC1091
 . "$ICI/agent-workspace.sh"
-# Modèle local en dernier de la rotation (#586)
 # shellcheck source=agent-local.sh disable=SC1091
 . "$ICI/agent-local.sh"
-# Liste de secours si « opencode models opencode » ne répond pas : même ordre
-# que la configuration opencode livrée par devzone.
 FREE_MODELS=(big-pickle deepseek-v4.1-flash-free glm-5.3-flash-free nemotron-3.5-super-vl-free
     nemotron-3.5-lightning-free mimo-v2.6-flash-free beam-free flint-40b-free nemotron-3-ultra-free)
+# Session pod ephemere (#222)
+# shellcheck source=agent-pod.sh disable=SC1091
+. "$ICI/agent-pod.sh"
 SILENCE="${DEVZONE_AGENT_SILENCE:-45}"
 FIGEE="${DEVZONE_AGENT_FIGEE:-600}"
 AGENT_ETAT="${DEVZONE_AGENT_ETAT:-$HOME/.local/state/oc-lancer}"
@@ -220,6 +210,7 @@ agent_lancer() {
     exit 3
 }
 case "${1:-}" in
+    status) agent_pod_status ;;
     etat) if [ "${2:-}" = "--json" ]; then exec bash "$ICI/agent-etat-json.sh"; else agent_etat; fi ;;
     liberer)
         [ -n "${2:-}" ] || { agent_aide >&2; exit 2; }
@@ -231,6 +222,14 @@ case "${1:-}" in
         exit 2
         ;;
     *)
+        if [ "${1:-}" = "--pod" ]; then
+            shift
+            if [ -z "${1:-}" ] || [ -z "${2:-}" ]; then
+                agent_aide >&2
+                exit 2
+            fi
+            agent_pod_lancer "$1" "$2"
+        fi
         mode_local=0
         if [ "${1:-}" = "--local" ]; then
             mode_local=1
