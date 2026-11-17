@@ -254,6 +254,8 @@ Dans le conteneur, le récapitulatif `devzone` signale une version publiée plus
 
 **Module `argocd`** : Argo CD sur le cluster de devzone, interface sur https://127.0.0.1:8443 dans le conteneur (voir [Argo CD](manage/docs/reference.md#argo-cd)). Pour l'activer : `devzone enable argocd`.
 
+**Option `devzone agent --pod`** : lance une session agent dans un pod éphémère isolé (ticket #222). Le pod est créé avec des ressources limitées (2 CPU, 4 Gi mémoire), des montages restreints du workspace et de l'état, et une affinité obligatoire vers le pod workspace. Isole : worktree du ticket au même chemin que dans le workspace, .git du dépôt, et sous-dossiers d'état (.config/opencode, .local/share/opencode, .local/state/oc-lancer, .local/npm en lecture seule). N'isole pas : le réseau (non filtré, c'est #220), le kubeconfig de l'hôte, `~/.config/gh`, `~/.claude`, les autres worktrees, et, comme le `.git` du dépôt est monté, les références git des autres branches y restent lisibles et modifiables. Sans `--pod`, le comportement `devzone agent` actuel est strictement inchangé.
+
 Ces modules sont désactivés par défaut, activables à la demande depuis le conteneur (sans rebuild), et leur choix est conservé d'un démarrage à l'autre.
 
 La commande `devzone` s'écrit en anglais, sous-commandes et options comprises (`enable`, `disable`, `platform`, `packages`, `update`, `uninstall`, `status`, `use` ; `postgres create`, `packages add`, `gitlab new-password`, `port --close`, `cluster --yes`). Les anciens noms français restent acceptés et écrivent un avertissement ; la table complète est dans [Anciens noms des commandes](manage/docs/reference.md#anciens-noms-des-commandes).
