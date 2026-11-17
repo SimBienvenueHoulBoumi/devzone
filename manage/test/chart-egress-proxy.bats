@@ -164,3 +164,24 @@ is_subset() {
     docs="$(grep -c '^---$' "$T/render.yaml" || true)"
     [ "$docs" -eq 10 ] || { echo "rendered documents: $docs"; false; }
 }
+
+@test "chart egress-proxy: strict adds the extra domains to the allow list, empty items ignored" {
+    run render --set egressProxy.enabled=true --set egressProxy.mode=strict --set "egressProxy.extraDomains=a.example.com\,.b.example.org\,"
+    [ "$status" -eq 0 ]
+    printf '%s' "$output" | grep -q "acl allowed dstdomain a.example.com" || false
+    printf '%s' "$output" | grep -q "acl allowed dstdomain .b.example.org" || false
+    [ "$(printf '%s\n' "$output" | grep -c 'acl allowed dstdomain ')" -eq 5 ] || false
+}
+
+@test "chart egress-proxy: strict without extra domains keeps the three base domains" {
+    run render --set egressProxy.enabled=true --set egressProxy.mode=strict
+    [ "$status" -eq 0 ]
+    [ "$(printf '%s\n' "$output" | grep -c 'acl allowed dstdomain ')" -eq 3 ] || false
+}
+
+@test "chart egress-proxy: observation ignores the extra domains" {
+    run render --set egressProxy.enabled=true --set egressProxy.mode=observation --set "egressProxy.extraDomains=a.example.com"
+    [ "$status" -eq 0 ]
+    if printf '%s' "$output" | grep -q "acl allowed"; then false; fi
+    printf '%s' "$output" | grep -q "http_access allow all" || false
+}

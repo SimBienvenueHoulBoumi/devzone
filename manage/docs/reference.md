@@ -288,6 +288,9 @@ devzone workspace services disable <service> [--yes]   # les retire
 devzone workspace services status          # présents ou non, par namespace
 devzone workspace argocd status            # Argo CD et ses Applications (#516)
 devzone workspace argocd app add <dépôt> [chemin] | app list | app remove <N>  # projets déployés par Argo CD
+devzone workspace egress observation|strict|off  # mandataire de sortie des sessions --pod (#633)
+devzone workspace egress status                  # mode, prêt ou non, domaines contactés
+devzone workspace egress allow|deny <domaine>    # ajoute ou retire un domaine de la liste stricte
 devzone workspace migrate [--oui]          # copie le poste Docker vers le workspace Kubernetes
 devzone workspace revert [--rapatrier]   # retour au poste Docker
 devzone workspace clean-docker [--oui] # supprime les volumes Docker devzone-* (confirmation)
@@ -428,6 +431,12 @@ Les clones de travail, les worktrees des tickets et les agents vivent dans le po
    - `strict` : le mandataire n'autorise que `egressProxy.allowedDomains` (défaut `.opencode.ai`, `.npmjs.org`, `.github.com`) ; une NetworkPolicy limite la sortie des pods portant le label `devzone.io/agent-session` au mandataire (3128) et au DNS (kube-system UDP/TCP 53). Un conteneur d'initialisation de garde tente 20 fois (1 s) une connexion directe `curl --noproxy "*"` vers `https://opencode.ai` et ne laisse démarrer l'agent que lorsque la connexion échoue ; si la restriction ne devient jamais effective, la session est refusée (« egress restriction never became effective: session refused »), pour couvrir la fenêtre de 1 à 2 s au démarrage.
 
    Lecture des contacts : `kubectl logs deploy/devzone-workspace-egress-proxy -c access-log -n <namespace>`. Limites : le workspace lui-même reste ouvert ; seules les sessions `devzone agent --pod` sont filtrées ; en mode strict, les outils qui ignorent `HTTPS_PROXY` sont bloqués. Sans `egressProxy.enabled=true`, le rendu du chart et le manifeste des pods de session restent identiques.
+
+   **Commandes du poste (#633)** : `devzone workspace egress observation|strict|off` règle le mode ; `status` affiche le mode (label `devzone.io/egress-mode` du service `egress-proxy`, sinon `egress off`), si le mandataire est prêt, le nombre de domaines autorisés et, depuis les 2000 dernières lignes du journal d'accès, chaque domaine contacté avec son nombre d'accès et son état (`allowed`, `refused`, ou `observed` en mode observation). `allow <domaine>` et `deny <domaine>` gèrent la liste ajoutée (`egressProxy.extraDomains`) : un domaine doit être en minuscules, avec au moins un point, un point initial facultatif, sans espace, virgule, `*` ni `/`. `deny` ne retire que les domaines ajoutés ; la liste de base (`.opencode.ai`, `.npmjs.org`, `.github.com`) se change dans `egressProxy.allowedDomains` du chart.
+
+   Le mode et les domaines ajoutés sont mémorisés dans `.devzone.modules` (`egress=`, `egress_domains=`) et rejoués à chaque `devzone workspace start` et `devzone workspace update`. Chaque changement redéploie l'Application Argo CD au même tag d'image : le pod du workspace n'est pas recréé, et la commande attend que le mandataire soit prêt (120 s). Sans Application Argo CD (installation directe), le réglage est gardé et `devzone workspace start` l'applique.
+
+   Exemple de parcours : `devzone workspace egress observation` (on laisse les sessions travailler), `devzone workspace egress status` (les domaines contactés), `devzone workspace egress allow <domaine>` pour chaque domaine légitime qui manque, puis `devzone workspace egress strict` (seules les sessions `--pod` sont filtrées ; le workspace reste ouvert).
 5. **Pousser** : `git push` depuis le worktree, en HTTPS avec les identifiants de `gh` ; la PR se fait comme partout.
 6. **Copies obsolètes** : `devzone workspace copy-to` refuse d'écraser un dossier du pod qui est un clone git d'un autre remote ; `devzone workspace status` signale les anciennes copies `repogarde/` et `wt/` (leur `.git` pointe hors du pod) avec la commande pour les retirer, à lancer après sauvegarde.
 
