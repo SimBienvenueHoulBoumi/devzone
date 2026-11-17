@@ -85,13 +85,13 @@ services_argocd_toggle() {
             chart_require "$svc" || return $?
             echo "▶ $svc as an Argo CD Application (charts/devzone-$svc at $(argocd_revision))…"
             services_note "$svc" on
-            services_reconcile
+            services_reconcile || return $?
             echo "✔ Application devzone-$svc declared ([services] $svc = on in $ARGOCD_CONF); status: devzone workspace argocd status; local access: devzone workspace ports"
             ;;
         disable)
             yes="$(yes_flag "services disable $svc [--yes]" "$@")" || return 1
             services_note "$svc" off
-            services_reconcile
+            services_reconcile || return $?
             if [ "$yes" = 1 ]; then
                 ak delete namespace "devzone-$svc" --wait=true --ignore-not-found >/dev/null
                 case "$svc" in

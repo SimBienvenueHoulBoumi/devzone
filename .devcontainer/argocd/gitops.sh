@@ -127,8 +127,13 @@ GitOps repository of devzone, written by the devzone commands (never by hand): t
 gitops_blob() { git hash-object "$1" 2>/dev/null || true; }
 
 gitops_sha() {
+    local out
     if gitops_is_gitlab; then gitlab_gitops_sha "$@"; return; fi
-    gh api "repos/$(gitops_slug)/contents/$1" --jq .sha 2>/dev/null || true
+    # A missing file answers 404 with its error body on stdout: never taken
+    # for a sha, or a removal would DELETE what is not there (#625)
+    out="$(gh api "repos/$(gitops_slug)/contents/$1" --jq .sha 2>/dev/null)" || out=""
+    case "$out" in '' | *[!0-9a-f]*) out="" ;; esac
+    printf '%s' "$out"
 }
 
 # Writes <file> at <path> of the repository (create or update), <message>
