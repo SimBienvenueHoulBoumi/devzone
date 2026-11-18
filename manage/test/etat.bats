@@ -8,6 +8,9 @@ setup() {
     load commun
     relais_docker_isole
     kube_isole
+    # Outside the pod by default: the ambient DEVZONE_WORKSPACE (a workspace
+    # pod) must not change the messages of these tests
+    unset DEVZONE_WORKSPACE
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
     ETAT_SH="$BATS_TEST_DIRNAME/../../.devcontainer/etat.sh"
     PORTS_AUTO="$BATS_TEST_DIRNAME/../../.devcontainer/ports-auto.sh"
