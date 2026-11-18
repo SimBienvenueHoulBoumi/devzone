@@ -79,9 +79,36 @@ agent_pod_wait() {
 
 # --- Keep the log of the session ---
 
+# Init containers run before the agent: their log goes first, so a refused
+# session shows the guard message. A failing `kubectl logs -c` is not fatal.
 agent_pod_fetch_logs() {
     local pod_name="$1" journal_file="$2"
+    local init_name
+    while IFS= read -r init_name; do
+        [ -n "$init_name" ] || continue
+        echo "=== init container ${init_name} ===" >>"$journal_file"
+        kubectl logs "$pod_name" -c "$init_name" >>"$journal_file" 2>/dev/null || true
+    done <<EOF
+$(kubectl get pod "$pod_name" -o jsonpath='{.spec.initContainers[*].name}' 2>/dev/null || true)
+EOF
     kubectl logs "$pod_name" >>"$journal_file" 2>/dev/null || true
+}
+
+# Names the init container that stopped the pod on stderr: the launcher already
+# shows the end of the log, which contains the message of the guard. Only the
+# init containers that actually failed (exit code different from 0) are named.
+agent_pod_init_failure() {
+    local pod_name="$1"
+    local cause name code
+    cause="$(kubectl get pod "$pod_name" -o jsonpath='{range .status.initContainerStatuses[?(@.state.terminated.exitCode)]}{.name}{" "}{.state.terminated.exitCode}{"\n"}{end}' 2>/dev/null)" || true
+    [ -n "$cause" ] || return 0
+    while IFS=' ' read -r name code; do
+        [ -n "$name" ] || continue
+        [ "${code:-0}" != 0 ] || continue
+        echo "devzone agent --pod : init container ${name} failed (exit ${code})" >&2
+    done <<EOF
+${cause}
+EOF
 }
 
 # Last lines of the log on stderr: the cause of a failure is there.
@@ -198,6 +225,9 @@ agent_pod_lancer() {
     phase="$(agent_pod_wait "$pod_name")" || rc=$?
     agent_pod_fetch_logs "$pod_name" "$journal_file"
     echo "=== end of agent session in pod (phase: ${phase:-Unknown})" >>"$journal_file"
+    if [ "$rc" -ne 0 ] || [ "$phase" = "Failed" ]; then
+        agent_pod_init_failure "$pod_name"
+    fi
     agent_pod_show_tail "$journal_file"
 
     if [ "$rc" -ne 0 ]; then
