@@ -26,8 +26,8 @@ RACINE="${DEVZONE_RACINE:-$(dirname "$ICI")}"
 . "$ICI/agent-workspace.sh"
 # shellcheck source=agent-local.sh disable=SC1091
 . "$ICI/agent-local.sh"
-FREE_MODELS=(big-pickle deepseek-v4.1-flash-free glm-5.3-flash-free nemotron-3.5-super-vl-free
-    nemotron-3.5-lightning-free mimo-v2.6-flash-free beam-free flint-40b-free nemotron-3-ultra-free)
+FREE_MODELS=(big-pickle deepseek-v4.1-flash-free hy4-flash-free nemotron-3.5-super-vl-free
+    nemotron-3.5-lightning-free mimo-v2.6-flash-free beam-free flint-40b-free longcat-2.5-free)
 # Session pod ephemere (#222)
 # shellcheck source=agent-pod.sh disable=SC1091
 . "$ICI/agent-pod.sh"
