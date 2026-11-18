@@ -46,6 +46,10 @@ if [ -f "$ICI/argocd/conf.sh" ]; then
     ARGOCD_CONF="$RACINE/.argocd.conf"
     . "$ICI/argocd/conf.sh"
 fi
+# GitOps repository line in the Kubernetes workspace pod (#639)
+# shellcheck source=SCRIPTDIR/etat-gitops.sh
+# shellcheck disable=SC1091
+. "$ICI/etat-gitops.sh"
 
 # Assistants IA, versions figées : mettre à jour ici, puis devzone apply
 # (ou Rebuild Container). Une ligne par paquet, séparées par une ligne qui ne
@@ -1253,6 +1257,8 @@ etat() {
     argocd_repo="$(conf_get argocd repo)"
     if [ -n "$argocd_repo" ] && [ "$argocd_repo" != none ]; then
         printf '  ○ argocd          GitOps repository: %s\n' "$argocd_repo"
+    elif dans_pod; then
+        gitops_state_line
     else
         printf '  ○ argocd          no GitOps repository: devzone argocd init\n'
     fi
