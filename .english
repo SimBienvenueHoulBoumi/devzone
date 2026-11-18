@@ -137,4 +137,5 @@ manage/test/workspace-update.bats
 manage/scripts/workspace-egress.sh
 manage/test/workspace-egress.bats
 manage/test/workspace-egress-wait.bats
+manage/test/ci-diagnostic.bats
 manage/test/agent-modeles.bats
