@@ -139,3 +139,5 @@ manage/test/workspace-egress.bats
 manage/test/workspace-egress-wait.bats
 manage/test/ci-diagnostic.bats
 manage/test/agent-modeles.bats
+.devcontainer/etat-gitops.sh
+manage/test/etat-gitops.bats
