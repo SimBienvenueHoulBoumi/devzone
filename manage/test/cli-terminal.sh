@@ -17,6 +17,8 @@
 set -uo pipefail
 
 RACINE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+# shellcheck source=SCRIPTDIR/journal-erreur.sh
+. "$(dirname "${BASH_SOURCE[0]}")/journal-erreur.sh"
 export DEVZONE_VOLUMES="devzone-test-cli-$$"
 # Désinstallation : aucun cluster de l'hôte examiné
 export KUBECONFIG=/nexiste/pas
@@ -54,7 +56,21 @@ nettoyer() {
 trap nettoyer EXIT
 
 ok() { reussis=$((reussis + 1)); echo "  ✔ $1"; }
-ko() { echecs=$((echecs + 1)); echo "  ✖ $1"; printf '%s\n' "$2" | tail -8 | sed 's/^/      /'; }
+ko() {
+    echecs=$((echecs + 1))
+    echo "  ✖ $1"
+    printf '%s\n' "$2" | tail -8 | sed 's/^/      /'
+    # make up failure names its full log: show its error lines and tail too
+    local journal
+    journal="$(printf '%s\n' "$2" | sed -n 's/.*[Ff]ull log: \([^[:space:]]*\).*/\1/p' | tail -1)"
+    [ -n "$journal" ] || return 0
+    case "$journal" in
+        /*) ;;
+        *) journal="$COPIE/$journal" ;;
+    esac
+    print_log_errors "$journal"
+    return 0
+}
 
 ESC="$(printf '\033')"
 # humain <nom> <délai s> <code attendu> <motif attendu dans la sortie, ou "">
