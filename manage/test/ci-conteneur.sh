@@ -9,6 +9,10 @@
 #       tests bats ont réussi et si rien d'autre n'était à tester, ou si les
 #       quatre jobs du conteneur ont réussi ; 1 sinon (échec, annulation, job
 #       sauté alors qu'il devait tourner)
+#   bash manage/test/ci-conteneur.sh diagnostic <repo> <run_id>
+#       pour chaque job bats annulé : « never started » si aucun runner ni
+#       étape (relance conseillée), « cancelled while running » si des étapes
+#       ont tourné (#636) ; le verdict de synthese ne change pas ; code 0 toujours
 # Arguments de synthese : sortie tester du job changements, puis résultat
 # (needs.<job>.result) de changements, fonctionnel, cli, windows, ia-arm64
 # (assistants IA installés sur arm64, Mac Apple Silicon, #194) et bats
@@ -60,8 +64,29 @@ synthese() {
     return "$ko"
 }
 
+# Diagnostic des jobs bats annulés (#636) : affiche une ligne par job bats
+# annulé qui n'a jamais eu de runner (aucune étape), ou qui a été annulé
+# pendant son exécution. N'influe pas sur le verdict de synthese. Sort toujours
+# avec 0 : si gh échoue ou est absent, rien n'est affiché. Le TSV est lu par
+# awk et non par read : IFS traite la tabulation comme un blanc, et une
+# colonne vide (runner_name) serait alors décalée
+diagnostic() {
+    local repo="$1" run_id="$2" lignes
+    lignes="$(gh api "repos/$repo/actions/runs/$run_id/jobs" --jq '.jobs[] | select(.name | startswith("bats")) | [.name, .conclusion, (.runner_name // ""), (.steps | length)] | @tsv' 2>/dev/null)" || return 0
+    printf '%s\n' "$lignes" | awk -F '\t' -v run="$run_id" '
+        $2 == "cancelled" && $3 == "" && $4 + 0 == 0 {
+            print "✖ " $1 " : never started, no GitHub runner was available ; rerun with : gh run rerun " run " --failed"
+            next
+        }
+        $2 == "cancelled" && $4 + 0 > 0 {
+            print "✖ " $1 " : cancelled while running (a newer run on the same ref ?)"
+        }
+    ' || true
+    return 0
+}
+
 usage() {
-    echo "usage : bash manage/test/ci-conteneur.sh a-tester < fichiers | synthese <tester> <changements> <fonctionnel> <cli> <windows> <ia-arm64> <bats>" >&2
+    echo "usage : bash manage/test/ci-conteneur.sh a-tester < fichiers | synthese <tester> <changements> <fonctionnel> <cli> <windows> <ia-arm64> <bats> | diagnostic <repo> <run_id>" >&2
     exit 2
 }
 
@@ -71,6 +96,11 @@ case "${1:-}" in
         [ "$#" -eq 8 ] || usage
         shift
         synthese "$@"
+        ;;
+    diagnostic)
+        # Toujours code 0 (#636) : un échec ici interromprait la synthèse qui suit
+        [ "$#" -eq 3 ] || { echo "usage : bash manage/test/ci-conteneur.sh diagnostic <repo> <run_id>" >&2; exit 0; }
+        diagnostic "$2" "$3"
         ;;
     *) usage ;;
 esac

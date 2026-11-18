@@ -255,8 +255,21 @@ jobs:
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # actions: read lets the diagnostic step list the jobs of this run (#636)
+    permissions:
+      contents: read
+      actions: read
     steps:
       - uses: actions/checkout@v7
+      # Bats jobs that never got a runner (cancelled after about 15 minutes, no
+      # step): says so and gives the rerun command. Exits 0 and changes no verdict
+      - name: Diagnostic of jobs that never started
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+        run: bash manage/test/ci-conteneur.sh diagnostic "$REPO" "$RUN_ID"
       - name: Container tests passed, or not needed
         env:
           TESTER: ${{ needs.changements.outputs.tester }}
