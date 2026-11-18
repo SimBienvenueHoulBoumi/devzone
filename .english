@@ -30,6 +30,7 @@ manage/test/shard.sh
 manage/test/shard.bats
 manage/test/workspace.bats
 manage/test/workspace-ports-apps.bats
+manage/test/workspace-ports-ready.bats
 manage/test/workspace-ports.bats
 manage/test/workspace-migration.bats
 manage/test/workspace-retour.bats
