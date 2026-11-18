@@ -100,6 +100,16 @@ alive() {
     [ "$(cat "$D/apps/default.web.3000")" -eq 3000 ]
 }
 
+@test "ready: slice line with an empty ready field (real kubectl format) is not relayed" {
+    services "default|web|10.96.0.11|ClusterIP||3000/TCP,"
+    endpoints "default|web|"
+    round
+    [ "$status" -eq 0 ]
+    sleep 0.3
+    ! grep -q "svc/web" "$T/kubectl.log" || false
+    [ -e "$D/no-ready-pod/default.web.3000" ]
+}
+
 @test "ready: Service with several slices, one of them ready, is relayed" {
     services "default|web|10.96.0.11|ClusterIP||3000/TCP,"
     endpoints "default|web|false," "default|web|true,"
