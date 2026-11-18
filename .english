@@ -130,6 +130,7 @@ manage/test/agent-pod-root.bats
 manage/test/agent-pod-racine.bash
 manage/test/agent-pod-yaml.bats
 manage/test/agent-pod-egress.bats
+manage/test/agent-pod-init.bats
 manage/test/chart-egress-proxy.bats
 manage/scripts/workspace-update.sh
 manage/test/workspace-update.bats
