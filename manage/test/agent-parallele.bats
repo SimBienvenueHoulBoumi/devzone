@@ -166,9 +166,9 @@ diagnostic_rang() {
     printf 'construis la feature\n' >"$DEVZONE_RACINE/workspace/consigne.txt"
     mkdir -p "$DEVZONE_RACINE/workspace/projet-six" "$DEVZONE_RACINE/workspace/projet-sept" \
         "$DEVZONE_RACINE/workspace/projet-huit"
-    for m in deepseek-v4.1-flash-free glm-5.3-flash-free nemotron-3.5-super-vl-free \
+    for m in deepseek-v4.1-flash-free hy4-flash-free nemotron-3.5-super-vl-free \
         nemotron-3.5-lightning-free mimo-v2.6-flash-free beam-free flint-40b-free \
-        nemotron-3-ultra-free; do
+        longcat-2.5-free; do
         echo "$(date +%s) quota 3600" >"$DEVZONE_AGENT_ETAT/ecart-$m"
     done
     j1="$DEVZONE_RACINE/workspace/.agents/projet-six.log"
