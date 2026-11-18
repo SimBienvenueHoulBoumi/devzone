@@ -111,13 +111,13 @@ case "${1:-}" in
         printf '%s\n' \
             'opencode/big-pickle' \
             'opencode/deepseek-v4.1-flash-free' \
-            'opencode/glm-5.3-flash-free' \
+            'opencode/hy4-flash-free' \
             'opencode/nemotron-3.5-super-vl-free' \
             'opencode/nemotron-3.5-lightning-free' \
             'opencode/mimo-v2.6-flash-free' \
             'opencode/beam-free' \
             'opencode/flint-40b-free' \
-            'opencode/nemotron-3-ultra-free'
+            'opencode/longcat-2.5-free'
         ;;
     run)
         modele=""
