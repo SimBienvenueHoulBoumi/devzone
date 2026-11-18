@@ -11,6 +11,8 @@
 set -uo pipefail
 
 RACINE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+# shellcheck source=SCRIPTDIR/journal-erreur.sh
+. "$(dirname "${BASH_SOURCE[0]}")/journal-erreur.sh"
 export DEVZONE_VOLUMES="devzone-test-$$"
 # Cluster kind du test, sur le Docker de l'hôte : nom unique, jamais celui
 # d'un autre devzone
@@ -70,7 +72,7 @@ echoue() {
 demarrer() {
     if ! "${DC[@]}" up "${WS[@]}" "$@" >>"$JOURNAL" 2>&1; then
         echo "✖ démarrage du conteneur impossible ; fin du journal :"
-        tail -20 "$JOURNAL"
+        print_log_errors "$JOURNAL"
         exit 1
     fi
 }
