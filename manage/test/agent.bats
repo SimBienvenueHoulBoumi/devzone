@@ -92,7 +92,7 @@ setup() {
 
 @test "agent : tous les modeles ecartes -> code 3" {
     agent_consigne
-    export FAKE_OP_ECHEC_MODELS="big-pickle deepseek-v4.1-flash-free glm-5.3-flash-free nemotron-3.5-super-vl-free nemotron-3.5-lightning-free mimo-v2.6-flash-free beam-free flint-40b-free nemotron-3-ultra-free"
+    export FAKE_OP_ECHEC_MODELS="big-pickle deepseek-v4.1-flash-free hy4-flash-free nemotron-3.5-super-vl-free nemotron-3.5-lightning-free mimo-v2.6-flash-free beam-free flint-40b-free longcat-2.5-free"
     agent_lance
     [ "$status" -eq 3 ]
     grep -q "aucun modèle gratuit disponible" "$(agent_journal)" || false
