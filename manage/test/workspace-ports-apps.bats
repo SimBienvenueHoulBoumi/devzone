@@ -18,12 +18,14 @@ setup() {
     cat >"$T/bin/kubectl" <<'KUBE'
 #!/usr/bin/env bash
 # Fake kubectl: get svc -A reads $T/svc, ss reads $T/ss, port-forward stays alive (sleep) and logs.
+# get endpointslices -A (#638): every Service of $T/svc has a ready endpoint.
 T="$BATS_TEST_TMPDIR"
 echo "kubectl $*" >>"$T/kubectl.log"
 case "$*" in
     "config get-contexts -o name") echo docker-desktop ;;
     *" exec "*" ss "*) cat "$T/ss" ;;
     "get svc -A "*) cat "$T/svc" ;;
+    "get endpointslices -A "*) awk -F'|' '{print $1 "|" $2 "|true,"}' "$T/svc" ;;
     *" port-forward "*) exec sleep 120 ;;
 esac
 exit 0

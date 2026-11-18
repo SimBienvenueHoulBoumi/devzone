@@ -3,7 +3,9 @@
 # Sourced by ports-workspace.sh, never run alone. One kubectl get svc -A per
 # round: each TCP port of each Service gets a local port, kept stable in
 # .devzone.ports-workspace/apps/<namespace>.<service>.<port> while the Service
-# exists. Output lines: "portlocal|namespace|svc/name|remoteport", as pw_services.
+# exists. Only Services with a ready endpoint are relayed (#638): the others keep
+# their local port and show as "no ready pod" in status. Output lines:
+# "portlocal|namespace|svc/name|remoteport", as pw_services.
 
 PA_MAX=30
 # Namespaces never relayed: system ones, and those of the devzone modules
@@ -13,6 +15,20 @@ PA_NS_SKIP=" kube-system kube-public kube-node-lease local-path-storage devzone-
 # Services of the cluster, one "namespace|name|clusterIP|type|relay annotation|port/proto," line each.
 pa_discover() {
     pw_kubectl get svc -A -o 'jsonpath={range .items[*]}{.metadata.namespace}|{.metadata.name}|{.spec.clusterIP}|{.spec.type}|{.metadata.annotations.devzone\.io/relay}|{range .spec.ports[*]}{.port}/{.protocol},{end}{"\n"}{end}' 2>/dev/null
+}
+
+# Services with a ready endpoint, as " namespace/name " items, from one kubectl get
+# endpointslices call. A Service with several slices is ready if one of its slices has
+# a ready endpoint. Exit 1 if the call fails: the caller then relays every Service.
+pa_ready() {
+    local out ns name conds set=" "
+    out="$(pw_kubectl get endpointslices -A -o 'jsonpath={range .items[*]}{.metadata.namespace}|{.metadata.labels.kubernetes\.io/service-name}|{range .endpoints[*]}{.conditions.ready},{end}{"\n"}{end}' 2>/dev/null)" || return 1
+    while IFS='|' read -r ns name conds; do
+        [ -n "$ns" ] || continue
+        [ -n "$name" ] || continue
+        case "$conds" in *true*) set="$set$ns/$name " ;; esac
+    done <<<"$out"
+    echo "$set"
 }
 
 # Is the Service excluded? $1 namespace, $2 name, $3 clusterIP, $4 type, $5 relay annotation.
@@ -53,14 +69,26 @@ pa_new() {
 }
 
 # One round of applications, from the ports already wanted "$1" (services, pod).
-# Prints the relay lines; writes apps/ (stable local port) and plafond/ (cap marker),
-# removes the state of Services gone, warns once per port over the cap of PA_MAX.
+# Prints the relay lines; writes apps/ (stable local port), plafond/ (cap marker) and
+# no-ready-pod/ (Service without ready endpoint, not relayed nor counted), removes the
+# state of Services gone, warns once per port over the cap of PA_MAX.
 pa_round() {
     local d used excl ns name ip type annot ports pp port key stored loc n=0 seen="" f
+    local ready="" ready_ok=1 unready
     d="$(pw_dir)"
     mkdir -p "$d/apps" "$d/plafond"
     excl="$(grep -E '^ports_exclus=' .devzone.modules 2>/dev/null | tail -1 | cut -d= -f2- | tr ',' ' ')"
     used=" $1 $excl "
+    # One kubectl call per round. If it fails, every Service is relayed, warned once.
+    if ready="$(pa_ready)"; then
+        rm -f "$d/endpoints-unreadable"
+    else
+        ready_ok=0
+        if [ ! -e "$d/endpoints-unreadable" ]; then
+            : >"$d/endpoints-unreadable"
+            echo "⚠ endpointslices unreadable, ready pods not checked" >&2
+        fi
+    fi
     while IFS='|' read -r ns name ip type annot ports; do
         [ -n "$ns" ] || continue
         pa_excluded "$ns" "$name" "$ip" "$type" "$annot" && continue
@@ -78,6 +106,16 @@ pa_round() {
             fi
             used="$used $loc "
             [ "$loc" = "$stored" ] || printf '%s' "$loc" >"$d/apps/$key"
+            unready=0
+            if [ "$ready_ok" -eq 1 ]; then
+                case "$ready" in *" $ns/$name "*) ;; *) unready=1 ;; esac
+            fi
+            if [ "$unready" -eq 1 ]; then
+                mkdir -p "$d/no-ready-pod"
+                : >"$d/no-ready-pod/$key"
+                continue
+            fi
+            rm -f "$d/no-ready-pod/$key"
             if [ "$n" -lt "$PA_MAX" ]; then
                 n=$((n + 1))
                 rm -f "$d/plafond/$key"
@@ -88,13 +126,14 @@ pa_round() {
             fi
         done
     done <<<"$(pa_discover)"
-    for f in "$d"/apps/* "$d"/plafond/*; do
+    for f in "$d"/apps/* "$d"/plafond/* "$d"/no-ready-pod/*; do
         [ -e "$f" ] || continue
         case "$seen" in *" $(basename "$f") "*) ;; *) rm -f "$f" ;; esac
     done
 }
 
 # Status lines of relayed applications: local URL, then namespace/service:port.
+# Then the Services without ready pod, with the local URL they would get.
 pa_status() {
     local d f key rest loc
     d="$(pw_dir)"
@@ -105,5 +144,13 @@ pa_status() {
         key="$(basename "$f")"
         rest="${key#*.}"
         echo "  http://127.0.0.1:$loc  ${key%%.*}/${rest%%.*}:${rest#*.}"
+    done
+    for f in "$d"/no-ready-pod/*; do
+        [ -e "$f" ] || continue
+        key="$(basename "$f")"
+        loc="$(cat "$d/apps/$key" 2>/dev/null || true)"
+        [ -n "$loc" ] || continue
+        rest="${key#*.}"
+        echo "  http://127.0.0.1:$loc  ${key%%.*}/${rest%%.*}:${rest#*.}  no ready pod"
     done
 }
