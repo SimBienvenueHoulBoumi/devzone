@@ -1,36 +1,72 @@
 #!/usr/bin/env bats
-# Host (Ollama) model detection and the devzone-host opencode provider (#665).
-# Fake Ollama (fake curl), no network, no cluster.
+# Host (Ollama) model detection, default choice and update check (#665, #668).
+# Fake Ollama and fake registry (fake curl), no network, no cluster.
 
 setup() {
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
     HM="$BATS_TEST_DIRNAME/../../.devcontainer/ia/host-models.sh"
+    HC="$BATS_TEST_DIRNAME/../../.devcontainer/ia/host-check.sh"
     export HOME="$BATS_TEST_TMPDIR/home"
     export DEVZONE_RACINE="$BATS_TEST_TMPDIR/racine"
     export DEVZONE_OLLAMA_URL="http://host.docker.internal:11434"
-    mkdir -p "$HOME" "$BATS_TEST_TMPDIR/bin" "$DEVZONE_RACINE/workspace"
+    export DEVZONE_OLLAMA_REGISTRY="http://registre.faux"
+    unset DEVZONE_HOST_MODEL DEVZONE_IA_MESURES
+    mkdir -p "$HOME" "$BATS_TEST_TMPDIR/bin" "$DEVZONE_RACINE/workspace" "$BATS_TEST_TMPDIR/manifests"
     : >"$BATS_TEST_TMPDIR/curl.log"
     export FAKE_CURL="$BATS_TEST_TMPDIR/curl.log"
     export FAKE_OLLAMA=ok
-    unset DEVZONE_HOST_MODEL
-    rm -f "$HOME/.config/opencode/config.json"
-    # Fake Ollama: /api/tags returns a JSON payload; anything else succeeds.
+    export FAKE_REGISTRY=on
+    export FAKE_MANIFEST_DIR="$BATS_TEST_TMPDIR/manifests"
+    export FAKE_TAGS='{"models":[{"name":"qwen3-coder:32k","size":12345,"digest":"sha256:aaaaaaaa","details":{"type":"llm"}},{"name":"nomic-embed-text:latest","size":67890,"details":{"type":"embedding"}},{"name":"deepseek-coder:latest","size":99999,"digest":"sha256:bbbbbbbb","details":{"type":"llm"}}]}'
+    rm -f "$HOME/.config/opencode/config.json" "$HOME/.config/devzone/ia-mesures.json"
+    # Fake Ollama: /api/tags returns $FAKE_TAGS; fake registry: a manifest file
+    # per name/tag, exit 1 (404) when absent; honors -o like curl.
     cat >"$BATS_TEST_TMPDIR/bin/curl" <<'FAKE'
 #!/usr/bin/env bash
 echo "$*" >>"$FAKE_CURL"
-case "$*" in
+sortie=""
+url=""
+prev=""
+for a in "$@"; do
+    [ "$prev" = "-o" ] && sortie="$a"
+    prev="$a"
+done
+for a in "$@"; do url="$a"; done
+ecrire() {
+    if [ -n "$sortie" ]; then cat >"$sortie"; else cat; fi
+}
+case "$url" in
     *"/api/tags"*)
-        if [ "${FAKE_OLLAMA:-ok}" = ok ]; then
-            printf '%s' '{"models":[{"name":"qwen3-coder:32k","size":12345,"details":{"type":"llm"}},{"name":"nomic-embed-text:latest","size":67890,"details":{"type":"embedding"}},{"name":"deepseek-coder:latest","size":999,"details":{"type":"llm"}}]}'
-        else
-            exit 1
-        fi
+        [ "${FAKE_OLLAMA:-ok}" = ok ] || exit 1
+        printf '%s' "$FAKE_TAGS" | ecrire
+        ;;
+    *"/v2/library/"*)
+        [ "${FAKE_REGISTRY:-on}" = on ] || exit 1
+        rest="${url#*/v2/library/}"
+        nom="${rest%%/manifests/*}"
+        tag="${rest##*/manifests/}"
+        [ -f "$FAKE_MANIFEST_DIR/$nom/$tag" ] || exit 1
+        cat "$FAKE_MANIFEST_DIR/$nom/$tag" | ecrire
         ;;
     *) exit 0 ;;
 esac
 FAKE
     chmod +x "$BATS_TEST_TMPDIR/bin/curl"
+    # Fake ollama: records any call (must never happen).
+    cat >"$BATS_TEST_TMPDIR/bin/ollama" <<'FAKE'
+#!/usr/bin/env bash
+echo "ollama $*" >>"$FAKE_CURL"
+FAKE
+    chmod +x "$BATS_TEST_TMPDIR/bin/ollama"
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
+}
+
+# Writes a fake registry manifest and prints its sha256.
+pose_manifest() {
+    local nom="$1" tag="$2" corps="$3"
+    mkdir -p "$FAKE_MANIFEST_DIR/$nom"
+    printf '%s' "$corps" >"$FAKE_MANIFEST_DIR/$nom/$tag"
+    sha256sum "$FAKE_MANIFEST_DIR/$nom/$tag" | cut -d' ' -f1
 }
 
 @test "detection: lists non-embedding models and ignores embedding models" {
@@ -42,7 +78,7 @@ FAKE
     [[ "$output" != *"nomic-embed-text"* ]] || false
 }
 
-@test "detection: first model and DEVZONE_HOST_MODEL override" {
+@test "detection: default model and DEVZONE_HOST_MODEL override" {
     run bash "$HM" first
     [ "$status" -eq 0 ]
     [ "$output" = "qwen3-coder:32k" ]
@@ -96,6 +132,128 @@ FAKE
     [ "$(jq -r .model "$F")" = "x/y" ]
     [ "$(jq -r '.provider.autre.name' "$F")" = a ]
     [ "$(jq -e '.provider["devzone-host"]' "$F" >/dev/null 2>&1; echo $?)" -ne 0 ]
+}
+
+@test "premier: la mesure l'emporte, un modèle non détecté est ignoré" {
+    mkdir -p "$HOME/.config/devzone"
+    cat >"$HOME/.config/devzone/ia-mesures.json" <<'EOF'
+{"qwen3-coder:32k":{"reussite":0.8,"tok_s":500,"date":"2026-11-19"},"deepseek-coder:latest":{"reussite":0.9,"tok_s":100,"date":"2026-11-19"},"inconnu:latest":{"reussite":1.0,"tok_s":999,"date":"2026-11-19"}}
+EOF
+    run bash "$HM" first
+    [ "$status" -eq 0 ]
+    [ "$output" = "deepseek-coder:latest" ]
+}
+
+@test "premier: à reussite égale, la plus grande vitesse tok_s gagne" {
+    mkdir -p "$HOME/.config/devzone"
+    cat >"$HOME/.config/devzone/ia-mesures.json" <<'EOF'
+{"qwen3-coder:32k":{"reussite":0.9,"tok_s":500,"date":"2026-11-19"},"deepseek-coder:latest":{"reussite":0.9,"tok_s":100,"date":"2026-11-19"}}
+EOF
+    run bash "$HM" first
+    [ "$status" -eq 0 ]
+    [ "$output" = "qwen3-coder:32k" ]
+}
+
+@test "premier: sans mesure, un nom contenant coder d'abord, puis la plus petite taille" {
+    export FAKE_TAGS='{"models":[{"name":"aaa-small:1","size":1,"details":{"type":"llm"}},{"name":"bbb-coder:1","size":9999,"details":{"type":"llm"}},{"name":"ccc-coder:1","size":5000,"details":{"type":"llm"}}]}'
+    run bash "$HM" first
+    [ "$status" -eq 0 ]
+    [ "$output" = "ccc-coder:1" ]
+}
+
+@test "premier: sans mesure, à taille égale l'ordre du nom décide" {
+    export FAKE_TAGS='{"models":[{"name":"zzz-coder:1","size":10,"details":{"type":"llm"}},{"name":"aaa-coder:1","size":10,"details":{"type":"llm"}}]}'
+    run bash "$HM" first
+    [ "$status" -eq 0 ]
+    [ "$output" = "aaa-coder:1" ]
+}
+
+@test "premier: Nemotron n'est plus le premier, la règle choisit le coder" {
+    export FAKE_TAGS='{"models":[{"name":"hf.co/ggml-org/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-GGUF:Q4_0","size":1,"details":{"type":"llm"}},{"name":"qwen3-coder:32k","size":12345,"details":{"type":"llm"}}]}'
+    run bash "$HM" first
+    [ "$status" -eq 0 ]
+    [ "$output" = "qwen3-coder:32k" ]
+}
+
+@test "check: à jour quand le sha256 du manifeste correspond au digest local" {
+    h="$(pose_manifest qwen3-coder 32k '{"schemaVersion":2}')"
+    export FAKE_TAGS="{\"models\":[{\"name\":\"qwen3-coder:32k\",\"size\":1,\"digest\":\"sha256:$h\",\"details\":{\"type\":\"llm\"}}]}"
+    run bash "$HC" check
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"qwen3-coder:32k : à jour"* ]] || false
+    [[ "$output" != *"mise à jour"* ]] || false
+}
+
+@test "check: mise à jour disponible, la commande ollama pull est affichée" {
+    pose_manifest qwen3-coder 32k '{"schemaVersion":2}' >/dev/null
+    export FAKE_TAGS='{"models":[{"name":"qwen3-coder:32k","size":1,"digest":"sha256:deadbeef","details":{"type":"llm"}}]}'
+    run bash "$HC" check
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"qwen3-coder:32k : mise à jour disponible"* ]] || false
+    [[ "$output" == *"ollama pull qwen3-coder:32k"* ]] || false
+}
+
+@test "check: non vérifiable (hf.co, 404, registre injoignable)" {
+    h="$(pose_manifest qwen3-coder 32k '{"schemaVersion":2}')"
+    export FAKE_TAGS="{\"models\":[{\"name\":\"hf.co/ggml-org/Nemotron:Q4_0\",\"size\":1,\"digest\":\"sha256:$h\",\"details\":{\"type\":\"llm\"}},{\"name\":\"absent:latest\",\"size\":1,\"digest\":\"sha256:$h\",\"details\":{\"type\":\"llm\"}},{\"name\":\"qwen3-coder:32k\",\"size\":1,\"digest\":\"sha256:$h\",\"details\":{\"type\":\"llm\"}}]}"
+    run bash "$HC" check
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"hf.co/ggml-org/Nemotron:Q4_0 : non vérifiable"* ]] || false
+    [[ "$output" == *"absent:latest : non vérifiable"* ]] || false
+    [[ "$output" == *"qwen3-coder:32k : à jour"* ]] || false
+
+    FAKE_REGISTRY=off run bash "$HC" check
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"qwen3-coder:32k : non vérifiable"* ]] || false
+}
+
+@test "check: un seul GET de manifeste par modèle, aucun téléchargement" {
+    h="$(pose_manifest qwen3-coder 32k '{"schemaVersion":2}')"
+    pose_manifest deepseek-coder latest '{"schemaVersion":2}' >/dev/null
+    export FAKE_TAGS="{\"models\":[{\"name\":\"qwen3-coder:32k\",\"size\":1,\"digest\":\"sha256:$h\",\"details\":{\"type\":\"llm\"}},{\"name\":\"deepseek-coder:latest\",\"size\":1,\"digest\":\"sha256:$h\",\"details\":{\"type\":\"llm\"}}]}"
+    : >"$FAKE_CURL"
+    run bash "$HC" check
+    [ "$status" -eq 0 ]
+    [ "$(grep -c '/v2/library/' "$FAKE_CURL")" -eq 2 ]
+    ! grep -q '/api/pull' "$FAKE_CURL" || false
+    ! grep -q '^ollama ' "$FAKE_CURL" || false
+}
+
+@test "check: Ollama injoignable -> message propre" {
+    FAKE_OLLAMA=ko run bash "$HC" check
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"aucun modèle Ollama détecté"* ]] || false
+}
+
+@test "rapport: affiche le modèle retenu et la raison (règle)" {
+    h="$(pose_manifest qwen3-coder 32k '{"schemaVersion":2}')"
+    export FAKE_TAGS="{\"models\":[{\"name\":\"qwen3-coder:32k\",\"size\":12345,\"digest\":\"sha256:$h\",\"details\":{\"type\":\"llm\"}}]}"
+    run bash "$HC" rapport
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"qwen3-coder:32k : à jour ; taille 12345"* ]] || false
+    [[ "$output" == *"modèle retenu : qwen3-coder:32k (règle)"* ]] || false
+}
+
+@test "rapport: la raison est la variable DEVZONE_HOST_MODEL quand elle est posée" {
+    pose_manifest qwen3-coder 32k '{"schemaVersion":2}' >/dev/null
+    export FAKE_TAGS='{"models":[{"name":"qwen3-coder:32k","size":1,"digest":"sha256:aaaaaaaa","details":{"type":"llm"}}]}'
+    DEVZONE_HOST_MODEL=deepseek-coder:latest run bash "$HC" rapport
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"modèle retenu : deepseek-coder:latest (variable DEVZONE_HOST_MODEL)"* ]] || false
+}
+
+@test "rapport: la raison est la mesure et les mesures sont affichées" {
+    pose_manifest qwen3-coder 32k '{"schemaVersion":2}' >/dev/null
+    pose_manifest deepseek-coder latest '{"schemaVersion":2}' >/dev/null
+    export FAKE_TAGS='{"models":[{"name":"qwen3-coder:32k","size":12345,"digest":"sha256:aaaaaaaa","details":{"type":"llm"}},{"name":"deepseek-coder:latest","size":99999,"digest":"sha256:bbbbbbbb","details":{"type":"llm"}}]}'
+    mkdir -p "$HOME/.config/devzone"
+    cat >"$HOME/.config/devzone/ia-mesures.json" <<'EOF'
+{"qwen3-coder:32k":{"reussite":0.8,"tok_s":500,"date":"2026-11-19"},"deepseek-coder:latest":{"reussite":0.9,"tok_s":100,"date":"2026-11-19"}}
+EOF
+    run bash "$HC" rapport
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"mesure : reussite 0.9, tok_s 100"* ]] || false
+    [[ "$output" == *"modèle retenu : deepseek-coder:latest (mesure)"* ]] || false
 }
 
 @test "agent: host model is the local model, after every online model" {
@@ -179,17 +337,7 @@ FAKE
     unset DEVZONE_WORKSPACE
     printf 'ia=on\n' >"$DEVZONE_RACINE/.devzone.modules"
     # Fake Ollama: one model whose name has slashes and a colon (as pulled from Hugging Face).
-    cat >"$BATS_TEST_TMPDIR/bin/curl" <<'FAKE'
-#!/usr/bin/env bash
-echo "$*" >>"$FAKE_CURL"
-case "$*" in
-    *"/api/tags"*)
-        printf '%s' '{"models":[{"name":"hf.co/ggml-org/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-GGUF:Q4_0","size":1,"details":{"type":"llm"}}]}'
-        ;;
-    *) exit 0 ;;
-esac
-FAKE
-    chmod +x "$BATS_TEST_TMPDIR/bin/curl"
+    export FAKE_TAGS='{"models":[{"name":"hf.co/ggml-org/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-GGUF:Q4_0","size":1,"digest":"sha256:aaaaaaaa","details":{"type":"llm"}}]}'
     fake_opencode_rotation
     run bash "$DEVZONE" agent "$DEVZONE_RACINE/workspace/projet" "$DEVZONE_RACINE/workspace/consigne.txt"
     [ "$status" -eq 3 ]

@@ -724,6 +724,8 @@ KUBE
     cp "$BATS_TEST_DIRNAME/../../.devcontainer/kube-compte.sh" "$BATS_TEST_TMPDIR/app/kube-compte.sh"
     cp "$BATS_TEST_DIRNAME/../../.devcontainer/command-aliases.sh" "$BATS_TEST_TMPDIR/app/command-aliases.sh"
     cp "$BATS_TEST_DIRNAME/../../.devcontainer/ia/host-models.sh" "$BATS_TEST_TMPDIR/app/ia/host-models.sh"
+    cp "$BATS_TEST_DIRNAME/../../.devcontainer/ia/host-check.sh" "$BATS_TEST_TMPDIR/app/ia/host-check.sh"
+    cp "$BATS_TEST_DIRNAME/../../.devcontainer/ia/host-check.message" "$BATS_TEST_TMPDIR/app/ia/host-check.message"
     cp "$BATS_TEST_DIRNAME/../../.devcontainer/ia/docker-garde.sh" "$BATS_TEST_TMPDIR/app/ia/docker-garde.sh"
     cp "$BATS_TEST_DIRNAME/../../.devcontainer/ia/plugins/devzone-garde.js" "$BATS_TEST_TMPDIR/app/ia/plugins/devzone-garde.js"
     cp "$BATS_TEST_DIRNAME/../../.devcontainer/ia/plugins/devzone-garde-v2.js" "$BATS_TEST_TMPDIR/app/ia/plugins/devzone-garde-v2.js"
