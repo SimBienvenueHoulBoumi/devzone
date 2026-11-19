@@ -50,6 +50,10 @@ fi
 # shellcheck source=SCRIPTDIR/etat-gitops.sh
 # shellcheck disable=SC1091
 . "$ICI/etat-gitops.sh"
+# Detection of the host (Ollama) models and the devzone-host opencode provider (#665).
+# shellcheck source=SCRIPTDIR/ia/host-models.sh
+# shellcheck disable=SC1091
+. "$ICI/ia/host-models.sh"
 
 # Assistants IA, versions figées : mettre à jour ici, puis devzone apply
 # (ou Rebuild Container). Une ligne par paquet, séparées par une ligne qui ne
@@ -397,7 +401,7 @@ installer_ia() {
 }
 
 appliquer_ia() {
-    local journal tmp
+    local journal tmp detectes
     if [ "$1" = on ]; then
         echo "devzone : installation de Claude Code et opencode (quelques minutes)…"
         if ! installer_ia; then
@@ -418,6 +422,16 @@ appliquer_ia() {
             echo "devzone : garde-fou repowarden non branché (repowarden 4.10 ou plus requis) : repowarden agents init --global" >&2
         fi
         config_opencode
+        # Provider opencode des modèles de l'hôte (Ollama), détection à chaud :
+        # silencieux et sans effet si Ollama ne répond pas.
+        set_provider || true
+        # Signale l'état de la détection (succès dans les deux cas).
+        detectes="$(modeles 2>/dev/null || true)"
+        if [ -n "$detectes" ]; then
+            printf "devzone : %s modèle(s) de l'hôte (Ollama) branché(s)\n" "$(printf '%s\n' "$detectes" | grep -c .)"
+        else
+            printf "devzone : aucun modèle Ollama détecté sur %s (modèles de l'hôte non branchés)\n" "$URL"
+        fi
         # Skill devzone : posée si absente, mise à jour si inchangée, gardée si personnalisée.
         poser_skill_devzone
         echo "devzone : ia actif : claude (puis /login), opencode auth login"
@@ -460,6 +474,8 @@ appliquer_ia() {
         # Configuration opencode : retirée seulement si elle porte le repère devzone
         # et n'a pas été modifiée ; personnalisée → gardée.
         retirer_config_opencode
+        # Retire le fournisseur opencode des modèles de l'hôte, garde le reste du fichier.
+        unset_provider || true
         # Skill devzone : retirée seulement si non modifiée ; personnalisée → gardée.
         retirer_skill_devzone
         # État de devzone agent : gardé dans le volume partagé (désactivation
@@ -1440,6 +1456,20 @@ case "${1:-}" in
         ;;
     agent)
         bash "$ICI/agent.sh" "${@:2}"
+        ;;
+    ia)
+        # Read-only: lists the host (Ollama) models detected and the default model.
+        liste="$(modeles)"
+        def="$(premier)"
+        if [ -z "$liste" ]; then
+            echo "devzone : aucun modèle Ollama détecté sur ${URL} (répondez sur /api/tags)"
+        else
+            echo "devzone : modèles détectés sur l'hôte (Ollama) :"
+            while IFS= read -r m; do
+                [ -n "$m" ] && printf '  %s\n' "$m"
+            done <<<"$liste"
+            echo "modèle par défaut : ${def:-aucun}"
+        fi
         ;;
     ticket) bash "$ICI/ticket.sh" "${@:2}" ;;
     build)

@@ -21,6 +21,7 @@ devzone_aide() {
   devzone test-bash32                      run the bats tests under bash 3.2 (Docker container)
   devzone test-gitlab                      end-to-end test of the GitLab module and platform
   devzone agent <folder> <instructions>    drive opencode with the instructions file
+  devzone ai | ia             list the host (Ollama) models detected and the default model
   devzone ticket <n> [--repo devzone|repowarden]  ticket worktree (ticket done <n> removes it)
   devzone build <folder> [--tag <name>]    build an image in the Kubernetes workspace (BuildKit)
   devzone enable postgres [--context CTX] [--confirm CTX]  shared PostgreSQL, cluster of choice
