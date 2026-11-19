@@ -66,14 +66,23 @@ WS
     [[ "$output" == *"Next: cd "*"make shell (the pod)"* ]] || false
 }
 
-@test "cluster unreachable, no option: docker recorded, reason and migrate named" {
+@test "cluster unreachable, no option: status 1, folder not created, ways to get a cluster" {
     FAKE_KUBE_CLUSTER_INFO=fail
     export FAKE_KUBE_CLUSTER_INFO
     run bash "$CLI" mon --gitops none
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"✖ Kubernetes not reachable: cluster devzone unreachable"*"Nothing created"* ]] || false
+    [[ "$output" == *"minikube start -p devzone"* ]] || false
+    [ ! -e mon ]
+}
+
+@test "cluster unreachable, --docker: docker recorded with the deprecation notice" {
+    FAKE_KUBE_CLUSTER_INFO=fail
+    export FAKE_KUBE_CLUSTER_INFO
+    run bash "$CLI" mon --docker --gitops none
     [ "$status" -eq 0 ]
     [ "$(cat mon/.devzone.modules)" = "workspace=docker" ]
-    [[ "$output" == *"⚠ Kubernetes not reachable: cluster devzone unreachable"* ]] || false
-    [[ "$output" == *"later: devzone workspace migrate"* ]] || false
+    [[ "$output" == *"is deprecated and will be removed"* ]] || false
     [[ "$output" == *"cd "*"make up"* ]] || false
 }
 
@@ -90,7 +99,7 @@ WS
     run bash "$CLI" mon --docker --gitops none
     [ "$status" -eq 0 ]
     [ "$(cat mon/.devzone.modules)" = "workspace=docker" ]
-    [[ "$output" == *"Docker workstation (--docker)"* ]] || false
+    [[ "$output" == *"Docker workstation (--docker) is deprecated"* ]] || false
     [[ "$(cat "$FAKE_LOG")" != *"cluster-info"* ]] || false
 }
 

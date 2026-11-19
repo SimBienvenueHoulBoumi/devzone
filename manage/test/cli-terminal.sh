@@ -119,7 +119,7 @@ humain "devzone uninstall hors d'un dossier devzone : refusé" 30 1 "dossier dev
 # Question posée pendant le lancement (CLI devcontainer simulé) : make up
 # doit la montrer et s'arrêter, pas attendre en silence
 FAUX="$TMP/faux-devzone"
-DEVZONE_SANS_DEMARRER=1 bash "$RACINE/manage/devzone" "$FAUX" >/dev/null
+DEVZONE_SANS_DEMARRER=1 bash "$RACINE/manage/devzone" "$FAUX" --docker >/dev/null
 mkdir -p "$TMP/faux-bin"
 printf '#!/usr/bin/env bash\nprintf "Running the postCreateCommand from devcontainer.json...\\r\\nConfigurer les bots de ce dépôt ? [o/N] "\nsleep 600\n' >"$TMP/faux-bin/npx"
 chmod +x "$TMP/faux-bin/npx"
@@ -128,7 +128,7 @@ humain "make up : question dans le conteneur signalée au lieu d'attendre" 90 2 
     -- env PATH="$TMP/faux-bin:$PATH" DEVZONE_ATTENTE_QUESTION=5 make -C "$FAUX" up
 
 echo "▶ Création et lancement : devzone <dossier> (npm)"
-humain "devzone <dossier> : créé et lancé, avancement affiché" 1800 0 "▶ Installing in container" --envoyer 'GitOps repository for Argo CD\?' $'n\n' -- bash "$RACINE/manage/devzone" "$COPIE"
+humain "devzone <dossier> : créé et lancé, avancement affiché" 1800 0 "▶ Installing in container" --envoyer 'GitOps repository for Argo CD\?' $'n\n' -- bash "$RACINE/manage/devzone" "$COPIE" --docker
 # Question du dépôt GitOps (#539) : répondue « n » ci-dessus, le choix est écrit
 verifier "question GitOps : aucun dépôt, Applications appliquées directement" grep -q "no GitOps repository: the Applications are applied directly" <<<"$SORTIE"
 verifier ".argocd.conf du devzone créé : repo = none" grep -q "repo = none" "$COPIE/.argocd.conf"

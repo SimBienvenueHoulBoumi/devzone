@@ -43,7 +43,7 @@ fabriquer_paquet() {
 
 creer_v1() {
     DZ="$T/devzone"
-    bash "$T/v1/manage/devzone" "$DZ" >/dev/null
+    bash "$T/v1/manage/devzone" "$DZ" --docker >/dev/null
 }
 
 sauvegarde_de() {

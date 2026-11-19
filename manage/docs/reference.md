@@ -344,9 +344,9 @@ devzone workspace status                  # suivre le déploiement ; la dernièr
 `devzone <dossier>` choisit le mode du poste d'après le cluster (#497) :
 
 - **Kubernetes** si `kubectl` et `helm` sont là et que le cluster répond (contexte `devzone` s'il est déclaré, sinon le contexte courant, en 5 s). Le dossier est créé avec `workspace=kubernetes` dans `.devzone.modules`, puis le workspace est installé dans le cluster depuis le dossier (comme `devzone workspace start`). Pas de `devzone workspace migrate` : il n'y a pas de volumes Docker à copier.
-- **Docker** sinon : un avertissement dit pourquoi le cluster ne répond pas, et `workspace=docker` est écrit ; `devzone workspace migrate` reste possible plus tard.
+- **Rien** sinon (#671) : plus de repli silencieux vers Docker. La commande échoue avec le code 1, sans rien créer, dit pourquoi le cluster ne répond pas et affiche, sans les exécuter, les moyens d'en avoir un : un cluster distant (`aws eks update-kubeconfig`, `gcloud container clusters get-credentials`, `az aks get-credentials`, qui le déclarent dans ton kubeconfig ; il faut en faire le contexte courant de kubectl), Docker Desktop avec Kubernetes activé, ou `minikube start -p devzone`. Aucun identifiant cloud ne passe par devzone. La question interactive (choisir un cluster distant ou créer un minikube) reste à faire dans #653.
 
-Options : `--kubernetes` exige le cluster et échoue sans rien créer (le contrôle se fait avant la copie des fichiers) ; `--docker` garde le poste Docker sans contrôler le cluster ; les deux ensemble sont refusés. Sans option, le mode suit le cluster.
+Options : `--kubernetes` exige le cluster et échoue sans rien créer (le contrôle se fait avant la copie des fichiers) ; `--docker` crée le poste Docker, **déprécié** (avertissement, retrait prévu : deux versions mineures après cette livraison, au moins 30 jours), sans contrôler le cluster ; les deux ensemble sont refusés. Sans option, le cluster doit répondre.
 
 Dans ce mode, Docker n'est pas nécessaire sur le poste. Les connexions gh et opencode se font dans le pod, au premier `make shell`.
 
