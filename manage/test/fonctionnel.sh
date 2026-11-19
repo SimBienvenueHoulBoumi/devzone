@@ -70,7 +70,8 @@ echoue() {
 }
 
 demarrer() {
-    if ! "${DC[@]}" up "${WS[@]}" "$@" >>"$JOURNAL" 2>&1; then
+    # One retry when SDKMAN served a corrupt archive (#685); any other failure stops
+    if ! build_with_retry "$JOURNAL" "${DC[@]}" up "${WS[@]}" "$@"; then
         echo "✖ démarrage du conteneur impossible ; fin du journal :"
         print_log_errors "$JOURNAL"
         exit 1

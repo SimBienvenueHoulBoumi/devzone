@@ -16,3 +16,23 @@ print_log_errors() {
     tail -n "$tail_lines" "$log" | sed 's/^/    /'
     return 0
 }
+
+# build_with_retry <log> <command...> (#685): runs the build command with its
+# output appended to <log>. When it fails and the NEW part of the log shows a
+# corrupt download ("The archive was corrupt", SDKMAN), the command runs once
+# more, never twice: a second failure, or any other error, is returned as is,
+# so a real failure is never hidden. Returns the exit code of the last run.
+build_with_retry() {
+    local log="$1" start code=0
+    shift
+    start="$(wc -c <"$log" 2>/dev/null || echo 0)"
+    "$@" >>"$log" 2>&1 && return 0
+    code=$?
+    if tail -c "+$((start + 1))" "$log" 2>/dev/null | grep -q 'archive was corrupt'; then
+        echo "⚠ corrupt download in the build log (#685): one retry of the build"
+        echo "=== retry of the build: corrupt download ===" >>"$log"
+        "$@" >>"$log" 2>&1 && return 0
+        code=$?
+    fi
+    return "$code"
+}
