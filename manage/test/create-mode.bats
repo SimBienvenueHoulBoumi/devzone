@@ -50,22 +50,43 @@ choose() {
     [[ "$output" == *"mode=kubernetes"* ]] || false
 }
 
-@test "no option, cluster unreachable: docker, notice with the reason and migrate" {
+@test "no option, cluster unreachable: status 1, the ways to get a cluster, no mode set" {
     FAKE_KUBE_CLUSTER_INFO=fail
     export FAKE_KUBE_CLUSTER_INFO
     choose ""
-    [ "$status" -eq 0 ]
-    [[ "$output" == *"⚠ Kubernetes not reachable: cluster devzone unreachable"* ]] || false
-    [[ "$output" == *"later: devzone workspace migrate"* ]] || false
-    [[ "$output" == *"mode=docker"* ]] || false
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"✖ Kubernetes not reachable: cluster devzone unreachable"* ]] || false
+    [[ "$output" == *"Nothing created"* ]] || false
+    [[ "$output" == *"kubectl config use-context"* ]] || false
+    [[ "$output" == *"minikube start -p devzone"* ]] || false
+    [[ "$output" == *"--docker still creates the Docker workstation, deprecated"* ]] || false
+    [[ "$output" != *"mode="* ]] || false
+    [ ! -e "$T/folder/.devzone.modules" ]
 }
 
-@test "no option, helm missing: docker, reason helm missing" {
+@test "no option, cluster unreachable: the commands are displayed, never run" {
+    FAKE_KUBE_CLUSTER_INFO=fail
+    export FAKE_KUBE_CLUSTER_INFO
+    choose ""
+    [ "$status" -eq 1 ]
+    [[ "$(cat "$FAKE_LOG")" != *"minikube"* ]] || false
+    [[ "$(cat "$FAKE_LOG")" != *"update-kubeconfig"* ]] || false
+}
+
+@test "no option, helm missing: status 1, reason helm missing" {
     rm "$T/bin/helm"
     choose ""
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"✖ Kubernetes not reachable: helm missing"* ]] || false
+    [[ "$output" != *"mode="* ]] || false
+}
+
+@test "--docker: docker mode, deprecation notice, cluster not asked" {
+    choose docker
     [ "$status" -eq 0 ]
-    [[ "$output" == *"⚠ Kubernetes not reachable: helm missing"* ]] || false
+    [[ "$output" == *"--docker) is deprecated and will be removed"* ]] || false
     [[ "$output" == *"mode=docker"* ]] || false
+    [[ "$(cat "$FAKE_LOG")" != *"cluster-info"* ]] || false
 }
 
 @test "--kubernetes, cluster unreachable: status 1, error notice, nothing written" {

@@ -12,7 +12,7 @@ setup() {
 }
 
 @test "devzone <dossier> : crée un devzone complet dans un dossier neuf" {
-    run bash "$CLI" mon-devzone
+    run bash "$CLI" mon-devzone --docker
     [ "$status" -eq 0 ]
     [[ "$output" == *"créé dans"* ]] || false
     for f in .devcontainer/devcontainer.json .devcontainer/devzone Makefile .gitattributes manage/scripts/lancer.sh manage/scripts/desinstaller.sh README.md LICENSE workspace/.gitkeep .gitignore .devzone.version; do
@@ -28,7 +28,7 @@ setup() {
 }
 
 @test "devzone <dossier> : .devzone.version porte la version et une empreinte par fichier copié" {
-    bash "$CLI" mon-devzone
+    bash "$CLI" mon-devzone --docker
     [ "$(sed -n '1p' mon-devzone/.devzone.version)" = "version $(bash "$CLI" --version)" ]
     for f in .devcontainer/devcontainer.json .devcontainer/devzone Makefile .gitattributes manage/scripts/lancer.sh manage/scripts/desinstaller.sh README.md LICENSE; do
         attendue="$(node -e 'const fs = require("fs"), crypto = require("crypto"); const h = crypto.createHash("sha256"); h.update(fs.readFileSync(process.argv[1])); process.stdout.write(h.digest("hex"))' "mon-devzone/$f")"
@@ -40,7 +40,7 @@ setup() {
 }
 
 @test "devzone <dossier> : n'embarque ni bin/, ni tests, ni CI, ni réglages du dépôt" {
-    bash "$CLI" mon-devzone
+    bash "$CLI" mon-devzone --docker
     for f in bin test .github .repowarden.conf package.json .devzone.log; do
         [ ! -e "mon-devzone/$f" ] || { echo "en trop : $f"; return 1; }
     done
@@ -48,7 +48,7 @@ setup() {
 
 @test "devzone <dossier> : dossier existant vide accepté" {
     mkdir vide
-    run bash "$CLI" vide
+    run bash "$CLI" vide --docker
     [ "$status" -eq 0 ]
     [ -f vide/Makefile ]
 }
@@ -63,7 +63,7 @@ setup() {
 }
 
 @test "devzone <dossier> --gitops none : .argocd.conf note no GitOps" {
-    run bash "$CLI" mon-devzone --gitops none
+    run bash "$CLI" mon-devzone --gitops none --docker
     [ "$status" -eq 0 ]
     grep -q '^\[argocd\]$' mon-devzone/.argocd.conf
     grep -q '^    repo = none$' mon-devzone/.argocd.conf
@@ -73,7 +73,7 @@ setup() {
 }
 
 @test "devzone <dossier> --gitops <url> : .argocd.conf note the URL" {
-    run bash "$CLI" mon-devzone --gitops https://github.com/x/y.git
+    run bash "$CLI" mon-devzone --gitops https://github.com/x/y.git --docker
     [ "$status" -eq 0 ]
     grep -q '^    repo = https://github.com/x/y.git$' mon-devzone/.argocd.conf
 }
@@ -90,13 +90,13 @@ exit 0
 GH
     chmod +x "$BATS_TEST_TMPDIR/bin/gh"
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
-    run bash "$CLI" mon-devzone --gitops github
+    run bash "$CLI" mon-devzone --gitops github --docker
     [ "$status" -eq 0 ]
     grep -q '^    repo = https://github.com/tester/devzone-argocd.git$' mon-devzone/.argocd.conf
 }
 
 @test "devzone <dossier> sans option ni terminal : none et avis sur --gitops" {
-    run bash "$CLI" mon-devzone
+    run bash "$CLI" mon-devzone --docker
     [ "$status" -eq 0 ]
     [[ "$output" == *"--gitops"* ]] || false
     grep -q '^    repo = none$' mon-devzone/.argocd.conf
@@ -249,7 +249,7 @@ faux_docker() {
 }
 
 @test "desinstaller.sh : Docker arrêté → message clair, une seule fois, rien d'autre lancé" {
-    bash "$CLI" dz-des
+    bash "$CLI" dz-des --docker
     faux_cli 'exit 1'
     faux_docker arrete
     run bash dz-des/manage/scripts/desinstaller.sh
@@ -262,7 +262,7 @@ faux_docker() {
 }
 
 @test "devzone desinstaller : Docker arrêté → la commande à relancer est devzone desinstaller" {
-    bash "$CLI" dz-des
+    bash "$CLI" dz-des --docker
     faux_cli 'exit 1'
     faux_docker arrete
     cd dz-des
@@ -279,7 +279,7 @@ faux_docker() {
     chmod +x "$BATS_TEST_TMPDIR/faux/kubectl"
     printf '#!/usr/bin/env bash\necho "make $*" >>"%s/make.log"\n' "$BATS_TEST_TMPDIR" >"$BATS_TEST_TMPDIR/faux/make"
     chmod +x "$BATS_TEST_TMPDIR/faux/make"
-    run bash "$CLI" mon-devzone
+    run bash "$CLI" mon-devzone --docker
     [ "$status" -ne 0 ]
     [ -f mon-devzone/Makefile ]
     [[ "$output" == *"Start Docker Desktop"*"cd $PWD/mon-devzone && make shell"* ]] || false
@@ -419,7 +419,7 @@ faux_docker() {
 }
 
 @test "devzone mon-projet : un nom libre crée toujours le dossier" {
-    run bash "$CLI" mon-projet
+    run bash "$CLI" mon-projet --docker
     [ "$status" -eq 0 ]
     [ -d mon-projet/.devcontainer ]
 }

@@ -426,7 +426,8 @@ devzone $(version) : environnement de développement conteneurisé
                            GitOps repository for Argo CD: github, or a URL, or none
                            --kubernetes: workspace in the cluster (default when it answers;
                            fails with nothing created without one)
-                           --docker: Docker workstation, no cluster check (migrate later)
+                           --docker: deprecated Docker workstation, no cluster check
+                           (without a cluster nothing is created, no silent Docker)
   devzone update [--oui] [--sans-reconstruire]
                            dans un dossier devzone : passe à la version du paquet
                            (sauvegarde les fichiers remplacés, propose make rebuild)

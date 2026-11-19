@@ -138,7 +138,7 @@ jobs:
           type %RUNNER_TEMP%\sortie.txt
           if %SORTIE% equ 0 exit /b 1
           set DEVZONE_SANS_DEMARRER=1
-          call devzone %RUNNER_TEMP%\dzcmd > %RUNNER_TEMP%\sortie.txt 2>&1
+          call devzone %RUNNER_TEMP%\dzcmd --docker > %RUNNER_TEMP%\sortie.txt 2>&1
           set SORTIE=%errorlevel%
           type %RUNNER_TEMP%\sortie.txt
           if not %SORTIE% equ 0 exit /b 1
