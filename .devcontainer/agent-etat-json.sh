@@ -46,6 +46,7 @@ agent_etat_json() {
         [ -e "$f" ] || continue
         journal="$(basename "$f")"
         session_modele_debut "$f"
+        session_demande "$f"
         modele="$MODELE_SESSION"
         [ -n "$modele" ] || modele="inconnu"
         debut="$DEBUT_SESSION"
@@ -58,8 +59,9 @@ agent_etat_json() {
             --arg modele "$modele" \
             --arg debut "$debut" \
             --arg dernier "$dernier" \
+            --arg demande "$DEMANDE_SESSION" \
             --argjson en_cours "$en_cours" \
-            '. + [{journal:$journal,modele:$modele,debut:(if $debut=="" then null else $debut end),dernier_ecrit:(if $dernier=="" then null else $dernier end),en_cours:$en_cours}]' \
+            '. + [{journal:$journal,modele:$modele,debut:(if $debut=="" then null else $debut end),dernier_ecrit:(if $dernier=="" then null else $dernier end),demande:(if $demande=="" then null else $demande end),en_cours:$en_cours}]' \
             <<<"$sessions_json")"
     done
 

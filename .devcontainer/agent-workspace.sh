@@ -72,7 +72,8 @@ agent_workspace() {
     fi
     echo "devzone agent : workspace Kubernetes (pod devzone-workspace-0, $dans_pod) ; --local pour le conteneur"
     agent_kc cp "$consigne" "devzone-workspace-0:/tmp/devzone-agent-$nom.md" -c workspace
-    agent_kc exec devzone-workspace-0 -c workspace -- env DEVZONE_RACINE="$racine_pod" bash -lc 'devzone agent "$1" "$2"' _ "$dans_pod" "/tmp/devzone-agent-$nom.md" || code=$?
+    # shellcheck disable=SC2016 # the pod shell expands MODELE_OPT, not this one
+    agent_kc exec devzone-workspace-0 -c workspace -- env DEVZONE_RACINE="$racine_pod" MODELE_OPT="$MODELE_LISTE" bash -lc 'devzone agent ${MODELE_OPT:+--modele "$MODELE_OPT"} "$1" "$2"' _ "$dans_pod" "/tmp/devzone-agent-$nom.md" || code=$?
     journal="$(journal_de "$nom")"
     mkdir -p "$(dirname "$journal")"
     if ! agent_kc exec devzone-workspace-0 -c workspace -- cat "$racine_pod/workspace/.agents/$nom.log" >>"$journal"; then
@@ -83,8 +84,9 @@ agent_workspace() {
 
 agent_aide() {
     cat <<'AGENTEOF2'
-usage : devzone agent [--local] <dossier> <fichier-consigne>
+usage : devzone agent [--modele <m>[,<m2>…]] [--local] <dossier> <fichier-consigne>
         lance opencode sur la consigne, modèles gratuits en rotation
+        --modele : modèles essayés d'abord, dans l'ordre, puis la rotation
         workspace Kubernetes d'abord s'il tourne ; --local : ce conteneur
         un chemin /workspaces/projets/... absent d'ici est un dossier du pod, sans copie
         devzone agent etat
