@@ -49,7 +49,7 @@ Sous Windows : il est recommandé de cloner avec Git for Windows (les scripts re
 
 #### Mémoire minimale par module
 
-Mesures du 16/11/2026. Le chiffre LLM vient des valeurs du chart (non mesuré en service).
+Mesures du 16/11/2026.
 
 | Module | Consommation mesurée | Mémoire allouable exigée par devzone |
 |---|---|---|
@@ -57,8 +57,6 @@ Mesures du 16/11/2026. Le chiffre LLM vient des valeurs du chart (non mesuré en
 | GitLab | ~3,6 Go | 8 Go |
 | MySQL | ~0,5 Go | aucune |
 | Argo CD | ~0,6 Go | 1 Go |
-| LLM modèle 7B (7 milliards de paramètres, fichier Q4_K_M) | 6 Gi | 12 Go |
-| LLM --preset light (modèle 3B) | 3 Gi demandés, 4 Gi en limite | 8 Go |
 
 Sur Docker Desktop (kind), le contrôle compare le minimum à la mémoire d'un seul nœud, donc à la VM ; sur un cluster de vraies machines, à la somme des nœuds.
 
@@ -245,15 +243,13 @@ Dans le conteneur, le récapitulatif `devzone` signale une version publiée plus
 
 **Module `ia`** : active Claude Code et opencode (versions figées), avec le garde-fou repowarden qui les arrête avant de modifier `main` ou `develop` ou de commiter sans `repowarden cc` (voir [manage/docs/reference.md](manage/docs/reference.md#garde-fou-des-assistants-ia)). Pour l'activer : `devzone enable ia`. Ils sont désinstallés quand le module est désactivé, mais tes connexions restent dans leurs volumes. Le module pose aussi un garde-fou qui arrête les commandes `docker` des agents : devzone est Kubernetes d'abord, seuls les pods sont des conteneurs (`kubectl`, ou un pod jetable, à la place).
 
-**Modèles de ton ordinateur** : devzone n'héberge aucun modèle. Si Ollama tourne sur ta machine, `devzone enable ia` détecte ses modèles et les branche à opencode (rien n'est installé ni téléchargé). `devzone ai` les liste avec le modèle par défaut, `devzone ai check` dit si chacun est à jour sans rien télécharger, et `devzone ai rapport` détaille le modèle retenu et pourquoi (la variable `DEVZONE_HOST_MODEL`, une mesure, ou la règle « un modèle de code d'abord, puis le plus petit »). Détails dans [manage/docs/reference.md](manage/docs/reference.md#configuration-dopencode).
+**Modèles de ton ordinateur** : devzone n'héberge aucun modèle. Si Ollama tourne sur ta machine, `devzone enable ia` détecte ses modèles et les branche à opencode (rien n'est installé ni téléchargé). `devzone ai` les liste avec le modèle par défaut, `devzone ai check` dit si chacun est à jour sans rien télécharger, et `devzone ai rapport` détaille le modèle retenu et pourquoi (la variable `DEVZONE_HOST_MODEL`, une mesure, ou la règle « un modèle de code d'abord, puis le plus petit »). Détails dans [manage/docs/reference.md](manage/docs/reference.md#configuration-dopencode). Le module `llm` (modèle hébergé dans le cluster) a été retiré : devzone n'héberge aucun modèle.
 
 **Module `kubernetes`** : active à chaque démarrage la connexion au cluster de l'hôte et l'installation de metrics-server sur les clusters locaux (pour voir le CPU et la RAM dans k9s). Pour l'activer : `devzone enable kubernetes`. Sans ce module, kubectl, helm, k9s et kind restent installés.
 
 **Plateforme GitHub ou GitLab** : GitHub par défaut (nouvelle architecture). Pour servir une équipe sur GitLab : `devzone platform gitlab --url URL` (ou sans `--url` quand le module `gitlab` est activé, pour l'instance de test) : glab est installé (version figée, somme vérifiée) et connecté à l'instance, et `devzone` l'affiche à la place des contrôles `gh`. `devzone platform github` revient en arrière (glab retiré). GitLab est accessible directement depuis le poste sans relais temporaire. Détails dans [manage/docs/reference.md](manage/docs/reference.md#plateforme--github-ou-gitlab).
 
 **Module `postgres`** : un PostgreSQL partagé, une base par projet (voir [Accéder à PostgreSQL](#accéder-à-postgresql)). Pour l'activer : `devzone enable postgres`.
-
-**Module `llm`** : un modèle de code local (Qwen2.5-Coder, sur CPU) dans le cluster de devzone, utilisé par opencode quand les modèles en ligne sont épuisés ou injoignables ; premier téléchargement de plusieurs Go (voir [manage/docs/reference.md](manage/docs/reference.md#modèle-de-code-local)). Pour l'activer : `devzone enable llm` (`--preset light` sur une machine juste en mémoire).
 
 **Module `argocd`** : Argo CD sur le cluster de devzone, interface sur https://127.0.0.1:8443 dans le conteneur (voir [Argo CD](manage/docs/reference.md#argo-cd)). Pour l'activer : `devzone enable argocd`.
 

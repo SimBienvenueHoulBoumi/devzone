@@ -2,7 +2,7 @@
 # Services of the container held by Argo CD (#559, step 5). Called by devzone
 # (changer) after the state line is written, before the helm-direct path:
 #   services-hook.sh <svc> <on|off>
-# postgres, mysql and llm with the module argocd installed and held: enable writes
+# postgres and mysql with the module argocd installed and held: enable writes
 # [services] <svc> = on and reconciles it (services_reconcile, services.sh),
 # then waits for the pods and starts the relay; disable removes the
 # Application (its resources leave with it, namespace and volumes stay).
@@ -22,7 +22,7 @@ STATE_RACINE="${DEVZONE_RACINE:-$RACINE}"
 # shellcheck disable=SC2034 # read by catalogue-argocd.sh
 ETAT="${DEVZONE_ETAT:-$STATE_RACINE/.devzone.modules}"
 APP_CONF="$RACINE/.devcontainer/catalogue/mysql/app.conf"
-HOOK_SERVICES="postgres mysql llm"
+HOOK_SERVICES="postgres mysql"
 
 # shellcheck source=SCRIPTDIR/../cluster.sh
 # shellcheck disable=SC1091
@@ -46,31 +46,22 @@ hook_script() {
     case "$1" in
         postgres) printf '%s' "$ICI/../postgres/postgres.sh" ;;
         mysql) printf '%s' "$ICI/../catalogue/mysql/mysql.sh" ;;
-        llm) printf '%s' "$ICI/../llm/llm.sh" ;;
     esac
 }
 
 # Waits for the pods of devzone-<svc> to be ready (the Application syncs
-# within a few minutes); the relay needs a ready pod to forward to. The model
-# of llm is downloaded on its first start: LLM_ATTENTE seconds (1800)
+# within a few minutes); the relay needs a ready pod to forward to
 hook_wait() {
-    local ns="devzone-$1" tour=0 limit=300
-    [ "$1" != llm ] || limit="${LLM_ATTENTE:-1800}"
+    local ns="devzone-$1" tour=0
     while [ "$tour" -lt 60 ]; do
         if argocd_kubectl -n "$ns" get pods -o name 2>/dev/null | grep -q .; then
-            argocd_kubectl -n "$ns" wait --for=condition=Ready pod --all --timeout="${limit}s" >/dev/null 2>&1 && return 0
+            argocd_kubectl -n "$ns" wait --for=condition=Ready pod --all --timeout=300s >/dev/null 2>&1 && return 0
         fi
         tour=$((tour + 1))
         sleep 5
     done
     echo "✖ $1 : pods not ready in devzone-$1 (devzone argocd status)" >&2
     return 1
-}
-
-# The llm.sh subcommands used by enable (preset, policy); a function so the
-# tests replace it
-hook_llm() {
-    DEVZONE_RACINE="$STATE_RACINE" bash "$ICI/../llm/llm.sh" "$@"
 }
 
 # Starts the relay of the service, after the pods are ready
@@ -104,20 +95,6 @@ services_secret_postgres() { services_secret_admin postgres devzone-postgres pos
 # The superuser secret of MySQL, the same way
 services_secret_mysql() { services_secret_admin mysql devzone-mysql mysql-admin; }
 
-# The llm secret hook: the chart has no Secret, nothing to create
-services_secret_llm() { :; }
-
-# Parameters of the llm chart: the stored preset (devzone enable llm --preset
-# light), the model and the memory it needs
-services_chart_llm() {
-    local preset
-    # shellcheck source=SCRIPTDIR/../llm/presets.sh
-    # shellcheck disable=SC1091
-    . "$ICI/../llm/presets.sh"
-    preset="$(cat "$STATE_RACINE/workspace/.llm/preset" 2>/dev/null || true)"
-    llm_preset_sets "$preset"
-}
-
 # Value of a key of the MySQL application file (app.conf, read as text)
 app_value() { sed -n "s/^$1=//p" "$APP_CONF" 2>/dev/null | tail -1; }
 
@@ -147,16 +124,9 @@ services_chart_mysql() {
 hook_on() {
     local svc="$1"
     catalogue_argocd_active "$svc" || return 3
-    # llm: the preset of the command line, then the ingress of the workspace
-    if [ "$svc" = llm ]; then
-        hook_llm preset "${@:2}" || return 1
-    fi
     services_note "$svc" on || return 1
     services_reconcile || return 1
     echo "▶ $svc as an Argo CD Application (charts/devzone-$svc at $(argocd_revision))…"
-    if [ "$svc" = llm ]; then
-        hook_llm policy || return 1
-    fi
     hook_wait "$svc" || return 1
     hook_relay "$svc" || return 1
     echo "✔ $svc held by Argo CD ([services] $svc = on in .argocd.conf)"
@@ -180,14 +150,14 @@ hook_off() {
 # is on the Application itself, not on the module state.
 hook_release() {
     local svc app
-    for svc in postgres mysql gitlab llm; do
+    for svc in postgres mysql gitlab; do
         app="devzone-$svc"
         argocd_kubectl -n devzone-argocd get application.argoproj.io "$app" >/dev/null 2>&1 || continue
         argocd_kubectl -n devzone-argocd patch application.argoproj.io "$app" --type merge \
             -p '{"metadata":{"finalizers":null}}' >/dev/null 2>&1 || true
         gitops_delete_application "$app" keep || return 1
         case "$svc" in
-            postgres | mysql | llm) services_note "$svc" off || return 1 ;;
+            postgres | mysql) services_note "$svc" off || return 1 ;;
         esac
         echo "✔ Application $app released: its resources stay for the helm-direct path"
     done
@@ -199,8 +169,8 @@ hook_main() {
     local svc="${1:-}" action="${2:-}"
     case "$svc:$action" in
         argocd:off) hook_load && hook_release ;;
-        postgres:on | mysql:on | llm:on) hook_load && hook_on "$svc" "${@:3}" ;;
-        postgres:off | mysql:off | llm:off) hook_load && hook_off "$svc" ;;
+        postgres:on | mysql:on) hook_load && hook_on "$svc" "${@:3}" ;;
+        postgres:off | mysql:off) hook_load && hook_off "$svc" ;;
         *) return 3 ;;
     esac
 }

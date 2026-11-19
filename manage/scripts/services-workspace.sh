@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 # devzone workspace services (#528): installs or removes the devzone services
-# (gitlab, postgres, mysql, argocd, llm) of a Kubernetes workspace from the workstation.
+# (gitlab, postgres, mysql, argocd) of a Kubernetes workspace from the workstation.
 # Sourced by manage/workspace.sh (drapeau_kubectl, POD, NAMESPACE).
 #   devzone workspace services enable <service> [options]
 #   devzone workspace services disable <service> [--yes]
-#   devzone workspace services bench llm [--apply] [--threads …] [--prompt …] [--gen …]
 #   devzone workspace services status
 # Why: the pod has no administrator access to the cluster (#430), while the
 # installers need one. The workstation creates a ServiceAccount bound to
@@ -20,12 +19,12 @@ SERVICES_ADMIN_SCRIPT="${DEVZONE_SERVICES_ADMIN_SCRIPT:-/usr/local/share/devzone
 SERVICES_TOKEN_DURATION="${DEVZONE_SERVICES_TOKEN_DURATION:-1h}"
 
 services_usage() {
-    echo "devzone workspace services enable|disable <gitlab|postgres|mysql|argocd|llm> [options] | seed gitlab | bench llm [--apply] [--threads …] [--prompt …] [--gen …] | status"
+    echo "devzone workspace services enable|disable <gitlab|postgres|mysql|argocd> [options] | seed gitlab | status"
 }
 
 services_known() {
     case "${1:-}" in
-        gitlab | postgres | mysql | argocd | llm) return 0 ;;
+        gitlab | postgres | mysql | argocd) return 0 ;;
     esac
     return 1
 }
@@ -47,7 +46,6 @@ services_namespace() {
         postgres) echo devzone-postgres ;;
         mysql) echo devzone-mysql ;;
         argocd) echo devzone-argocd ;;
-        llm) echo devzone-llm ;;
     esac
 }
 
@@ -113,10 +111,10 @@ services_run() {
         services_state_note "$action" "$service"
         return 0
     fi
-    # bench is a measure, not a change of state: never taken by Argo CD
+    # postgres and mysql are held by Argo CD when it holds the charts
     case "$service" in
-        postgres | mysql | llm)
-            if [ "$action" != bench ] && argocd_holds_charts; then
+        postgres | mysql)
+            if argocd_holds_charts; then
                 services_argocd_toggle "$service" "$action" "$@"
                 code=$?
                 [ "$code" -eq 0 ] || return "$code"
@@ -161,7 +159,7 @@ services_run() {
 # One line per service: installed (namespace present) or not
 services_status() {
     local s ns
-    for s in gitlab postgres mysql argocd llm; do
+    for s in gitlab postgres mysql argocd; do
         ns="$(services_namespace "$s")"
         # shellcheck disable=SC2046
         if kubectl $(drapeau_kubectl) get namespace "$ns" >/dev/null 2>&1; then
@@ -185,14 +183,6 @@ services() {
                 return 1
             fi
             services_run seed gitlab
-            ;;
-        # The speed of the model measured from the workstation, in the pod (#593)
-        bench)
-            if [ "${2:-}" != llm ]; then
-                echo "✖ bench: only llm ($(services_usage))" >&2
-                return 1
-            fi
-            services_run bench llm "${@:3}"
             ;;
         status | etat | '') services_status ;;
         *)
