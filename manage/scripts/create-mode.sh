@@ -9,6 +9,8 @@
 # shellcheck disable=SC2034 # CREATE_MODE is read by manage/devzone (creer)
 # shellcheck source=manage/scripts/kube-ready.sh
 . "$(dirname "${BASH_SOURCE[0]}")/kube-ready.sh"
+# shellcheck source=manage/scripts/create-cluster.sh
+. "$(dirname "${BASH_SOURCE[0]}")/create-cluster.sh"
 
 # Context shown to the user: devzone if declared, otherwise the current one.
 kube_context() {
@@ -48,6 +50,14 @@ create_mode_choose() {
         return 0
     fi
     if reason="$(kube_ready_reason)"; then
+        CREATE_MODE=kubernetes
+        echo "✔ Kubernetes ready ($(kube_context)): workspace in the cluster"
+        create_mode_existing
+        return 0
+    fi
+    # No option, in a terminal: a menu (remote cluster, minikube) instead of a
+    # failure (#653); the choice is accepted only if the cluster then answers.
+    if [ -z "$option" ] && create_cluster_offer && reason="$(kube_ready_reason)"; then
         CREATE_MODE=kubernetes
         echo "✔ Kubernetes ready ($(kube_context)): workspace in the cluster"
         create_mode_existing

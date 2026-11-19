@@ -27,7 +27,7 @@ fabriquer_paquet() {
     chmod +x "$dossier/manage/devzone"
     cp "$RACINE/.devcontainer/argocd/conf.sh" "$dossier/.devcontainer/argocd/conf.sh"
     # creer sources the mode check (#497) from the package
-    cp "$RACINE/manage/scripts/create-mode.sh" "$RACINE/manage/scripts/kube-ready.sh" "$dossier/manage/scripts/"
+    cp "$RACINE/manage/scripts/create-mode.sh" "$RACINE/manage/scripts/create-cluster.sh" "$RACINE/manage/scripts/kube-ready.sh" "$dossier/manage/scripts/"
     printf '{"name":"devzone","version":"%s"}\n' "$v" >"$dossier/package.json"
     printf '# makefile %s\n' "$marque" >"$dossier/Makefile"
     printf '*.sh text eol=lf\n' >"$dossier/.gitattributes"

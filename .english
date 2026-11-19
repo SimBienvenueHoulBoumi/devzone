@@ -8,6 +8,8 @@ manage/scripts/ci-dns.sh
 manage/scripts/docker.sh
 manage/scripts/kube-ready.sh
 manage/scripts/create-mode.sh
+manage/scripts/create-cluster.sh
+manage/test/create-cluster.bats
 manage/scripts/workspace-wait.sh
 manage/scripts/migrer-retour.sh
 manage/scripts/poste.sh
