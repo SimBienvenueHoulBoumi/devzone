@@ -192,6 +192,7 @@ La skill « repowarden » est déjà posée par `repowarden agents init` : véri
 Claude Code est le **lead** (conception, consignes, relecture, essais, push, suivi CI) ; opencode est le **développeur** (code, tests, commit `repowarden cc`). Plusieurs sessions opencode tournent en parallèle, une par ticket et par worktree.
 
 ```bash
+devzone agent [--modele <m>[,<m2>…]] <dossier> <fichier-consigne>  # modèles demandés d'abord (#420)
 devzone agent <dossier> <fichier-consigne>    # au premier plan
 devzone agent <dossier> <fichier-consigne> &  # plusieurs en parallèle (ou nohup)
 devzone agent etat                            # sessions, modèles écartés et leur cause
@@ -207,6 +208,7 @@ devzone agent --pod <dossier> <consigne>     # session agent dans un pod éphém
   - **réseau** (`ENOTFOUND`, `ECONNREFUSED`, `ETIMEDOUT`…) : retenu seulement si le réseau est coupé au moment de l'erreur, sinon traité comme **autre**. Aucun écart. devzone attend le retour du réseau (essai toutes les 30 s, 30 min au plus, journal « réseau coupé, attente »), puis relance le même modèle, 3 fois au plus par modèle ; ensuite modèle suivant. Sans retour : arrêt, « réseau indisponible », code 4 ;
   - autre (« Model is unavailable », « Upstream request failed »…) : modèle suivant, sans écart.
 - **Écarts** : `devzone agent etat` affiche la cause et l'heure de fin de chaque écart ; `devzone agent liberer <modèle>` (ou `--tous`) le lève.
+- **Modèle demandé** (`--modele`, #420) : liste ordonnée de noms de modèles gratuits (sans préfixe `opencode/`), séparés par des virgules. Ils sont essayés dans cet ordre, sauf ceux écartés ; puis la rotation habituelle reprend depuis le rang partagé, sans réessayer un modèle déjà tenté. Un nom inconnu est refusé avant tout lancement (code 2) avec la liste des modèles gratuits. Un modèle demandé qui démarre ne fait pas avancer le rang partagé. Le journal écrit `=== modèle choisi : <m> (demandé)` au démarrage et `=== modèle demandé <m> écarté (<cause>), suivant` pour un modèle demandé écarté. `devzone agent etat` (et `--json`, champ `demande`) montre le modèle demandé et le modèle utilisé. Non géré avec `--pod`.
 - Une session figée (rien écrit depuis 10 min) est arrêtée et reprise sur une session neuve, modèle suivant, avec une consigne de reprise (`git status`, `git diff`, `git log`). Tous les modèles écartés : « aucun modèle gratuit disponible », code 3.
 - **Permissions** : `.devcontainer/opencode/agent.json` est la configuration par défaut, fusionnée avec `OPENCODE_CONFIG_CONTENT` s'il est défini. opencode applique la dernière règle qui correspond : les `deny` de devzone sont ré-ajoutés en dernier après la fusion, donc l'appelant peut ajouter des permissions mais jamais retirer un interdit de devzone. `webfetch` est permis ; `git push`, `git checkout/reset/restore/stash/clean`, `git branch -D`, les écritures GitHub, `gh api`, `curl`, `sudo`, `rm -rf` (sauf `./.essai`) et la gestion des tickets/PR par repowarden (`repowarden ticket …`, `repowarden proteger`, `repowarden run`) sont interdits ; `git commit` reste permis pour `repowarden cc`. `~/bash32` est toujours protégé (le bash 3.2 du conteneur).
 - **Fichiers de droits protégés** : pendant une session, `agent.json`, `.devcontainer/opencode.jsonc`, `.repowarden.conf` et `.devcontainer/agent-droits.sh` (liste fixe, qu'aucune variable ne change) sont interdits à l'écriture d'opencode (`permission.edit`, `deny` ajoutés en dernier). Comme un agent peut aussi écrire par le shell, `devzone agent` photographie ces fichiers au lancement et les compare après **chaque** session (fin normale, erreur, muet, figée) : tout changement est annulé dans l'arbre (jamais de `reset` ni de `rebase`), le journal reçoit `=== ⚠ droits modifiés : <fichier>` (avec le commit à retirer avant tout push si l'agent a commité) et `devzone agent etat` affiche `⚠ droits modifiés (<projet>)` jusqu'au prochain lancement sur ce projet. Le code de sortie ne change pas. De plus, le garde-fou repowarden (réglage `agentsProtectedPaths` de `.repowarden.conf`, repowarden 4.17.1) refuse à tout agent, Claude Code comme opencode, d'écrire ou de commiter ces fichiers, avant même la fin de la session ; un humain peut toujours les modifier.
@@ -941,6 +943,12 @@ outil peut relancer la consigne ensuite avec `devzone agent`.
 | Deux conteneurs devzone | `make up` lancé pendant que VS Code ouvrait le conteneur | `make down`, puis un seul lancement |
 | Windows (Git Bash, MSYS) : `~/.kube` introuvable | `HOME` et `USERPROFILE` concaténés dans le chemin monté | lancer depuis VS Code ou PowerShell |
 | Pas de `~/.kube` sur l'hôte | Docker le crée vide au démarrage (sous Linux avec Docker Engine, il appartient à root) | rien à faire : le conteneur démarre quand même |
+
+### Reprise de la construction du conteneur de test (#685)
+
+Le job `fonctionnel` construit le conteneur avec le CLI des devcontainers. SDKMAN (Java, Maven) sert parfois une archive corrompue (« Stop! The archive was corrupt ») : ses 5 tentatives tombent alors dans la même panne, le build échoue sans rapport avec le code (constaté deux fois, #661 et le run 44596691628).
+
+`build_with_retry` (`manage/test/journal-erreur.sh`, utilisée par `manage/test/fonctionnel.sh`) refait **une seule fois** la construction quand la partie nouvelle du journal contient ce motif, avec un message visible (« one retry of the build ») et une ligne dans le journal. Un autre échec n'est jamais repris, et une seconde panne identique fait échouer le job : un vrai problème n'est pas masqué. Un motif resté dans un journal d'un lancement précédent ne compte pas.
 
 ### Relance automatique de la CI (#656)
 
