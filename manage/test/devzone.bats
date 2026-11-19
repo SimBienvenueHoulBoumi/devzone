@@ -696,6 +696,95 @@ KUBE
     grep -q "install -g" "$BATS_TEST_TMPDIR/npm.log"
 }
 
+@test "garde-fou docker : activer ia pose le hook Claude Code et les deux plugins" {
+    install_faux_repowarden
+    run bash "$DEVZONE" enable ia
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"garde-fou docker actif pour Claude Code et opencode"* ]] || false
+    [ -f "$HOME/.claude/settings.json" ]
+    [ "$(jq '[.hooks.PreToolUse[] | .hooks[] | select((.command // "") | contains("docker-garde.sh"))] | length' "$HOME/.claude/settings.json")" -eq 1 ]
+    grep -q -- "--format claude" "$HOME/.claude/settings.json"
+    [ -f "$HOME/.config/opencode/plugins/devzone-garde.js" ]
+    [ -f "$HOME/.config/opencode/plugins/devzone-garde-v2.js" ]
+    grep -q "docker-garde.sh" "$HOME/.config/opencode/plugins/devzone-garde.js"
+}
+
+@test "garde-fou docker : disposition de l application installee -> enable ia pose les plugins depuis ia/plugins" {
+    # Copie de l application installee : seuls les fichiers dont le garde-fou a
+    # besoin, sans .opencode ni autre dossier du depot
+    APP="$BATS_TEST_TMPDIR/app/devzone"
+    mkdir -p "$BATS_TEST_TMPDIR/app/ia/plugins" "$BATS_TEST_TMPDIR/app/skills/devzone" "$BATS_TEST_TMPDIR/app/argocd"
+    cp "$BATS_TEST_DIRNAME/../../.devcontainer/devzone" "$APP"
+    cp "$BATS_TEST_DIRNAME/../../.devcontainer/help.sh" "$BATS_TEST_TMPDIR/app/help.sh"
+    cp "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh" "$BATS_TEST_TMPDIR/app/cluster.sh"
+    cp "$BATS_TEST_DIRNAME/../../.devcontainer/etat.sh" "$BATS_TEST_TMPDIR/app/etat.sh"
+    cp "$BATS_TEST_DIRNAME/../../.devcontainer/etat-verrou.sh" "$BATS_TEST_TMPDIR/app/etat-verrou.sh"
+    cp "$BATS_TEST_DIRNAME/../../.devcontainer/etat-gitops.sh" "$BATS_TEST_TMPDIR/app/etat-gitops.sh"
+    cp "$BATS_TEST_DIRNAME/../../.devcontainer/kube-joignable.sh" "$BATS_TEST_TMPDIR/app/kube-joignable.sh"
+    cp "$BATS_TEST_DIRNAME/../../.devcontainer/kube-compte.sh" "$BATS_TEST_TMPDIR/app/kube-compte.sh"
+    cp "$BATS_TEST_DIRNAME/../../.devcontainer/command-aliases.sh" "$BATS_TEST_TMPDIR/app/command-aliases.sh"
+    cp "$BATS_TEST_DIRNAME/../../.devcontainer/ia/host-models.sh" "$BATS_TEST_TMPDIR/app/ia/host-models.sh"
+    cp "$BATS_TEST_DIRNAME/../../.devcontainer/ia/docker-garde.sh" "$BATS_TEST_TMPDIR/app/ia/docker-garde.sh"
+    cp "$BATS_TEST_DIRNAME/../../.devcontainer/ia/plugins/devzone-garde.js" "$BATS_TEST_TMPDIR/app/ia/plugins/devzone-garde.js"
+    cp "$BATS_TEST_DIRNAME/../../.devcontainer/ia/plugins/devzone-garde-v2.js" "$BATS_TEST_TMPDIR/app/ia/plugins/devzone-garde-v2.js"
+    cp "$BATS_TEST_DIRNAME/../../.devcontainer/opencode.jsonc" "$BATS_TEST_TMPDIR/app/opencode.jsonc"
+    cp "$BATS_TEST_DIRNAME/../../.devcontainer/skills/devzone/SKILL.md" "$BATS_TEST_TMPDIR/app/skills/devzone/SKILL.md"
+    chmod +x "$APP"
+    cat >"$BATS_TEST_TMPDIR/app/argocd/services-hook.sh" <<'HOOK'
+#!/usr/bin/env bash
+# Exit 3: not concerned, devzone goes on as before (contract of services-hook.sh)
+exit 3
+HOOK
+    chmod +x "$BATS_TEST_TMPDIR/app/argocd/services-hook.sh"
+    mkdir -p "$HOME/.claude"
+    printf '{}' >"$HOME/.claude/settings.json"
+    DEVZONE_OLLAMA_URL="http://127.0.0.1:9" run bash "$APP" enable ia
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"garde-fou docker actif pour Claude Code et opencode"* ]] || false
+    [ -f "$HOME/.config/opencode/plugins/devzone-garde.js" ]
+    [ -f "$HOME/.config/opencode/plugins/devzone-garde-v2.js" ]
+    grep -qF "$BATS_TEST_TMPDIR/app/ia/docker-garde.sh" "$HOME/.config/opencode/plugins/devzone-garde.js"
+    ! grep -q "__DEVZONE_DOCKER_GARDE__" "$HOME/.config/opencode/plugins/devzone-garde.js"
+    [ "$(jq '[.hooks.PreToolUse[] | .hooks[] | select((.command // "") | contains("docker-garde.sh"))] | length' "$HOME/.claude/settings.json")" -eq 1 ]
+    run bash "$APP" disable ia
+    [ "$status" -eq 0 ]
+    [ ! -e "$HOME/.config/opencode/plugins/devzone-garde.js" ]
+    [ ! -e "$HOME/.config/opencode/plugins/devzone-garde-v2.js" ]
+}
+
+@test "garde-fou docker : activer ia deux fois laisse une seule entrée" {
+    install_faux_repowarden
+    bash "$DEVZONE" enable ia >/dev/null
+    bash "$DEVZONE" enable ia >/dev/null
+    [ "$(jq '[.hooks.PreToolUse[] | .hooks[] | select((.command // "") | contains("docker-garde.sh"))] | length' "$HOME/.claude/settings.json")" -eq 1 ]
+}
+
+@test "garde-fou docker : désactiver ia retire ses entrées et garde un hook utilisateur" {
+    install_faux_repowarden
+    bash "$DEVZONE" enable ia >/dev/null
+    tmp="$(mktemp)"
+    jq '.hooks.PreToolUse += [{"matcher": "Bash", "hooks": [{"type": "command", "command": "outil-personnel"}]}]' \
+        "$HOME/.claude/settings.json" >"$tmp"
+    mv "$tmp" "$HOME/.claude/settings.json"
+    run bash "$DEVZONE" disable ia
+    [ "$status" -eq 0 ]
+    [ -f "$HOME/.claude/settings.json" ]
+    grep -q "outil-personnel" "$HOME/.claude/settings.json"
+    ! grep -q "docker-garde.sh" "$HOME/.claude/settings.json" || false
+    [ ! -e "$HOME/.config/opencode/plugins/devzone-garde.js" ]
+    [ ! -e "$HOME/.config/opencode/plugins/devzone-garde-v2.js" ]
+}
+
+@test "garde-fou docker : cycle activer + désactiver -> empreinte des fichiers identique" {
+    install_faux_repowarden
+    empreinte_avant="$(empreinte)"
+    run bash "$DEVZONE" enable ia
+    [ "$status" -eq 0 ]
+    run bash "$DEVZONE" disable ia
+    [ "$status" -eq 0 ]
+    [ "$(empreinte)" = "$empreinte_avant" ]
+}
+
 @test "activer ia : configuration opencode absente -> écrite depuis le modèle" {
     run bash "$DEVZONE" enable ia
     [ "$status" -eq 0 ]

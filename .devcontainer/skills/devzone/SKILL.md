@@ -54,6 +54,14 @@ Avec `ia` actif, le garde-fou repowarden est branché pour Claude Code et openco
 
 Fichiers de droits protégés (jamais écrits par un agent, listés fixes, qu'aucune variable ne change) : `.devcontainer/opencode/agent.json`, `.devcontainer/opencode.jsonc`, `.repowarden.conf`, `.devcontainer/agent-droits.sh`. Un agent qui les touche est refusé et le changement est annulé dans l'arbre.
 
+## Kubernetes seulement
+
+devzone se décrit avec **le cluster**, **le pod** et **les nœuds** ; jamais « Docker » pour décrire devzone. Seuls les **pods** sont des conteneurs.
+
+Pour un essai jetable, crée un **pod** ou un **namespace** jetable (`kubectl run`, `kubectl create ns`), puis supprime-le. Ne lance pas `docker`.
+
+Un garde-fou arrête les agents qui lancent `docker` ou `docker-compose` ; `DEVZONE_ALLOW_DOCKER=1` est réservé à une action sur l'**hôte** lui-même, jamais au cluster.
+
 ## Services Kubernetes et workspace
 
 Les services (PostgreSQL, MySQL, GitLab, Argo CD) vivent sur le **cluster des services de devzone**, choisi une fois (`devzone cluster CTX`) et gardé dans l'état. Le contexte `devzone` de kubectl est posé sur ce cluster. Namespaces des services : `devzone-*`. `devzone cluster` affiche le cluster et les possibles, `devzone clusters` donne la vue travail/services ; le module `kubernetes` actif relie au cluster de la machine et installe metrics-server au démarrage.
