@@ -133,7 +133,7 @@ devzone mon-devzone
                             d'avoir un cluster, puis tu relances
 ```
 
-Sans cluster, devzone s'arrête et affiche des commandes à copier (il ne les exécute jamais, et aucun identifiant cloud ne passe par lui) : un cluster distant (`aws eks update-kubeconfig`, `gcloud container clusters get-credentials`, `az aks get-credentials`, qui le déclarent dans ton kubeconfig ; fais-en le contexte courant de kubectl), ou un cluster local (Docker Desktop : *Settings → Kubernetes → Enable Kubernetes*, ou `minikube start -p devzone`). `devzone mon-devzone --docker` crée encore le poste Docker, **déprécié** : il sera retiré, et `devzone workspace migrate` le fait passer dans le cluster. Détails dans [manage/docs/reference.md](manage/docs/reference.md#création-directe-dans-le-cluster).
+Sans cluster, dans un terminal, devzone propose de choisir un cluster distant (un contexte de ton kubeconfig, dont tu retapes le nom pour confirmer) ou de créer un minikube ; sans terminal, il s'arrête et affiche des commandes à copier (il ne les exécute jamais, et aucun identifiant cloud ne passe par lui) : un cluster distant (`aws eks update-kubeconfig`, `gcloud container clusters get-credentials`, `az aks get-credentials`, qui le déclarent dans ton kubeconfig ; fais-en le contexte courant de kubectl), ou un cluster local (Docker Desktop : *Settings → Kubernetes → Enable Kubernetes*, ou `minikube start -p devzone`). `devzone mon-devzone --docker` crée encore le poste Docker, **déprécié** : il sera retiré, et `devzone workspace migrate` le fait passer dans le cluster. Détails dans [manage/docs/reference.md](manage/docs/reference.md#création-directe-dans-le-cluster).
 
 ### Vérifier que tout fonctionne
 

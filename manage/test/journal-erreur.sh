@@ -20,17 +20,21 @@ print_log_errors() {
 # build_with_retry <log> <command...> (#685): runs the build command with its
 # output appended to <log>. When it fails and the NEW part of the log shows a
 # corrupt download ("The archive was corrupt", SDKMAN), the command runs once
-# more, never twice: a second failure, or any other error, is returned as is,
-# so a real failure is never hidden. Returns the exit code of the last run.
+# more after a pause, never twice: a second failure, or any other error, is
+# returned as is, so a real failure is never hidden. The pause (BUILD_RETRY_WAIT
+# seconds, default 120) matters: a retry started at once fell in the same bad
+# window of the download server (run 44612039534: both builds corrupt, 75 s
+# apart). Returns the exit code of the last run.
 build_with_retry() {
-    local log="$1" start code=0
+    local log="$1" start=0 code=0 wait_s="${BUILD_RETRY_WAIT:-120}"
     shift
-    start="$(wc -c <"$log" 2>/dev/null || echo 0)"
+    if [ -f "$log" ]; then start="$(wc -c <"$log")"; fi
     "$@" >>"$log" 2>&1 && return 0
     code=$?
     if tail -c "+$((start + 1))" "$log" 2>/dev/null | grep -q 'archive was corrupt'; then
-        echo "⚠ corrupt download in the build log (#685): one retry of the build"
-        echo "=== retry of the build: corrupt download ===" >>"$log"
+        echo "⚠ corrupt download in the build log (#685): one retry of the build in ${wait_s}s"
+        echo "=== retry of the build in ${wait_s}s: corrupt download ===" >>"$log"
+        sleep "$wait_s"
         "$@" >>"$log" 2>&1 && return 0
         code=$?
     fi

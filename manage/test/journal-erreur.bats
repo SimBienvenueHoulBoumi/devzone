@@ -82,6 +82,7 @@ echo "${!var:-ok}"
 FAKE
     chmod +x "$BATS_TEST_TMPDIR/build"
     export FAKE_RUNS="$BATS_TEST_TMPDIR/runs"
+    export BUILD_RETRY_WAIT=0
     : >"$FAKE_RUNS"
 }
 
@@ -102,7 +103,7 @@ FAKE
     [ "$status" -eq 0 ]
     [ "$(cat "$FAKE_RUNS")" = 2 ]
     [[ "$output" == *"one retry of the build"* ]] || false
-    grep -q "retry of the build: corrupt download" "$BATS_TEST_TMPDIR/log"
+    grep -q "retry of the build in 0s: corrupt download" "$BATS_TEST_TMPDIR/log"
 }
 
 @test "build_with_retry: corrupt archive twice: failure kept, never a third run" {
@@ -134,3 +135,22 @@ FAKE
     [ "$(cat "$FAKE_RUNS")" = 1 ]
 }
 
+@test "build_with_retry: the retry waits BUILD_RETRY_WAIT seconds (default 120), announced in the message" {
+    . "$SOURCE"
+    fake_build
+    export FAKE_OUT_1="The archive was corrupt"
+    export BUILD_RETRY_WAIT=1
+    start="$(date +%s)"
+    run build_with_retry "$BATS_TEST_TMPDIR/log" "$BATS_TEST_TMPDIR/build"
+    [ "$status" -eq 0 ]
+    [ $(( $(date +%s) - start )) -ge 1 ]
+    [[ "$output" == *"in 1s"* ]] || false
+    grep -q 'BUILD_RETRY_WAIT:-120' "$RACINE/manage/test/journal-erreur.sh" 2>/dev/null || grep -q 'BUILD_RETRY_WAIT:-120' "$SOURCE"
+}
+
+@test "build_with_retry: an absent log gives no shell error" {
+    . "$SOURCE"
+    fake_build
+    run build_with_retry "$BATS_TEST_TMPDIR/not-yet.log" "$BATS_TEST_TMPDIR/build"
+    [[ "$output" != *"No such file"* ]] || false
+}
