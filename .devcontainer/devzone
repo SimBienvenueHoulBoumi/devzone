@@ -28,7 +28,7 @@ VERSIONS="$ICI/../manage/scripts/versions.sh"
 RACINE="${DEVZONE_RACINE:-$(dirname "$ICI")}"
 # État par défaut de l'instance ; DEVZONE_ETAT garde la priorité (tests, CI)
 ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
-MODULES=(ia kubernetes gitlab postgres argocd mysql llm)
+MODULES=(ia kubernetes gitlab postgres argocd mysql)
 # shellcheck source=SCRIPTDIR/cluster.sh
 # shellcheck disable=SC1091
 . "$ICI/cluster.sh"
@@ -90,7 +90,6 @@ description() {
         postgres) echo "PostgreSQL partagé, une base par projet" ;;
         argocd) echo "Argo CD, interface de déploiement du cluster des services" ;;
         mysql) echo "MySQL partagé, une base par projet" ;;
-        llm) echo "modèle de code local (llama.cpp) dans le cluster des services" ;;
     esac
 }
 
@@ -314,8 +313,8 @@ fichier_echec() {
     echo "$ETAT-echec-$1"
 }
 
-# Services in the Kubernetes workspace pod (#528): gitlab, postgres, argocd and
-# llm live in the cluster, installed from the workstation (devzone workspace
+# Services in the Kubernetes workspace pod (#528): gitlab, postgres and argocd
+# live in the cluster, installed from the workstation (devzone workspace
 # services). The pod has no kubeconfig and a limited account (#430): their
 # presence is the cluster DNS (like #515), never an installer failure marker.
 dans_pod() {
@@ -324,7 +323,7 @@ dans_pod() {
 
 service_module() {
     case "$1" in
-        gitlab | postgres | argocd | llm) return 0 ;;
+        gitlab | postgres | argocd) return 0 ;;
     esac
     return 1
 }
@@ -335,7 +334,6 @@ service_dns() {
         gitlab) echo "gitlab-webservice-default.devzone-gitlab${INSTANCE_SUFFIX}.svc" ;;
         postgres) echo "postgres.devzone-postgres.svc" ;;
         argocd) echo "argocd-server.devzone-argocd.svc" ;;
-        llm) echo "llm.devzone-llm.svc" ;;
     esac
 }
 
@@ -498,6 +496,21 @@ appliquer_ia() {
         fi
         poser_garde_docker
         config_opencode
+        # Remove the provider of the removed llm module from old configs (#669).
+        if [ -f "$HOME/.config/opencode/config.json" ] && command -v jq >/dev/null 2>&1; then
+            tmp="$(mktemp)"
+            if jq '
+                if .provider then del(.provider["devzone-llm"]) | (if .provider == {} then del(.provider) else . end) else . end
+            ' "$HOME/.config/opencode/config.json" >"$tmp" 2>/dev/null; then
+                if [ "$(cat "$tmp")" = "{}" ] || [ "$(jq -c 'del(."$schema") | length' "$tmp" 2>/dev/null)" = 0 ]; then
+                    rm -f "$tmp" "$HOME/.config/opencode/config.json"
+                else
+                    mv "$tmp" "$HOME/.config/opencode/config.json"
+                fi
+            else
+                rm -f "$tmp"
+            fi
+        fi
         # Provider opencode des modèles de l'hôte (Ollama), détection à chaud :
         # silencieux et sans effet si Ollama ne répond pas.
         set_provider || true
@@ -664,7 +677,6 @@ appliquer_postgres() {
     fi
 }
 
-appliquer_llm() { bash "$ICI/llm/llm.sh" apply "$@"; }
 # Argo CD (#411) : installé dans le cluster des services, accès par le relais
 # 127.0.0.1:8443 ; un échec est marqué dans l'état et repris par devzone apply
 appliquer_argocd() {
@@ -1335,7 +1347,7 @@ etat() {
         elif [ "$(valeur "$m")" = on ] && [ "$m" = gitlab ]; then
             # GitLab actif : son état réel (prêt, runner, en échec)
             printf '  ✔ module %-10s %s\n' "$m" "$(bash "$ICI/gitlab/gitlab.sh" status)"
-        elif [ "$(valeur "$m")" = on ] && { [ "$m" = postgres ] || [ "$m" = llm ]; }; then
+        elif [ "$(valeur "$m")" = on ] && [ "$m" = postgres ]; then
             printf '  ✔ module %-10s %s\n' "$m" "$(bash "$ICI/$m/$m.sh" status)"
         elif [ "$(valeur "$m")" = on ] && [ "$m" = argocd ]; then
             printf '  ✔ module %-10s %s\n' "$m" "$(bash "$ICI/argocd/argocd.sh" status)"
@@ -1433,12 +1445,35 @@ etat() {
     fi
 }
 
+# Message for the removed llm module (migration, #669).
+llm_retire_msg() {
+    echo "devzone : module llm retiré : devzone n'héberge plus de modèle ; les modèles de l'hôte (Ollama) sont détectés à la place (devzone ai). Pour libérer le disque : kubectl delete namespace devzone-llm"
+}
+
+# Drops the llm= state line when present and reports the removal once (#669).
+migrer_llm() {
+    [ -f "$ETAT" ] || return 0
+    grep -qE '^llm=' "$ETAT" 2>/dev/null || return 0
+    etat_retirer llm
+    llm_retire_msg
+}
+
 changer() {
     local m="${2:-}"
     if [ -z "$m" ]; then
         echo "devzone : module inconnu : (aucun) ; modules : ${MODULES[*]}" >&2
         exit 1
     fi
+    # llm removed (#669): migration message, never unknown module.
+    if [ "$m" = llm ]; then
+        initialiser 2>/dev/null || true
+        if [ -f "$ETAT" ] && grep -qE '^llm=' "$ETAT" 2>/dev/null; then
+            etat_retirer llm
+        fi
+        llm_retire_msg
+        return 1
+    fi
+    migrer_llm
     # Option docker-hote (#432) : le socket de l'hôte, partagé par défaut.
     # Le choix ne s'applique qu'à la création du conteneur ; sans rebuild,
     # le conteneur courant garde son montage.
@@ -1514,6 +1549,7 @@ case "${1:-}" in
     activer) changer on "${2:-}" "${@:3}" ;;
     desactiver) changer off "${2:-}" "${@:3}" ;;
     appliquer)
+        migrer_llm
         # L'utilisateur confirme l'état courant (#417, étape 4) : les
         # veilleurs peuvent de nouveau désinstaller
         etat_recouvrement_confirmer
@@ -1522,7 +1558,7 @@ case "${1:-}" in
         # gitlab, postgres, argocd: installed from the workstation in the
         # Kubernetes workspace pod (#528), by their installer elsewhere
         [ "$(valeur gitlab)" = off ] || appliquer_service gitlab
-        for m in postgres llm; do [ "$(valeur "$m")" = off ] || appliquer_service "$m"; done
+        [ "$(valeur postgres)" = off ] || appliquer_service postgres
         [ "$(valeur mysql)" = off ] || appliquer_mysql on
         [ "$(valeur argocd)" = off ] || appliquer_service argocd
         ;;
@@ -1571,7 +1607,7 @@ case "${1:-}" in
     utiliser) utiliser "${@:2}" ;;
     clusters) DEVZONE_ETAT="$ETAT" bash "$ICI/clusters.sh" "${@:2}" ;;
     cluster) changer_cluster "${@:2}" ;;
-    postgres | llm) DEVZONE_ETAT="$ETAT" bash "$ICI/$1/$1.sh" "${@:2}" ;;
+    postgres) DEVZONE_ETAT="$ETAT" bash "$ICI/postgres/postgres.sh" "${@:2}" ;;
     mysql) DEVZONE_ETAT="$ETAT" bash "$ICI/catalogue/mysql/mysql.sh" "${@:2}" ;;
     gitlab) DEVZONE_ETAT="$ETAT" bash "$ICI/gitlab/gitlab.sh" "${@:2}" ;;
     catalogue) DEVZONE_ETAT="$ETAT" bash "$ICI/catalogue.sh" list ;;

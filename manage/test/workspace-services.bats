@@ -105,12 +105,6 @@ KUBE
     grep -q 'delete serviceaccount devzone-services-admin' "$T/kubectl.log"
 }
 
-@test "services enable llm --preset light: the options reach the installer in the pod" {
-    run bash "$CLI" workspace services enable llm --preset light
-    [ "$status" -eq 0 ]
-    grep -q 'services-admin.sh enable llm --preset light$' "$T/kubectl.log"
-}
-
 @test "services enable: unknown service refused" {
     run bash "$CLI" workspace services enable redis
     [ "$status" -eq 1 ]
@@ -119,13 +113,12 @@ KUBE
 }
 
 @test "services status: installed or not, by namespace" {
-    export FAUX_NS="devzone-postgres devzone-llm"
+    export FAUX_NS="devzone-postgres"
     run bash "$CLI" workspace services status
     [ "$status" -eq 0 ]
     [[ "$output" == *"✔ postgres installed (namespace devzone-postgres)"* ]] || false
     [[ "$output" == *"○ gitlab not installed: devzone workspace services enable gitlab"* ]] || false
     [[ "$output" == *"○ argocd not installed"* ]] || false
-    [[ "$output" == *"✔ llm installed (namespace devzone-llm)"* ]] || false
     [[ "$output" == *"○ mysql not installed: devzone workspace services enable mysql"* ]] || false
 }
 
@@ -136,21 +129,6 @@ KUBE
     run bash "$CLI" workspace --help
     [ "$status" -eq 0 ]
     [[ "$output" == *"services enable|disable <service>"* ]] || false
-}
-
-@test "services bench llm: options passed to the pod through services-admin.sh bench, Argo CD not asked (#593)" {
-    export FAUX_CONTEXTES="devzone"
-    run bash "$CLI" workspace services bench llm --apply --threads 4,8 --prompt 256 --gen 32
-    [ "$status" -eq 0 ]
-    grep -q 'services-admin.sh bench llm --apply --threads 4,8 --prompt 256 --gen 32$' "$T/kubectl.log"
-    grep -q 'delete clusterrolebinding devzone-services-admin' "$T/kubectl.log"
-}
-
-@test "services bench postgres: refused, nothing run in the pod (#593)" {
-    run bash "$CLI" workspace services bench postgres
-    [ "$status" -eq 1 ]
-    [[ "$output" == *"bench: only llm"* ]] || false
-    ! grep -q 'exec -i' "$T/kubectl.log" || false
 }
 
 @test "services enable gitlab: gitlab=on written in .devzone.modules (#605)" {
@@ -172,11 +150,11 @@ KUBE
     [ "$(cat "$T/.devzone.modules")" = "$(printf 'workspace=kubernetes\nargocd=off')" ]
 }
 
-@test "services enable llm: the other lines of .devzone.modules are kept (#605)" {
+@test "services enable postgres: the other lines of .devzone.modules are kept (#605)" {
     printf 'workspace=kubernetes\nfoo=bar\nargocd=off\n' >"$T/.devzone.modules"
-    run bash "$CLI" workspace services enable llm
+    run bash "$CLI" workspace services enable postgres
     [ "$status" -eq 0 ]
-    grep -qx 'llm=on' "$T/.devzone.modules"
+    grep -qx 'postgres=on' "$T/.devzone.modules"
     grep -qx 'foo=bar' "$T/.devzone.modules"
     grep -qx 'workspace=kubernetes' "$T/.devzone.modules"
     grep -qx 'argocd=off' "$T/.devzone.modules"
@@ -190,13 +168,10 @@ KUBE
     grep -qx 'mysql=off' "$T/.devzone.modules"
 }
 
-@test "services seed, bench and status leave .devzone.modules untouched (#605)" {
+@test "services seed and status leave .devzone.modules untouched (#605)" {
     run bash "$CLI" workspace services seed gitlab
-    [ "$status" -eq 0 ]
-    run bash "$CLI" workspace services bench llm
     [ "$status" -eq 0 ]
     run bash "$CLI" workspace services status
     [ "$status" -eq 0 ]
     ! grep -q '^gitlab=' "$T/.devzone.modules" || false
-    ! grep -q '^llm=' "$T/.devzone.modules" || false
 }

@@ -13,6 +13,12 @@
 #       pour chaque job bats annulé : « never started » si aucun runner ni
 #       étape (relance conseillée), « cancelled while running » si des étapes
 #       ont tourné (#636) ; le verdict de synthese ne change pas ; code 0 toujours
+#   bash manage/test/ci-conteneur.sh relancer <repo> <run_id> <tentative>
+#       relance automatique, une seule fois (#656) : « gh run rerun --failed »
+#       seulement à la première tentative, quand au moins un job est « jamais
+#       démarré » (annulé, sans runner ni étape) et qu'aucun autre job (hors
+#       tests-conteneur) n'a échoué, expiré ou été annulé en cours d'exécution ;
+#       un vrai échec n'est jamais masqué ; code 0 toujours
 # Arguments de synthese : sortie tester du job changements, puis résultat
 # (needs.<job>.result) de changements, fonctionnel, cli, windows, ia-arm64
 # (assistants IA installés sur arm64, Mac Apple Silicon, #194) et bats
@@ -85,8 +91,43 @@ diagnostic() {
     return 0
 }
 
+# Relance automatique des jobs jamais démarrés (#656), appelée par le workflow
+# relance-ci.yml quand le run fonctionnel est terminé en échec. Une seule
+# relance : seulement à la tentative 1. tests-conteneur (le résumé) est ignoré :
+# il échoue justement à cause du job jamais démarré. Sort toujours avec 0.
+relancer() {
+    local repo="$1" run_id="$2" tentative="$3" lignes verdict
+    if [ "$tentative" != 1 ]; then
+        echo "relance : tentative $tentative, une seule relance automatique : rien à faire"
+        return 0
+    fi
+    lignes="$(gh api "repos/$repo/actions/runs/$run_id/jobs" --jq '.jobs[] | [.name, .conclusion, (.runner_name // ""), (.steps | length)] | @tsv' 2>/dev/null)" || {
+        echo "relance : jobs illisibles, aucune relance"
+        return 0
+    }
+    verdict="$(printf '%s\n' "$lignes" | awk -F '\t' '
+        $1 == "tests-conteneur" { next }
+        $2 == "cancelled" && $3 == "" && $4 + 0 == 0 { jamais++; next }
+        $2 == "failure" || $2 == "cancelled" || $2 == "timed_out" { autre++ }
+        END {
+            if (jamais > 0 && autre == 0) print "relancer"
+            else if (jamais > 0) print "echec-reel"
+            else print "rien"
+        }
+    ')" || verdict=rien
+    case "$verdict" in
+        relancer)
+            echo "relance : job jamais démarré (aucun runner, aucune étape) : gh run rerun $run_id --failed"
+            gh run rerun "$run_id" --failed || echo "relance : gh run rerun a échoué, rien de plus à faire"
+            ;;
+        echec-reel) echo "relance : un job n'a pas démarré, mais un autre a échoué ou été annulé en cours : pas de relance automatique" ;;
+        *) echo "relance : aucun job jamais démarré : rien à relancer" ;;
+    esac
+    return 0
+}
+
 usage() {
-    echo "usage : bash manage/test/ci-conteneur.sh a-tester < fichiers | synthese <tester> <changements> <fonctionnel> <cli> <windows> <ia-arm64> <bats> | diagnostic <repo> <run_id>" >&2
+    echo "usage : bash manage/test/ci-conteneur.sh a-tester < fichiers | synthese <tester> <changements> <fonctionnel> <cli> <windows> <ia-arm64> <bats> | diagnostic <repo> <run_id> | relancer <repo> <run_id> <tentative>" >&2
     exit 2
 }
 
@@ -101,6 +142,11 @@ case "${1:-}" in
         # Toujours code 0 (#636) : un échec ici interromprait la synthèse qui suit
         [ "$#" -eq 3 ] || { echo "usage : bash manage/test/ci-conteneur.sh diagnostic <repo> <run_id>" >&2; exit 0; }
         diagnostic "$2" "$3"
+        ;;
+    relancer)
+        # Toujours code 0, comme diagnostic : jamais un second échec par-dessus le premier
+        [ "$#" -eq 4 ] || { echo "usage : bash manage/test/ci-conteneur.sh relancer <repo> <run_id> <tentative>" >&2; exit 0; }
+        relancer "$2" "$3" "$4"
         ;;
     *) usage ;;
 esac

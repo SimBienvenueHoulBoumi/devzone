@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
-# Installs or removes a devzone service (gitlab, postgres, argocd, llm) from inside
+# Installs or removes a devzone service (gitlab, postgres, argocd) from inside
 # the Kubernetes workspace pod, with a temporary administrator token (#528).
 #   services-admin.sh enable|disable <service> [options of devzone enable]
 #   services-admin.sh seed gitlab   data of gitlab seeded again, in the pod (#538)
-#   services-admin.sh bench llm [options]   speed of the model (#593)
 # Run by the workstation (manage/scripts/services-workspace.sh) through
 # kubectl exec -i: the token comes on stdin, is never printed and lives only
 # in a temporary kubeconfig removed at the end.
@@ -44,19 +43,16 @@ service="${2:-}"
 case "$action" in
     enable | activer) action=enable ;;
     disable | desactiver) action=disable ;;
-    seed | bench) ;;
-    *) refuse "usage: services-admin.sh enable|disable|seed|bench gitlab|postgres|argocd|llm [options]" ;;
+    seed) ;;
+    *) refuse "usage: services-admin.sh enable|disable|seed gitlab|postgres|argocd [options]" ;;
 esac
 case "$service" in
-    gitlab | postgres | argocd | llm) ;;
-    *) refuse "unknown service: ${service:-(none)} (gitlab, postgres, argocd, llm)" ;;
+    gitlab | postgres | argocd) ;;
+    *) refuse "unknown service: ${service:-(none)} (gitlab, postgres, argocd)" ;;
 esac
 # The seed of the data (group, demo project, dev user, runner) is gitlab's (#538)
 if [ "$action" = seed ] && [ "$service" != gitlab ]; then
     refuse "seed: only gitlab"
-fi
-if [ "$action" = bench ] && [ "$service" != llm ]; then
-    refuse "bench: only llm"
 fi
 [ "${DEVZONE_WORKSPACE:-}" = kubernetes ] || refuse "only in the Kubernetes workspace pod"
 [ -f "$SA_DIR/ca.crt" ] || refuse "cluster CA not found: $SA_DIR/ca.crt"
@@ -118,6 +114,5 @@ echo "devzone services: $action $service in the cluster of the pod (temporary ad
 case "$action" in
     # The seed is a module command: devzone gitlab seed (#538)
     seed) "$DEVZONE_CMD" gitlab seed "${@:3}" ;;
-    bench) "$DEVZONE_CMD" llm bench "${@:3}" ;;
     *) "$DEVZONE_CMD" "$action" "$service" "${@:3}" ;;
 esac
