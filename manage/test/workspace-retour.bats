@@ -65,6 +65,20 @@ setup() {
     grep -qx "workspace=kubernetes" "$T/workstation/.devzone.modules" || false
 }
 
+@test "revert: deprecation warning on stderr, still switches back to docker" {
+    echo "workspace=kubernetes" >>"$T/workstation/.devzone.modules"
+    ws revert
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"⚠ devzone workspace revert is deprecated: the Docker workstation will be removed"* ]] || false
+    [[ "$output" == *"devzone workspace migrate stays"* ]] || false
+    grep -qx "workspace=docker" "$T/workstation/.devzone.modules" || false
+}
+
+@test "migrate: no deprecation warning" {
+    ws migrate --yes
+    [[ "$output" != *"deprecated"* ]] || false
+}
+
 @test "revert: unknown option refused" {
     ws revert --all
     [ "$status" -eq 1 ]
