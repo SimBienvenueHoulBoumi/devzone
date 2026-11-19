@@ -9,7 +9,8 @@
       "jdkDistro": "tem",
       "installMaven": true,
       "installGradle": true,
-      "gradleVersion": "9.8.2"
+      "gradleVersion": "9.8.2",
+      "mavenVersion": "3.9.8"
     },
     "ghcr.io/devcontainers/features/node:1": {
       "version": "lts",
