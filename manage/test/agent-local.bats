@@ -61,7 +61,8 @@ FAKE
     agent_lance
     [ "$status" -eq 3 ]
     ! grep -q 'devzone-llm' "$FAKE_ARGS" || false
-    [ ! -s "$FAKE_CURL" ]
+    grep -q '/api/tags' "$FAKE_CURL" || false
+    ! grep -q '/health' "$FAKE_CURL" || false
 }
 
 @test "agent: module llm on but /health fails: never tried" {
