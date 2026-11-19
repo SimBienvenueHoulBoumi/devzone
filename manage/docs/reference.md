@@ -942,6 +942,17 @@ outil peut relancer la consigne ensuite avec `devzone agent`.
 | Windows (Git Bash, MSYS) : `~/.kube` introuvable | `HOME` et `USERPROFILE` concaténés dans le chemin monté | lancer depuis VS Code ou PowerShell |
 | Pas de `~/.kube` sur l'hôte | Docker le crée vide au démarrage (sous Linux avec Docker Engine, il appartient à root) | rien à faire : le conteneur démarre quand même |
 
+### Relance automatique de la CI (#656)
+
+Le job `bats (macos-latest)` n'obtient parfois aucun runner : il reste en file une quinzaine de minutes, puis est annulé sans une seule étape (« jamais démarré »), et `tests-conteneur` échoue alors, volontairement (#522). Le workflow `.github/workflows/relance-ci.yml` relance ce cas **une seule fois**, sans intervention.
+
+- **Déclencheur** : le run `fonctionnel` se termine en échec (`workflow_run`).
+- **Décision** (`bash manage/test/ci-conteneur.sh relancer <dépôt> <run> <tentative>`) : relance (`gh run rerun --failed`) seulement si au moins un job est jamais démarré (annulé, sans runner, sans étape) **et** qu'aucun autre job, hors `tests-conteneur`, n'a échoué, expiré ou été annulé en cours d'exécution. Un vrai échec de test n'est jamais masqué, ni un job annulé par un run plus récent.
+- **Une seule relance** : le workflow ne tourne qu'à la tentative 1 ; le run relancé est la tentative 2, donc aucune boucle. Le journal du job dit ce qui a été décidé.
+- **Droits minimaux** : `actions: write` sur ce workflow seul. Il récupère la branche par défaut (jamais le code de la PR) et n'utilise que l'identifiant du run.
+- **Limite** : un workflow `workflow_run` ne s'exécute que depuis la branche par défaut : il n'agit qu'après la première livraison qui le contient dans `main`. Le dépôt repowarden a le même défaut, à traiter là-bas.
+- **Désactiver** : supprimer le fichier, ou « Disable workflow » dans l'onglet Actions de GitHub. Le diagnostic de `tests-conteneur` (#636) continue d'indiquer la commande de relance à la main.
+
 ## Anciens noms des commandes
 
 Les commandes de devzone s'écrivent en anglais (#502). Les anciens noms français restent acceptés et font exactement la même chose, mais écrivent un avertissement sur la sortie d'erreur (#532) :
