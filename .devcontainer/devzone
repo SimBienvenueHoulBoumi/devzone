@@ -400,6 +400,77 @@ installer_ia() {
     [ "${#IA_FAILED[@]}" -eq 0 ]
 }
 
+# Docker guard for the folders that are not this repository: a Claude Code
+# PreToolUse hook in the global settings and the two opencode plugins in the
+# global plugins folder. Idempotent, other user settings and hooks preserved.
+poser_garde_docker() {
+    local script="$ICI/ia/docker-garde.sh" config="$HOME/.claude/settings.json"
+    local src="$ICI/ia/plugins" dst="$HOME/.config/opencode/plugins"
+    local tmp f
+    if ! command -v jq >/dev/null 2>&1; then
+        echo "devzone : jq absent : garde-fou docker non posé pour Claude Code" >&2
+    elif [ ! -f "$config" ]; then
+        echo "devzone : $config absent : garde-fou docker non posé pour Claude Code" >&2
+    elif ! jq -e . "$config" >/dev/null 2>&1; then
+        echo "devzone : $config illisible (JSON invalide) : garde-fou docker non posé pour Claude Code" >&2
+    else
+        tmp="$(mktemp)"
+        if jq --arg cmd "bash \"$script\" --format claude" '
+            .hooks = (.hooks // {}) |
+            .hooks.PreToolUse = (.hooks.PreToolUse // []) |
+            if ([.hooks.PreToolUse[]? | .hooks[]? | (.command // "")] | any(contains("docker-garde.sh")))
+            then .
+            else .hooks.PreToolUse += [{"matcher": "Bash", "hooks": [{"type": "command", "command": $cmd}]}]
+            end
+        ' "$config" >"$tmp" 2>/dev/null; then
+            mv "$tmp" "$config"
+        else
+            rm -f "$tmp"
+            echo "devzone : $config inchangé : garde-fou docker non posé pour Claude Code" >&2
+        fi
+    fi
+    mkdir -p "$dst"
+    for f in devzone-garde.js devzone-garde-v2.js; do
+        [ -f "$src/$f" ] || continue
+        sed "s|__DEVZONE_DOCKER_GARDE__|$script|g" "$src/$f" >"$dst/$f"
+    done
+    echo "devzone : garde-fou docker actif pour Claude Code et opencode"
+}
+
+# Removes only the Docker guard entries (commands containing docker-garde.sh)
+# and the two plugins; the rest of settings.json and of the plugins is kept.
+retirer_garde_docker() {
+    local config="$HOME/.claude/settings.json" tmp
+    if [ -f "$config" ] && jq -e . "$config" >/dev/null 2>&1; then
+        tmp="$(mktemp)"
+        if jq '
+            if (.hooks.PreToolUse // null) != null then
+                .hooks.PreToolUse = [
+                    .hooks.PreToolUse[] |
+                    if (.hooks // null) != null then
+                        .hooks = [ .hooks[] | select(((.command // "") | contains("docker-garde.sh")) | not) ] |
+                        select((.hooks | length) > 0)
+                    else
+                        select(((.command // "") | contains("docker-garde.sh")) | not)
+                    end
+                ] |
+                if (.hooks.PreToolUse | length) == 0 then del(.hooks.PreToolUse) else . end |
+                if ((.hooks // {}) | keys | length) == 0 then del(.hooks) else . end
+            else . end
+        ' "$config" >"$tmp" 2>/dev/null; then
+            if [ "$(cat "$tmp")" = "{}" ]; then
+                rm -f "$tmp" "$config"
+            else
+                mv "$tmp" "$config"
+            fi
+        else
+            rm -f "$tmp"
+        fi
+    fi
+    rm -f "$HOME/.config/opencode/plugins/devzone-garde.js" \
+          "$HOME/.config/opencode/plugins/devzone-garde-v2.js"
+}
+
 appliquer_ia() {
     local journal tmp detectes
     if [ "$1" = on ]; then
@@ -421,6 +492,7 @@ appliquer_ia() {
         else
             echo "devzone : garde-fou repowarden non branché (repowarden 4.10 ou plus requis) : repowarden agents init --global" >&2
         fi
+        poser_garde_docker
         config_opencode
         # Provider opencode des modèles de l'hôte (Ollama), détection à chaud :
         # silencieux et sans effet si Ollama ne répond pas.
@@ -471,6 +543,8 @@ appliquer_ia() {
         # Plugin opencode du garde-fou (retiré aussi par repowarden ci-dessus)
         rm -f "$HOME/.config/opencode/plugins/repowarden-garde.js" \
               "$HOME/.config/opencode/plugins/repowarden-garde-v2.js"
+        # Garde-fou docker : seules ses entrées et ses plugins sont retirés.
+        retirer_garde_docker
         # Configuration opencode : retirée seulement si elle porte le repère devzone
         # et n'a pas été modifiée ; personnalisée → gardée.
         retirer_config_opencode
