@@ -239,7 +239,7 @@ case "${1:-}" in
         echo "  argocd status | init [--repo <url>|--none] | apply | app add <repo url> [path] [--name N] [--revision R] | app list | app remove <N>"
         echo "                        Argo CD of the workspace: .argocd.conf, GitOps repository, your projects as Applications"
         echo "  migrate [--yes]        copy Docker workstation to Kubernetes workspace (nothing is deleted)"
-        echo "  revert [--bring-back]  back to Docker workstation; --bring-back: copy pod projects first"
+        echo "  revert [--bring-back]  back to Docker workstation (deprecated, will be removed); --bring-back: copy pod projects first"
         echo "  clean-docker           remove devzone-* Docker volumes, after confirmation [y/N] (--yes)"
         echo "  egress observation|strict|off|status|allow <domain>|deny <domain>   egress proxy of the agent sessions (--pod)"
         ;;
