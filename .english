@@ -145,3 +145,9 @@ manage/test/agent-modeles.bats
 manage/test/etat-gitops.bats
 manage/test/journal-erreur.sh
 manage/test/journal-erreur.bats
+.devcontainer/ia/docker-garde.sh
+manage/test/docker-garde.bats
+.opencode/plugins/devzone-garde.js
+.opencode/plugins/devzone-garde-v2.js
+.devcontainer/ia/plugins/devzone-garde.js
+.devcontainer/ia/plugins/devzone-garde-v2.js
