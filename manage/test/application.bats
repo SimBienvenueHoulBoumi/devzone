@@ -20,6 +20,8 @@ setup() {
     cp "$RACINE_TEST/.devcontainer/etat-gitops.sh" "$T/app/etat-gitops.sh"
     cp "$RACINE_TEST/.devcontainer/kube-joignable.sh" "$T/app/kube-joignable.sh"
     cp "$RACINE_TEST/.devcontainer/kube-compte.sh" "$T/app/kube-compte.sh"
+    mkdir -p "$T/app/ia"
+    cp "$RACINE_TEST/.devcontainer/ia/host-models.sh" "$T/app/ia/host-models.sh"
     chmod +x "$APP"
     export PATH="$T/bin:$PATH"
 
