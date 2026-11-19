@@ -1,11 +1,16 @@
 #!/usr/bin/env bash
-# Detection of the models served by Ollama on the host (#665).
+# Detection of the models served by Ollama on the host (#665, #668).
 # devzone hosts no model: models live on the host (Ollama) and are detected here.
 #   host-models.sh            list the detected model names, one per line
-#   host-models.sh first      the model to use (DEVZONE_HOST_MODEL or first detected)
+#   host-models.sh first      the model to use: DEVZONE_HOST_MODEL, else the best
+#                             measured model, else a deterministic rule
 #   host-models.sh set        merge the devzone-host provider into ~/.config/opencode/config.json
 #   host-models.sh unset      remove the devzone-host provider from that file
+#   host-models.sh check      update check of each model (delegates to host-check.sh)
+#   host-models.sh rapport    report (delegates to host-check.sh)
 # Default URL: http://host.docker.internal:11434, overridable with DEVZONE_OLLAMA_URL.
+# Measurements: DEVZONE_IA_MESURES, else ~/.config/devzone/ia-mesures.json
+# ({"<model>": {"reussite": 0..1, "tok_s": n, "date": "..."}}).
 # Short timeout; exits 0 and writes nothing when Ollama does not answer.
 # bash 3.2 (macOS). Code and comments in English.
 set -euo pipefail
@@ -13,6 +18,7 @@ set -euo pipefail
 URL="${DEVZONE_OLLAMA_URL:-http://host.docker.internal:11434}"
 URL="${URL%/}"
 FILE="$HOME/.config/opencode/config.json"
+MESURES="${DEVZONE_IA_MESURES:-$HOME/.config/devzone/ia-mesures.json}"
 
 # True when a model is an embedding model (Ollama details.type, or a name
 # containing "embed", case-insensitive).
@@ -25,11 +31,16 @@ is_embedding() {
     esac
 }
 
+# Raw /api/tags payload, empty when Ollama does not answer.
+json_tags() {
+    curl -fsS --max-time 3 "${URL}/api/tags" 2>/dev/null || return 0
+}
+
 # Prints the detected model names, one per line. Exits 0 and prints nothing
 # when Ollama does not answer or the payload is not usable.
 modeles() {
     local data
-    data="$(curl -fsS --max-time 3 "${URL}/api/tags" 2>/dev/null)" || return 0
+    data="$(json_tags)" || return 0
     [ -n "$data" ] || return 0
     # Ignore embedding models (Ollama details.type, or a name containing "embed").
     printf '%s' "$data" | jq -r '.models[] | select((.details.type // "") != "embedding") | .name' 2>/dev/null |
@@ -39,18 +50,91 @@ modeles() {
     return 0
 }
 
-# The model to use: DEVZONE_HOST_MODEL when set, else the first detected.
-# Empty when Ollama did not answer or no model was detected.
-premier() {
-    local liste nom="${DEVZONE_HOST_MODEL:-}"
-    liste="$(modeles)" || true
+# Prints the detected models as "name<TAB>size" (bytes), one per line.
+tailles() {
+    local data line name
+    data="$(json_tags)" || return 0
+    [ -n "$data" ] || return 0
+    printf '%s' "$data" | jq -r '.models[] | select((.details.type // "") != "embedding") | "\(.name)\t\(.size // 0)"' 2>/dev/null |
+        while IFS= read -r line; do
+            name="${line%%$'\t'*}"
+            is_embedding "$name" || printf '%s\n' "$line"
+        done || true
+    return 0
+}
+
+# Prints the detected models as "name<TAB>size<TAB>digest", one per line.
+infos() {
+    local data line name
+    data="$(json_tags)" || return 0
+    [ -n "$data" ] || return 0
+    printf '%s' "$data" | jq -r '.models[] | select((.details.type // "") != "embedding") | "\(.name)\t\(.size // 0)\t\(.digest // "")"' 2>/dev/null |
+        while IFS= read -r line; do
+            name="${line%%$'\t'*}"
+            is_embedding "$name" || printf '%s\n' "$line"
+        done || true
+    return 0
+}
+
+# Best measured model among the detected names ($1, one per line): highest
+# reussite, then highest tok_s. Prints nothing when the file is absent, invalid
+# or no detected model is measured.
+mesure_choix() {
+    local liste="$1" data
+    [ -f "$MESURES" ] || return 0
+    data="$(cat "$MESURES" 2>/dev/null)" || return 0
+    [ -n "$data" ] || return 0
+    printf '%s' "$data" | jq -r --arg liste "$liste" '
+        ($liste | split("\n") | map(select(length > 0))) as $d
+        | [to_entries[] | select(.key as $k | $d | index($k))]
+        | sort_by([-(.value.reussite // 0), -(.value.tok_s // 0)])
+        | .[0].key // empty
+    ' 2>/dev/null || return 0
+}
+
+# Deterministic fallback: a name containing "coder" first, then the smallest
+# size, then the name order.
+regle_choix() {
+    tailles | LC_ALL=C awk -F'\t' '
+        {
+            low = tolower($1)
+            coder = (index(low, "coder") > 0) ? 0 : 1
+            size = ($2 + 0)
+            if (best == "" || coder < bc || (coder == bc && size < bs) || (coder == bc && size == bs && $1 < bn)) {
+                best = $1
+                bc = coder
+                bs = size
+                bn = $1
+            }
+        }
+        END { if (best != "") print best }
+    '
+}
+
+# The model to use among the detected names: DEVZONE_HOST_MODEL when set, else
+# the best measured model, else the deterministic rule.
+choix() {
+    local liste="$1" nom mesure
     [ -n "$liste" ] || return 0
+    nom="${DEVZONE_HOST_MODEL:-}"
     if [ -n "$nom" ]; then
         printf '%s\n' "$nom"
-    else
-        printf '%s\n' "${liste%%$'\n'*}"
+        return 0
     fi
-    return 0
+    mesure="$(mesure_choix "$liste")" || true
+    if [ -n "$mesure" ]; then
+        printf '%s\n' "$mesure"
+        return 0
+    fi
+    regle_choix
+}
+
+# The model to use. Empty when Ollama did not answer or no model was detected.
+premier() {
+    local liste
+    liste="$(modeles)" || true
+    [ -n "$liste" ] || return 0
+    choix "$liste"
 }
 
 # jq program $1 applied to the file (or {}), written back atomically.
@@ -108,6 +192,9 @@ if [ "${0##*/}" = "host-models.sh" ]; then
         first) premier ;;
         set) set_provider ;;
         unset) unset_provider ;;
+        check | rapport)
+            exec bash "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/host-check.sh" "$@"
+            ;;
         *) modeles ;;
     esac
 fi

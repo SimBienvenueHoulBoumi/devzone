@@ -54,6 +54,10 @@ fi
 # shellcheck source=SCRIPTDIR/ia/host-models.sh
 # shellcheck disable=SC1091
 . "$ICI/ia/host-models.sh"
+# Update check and report for the host (Ollama) models (#668).
+# shellcheck source=SCRIPTDIR/ia/host-check.sh
+# shellcheck disable=SC1091
+. "$ICI/ia/host-check.sh"
 
 # Assistants IA, versions figées : mettre à jour ici, puis devzone apply
 # (ou Rebuild Container). Une ligne par paquet, séparées par une ligne qui ne
@@ -1532,18 +1536,30 @@ case "${1:-}" in
         bash "$ICI/agent.sh" "${@:2}"
         ;;
     ia)
-        # Read-only: lists the host (Ollama) models detected and the default model.
-        liste="$(modeles)"
-        def="$(premier)"
-        if [ -z "$liste" ]; then
-            echo "devzone : aucun modèle Ollama détecté sur ${URL} (répondez sur /api/tags)"
-        else
-            echo "devzone : modèles détectés sur l'hôte (Ollama) :"
-            while IFS= read -r m; do
-                [ -n "$m" ] && printf '  %s\n' "$m"
-            done <<<"$liste"
-            echo "modèle par défaut : ${def:-aucun}"
-        fi
+        case "${2:-}" in
+            check)
+                # Read-only: update state of each detected host model (#668).
+                check
+                ;;
+            rapport)
+                # Read-only: sizes, update state, measurements, chosen model (#668).
+                rapport
+                ;;
+            *)
+                # Read-only: lists the host (Ollama) models detected and the default model.
+                liste="$(modeles)"
+                def="$(premier)"
+                if [ -z "$liste" ]; then
+                    echo "devzone : aucun modèle Ollama détecté sur ${URL} (répondez sur /api/tags)"
+                else
+                    echo "devzone : modèles détectés sur l'hôte (Ollama) :"
+                    while IFS= read -r m; do
+                        [ -n "$m" ] && printf '  %s\n' "$m"
+                    done <<<"$liste"
+                    echo "modèle par défaut : ${def:-aucun}"
+                fi
+                ;;
+        esac
         ;;
     ticket) bash "$ICI/ticket.sh" "${@:2}" ;;
     build)
