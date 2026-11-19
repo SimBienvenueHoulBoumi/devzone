@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Dirige opencode sur une consigne : rotation, silence au depart, reprise.
 # Module ia (#221). devzone agent <dossier> <consigne> | etat | liberer.
+# shellcheck disable=SC2034 # RACINE, FREE_MODELS, PAUSE_RANG: read by the sourced agent-*.sh
 set -euo pipefail
 # Dossier du script, liens symboliques suivis à la main : readlink -f n'existe
 # pas sur macOS (tests sous bash 3.2).
@@ -14,18 +15,19 @@ while [ -L "$SOURCE" ]; do
     esac
 done
 ICI="$(cd -P "$(dirname "$SOURCE")" && pwd)"
-# shellcheck disable=SC2034 # lue par agent-session.sh
 RACINE="${DEVZONE_RACINE:-$(dirname "$ICI")}"
 # shellcheck source=agent-erreurs.sh disable=SC1091
 . "$ICI/agent-erreurs.sh"
 # shellcheck source=agent-droits.sh disable=SC1091
 . "$ICI/agent-droits.sh"
-# shellcheck source=agent-session.sh disable=SC1091
+# shellcheck source=SCRIPTDIR/agent-session.sh disable=SC1091
 . "$ICI/agent-session.sh"
 # shellcheck source=agent-workspace.sh disable=SC1091
 . "$ICI/agent-workspace.sh"
 # shellcheck source=agent-local.sh disable=SC1091
 . "$ICI/agent-local.sh"
+# shellcheck source=SCRIPTDIR/agent-modele.sh disable=SC1091
+. "$ICI/agent-modele.sh"
 FREE_MODELS=(big-pickle deepseek-v4.1-flash-free hy4-flash-free nemotron-3.5-super-vl-free
     nemotron-3.5-lightning-free mimo-v2.6-flash-free beam-free flint-40b-free longcat-2.5-free)
 # Session pod ephemere (#222)
@@ -62,18 +64,9 @@ agent_lancer() {
     etat="$AGENT_ETAT"
     mkdir -p "$(dirname "$journal")" "$etat"
     droits_photo "$dossier"
-    FREE_MODELS=()
-    while IFS= read -r m; do
-        if [ -n "$m" ]; then FREE_MODELS+=("$m"); fi
-    done < <(liste_modeles)
-    [ "${#FREE_MODELS[@]}" -gt 0 ] || refuse "aucun modèle gratuit disponible"
+    modeles_charger "$journal"
     local_charge
-    verrou_prendre || refuse "rang des modèles verrouillé : réessayer"
-    debut=$(( $(cat "$etat/rang" 2>/dev/null || echo 0) % ${#FREE_MODELS[@]} ))
-    if [ "$PAUSE_RANG" -gt 0 ]; then sleep "$PAUSE_RANG"; fi
-    echo $(( debut + 1 )) >"$etat/rang"
-    verrou_lacher
-    echo "=== rang $(( debut + 1 ))/${#FREE_MODELS[@]}" >>"$journal"
+    debut="$(rang_prendre "$etat" "$journal")" || refuse "rang des modèles verrouillé : réessayer"
     consigne_courante="$consigne"
     # Reprise : une session neuve repart du travail déjà présent (git status,
     # diff, log), sans historique de conversation.
@@ -86,14 +79,17 @@ agent_lancer() {
         printf '\n\nREPRISE : une session précédente a été interrompue. Lis git status, git diff et git log dans le dossier, vérifie ce travail contre la consigne ci-dessus, corrige ce qui s en écarte et termine ce qui manque.\n' >>"$c"
         consigne_courante="$c"
     }
+    modele_ordre "$debut"
     i=0
-    while [ "$i" -lt "$(modeles_total)" ]; do
-        m="$(modele_au_rang "$i" "$debut")"
+    while [ "$i" -lt "${#ORDRE[@]}" ]; do
+        m="${ORDRE[$i]}"
         if [ "$m" != "$reseau_pour" ]; then reseau_pour="$m"; reseau_n=0; fi
         if modele_ecarte "$m"; then
+            modele_demande_ecart "$m" "$(modele_ecart_cause "$m")" "$journal"
             i=$(( i + 1 ))
             continue
         fi
+        modele_demande_choisi "$m" "$journal"
         echo "=== modèle opencode/$m début $(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$journal"
         offset="$(wc -c <"$journal")"
         opencode_lancer "$dossier" "$m" "$consigne_courante" "$journal" "$etat"
@@ -119,6 +115,7 @@ agent_lancer() {
             droits_verifier "$dossier"
             echo "=== opencode/$m muet au départ : écarté 1 h, modèle suivant" >>"$journal"
             modele_ecarter "$m" mute
+            modele_demande_ecart "$m" mute "$journal"
             reprise
             i=$(( i + 1 ))
             continue
@@ -190,6 +187,7 @@ agent_lancer() {
                     echo "=== opencode/$m erreur, sans écart : modèle suivant" >>"$journal"
                 else
                     modele_ecarter "$m" "$cause"
+                    modele_demande_ecart "$m" "$cause" "$journal"
                     echo "=== opencode/$m écarté ($cause, $(ecart_libelle "$cause")) : modèle suivant" >>"$journal"
                 fi
                 reprise
@@ -222,7 +220,9 @@ case "${1:-}" in
         exit 2
         ;;
     *)
+        if [ "${1:-}" = "--modele" ]; then [ -n "${2:-}" ] || { agent_aide >&2; exit 2; }; MODELE_LISTE="$2"; shift 2; fi
         if [ "${1:-}" = "--pod" ]; then
+            [ -z "$MODELE_LISTE" ] || refuse "--modele n'est pas géré avec --pod"
             shift
             if [ -z "${1:-}" ] || [ -z "${2:-}" ]; then
                 agent_aide >&2

@@ -105,6 +105,21 @@ verrou_lacher() {
     fi
 }
 
+# Takes the shared rank and returns the start of the rotation (#421). The rank
+# advances only when no requested model is available (#420). The « === rang »
+# line is written to the journal in every case. Called in a command
+# substitution: the lock is taken and released in that same process.
+rang_prendre() {
+    local etat="$1" journal="$2" debut
+    verrou_prendre || return 1
+    debut=$(( $(cat "$etat/rang" 2>/dev/null || echo 0) % ${#FREE_MODELS[@]} ))
+    if [ "$PAUSE_RANG" -gt 0 ]; then sleep "$PAUSE_RANG"; fi
+    if modele_rang_avance; then echo $(( debut + 1 )) >"$etat/rang"; fi
+    verrou_lacher
+    echo "=== rang $(( debut + 1 ))/${#FREE_MODELS[@]}" >>"$journal"
+    echo "$debut"
+}
+
 # Passe permission.edit en objet et ajoute en dernier un deny par fichier de droits
 # (#361) : la dernière règle qui correspond l'emporte, l'appelant ne peut pas le retirer.
 droits_edit_deny() {
@@ -182,6 +197,15 @@ session_modele_debut() {
     DEBUT_SESSION="$(sed -nE 's/.* début ([^ ]+).*/\1/p' <<<"$ligne")"
 }
 
+# Models asked with devzone agent --modele (#420): the last header line
+# « === --modele : » of the journal, empty when nothing was asked.
+session_demande() {
+    local ligne
+    ligne="$(grep '^=== --modele : ' "$1" 2>/dev/null | tail -1 || true)"
+    DEMANDE_SESSION="${ligne#=== --modele : }"
+    if [ "$DEMANDE_SESSION" = aucun ]; then DEMANDE_SESSION=""; fi
+}
+
 # Une session est en cours (#308) si un processus agent.sh vivant a pour
 # premier argument (le dossier, absolu depuis #287) un chemin dont le nom est
 # exactement le journal sans « .log » ; un simple dossier contenant ce nom ne
@@ -212,7 +236,8 @@ agent_etat() {
         m="${MODELE_SESSION:+opencode/$MODELE_SESSION}"
         debut="$DEBUT_SESSION"
         dernier="$(heure "$(mtime "$f")")"
-        echo "  session $(basename "$f") : modèle ${m:-inconnu}, depuis ${debut:-inconnu}, dernier écrit $dernier"
+        session_demande "$f"
+        echo "  session $(basename "$f") : modèle ${m:-inconnu}${DEMANDE_SESSION:+ (demandé : $DEMANDE_SESSION)}, depuis ${debut:-inconnu}, dernier écrit $dernier"
     done
     [ "$vu" = 1 ] || echo "  aucune session"
     agent_ecarts

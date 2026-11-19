@@ -132,6 +132,7 @@ session_erreur_fatale() {
     wait "$pid" 2>/dev/null || true
     droits_verifier "$dossier"
     modele_ecarter "$m" "$cause"
+    modele_demande_ecart "$m" "$cause" "$journal"
     printf '%s\n' "=== opencode/$m écarté ($cause) : modèle suivant" >>"$journal"
     return 0
 }

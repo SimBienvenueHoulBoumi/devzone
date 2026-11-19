@@ -152,3 +152,5 @@ manage/test/docker-garde.bats
 .opencode/plugins/devzone-garde-v2.js
 .devcontainer/ia/plugins/devzone-garde.js
 .devcontainer/ia/plugins/devzone-garde-v2.js
+.devcontainer/agent-modele.sh
+manage/test/agent-modele.bats
