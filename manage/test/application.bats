@@ -22,6 +22,8 @@ setup() {
     cp "$RACINE_TEST/.devcontainer/kube-compte.sh" "$T/app/kube-compte.sh"
     mkdir -p "$T/app/ia"
     cp "$RACINE_TEST/.devcontainer/ia/host-models.sh" "$T/app/ia/host-models.sh"
+    cp "$RACINE_TEST/.devcontainer/ia/host-check.sh" "$T/app/ia/host-check.sh"
+    cp "$RACINE_TEST/.devcontainer/ia/host-check.message" "$T/app/ia/host-check.message"
     chmod +x "$APP"
     export PATH="$T/bin:$PATH"
 
