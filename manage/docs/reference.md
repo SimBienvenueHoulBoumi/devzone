@@ -303,7 +303,7 @@ devzone workspace egress observation|strict|off  # mandataire de sortie des sess
 devzone workspace egress status                  # mode, prêt ou non, domaines contactés
 devzone workspace egress allow|deny <domaine>    # ajoute ou retire un domaine de la liste stricte
 devzone workspace migrate [--oui]          # copie le poste Docker vers le workspace Kubernetes
-devzone workspace revert [--rapatrier]   # retour au poste Docker
+devzone workspace revert [--rapatrier]   # retour au poste Docker (déprécié, #682)
 devzone workspace clean-docker [--oui] # supprime les volumes Docker devzone-* (confirmation)
 ```
 
@@ -364,7 +364,7 @@ Un workspace déjà installé dans le cluster (release helm `devzone-workspace`,
 
 Apres `devzone workspace migrate`, `make up`, `make shell` et `make stop` pilotent le workspace Kubernetes ; `make rebuild` refuse ; `devzone workspace revert` rend le poste Docker.
 
-**Retour arriere** : `devzone workspace revert` remet `workspace=docker` et rappelle `make shell`. Le poste Docker et ses volumes n'ont jamais ete touches par `migrate` : rien d'autre a faire. `--rapatrier` recopie d'abord tous les projets du pod dans `./workspace` (`copier-depuis`, les dossiers du poste du meme nom sont ecrases) ; en cas d'echec, la bascule n'a pas lieu.
+**Retour arriere** (déprécié, #682 : un avertissement s'affiche, le retrait est prévu deux versions mineures et au moins 30 jours après cette livraison ; `migrate` reste) : `devzone workspace revert` remet `workspace=docker` et rappelle `make shell`. Le poste Docker et ses volumes n'ont jamais ete touches par `migrate` : rien d'autre a faire. `--rapatrier` recopie d'abord tous les projets du pod dans `./workspace` (`copier-depuis`, les dossiers du poste du meme nom sont ecrases) ; en cas d'echec, la bascule n'a pas lieu.
 
 **Nettoyage** : les volumes Docker ne sont jamais supprimes par `migrate` ni `revenir`. `devzone workspace clean-docker` liste les volumes `devzone-*` presents puis demande [o/N] avant de les supprimer (`--oui` sans terminal ; sinon refus). Irreversible : apres, `revenir` repart de volumes vides.
 

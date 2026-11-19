@@ -38,6 +38,8 @@ bring_back_project() {
 revert_workspace() {
     local bring_back p list backup
     bring_back="$(read_flag --bring-back "revert [--bring-back]" "$@")" || return 1
+    # Deprecated with the Docker workstation (#671, #682): still works, but it will be removed.
+    echo "⚠ devzone workspace revert is deprecated: the Docker workstation will be removed (two minor versions and 30 days at least after this release). devzone workspace migrate stays." >&2
     if [ "$bring_back" = 1 ]; then
         echo "▶ bring-back: projects from pod to ./workspace (workstation version is saved first)"
         list="$(kc exec "$POD" -c workspace -- ls -1 "$PROJECTS_DIR")" || { fail "cannot read project list from pod"; return 1; }
