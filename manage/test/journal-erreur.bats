@@ -68,3 +68,69 @@ log_200() {
     [ "$status" -eq 0 ]
     [ "$(grep -c 'ERROR: failed to' <<<"$output")" -eq 20 ]
 }
+
+# Fake build command: counts its runs in $FAKE_RUNS, prints the line of the
+# run (FAKE_OUT_1, FAKE_OUT_2...) and fails unless the line is "ok".
+fake_build() {
+    cat >"$BATS_TEST_TMPDIR/build" <<'FAKE'
+#!/usr/bin/env bash
+n=$(( $(cat "$FAKE_RUNS" 2>/dev/null || echo 0) + 1 ))
+echo "$n" >"$FAKE_RUNS"
+var="FAKE_OUT_$n"
+echo "${!var:-ok}"
+[ "${!var:-ok}" = ok ]
+FAKE
+    chmod +x "$BATS_TEST_TMPDIR/build"
+    export FAKE_RUNS="$BATS_TEST_TMPDIR/runs"
+    : >"$FAKE_RUNS"
+}
+
+@test "build_with_retry: success on the first run, no retry" {
+    . "$SOURCE"
+    fake_build
+    run build_with_retry "$BATS_TEST_TMPDIR/log" "$BATS_TEST_TMPDIR/build"
+    [ "$status" -eq 0 ]
+    [ "$(cat "$FAKE_RUNS")" = 1 ]
+    [[ "$output" != *"retry"* ]] || false
+}
+
+@test "build_with_retry: corrupt archive once, then success: one retry, message, code 0" {
+    . "$SOURCE"
+    fake_build
+    export FAKE_OUT_1="Stop! The archive was corrupt and has been removed!"
+    run build_with_retry "$BATS_TEST_TMPDIR/log" "$BATS_TEST_TMPDIR/build"
+    [ "$status" -eq 0 ]
+    [ "$(cat "$FAKE_RUNS")" = 2 ]
+    [[ "$output" == *"one retry of the build"* ]] || false
+    grep -q "retry of the build: corrupt download" "$BATS_TEST_TMPDIR/log"
+}
+
+@test "build_with_retry: corrupt archive twice: failure kept, never a third run" {
+    . "$SOURCE"
+    fake_build
+    export FAKE_OUT_1="The archive was corrupt" FAKE_OUT_2="The archive was corrupt"
+    run build_with_retry "$BATS_TEST_TMPDIR/log" "$BATS_TEST_TMPDIR/build"
+    [ "$status" -ne 0 ]
+    [ "$(cat "$FAKE_RUNS")" = 2 ]
+}
+
+@test "build_with_retry: another error: no retry, failure kept" {
+    . "$SOURCE"
+    fake_build
+    export FAKE_OUT_1="ERROR: Feature failed to install"
+    run build_with_retry "$BATS_TEST_TMPDIR/log" "$BATS_TEST_TMPDIR/build"
+    [ "$status" -ne 0 ]
+    [ "$(cat "$FAKE_RUNS")" = 1 ]
+    [[ "$output" != *"retry"* ]] || false
+}
+
+@test "build_with_retry: a corrupt line already in the log before the run does not count" {
+    . "$SOURCE"
+    fake_build
+    echo "The archive was corrupt (old run)" >"$BATS_TEST_TMPDIR/log"
+    export FAKE_OUT_1="ERROR: something else"
+    run build_with_retry "$BATS_TEST_TMPDIR/log" "$BATS_TEST_TMPDIR/build"
+    [ "$status" -ne 0 ]
+    [ "$(cat "$FAKE_RUNS")" = 1 ]
+}
+
