@@ -37,9 +37,9 @@ export default {
   id: "devzone-garde",
   setup: (ctx) => {
     if (typeof ctx?.tool?.hook !== "function") return
-    const dossier = ctx.location?.directory || process.cwd()
+    const dir = ctx.location?.directory || process.cwd()
     const script = guardScript()
-    return ctx.tool.hook("execute.before", (appel) => garde(script, appel.tool, appel.input, dossier))
+    return ctx.tool.hook("execute.before", (call) => garde(script, call.tool, call.input, dir))
   },
   server: async () => ({}),
 }

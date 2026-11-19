@@ -8,7 +8,13 @@
 
 set -u
 
-MESSAGE="devzone est Kubernetes d'abord : seuls les pods sont des conteneurs. Utilise kubectl, ou un pod ou un namespace jetable (kubectl run, kubectl create ns, puis suppression). Action sur l'hôte lui-même : DEVZONE_ALLOW_DOCKER=1."
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MESSAGE_FILE="$SCRIPT_DIR/docker-garde.message"
+FALLBACK="devzone is Kubernetes-first: only pods are containers. Use kubectl, or a throwaway pod or namespace. Host action: set DEVZONE_ALLOW_DOCKER to 1."
+MESSAGE="$FALLBACK"
+if [ -r "$MESSAGE_FILE" ]; then
+    MESSAGE="$(cat "$MESSAGE_FILE" 2>/dev/null)" || MESSAGE="$FALLBACK"
+fi
 
 [ "${DEVZONE_ALLOW_DOCKER:-}" = "1" ] && exit 0
 

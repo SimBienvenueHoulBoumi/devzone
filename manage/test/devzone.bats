@@ -744,7 +744,7 @@ HOOK
     [ -f "$HOME/.config/opencode/plugins/devzone-garde.js" ]
     [ -f "$HOME/.config/opencode/plugins/devzone-garde-v2.js" ]
     grep -qF "$BATS_TEST_TMPDIR/app/ia/docker-garde.sh" "$HOME/.config/opencode/plugins/devzone-garde.js"
-    ! grep -q "__DEVZONE_DOCKER_GARDE__" "$HOME/.config/opencode/plugins/devzone-garde.js"
+    ! grep -q "__DEVZONE_DOCKER_GARDE__" "$HOME/.config/opencode/plugins/devzone-garde.js" || false
     [ "$(jq '[.hooks.PreToolUse[] | .hooks[] | select((.command // "") | contains("docker-garde.sh"))] | length' "$HOME/.claude/settings.json")" -eq 1 ]
     run bash "$APP" disable ia
     [ "$status" -eq 0 ]

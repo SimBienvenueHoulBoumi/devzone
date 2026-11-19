@@ -4,7 +4,8 @@
 
 setup() {
     GUARD="$BATS_TEST_DIRNAME/../../.devcontainer/ia/docker-garde.sh"
-    MSG="devzone est Kubernetes d'abord : seuls les pods sont des conteneurs. Utilise kubectl, ou un pod ou un namespace jetable (kubectl run, kubectl create ns, puis suppression). Action sur l'hôte lui-même : DEVZONE_ALLOW_DOCKER=1."
+    # The message lives in a text file next to the script (French user text, not listed in .english)
+    MSG="$(cat "$BATS_TEST_DIRNAME/../../.devcontainer/ia/docker-garde.message")"
     export MSG
 }
 
@@ -180,4 +181,13 @@ assert_blocked() {
     p="$(path_without jq python3)"
     run bash -c 'PATH="$1" printf "%s" "$2" | PATH="$1" bash "$3"' _ "$p" "$(opencode_call bash 'docker ps')" "$GUARD"
     [ "$status" -eq 0 ]
+}
+
+@test "message: without the message file the guard falls back to an English message" {
+    local dir="$BATS_TEST_TMPDIR/bare"
+    mkdir -p "$dir"
+    cp "$GUARD" "$dir/docker-garde.sh"
+    run bash -c 'printf "%s" "$1" | bash "$2"' _ "$(opencode_call bash 'docker ps')" "$dir/docker-garde.sh"
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"Kubernetes-first"* ]] || false
 }

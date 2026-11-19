@@ -1,0 +1,1 @@
+devzone est Kubernetes d'abord : seuls les pods sont des conteneurs. Utilise kubectl, ou un pod ou un namespace jetable (kubectl run, kubectl create ns, puis suppression). Action sur l'hôte lui-même : DEVZONE_ALLOW_DOCKER=1.
