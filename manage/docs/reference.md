@@ -948,7 +948,7 @@ outil peut relancer la consigne ensuite avec `devzone agent`.
 
 Le job `fonctionnel` construit le conteneur avec le CLI des devcontainers. SDKMAN (Java, Maven) sert parfois une archive corrompue (« Stop! The archive was corrupt ») : ses 5 tentatives tombent alors dans la même panne, le build échoue sans rapport avec le code (constaté deux fois, #661 et le run 44596691628).
 
-`build_with_retry` (`manage/test/journal-erreur.sh`, utilisée par `manage/test/fonctionnel.sh`) refait **une seule fois** la construction quand la partie nouvelle du journal contient ce motif, avec un message visible (« one retry of the build ») et une ligne dans le journal. Un autre échec n'est jamais repris, et une seconde panne identique fait échouer le job : un vrai problème n'est pas masqué. Un motif resté dans un journal d'un lancement précédent ne compte pas.
+`build_with_retry` (`manage/test/journal-erreur.sh`, utilisée par `manage/test/fonctionnel.sh`) refait **une seule fois** la construction quand la partie nouvelle du journal contient ce motif, **après une pause** de 120 s (réglable par `BUILD_RETRY_WAIT`) : une reprise immédiate retombait dans la même panne du serveur de téléchargement (run 44612039534, deux builds corrompus à 75 s d'écart). Le message (« one retry of the build in 120s ») et une ligne du journal le disent. Un autre échec n'est jamais repris, et une seconde panne identique fait échouer le job : un vrai problème n'est pas masqué. Un motif resté dans un journal d'un lancement précédent ne compte pas.
 
 ### Relance automatique de la CI (#656)
 
