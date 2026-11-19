@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# Commande devzone de l'hôte (paquet npm, manage/devzone) et contenu du paquet.
+# devzone command on the host (npm package, manage/devzone) and package content.
 
 setup() {
     load commun
@@ -11,7 +11,7 @@ setup() {
     cd "$BATS_TEST_TMPDIR" || return 1
 }
 
-@test "devzone <dossier> : crée un devzone complet dans un dossier neuf" {
+@test "devzone <folder>: creates a complete devzone in a new folder" {
     run bash "$CLI" mon-devzone --docker
     [ "$status" -eq 0 ]
     [[ "$output" == *"créé dans"* ]] || false
@@ -20,40 +20,40 @@ setup() {
     done
     [ -x mon-devzone/manage/scripts/desinstaller.sh ]
     [ -x mon-devzone/manage/scripts/lancer.sh ]
-    # Ni la commande npm, ni les tests dans un devzone
+    # Neither the npm command nor the tests in a devzone
     [ ! -e mon-devzone/manage/devzone ]
     [ ! -e mon-devzone/manage/test ]
     grep -q '^workspace/\*$' mon-devzone/.gitignore
     grep -qx '.devzone.sauvegarde/' mon-devzone/.gitignore
 }
 
-@test "devzone <dossier> : .devzone.version porte la version et une empreinte par fichier copié" {
+@test "devzone <folder>: .devzone.version holds the version and one checksum per copied file" {
     bash "$CLI" mon-devzone --docker
     [ "$(sed -n '1p' mon-devzone/.devzone.version)" = "version $(bash "$CLI" --version)" ]
     for f in .devcontainer/devcontainer.json .devcontainer/devzone Makefile .gitattributes manage/scripts/lancer.sh manage/scripts/desinstaller.sh README.md LICENSE; do
         attendue="$(node -e 'const fs = require("fs"), crypto = require("crypto"); const h = crypto.createHash("sha256"); h.update(fs.readFileSync(process.argv[1])); process.stdout.write(h.digest("hex"))' "mon-devzone/$f")"
         grep -qxF "$attendue  $f" mon-devzone/.devzone.version || { echo "empreinte absente : $f"; return 1; }
     done
-    # La commande npm et les fichiers écrits localement ne sont pas copiés
+    # The npm command and the locally written files are not copied
     ! grep -q 'manage/devzone' mon-devzone/.devzone.version || false
     ! grep -q '  .gitignore$' mon-devzone/.devzone.version || false
 }
 
-@test "devzone <dossier> : n'embarque ni bin/, ni tests, ni CI, ni réglages du dépôt" {
+@test "devzone <folder>: embeds neither bin/, nor tests, nor CI, nor repository settings" {
     bash "$CLI" mon-devzone --docker
     for f in bin test .github .repowarden.conf package.json .devzone.log; do
         [ ! -e "mon-devzone/$f" ] || { echo "en trop : $f"; return 1; }
     done
 }
 
-@test "devzone <dossier> : dossier existant vide accepté" {
+@test "devzone <folder>: existing empty folder accepted" {
     mkdir vide
     run bash "$CLI" vide --docker
     [ "$status" -eq 0 ]
     [ -f vide/Makefile ]
 }
 
-@test "devzone <dossier> : dossier non vide refusé, rien n'est écrasé" {
+@test "devzone <folder>: non-empty folder refused, nothing overwritten" {
     mkdir plein && echo important >plein/fichier
     run bash "$CLI" plein
     [ "$status" -eq 1 ]
@@ -95,22 +95,22 @@ GH
     grep -q '^    repo = https://github.com/tester/devzone-argocd.git$' mon-devzone/.argocd.conf
 }
 
-@test "devzone <dossier> sans option ni terminal : none et avis sur --gitops" {
+@test "devzone <folder> without option nor terminal: none and a notice about --gitops" {
     run bash "$CLI" mon-devzone --docker
     [ "$status" -eq 0 ]
     [[ "$output" == *"--gitops"* ]] || false
     grep -q '^    repo = none$' mon-devzone/.argocd.conf
 }
 
-@test "devzone desinstaller : refusé hors d'un dossier devzone" {
+@test "devzone uninstall: refused outside a devzone folder" {
     run bash "$CLI" uninstall
     [ "$status" -eq 1 ]
     [[ "$output" == *"dossier devzone"* ]] || false
 }
 
-@test "devzone desinstaller : ancien devzone (desinstaller.sh à la racine) accepté" {
-    # devzone créé avant le rangement dans scripts/ : desinstaller.sh à la
-    # racine, pas de scripts/ ; la commande doit continuer à fonctionner
+@test "devzone uninstall: old devzone (desinstaller.sh at the root) accepted" {
+    # devzone created before the move into scripts/: desinstaller.sh at the
+    # root, no scripts/; the command must keep working
     mkdir -p vieux/.devcontainer
     printf '#!/usr/bin/env bash\necho ancien\n' >vieux/desinstaller.sh
     chmod +x vieux/desinstaller.sh
@@ -120,9 +120,9 @@ GH
     [[ "$output" == *ancien* ]] || false
 }
 
-@test "devzone desinstaller : devzone d'avant manage/ (scripts/desinstaller.sh) accepté" {
-    # devzone créé avant le rangement dans manage/ : son desinstaller.sh est
-    # dans scripts/ ; la commande doit continuer à fonctionner
+@test "devzone uninstall: devzone from before manage/ (scripts/desinstaller.sh) accepted" {
+    # devzone created before the move into manage/: its desinstaller.sh is
+    # in scripts/; the command must keep working
     mkdir -p avant-core/.devcontainer avant-core/scripts
     printf '#!/usr/bin/env bash\necho avant-core\n' >avant-core/scripts/desinstaller.sh
     chmod +x avant-core/scripts/desinstaller.sh
@@ -132,7 +132,7 @@ GH
     [[ "$output" == *avant-core* ]] || false
 }
 
-@test "devzone desinstaller : desinstaller.sh sans .devcontainer refusé" {
+@test "devzone uninstall: desinstaller.sh without .devcontainer refused" {
     mkdir pas-devzone
     printf '#!/usr/bin/env bash\necho appele\n' >pas-devzone/desinstaller.sh
     cd pas-devzone
@@ -151,7 +151,7 @@ GH
     [ "$status" -eq 1 ]
 }
 
-@test "paquet npm : contenu attendu, aucun fichier local ni de développement" {
+@test "npm package: expected content, no local nor development file" {
     command -v npm >/dev/null || skip "npm absent"
     fichiers="$(cd "$RACINE" && npm pack --dry-run --json 2>/dev/null | node -e 'for (const f of JSON.parse(require("fs").readFileSync(0))[0].files) console.log(f.path)')"
     for f in manage/devzone .devcontainer/devcontainer.json .devcontainer/devzone Makefile manage/scripts/lancer.sh manage/scripts/desinstaller.sh README.md LICENSE package.json; do
@@ -160,20 +160,20 @@ GH
     ! grep -qE '^(manage/test/|\.github/|workspace/|\.devzone\.|\.repowarden\.conf)' <<<"$fichiers" || false
 }
 
-@test "README : commandes npm citées, sous-commandes citées dans devzone --help" {
+@test "README: npm commands cited, subcommands cited in devzone --help" {
     readme="$RACINE/README.md"
     for c in 'npm install -g devzone' 'npm uninstall -g devzone' 'devzone uninstall'; do
         grep -q -- "$c" "$readme" || { echo "absent du README : $c"; return 1; }
     done
     run bash "$CLI" --help
     [ "$status" -eq 0 ]
-    # Commandes du poste citées dans les blocs bash du README. Les citations
-    # en ligne sont contrôlées par readme.bats (poste, conteneur, alias).
+    # Workstation commands cited in the bash blocks of the README. Inline citations
+    # are checked by readme.bats (workstation, container, aliases).
     citations="$(awk '/^```bash$/ { dans = 1; next } /^```$/ { dans = 0 } dans' "$readme")"
     [ -n "$citations" ]
-    # Tout mot cité aussi après npx devzone est le nom du dossier (argument
-    # <dossier>), pas une sous-commande ; les options (--version, --help)
-    # non plus.
+    # Any word also cited after npx devzone is the folder name (argument
+    # <folder>), not a subcommand; the options (--version, --help)
+    # neither.
     dossier="$(grep -oE 'npx devzone [A-Za-z0-9_-]+' "$readme" | awk '{ print $NF }' | sort -u)"
     mots="$(grep -oE '(^|[^A-Za-z0-9_-])devzone [A-Za-z0-9_-]+' <<<"$citations" | awk '{ print $NF }' | sort -u)"
     while IFS= read -r mot; do
@@ -184,20 +184,20 @@ GH
     done <<<"$mots"
 }
 
-# manage/scripts/lancer.sh (make up, make rebuild) avec un CLI devcontainer simulé : $1 = son script
-faux_cli() {
+# manage/scripts/lancer.sh (make up, make rebuild) with a fake devcontainer CLI: $1 = its script
+fake_cli() {
     mkdir -p "$BATS_TEST_TMPDIR/faux"
     { echo '#!/usr/bin/env bash'; echo "echo \"\$*\" >\"$BATS_TEST_TMPDIR/args\""; echo "$1"; } >"$BATS_TEST_TMPDIR/faux/npx"
     chmod +x "$BATS_TEST_TMPDIR/faux/npx"
     export PATH="$BATS_TEST_TMPDIR/faux:$PATH"
     mkdir -p dz
-    # Docker démarré par défaut : les runners macOS n'en ont pas
-    faux_docker demarre
+    # Docker started by default: macOS runners have none
+    fake_docker demarre
 }
 
-# docker simulé : $1 = demarre, arrete, droits ou absent (commande introuvable) ;
-# chaque appel est noté dans $BATS_TEST_TMPDIR/docker.log
-faux_docker() {
+# fake docker: $1 = demarre, arrete, droits or absent (command not found);
+# each call is logged in $BATS_TEST_TMPDIR/docker.log
+fake_docker() {
     mkdir -p "$BATS_TEST_TMPDIR/faux"
     if [ "$1" = absent ]; then
         export DEVZONE_DOCKER=docker-introuvable-devzone
@@ -217,9 +217,9 @@ faux_docker() {
     export PATH="$BATS_TEST_TMPDIR/faux:$PATH"
 }
 
-@test "lancer.sh : Docker absent → comment l'installer, CLI devcontainers jamais lancé" {
-    faux_cli 'echo "{\"outcome\":\"error\"}"; exit 1'
-    faux_docker absent
+@test "lancer.sh: Docker absent → how to install it, devcontainer CLI never started" {
+    fake_cli 'echo "{\"outcome\":\"error\"}"; exit 1'
+    fake_docker absent
     run bash "$RACINE/manage/scripts/lancer.sh" up "$PWD/dz"
     [ "$status" -ne 0 ]
     [[ "$output" == *"Docker not found"*"Docker Desktop"*"Docker Engine"*"make up"* ]] || false
@@ -227,9 +227,9 @@ faux_docker() {
     [[ "$output" != *outcome* ]] || false
 }
 
-@test "lancer.sh : Docker arrêté → démarrer Docker Desktop puis relancer, sans erreur brute" {
-    faux_cli 'echo "{\"outcome\":\"error\"}"; exit 1'
-    faux_docker arrete
+@test "lancer.sh: Docker stopped → start Docker Desktop then retry, without a raw error" {
+    fake_cli 'echo "{\"outcome\":\"error\"}"; exit 1'
+    fake_docker arrete
     run bash "$RACINE/manage/scripts/lancer.sh" rebuild "$PWD/dz"
     [ "$status" -ne 0 ]
     [[ "$output" == *"Start Docker Desktop"*"make rebuild"* ]] || false
@@ -238,9 +238,9 @@ faux_docker() {
     [[ "$output" != *"failed to connect"* ]] || false
 }
 
-@test "lancer.sh : Docker sans droits → la commande du groupe docker" {
-    faux_cli 'exit 0'
-    faux_docker droits
+@test "lancer.sh: Docker without rights → the docker group command" {
+    fake_cli 'exit 0'
+    fake_docker droits
     run bash "$RACINE/manage/scripts/lancer.sh" up "$PWD/dz"
     [ "$status" -ne 0 ]
     [[ "$output" == *"sudo usermod -aG docker"*"make up"* ]] || false
@@ -248,10 +248,10 @@ faux_docker() {
     [ ! -e "$BATS_TEST_TMPDIR/args" ]
 }
 
-@test "desinstaller.sh : Docker arrêté → message clair, une seule fois, rien d'autre lancé" {
+@test "desinstaller.sh: Docker stopped → clear message, once, nothing else started" {
     bash "$CLI" dz-des --docker
-    faux_cli 'exit 1'
-    faux_docker arrete
+    fake_cli 'exit 1'
+    fake_docker arrete
     run bash dz-des/manage/scripts/desinstaller.sh
     [ "$status" -ne 0 ]
     [[ "$output" == *"Start Docker Desktop"*"make desinstaller"* ]] || false
@@ -261,19 +261,19 @@ faux_docker() {
     [ "$(cat "$BATS_TEST_TMPDIR/docker.log")" = "docker info" ]
 }
 
-@test "devzone desinstaller : Docker arrêté → la commande à relancer est devzone desinstaller" {
+@test "devzone uninstall: Docker stopped → the command to re-run is devzone desinstaller" {
     bash "$CLI" dz-des --docker
-    faux_cli 'exit 1'
-    faux_docker arrete
+    fake_cli 'exit 1'
+    fake_docker arrete
     cd dz-des
     run bash "$CLI" uninstall
     [ "$status" -ne 0 ]
 }
 
-@test "devzone <dossier> sans Docker : dossier créé, comment lancer ensuite, sans erreur brute" {
+@test "devzone <folder> without Docker: folder created, how to start later, without a raw error" {
     unset DEVZONE_SANS_DEMARRER
-    faux_cli 'echo "{\"outcome\":\"error\"}"; exit 1'
-    faux_docker arrete
+    fake_cli 'echo "{\"outcome\":\"error\"}"; exit 1'
+    fake_docker arrete
     # Cluster unreachable: the mode is Docker, whatever kubectl the host has (#497)
     printf '#!/usr/bin/env bash\nexit 1\n' >"$BATS_TEST_TMPDIR/faux/kubectl"
     chmod +x "$BATS_TEST_TMPDIR/faux/kubectl"
@@ -288,8 +288,8 @@ faux_docker() {
     [[ "$output" != *outcome* ]] || false
 }
 
-@test "lancer.sh : étapes clés et état affichés, journal complet gardé" {
-    faux_cli 'printf "Start: Run: docker buildx build x\r\nbruit\r\nRunning the postStartCommand from devcontainer.json...\r\ndevzone : état\r\n  ○ module ia        facultatif\r\n"'
+@test "lancer.sh: key steps and state shown, full log kept" {
+    fake_cli 'printf "Start: Run: docker buildx build x\r\nbruit\r\nRunning the postStartCommand from devcontainer.json...\r\ndevzone : état\r\n  ○ module ia        facultatif\r\n"'
     run bash "$RACINE/manage/scripts/lancer.sh" up "$PWD/dz"
     [ "$status" -eq 0 ]
     [[ "$output" == *"▶ Building image"*"▶ Starting (git identity, clusters, state)"*"○ module ia"*"devzone started"* ]] || false
@@ -298,23 +298,23 @@ faux_docker() {
     [[ "$(cat "$BATS_TEST_TMPDIR/args")" == *"up --workspace-folder $PWD/dz"* ]] || false
 }
 
-@test "lancer.sh : récapitulatif « devzone: state » (forme anglaise) affiché" {
-    faux_cli 'printf "Running the postStartCommand from devcontainer.json...\r\ndevzone: state\r\n  ○ module ia        facultatif\r\n"'
+@test "lancer.sh: « devzone: state » summary (English form) shown" {
+    fake_cli 'printf "Running the postStartCommand from devcontainer.json...\r\ndevzone: state\r\n  ○ module ia        facultatif\r\n"'
     run bash "$RACINE/manage/scripts/lancer.sh" up "$PWD/dz"
     [ "$status" -eq 0 ]
     [[ "$output" == *"devzone: state"*"○ module ia"* ]] || false
 }
 
-@test "lancer.sh rebuild : conteneur recréé" {
-    faux_cli 'exit 0'
+@test "lancer.sh rebuild: container recreated" {
+    fake_cli 'exit 0'
     run bash "$RACINE/manage/scripts/lancer.sh" rebuild "$PWD/dz"
     [ "$status" -eq 0 ]
     [[ "$output" == *"devzone rebuilt"* ]] || false
     [[ "$(cat "$BATS_TEST_TMPDIR/args")" == *"--remove-existing-container"* ]] || false
 }
 
-@test "lancer.sh : question posée dans le conteneur signalée, lancement arrêté au lieu d'attendre" {
-    faux_cli 'printf "Running the postCreateCommand from devcontainer.json...\r\nConfigurer les bots de ce dépôt ? [o/N] "; sleep 60'
+@test "lancer.sh: question asked in the container reported, start stopped instead of waiting" {
+    fake_cli 'printf "Running the postCreateCommand from devcontainer.json...\r\nConfigurer les bots de ce dépôt ? [o/N] "; sleep 60'
     export DEVZONE_ATTENTE_QUESTION=2
     debut="$(date +%s)"
     run bash "$RACINE/manage/scripts/lancer.sh" up "$PWD/dz"
@@ -323,8 +323,8 @@ faux_docker() {
     [[ "$output" == *"asks a question"*"Configurer les bots de ce dépôt ? [o/N]"* ]] || false
 }
 
-@test "lancer.sh : silence signalé (signe de vie), sans le prendre pour une question" {
-    faux_cli 'printf "npm install en cours\r\n"; sleep 4'
+@test "lancer.sh: silence reported (sign of life), not taken for a question" {
+    fake_cli 'printf "npm install en cours\r\n"; sleep 4'
     export DEVZONE_SIGNE_DE_VIE=1 DEVZONE_ATTENTE_QUESTION=1
     run bash "$RACINE/manage/scripts/lancer.sh" up "$PWD/dz"
     [ "$status" -eq 0 ]
@@ -332,15 +332,15 @@ faux_docker() {
     [[ "$output" == *"devzone started"* ]] || false
 }
 
-@test "lancer.sh : échec, fin du journal affichée" {
-    faux_cli 'echo "erreur de construction"; exit 1'
+@test "lancer.sh: failure, end of the log shown" {
+    fake_cli 'echo "erreur de construction"; exit 1'
     run bash "$RACINE/manage/scripts/lancer.sh" up "$PWD/dz"
     [ "$status" -eq 1 ]
     [[ "$output" == *"erreur de construction"*"failed"* ]] || false
 }
 
-@test "lancer.sh : docker-hote=off → config sans la feature, chemins de build corrigés, --config passé" {
-    faux_cli 'exit 0'
+@test "lancer.sh: docker-hote=off → config without the feature, build paths fixed, --config passed" {
+    fake_cli 'exit 0'
     mkdir -p dz/.devcontainer
     cp "$RACINE/.devcontainer/devcontainer.json" dz/.devcontainer/devcontainer.json
     printf 'docker-hote=off\n' >dz/.devzone.modules
@@ -351,13 +351,13 @@ faux_docker() {
     ! grep -q "docker-outside-of-docker" "$cfg" || false
     grep -q '"dockerfile": "../Dockerfile"' "$cfg"
     grep -q '"context": ".."' "$cfg"
-    # JSONC : les commentaires de la copie d'origine sont gardés
+    # JSONC: the comments of the original copy are kept
     grep -q '// Image de base' "$cfg"
     [[ "$(cat "$BATS_TEST_TMPDIR/args")" == *"up --workspace-folder $PWD/dz --config $cfg"* ]] || false
 }
 
-@test "lancer.sh : docker-hote absent ou on → config normale, aucun --config" {
-    faux_cli 'exit 0'
+@test "lancer.sh: docker-hote absent or on → normal config, no --config" {
+    fake_cli 'exit 0'
     run bash "$RACINE/manage/scripts/lancer.sh" up "$PWD/dz"
     [ "$status" -eq 0 ]
     [ ! -e dz/.devcontainer/without-host-docker/devcontainer.json ]
@@ -369,10 +369,10 @@ faux_docker() {
     [[ "$(cat "$BATS_TEST_TMPDIR/args")" != *"--config"* ]] || false
 }
 
-@test "scripts en LF" {
-    # Tout fichier suivi commençant par #! doit imposer eol=lf, sinon un clone
-    # Windows le reçoit en CRLF. Dans git ls-files --eol, les attributs
-    # (3e champ, avec des espaces) précèdent le nom, séparés par une tabulation.
+@test "scripts with LF endings" {
+    # Any tracked file starting with #! must enforce eol=lf, otherwise a
+    # Windows clone gets it in CRLF. In git ls-files --eol, the attributes
+    # (3rd field, with spaces) come before the name, separated by a tab.
     run git -C "$RACINE" ls-files --eol
     [ "$status" -eq 0 ]
     while IFS= read -r ligne; do
@@ -387,9 +387,9 @@ faux_docker() {
     done <<<"$output"
 }
 
-@test "arborescence : chemins cités par Makefile, package.json, .gitattributes et fonctionnel.yml existants" {
+@test "layout: paths cited by Makefile, package.json, .gitattributes and fonctionnel.yml exist" {
     cd "$RACINE"
-    # Anciens emplacements de la racine : ne reviennent pas (tout est sous manage/)
+    # Old root locations: must not come back (everything is under manage/)
     for d in bin scripts test; do
         [ ! -e "$d" ] || { echo "ancien dossier revenu à la racine : $d/"; return 1; }
     done
@@ -397,10 +397,10 @@ faux_docker() {
         grep -oE 'manage/[A-Za-z0-9_./-]+' Makefile
         grep -oE 'bash [A-Za-z0-9_./-]+' Makefile | awk '{ print $2 }'
         node -e 'const p = require(process.argv[1]); for (const v of Object.values(p.bin)) console.log(v); for (const f of p.files) console.log(f)' "$RACINE/package.json"
-        # .gitattributes : seules les entrées avec un « / » sont des chemins
-        # (« Dockerfile » est un motif valable partout)
+        # .gitattributes: only the entries with a « / » are paths
+        # («Dockerfile» is a pattern valid everywhere)
         awk '!/^#/ && NF && $1 ~ /\// && $1 !~ /\*/ { print $1 }' .gitattributes
-        # seuls les mots avec un « / » sont des chemins (ni « bash 3.2 » ni « bash --version »)
+        # only the words with a « / » are paths (neither « bash 3.2 » nor « bash --version »)
         grep -oE '(bash|run: bash) [A-Za-z0-9_.-]*/[A-Za-z0-9_./-]+' .github/workflows/fonctionnel.yml | awk '{ print $NF }'
         grep -oE '^ +- "[^"*]+' .github/workflows/fonctionnel.yml | sed 's/^ *- "//'
     )"
@@ -411,32 +411,32 @@ faux_docker() {
     done <<<"$chemins"
 }
 
-@test "devzone modules : commande du conteneur refusée sur le poste, aucun dossier créé" {
+@test "devzone modules: container command refused on the workstation, no folder created" {
     run bash "$CLI" modules
     [ "$status" -eq 2 ]
     [[ "$output" == *"devzone modules : commande du conteneur"* ]] || false
     [ ! -e modules ]
 }
 
-@test "devzone mon-projet : un nom libre crée toujours le dossier" {
+@test "devzone mon-projet: a free name always creates the folder" {
     run bash "$CLI" mon-projet --docker
     [ "$status" -eq 0 ]
     [ -d mon-projet/.devcontainer ]
 }
 
-@test "devzone : chaque commande du conteneur figure dans la liste du lanceur" {
+@test "devzone: each container command is in the launcher list" {
     local cmd noms
-    # Cas du case final de .devcontainer/devzone : lignes à 4 espaces, avant ')'
+    # Final case of .devcontainer/devzone: lines with 4 spaces, before ')'
     noms="$(sed -n '/^case "\${1:-}" in/,/^esac/p' "$RACINE/.devcontainer/devzone" |
         grep -oE '^    [^ ][^)]*\)' | sed 's/)$//' | tr '|' '\n' | tr -d ' "')"
     [ -n "$noms" ]
-    # Sans expansion : le cas par défaut « * » ne doit pas devenir une liste de fichiers
+    # No expansion: the default case « * » must not become a list of files
     set -f
     for cmd in $noms; do
         case "$cmd" in
-            workspace | desinstaller | mettre-a-jour | -h | --help | -v | --version | aide | help | '*') continue ;;
+            workspace | uninstall | update | -h | --help | -v | --version | aide | help | '*') continue ;;
         esac
-        # Le lanceur ne doit pas créer de dossier pour ce nom
+        # The launcher must not create a folder for this name
         run bash "$CLI" "$cmd"
         [ "$status" -eq 2 ] || { echo "absent de la liste du lanceur : $cmd"; return 1; }
         [ ! -e "$cmd" ] || { echo "dossier créé : $cmd"; return 1; }

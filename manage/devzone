@@ -1,28 +1,31 @@
 #!/usr/bin/env bash
-# Commande devzone sur ta machine (paquet npm) :
-#   devzone <dossier>        crée un devzone dans <dossier> puis le lance
-#   devzone update           dans un dossier devzone : passe à la version du paquet
-#   devzone uninstall        dans un dossier devzone : retire tout ce qu'il a créé
+# devzone command on your machine (npm package):
+#   devzone <folder>         creates a devzone in <folder>, then starts it
+#   devzone update           in a devzone folder: moves to the package version
+#   devzone uninstall        in a devzone folder: removes everything it created
 #   devzone --version | --help
-# Dans le conteneur, « devzone » est une autre commande : les modules
+# In the container, « devzone » is another command: the modules
 # (.devcontainer/devzone).
-# DEVZONE_SANS_DEMARRER=1 : copie seule, sans lancer le conteneur (tests).
+# DEVZONE_SANS_DEMARRER=1: copy only, without starting the container (tests).
+# The helpers live in manage/scripts/devzone-*.sh, sourced by the command that
+# needs them (so --version and --help work with this file alone).
+# shellcheck disable=SC2034 # PACKAGE_ITEMS, GITIGNORE_LINES: read by the sourced devzone-*.sh
 set -euo pipefail
 
-# Chemin du script : depuis cmd, le raccourci .cmd de npm appelle bash avec le
-# chemin Windows (C:\…\bin\devzone) : sans « / », dirname/readlink donneraient
-# « . » et PAQUET serait faux. On normalise d'abord (cygpath de Git Bash, sinon
-# \ → /) ; macOS/Linux : chemin POSIX, inchangé.
+# Script path. From cmd, the npm .cmd shim calls bash with the Windows path
+# (C:\…\bin\devzone): without "/", dirname/readlink would give "." and PAQUET
+# would be wrong. We normalize first (cygpath from Git Bash, else \ → /);
+# macOS/Linux: POSIX path, unchanged.
 SCRIPT="${BASH_SOURCE[0]}"
 case "$SCRIPT" in
     [A-Za-z]:[\\/]*) SCRIPT="$(cygpath -u "$SCRIPT" 2>/dev/null || echo "${SCRIPT//\\//}")" ;;
 esac
 PAQUET="$(cd "$(dirname "$(readlink -f "$SCRIPT" 2>/dev/null || echo "$SCRIPT")")/.." && pwd)"
-# Fichiers d'un devzone (même liste que « files » de package.json, sans la
-# commande manage/devzone) ; manage/scripts copié à part, sous manage/
-FICHIERS=(.devcontainer Makefile .gitattributes README.md LICENSE)
-# Lignes d'office du .gitignore d'un devzone : complétées, jamais écrasées
-LIGNES_GITIGNORE=(
+# Items copied into a devzone (same list as the « files » of package.json,
+# without the command manage/devzone); manage/scripts is copied apart, under manage/
+PACKAGE_ITEMS=(.devcontainer Makefile .gitattributes README.md LICENSE)
+# Lines always present in the .gitignore of a devzone: added to, never overwritten
+GITIGNORE_LINES=(
     '# Chaque projet du workspace a son propre dépôt git'
     'workspace/*'
     '!workspace/.gitkeep'
@@ -35,390 +38,16 @@ LIGNES_GITIGNORE=(
     '.devcontainer/without-host-docker/'
 )
 
+# Version of the package (package.json next to manage/)
 version() {
-    # Chemin passé en argument à node, jamais écrit dans le code JavaScript de -p :
-    # sous Git Bash $PAQUET vaut /c/… et seul un argument séparé est reconverti
-    # pour un programme Windows (cygpath inutile)
+    # Path passed as an argument to node, never written in the JavaScript code of -p:
+    # under Git Bash $PAQUET is /c/… and only a separate argument is converted
+    # for a Windows program (cygpath not needed)
     node -p 'require(process.argv[1]).version' "$PAQUET/package.json" 2>/dev/null || echo inconnue
 }
 
-# Empreinte sha256 d'un fichier, calculée par node (portable macOS, Linux,
-# Windows Git Bash) ; le chemin est passé en argument, comme pour version()
-empreinte() {
-    node -e 'const fs = require("fs"), crypto = require("crypto"); const h = crypto.createHash("sha256"); h.update(fs.readFileSync(process.argv[1])); process.stdout.write(h.digest("hex"))' "$1"
-}
-
-# Fichiers du paquet copiés dans un devzone, chemins absolus puis relatifs
-fichiers_paquet() {
-    local base
-    for base in "${FICHIERS[@]}"; do
-        if [ -d "$PAQUET/$base" ]; then
-            find "$PAQUET/$base" -type f -print
-        elif [ -f "$PAQUET/$base" ]; then
-            printf '%s\n' "$PAQUET/$base"
-        fi
-    done
-    if [ -d "$PAQUET/manage/scripts" ]; then
-        find "$PAQUET/manage/scripts" -type f -print
-    fi
-}
-
-fichiers_relatifs() {
-    local f
-    fichiers_paquet | while IFS= read -r f; do
-        printf '%s\n' "${f#"$PAQUET"/}"
-    done | LC_ALL=C sort
-}
-
-# .devzone.version : version du dossier, puis une empreinte par fichier copié
-ecrire_manifeste() {
-    local dossier="$1" rel
-    {
-        printf 'version %s\n' "$(version)"
-        fichiers_relatifs | while IFS= read -r rel; do
-            printf '%s  %s\n' "$(empreinte "$dossier/$rel")" "$rel"
-        done
-    } >"$dossier/.devzone.version"
-}
-
-version_dossier() {
-    local dossier="${1:-.}" v
-    if [ -f "$dossier/.devzone.version" ]; then
-        v="$(sed -n '1s/^version //p' "$dossier/.devzone.version" 2>/dev/null | head -1 || true)"
-        if [ -n "$v" ]; then
-            printf '%s\n' "$v"
-            return 0
-        fi
-    fi
-    printf 'inconnue\n'
-}
-
-empreinte_manifeste() {
-    local dossier="$1" cible="$2" ligne h p
-    [ -f "$dossier/.devzone.version" ] || return 1
-    while IFS= read -r ligne; do
-        case "$ligne" in
-            version\ * | '') continue ;;
-        esac
-        h="${ligne%%  *}"
-        p="${ligne#*  }"
-        if [ "$p" = "$cible" ]; then
-            printf '%s\n' "$h"
-            return 0
-        fi
-    done <"$dossier/.devzone.version"
-    return 1
-}
-
-fichiers_manifeste() {
-    local dossier="$1" ligne
-    [ -f "$dossier/.devzone.version" ] || return 0
-    while IFS= read -r ligne; do
-        case "$ligne" in
-            version\ * | '') continue ;;
-        esac
-        printf '%s\n' "${ligne#*  }"
-    done <"$dossier/.devzone.version"
-}
-
-# Un chemin lu dans le manifeste n'est accepté que s'il est relatif, simple
-# (ni « .. », « . », « // », retour à la ligne ou tabulation), et sous un
-# dossier géré par le paquet ou un fichier de sa racine. Sinon : refus.
-chemin_sur() {
-    local rel="$1"
-    case "$rel" in
-        '' | /* | *//* | *$'\n'* | *$'\t'*) return 1 ;;
-    esac
-    case "/$rel/" in
-        */../* | */./*) return 1 ;;
-    esac
-    case "$rel" in
-        .devcontainer/* | manage/* | core/* | scripts/* | \
-            Makefile | README.md | LICENSE | .gitattributes) return 0 ;;
-    esac
-    return 1
-}
-
-# Défense en profondeur : le dossier parent réel doit rester sous le dossier
-# devzone réel (pwd -P) ; un lien symbolique qui en sort est donc refusé.
-dans_dossier() {
-    local dossier="$1" rel="$2" racine parent
-    racine="$(cd "$dossier" && pwd -P)" || return 1
-    parent="$(cd "$dossier/$(dirname "$rel")" 2>/dev/null && pwd -P)" || return 1
-    case "$parent" in
-        "$racine" | "$racine"/*) return 0 ;;
-    esac
-    return 1
-}
-
-# Jamais touchés par mettre-a-jour, même si un ancien manifeste les cite
-protege() {
-    case "$1" in
-        workspace | workspace/* | .devzone.version | .devzone.modules | .devzone.modules-* | \
-            .devzone.paquets | .password | .app | .devzone.log | .git | .git/*) return 0 ;;
-    esac
-    return 1
-}
-
-dans_liste() {
-    grep -Fqx -- "$2" "$1"
-}
-
-# Ancienne arborescence de devzone (d'avant manage/) : core/ n'est reconnu que
-# par ses fichiers marqueurs, scripts/ que par les deux siens. Sinon, c'est un
-# dossier de l'utilisateur : jamais touché.
-arbre_ancien() {
-    local dossier="$1" arbre="$2"
-    case "$arbre" in
-        core)
-            [ -f "$dossier/core/devzone" ] || [ -f "$dossier/core/scripts/desinstaller.sh" ]
-            ;;
-        scripts)
-            [ -f "$dossier/scripts/desinstaller.sh" ] && [ -f "$dossier/scripts/lancer.sh" ]
-            ;;
-        *) return 1 ;;
-    esac
-}
-
-# Fichier connu de l'ancien paquet : les noms de manage/scripts/ ramenés dans
-# core/scripts/ ou scripts/, core/devzone, et tout core/test/ et core/docs/.
-fichier_ancien_connu() {
-    local rel="$1" nom
-    case "$rel" in
-        core/devzone | core/test/* | core/docs/*) return 0 ;;
-        core/scripts/*) nom="${rel#core/scripts/}" ;;
-        scripts/*) nom="${rel#scripts/}" ;;
-        *) return 1 ;;
-    esac
-    [ -f "$PAQUET/manage/scripts/$nom" ]
-}
-
-completer_gitignore() {
-    local dossier="$1" ligne
-    touch "$dossier/.gitignore"
-    for ligne in "${LIGNES_GITIGNORE[@]}"; do
-        grep -qxF -- "$ligne" "$dossier/.gitignore" || printf '%s\n' "$ligne" >>"$dossier/.gitignore"
-    done
-}
-
-# Six étapes de la conception (#349)
-mettre_a_jour() {
-    local oui="" sans="" arg dossier pkg vdossier liste_paquet liste_anciens
-    local manquants rel actuelle attendue reponse sauvegarde base n ancien f
-    for arg in "$@"; do
-        case "$arg" in
-            --oui) oui=1 ;;
-            --sans-reconstruire) sans=1 ;;
-            *)
-                echo "✖ option inconnue : $arg (devzone mettre-a-jour [--oui] [--sans-reconstruire])" >&2
-                exit 1
-                ;;
-        esac
-    done
-    if [ ! -d .devcontainer ]; then
-        echo "✖ À lancer dans un dossier devzone (.devcontainer introuvable ici)." >&2
-        exit 1
-    fi
-
-    dossier="$(pwd)"
-    pkg="$(version)"
-    vdossier="$(version_dossier "$dossier")"
-    travail="$(mktemp -d)"
-    trap 'rm -rf "$travail"' EXIT
-    liste_paquet="$travail/paquet"
-    liste_anciens="$travail/anciens"
-    fichiers_relatifs >"$liste_paquet"
-    fichiers_manifeste "$dossier" | LC_ALL=C sort >"$liste_anciens"
-
-    # 1. Versions et fichiers du paquet présents
-    manquants=""
-    while IFS= read -r rel; do
-        [ -f "$dossier/$rel" ] || manquants=1
-    done <"$liste_paquet"
-    if [ "$vdossier" = "$pkg" ] && [ -z "$manquants" ]; then
-        echo "✔ devzone $vdossier : déjà à jour."
-        echo "Pour la dernière version publiée : npx devzone@latest mettre-a-jour"
-        return 0
-    fi
-    echo "devzone : dossier $vdossier, paquet $pkg"
-
-    # 2. Fichiers modifiés localement (empreinte différente du manifeste ;
-    # sans manifeste, différente de celle du paquet)
-    : >"$travail/modifies"
-    : >"$travail/sauver"
-    : >"$travail/supprimer"
-    : >"$travail/arbres"
-    while IFS= read -r rel; do
-        [ -f "$dossier/$rel" ] || continue
-        printf '%s\n' "$rel" >>"$travail/sauver"
-        actuelle="$(empreinte "$dossier/$rel")"
-        if attendue="$(empreinte_manifeste "$dossier" "$rel")"; then
-            :
-        else
-            attendue="$(empreinte "$PAQUET/$rel")"
-        fi
-        [ "$actuelle" = "$attendue" ] || printf '%s\n' "$rel" >>"$travail/modifies"
-    done <"$liste_paquet"
-    while IFS= read -r rel; do
-        [ -n "$rel" ] || continue
-        if ! chemin_sur "$rel"; then
-            echo "devzone : manifeste : chemin refusé : $rel" >&2
-            continue
-        fi
-        dans_liste "$liste_paquet" "$rel" && continue
-        protege "$rel" && continue
-        if ! dans_dossier "$dossier" "$rel"; then
-            echo "devzone : manifeste : chemin refusé : $rel" >&2
-            continue
-        fi
-        printf '%s\n' "$rel" >>"$travail/supprimer"
-        [ -f "$dossier/$rel" ] || continue
-        printf '%s\n' "$rel" >>"$travail/sauver"
-        if attendue="$(empreinte_manifeste "$dossier" "$rel")"; then
-            [ "$(empreinte "$dossier/$rel")" = "$attendue" ] || printf '%s\n' "$rel" >>"$travail/modifies"
-        else
-            printf '%s\n' "$rel" >>"$travail/modifies"
-        fi
-    done <"$liste_anciens"
-    for ancien in core scripts; do
-        [ -d "$dossier/$ancien" ] || continue
-        arbre_ancien "$dossier" "$ancien" || continue
-        printf '%s\n' "$ancien" >>"$travail/arbres"
-        while IFS= read -r f; do
-            rel="${f#"$dossier"/}"
-            if ! chemin_sur "$rel"; then
-                echo "devzone : manifeste : chemin refusé : $rel" >&2
-                continue
-            fi
-            protege "$rel" && continue
-            # Un fichier inconnu de l'ancien paquet appartient à l'utilisateur
-            fichier_ancien_connu "$rel" || continue
-            printf '%s\n' "$rel" >>"$travail/supprimer"
-            printf '%s\n' "$rel" >>"$travail/sauver"
-            # Toujours confirmé : la suppression d'un fichier de l'ancien paquet
-            # est un changement, même avec un manifeste
-            printf '%s\n' "$rel" >>"$travail/modifies"
-        done < <(find "$dossier/$ancien" -type f -print)
-    done
-    LC_ALL=C sort -u "$travail/modifies" >"$travail/modifies.tri"
-    mv "$travail/modifies.tri" "$travail/modifies"
-    LC_ALL=C sort -u "$travail/sauver" >"$travail/sauver.tri"
-    mv "$travail/sauver.tri" "$travail/sauver"
-
-    if [ -s "$travail/modifies" ]; then
-        echo "Fichiers modifiés localement :"
-        while IFS= read -r rel; do
-            printf '  %s\n' "$rel"
-        done <"$travail/modifies"
-        if [ -z "$oui" ]; then
-            if [ ! -t 0 ]; then
-                echo "✖ Fichiers modifiés localement : relance avec --oui pour les remplacer (sauvegarde dans .devzone.sauvegarde/)." >&2
-                exit 1
-            fi
-            printf 'Remplacer ces fichiers (sauvegarde dans .devzone.sauvegarde/) ? [o/N] ' >&2
-            read -r reponse || reponse=""
-            case "$reponse" in
-                o | O | oui | Oui | OUI) ;;
-                *)
-                    echo "Abandon : rien n'a été modifié."
-                    return 1
-                    ;;
-            esac
-        fi
-    fi
-
-    # 3. Sauvegarde de tout fichier remplacé ou supprimé
-    if [ -s "$travail/sauver" ]; then
-        base="$dossier/.devzone.sauvegarde/$(date +%Y%m%d-%H%M%S)"
-        sauvegarde="$base"
-        n=1
-        while [ -e "$sauvegarde" ]; do
-            n=$((n + 1))
-            sauvegarde="$base-$n"
-        done
-        while IFS= read -r rel; do
-            [ -f "$dossier/$rel" ] || continue
-            if ! dans_dossier "$dossier" "$rel"; then
-                echo "devzone : manifeste : chemin refusé : $rel" >&2
-                continue
-            fi
-            mkdir -p "$sauvegarde/$(dirname "$rel")"
-            # -P : un lien est sauvegardé tel quel, jamais sa cible
-            cp -P -p "$dossier/$rel" "$sauvegarde/$rel"
-        done <"$travail/sauver"
-        echo "Sauvegarde : $sauvegarde"
-    fi
-
-    # 4. Remplacement, suppression de l'ancien paquet et des anciennes
-    # arborescences, .gitignore complété sans être écrasé
-    completer_gitignore "$dossier"
-    while IFS= read -r rel; do
-        mkdir -p "$dossier/$(dirname "$rel")"
-        if ! dans_dossier "$dossier" "$rel"; then
-            echo "devzone : manifeste : chemin refusé : $rel" >&2
-            continue
-        fi
-        # Jamais d'écriture à travers un lien : le lien (pas sa cible) est retiré
-        if [ -L "$dossier/$rel" ]; then
-            rm -f -- "$dossier/$rel"
-            echo "devzone : manifeste : lien remplacé : $rel" >&2
-        fi
-        cp -p "$PAQUET/$rel" "$dossier/$rel"
-        if [ -x "$PAQUET/$rel" ]; then
-            chmod +x "$dossier/$rel"
-        fi
-    done <"$liste_paquet"
-    while IFS= read -r rel; do
-        [ -n "$rel" ] || continue
-        [ -f "$dossier/$rel" ] || continue
-        if ! dans_dossier "$dossier" "$rel"; then
-            echo "devzone : manifeste : chemin refusé : $rel" >&2
-            continue
-        fi
-        # rm ne suit pas les liens : seul le lien est retiré, jamais sa cible
-        rm -f -- "$dossier/$rel"
-    done <"$travail/supprimer"
-    while IFS= read -r ancien; do
-        [ -n "$ancien" ] || continue
-        [ -d "$dossier/$ancien" ] || continue
-        # Seuls les dossiers devenus vides sont retirés, jamais leur contenu
-        find "$dossier/$ancien" -depth -type d -empty -delete
-    done <"$travail/arbres"
-
-    # 6. Nouveau manifeste, puis reconstruction proposée
-    ecrire_manifeste "$dossier"
-    echo "✔ devzone $pkg : mis à jour."
-    bash "$PAQUET/manage/scripts/poste.sh" conseil "$dossier" || true
-    # la mise à jour ne change jamais le mode du poste (#472)
-    if [ "$(grep -E '^workspace=' "$dossier/.devzone.modules" 2>/dev/null | tail -1)" = "workspace=kubernetes" ]; then
-        return 0
-    fi
-    if [ -n "$sans" ]; then
-        echo "Reconstruction non lancée (--sans-reconstruire)."
-        return 0
-    fi
-    if [ ! -t 0 ]; then
-        echo "Reconstruction : make -C $dossier rebuild (à lancer dans un terminal)"
-        return 0
-    fi
-    printf 'Reconstruire le conteneur maintenant (make rebuild) ? [o/N] ' >&2
-    read -r reponse || reponse=""
-    case "$reponse" in
-        o | O | oui | Oui | OUI) ;;
-        *)
-            echo "Reconstruction non lancée : make -C $dossier rebuild"
-            return 0
-            ;;
-    esac
-    if [ -n "${DEVZONE_RECONSTRUIRE:-}" ]; then
-        sh -c "$DEVZONE_RECONSTRUIRE"
-    else
-        make -C "$dossier" rebuild
-    fi
-}
-
-aide() {
-    cat <<EOF
+show_help() {
+    cat <<EOT
 devzone $(version) : environnement de développement conteneurisé
 
   devzone <dossier> [--gitops github|none|<url>] [--kubernetes|--docker]
@@ -440,146 +69,14 @@ devzone $(version) : environnement de développement conteneurisé
                            services (gitlab, postgres, argocd) du workspace Kubernetes
   devzone workspace argocd status|init|apply|app add|list|remove
                            Argo CD du workspace : dépôt GitOps, .argocd.conf, projets
-  (anciens noms français acceptés : mettre-a-jour, desinstaller, demarrer…)
+  (noms français renommés : mettre-a-jour, desinstaller, aide ; demarrer… reste accepté)
   devzone --version
-EOF
+EOT
 }
 
-gitops_saisir() {
-    # GitOps repository of Argo CD for the creation (#539): github, an
-    # existing URL, or none. Asked in a terminal (default: github when gh is
-    # connected), or none with a notice without one (the --gitops option names
-    # the choice).
-    local reponse defaut=""
-    if gh auth status >/dev/null 2>&1; then
-        defaut="github"
-    fi
-    printf 'GitOps repository for Argo CD? [G]itHub (created under your gh account at first start) / a URL / [n]one : ' >&2
-    read -r reponse || reponse=""
-    reponse="${reponse:-$defaut}"
-    case "$reponse" in
-        G | g | GitHub | github | Oui | oui | OUI) echo "github" ;;
-        n | N | none | None | Non | non | NON | aucun | Aucun) echo "none" ;;
-        *) echo "$reponse" ;;
-    esac
-}
-
-creer() {
-    local cible="$1" gitops="" expect="" option="" arg valeur login nom instance
-    shift
-    for arg in "$@"; do
-        if [ "$expect" = gitops ]; then gitops="$arg"; expect=""; continue; fi
-        case "$arg" in
-            --gitops) expect=gitops ;;
-            --gitops=*) gitops="${arg#--gitops=}" ;;
-            --kubernetes | --docker)
-                if [ -n "$option" ] && [ "$option" != "${arg#--}" ]; then
-                    echo "✖ --kubernetes and --docker: choose one" >&2
-                    exit 1
-                fi
-                option="${arg#--}"
-                ;;
-            *) echo "✖ option inconnue : $arg (devzone <dossier> [--gitops github|none|<url>] [--kubernetes|--docker])" >&2; exit 1 ;;
-        esac
-    done
-    if [ -n "$expect" ]; then
-        echo "✖ --gitops attend une valeur (github, none or a URL)" >&2
-        exit 1
-    fi
-
-    if [ -e "$cible" ] && [ -n "$(ls -A "$cible" 2>/dev/null)" ]; then
-        echo "✖ $cible existe et n'est pas vide : rien n'est écrasé. Choisis un autre dossier." >&2
-        exit 1
-    fi
-
-    # Mode before any copy: --kubernetes without a cluster creates nothing (#497)
-    # shellcheck source=SCRIPTDIR/scripts/create-mode.sh
-    . "$PAQUET/manage/scripts/create-mode.sh"
-    create_mode_choose "$option" || exit 1
-
-    if [ -z "$gitops" ]; then
-        if [ -t 0 ]; then
-            gitops="$(gitops_saisir)"
-        else
-            echo "⚠ no GitOps repository for Argo CD: pass --gitops <github|none|https://github.com/<login>/<name>.git> to create a devzone without a terminal; using none" >&2
-            gitops="none"
-        fi
-    fi
-    mkdir -p "$cible/workspace" "$cible/manage"
-    cp -R "${FICHIERS[@]/#/$PAQUET/}" "$cible/"
-    cp -R "$PAQUET/manage/scripts" "$cible/manage/"
-    touch "$cible/workspace/.gitkeep"
-    # npm n'embarque jamais .gitignore : écrit ici
-    : >"$cible/.gitignore"
-    completer_gitignore "$cible"
-    chmod +x "$cible/manage/scripts/desinstaller.sh" "$cible/manage/scripts/lancer.sh"
-    create_mode_write "$cible" "$CREATE_MODE"
-    # The GitOps repository of the new devzone (#539): github, an existing URL,
-    # or none, written in the .argocd.conf of the new devzone (conf.sh writes
-    # the header of the file when absent)
-    . "$PAQUET/.devcontainer/argocd/conf.sh"
-    # shellcheck disable=SC2034 # read by conf.sh
-    ARGOCD_CONF="$cible/.argocd.conf"
-    if [ "$gitops" = github ]; then
-        if ! gh auth status >/dev/null 2>&1; then
-            echo "⚠ GitHub not connected (gh auth login): no GitOps repository, the Applications are applied directly; pass --gitops none" >&2
-            valeur="none"
-        else
-            login="$(gh api user --jq .login 2>/dev/null)" || login=""
-            if [ -z "$login" ]; then
-                echo "⚠ GitHub login unreadable (gh api user): no GitOps repository, the Applications are applied directly; pass --gitops none" >&2
-                valeur="none"
-            else
-                nom="${DEVZONE_GITOPS_REPO_NAME:-devzone-argocd}"
-                instance="${DEVZONE_VOLUMES:-devzone}"
-                if [ "$instance" != "devzone" ]; then
-                    nom="$nom-$instance"
-                fi
-                valeur="https://github.com/$login/$nom.git"
-            fi
-        fi
-    elif [ "$gitops" = none ]; then
-        valeur="none"
-    else
-        valeur="$gitops"
-    fi
-    conf_set argocd "repo=$valeur"
-    case "$valeur" in
-        none) echo "✔ no GitOps repository: the Applications are applied directly (devzone workspace argocd init to change)" ;;
-        *) echo "✔ GitOps repository: $valeur ($cible/.argocd.conf)" ;;
-    esac
-    cible="$(cd "$cible" && pwd)"
-    ecrire_manifeste "$cible"
-    echo "✔ devzone $(version) créé dans $cible"
-    # Kubernetes: the workspace goes to the cluster, no Docker check (Docker
-    # Desktop hosts the cluster, but devzone does not need it directly)
-    if [ "$CREATE_MODE" = kubernetes ]; then
-        create_mode_start "$cible" "$PAQUET/manage/workspace.sh"
-        return
-    fi
-    if [ -n "${DEVZONE_SANS_DEMARRER:-}" ]; then
-        echo "Pour le lancer : cd $cible && make up"
-        return 0
-    fi
-    # Docker d'abord : le dossier reste prêt, à lancer une fois Docker démarré
-    # shellcheck source=SCRIPTDIR/scripts/docker.sh
-    . "$PAQUET/manage/scripts/docker.sh"
-    if ! docker_ready "cd $cible && make shell"; then
-        echo "  Le dossier est prêt : rien à refaire, sauf ce lancement." >&2
-        exit 1
-    fi
-    echo "▶ Lancement (quelques minutes la première fois)…"
-    if command -v make >/dev/null 2>&1; then
-        make -C "$cible" up
-    else
-        bash "$cible/manage/scripts/lancer.sh" up "$cible"
-    fi
-    echo "Ensuite : cd $cible && make shell (ou ouvre le dossier dans VS Code : Reopen in Container)."
-}
-
-# Commandes du conteneur (#471) : liste figée, à garder alignée sur le case
-# final de .devcontainer/devzone (test de cohérence dans manage/test/cli.bats)
-commande_du_conteneur() {
+# Container commands (#471): a fixed list, to keep aligned with the final case
+# of .devcontainer/devzone (consistency test in manage/test/cli.bats)
+container_command() {
     case "$1" in
         actif | activer | agent | appliquer | argocd | build | catalogue | cluster | clusters | \
             demarrer | desactiver | etat | gitlab | metrics | modules | mots-de-passe | \
@@ -592,48 +89,63 @@ commande_du_conteneur() {
     esac
 }
 
-# English command names are accepted, French ones unchanged and warned (#502,
-# #532). A copied devzone may miss the aliases file: then no normalization.
-# On the host, translate only to a known host or container command; any other
-# name stays as typed (so « devzone stop » creates ./stop, not ./arreter).
+# The host commands have English names (#532). The old French names are
+# renamed, not accepted: they refuse with the new name and create nothing
+# (otherwise « devzone mettre-a-jour » would create a folder of that name).
+renamed_command() {
+    case "${1:-}" in
+        mettre-a-jour) echo update ;;
+        desinstaller) echo uninstall ;;
+        aide) echo help ;;
+        *) return 1 ;;
+    esac
+}
+if [ "$#" -gt 0 ] && new_name="$(renamed_command "$1")"; then
+    echo "✖ « $1 » a été renommé : devzone $new_name" >&2
+    exit 1
+fi
+
+# English names of the container commands are accepted, French ones unchanged
+# and warned (#502, #532). A copied devzone may miss the aliases file: then no
+# normalization. On the host, translate only to a known container command; any
+# other name stays as typed (so « devzone stop » creates ./stop, not ./arreter).
 # shellcheck source=SCRIPTDIR/../.devcontainer/command-aliases.sh
 # shellcheck disable=SC1091
 if [ -f "$PAQUET/.devcontainer/command-aliases.sh" ]; then
     . "$PAQUET/.devcontainer/command-aliases.sh"
     if [ "$#" -gt 0 ]; then
-        canon="$(command_canonical "$1")"
-        if command -v command_deprecated_warning >/dev/null 2>&1; then
-            command_deprecated_warning "$1"
+        command_deprecated_warning "$1"
+        canonical="$(command_canonical "$1")"
+        if container_command "$canonical"; then
+            set -- "$canonical" "${@:2}"
         fi
-        case "$canon" in
-            mettre-a-jour | desinstaller | aide | workspace) set -- "$canon" "${@:2}" ;;
-            *)
-                if commande_du_conteneur "$canon"; then
-                    set -- "$canon" "${@:2}"
-                fi
-                ;;
-        esac
     fi
 fi
 
 case "${1:-}" in
-    "" | -h | --help | aide) aide ;;
+    "" | -h | --help | help) show_help ;;
     -v | --version) version ;;
-    mettre-a-jour) mettre_a_jour "${@:2}" ;;
-    desinstaller)
-        # Dossier devzone (.devcontainer/) ; un devzone plus ancien a son
-        # desinstaller.sh dans manage/scripts/ (nouveau), core scripts ou scripts/ (anciens), ou à la racine
-        desinstalleur=""
+    update)
+        # shellcheck source=SCRIPTDIR/scripts/devzone-manifest.sh
+        . "$PAQUET/manage/scripts/devzone-manifest.sh"
+        # shellcheck source=SCRIPTDIR/scripts/devzone-update.sh
+        . "$PAQUET/manage/scripts/devzone-update.sh"
+        update_workstation "${@:2}"
+        ;;
+    uninstall)
+        # Devzone folder (.devcontainer/); an older devzone has its desinstaller.sh
+        # in manage/scripts/ (new), core/scripts or scripts/ (old), or at the root
+        uninstaller=""
         if [ -d .devcontainer ]; then
             for f in manage/scripts/desinstaller.sh core/scripts/desinstaller.sh scripts/desinstaller.sh desinstaller.sh; do
-                if [ -f "$f" ]; then desinstalleur="$f" && break; fi
+                if [ -f "$f" ]; then uninstaller="$f" && break; fi
             done
         fi
-        if [ -z "$desinstalleur" ]; then
+        if [ -z "$uninstaller" ]; then
             echo "✖ À lancer dans un dossier devzone (desinstaller.sh introuvable ici)." >&2
             exit 1
         fi
-        DEVZONE_COMMANDE="devzone desinstaller" bash "$desinstalleur"
+        DEVZONE_COMMANDE="devzone uninstall" bash "$uninstaller"
         ;;
     workspace)
         bash "$PAQUET/manage/workspace.sh" "${@:2}"
@@ -643,10 +155,14 @@ case "${1:-}" in
         exit 1
         ;;
     *)
-        if commande_du_conteneur "$1"; then
+        if container_command "$1"; then
             echo "✖ devzone $1 : commande du conteneur ; lance-la dans devzone (make shell), ou choisis un autre nom de dossier" >&2
             exit 2
         fi
-        creer "$1" "${@:2}"
+        # shellcheck source=SCRIPTDIR/scripts/devzone-manifest.sh
+        . "$PAQUET/manage/scripts/devzone-manifest.sh"
+        # shellcheck source=SCRIPTDIR/scripts/devzone-create.sh
+        . "$PAQUET/manage/scripts/devzone-create.sh"
+        create_workstation "$1" "${@:2}"
         ;;
 esac

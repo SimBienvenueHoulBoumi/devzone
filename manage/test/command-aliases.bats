@@ -132,14 +132,34 @@ TABLE
     [[ "$stderr" != *"deprecated"* ]] || false
 }
 
-@test "devzone mettre-a-jour warns, update is silent" {
-    run --separate-stderr bash "$CLI" mettre-a-jour
-    [ "$status" -eq 1 ]
-    [[ "$stderr" == *"devzone: \"mettre-a-jour\" is deprecated, use \"update\""* ]] || false
+@test "devzone update and uninstall: English names work, no warning" {
     run --separate-stderr bash "$CLI" update
     [ "$status" -eq 1 ]
     [[ "$stderr" == *".devcontainer introuvable"* ]] || false
     [[ "$stderr" != *"deprecated"* ]] || false
+    run --separate-stderr bash "$CLI" uninstall
+    [ "$status" -eq 1 ]
+    [[ "$stderr" == *"introuvable"* ]] || false
+    [[ "$stderr" != *"renomm"* ]] || false
+}
+
+@test "devzone help: English name shows the help, no warning" {
+    run --separate-stderr bash "$CLI" help
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"--version"* ]] || false
+    [[ "$stderr" != *"renomm"* ]] || false
+}
+
+@test "old French host names are renamed: message, exit 1, no folder created" {
+    for pair in mettre-a-jour:update desinstaller:uninstall aide:help; do
+        old="${pair%%:*}"
+        new="${pair#*:}"
+        run --separate-stderr bash "$CLI" "$old"
+        [ "$status" -eq 1 ]
+        [[ "$stderr" == *"$old"*"renomm"*"devzone $new"* ]] || { echo "message absent : $old"; false; }
+        [ ! -e "$old" ]
+        [ -z "$output" ]
+    done
 }
 
 @test "workspace migrer warns, migrate is silent" {
