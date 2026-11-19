@@ -257,8 +257,8 @@ EOF
 }
 
 @test "agent: host model is the local model, after every online model" {
-    # Module ia (and llm) on: the local slot is the host model detected via /api/tags.
-    printf 'ia=on\nllm=on\n' >"$DEVZONE_RACINE/.devzone.modules"
+    # Module ia on: the local slot is the host model detected via /api/tags.
+    printf 'ia=on\n' >"$DEVZONE_RACINE/.devzone.modules"
     export DEVZONE_AGENT_ETAT="$BATS_TEST_TMPDIR/etat"
     export FAKE_ARGS="$BATS_TEST_TMPDIR/refs.log"
     : >"$FAKE_ARGS"
@@ -322,7 +322,7 @@ FAKE
     chmod +x "$BATS_TEST_TMPDIR/bin/opencode"
 }
 
-@test "agent: the host model is tried even when the llm module is off" {
+@test "agent: the host model is tried last, whatever .devzone.modules says" {
     unset DEVZONE_WORKSPACE
     printf 'ia=on\n' >"$DEVZONE_RACINE/.devzone.modules"
     fake_opencode_rotation

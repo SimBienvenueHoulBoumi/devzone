@@ -179,11 +179,11 @@ set_provider() {
     fi
 }
 
-# Removes the devzone-host provider from the opencode configuration file,
-# keeping everything else. No error when the file is absent.
+# Removes the devzone-host and devzone-llm providers from the opencode
+# configuration file, keeping everything else. No error when the file is absent.
 unset_provider() {
     [ ! -f "$FILE" ] && return 0
-    rewrite 'if .provider then del(.provider["devzone-host"]) | (if .provider == {} then del(.provider) else . end) else . end'
+    rewrite 'if .provider then del(.provider["devzone-host"]) | del(.provider["devzone-llm"]) | (if .provider == {} then del(.provider) else . end) else . end'
 }
 
 # When run directly (not sourced): dispatch the subcommands.
