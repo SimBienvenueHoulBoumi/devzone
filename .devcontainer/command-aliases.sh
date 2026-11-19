@@ -16,6 +16,7 @@ command_canonical() {
         is-enabled) echo actif ;;
         enable) echo activer ;;
         disable) echo desactiver ;;
+        ai) echo ia ;;
         help) echo aide ;;
         apply) echo appliquer ;;
         catalog) echo catalogue ;;
@@ -45,6 +46,7 @@ command_english() {
         actif) echo is-enabled ;;
         activer) echo enable ;;
         desactiver) echo disable ;;
+        ia) echo ai ;;
         aide) echo help ;;
         appliquer) echo apply ;;
         catalogue) echo catalog ;;

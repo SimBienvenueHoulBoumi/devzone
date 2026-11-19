@@ -938,3 +938,23 @@ KUBE
     [ "$status" -eq 0 ] || false
     [[ "$output" != *"cluster de travail"* ]] || false
 }
+
+@test "activer ia : signale l'absence d'Ollama, sans échec (#665)" {
+    DEVZONE_OLLAMA_URL="http://127.0.0.1:9" run bash "$DEVZONE" enable ia
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"aucun modèle Ollama détecté sur http://127.0.0.1:9 (modèles de l'hôte non branchés)"* ]] || false
+}
+
+@test "activer ia : signale les modèles de l'hôte branchés (#665)" {
+    cat >"$BATS_TEST_TMPDIR/bin/curl" <<'FAKE'
+#!/usr/bin/env bash
+case "$*" in
+    *"/api/tags"*) printf '%s' '{"models":[{"name":"qwen3-coder:32k","details":{"type":"llm"}},{"name":"deepseek-coder:latest","details":{"type":"llm"}}]}' ;;
+    *) exit 0 ;;
+esac
+FAKE
+    chmod +x "$BATS_TEST_TMPDIR/bin/curl"
+    run bash "$DEVZONE" enable ia
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"2 modèle(s) de l'hôte (Ollama) branché(s)"* ]] || false
+}
