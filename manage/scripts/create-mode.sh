@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Workstation mode at creation (#497): a new devzone is Kubernetes when the
-# cluster answers, Docker otherwise. Sourced by manage/devzone (creer):
+# cluster answers. Without a cluster there is no silent fallback to Docker
+# (#671): creation stops and lists the ways to get a cluster; --docker still
+# asks for the deprecated Docker workstation explicitly. Sourced by manage/devzone (creer):
 # create_mode_choose runs before any file is copied (so --kubernetes without a
 # cluster creates nothing), create_mode_write once the folder exists.
 # Sourced only: no code at file level. Compatible with bash 3.2 (macOS).
@@ -17,15 +19,32 @@ kube_context() {
     fi
 }
 
+# Prints, on stderr, how to get a cluster: devzone only displays the commands,
+# it never runs them and no cloud credential goes through it.
+create_mode_no_cluster() {
+    cat >&2 <<EOF
+✖ Kubernetes not reachable: $1. Nothing created.
+  devzone runs in a Kubernetes cluster. Pick one, then run the same command again:
+  - a remote cluster (AWS, GCP, Azure, other): add its context to your kubeconfig, then select it
+      aws eks update-kubeconfig --name <cluster>
+      gcloud container clusters get-credentials <cluster>
+      az aks get-credentials --name <cluster> --resource-group <group>
+      kubectl config use-context <context>
+  - a local cluster: Docker Desktop (Settings > Kubernetes > Enable Kubernetes), or minikube
+      minikube start -p devzone
+  --docker still creates the Docker workstation, deprecated: it will be removed
+EOF
+}
+
 # Chooses the mode from the option (kubernetes, docker, or empty) and sets
 # CREATE_MODE to kubernetes or docker, with one line of notice. Returns 1,
-# nothing set on disk, when --kubernetes is asked and the cluster does not
-# answer.
+# nothing set on disk, when the cluster does not answer and the Docker
+# workstation was not asked with --docker.
 create_mode_choose() {
     local option="$1" reason
     if [ "$option" = docker ]; then
         CREATE_MODE=docker
-        echo "Docker workstation (--docker): later: devzone workspace migrate"
+        echo "⚠ Docker workstation (--docker) is deprecated and will be removed: devzone workspace migrate moves it to the cluster"
         return 0
     fi
     if reason="$(kube_ready_reason)"; then
@@ -34,13 +53,8 @@ create_mode_choose() {
         create_mode_existing
         return 0
     fi
-    if [ "$option" = kubernetes ]; then
-        echo "✖ Kubernetes not reachable: $reason. Nothing created: start the cluster, or create with --docker" >&2
-        return 1
-    fi
-    CREATE_MODE=docker
-    echo "⚠ Kubernetes not reachable: $reason. Docker workstation; later: devzone workspace migrate"
-    return 0
+    create_mode_no_cluster "$reason"
+    return 1
 }
 
 # A workspace already installed in the cluster (helm release devzone-workspace,

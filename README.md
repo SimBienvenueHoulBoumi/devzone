@@ -32,7 +32,7 @@ devzone les évite : le même environnement sur chaque poste, sur ta machine.
 devzone prépare un environnement Ubuntu aux versions d'outils figées, et le lance à l'un de ces deux endroits :
 
 - **dans le cluster Kubernetes** de ta machine, par défaut, dès qu'un cluster répond à la création : le poste est un pod `devzone-workspace-0` (namespace `devzone-workspace`) ;
-- **dans un conteneur Docker** sinon : un devcontainer lancé par Docker sur ton poste (mode « poste Docker »).
+- **dans un conteneur Docker** (mode « poste Docker », déprécié, retiré dans une version à venir) : seulement avec `--docker` à la création, ou pour un poste déjà créé ainsi.
 
 Dans les deux cas, rien n'est hébergé : tout tourne sur ta machine. `workspace/` est conservé entre les rebuilds, et les projets d'un poste Kubernetes restent dans le volume du pod. Le mode de chaque poste est écrit dans `.devzone.modules` (`workspace=kubernetes` ou `workspace=docker`) ; le détail est dans la [référence](manage/docs/reference.md#workspace-kubernetes).
 
@@ -41,7 +41,7 @@ Dans les deux cas, rien n'est hébergé : tout tourne sur ta machine. `workspace
 ### Prérequis
 
 - **Kubernetes (mode par défaut)** : un cluster Kubernetes 1.30 ou plus qui répond, avec `kubectl` et `helm` sur la machine. Sur Mac et Windows, le plus simple est le cluster de Docker Desktop : *Settings → Kubernetes → Enable Kubernetes*. devzone lui-même n'a pas besoin de Docker dans ce mode, mais le cluster de Docker Desktop s'arrête avec Docker Desktop (si le cluster ne répond pas, voir [Questions fréquentes](#questions-fréquentes)). Détails dans le [workspace Kubernetes](manage/docs/reference.md#workspace-kubernetes).
-- **Docker (repli)** : Docker Desktop (ou Docker Engine sous Linux). Il sert au poste Docker, qui prend le relais quand aucun cluster ne répond à la création, et il est nécessaire pour lire les volumes à migrer (`devzone workspace migrate`, `devzone workspace revert` pour y retourner).
+- **Docker (déprécié)** : Docker Desktop (ou Docker Engine sous Linux). Il sert au poste Docker, qui n'est plus un repli automatique : sans cluster, la création s'arrête. Il reste nécessaire pour lire les volumes à migrer (`devzone workspace migrate`, `devzone workspace revert` pour y retourner).
 - Node et npm (pour `npx` ou l'installation globale).
 - `make` (nécessaire pour `make shell` ; sous Windows sans `make`, voir le tableau « Au quotidien »).
 
@@ -121,9 +121,9 @@ Une ligne `○ GitHub … optional` remplace `✔ GitHub connecté` tant que `gh
 
 Le premier lancement prend 4 à 5 min mesurées, plus le téléchargement des images de base sur une machine neuve.
 
-### Kubernetes ou Docker à la création
+### Un cluster à la création
 
-À la création, le poste suit le cluster : Kubernetes s'il répond, Docker sinon.
+À la création, devzone a besoin d'un cluster Kubernetes qui répond.
 
 ```text
 devzone mon-devzone
@@ -131,12 +131,11 @@ devzone mon-devzone
   ├─ cluster qui répond ──▶ workspace dans le cluster (Kubernetes)
   │                         make shell ouvre le pod ; pas de migration
   │
-  └─ sinon ───────────────▶ poste Docker
-                            make shell lance le conteneur ;
-                            plus tard : devzone workspace migrate
+  └─ sinon ───────────────▶ rien n'est créé : devzone liste les moyens
+                            d'avoir un cluster, puis tu relances
 ```
 
-`devzone mon-devzone --kubernetes` exige le cluster : sans lui, rien n'est créé. `devzone mon-devzone --docker` garde le poste Docker sans contrôler le cluster. Détails dans [manage/docs/reference.md](manage/docs/reference.md#création-directe-dans-le-cluster).
+Sans cluster, devzone s'arrête et affiche des commandes à copier (il ne les exécute jamais, et aucun identifiant cloud ne passe par lui) : un cluster distant (`aws eks update-kubeconfig`, `gcloud container clusters get-credentials`, `az aks get-credentials`, qui le déclarent dans ton kubeconfig ; fais-en le contexte courant de kubectl), ou un cluster local (Docker Desktop : *Settings → Kubernetes → Enable Kubernetes*, ou `minikube start -p devzone`). `devzone mon-devzone --docker` crée encore le poste Docker, **déprécié** : il sera retiré, et `devzone workspace migrate` le fait passer dans le cluster. Détails dans [manage/docs/reference.md](manage/docs/reference.md#création-directe-dans-le-cluster).
 
 ### Vérifier que tout fonctionne
 
@@ -242,7 +241,7 @@ Dans le conteneur, le récapitulatif `devzone` signale une version publiée plus
 
 ## Options
 
-**Mode à la création** : `--kubernetes` (workspace dans le cluster, refusé sans cluster) ou `--docker` (poste Docker, sans contrôle du cluster). Sans option, le mode suit le cluster (voir [Kubernetes ou Docker à la création](#kubernetes-ou-docker-à-la-création)).
+**Mode à la création** : `--kubernetes` (workspace dans le cluster, refusé sans cluster) ou `--docker` (poste Docker déprécié, sans contrôle du cluster). Sans option, le cluster doit répondre, sinon rien n'est créé (voir [Un cluster à la création](#un-cluster-à-la-création)).
 
 **Module `ia`** : active Claude Code et opencode (versions figées), avec le garde-fou repowarden qui les arrête avant de modifier `main` ou `develop` ou de commiter sans `repowarden cc` (voir [manage/docs/reference.md](manage/docs/reference.md#garde-fou-des-assistants-ia)). Pour l'activer : `devzone enable ia`. Ils sont désinstallés quand le module est désactivé, mais tes connexions restent dans leurs volumes. Le module pose aussi un garde-fou qui arrête les commandes `docker` des agents : devzone est Kubernetes d'abord, seuls les pods sont des conteneurs (`kubectl`, ou un pod jetable, à la place).
 
@@ -389,13 +388,13 @@ Spring Boot écoute sur `0.0.0.0` par défaut : ne fixe pas `server.address` à 
 - **Accès au socket Docker de l'hôte** : le socket Docker de la machine hôte est monté dans le conteneur. Cela offre un accès administrateur au Docker de l'hôte, y compris pour les agents IA. C'est un compromis de sécurité assumé documenté dans la section Limites. Pour restreindre l'accès, utilisez les mécanismes propres à Docker Desktop/Linux.
 - **Le premier lancement est long** : c'est normal (construction de l'image, téléchargement des images de base). Il prend 4 à 5 min mesurées, plus le téléchargement des images de base sur une machine neuve.
 - **`make` est absent sous Windows** : tu peux utiliser `npx @devcontainers/cli` (voir le tableau « Au quotidien ») ou Git Bash. Les scripts sont compatibles (fins de ligne LF).
-- **Le cluster Kubernetes ne répond pas** : devzone ne crée jamais de cluster. À la création, sans cluster qui répond (en 5 s), le poste devient un poste Docker et l'annonce :
+- **Le cluster Kubernetes ne répond pas** : devzone ne crée jamais de cluster. À la création, sans cluster qui répond (en 5 s), rien n'est créé : la commande échoue (code 1), dit pourquoi et liste les moyens d'avoir un cluster (voir [Un cluster à la création](#un-cluster-à-la-création)) :
 
   ```text
-  ⚠ Kubernetes not reachable: cluster <contexte> unreachable (<serveur>). Docker workstation; later: devzone workspace migrate
+  ✖ Kubernetes not reachable: cluster <contexte> unreachable (<serveur>). Nothing created.
   ```
 
-  Avec `--kubernetes`, rien n'est créé et la commande échoue. Ensuite, `devzone workspace start` (donc `make up` et `make shell`) vérifie le cluster en premier et s'arrête sans rien modifier. Le message dit la cause :
+  Seul `--docker` crée encore un poste Docker, déprécié. Ensuite, `devzone workspace start` (donc `make up` et `make shell`) vérifie le cluster en premier et s'arrête sans rien modifier. Le message dit la cause :
 
   - **Docker Desktop arrêté** : `✖ Docker Desktop is stopped: the Kubernetes cluster of this machine runs inside it. Start Docker Desktop, then: make shell`. Lance Docker Desktop, puis `make shell`. Pour qu'il démarre à chaque connexion : *Settings → General → Start Docker Desktop when you sign in*.
   - **Docker répond, pas le cluster** : `✖ Kubernetes cluster <contexte> unreachable (<serveur>): enable Kubernetes in Docker Desktop (Settings → Kubernetes) or check kubectl config get-contexts`. Active Kubernetes dans Docker Desktop (*Settings → Kubernetes → Enable Kubernetes*).
