@@ -36,7 +36,7 @@ refuse() { echo "devzone : catalogue mysql : $*" >&2; exit 2; }
 services_secret_mysql() { mysql_secret; }
 # Régénère la vue .password (échec non bloquant)
 regenerer_identifiants() {
-    password_regenerer ||
+    password_regenerate ||
         echo "devzone : catalogue mysql : identifiants regroupés non mis à jour (devzone passwords)" >&2
 }
 # Raccourci kubectl dans le namespace devzone-mysql

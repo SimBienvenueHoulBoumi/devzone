@@ -43,7 +43,7 @@ trier_ports() {
 
 # Écrit la ligne ports= de l'état (#417 : jamais de mv hors de etat.sh)
 ecrire_ports() {
-    etat_ecrire ports "${1:-}" || { echo "devzone : port : état non enregistré : $ETAT" >&2; exit 1; }
+    state_write ports "${1:-}" || { echo "devzone : port : état non enregistré : $ETAT" >&2; exit 1; }
 }
 
 ajouter_port() {

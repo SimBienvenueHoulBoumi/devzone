@@ -21,8 +21,8 @@ ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
 # shellcheck source=SCRIPTDIR/../isolement.sh
 # shellcheck disable=SC1091
 . "$ICI/../isolement.sh"
-# Shared memory check of the services cluster (#608): quantite_ki and
-# memoire_cluster_ki.
+# Shared memory check of the services cluster (#608): quantity_ki and
+# memory_cluster_ki.
 # shellcheck source=SCRIPTDIR/../memoire.sh
 # shellcheck disable=SC1091
 . "$ICI/../memoire.sh"
@@ -39,7 +39,7 @@ refuse() { echo "devzone : argocd : $*" >&2; exit 2; }
 
 # Vue regroupée des identifiants : un échec n'empêche jamais l'opération
 regenerer_identifiants() {
-    password_regenerer ||
+    password_regenerate ||
         echo "devzone : argocd : identifiants regroupés non mis à jour (devzone passwords)" >&2
 }
 
@@ -47,7 +47,7 @@ regenerer_identifiants() {
 # message indique où agrandir le cluster et la commande à relancer.
 verifier_memoire() {
     local memoire
-    if ! memoire="$(memoire_cluster_ki)"; then
+    if ! memoire="$(memory_cluster_ki)"; then
         echo "devzone : argocd : cluster des services injoignable : devzone cluster" >&2
         return 2
     fi

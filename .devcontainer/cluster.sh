@@ -64,7 +64,7 @@ cluster_lu() {
 }
 
 cluster_ecrire() {
-    etat_ecrire cluster "$1"
+    state_write cluster "$1"
 }
 
 cluster_est_dedie() {

@@ -37,7 +37,7 @@ refuse() { echo "devzone : postgres : $*" >&2; exit 2; }
 
 # Vue regroupée des identifiants : un échec n'empêche jamais l'opération
 regenerer_identifiants() {
-    password_regenerer ||
+    password_regenerate ||
         echo "devzone : postgres : identifiants regroupés non mis à jour (devzone passwords)" >&2
 }
 

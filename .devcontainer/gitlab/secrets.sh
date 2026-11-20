@@ -89,7 +89,7 @@ puts \"OK\""
     mkdir -p "$GITLAB_SECRETS_DIR" || return 1
     (umask 077 && printf '%s' "$mdp" >"$fichier") || return 1
     chmod 600 "$fichier"
-    password_regenerer ||
+    password_regenerate ||
         echo "devzone : gitlab : identifiants regroupés non mis à jour (devzone passwords)" >&2
     printf '%s\n' "$RACINE/.password"
 }

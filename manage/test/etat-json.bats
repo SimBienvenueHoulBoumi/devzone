@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# Sortie machine devzone status --json (#308)
+# Machine output devzone status --json (#308)
 
 setup() {
     load commun
@@ -15,8 +15,8 @@ setup() {
     export GIT_CONFIG_NOSYSTEM=1
     cd "$BATS_TEST_TMPDIR" || return 1
 
-    # git config user name/email par défaut absent
-    # faux kubectl
+    # no default git user name/email
+    # fake kubectl
     cat >"$BATS_TEST_TMPDIR/bin/kubectl" <<'KUBECTL'
 #!/usr/bin/env bash
 case "$*" in
@@ -24,16 +24,16 @@ case "$*" in
     *) exit 1 ;;
 esac
 KUBECTL
-    # faux gh
+    # fake gh
     cat >"$BATS_TEST_TMPDIR/bin/gh" <<'GH'
 #!/usr/bin/env bash
 case "${GH_ETAT:-absent}" in
     absent) echo "You are not logged into any GitHub hosts." >&2; exit 1 ;;
-    sans) echo "  - Token scopes: 'gist', 'read:org', 'repo'" ;;
-    avec) echo "  - Token scopes: 'gist', 'read:org', 'repo', 'workflow'" ;;
+    without) echo "  - Token scopes: 'gist', 'read:org', 'repo'" ;;
+    with) echo "  - Token scopes: 'gist', 'read:org', 'repo', 'workflow'" ;;
 esac
 GH
-    # faux docker
+    # fake docker
     mkdir -p "$BATS_TEST_TMPDIR/relais"
     cat >"$BATS_TEST_TMPDIR/bin/docker" <<'DOCKER'
 #!/usr/bin/env bash
@@ -58,7 +58,7 @@ case "${1:-}" in
 esac
 exit 0
 DOCKER
-    # faux curl
+    # fake curl
     cat >"$BATS_TEST_TMPDIR/bin/curl" <<'CURL'
 #!/usr/bin/env bash
 for p in ${FAUX_REPOND:-}; do
@@ -70,30 +70,32 @@ CURL
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
 }
 
-@test "etat-json : schema 1 et JSON valide" {
+@test "state-json: schema 1 and valid JSON" {
     run bash "$DEVZONE" status --json
     [ "$status" -eq 0 ]
     printf '%s\n' "$output" | jq -e . >/dev/null
     [ "$(printf '%s\n' "$output" | jq -r '.schema')" = "1" ]
 }
 
-@test "etat-json : identité absente → ok false avec commande" {
+@test "state-json: git identity absent → ok false with command" {
     run bash "$DEVZONE" status --json
     [ "$status" -eq 0 ]
     [ "$(printf '%s\n' "$output" | jq -r '.identite_git.ok')" = "false" ]
     [ "$(printf '%s\n' "$output" | jq -r '.identite_git.commande')" != "null" ]
 }
 
-@test "etat-json : identité présente" {
-    git config --global user.name "Nom Accentué \"X\"" 2>/dev/null || true
+@test "state-json: git identity present" {
+    # non-ASCII name written with octal escapes (UTF-8 e-acute = \303\251), so the source stays ASCII
+    nom=$'Nom Accent\303\251 "X"'
+    git config --global user.name "$nom" 2>/dev/null || true
     git config --global user.email "a@b.invalid" 2>/dev/null || true
     run bash "$DEVZONE" status --json
     [ "$status" -eq 0 ]
     printf '%s\n' "$output" | jq -e . >/dev/null
-    [ "$(printf '%s\n' "$output" | jq -r '.identite_git.nom')" = 'Nom Accentué "X"' ]
+    [ "$(printf '%s\n' "$output" | jq -r '.identite_git.nom')" = "$nom" ]
 }
 
-@test "etat-json : module en échec → echec et commande" {
+@test "state-json: module failed → echec and command" {
     printf 'ia=on\n' >"$DEVZONE_ETAT"
     echo "echec npm" >"$DEVZONE_ETAT-echec-ia"
     run bash "$DEVZONE" status --json
@@ -102,22 +104,22 @@ CURL
     [ "$(printf '%s\n' "$output" | jq -r '.modules[] | select(.nom=="ia") | .commande')" = "devzone apply" ]
 }
 
-@test "etat-json : faux gh qui échoue → github null et erreurs.github" {
+@test "state-json: gh failing → github null and errors.github" {
     GH_ETAT=absent run bash "$DEVZONE" status --json
     [ "$status" -eq 0 ]
     [ "$(printf '%s\n' "$output" | jq -r '.plateforme.github')" = "null" ]
     [ "$(printf '%s\n' "$output" | jq -r '.erreurs.github')" != "null" ]
 }
 
-@test "etat-json : relais en échec → alerte relais_docker" {
-    echo "relais cassé" >"$BATS_TEST_TMPDIR/relais.echec"
+@test "state-json: relay failed → alert relais_docker" {
+    echo "relay broken" >"$BATS_TEST_TMPDIR/relais.echec"
     export DEVZONE_RELAIS_MARQUE="$BATS_TEST_TMPDIR/relais.echec"
     run bash "$DEVZONE" status --json
     [ "$status" -eq 0 ]
     [ "$(printf '%s\n' "$output" | jq -r '.alertes[] | select(.code=="relais_docker") | .code')" = "relais_docker" ]
 }
 
-@test "etat-json : port ouvert → dans ports" {
+@test "state-json: open port → in ports" {
     printf 'ports=8080\n' >"$DEVZONE_ETAT"
     : >"$BATS_TEST_TMPDIR/relais/devzone-devzone-port-8080"
     FAUX_REPOND=8080 run bash "$DEVZONE" status --json
@@ -125,7 +127,7 @@ CURL
     [ "$(printf '%s\n' "$output" | jq -r '.ports[] | select(.port==8080) | .port')" = "8080" ]
 }
 
-@test "etat-json : aucun secret dans la sortie" {
+@test "state-json: no secret in the output" {
     printf 'secret-sentinel-123\n' >"$DEVZONE_RACINE/.password"
     cat >"$BATS_TEST_TMPDIR/bin/gh" <<'GH'
 #!/usr/bin/env bash
@@ -139,7 +141,7 @@ GH
     [[ "$output" != *"secret-gh-456"* ]] || false
 }
 
-@test "etat-json : docker-hote on par défaut, socket présent → actif" {
+@test "state-json: docker-hote on by default, socket present → active" {
     : >"$DEVZONE_RELAIS_SOURCE"
     run bash "$DEVZONE" status --json
     [ "$status" -eq 0 ]
@@ -148,7 +150,7 @@ GH
     [ "$(printf '%s\n' "$output" | jq -r '.docker_hote_actif')" = "true" ]
 }
 
-@test "etat-json : docker-hote on, socket absent → actif false" {
+@test "state-json: docker-hote on, socket absent → active false" {
     rm -f "$DEVZONE_RELAIS_SOURCE"
     run bash "$DEVZONE" status --json
     [ "$status" -eq 0 ]
@@ -156,7 +158,7 @@ GH
     [ "$(printf '%s\n' "$output" | jq -r '.docker_hote_actif')" = "false" ]
 }
 
-@test "etat-json : docker-hote=off, socket encore monté → actif true" {
+@test "state-json: docker-hote=off, socket still mounted → active true" {
     : >"$DEVZONE_RELAIS_SOURCE"
     printf 'docker-hote=off\n' >"$DEVZONE_ETAT"
     run bash "$DEVZONE" status --json
@@ -165,7 +167,7 @@ GH
     [ "$(printf '%s\n' "$output" | jq -r '.docker_hote_actif')" = "true" ]
 }
 
-@test "etat-json : docker-hote=off sans socket → false" {
+@test "state-json: docker-hote=off without socket → false" {
     printf 'docker-hote=off\n' >"$DEVZONE_ETAT"
     rm -f "$DEVZONE_RELAIS_SOURCE"
     run bash "$DEVZONE" status --json
@@ -174,7 +176,7 @@ GH
     [ "$(printf '%s\n' "$output" | jq -r '.docker_hote_actif')" = "false" ]
 }
 
-@test "etat-json : DEVZONE_WORKSPACE=kubernetes → socket absent, sans alerte" {
+@test "state-json: DEVZONE_WORKSPACE=kubernetes → socket absent, no alert" {
     : >"$DEVZONE_RELAIS_SOURCE"
     export DEVZONE_WORKSPACE=kubernetes
     run bash "$DEVZONE" status --json
@@ -184,7 +186,7 @@ GH
     [ "$(printf '%s\n' "$output" | jq -r '.docker_hote_actif')" = "false" ]
 }
 
-@test "etat-json : champ argocd_repo : le dépôt GitOps désigné" {
+@test "state-json: argocd_repo field: the designated GitOps repository" {
     printf '[argocd]\n    repo = https://github.com/tester/devzone-argocd.git\n' >"$DEVZONE_RACINE/.argocd.conf"
     run bash "$DEVZONE" status --json
     [ "$status" -eq 0 ]
@@ -192,14 +194,14 @@ GH
     [ "$(printf '%s\n' "$output" | jq -r '.argocd_repo')" = "https://github.com/tester/devzone-argocd.git" ]
 }
 
-@test "etat-json : champ argocd_repo : aucun dépôt GitOps → null" {
+@test "state-json: argocd_repo field: no GitOps repository → null" {
     run bash "$DEVZONE" status --json
     [ "$status" -eq 0 ]
     printf '%s\n' "$output" | jq -e . >/dev/null
     [ "$(printf '%s\n' "$output" | jq -r '.argocd_repo')" = "null" ]
 }
 
-@test "etat-json : texte non modifié (devzone sans --json)" {
+@test "state-json: text unchanged (devzone without --json)" {
     run bash "$DEVZONE"
     [ "$status" -eq 0 ]
     [[ "$output" == *"devzone: state"* ]] || false

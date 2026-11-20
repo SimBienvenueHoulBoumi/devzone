@@ -1,99 +1,100 @@
 #!/usr/bin/env bash
-# Installe metrics-server (CPU/RAM dans k9s, kubectl top) sur les clusters qui
-# n'ont pas d'API Metrics. Docker Desktop et kind ne l'ont pas d'office.
-# Usage : metrics-server.sh [contexte...] | metrics-server.sh retirer [contexte...]
-#        (défaut : clusters locaux joignables ; retirer : ceux où devzone a installé)
-# --kubelet-insecure-tls : le kubelet de Docker Desktop et de kind a un
-# certificat auto-signé, sans cette option le pod ne devient jamais Ready.
-# Sortie en erreur si un contexte demandé est inconnu ou injoignable, ou si
-# une installation échoue (kube-config.sh l'appelle avec || true).
+# Installs metrics-server (CPU/RAM in k9s, kubectl top) on the clusters that
+# have no Metrics API. Docker Desktop and kind do not have it by default.
+# Usage: metrics-server.sh [context...] | metrics-server.sh retirer [context...]
+#        (default: reachable local clusters; retirer, the public subcommand
+#        name kept as is: removal from the clusters where devzone installed it)
+# --kubelet-insecure-tls: the kubelet of Docker Desktop and kind has a
+# self-signed certificate, without this option the pod never becomes Ready.
+# Exits in error if a requested context is unknown or unreachable, or if an
+# installation fails (kube-config.sh calls it with || true).
 set -euo pipefail
 
 # shellcheck source=SCRIPTDIR/cluster.sh
 . "$(dirname "$0")/cluster.sh"
 
 VERSION=v0.9.0
-MANIFESTE="https://github.com/kubernetes-sigs/metrics-server/releases/download/${VERSION}/components.yaml"
+MANIFEST="https://github.com/kubernetes-sigs/metrics-server/releases/download/${VERSION}/components.yaml"
 
-mapfile -t connus < <(kubectl config get-contexts -o name 2>/dev/null || true)
+mapfile -t known < <(kubectl config get-contexts -o name 2>/dev/null || true)
 
 if [ "${1:-}" = retirer ]; then
     shift
-    # Retrait (désactivation de kubernetes) : ne retirer que les contextes dont
-    # devzone a installé metrics-server (marqueur devzone=installe)
-    demandes=$#
-    if [ "$demandes" -eq 0 ]; then
-        # Clusters locaux seulement : un retrait sur un cluster distant n'a rien
-        # à retirer (devzone n'y installe jamais)
-        mapfile -t contextes < <(printf '%s\n' ${connus[@]+"${connus[@]}"} |
+    # Removal (kubernetes module disabled): only the contexts where devzone
+    # installed metrics-server (devzone=installe mark) are removed
+    requested=$#
+    if [ "$requested" -eq 0 ]; then
+        # Local clusters only: removal on a remote cluster has nothing to remove
+        # (devzone never installs there)
+        mapfile -t contexts < <(printf '%s\n' ${known[@]+"${known[@]}"} |
             while IFS= read -r c; do cluster_est_local "$c" && echo "$c"; done || true)
-        set -- ${contextes[@]+"${contextes[@]}"}
+        set -- ${contexts[@]+"${contexts[@]}"}
     fi
     code=0
-    for contexte in "$@"; do
-        # Marqueur lu sur le deployment par son nom : kubectl refuse un nom
-        # avec un sélecteur (-l), le test serait toujours faux (#255)
-        marque="$(kubectl --context "$contexte" -n kube-system get deployment metrics-server \
+    for context in "$@"; do
+        # Mark read on the deployment by its name: kubectl refuses a name with
+        # a selector (-l), the test would always be false (#255)
+        mark="$(kubectl --context "$context" -n kube-system get deployment metrics-server \
             -o jsonpath='{.metadata.labels.devzone}' 2>/dev/null || true)"
-        if [ "$marque" = installe ]; then
-            if kubectl --context "$contexte" delete -f "$MANIFESTE" --ignore-not-found >/dev/null 2>&1; then
-                echo "metrics-server retiré ($VERSION) : $contexte"
+        if [ "$mark" = installe ]; then
+            if kubectl --context "$context" delete -f "$MANIFEST" --ignore-not-found >/dev/null 2>&1; then
+                echo "metrics-server removed ($VERSION) : $context"
             else
-                echo "metrics-server : échec de retrait : $contexte" >&2
+                echo "metrics-server : removal failed: $context" >&2
                 code=1
             fi
-        elif kubectl --context "$contexte" -n kube-system get deployment metrics-server >/dev/null 2>&1; then
-            # Installé par quelqu'un d'autre : pas à devzone de le retirer
-            echo "metrics-server présent sans repère devzone, laissé : $contexte" >&2
+        elif kubectl --context "$context" -n kube-system get deployment metrics-server >/dev/null 2>&1; then
+            # Installed by someone else: not up to devzone to remove it
+            echo "metrics-server present without a devzone mark, left: $context" >&2
         fi
     done
     exit "$code"
 fi
 
-demandes=$#
-if [ "$demandes" -eq 0 ]; then
-    # Clusters locaux seulement : jamais d'install automatique sur un cluster
-    # distant de l'hôte (prod, staging…) ; pour un autre, le nommer en argument
-    mapfile -t contextes < <(printf '%s\n' ${connus[@]+"${connus[@]}"} |
+requested=$#
+if [ "$requested" -eq 0 ]; then
+    # Local clusters only: never an automatic installation on a remote cluster
+    # of the host (prod, staging…); for another one, name it as an argument
+    mapfile -t contexts < <(printf '%s\n' ${known[@]+"${known[@]}"} |
         while IFS= read -r c; do cluster_est_local "$c" && echo "$c"; done || true)
-    set -- ${contextes[@]+"${contextes[@]}"}
+    set -- ${contexts[@]+"${contexts[@]}"}
 fi
 
 code=0
-joignables=0
-for contexte in "$@"; do
-    if [ "$demandes" -gt 0 ] && ! printf '%s\n' ${connus[@]+"${connus[@]}"} | grep -qxF -- "$contexte"; then
-        echo "metrics-server : contexte inconnu : $contexte (voir kubectl config get-contexts)" >&2
+reachable=0
+for context in "$@"; do
+    if [ "$requested" -gt 0 ] && ! printf '%s\n' ${known[@]+"${known[@]}"} | grep -qxF -- "$context"; then
+        echo "metrics-server : unknown context: $context (see kubectl config get-contexts)" >&2
         code=1
         continue
     fi
-    k=(kubectl --context "$contexte" --request-timeout=5s)
+    k=(kubectl --context "$context" --request-timeout=5s)
     if ! "${k[@]}" get --raw /readyz >/dev/null 2>&1; then
-        # Sans argument : kind peut être en cours de démarrage, ignoré
-        if [ "$demandes" -gt 0 ]; then
-            echo "metrics-server : cluster injoignable : $contexte" >&2
+        # Without argument: kind may still be starting, ignored
+        if [ "$requested" -gt 0 ]; then
+            echo "metrics-server : cluster unreachable: $context" >&2
             code=1
         fi
         continue
     fi
-    joignables=$((joignables + 1))
+    reachable=$((reachable + 1))
     if "${k[@]}" get apiservice v1beta1.metrics.k8s.io >/dev/null 2>&1; then
-        echo "metrics-server : déjà présent : $contexte"
+        echo "metrics-server : already present: $context"
         continue
     fi
-    if "${k[@]}" apply -f "$MANIFESTE" >/dev/null &&
+    if "${k[@]}" apply -f "$MANIFEST" >/dev/null &&
         "${k[@]}" -n kube-system patch deployment metrics-server --type=json \
             -p '[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"}]' >/dev/null &&
-        # Marque : make desinstaller ne retire que ce que devzone a installé
+        # Mark: make desinstaller only removes what devzone installed
         "${k[@]}" -n kube-system label deployment metrics-server devzone=installe app.kubernetes.io/managed-by=devzone --overwrite >/dev/null; then
-        echo "metrics-server : installé ($VERSION) : $contexte (métriques dans ~1 min)"
+        echo "metrics-server : installed ($VERSION): $context (metrics within ~1 min)"
     else
-        echo "metrics-server : échec de l'installation : $contexte" >&2
+        echo "metrics-server : installation failed: $context" >&2
         code=1
     fi
 done
 
-if [ "$demandes" -eq 0 ] && [ "$joignables" -eq 0 ]; then
-    echo "metrics-server : aucun cluster local joignable ; après kind create cluster : bash .devcontainer/metrics-server.sh"
+if [ "$requested" -eq 0 ] && [ "$reachable" -eq 0 ]; then
+    echo "metrics-server : no reachable local cluster; after kind create cluster: bash .devcontainer/metrics-server.sh"
 fi
 exit "$code"

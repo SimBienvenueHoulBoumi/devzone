@@ -193,7 +193,7 @@ GH
 
 @test "docker-hote : desactiver concurrent avec une écriture d'état : aucune ligne perdue" {
     printf 'docker-hote=off\nia=on\n' >"$DEVZONE_RACINE/.devzone.modules"
-    ETAT="$DEVZONE_RACINE/.devzone.modules" bash -c '. "$1"; etat_ecrire postgres on' _ "$BATS_TEST_DIRNAME/../../.devcontainer/etat.sh" & pid_w=$!
+    ETAT="$DEVZONE_RACINE/.devzone.modules" bash -c '. "$1"; state_write postgres on' _ "$BATS_TEST_DIRNAME/../../.devcontainer/etat.sh" & pid_w=$!
     bash "$DEVZONE" disable docker-hote & pid_d=$!
     wait "$pid_w"
     wait "$pid_d"
@@ -541,7 +541,7 @@ KUBE
     run bash "$DEVZONE" disable kubernetes
     [ "$status" -eq 0 ]
     [ "$(cat "$KUBE_DELETE_LOG")" = "delete -f kind-dev" ]
-    [[ "$output" == *"metrics-server présent sans repère devzone, laissé : kind-staging"* ]] || false
+    [[ "$output" == *"metrics-server present without a devzone mark, left: kind-staging"* ]] || false
 }
 
 @test "désactiver kubernetes : cycle activer + désactiver → ~/.kube identique" {

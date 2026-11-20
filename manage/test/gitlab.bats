@@ -237,7 +237,7 @@ attendre_journal() {
 @test "gitlab : moins de 8 Go de mémoire allouable dans le cluster → refus, rien lancé" {
     FAUX_MEMOIRE_CLUSTER='4000000Ki' run bash "$GITLAB" install
     [ "$status" -eq 2 ] || false
-    [[ "$output" == *"8 Go"* ]] || false
+    [[ "$output" == *"8 GiB"* ]] || false
     [ ! -e "$BATS_TEST_TMPDIR/helm.log" ] || false
     [ ! -e "$BATS_TEST_TMPDIR/kind.log" ] || false
 }

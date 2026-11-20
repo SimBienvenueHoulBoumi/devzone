@@ -1,51 +1,52 @@
 #!/usr/bin/env bash
-# Verrou d'écriture de l'état des modules, sourcé par etat.sh (#417 et #476)
-#   etat_verrou_prendre / etat_verrou_lacher    verrou d'écriture
+# Write lock of the module state, sourced by etat.sh (#417 and #476)
+#   state_lock_take / state_lock_release    write lock
 
-# Verrou exclusif (mkdir) : une seule écriture à la fois. Le détenteur
-# disparu est deviné par l'âge du dossier (aucun kill) et le compteur rend
-# le verrou reprenable dans le même processus (initialiser puis ecrire).
-etat_verrou_prendre() {
-    local age debut
-    [ "${ETAT_VERROU_PROF:-0}" -gt 0 ] && { ETAT_VERROU_PROF=$((ETAT_VERROU_PROF + 1)); return 0; }
+# Exclusive lock (mkdir): one write at a time. A vanished holder is guessed
+# from the age of the folder (no kill) and the depth counter makes the lock
+# re-takeable within the same process (init then write).
+state_lock_take() {
+    local age start
+    [ "${STATE_LOCK_DEPTH:-0}" -gt 0 ] && { STATE_LOCK_DEPTH=$((STATE_LOCK_DEPTH + 1)); return 0; }
     mkdir -p "$(dirname "$ETAT")" || return 1
-    debut="$(date +%s)"
+    start="$(date +%s)"
     while ! mkdir "${ETAT}.verrou" 2>/dev/null; do
         age="$(stat -c %Y "${ETAT}.verrou" 2>/dev/null || stat -f %m "${ETAT}.verrou" 2>/dev/null || true)"
         if [ -n "$age" ] && [ "$(( $(date +%s) - age ))" -gt 30 ]; then
             rm -rf "${ETAT}.verrou"
             continue
         fi
-        if [ "$(( $(date +%s) - debut ))" -ge 10 ]; then
-            echo "devzone : état verrouillé ailleurs : ${ETAT}.verrou" >&2
+        if [ "$(( $(date +%s) - start ))" -ge 10 ]; then
+            echo "devzone : state locked elsewhere: ${ETAT}.verrou" >&2
             return 1
         fi
         sleep 1
     done
-    # flock sérialise l'écriture quand il existe (Linux), mkdir reste seul garde-fou sous macOS (#476, même motif que #461).
+    # flock serializes the write when it exists (Linux); mkdir stays the only
+    # guard on macOS (#476, same pattern as #461).
     if command -v flock >/dev/null 2>&1; then
         if { exec 8>"${ETAT}.lock"; } && flock -w 10 8; then
-            ETAT_VERROU_FLOCK=1
+            STATE_LOCK_FLOCK=1
         else
             rm -rf "${ETAT}.verrou" 2>/dev/null || true
-            echo "devzone : état verrouillé ailleurs (flock) : ${ETAT}.lock" >&2
+            echo "devzone : state locked elsewhere (flock): ${ETAT}.lock" >&2
             return 1
         fi
     fi
-    ETAT_VERROU_PROF=1
+    STATE_LOCK_DEPTH=1
     return 0
 }
 
-# Rend le verrou pris par ce processus ; profondeur > 1 : détenu encore
-etat_verrou_lacher() {
-    local prof="${ETAT_VERROU_PROF:-0}"
-    [ "$prof" -gt 0 ] || return 0
-    [ "$prof" -gt 1 ] && { ETAT_VERROU_PROF=$((prof - 1)); return 0; }
-    ETAT_VERROU_PROF=0
-    if [ "${ETAT_VERROU_FLOCK:-0}" = 1 ]; then
+# Releases the lock taken by this process; depth > 1: still held
+state_lock_release() {
+    local depth="${STATE_LOCK_DEPTH:-0}"
+    [ "$depth" -gt 0 ] || return 0
+    [ "$depth" -gt 1 ] && { STATE_LOCK_DEPTH=$((depth - 1)); return 0; }
+    STATE_LOCK_DEPTH=0
+    if [ "${STATE_LOCK_FLOCK:-0}" = 1 ]; then
         flock -u 8 2>/dev/null || true
         exec 8>&-
-        ETAT_VERROU_FLOCK=0
+        STATE_LOCK_FLOCK=0
     fi
     rm -rf "${ETAT}.verrou" 2>/dev/null || true
     return 0
