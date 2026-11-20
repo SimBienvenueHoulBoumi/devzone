@@ -17,7 +17,7 @@ ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
 # shellcheck source=SCRIPTDIR/../password.sh
 # shellcheck disable=SC1091
 . "$ICI/../password.sh"
-# Isolation réseau : namespace_isoler, posée avec le namespace devzone-argocd
+# Isolation réseau : namespace_isolate, posée avec le namespace devzone-argocd
 # shellcheck source=SCRIPTDIR/../isolation.sh
 # shellcheck disable=SC1091
 . "$ICI/../isolation.sh"
@@ -60,19 +60,19 @@ verifier_memoire() {
 # Namespace présent dans le cluster des services : Argo CD est installé.
 # Lecture des namespaces réservée à l'administrateur (#430).
 installe() {
-    compte_admin "$(compte_ctx)" get namespace "$NS" >/dev/null 2>&1
+    account_admin "$(account_context)" get namespace "$NS" >/dev/null 2>&1
 }
 
 # Crée le namespace et l'étiquette par l'administrateur, autorise le compte
 # limité puis pose la NetworkPolicy isolante du module (#430).
 preparer_namespace() {
     local ctx
-    ctx="$(compte_ctx)"
-    compte_admin "$ctx" create namespace "$NS" --dry-run=client -o yaml |
-        compte_admin "$ctx" apply -f - >/dev/null
-    compte_admin "$ctx" label namespace "$NS" "$CLUSTER_ETIQUETTE" --overwrite >/dev/null
-    compte_autoriser "$ctx" "$NS"
-    namespace_isoler "$NS"
+    ctx="$(account_context)"
+    account_admin "$ctx" create namespace "$NS" --dry-run=client -o yaml |
+        account_admin "$ctx" apply -f - >/dev/null
+    account_admin "$ctx" label namespace "$NS" "$CLUSTER_LABEL" --overwrite >/dev/null
+    account_allow "$ctx" "$NS"
+    namespace_isolate "$NS"
 }
 
 # Lit le mot de passe initial dans le Secret du chart et l'écrit dans
@@ -112,14 +112,14 @@ installer() {
     # Wrapper chart: the dependency argo-cd (pinned in Chart.yaml) is built
     # first, then installed from the local chart (#538)
     helm dependency build "$RACINE/charts/devzone-argocd" >/dev/null
-    compte_helm "$(compte_ctx)" upgrade --install argocd \
+    account_helm "$(account_context)" upgrade --install argocd \
         "$RACINE/charts/devzone-argocd" \
         --namespace "$NS" \
         --create-namespace \
         --timeout "${ARGOCD_ATTENTE}s" \
         --wait
     enregistrer_admin
-    relais_lancer argocd devzone "$NS" svc/argocd-server "$ARGOCD_PORT:443"
+    relay_start argocd devzone "$NS" svc/argocd-server "$ARGOCD_PORT:443"
     regenerer_identifiants
     echo "✔ module argocd prêt : https://127.0.0.1:$ARGOCD_PORT"
 }
@@ -129,15 +129,15 @@ installer() {
 # par l'administrateur (#430).
 desinstaller() {
     local ctx
-    relais_arreter argocd
+    relay_stop argocd
     if installe; then
         echo "▶ Suppression d'Argo CD sur le cluster des services…"
-        if ! compte_helm "$(compte_ctx)" uninstall argocd -n "$NS" >/dev/null 2>&1; then
+        if ! account_helm "$(account_context)" uninstall argocd -n "$NS" >/dev/null 2>&1; then
             echo "devzone : argocd : helm uninstall a échoué (release déjà absente ?)" >&2
         fi
-        ctx="$(compte_ctx)"
-        compte_retirer "$ctx" "$NS" >/dev/null 2>&1 || true
-        compte_admin "$ctx" delete namespace "$NS" --wait=true >/dev/null
+        ctx="$(account_context)"
+        account_remove "$ctx" "$NS" >/dev/null 2>&1 || true
+        account_admin "$ctx" delete namespace "$NS" --wait=true >/dev/null
     fi
     rm -rf "$SECRETS"
     echo "✔ module argocd désactivé ; les services restent, sous helm direct."
@@ -150,7 +150,7 @@ etat() {
         echo "désactivé"
         return 0
     fi
-    if ! relais_actif argocd; then
+    if ! relay_active argocd; then
         echo "prêt, relais arrêté : devzone apply"
     else
         echo "prêt : https://127.0.0.1:$ARGOCD_PORT"
@@ -160,7 +160,7 @@ etat() {
 # Relance le relais d'accès seulement si le namespace Argo CD existe.
 relais() {
     if installe; then
-        relais_lancer argocd devzone "$NS" svc/argocd-server "$ARGOCD_PORT:443"
+        relay_start argocd devzone "$NS" svc/argocd-server "$ARGOCD_PORT:443"
     fi
 }
 
@@ -196,7 +196,7 @@ case "${1:-}" in
     uninstall) desinstaller ;;
     status) etat ;;
     relay-start) relais ;;
-    relay-stop) relais_arreter argocd ;;
+    relay-stop) relay_stop argocd ;;
     init)
         # GitOps repository of the user (#516): created or designated, then
         # the root Application when the module is installed

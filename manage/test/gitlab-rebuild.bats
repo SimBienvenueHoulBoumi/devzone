@@ -1,6 +1,6 @@
 #!/usr/bin/env bats
-# Rebuild et gitlab (#366, #396) : kind_sans_basculer et
-# kind_creer_sans_basculer (cluster.sh), installation dans le cluster des
+# Rebuild et gitlab (#366, #396) : kind_keep_context et
+# kind_create_keep_context (cluster.sh), installation dans le cluster des
 # services sans kind ni bascule de contexte, migration depuis kind-gitlab,
 # échec effacé quand gitlab est prêt (devzone apply).
 # Faux kind, kubectl, helm, docker, curl, setsid et git dans $BATS_TEST_TMPDIR/bin :
@@ -135,24 +135,24 @@ contexte_courant() {
     sed -n 's/^current-context:[[:space:]]*//p' "$HOME/.kube/config" 2>/dev/null | head -1
 }
 
-@test "kind_sans_basculer : export sans basculer, contexte courant gardé" {
+@test "kind_keep_context : export sans basculer, contexte courant gardé" {
     poser_contexte_courant docker-desktop
     (
         set -e
         source "$CLUSTER"
-        kind_sans_basculer export kubeconfig --name gitlab --kubeconfig "$HOME/.kube/config"
+        kind_keep_context export kubeconfig --name gitlab --kubeconfig "$HOME/.kube/config"
     ) || false
     grep -qxF "kind export kubeconfig --name gitlab --kubeconfig $HOME/.kube/config" "$BATS_TEST_TMPDIR/kind.log" || false
     grep -qxF 'ctx: kind-gitlab' "$HOME/.kube/config" || false
     [ "$(contexte_courant)" = docker-desktop ] || false
 }
 
-@test "kind_sans_basculer : aucun contexte au départ, aucun posé à la fin" {
+@test "kind_keep_context : aucun contexte au départ, aucun posé à la fin" {
     poser_contexte_courant ""
     (
         set -e
         source "$CLUSTER"
-        kind_sans_basculer export kubeconfig --name gitlab --kubeconfig "$HOME/.kube/config"
+        kind_keep_context export kubeconfig --name gitlab --kubeconfig "$HOME/.kube/config"
     ) || false
     grep -qxF 'ctx: kind-gitlab' "$HOME/.kube/config" || false
     [ -z "$(contexte_courant)" ] || false
@@ -160,23 +160,23 @@ contexte_courant() {
     ! grep -q 'config use-context' "$BATS_TEST_TMPDIR/kubectl.log" || false
 }
 
-@test "kind_sans_basculer : échec de kind, code 1 rendu sous set -e, contexte remis" {
+@test "kind_keep_context : échec de kind, code 1 rendu sous set -e, contexte remis" {
     poser_contexte_courant docker-desktop
     FAUX_KIND_ECHEC=1 run bash -c '
         set -e
         source "$1"
-        kind_sans_basculer create cluster --name gitlab
+        kind_keep_context create cluster --name gitlab
     ' _ "$CLUSTER"
     [ "$status" -eq 1 ] || false
     [ "$(contexte_courant)" = docker-desktop ] || false
 }
 
-@test "kind_creer_sans_basculer : appelle kind create cluster, contexte gardé" {
+@test "kind_create_keep_context : appelle kind create cluster, contexte gardé" {
     poser_contexte_courant docker-desktop
     (
         set -e
         source "$CLUSTER"
-        kind_creer_sans_basculer --name devzone --wait 120s
+        kind_create_keep_context --name devzone --wait 120s
     ) || false
     grep -qxF 'kind create cluster --name devzone --wait 120s' "$BATS_TEST_TMPDIR/kind.log" || false
     [ "$(contexte_courant)" = docker-desktop ] || false

@@ -1,9 +1,9 @@
 #!/usr/bin/env bats
-# Isolement network et autorisation d'acces entre namespaces devzone (#396 etape A).
-# Tests avec faux kubectl, kind : aucun cluster touche.
-# Les aides de manage/test/commun.bash : relais_docker_isole, kube_isole.
+# Network isolation and access authorization between devzone namespaces (#396 step A).
+# Tests with fake kubectl, kind: no cluster touched.
+# Helpers of manage/test/commun.bash: relais_docker_isole, kube_isole.
 
-# Source des fonctions d'isolation
+# Source of the isolation functions
 source "$BATS_TEST_DIRNAME/../../.devcontainer/isolation.sh"
 
 load commun
@@ -23,14 +23,14 @@ setup() {
     : >"$DEVZONE_ETAT"
     helm_fake_install
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
-    actif_sur() {
+    active_on() {
         local c="${1:-}"
         [ -n "$c" ] || return 2
         printf 'postgres=on\ncluster=%s\n' "$c" >"$DEVZONE_ETAT"
     }
 }
 
-faux_kubectl_isole() {
+fake_kubectl_isole() {
     cat >"$BATS_TEST_TMPDIR/bin/kubectl" <<'KUBE'
 #!/usr/bin/env bash
 echo "kubectl $*" >>"$BATS_TEST_TMPDIR/kubectl.log"
@@ -43,19 +43,19 @@ case "$*" in
     *"config use-context"*) echo "${@: -1}" >"$T/ctx" ;;
     *"config unset current-context"*) : >"$T/ctx" ;;
     *"config view"*)
-        nom=""
+        name=""
         for c in docker-desktop; do
-            if [[ "$*" == *\"$c\"* ]]; then nom="$c"; break; fi
+            if [[ "$*" == *\"$c\"* ]]; then name="$c"; break; fi
         done
-        if [[ "$*" == *'.cluster.server'* ]]; then echo "https://127.0.0.1:6443"; else echo "$nom"; fi
+        if [[ "$*" == *'.cluster.server'* ]]; then echo "https://127.0.0.1:6443"; else echo "$name"; fi
         ;;
     *"get --raw /readyz"*)
-        case "$*" in *"--context ${FAUX_INJOIGNABLE:-aucun} "*) exit 1 ;; esac ;;
+        case "$*" in *"--context ${FAKE_UNREACHABLE:-none} "*) exit 1 ;; esac ;;
     *"create namespace"*) printf 'kind: Namespace\nmetadata:\n  name: devzone-postgres\n' ;;
     *"get namespace devzone-postgres"*) [ -f "$T/ns" ]; exit $? ;;
     *"get namespaces -l"*) ;;
     *"apply -f -"*)
-        # Manifeste reçu sur stdin : journalisé dans np (lu par le test) et apply.log
+        # Manifest received on stdin: logged in np (read by the test) and apply.log
         tee -a "$T/apply.log" >>"$T/np"
         touch "$T/ns" ;;
     *"get secret postgres-admin -o jsonpath"*) printf 'YWRtaW4tZXhpc3RhbnQ=' ;;
@@ -75,62 +75,62 @@ KUBE
     : >"$BATS_TEST_TMPDIR/kubectl.log"
 }
 
-faux_kind_isole() {
+fake_kind_isole() {
     printf '#!/usr/bin/env bash\necho "kind $*" >>"$BATS_TEST_TMPDIR/kind.log"\nexit 0\n' >"$BATS_TEST_TMPDIR/bin/kind"
     chmod +x "$BATS_TEST_TMPDIR/bin/kind"
     : >"$BATS_TEST_TMPDIR/kind.log"
 }
 
-@test "isolement : namespace isolé avec NetworkPolicy devzone-meme-namespace" {
-    faux_kubectl_isole
-    faux_kind_isole
-    printf 'kind-devzone\n' >"$BATS_TEST_TMPDIR/hote.contexts"
-    printf 'kind-devzone\thttps://127.0.0.1:6443\n' >"$BATS_TEST_TMPDIR/hote.servers"
+@test "isolation : namespace isolated with NetworkPolicy devzone-meme-namespace" {
+    fake_kubectl_isole
+    fake_kind_isole
+    printf 'kind-devzone\n' >"$BATS_TEST_TMPDIR/host.contexts"
+    printf 'kind-devzone\thttps://127.0.0.1:6443\n' >"$BATS_TEST_TMPDIR/host.servers"
 
-    # Test la fonction namespace_isoler directement
-    namespace_isoler devzone-postgres
+    # Tests the namespace_isolate function directly
+    namespace_isolate devzone-postgres
     [ "$?" -eq 0 ]
 
-    # Vérifier que apply a été appelé
+    # Check that apply was called
     grep -q 'devzone-meme-namespace' "$BATS_TEST_TMPDIR/apply.log"
 
-    # Vérifier le contenu de la NetworkPolicy
+    # Check the content of the NetworkPolicy
     grep -q 'podSelector' "$BATS_TEST_TMPDIR/np" 
 }
 
-@test "isolement : autoriser puis interdire l'accès depuis un namespace vers PostgreSQL" {
-    faux_kubectl_isole
-    faux_kind_isole
-    printf 'kind-devzone\n' >"$BATS_TEST_TMPDIR/hote.contexts"
-    printf 'kind-devzone\thttps://127.0.0.1:6443\n' >"$BATS_TEST_TMPDIR/hote.servers"
+@test "isolation : allow then forbid access from a namespace to PostgreSQL" {
+    fake_kubectl_isole
+    fake_kind_isole
+    printf 'kind-devzone\n' >"$BATS_TEST_TMPDIR/host.contexts"
+    printf 'kind-devzone\thttps://127.0.0.1:6443\n' >"$BATS_TEST_TMPDIR/host.servers"
 
-    # Tester la fonction autoriser
-    actif_sur kind-devzone
-    run autoriser devzone-postgres
+    # Tests the allow function
+    active_on kind-devzone
+    run allow devzone-postgres
     [ "$status" -eq 0 ]
-    [[ "$output" == *"règle autorisée vers devzone-postgres"* ]] || false
-    # Le patch envoyé par autoriser : JSON valide, avec le namespaceSelector
+    [[ "$output" == *"rule allowed to devzone-postgres"* ]] || false
+    # The patch sent by allow: valid JSON, with the namespaceSelector
     p="$(grep 'patch networkpolicy' "$BATS_TEST_TMPDIR/kubectl.log" | head -n 1 | sed 's/^.*-p //')"
     python3 -c 'import json,sys; json.loads(sys.argv[1])' "$p"
     [[ "$p" == *namespaceSelector* ]] || false
 
-    # Tester la fonction interdire
-    run interdire devzone-postgres
+    # Tests the forbid function
+    run forbid devzone-postgres
     [ "$status" -eq 0 ]
-    [[ "$output" == *"règle interdite vers devzone-postgres"* ]] || false
-    # Le patch d'interdire : JSON valide, sans namespaceSelector
+    [[ "$output" == *"rule forbidden to devzone-postgres"* ]] || false
+    # The patch of forbid: valid JSON, without namespaceSelector
     p="$(grep 'patch networkpolicy' "$BATS_TEST_TMPDIR/kubectl.log" | tail -n 1 | sed 's/^.*-p //')"
     python3 -c 'import json,sys; json.loads(sys.argv[1])' "$p"
     [[ "$p" != *namespaceSelector* ]] || false
 }
 
-@test "isolement : contexte de travail inchangé après devzone cluster" {
-    faux_kubectl_isole
-    faux_kind_isole
-    printf 'kind-devzone\n' >"$BATS_TEST_TMPDIR/hote.contexts"
-    printf 'kind-devzone\thttps://127.0.0.1:6443\n' >"$BATS_TEST_TMPDIR/hote.servers"
+@test "isolation : work context unchanged after devzone cluster" {
+    fake_kubectl_isole
+    fake_kind_isole
+    printf 'kind-devzone\n' >"$BATS_TEST_TMPDIR/host.contexts"
+    printf 'kind-devzone\thttps://127.0.0.1:6443\n' >"$BATS_TEST_TMPDIR/host.servers"
 
-    # Faux nohup et faux sleep : le relais et les attentes ne partent jamais en arrière-plan
+    # Fake nohup and fake sleep: the relay and the waits never go to the background
     cat >"$BATS_TEST_TMPDIR/bin/nohup" <<'NOHUP'
 #!/usr/bin/env bash
 echo "nohup $*" >>"$BATS_TEST_TMPDIR/nohup.log"
@@ -143,18 +143,18 @@ exit 0
 SLEEP
     chmod +x "$BATS_TEST_TMPDIR/bin/nohup" "$BATS_TEST_TMPDIR/bin/sleep"
 
-    # Contexte kubectl courant : kind-devzone (tenu par le faux kubectl dans $BATS_TEST_TMPDIR/ctx)
+    # Current kubectl context: kind-devzone (kept by the fake kubectl in $BATS_TEST_TMPDIR/ctx)
     printf 'kind-devzone\n' >"$BATS_TEST_TMPDIR/ctx"
-    actif_sur kind-devzone
+    active_on kind-devzone
 
     run bash "$DEVZONE" cluster docker-desktop --yes </dev/null
     [ "$status" -eq 0 ]
-    # Le choix de cluster est enregistré
+    # The cluster choice is recorded
     grep -qx 'cluster=docker-desktop' "$DEVZONE_ETAT"
-    # L'installation dans le nouveau cluster passe par le contexte devzone
+    # The installation in the new cluster goes through the devzone context
     grep -q 'kubectl config set-context devzone --cluster=docker-desktop --user=docker-desktop' "$BATS_TEST_TMPDIR/kubectl.log"
     grep -q 'kubectl --context devzone -n devzone-postgres apply -f -' "$BATS_TEST_TMPDIR/kubectl.log"
-    # Le contexte utilisateur n'a pas été basculé : aucun use-context, ni unset
+    # The user context was not switched: no use-context, nor unset
     ! grep -q 'config use-context' "$BATS_TEST_TMPDIR/kubectl.log" || false
     ! grep -q 'config unset current-context' "$BATS_TEST_TMPDIR/kubectl.log" || false
     [ "$(cat "$BATS_TEST_TMPDIR/ctx")" = "kind-devzone" ]

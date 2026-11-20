@@ -23,7 +23,7 @@ gitlab_chart_depend() {
 # is the main instance, so it is passed here
 gitlab_helm_pass() {
     local replicas="$1"
-    compte_helm "$(compte_ctx)" upgrade --install gitlab "$RACINE/charts/devzone-gitlab" \
+    account_helm "$(account_context)" upgrade --install gitlab "$RACINE/charts/devzone-gitlab" \
         --namespace "$GITLAB_NS" \
         --create-namespace \
         --timeout "${GITLAB_ATTENTE}s" \
@@ -35,5 +35,5 @@ gitlab_helm_pass() {
 # Release gitlab-runner of the installations before the wrapper chart (#396):
 # its runner now comes with the chart, the release leaves without touching data
 gitlab_runner_ancien_retirer() {
-    compte_helm "$(compte_ctx)" uninstall gitlab-runner --namespace "$GITLAB_NS" >/dev/null 2>&1 || true
+    account_helm "$(account_context)" uninstall gitlab-runner --namespace "$GITLAB_NS" >/dev/null 2>&1 || true
 }

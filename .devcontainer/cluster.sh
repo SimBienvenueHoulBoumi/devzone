@@ -1,111 +1,109 @@
 #!/usr/bin/env bash
-# Cluster de devzone (#280) : le cluster où se déploient les modules qui
-# fournissent un service (postgres ; gitlab avec #279). Un seul choix par
-# instance, gardé dans l'état (ligne « cluster=<contexte kubectl> ») : les
-# services d'une instance vivent au même endroit et se déplacent ensemble
-# (devzone cluster CTX).
-# Bibliothèque sourcée : l'appelant définit RACINE et ETAT.
-#   cluster_lu                       contexte choisi, rien s'il n'y en a pas
-#   cluster_ecrire CTX               garde le choix dans l'état
-#   cluster_est_local CTX            0 si cluster local (config, sans réseau)
-#   cluster_candidats                locaux, puis kind dédié, puis distants
-#   cluster_choisir [CTX] [--confirm CTX]
-#                                    CTX validé (distant : confirmation),
-#                                    sinon choix gardé, sinon menu
-#                                    (terminal seulement), sinon défaut local
-#   cluster_preparer CTX             crée le cluster kind dédié s'il manque
-#   cluster_liberer CTX              supprime le kind dédié devenu vide
-#   kube_joignable_depuis_conteneur FICHIER   réécrit 127.0.0.1/localhost
-#   relais_lancer NOM CTX NS CIBLE PORTS…   port-forward gardé en vie
-#   relais_actif NOM / relais_arreter NOM
-#   compte_* (kube-account.sh #430)    compte limité et contexte administrateur
+# devzone cluster (#280): the cluster where the modules that provide a service
+# are deployed (postgres; gitlab with #279). A single choice per instance, kept
+# in the state (line « cluster=<kubectl context> »): the services of an instance
+# live in the same place and move together (devzone cluster CTX).
+# Sourced library: the caller defines RACINE and ETAT.
+#   cluster_saved                    chosen context, nothing if there is none
+#   cluster_save CTX                 keeps the choice in the state
+#   cluster_is_local CTX             0 if local cluster (config, no network)
+#   cluster_candidates               local, then dedicated kind, then remote
+#   cluster_choose [CTX] [--confirm CTX]
+#                                    CTX validated (remote: confirmation),
+#                                    otherwise kept choice, otherwise menu
+#                                    (terminal only), otherwise local default
+#   cluster_prepare CTX              creates the dedicated kind cluster if missing
+#   cluster_release CTX              deletes the dedicated kind cluster once empty
+#   kube_reachable_from_container FILE   rewrites 127.0.0.1/localhost
+#   relay_start NAME CTX NS TARGET PORTS…   port-forward kept alive
+#   relay_active NAME / relay_stop NAME
+#   account_* (kube-account.sh #430)   limited account and admin context
 
-# Clusters kind et de l'hôte, comme remoteEnv de devcontainer.json : un
-# docker exec ou un script lancé hors du terminal du conteneur ne l'a pas,
-# et le relais doit voir le cluster de l'hôte
+# Kind and host clusters, as remoteEnv of devcontainer.json: a docker exec or a
+# script run outside the container terminal does not have it, and the relay
+# must see the host cluster
 : "${KUBECONFIG:=$HOME/.kube/config:$HOME/.kube/hote.config}"
 export KUBECONFIG
 
-# État des modules : défini par l'appelant ; valeur par défaut pour les tests
+# Module state: defined by the caller; default value for the tests
 : "${ETAT:=${DEVZONE_ETAT:-$HOME/.devzone.modules}}"
 
-# Écriture sûre de l'état (#417) : verrou, temporaire dans le dossier de
-# l'état, copie de secours .prec — partagée par devzone, ports et ports-auto
+# Safe state write (#417): lock, temporary file in the state folder, backup copy
+# .prec — shared by devzone, ports and ports-auto
 # shellcheck source=SCRIPTDIR/state.sh
 # shellcheck disable=SC1091
 . "$(dirname "${BASH_SOURCE[0]}")/state.sh"
 
-# Nom d'instance : vide ou « devzone » = instance par défaut (pas de suffixe)
+# Instance name: empty or « devzone » = default instance (no suffix)
 : "${DEVZONE_INSTANCE:=}"
 INSTANCE_SUFFIX=""
 if [ -n "$DEVZONE_INSTANCE" ] && [ "$DEVZONE_INSTANCE" != "devzone" ]; then
     INSTANCE_SUFFIX="-${DEVZONE_INSTANCE}"
 fi
 
-# Cluster kind dédié, créé sur le Docker de l'hôte ; nom suffixé par instance
-CLUSTER_DEDIE=kind-devzone${INSTANCE_SUFFIX}
-# Étiquette posée sur tout namespace créé par devzone : un kind dédié sans
-# namespace étiqueté n'a plus d'usage et peut être supprimé
-CLUSTER_ETIQUETTE=app.kubernetes.io/managed-by=devzone
+# Dedicated kind cluster, created on the host Docker; name suffixed per instance
+CLUSTER_DEDICATED=kind-devzone${INSTANCE_SUFFIX}
+# Label set on every namespace created by devzone : a dedicated kind without a
+# labelled namespace has no use left and can be deleted
+CLUSTER_LABEL=app.kubernetes.io/managed-by=devzone
 
-# Réécriture 127.0.0.1 → host.docker.internal (#291) : partagée avec
-# l'enveloppe kind, qui l'applique aussi aux clusters créés à la main
+# Rewrite 127.0.0.1 → host.docker.internal (#291): shared with the kind wrapper,
+# which applies it too to clusters created by hand
 # shellcheck source=SCRIPTDIR/kube-reachable.sh
 . "$(dirname "${BASH_SOURCE[0]}")/kube-reachable.sh"
 
-# Compte Kubernetes limité (#430) : compte_poser, compte_autoriser,
-# compte_retirer, compte_jeton, compte_admin (contexte administrateur) ;
-# les installeurs l'utilisent, cluster_liberer aussi
+# Limited Kubernetes account (#430): account_setup, account_allow,
+# account_remove, account_token, account_admin (admin context); the installers
+# use it, cluster_release too
 # shellcheck source=SCRIPTDIR/kube-account.sh
 . "$(dirname "${BASH_SOURCE[0]}")/kube-account.sh"
 
-cluster_lu() {
+cluster_saved() {
     grep -E '^cluster=' "$ETAT" 2>/dev/null | tail -1 | cut -d= -f2- || true
 }
 
-cluster_ecrire() {
+cluster_save() {
     state_write cluster "$1"
 }
 
-cluster_est_dedie() {
-    [ "$1" = "${CLUSTER_DEDIE}" ]
+cluster_is_dedicated() {
+    [ "$1" = "${CLUSTER_DEDICATED}" ]
 }
 
-# Cluster local : lu dans la configuration KUBECONFIG, sans appel réseau.
-# Le kind dédié est toujours local ; un cluster de l'hôte l'est si son
-# serveur écoute sur une adresse de boucle (127.0.0.1, localhost, ::1,
-# host.docker.internal).
-cluster_est_local() {
-    local ctx="$1" cluster serveur hote
-    cluster_est_dedie "$ctx" && return 0
+# Local cluster: read from the KUBECONFIG configuration, without network call.
+# The dedicated kind is always local; a host cluster is local when its server
+# listens on a loopback address (127.0.0.1, localhost, ::1, host.docker.internal).
+cluster_is_local() {
+    local ctx="$1" cluster server host
+    cluster_is_dedicated "$ctx" && return 0
     cluster="$(kubectl config view -o jsonpath="{.contexts[?(@.name==\"$ctx\")].context.cluster}" 2>/dev/null || true)"
     [ -n "$cluster" ] || return 1
-    serveur="$(kubectl config view -o jsonpath="{.clusters[?(@.name==\"$cluster\")].cluster.server}" 2>/dev/null || true)"
-    [ -n "$serveur" ] || return 1
-    # Règle par le nom (ancienne règle de metrics-server.sh)
+    server="$(kubectl config view -o jsonpath="{.clusters[?(@.name==\"$cluster\")].cluster.server}" 2>/dev/null || true)"
+    [ -n "$server" ] || return 1
+    # Rule by name (old rule of metrics-server.sh)
     case "$ctx" in
         kind-* | docker-desktop | rancher-desktop | orbstack | minikube) return 0 ;;
     esac
-    # Extraction de l'hôte (adresses IPv6 entre crochets gérées)
-    hote="${serveur#*://}"
-    hote="${hote%%/*}"
-    if [[ "$hote" == \[* ]]; then
-        hote="${hote#[}"
-        hote="${hote%%]*}"
+    # Host extraction (IPv6 addresses in brackets handled)
+    host="${server#*://}"
+    host="${host%%/*}"
+    if [[ "$host" == \[* ]]; then
+        host="${host#[}"
+        host="${host%%]*}"
     else
-        hote="${hote%%:*}"
+        host="${host%%:*}"
     fi
-    case "$hote" in
+    case "$host" in
         127.0.0.1 | localhost | ::1 | host.docker.internal) return 0 ;;
         *-control-plane) return 0 ;;
     esac
     return 1
 }
 
-# Pose le contexte « devzone » (cluster + user) sur le contexte donné (défaut :
-# le courant) : après une installation sur une machine neuve, --context devzone
-# vise d'emblée le cluster des services choisi (#396)
-contexte_devzone_poser() {
+# Sets the « devzone » context (cluster + user) on the given context (default:
+# the current one): after an installation on a new machine, --context devzone
+# targets the chosen services cluster from the start (#396)
+devzone_context_set() {
     local ctx cluster user
     ctx="${1:-$(kubectl config current-context 2>/dev/null || true)}"
     if [ -z "$ctx" ]; then
@@ -120,29 +118,29 @@ contexte_devzone_poser() {
     fi
 }
 
-cluster_joignable() {
+cluster_reachable() {
     kubectl --context "$1" --request-timeout=3s get --raw /readyz >/dev/null 2>&1
 }
 
-# Contextes de l'hôte : locaux d'abord, puis le kind dédié, enfin les distants
-cluster_candidats() {
-    local hote="${DEVZONE_KUBE_HOTE:-$HOME/.kube/hote.config}" c
-    if [ -f "$hote" ]; then
-        # 1. Clusters locaux de l'hôte (serveur sur une adresse de boucle)
-        for c in $(KUBECONFIG="$hote" kubectl config get-contexts -o name 2>/dev/null); do
-            cluster_est_dedie "$c" && continue
-            if cluster_est_local "$c" && cluster_joignable "$c"; then
+# Host contexts: local ones first, then the dedicated kind, finally the remote ones
+cluster_candidates() {
+    local host="${DEVZONE_KUBE_HOTE:-$HOME/.kube/hote.config}" c
+    if [ -f "$host" ]; then
+        # 1. Local clusters of the host (server on a loopback address)
+        for c in $(KUBECONFIG="$host" kubectl config get-contexts -o name 2>/dev/null); do
+            cluster_is_dedicated "$c" && continue
+            if cluster_is_local "$c" && cluster_reachable "$c"; then
                 echo "$c"
             fi
         done
     fi
-    # 2. Cluster kind dédié
-    echo "$CLUSTER_DEDIE"
-    if [ -f "$hote" ]; then
-        # 3. Clusters distants de l'hôte
-        for c in $(KUBECONFIG="$hote" kubectl config get-contexts -o name 2>/dev/null); do
-            cluster_est_dedie "$c" && continue
-            if ! cluster_est_local "$c" && cluster_joignable "$c"; then
+    # 2. Dedicated kind cluster
+    echo "$CLUSTER_DEDICATED"
+    if [ -f "$host" ]; then
+        # 3. Remote clusters of the host
+        for c in $(KUBECONFIG="$host" kubectl config get-contexts -o name 2>/dev/null); do
+            cluster_is_dedicated "$c" && continue
+            if ! cluster_is_local "$c" && cluster_reachable "$c"; then
                 echo "$c"
             fi
         done
@@ -150,220 +148,220 @@ cluster_candidats() {
     return 0
 }
 
-# Menu sur stderr (stdout porte la réponse) ; Entrée = premier candidat
+# Menu on stderr (stdout carries the answer); Enter = first candidate
 cluster_menu() {
-    local candidats=() c i=1 reponse
-    while IFS= read -r c; do candidats+=("$c"); done < <(cluster_candidats)
+    local candidates=() c i=1 answer
+    while IFS= read -r c; do candidates+=("$c"); done < <(cluster_candidates)
 {
-        echo "devzone : sur quel cluster installer les services de devzone ?"
-        for c in "${candidats[@]}"; do
-            if cluster_est_dedie "$c"; then
-                echo "  $i) $c   cluster kind dédié, dans le conteneur (défaut)"
-            elif cluster_est_local "$c"; then
-                echo "  $i) $c   cluster local"
+        echo "devzone : on which cluster should the devzone services be installed?"
+        for c in "${candidates[@]}"; do
+            if cluster_is_dedicated "$c"; then
+                echo "  $i) $c   dedicated kind cluster, in the container (default)"
+            elif cluster_is_local "$c"; then
+                echo "  $i) $c   local cluster"
             else
-                echo "  $i) $c   cluster distant"
+                echo "  $i) $c   remote cluster"
             fi
             i=$((i + 1))
         done
         [ -f "${DEVZONE_KUBE_HOTE:-$HOME/.kube/hote.config}" ] ||
-            echo "  (clusters de l'hôte invisibles : devzone enable kubernetes)"
+            echo "  (host clusters not visible: devzone enable kubernetes)"
     } >&2
-    printf 'Numéro [1] : ' >&2
-    read -r reponse || reponse=""
-    reponse="${reponse:-1}"
-    case "$reponse" in
-        *[!0-9]* | 0) echo "devzone : choix invalide : $reponse" >&2; return 2 ;;
+    printf 'Number [1]: ' >&2
+    read -r answer || answer=""
+    answer="${answer:-1}"
+    case "$answer" in
+        *[!0-9]* | 0) echo "devzone : invalid choice: $answer" >&2; return 2 ;;
     esac
-    if [ "$reponse" -gt "${#candidats[@]}" ]; then
-        echo "devzone : choix invalide : $reponse" >&2
+    if [ "$answer" -gt "${#candidates[@]}" ]; then
+        echo "devzone : invalid choice: $answer" >&2
         return 2
     fi
-    echo "${candidats[$((reponse - 1))]}"
+    echo "${candidates[$((answer - 1))]}"
 }
 
-# Terminal interactif ; DEVZONE_INTERACTIF=1 pour les tests (stdin redirigé)
-cluster_interactif() {
+# Interactive terminal; DEVZONE_INTERACTIF=1 for the tests (stdin redirected)
+cluster_interactive() {
     [ "${DEVZONE_INTERACTIF:-}" = 1 ] || [ -t 0 ]
 }
 
-cluster_choisir() {
-    local voulu="" confirmer="" c reponse arg
+cluster_choose() {
+    local wanted="" confirm="" c answer arg
     while [ "$#" -gt 0 ]; do
         arg="$1"
         shift
         case "$arg" in
             --confirm)
                 if [ "$#" -eq 0 ]; then
-                    echo "devzone : --confirm attend un contexte" >&2
+                    echo "devzone : --confirm needs a context" >&2
                     return 2
                 fi
-                confirmer="$1"
+                confirm="$1"
                 shift
                 ;;
-            --confirm=*) confirmer="${arg#*=}" ;;
+            --confirm=*) confirm="${arg#*=}" ;;
             -*)
-                echo "devzone : argument inconnu : $arg (cluster_choisir [CTX] [--confirm CTX])" >&2
+                echo "devzone : unknown argument: $arg (cluster_choose [CTX] [--confirm CTX])" >&2
                 return 2
                 ;;
             *)
-                if [ -n "$voulu" ]; then
-                    echo "devzone : argument inconnu : $arg (cluster_choisir [CTX] [--confirm CTX])" >&2
+                if [ -n "$wanted" ]; then
+                    echo "devzone : unknown argument: $arg (cluster_choose [CTX] [--confirm CTX])" >&2
                     return 2
                 fi
-                voulu="$arg"
+                wanted="$arg"
                 ;;
         esac
     done
-    if [ -n "$voulu" ]; then
+    if [ -n "$wanted" ]; then
         while IFS= read -r c; do
-            [ "$c" = "$voulu" ] && break
-        done < <(cluster_candidats)
-        if [ "$c" != "$voulu" ]; then
-            echo "devzone : cluster inconnu ou injoignable : $voulu ; possibles : $(cluster_candidats | tr '\n' ' ')" >&2
+            [ "$c" = "$wanted" ] && break
+        done < <(cluster_candidates)
+        if [ "$c" != "$wanted" ]; then
+            echo "devzone : unknown or unreachable cluster: $wanted; candidates: $(cluster_candidates | tr '\n' ' ')" >&2
             return 2
         fi
-        # Distant : confirmation requise. --confirm ne vaut que s'il est
-        # exactement le contexte demandé ; DEVZONE_CLUSTER_DISTANT reste
-        # accepté pour les tests et la CI.
-        if ! cluster_est_local "$voulu"; then
-            if [ -n "$confirmer" ]; then
-                if [ "$confirmer" != "$voulu" ]; then
-                    echo "devzone : cluster distant refusé : $voulu (--confirm $voulu)" >&2
+        # Remote: confirmation required. --confirm counts only if it is exactly
+        # the requested context; DEVZONE_CLUSTER_DISTANT is still accepted for
+        # the tests and CI
+        if ! cluster_is_local "$wanted"; then
+            if [ -n "$confirm" ]; then
+                if [ "$confirm" != "$wanted" ]; then
+                    echo "devzone : remote cluster refused: $wanted (--confirm $wanted)" >&2
                     return 2
                 fi
             elif [ -n "${DEVZONE_CLUSTER_DISTANT:-}" ]; then
-                if [ "${DEVZONE_CLUSTER_DISTANT}" != "$voulu" ]; then
-                    echo "devzone : cluster distant refusé : $voulu (DEVZONE_CLUSTER_DISTANT doit valoir exactement $voulu)" >&2
+                if [ "${DEVZONE_CLUSTER_DISTANT}" != "$wanted" ]; then
+                    echo "devzone : remote cluster refused: $wanted (DEVZONE_CLUSTER_DISTANT must be exactly $wanted)" >&2
                     return 2
                 fi
-            elif cluster_interactif; then
-                printf 'cluster distant : %s ; tape son nom pour confirmer : ' "$voulu" >&2
-                read -r reponse || reponse=""
-                if [ "$reponse" != "$voulu" ]; then
-                    echo "devzone : cluster distant refusé : $voulu (--confirm $voulu)" >&2
+            elif cluster_interactive; then
+                printf 'remote cluster: %s ; type its name to confirm: ' "$wanted" >&2
+                read -r answer || answer=""
+                if [ "$answer" != "$wanted" ]; then
+                    echo "devzone : remote cluster refused: $wanted (--confirm $wanted)" >&2
                     return 2
                 fi
             else
-                echo "devzone : cluster distant refusé : $voulu (--confirm $voulu)" >&2
+                echo "devzone : remote cluster refused: $wanted (--confirm $wanted)" >&2
                 return 2
             fi
         fi
-        echo "$voulu"
+        echo "$wanted"
         return 0
     fi
-    c="$(cluster_lu)"
+    c="$(cluster_saved)"
     if [ -n "$c" ]; then
         echo "$c"
-    elif cluster_interactif; then
+    elif cluster_interactive; then
         cluster_menu
     else
-        # Défaut : local seulement (jamais distant par défaut)
-        local hote_choix=""
+        # Default: local only (never remote by default)
+        local host_choice=""
         if [ -f "${DEVZONE_KUBE_HOTE:-$HOME/.kube/hote.config}" ]; then
-            hote_choix="$(KUBECONFIG="${DEVZONE_KUBE_HOTE:-$HOME/.kube/hote.config}" kubectl config current-context 2>/dev/null || true)"
+            host_choice="$(KUBECONFIG="${DEVZONE_KUBE_HOTE:-$HOME/.kube/hote.config}" kubectl config current-context 2>/dev/null || true)"
         fi
-        if [ -n "$hote_choix" ] && cluster_est_local "$hote_choix" && cluster_joignable "$hote_choix"; then
-            echo "$hote_choix"
+        if [ -n "$host_choice" ] && cluster_is_local "$host_choice" && cluster_reachable "$host_choice"; then
+            echo "$host_choice"
         else
-            echo "$CLUSTER_DEDIE"
+            echo "$CLUSTER_DEDICATED"
         fi
     fi
 }
 
-# Lance kind sans basculer le contexte courant de kubectl (#366) : le contexte
-# d'avant est remis, ou retiré s'il n'y en avait pas. Le code de kind est rendu
-# meme sous set -e : la restauration a lieu avant.
-kind_sans_basculer() {
-    local precedent code=0
-    precedent="$(kubectl config current-context 2>/dev/null || true)"
+# Runs kind without switching kubectl's current context (#366): the previous
+# one is restored, or removed if there was none. The kind exit code is returned
+# even under set -e: the restore happens first.
+kind_keep_context() {
+    local previous code=0
+    previous="$(kubectl config current-context 2>/dev/null || true)"
     kind "$@" || code=$?
-    if [ -n "$precedent" ]; then
-        kubectl config use-context "$precedent" >/dev/null 2>&1 || true
+    if [ -n "$previous" ]; then
+        kubectl config use-context "$previous" >/dev/null 2>&1 || true
     else
         KUBECONFIG="$HOME/.kube/config" kubectl config unset current-context >/dev/null 2>&1 || true
     fi
     return "$code"
 }
 
-# Cree un cluster kind sans basculer le contexte courant de kubectl.
-kind_creer_sans_basculer() {
-    kind_sans_basculer create cluster "$@"
+# Creates a kind cluster without switching kubectl's current context.
+kind_create_keep_context() {
+    kind_keep_context create cluster "$@"
 }
 
-cluster_preparer() {
+cluster_prepare() {
     local ctx="$1"
-    if [ "$ctx" = "$CLUSTER_DEDIE" ]; then
+    if [ "$ctx" = "$CLUSTER_DEDICATED" ]; then
         if ! kind get clusters 2>/dev/null | grep -qx "devzone${INSTANCE_SUFFIX}"; then
-            echo "▶ Création du cluster kind devzone (environ 1 min)…"
-            # Sur le Docker de l'hôte, l'API écoute sur 127.0.0.1 du poste :
-            # kube_joignable_depuis_conteneur la rend joignable du conteneur
-            # (host.docker.internal), sans l'exposer sur le réseau local.
-            # Docker de l'hôte chargé (son Kubernetes, d'autres clusters) : l'API du
-            # nœud peut redémarrer pendant l'initialisation et kind abandonne à
-            # quelques secondes près. Une seconde tentative, sur un cluster neuf.
-            if ! kind_creer_sans_basculer --name "devzone${INSTANCE_SUFFIX}" --wait 120s; then
-                echo "▶ Nouvelle tentative de création du cluster kind…"
+            echo "▶ Creating the kind devzone cluster (about 1 min)…"
+            # On the host Docker, the API listens on the workstation's 127.0.0.1:
+            # kube_reachable_from_container makes it reachable from the container
+            # (host.docker.internal), without exposing it on the local network.
+            # Busy host Docker (its Kubernetes, other clusters): the node API can
+            # restart during initialization and kind gives up within seconds. A
+            # second attempt, on a fresh cluster.
+            if ! kind_create_keep_context --name "devzone${INSTANCE_SUFFIX}" --wait 120s; then
+                echo "▶ Retrying the kind cluster creation…"
                 kind delete cluster --name "devzone${INSTANCE_SUFFIX}" >/dev/null 2>&1 || true
-                kind_creer_sans_basculer --name "devzone${INSTANCE_SUFFIX}" --wait 120s || return 1
+                kind_create_keep_context --name "devzone${INSTANCE_SUFFIX}" --wait 120s || return 1
             fi
-            kube_joignable_depuis_conteneur "$HOME/.kube/config"
+            kube_reachable_from_container "$HOME/.kube/config"
         fi
-    elif ! cluster_joignable "$ctx"; then
-        echo "devzone : cluster $ctx injoignable (module kubernetes actif ? cluster démarré ?)" >&2
+    elif ! cluster_reachable "$ctx"; then
+        echo "devzone : cluster $ctx unreachable (kubernetes module enabled? cluster started?)" >&2
         return 1
     fi
-    # S'il vient d'être créé, le cluster des services doit tout de suite porter
-    # le contexte devzone, sans quoi l'installation vise l'ancien cluster (#396)
-    contexte_devzone_poser "$ctx" || echo "devzone : contexte devzone non posé sur $ctx" >&2
+    # If it has just been created, the services cluster must carry the devzone
+    # context at once, otherwise the installation targets the old cluster (#396)
+    devzone_context_set "$ctx" || echo "devzone : devzone context not set on $ctx" >&2
 }
 
-# Kind dédié sans plus aucun namespace de devzone : supprimé (il n'occupe
-# que de la mémoire). Jamais un cluster de l'hôte.
-cluster_liberer() {
-    local ctx="$1" reste
-    cluster_est_dedie "$ctx" || return 0
+# Dedicated kind with no devzone namespace left: deleted (it only uses memory).
+# Never a host cluster.
+cluster_release() {
+    local ctx="$1" left
+    cluster_is_dedicated "$ctx" || return 0
     kind get clusters 2>/dev/null | grep -qx "devzone${INSTANCE_SUFFIX}" || return 0
-    # Lecture des namespaces étiquetés par l'administrateur (#430) : la liste
-    # des namespaces est refusée au compte limité
-    reste="$(compte_admin "$ctx" get namespaces -l "$CLUSTER_ETIQUETTE" -o name 2>/dev/null || true)"
-    if [ -z "$reste" ]; then
+    # Reading the namespaces labelled by the administrator (#430): the namespace
+    # list is refused to the limited account
+    left="$(account_admin "$ctx" get namespaces -l "$CLUSTER_LABEL" -o name 2>/dev/null || true)"
+    if [ -z "$left" ]; then
         kind delete cluster --name "devzone${INSTANCE_SUFFIX}" >/dev/null 2>&1 || true
-        echo "▶ Cluster kind devzone supprimé (plus aucun service)."
+        echo "▶ kind devzone cluster removed (no service left)."
     fi
 }
 
-# ---- Relais : port d'un service du cluster sur 127.0.0.1 du conteneur ----
-# kubectl port-forward marche sur tout cluster dont l'API répond (kind dédié
-# comme cluster de l'hôte), sans exposer de port sur les nœuds. Il s'arrête
-# quand le pod redémarre : la boucle le relance. PID et journal dans
-# workspace/.<nom>/ (dossier du module, ignoré par git).
-relais_dossier() {
+# ---- Relay: port of a cluster service on the container's 127.0.0.1 ----
+# kubectl port-forward works on every cluster whose API answers (dedicated kind
+# or host cluster), without exposing a port on the nodes. It stops when the pod
+# restarts: the loop restarts it. PID and log in workspace/.<name>/ (module
+# folder, ignored by git).
+relay_dir() {
     echo "$RACINE/workspace/.$1"
 }
 
-relais_actif() {
+relay_active() {
     local pid
-    pid="$(cat "$(relais_dossier "$1")/relais.pid" 2>/dev/null || true)"
+    pid="$(cat "$(relay_dir "$1")/relais.pid" 2>/dev/null || true)"
     [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null
 }
 
-relais_lancer() {
-    local nom="$1" ctx="$2" ns="$3" cible="$4" dossier
+relay_start() {
+    local name="$1" ctx="$2" ns="$3" target="$4" dir
     shift 4
-    dossier="$(relais_dossier "$nom")"
-    mkdir -p "$dossier"
-    relais_actif "$nom" && return 0
-    # setsid : session à part, le relais survit à la fin du script qui l'a
-    # lancé (postStartCommand, make shell) ; absent sur macOS (tests bash 3.2)
-    local detache=()
-    command -v setsid >/dev/null 2>&1 && detache=(setsid)
-    # port-forward vise un pod précis et ne voit sa disparition qu'à la
-    # connexion suivante, qui échoue. Pour un service, la boucle suit donc le
-    # pod prêt derrière lui (UID dans ses endpoints) : attend qu'il y en ait
-    # un, puis relance port-forward dès qu'il change (pod redémarré).
-    # shellcheck disable=SC2016 # variables développées par le bash du relais
-    ${detache[@]+"${detache[@]}"} nohup bash -c '
+    dir="$(relay_dir "$name")"
+    mkdir -p "$dir"
+    relay_active "$name" && return 0
+    # setsid: separate session, the relay survives the end of the script that
+    # started it (postStartCommand, make shell); absent on macOS (bash 3.2 tests)
+    local detached=()
+    command -v setsid >/dev/null 2>&1 && detached=(setsid)
+    # port-forward targets one precise pod and sees its disappearance only at the
+    # next connection, which fails. For a service, the loop therefore follows the
+    # ready pod behind it (UID in its endpoints): waits until there is one, then
+    # restarts port-forward as soon as it changes (pod restarted).
+    # shellcheck disable=SC2016 # variables expanded by the relay's bash
+    ${detached[@]+"${detached[@]}"} nohup bash -c '
         pod() {
             case "$2" in
                 svc/*) kubectl --context "$0" -n "$1" get endpoints "${2#svc/}" -o jsonpath="{.subsets[*].addresses[*].targetRef.uid}" 2>/dev/null ;;
@@ -382,22 +380,22 @@ relais_lancer() {
             wait "$pf" 2>/dev/null
             sleep 1
         done' \
-        "$ctx" "$ns" "$cible" "$@" >"$dossier/relais.log" 2>&1 &
-    echo "$!" >"$dossier/relais.pid"
+        "$ctx" "$ns" "$target" "$@" >"$dir/relais.log" 2>&1 &
+    echo "$!" >"$dir/relais.pid"
 }
 
-relais_arreter() {
-    local fichier pid enfants
-    fichier="$(relais_dossier "$1")/relais.pid"
-    pid="$(cat "$fichier" 2>/dev/null || true)"
+relay_stop() {
+    local file pid children
+    file="$(relay_dir "$1")/relais.pid"
+    pid="$(cat "$file" 2>/dev/null || true)"
     if [ -n "$pid" ]; then
-        # Enfants (port-forward) relevés avant : une fois la boucle tuée, ils
-        # sont rattachés à init et pgrep -P ne les voit plus. La boucle
-        # d'abord, sinon elle relancerait le port-forward.
-        enfants="$(pgrep -P "$pid" 2>/dev/null || true)"
+        # Children (port-forward) listed before: once the loop is killed, they
+        # are reattached to init and pgrep -P no longer sees them. The loop first,
+        # otherwise it would restart the port-forward.
+        children="$(pgrep -P "$pid" 2>/dev/null || true)"
         kill "$pid" 2>/dev/null || true
-        # shellcheck disable=SC2086 # liste de PID
-        [ -z "$enfants" ] || kill $enfants 2>/dev/null || true
+        # shellcheck disable=SC2086 # list of PIDs
+        [ -z "$children" ] || kill $children 2>/dev/null || true
     fi
-    rm -f "$fichier"
+    rm -f "$file"
 }

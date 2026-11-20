@@ -56,7 +56,7 @@ devzone/
 │   ├── startup.sh            # chaque démarrage : identité git, clusters, puis récapitulatif (devzone)
 │   ├── kube-config.sh          # contextes kind ; module kubernetes : cluster de l'hôte, metrics-server
 │   ├── metrics-server.sh       # metrics-server sur les clusters locaux (CPU et RAM dans k9s)
-│   └── git-identite.sh         # identité git déduite du compte gh si elle manque
+│   └── git-identity.sh         # identité git déduite du compte gh si elle manque
 ├── .github/workflows/
 │   ├── fonctionnel.yml         # tests du conteneur (fonctionnels, CLI, Windows, ia-arm64), job bats sur chaque PR/push develop/main, synthèse tests-conteneur exigée pour merger
 │   ├── repowarden.yml          # vérifications repowarden de chaque PR (PR mal visée reciblée vers develop)

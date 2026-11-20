@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Enveloppe de kind (#291), installée comme /usr/local/bin/kind ; le vrai
-# binaire est kind-reel. Avec le Docker de l'hôte, un cluster créé par
-# « kind create cluster » écrit server: https://127.0.0.1:<port> : injoignable
-# depuis le conteneur. Après une création ou un export de kubeconfig réussis,
-# l'adresse est rendue joignable (kube-reachable.sh). Tout le reste passe tel quel.
+# kind wrapper (#291), installed as /usr/local/bin/kind; the real binary is
+# kind-reel. With the host's Docker, a cluster created by « kind create cluster »
+# writes server: https://127.0.0.1:<port>: unreachable from the container. After
+# a successful creation or kubeconfig export, the address is made reachable
+# (kube-reachable.sh). Everything else passes through unchanged.
 set -uo pipefail
 
 KIND_REEL="${DEVZONE_KIND_REEL:-/usr/local/bin/kind-reel}"
@@ -25,21 +25,21 @@ case "${1:-} ${2:-}" in
     *) exit 0 ;;
 esac
 
-# Fichier écrit par kind : --kubeconfig s'il est donné, sinon le premier de
-# KUBECONFIG, sinon ~/.kube/config (même règle que kind)
-fichier=""
-precedent=""
+# File written by kind: --kubeconfig if given, otherwise the first of KUBECONFIG,
+# otherwise ~/.kube/config (same rule as kind)
+file=""
+previous=""
 for arg in "$@"; do
     case "$arg" in
-        --kubeconfig=*) fichier="${arg#--kubeconfig=}" ;;
+        --kubeconfig=*) file="${arg#--kubeconfig=}" ;;
     esac
-    [ "$precedent" = "--kubeconfig" ] && fichier="$arg"
-    precedent="$arg"
+    [ "$previous" = "--kubeconfig" ] && file="$arg"
+    previous="$arg"
 done
-if [ -z "$fichier" ] && [ -n "${KUBECONFIG:-}" ]; then
-    fichier="${KUBECONFIG%%:*}"
+if [ -z "$file" ] && [ -n "${KUBECONFIG:-}" ]; then
+    file="${KUBECONFIG%%:*}"
 fi
-[ -n "$fichier" ] || fichier="$HOME/.kube/config"
+[ -n "$file" ] || file="$HOME/.kube/config"
 
-kube_joignable_depuis_conteneur "$fichier"
+kube_reachable_from_container "$file"
 exit 0

@@ -64,6 +64,13 @@ init_prompt() {
         log "prompt: cannot write $bashrc"
         return 0
     fi
+    # Block written before the rename invite-kube.sh -> kube-prompt.sh: the file
+    # no longer exists, every prompt would fail (migration, idempotent)
+    if grep -qE 'invite-kube\.sh|devzone_invite_kube' "$bashrc" 2>/dev/null; then
+        sed -i -e 's#/\.devcontainer/invite-kube\.sh#/.devcontainer/kube-prompt.sh#' \
+            -e 's#devzone_invite_kube#devzone_kube_prompt#' "$bashrc"
+        log "prompt block migrated to kube-prompt.sh"
+    fi
     if grep -qF "$PROMPT_START" "$bashrc" 2>/dev/null; then
         log "prompt block already present"
         return 0
@@ -71,8 +78,8 @@ init_prompt() {
     cat >>"$bashrc" <<'PROMPT'
 # >>> devzone prompt >>>
 # shellcheck source=/dev/null
-. /usr/local/share/devzone/.devcontainer/invite-kube.sh
-PS1='$(devzone_invite_kube) '"$PS1"
+. /usr/local/share/devzone/.devcontainer/kube-prompt.sh
+PS1='$(devzone_kube_prompt) '"$PS1"
 # <<< devzone prompt <<<
 PROMPT
     log "prompt block added to $bashrc"

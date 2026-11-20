@@ -164,7 +164,7 @@ GIT
 #!/usr/bin/env bash
 if [ "${1:-}" = ls ]; then printf '{"dependencies":{}}\n'; fi
 NPM
-    # gh : jamais connecté (git-identite, état devzone) : aucun appel réseau
+    # gh : jamais connecté (git-identity, état devzone) : aucun appel réseau
     cat >"$BATS_TEST_TMPDIR/bin/gh" <<'GH'
 #!/usr/bin/env bash
 echo "gh $*" >>"$BATS_TEST_TMPDIR/gh.log"

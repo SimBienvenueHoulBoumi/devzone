@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# Clusters connectés (#337) : vue, namespace, invite, cache.
+# Connected clusters (#337): view, namespace, prompt, cache.
 
 setup() {
     load commun
@@ -13,7 +13,7 @@ setup() {
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
 }
 
-faux_kubectl() {
+fake_kubectl() {
     cat >"$BATS_TEST_TMPDIR/bin/kubectl" <<'KUBE'
 #!/usr/bin/env bash
 echo "kubectl $*" >>"$BATS_TEST_TMPDIR/kubectl.log"
@@ -29,11 +29,11 @@ case "$*" in
         printf '%s\n' "${3:-}" >"$T/current"
         ;;
     "config set-context "*)
-        # enregistre le namespace demande
+        # records the requested namespace
         ctx="${3:-}"
         ns=""
         for a in "$@"; do case "$a" in --namespace) ;; esac; done
-        # recupere le dernier argument apres --namespace
+        # gets the last argument after --namespace
         prev=""
         for a in "$@"; do
             if [ "$prev" = "--namespace" ]; then ns="$a"; fi
@@ -42,28 +42,28 @@ case "$*" in
         printf '%s\n' "$ns" >"$T/ns.$ctx"
         ;;
     *"config view"*)
-        # contexte vise
-        nom=""
+        # targeted context
+        name=""
         for c in $(cat "$T/contexts" 2>/dev/null); do
-            if [[ "$*" == *\"$c\"* ]]; then nom="$c"; break; fi
+            if [[ "$*" == *\"$c\"* ]]; then name="$c"; break; fi
         done
         if [[ "$*" == *'.context.namespace'* ]]; then
-            if [ -f "$T/ns.$nom" ]; then cat "$T/ns.$nom"; else printf 'default\n'; fi
+            if [ -f "$T/ns.$name" ]; then cat "$T/ns.$name"; else printf 'default\n'; fi
         elif [[ "$*" == *'.cluster.server'* ]]; then
-            case "$nom" in
+            case "$name" in
                 docker-desktop) echo "https://127.0.0.1:6443" ;;
                 prod) echo "https://example.org:6443" ;;
                 *) echo "https://127.0.0.1:6443" ;;
             esac
         else
             # .context.cluster
-            echo "$nom"
+            echo "$name"
         fi
         ;;
     *"get --raw /readyz"*)
         case "$*" in
-            *"--context injoignable "*) exit 1 ;;
-            *"--context injoignable"*) exit 1 ;;
+            *"--context unreachable "*) exit 1 ;;
+            *"--context unreachable"*) exit 1 ;;
         esac
         exit 0
         ;;
@@ -74,34 +74,34 @@ KUBE
     : >"$BATS_TEST_TMPDIR/kubectl.log"
 }
 
-@test "clusters : tableau avec marques et distant" {
-    faux_kubectl
-    printf 'docker-desktop\nkind-gitlab\nprod\ninjoignable\n' >"$BATS_TEST_TMPDIR/contexts"
+@test "clusters : table with marks and remote" {
+    fake_kubectl
+    printf 'docker-desktop\nkind-gitlab\nprod\nunreachable\n' >"$BATS_TEST_TMPDIR/contexts"
     printf 'docker-desktop\n' >"$BATS_TEST_TMPDIR/current"
     printf 'gitlab\n' >"$BATS_TEST_TMPDIR/ns.kind-gitlab"
     printf 'kind-devzone\n' >"$BATS_TEST_TMPDIR/modules"
-    # cluster services = kind-devzone (pas dans contexts) -> pas de marque
+    # services cluster = kind-devzone (not in contexts) -> no mark
     run bash "$DEVZONE" clusters
     [ "$status" -eq 0 ]
-    [[ "$output" == *"CONTEXTE"* ]] || false
+    [[ "$output" == *"CONTEXT"* ]] || false
     [[ "$output" == *"docker-desktop"* ]] || false
     [[ "$output" == *"kind-gitlab"* ]] || false
     [[ "$output" == *"prod"* ]] || false
-    [[ "$output" == *"distant"* ]] || false
-    [[ "$output" == *"injoignable"* ]] || false
-    [[ "$output" == *"cluster de travail"* ]] || false
+    [[ "$output" == *"remote"* ]] || false
+    [[ "$output" == *"unreachable"* ]] || false
+    [[ "$output" == *"working cluster"* ]] || false
 }
 
-@test "clusters : aucun contexte" {
-    faux_kubectl
+@test "clusters : no context" {
+    fake_kubectl
     : >"$BATS_TEST_TMPDIR/contexts"
     run bash "$DEVZONE" clusters
     [ "$status" -eq 0 ]
-    [[ "$output" == *"aucun cluster"* ]] || false
+    [[ "$output" == *"no cluster"* ]] || false
 }
 
-@test "clusters : cluster des services marqué, seul et avec le travail" {
-    faux_kubectl
+@test "clusters : services cluster marked, alone and with the work" {
+    fake_kubectl
     printf 'docker-desktop\nkind-gitlab\n' >"$BATS_TEST_TMPDIR/contexts"
     printf 'docker-desktop\n' >"$BATS_TEST_TMPDIR/current"
     printf 'cluster=docker-desktop\n' >"$DEVZONE_ETAT"
@@ -115,20 +115,20 @@ KUBE
     [[ "$output" == *"★  kind-gitlab"* ]] || false
 }
 
-@test "clusters : colonnes alignées sous LC_ALL=C" {
-    faux_kubectl
+@test "clusters : columns aligned under LC_ALL=C" {
+    fake_kubectl
     printf 'docker-desktop\nkind-gitlab\n' >"$BATS_TEST_TMPDIR/contexts"
     printf 'docker-desktop\n' >"$BATS_TEST_TMPDIR/current"
     printf 'cluster=kind-gitlab\n' >"$DEVZONE_ETAT"
     run env LC_ALL=C bash "$DEVZONE" clusters
     [ "$status" -eq 0 ]
-    printf '%s\n' "$output" | grep -q '^   CONTEXTE' || false
+    printf '%s\n' "$output" | grep -q '^   CONTEXT' || false
     printf '%s\n' "$output" | grep -q '^★  docker-desktop' || false
     printf '%s\n' "$output" | grep -q '^●  kind-gitlab' || false
 }
 
-@test "utiliser CTX -n NS : set-context avec namespace" {
-    faux_kubectl
+@test "use CTX -n NS : set-context with namespace" {
+    fake_kubectl
     printf 'docker-desktop\nprod\n' >"$BATS_TEST_TMPDIR/contexts"
     printf 'docker-desktop\n' >"$BATS_TEST_TMPDIR/current"
     run bash "$DEVZONE" use prod --confirm prod -n gitlab
@@ -137,8 +137,8 @@ KUBE
     grep -q "config set-context prod --namespace gitlab" "$BATS_TEST_TMPDIR/kubectl.log" || false
 }
 
-@test "utiliser -n seul : garde le contexte et change le namespace" {
-    faux_kubectl
+@test "use -n only : keeps the context and changes the namespace" {
+    fake_kubectl
     printf 'docker-desktop\n' >"$BATS_TEST_TMPDIR/contexts"
     printf 'docker-desktop\n' >"$BATS_TEST_TMPDIR/current"
     run bash "$DEVZONE" use -n dev
@@ -147,55 +147,55 @@ KUBE
     ! grep -q "use-context" "$BATS_TEST_TMPDIR/kubectl.log" || false
 }
 
-@test "utiliser distant sans confirmer : refuse" {
-    faux_kubectl
+@test "use remote without confirming : refused" {
+    fake_kubectl
     printf 'prod\n' >"$BATS_TEST_TMPDIR/contexts"
     printf 'docker-desktop\n' >"$BATS_TEST_TMPDIR/current"
     run bash "$DEVZONE" use prod
     [ "$status" -eq 2 ]
-    [[ "$output" == *"cluster distant refusé"* ]] || false
+    [[ "$output" == *"--confirm prod"* ]] || false
 }
 
-@test "invite : local et distant et cache" {
-    faux_kubectl
+@test "prompt : local and remote and cache" {
+    fake_kubectl
     printf 'docker-desktop\n' >"$BATS_TEST_TMPDIR/contexts"
     printf 'docker-desktop\n' >"$BATS_TEST_TMPDIR/current"
     : >"$BATS_TEST_TMPDIR/ns.docker-desktop"
-    # namespace default
+    # default namespace
     # shellcheck disable=SC1091
     source "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
     # shellcheck disable=SC1091
-    source "$BATS_TEST_DIRNAME/../../.devcontainer/invite-kube.sh"
-    run devzone_invite_kube
+    source "$BATS_TEST_DIRNAME/../../.devcontainer/kube-prompt.sh"
+    run devzone_kube_prompt
     [ "$status" -eq 0 ]
     [[ "$output" == *"docker-desktop/default"* ]] || false
-    [[ "$output" != *"distant"* ]] || false
+    [[ "$output" != *"remote"* ]] || false
     before="$(wc -l <"$BATS_TEST_TMPDIR/kubectl.log")"
-    run devzone_invite_kube
+    run devzone_kube_prompt
     [ "$status" -eq 0 ]
     after="$(wc -l <"$BATS_TEST_TMPDIR/kubectl.log")"
     [ "$before" -eq "$after" ] || false
 }
 
-@test "invite : marqueurs non imprimables autour des couleurs" {
-    faux_kubectl
+@test "prompt : non-printing markers around the colours" {
+    fake_kubectl
     printf 'docker-desktop\n' >"$BATS_TEST_TMPDIR/contexts"
     printf 'docker-desktop\n' >"$BATS_TEST_TMPDIR/current"
     # shellcheck disable=SC1091
-    source "$BATS_TEST_DIRNAME/../../.devcontainer/invite-kube.sh"
-    run devzone_invite_kube
+    source "$BATS_TEST_DIRNAME/../../.devcontainer/kube-prompt.sh"
+    run devzone_kube_prompt
     [ "$status" -eq 0 ]
     [[ "$output" == *$'\001\033[36m\002'* ]] || false
     [[ "$output" == *$'\001\033[0m\002'* ]] || false
 }
 
-@test "invite : aucun effet de bord sur le shell appelant" {
-    faux_kubectl
+@test "prompt : no side effect on the calling shell" {
+    fake_kubectl
     printf 'docker-desktop\n' >"$BATS_TEST_TMPDIR/contexts"
     printf 'docker-desktop\n' >"$BATS_TEST_TMPDIR/current"
     # shellcheck disable=SC1091
-    source "$BATS_TEST_DIRNAME/../../.devcontainer/invite-kube.sh"
-    run devzone_invite_kube
+    source "$BATS_TEST_DIRNAME/../../.devcontainer/kube-prompt.sh"
+    run devzone_kube_prompt
     [ "$status" -eq 0 ]
     [ -z "${ICI+x}" ] || false
     [ -z "${ETAT+x}" ] || false
@@ -203,9 +203,9 @@ KUBE
     ! declare -F cluster_est_local || false
 }
 
-@test "post-create : bloc invite une seule fois" {
+@test "post-create : prompt block only once" {
     script="$BATS_TEST_DIRNAME/../../.devcontainer/post-create.sh"
     [ "$(grep -c '# >>> devzone invite >>>' "$script")" -eq 1 ] || false
-    grep -q "invite-kube.sh" "$script" || false
-    grep -q 'PS1=.*devzone_invite_kube' "$script" || false
+    grep -q "kube-prompt.sh" "$script" || false
+    grep -q 'PS1=.*devzone_kube_prompt' "$script" || false
 }

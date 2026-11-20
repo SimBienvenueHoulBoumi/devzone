@@ -1,44 +1,43 @@
 #!/usr/bin/env bash
-# Compte Kubernetes limité (#430) : le contexte devzone (projets, relais,
-# agents) ne peut agir que dans les namespaces devzone-*. Le compte est le
-# ServiceAccount devzone-agent du namespace devzone-system, lié au ClusterRole
-# edit (ni RBAC ni quotas) dans chaque namespace de devzone par un RoleBinding,
-# avec un jeton TokenRequest de 24 h renouvelé au démarrage (startup.sh) et
-# par « devzone repair ». Les installeurs utilisent seuls le contexte
-# administrateur (contexte de l hôte dans ~/.kube/hote.config, cluster kind
-# dans ~/.kube/config) ; les shells et les agents n'ont que ~/.kube/config.
-# Bibliothèque sourcée par cluster.sh ; exécutable pour le jeton :
-#   kube-account.sh jeton
+# Limited Kubernetes account (#430): the devzone context (projects, relays,
+# agents) can only act in the devzone-* namespaces. The account is the
+# ServiceAccount devzone-agent of the devzone-system namespace, bound to the
+# edit ClusterRole (no RBAC, no quotas) in each devzone namespace by a
+# RoleBinding, with a 24 h TokenRequest token renewed at startup (startup.sh) and
+# by « devzone repair ». The installers alone use the admin context (host context
+# in ~/.kube/hote.config, kind cluster in ~/.kube/config); shells and agents only
+# have ~/.kube/config.
+# Library sourced by cluster.sh; executable for the token:
+#   kube-account.sh jeton   (argument kept: called by startup.sh and devzone repair)
 
-COMPTES_NS=devzone-system
-COMPTES_SA=devzone-agent
-COMPTES_DUREE=24h
-COMPTES_CONFIG="${DEVZONE_KUBE_CONFIG:-$HOME/.kube/config}"
+ACCOUNT_NS=devzone-system
+ACCOUNT_SA=devzone-agent
+ACCOUNT_DURATION=24h
+ACCOUNT_CONFIG="${DEVZONE_KUBE_CONFIG:-$HOME/.kube/config}"
 
-# Fichier kubeconfig qui porte le contexte administrateur ctx : hote.config
-# s'il y figure (clusters de l'hôte), sinon ~/.kube/config (clusters kind du
-# conteneur).
-compte_config_admin() {
-    local ctx="$1" hote="${DEVZONE_KUBE_HOTE:-$HOME/.kube/hote.config}"
-    if [ -n "$ctx" ] && [ -f "$hote" ]; then
-        if KUBECONFIG="$hote" kubectl config get-contexts -o name 2>/dev/null | grep -qx -- "$ctx"; then
-            echo "$hote"
+# kubeconfig file that holds the admin context ctx: hote.config if it lists it
+# (host clusters), otherwise ~/.kube/config (kind clusters of the container).
+account_admin_config() {
+    local ctx="$1" host="${DEVZONE_KUBE_HOTE:-$HOME/.kube/hote.config}"
+    if [ -n "$ctx" ] && [ -f "$host" ]; then
+        if KUBECONFIG="$host" kubectl config get-contexts -o name 2>/dev/null | grep -qx -- "$ctx"; then
+            echo "$host"
             return 0
         fi
     fi
-    echo "$COMPTES_CONFIG"
+    echo "$ACCOUNT_CONFIG"
 }
 
-# kubectl sur le contexte administrateur : kubeconfig explicite qui porte ce
-# contexte, jamais le KUBECONFIG combiné (l'administrateur ne passe jamais par
-# le compte limité). Sans contexte connu : celui de kubectl.
-compte_admin() {
+# kubectl on the admin context: explicit kubeconfig that holds this context,
+# never the combined KUBECONFIG (the admin never goes through the limited
+# account). Without a known context: the one kubectl uses.
+account_admin() {
     local ctx="$1" conf
     shift
     if [ -z "$ctx" ]; then
         ctx="$(kubectl config current-context 2>/dev/null || true)"
     fi
-    conf="$(compte_config_admin "$ctx")"
+    conf="$(account_admin_config "$ctx")"
     if [ -n "$ctx" ]; then
         kubectl --kubeconfig="$conf" --context "$ctx" "$@"
     else
@@ -46,16 +45,16 @@ compte_admin() {
     fi
 }
 
-# helm sur le contexte administrateur ctx : les charts créent des CRD, des
-# ClusterRoles ou des RoleBindings, hors des droits du compte limité (edit).
-# Usage : compte_helm <ctx> <args helm…>
-compte_helm() {
+# helm on the admin context ctx: the charts create CRDs, ClusterRoles or
+# RoleBindings, beyond the limited account's rights (edit).
+# Usage: account_helm <ctx> <helm args…>
+account_helm() {
     local ctx="$1" conf
     shift
     if [ -z "$ctx" ]; then
         ctx="$(kubectl config current-context 2>/dev/null || true)"
     fi
-    conf="$(compte_config_admin "$ctx")"
+    conf="$(account_admin_config "$ctx")"
     if [ -n "$ctx" ]; then
         helm --kubeconfig "$conf" --kube-context "$ctx" "$@"
     else
@@ -63,11 +62,11 @@ compte_helm() {
     fi
 }
 
-# Contexte administrateur d'une installation : le cluster des services choisi
-# (cluster_lu de cluster.sh), sinon le contexte courant de kubectl.
-compte_ctx() {
+# Admin context of an installation: the chosen services cluster (cluster_saved
+# of cluster.sh), otherwise the current kubectl context.
+account_context() {
     local ctx
-    ctx="$(cluster_lu 2>/dev/null || true)"
+    ctx="$(cluster_saved 2>/dev/null || true)"
     if [ -n "$ctx" ]; then
         echo "$ctx"
         return 0
@@ -75,116 +74,116 @@ compte_ctx() {
     kubectl config current-context 2>/dev/null || true
 }
 
-# Pose le compte limité avec le contexte administrateur : namespace
-# devzone-system et ServiceAccount devzone-agent (idempotent, repris au
-# démarrage et à chaque installation).
-compte_poser() {
+# Sets up the limited account with the admin context: devzone-system namespace
+# and devzone-agent ServiceAccount (idempotent, resumed at startup and at each
+# installation).
+account_setup() {
     local ctx="$1"
-    compte_admin "$ctx" create namespace "$COMPTES_NS" --dry-run=client -o yaml |
-        compte_admin "$ctx" apply -f - >/dev/null || return 1
-    compte_admin "$ctx" -n "$COMPTES_NS" create serviceaccount "$COMPTES_SA" \
-        --dry-run=client -o yaml | compte_admin "$ctx" apply -f - >/dev/null || return 1
+    account_admin "$ctx" create namespace "$ACCOUNT_NS" --dry-run=client -o yaml |
+        account_admin "$ctx" apply -f - >/dev/null || return 1
+    account_admin "$ctx" -n "$ACCOUNT_NS" create serviceaccount "$ACCOUNT_SA" \
+        --dry-run=client -o yaml | account_admin "$ctx" apply -f - >/dev/null || return 1
 }
 
-# Autorise le compte dans le namespace ns : RoleBinding devzone-agent vers le
-# ClusterRole edit (lecture, écriture, secrets, NetworkPolicies — ni RBAC ni
-# quotas), posé avec le contexte administrateur après la création du namespace.
-# Le compte est posé d'abord s'il manque : une installation sur un cluster
-# encore vierge rend le compte utilisable au prochain renouvellement de jeton.
-compte_autoriser() {
+# Allows the account in namespace ns: devzone-agent RoleBinding to the edit
+# ClusterRole (read, write, secrets, NetworkPolicies — no RBAC, no quotas), set
+# with the admin context after the namespace is created.
+# The account is set up first if missing: an installation on a still blank
+# cluster makes the account usable at the next token renewal.
+account_allow() {
     local ctx="$1" ns="$2"
-    compte_poser "$ctx" || return 1
-    compte_admin "$ctx" -n "$ns" create rolebinding "$COMPTES_SA" \
-        --clusterrole=edit --serviceaccount="$COMPTES_NS:$COMPTES_SA" \
-        --dry-run=client -o yaml | compte_admin "$ctx" apply -f - >/dev/null || return 1
+    account_setup "$ctx" || return 1
+    account_admin "$ctx" -n "$ns" create rolebinding "$ACCOUNT_SA" \
+        --clusterrole=edit --serviceaccount="$ACCOUNT_NS:$ACCOUNT_SA" \
+        --dry-run=client -o yaml | account_admin "$ctx" apply -f - >/dev/null || return 1
 }
 
-# Retire l'autorisation du compte dans le namespace ns (désinstallation) :
-# RoleBinding supprimé avec le contexte administrateur.
-compte_retirer() {
+# Removes the account's permission in namespace ns (uninstall): RoleBinding
+# deleted with the admin context.
+account_remove() {
     local ctx="$1" ns="$2"
-    compte_admin "$ctx" -n "$ns" delete rolebinding "$COMPTES_SA" \
+    account_admin "$ctx" -n "$ns" delete rolebinding "$ACCOUNT_SA" \
         --ignore-not-found >/dev/null || return 1
 }
 
-# Crée et étiquette le namespace ns par l'administrateur puis autorise le compte.
-compte_namespace() {
+# Creates and labels namespace ns as administrator, then allows the account.
+account_namespace() {
     local ctx="$1" ns="$2"
-    compte_admin "$ctx" create namespace "$ns" --dry-run=client -o yaml |
-        compte_admin "$ctx" apply -f - >/dev/null || return 1
-    compte_admin "$ctx" label namespace "$ns" "$CLUSTER_ETIQUETTE" --overwrite >/dev/null || return 1
-    compte_autoriser "$ctx" "$ns" || return 1
+    account_admin "$ctx" create namespace "$ns" --dry-run=client -o yaml |
+        account_admin "$ctx" apply -f - >/dev/null || return 1
+    account_admin "$ctx" label namespace "$ns" "$CLUSTER_LABEL" --overwrite >/dev/null || return 1
+    account_allow "$ctx" "$ns" || return 1
 }
 
-# Rattrape les namespaces devzone existants : RoleBinding posée dans chaque
-# namespace étiqueté CLUSTER_ETIQUETTE (idempotent), pour les installations
-# antérieures au compte limité.
-compte_rattraper() {
-    local ctx="$1" ns etiquette="${CLUSTER_ETIQUETTE:-app.kubernetes.io/managed-by=devzone}"
+# Catches up the existing devzone namespaces: RoleBinding set in each namespace
+# labelled CLUSTER_LABEL (idempotent), for the installations prior to the
+# limited account.
+account_catch_up() {
+    local ctx="$1" ns label="${CLUSTER_LABEL:-app.kubernetes.io/managed-by=devzone}"
     while IFS= read -r ns; do
         [ -n "$ns" ] || continue
         ns="${ns#namespace/}"
-        compte_admin "$ctx" -n "$ns" create rolebinding "$COMPTES_SA" \
-            --clusterrole=edit --serviceaccount="$COMPTES_NS:$COMPTES_SA" \
-            --dry-run=client -o yaml | compte_admin "$ctx" apply -f - >/dev/null || return 1
-    done < <(compte_admin "$ctx" get namespaces -l "$etiquette" -o name 2>/dev/null || true)
+        account_admin "$ctx" -n "$ns" create rolebinding "$ACCOUNT_SA" \
+            --clusterrole=edit --serviceaccount="$ACCOUNT_NS:$ACCOUNT_SA" \
+            --dry-run=client -o yaml | account_admin "$ctx" apply -f - >/dev/null || return 1
+    done < <(account_admin "$ctx" get namespaces -l "$label" -o name 2>/dev/null || true)
 }
 
-# Renouvelle le jeton du compte (TokenRequest de 24 h) et l'écrit dans le
-# contexte devzone de ~/.kube/config : user devzone-agent, même cluster que le
-# contexte administrateur (entrée cluster copiée : server, autorité de
-# certificat et tls-server-name du contexte de l'hôte).
-compte_jeton() {
-    local ctx="$1" conf jeton cluster serveur tls ca_donnees ca_fichier
-    local entree=()
-    conf="$(compte_config_admin "$ctx")"
-    jeton="$(compte_admin "$ctx" create token "$COMPTES_SA" -n "$COMPTES_NS" \
-        --duration="$COMPTES_DUREE")" || return 1
-    if [ -z "$jeton" ]; then
-        echo "devzone : jeton du compte limité vide" >&2
+# Renews the account's token (24 h TokenRequest) and writes it into the devzone
+# context of ~/.kube/config: user devzone-agent, same cluster as the admin
+# context (cluster entry copied: server, certificate authority and
+# tls-server-name of the host context).
+account_token() {
+    local ctx="$1" conf token cluster server tls ca_data ca_file
+    local entry=()
+    conf="$(account_admin_config "$ctx")"
+    token="$(account_admin "$ctx" create token "$ACCOUNT_SA" -n "$ACCOUNT_NS" \
+        --duration="$ACCOUNT_DURATION")" || return 1
+    if [ -z "$token" ]; then
+        echo "devzone : limited account token is empty" >&2
         return 1
     fi
     cluster="$(KUBECONFIG="$conf" kubectl config view \
         -o jsonpath="{.contexts[?(@.name==\"$ctx\")].context.cluster}" 2>/dev/null || true)"
     if [ -z "$cluster" ]; then
-        echo "devzone : cluster du contexte $ctx introuvable dans $conf" >&2
+        echo "devzone : cluster of context $ctx not found in $conf" >&2
         return 1
     fi
-    serveur="$(KUBECONFIG="$conf" kubectl config view \
+    server="$(KUBECONFIG="$conf" kubectl config view \
         -o jsonpath="{.clusters[?(@.name==\"$cluster\")].cluster.server}" 2>/dev/null || true)"
-    if [ -z "$serveur" ]; then
-        echo "devzone : serveur du cluster $cluster introuvable dans $conf" >&2
+    if [ -z "$server" ]; then
+        echo "devzone : server of cluster $cluster not found in $conf" >&2
         return 1
     fi
-    ca_donnees="$(KUBECONFIG="$conf" kubectl config view \
+    ca_data="$(KUBECONFIG="$conf" kubectl config view \
         -o jsonpath="{.clusters[?(@.name==\"$cluster\")].cluster.certificate-authority-data}" 2>/dev/null || true)"
-    ca_fichier="$(KUBECONFIG="$conf" kubectl config view \
+    ca_file="$(KUBECONFIG="$conf" kubectl config view \
         -o jsonpath="{.clusters[?(@.name==\"$cluster\")].cluster.certificate-authority}" 2>/dev/null || true)"
-    entree=(--server="$serveur")
-    if [ -n "$ca_donnees" ]; then
-        entree+=(--certificate-authority-data="$ca_donnees")
-    elif [ -n "$ca_fichier" ]; then
-        entree+=(--certificate-authority="$ca_fichier" --embed-certs=true)
+    entry=(--server="$server")
+    if [ -n "$ca_data" ]; then
+        entry+=(--certificate-authority-data="$ca_data")
+    elif [ -n "$ca_file" ]; then
+        entry+=(--certificate-authority="$ca_file" --embed-certs=true)
     fi
     tls="$(KUBECONFIG="$conf" kubectl config view \
         -o jsonpath="{.clusters[?(@.name==\"$cluster\")].cluster.tls-server-name}" 2>/dev/null || true)"
     if [ -n "$tls" ]; then
-        entree+=(--tls-server-name="$tls")
+        entry+=(--tls-server-name="$tls")
     fi
-    KUBECONFIG="$COMPTES_CONFIG" kubectl config set-cluster "$cluster" \
-        ${entree[@]+"${entree[@]}"} >/dev/null
-    KUBECONFIG="$COMPTES_CONFIG" kubectl config set-credentials "$COMPTES_SA" \
-        --token="$jeton" >/dev/null
-    KUBECONFIG="$COMPTES_CONFIG" kubectl config set-context devzone \
-        --cluster="$cluster" --user="$COMPTES_SA" >/dev/null
+    KUBECONFIG="$ACCOUNT_CONFIG" kubectl config set-cluster "$cluster" \
+        ${entry[@]+"${entry[@]}"} >/dev/null
+    KUBECONFIG="$ACCOUNT_CONFIG" kubectl config set-credentials "$ACCOUNT_SA" \
+        --token="$token" >/dev/null
+    KUBECONFIG="$ACCOUNT_CONFIG" kubectl config set-context devzone \
+        --cluster="$cluster" --user="$ACCOUNT_SA" >/dev/null
 }
 
-# Exécution directe : jeton du compte renouvelé au démarrage (startup.sh) et
-# par « devzone repair ». Sans cluster des services choisi : rien à faire.
-# Quand le fichier est sourcé, $0 diffère de BASH_SOURCE : rien ne s'exécute.
+# Direct execution: account token renewed at startup (startup.sh) and by
+# « devzone repair ». Without a chosen services cluster: nothing to do.
+# When the file is sourced, $0 differs from BASH_SOURCE: nothing runs.
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
     if [ "${1:-}" != jeton ]; then
-        echo "devzone : kube-compte : jeton" >&2
+        echo "devzone : kube-account : jeton" >&2
         exit 1
     fi
     ICI="$(cd "$(dirname "$0")" && pwd)"
@@ -194,7 +193,7 @@ if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
     if [ -z "$ctx" ]; then
         exit 0
     fi
-    compte_poser "$ctx" || exit 1
-    compte_rattraper "$ctx" || exit 1
-    compte_jeton "$ctx" || exit 1
+    account_setup "$ctx" || exit 1
+    account_catch_up "$ctx" || exit 1
+    account_token "$ctx" || exit 1
 fi

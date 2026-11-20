@@ -646,19 +646,19 @@ appliquer_postgres() {
             ecrire postgres off
             return 2
         fi
-        actuel="$(cluster_lu)"
+        actuel="$(cluster_saved)"
         if [ -n "$voulu" ] && [ -n "$actuel" ] && [ "$voulu" != "$actuel" ]; then
             echo "devzone : les services de devzone sont sur $actuel ; pour en changer : devzone cluster $voulu" >&2
             ecrire postgres off
             return 2
         fi
         if [ -n "$confirmer" ]; then
-            ctx="$(cluster_choisir "$voulu" --confirm "$confirmer")" || { ecrire postgres off; return 2; }
+            ctx="$(cluster_choose "$voulu" --confirm "$confirmer")" || { ecrire postgres off; return 2; }
         else
-            ctx="$(cluster_choisir "$voulu")" || { ecrire postgres off; return 2; }
+            ctx="$(cluster_choose "$voulu")" || { ecrire postgres off; return 2; }
         fi
         # Choix gardé avant l'installation : une reprise vise le même cluster
-        cluster_ecrire "$ctx"
+        cluster_save "$ctx"
         etat_courant="$(bash "$ICI/postgres/postgres.sh" status)"
         # « relais arrêté » d'abord : cette ligne commence aussi par « prêt sur »
         if [[ "$etat_courant" == *"relais arrêté"* ]]; then
@@ -705,7 +705,7 @@ appliquer_argocd() {
 appliquer_mysql() {
     local etat_courant ctx
     if [ "$1" = on ]; then
-        ctx="$(cluster_lu)"
+        ctx="$(cluster_saved)"
         if [ -z "$ctx" ]; then
             echo "devzone : mysql : aucun cluster choisi : devzone enable mysql" >&2
             ecrire mysql off
@@ -747,7 +747,7 @@ confirmer_suppression() {
         case "$arg" in --yes) SUPPRIMER_DONNEES=1 ;; esac
     done
     [ -z "$SUPPRIMER_DONNEES" ] || return 0
-    cluster_interactif || return 0
+    cluster_interactive || return 0
     # mysql : la question porte sur le namespace (volume et bases restent) ;
     # postgres : tout part, le refus annule ; gitlab : le secret Rails reste,
     # sa suppression n'a lieu que sur une désinstallation complète voulue
@@ -792,22 +792,22 @@ changer_cluster() {
         echo "devzone : --confirm attend un contexte" >&2
         return 2
     fi
-    actuel="$(cluster_lu)"
+    actuel="$(cluster_saved)"
     if [ -z "$voulu" ]; then
         if [ -z "$actuel" ]; then
             echo "devzone : aucun cluster choisi (fixé à l'activation d'un module : devzone enable postgres)"
-        elif cluster_est_dedie "$actuel"; then
+        elif cluster_is_dedicated "$actuel"; then
             echo "devzone : cluster $actuel (kind dédié, dans le conteneur)"
         else
             echo "devzone : cluster $actuel (cluster de l'hôte)"
         fi
-        echo "  possibles : $(cluster_candidats | tr '\n' ' ')"
+        echo "  possibles : $(cluster_candidates | tr '\n' ' ')"
         return 0
     fi
     if [ -n "$confirmer" ]; then
-        nouveau="$(cluster_choisir "$voulu" --confirm "$confirmer")" || return 2
+        nouveau="$(cluster_choose "$voulu" --confirm "$confirmer")" || return 2
     else
-        nouveau="$(cluster_choisir "$voulu")" || return 2
+        nouveau="$(cluster_choose "$voulu")" || return 2
     fi
     if [ "$nouveau" = "$actuel" ]; then
         echo "devzone : déjà sur $nouveau, rien à faire."
@@ -817,7 +817,7 @@ changer_cluster() {
     ctx_new="$nouveau"
     if [ "$(valeur postgres)" = on ]; then
         if [ -z "$oui" ]; then
-            if ! cluster_interactif; then
+            if ! cluster_interactive; then
                 echo "devzone : les bases postgres seront supprimées de $ctx_ancien (non migrées) : devzone cluster $ctx_new --yes" >&2
                 return 1
             fi
@@ -831,24 +831,24 @@ changer_cluster() {
         # Retire PostgreSQL de l'ancien cluster (contexte explicite) ;
         # namespace et RoleBinding par l'administrateur (#430)
         export KUBECONFIG="$HOME/.kube/config:$HOME/.kube/hote.config"
-        compte_retirer "$ctx_ancien" "$NS" >/dev/null 2>&1 || true
-        compte_admin "$ctx_ancien" delete namespace "$NS" --wait=true >/dev/null 2>&1 || true
-        cluster_liberer "$ctx_ancien"
+        account_remove "$ctx_ancien" "$NS" >/dev/null 2>&1 || true
+        account_admin "$ctx_ancien" delete namespace "$NS" --wait=true >/dev/null 2>&1 || true
+        cluster_release "$ctx_ancien"
         # Le nouveau cluster devient le contexte devzone
-        cluster_ecrire "$ctx_new"
+        cluster_save "$ctx_new"
         # Pose le contexte devzone sur le nouveau cluster (cluster + user :
         # commande importante, échec affiché et rendu #396)
-        if ! contexte_devzone_poser "$ctx_new"; then
+        if ! devzone_context_set "$ctx_new"; then
             echo "devzone : impossible de poser le contexte devzone sur $ctx_new" >&2
             return 1
         fi
         # Installe PostgreSQL sur le nouveau cluster (via --context devzone qui pointe maintenant dessus)
         bash "$ICI/postgres/postgres.sh" install
     else
-        cluster_ecrire "$ctx_new"
+        cluster_save "$ctx_new"
         # Pose le contexte devzone sur le nouveau cluster (cluster + user :
         # commande importante, échec affiché et rendu #396)
-        if ! contexte_devzone_poser "$ctx_new"; then
+        if ! devzone_context_set "$ctx_new"; then
             echo "devzone : impossible de poser le contexte devzone sur $ctx_new" >&2
             return 1
         fi
@@ -1176,7 +1176,7 @@ reparer() {
     reparer_element "relais Docker" env DEVZONE_RELAIS_REEL=oui bash "$ICI/docker-relay.sh"
     # Jeton du compte Kubernetes limité (#430) : 24 h, renouvelé ici ; sans
     # module kubernetes et sans cluster des services, rien à faire
-    if [ "$(valeur kubernetes)" = on ] || [ -n "$(cluster_lu)" ]; then
+    if [ "$(valeur kubernetes)" = on ] || [ -n "$(cluster_saved)" ]; then
         reparer_element "compte kubernetes" bash "$ICI/kube-account.sh" jeton
     fi
     if [ "$(valeur gitlab)" = on ]; then
@@ -1203,7 +1203,7 @@ reparer() {
 }
 
 # Bascule le cluster de travail de l'utilisateur (#341). Ne touche jamais au
-# cluster des services de devzone : aucun cluster_ecrire, aucune ligne
+# cluster des services de devzone : aucun cluster_save, aucune ligne
 # cluster= dans l'état.
 utiliser() {
     local ctx="" confirmer="" namespace="" reponse arg courant
@@ -1260,13 +1260,13 @@ utiliser() {
     fi
     courant="$(kubectl config current-context 2>/dev/null || true)"
     if [ "$ctx" != "$courant" ]; then
-        if ! cluster_est_local "$ctx"; then
+        if ! cluster_is_local "$ctx"; then
             if [ -n "$confirmer" ]; then
                 if [ "$confirmer" != "$ctx" ]; then
                     echo "devzone : cluster distant refusé : $ctx (--confirm $ctx)" >&2
                     return 2
                 fi
-            elif cluster_interactif; then
+            elif cluster_interactive; then
                 printf 'cluster distant : %s ; tape son nom pour confirmer : ' "$ctx" >&2
                 read -r reponse || reponse=""
                 if [ "$reponse" != "$ctx" ]; then
@@ -1394,8 +1394,8 @@ etat() {
         echo "  ⚠ gitlab          GitLab réinstallé : si le navigateur affiche 422, supprimez les données de site de gitlab.localhost"
     fi
     # Cluster de devzone distant : avertissement dans le récapitulatif
-    cluster_actuel="$(cluster_lu)"
-    if [ -n "$cluster_actuel" ] && ! cluster_est_local "$cluster_actuel"; then
+    cluster_actuel="$(cluster_saved)"
+    if [ -n "$cluster_actuel" ] && ! cluster_is_local "$cluster_actuel"; then
         printf '  ⚠ cluster        remote: %s — services on a remote cluster\n' "$cluster_actuel"
     fi
     # Ancien cluster kind-gitlab encore présent : inviter à migrer (#396)
@@ -1407,7 +1407,7 @@ etat() {
     case "$ctx_travail" in
         kind-gitlab* | kind-devzone*)
             ctx_hote="$(KUBECONFIG="${DEVZONE_KUBE_HOTE:-$HOME/.kube/hote.config}" kubectl config current-context 2>/dev/null || true)"
-            if [ -n "$ctx_hote" ] && cluster_joignable "$ctx_hote"; then
+            if [ -n "$ctx_hote" ] && cluster_reachable "$ctx_hote"; then
                 printf '  ⚠ cluster de travail : %s (cluster interne de devzone) ; revenir : devzone use %s\n' "$ctx_travail" "$ctx_hote"
             fi
             ;;

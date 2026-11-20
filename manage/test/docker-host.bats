@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# Tests du Docker de l'hôte (doublures dans $BATS_TEST_TMPDIR/bin).
+# Tests of the host Docker (fakes in $BATS_TEST_TMPDIR/bin).
 
 setup() {
     load commun
@@ -9,19 +9,19 @@ setup() {
     export HOME="$BATS_TEST_TMPDIR/home"
     mkdir -p "$HOME"
     export DEVZONE_INSTANCE="${DEVZONE_INSTANCE:-devzone}"
-    export ETAT="$BATS_TEST_TMPDIR/etat"
+    export ETAT="$BATS_TEST_TMPDIR/state"
     : >"$ETAT"
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
 }
 
-# --- kube_joignable_depuis_conteneur ---------------------------------------
-# docker : aucun nœud kind par défaut ; FAUX_NOEUD=<nom> pour en simuler un
-setup_docker_noeud() {
+# --- kube_reachable_from_container ---------------------------------------
+# docker: no kind node by default; FAKE_NODE=<name> to simulate one
+setup_docker_node() {
     cat >"$BATS_TEST_TMPDIR/bin/docker" <<'DOCKER'
 #!/usr/bin/env bash
 echo "docker $*" >>"$BATS_TEST_TMPDIR/docker.log"
 case "$*" in
-    "ps --filter label=io.x-k8s.kind.role=control-plane --filter publish=6443"*) [ -z "${FAUX_NOEUD:-}" ] || echo "$FAUX_NOEUD" ;;
+    "ps --filter label=io.x-k8s.kind.role=control-plane --filter publish=6443"*) [ -z "${FAKE_NODE:-}" ] || echo "$FAKE_NODE" ;;
     "inspect "*) echo "kind " ;;
 esac
 exit 0
@@ -31,7 +31,7 @@ DOCKER
 }
 
 setup_kubectl_view() {
-    setup_docker_noeud
+    setup_docker_node
     cat >"$BATS_TEST_TMPDIR/bin/kubectl" <<'KUBE'
 #!/usr/bin/env bash
 echo "kubectl $*" >>"$BATS_TEST_TMPDIR/kubectl.log"
@@ -39,7 +39,7 @@ case "$*" in
     *"config view"*)
         printf 'cluster127\thttps://127.0.0.1:6443\n'
         printf 'clusterlocalhost\thttps://localhost:6443\n'
-        printf 'clusterexemple\thttps://example.org:443\n'
+        printf 'clusterexample\thttps://example.org:443\n'
         ;;
 esac
 KUBE
@@ -47,48 +47,48 @@ KUBE
     : >"$BATS_TEST_TMPDIR/kubectl.log"
 }
 
-@test "kube_joignable_depuis_conteneur : reecrit 127.0.0.1 et localhost" {
+@test "kube_reachable_from_container : rewrites 127.0.0.1 and localhost" {
     setup_kubectl_view
     source "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
     local cfg="$BATS_TEST_TMPDIR/kubeconfig"
     : >"$cfg"
-    kube_joignable_depuis_conteneur "$cfg"
+    kube_reachable_from_container "$cfg"
     grep -q "config set-cluster cluster127" "$BATS_TEST_TMPDIR/kubectl.log"
     grep -q -- "--server=https://host.docker.internal:6443" "$BATS_TEST_TMPDIR/kubectl.log"
     grep -q -- "--tls-server-name=127.0.0.1" "$BATS_TEST_TMPDIR/kubectl.log"
     grep -q "config set-cluster clusterlocalhost" "$BATS_TEST_TMPDIR/kubectl.log"
     grep -q -- "--tls-server-name=localhost" "$BATS_TEST_TMPDIR/kubectl.log"
-    ! grep -q "set-cluster clusterexemple" "$BATS_TEST_TMPDIR/kubectl.log" || false
+    ! grep -q "set-cluster clusterexample" "$BATS_TEST_TMPDIR/kubectl.log" || false
 }
 
-@test "kube_joignable_depuis_conteneur : idempotente" {
+@test "kube_reachable_from_container : idempotent" {
     setup_kubectl_view
     source "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
     local cfg="$BATS_TEST_TMPDIR/kubeconfig"
     : >"$cfg"
-    kube_joignable_depuis_conteneur "$cfg"
-    kube_joignable_depuis_conteneur "$cfg"
+    kube_reachable_from_container "$cfg"
+    kube_reachable_from_container "$cfg"
     [ "$(grep -c "config set-cluster" "$BATS_TEST_TMPDIR/kubectl.log")" -eq 4 ]
 }
 
-# --- suffixe d'instance -----------------------------------------------------
-@test "suffixe : DEVZONE_INSTANCE=devzone -> kind-devzone" {
+# --- instance suffix -----------------------------------------------------
+@test "suffix : DEVZONE_INSTANCE=devzone -> kind-devzone" {
     (
         export DEVZONE_INSTANCE=devzone
         source "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
-        [ "$CLUSTER_DEDIE" = "kind-devzone" ]
+        [ "$CLUSTER_DEDICATED" = "kind-devzone" ]
     )
 }
 
-@test "suffixe : DEVZONE_INSTANCE=mon-devzone -> kind-devzone-mon-devzone" {
+@test "suffix : DEVZONE_INSTANCE=mon-devzone -> kind-devzone-mon-devzone" {
     (
         export DEVZONE_INSTANCE=mon-devzone
         source "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
-        [ "$CLUSTER_DEDIE" = "kind-devzone-mon-devzone" ]
+        [ "$CLUSTER_DEDICATED" = "kind-devzone-mon-devzone" ]
     )
 }
 
-# --- cluster_choisir --------------------------------------------------------
+# --- cluster_choose --------------------------------------------------------
 setup_cluster_choisir() {
     cat >"$BATS_TEST_TMPDIR/bin/kubectl" <<'KUBE'
 #!/usr/bin/env bash
@@ -97,14 +97,14 @@ case "$*" in
     *"config get-contexts -o name"*) echo "docker-desktop" ;;
     *"config current-context"*) echo "docker-desktop" ;;
     *"config view"*)
-        nom=""
+        name=""
         for c in docker-desktop; do
-            if [[ "$*" == *\"$c\"* ]]; then nom="$c"; break; fi
+            if [[ "$*" == *\"$c\"* ]]; then name="$c"; break; fi
         done
-        if [[ "$*" == *'.cluster.server'* ]]; then echo "https://127.0.0.1:6443"; else echo "$nom"; fi
+        if [[ "$*" == *'.cluster.server'* ]]; then echo "https://127.0.0.1:6443"; else echo "$name"; fi
         ;;
     *"get --raw /readyz"*)
-        if [ "${FAUX_HOTE_REPOND:-1}" = 1 ]; then exit 0; else exit 1; fi
+        if [ "${FAKE_HOST_ANSWERS:-1}" = 1 ]; then exit 0; else exit 1; fi
         ;;
 esac
 exit 0
@@ -115,51 +115,51 @@ KUBE
     : >"$DEVZONE_KUBE_HOTE"
 }
 
-@test "cluster_choisir : hote repond -> contexte hote" {
+@test "cluster_choose : host answers -> contexte host" {
     setup_cluster_choisir
-    export FAUX_HOTE_REPOND=1
+    export FAKE_HOST_ANSWERS=1
     (
         export DEVZONE_INSTANCE=devzone
-        export ETAT="$BATS_TEST_TMPDIR/etat"
+        export ETAT="$BATS_TEST_TMPDIR/state"
         export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
         source "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
-        run cluster_choisir
+        run cluster_choose
         [ "$status" -eq 0 ]
         [ "$output" = "docker-desktop" ]
     )
 }
 
-@test "cluster_choisir : hote ne repond pas -> kind-devzone" {
+@test "cluster_choose : host ne repond pas -> kind-devzone" {
     setup_cluster_choisir
-    export FAUX_HOTE_REPOND=0
+    export FAKE_HOST_ANSWERS=0
     (
         export DEVZONE_INSTANCE=devzone
-        export ETAT="$BATS_TEST_TMPDIR/etat"
+        export ETAT="$BATS_TEST_TMPDIR/state"
         export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
         source "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
-        run cluster_choisir
+        run cluster_choose
         [ "$status" -eq 0 ]
         [ "$output" = "kind-devzone" ]
     )
 }
 
-@test "cluster_choisir : choix garde respecte meme si hote repond" {
+@test "cluster_choose : kept choice respected even if the host answers" {
     setup_cluster_choisir
-    export FAUX_HOTE_REPOND=1
-    printf 'cluster=docker-desktop-garde\n' >"$BATS_TEST_TMPDIR/etat"
+    export FAKE_HOST_ANSWERS=1
+    printf 'cluster=docker-desktop-kept\n' >"$BATS_TEST_TMPDIR/state"
     (
         export DEVZONE_INSTANCE=devzone
-        export ETAT="$BATS_TEST_TMPDIR/etat"
+        export ETAT="$BATS_TEST_TMPDIR/state"
         export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
         source "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
-        run cluster_choisir
+        run cluster_choose
         [ "$status" -eq 0 ]
-        [ "$output" = "docker-desktop-garde" ]
+        [ "$output" = "docker-desktop-kept" ]
     )
 }
 
-# --- desinstallation ---------------------------------------------------------
-@test "desinstallation : filtre par instance, pas de kind" {
+# --- uninstall ---------------------------------------------------------
+@test "uninstall : filter by instance, no kind" {
     export DEVZONE_VOLUMES="mon-devzone"
     export CONFIRMER=oui
     export DEVZONE_DANS_CONTENEUR=non
@@ -169,15 +169,15 @@ echo "docker $*" >>"$BATS_TEST_TMPDIR/docker.log"
 case "$*" in
     *"ps -aq --filter"*"io.x-k8s.kind.cluster=devzone-mon-devzone"*) echo "KIND_DEVZONE_ID" ;;
     *"ps -aq --filter"*"io.x-k8s.kind.cluster=gitlab-mon-devzone"*) echo "KIND_GITLAB_ID" ;;
-    *"ps -aq --filter"*"devzone.instance=mon-devzone"*) echo "ETIQ_ID" ;;
-    *"ps -aq --filter"*"devzone.instance=autre"*) echo "AUTRE_ID" ;;
+    *"ps -aq --filter"*"devzone.instance=mon-devzone"*) echo "LABEL_ID" ;;
+    *"ps -aq --filter"*"devzone.instance=other"*) echo "OTHER_ID" ;;
 esac
 exit 0
 DOCKER
     chmod +x "$BATS_TEST_TMPDIR/bin/docker"
     : >"$BATS_TEST_TMPDIR/docker.log"
-    # kind n'est en général pas installé sur le poste : la désinstallation ne
-    # doit jamais l'appeler (les clusters se retrouvent par étiquette Docker)
+    # kind is usually not installed on the workstation: the uninstall must never
+    # call it (the clusters are found by their Docker label)
     printf '#!/usr/bin/env bash\necho "kind $*" >>"$BATS_TEST_TMPDIR/kind.log"\n' >"$BATS_TEST_TMPDIR/bin/kind"
     chmod +x "$BATS_TEST_TMPDIR/bin/kind"
     : >"$BATS_TEST_TMPDIR/kind.log"
@@ -185,58 +185,58 @@ DOCKER
     [ "$status" -eq 0 ]
     grep -q "docker rm -f KIND_DEVZONE_ID" "$BATS_TEST_TMPDIR/docker.log"
     grep -q "docker rm -f KIND_GITLAB_ID" "$BATS_TEST_TMPDIR/docker.log"
-    grep -q "docker rm -f ETIQ_ID" "$BATS_TEST_TMPDIR/docker.log"
-    ! grep -q "docker rm -f AUTRE_ID" "$BATS_TEST_TMPDIR/docker.log" || false
+    grep -q "docker rm -f LABEL_ID" "$BATS_TEST_TMPDIR/docker.log"
+    ! grep -q "docker rm -f OTHER_ID" "$BATS_TEST_TMPDIR/docker.log" || false
     [ ! -s "$BATS_TEST_TMPDIR/kind.log" ]
 }
 
-# --- Enveloppe kind : clusters créés à la main joignables -------------------
-setup_enveloppe() {
+# --- kind wrapper: clusters created by hand reachable -------------------
+setup_wrapper() {
     setup_kubectl_view
     cat >"$BATS_TEST_TMPDIR/bin/kind-reel" <<'KIND'
 #!/usr/bin/env bash
 echo "kind-reel $*" >>"$BATS_TEST_TMPDIR/kind-reel.log"
-exit "${FAUX_KIND_CODE:-0}"
+exit "${FAKE_KIND_CODE:-0}"
 KIND
     chmod +x "$BATS_TEST_TMPDIR/bin/kind-reel"
     : >"$BATS_TEST_TMPDIR/kind-reel.log"
     export DEVZONE_KIND_REEL="$BATS_TEST_TMPDIR/bin/kind-reel"
-    ENVELOPPE="$BATS_TEST_DIRNAME/../../.devcontainer/kind-wrapper.sh"
+    WRAPPER="$BATS_TEST_DIRNAME/../../.devcontainer/kind-wrapper.sh"
 }
 
-@test "enveloppe kind : create cluster -> kubeconfig rendu joignable" {
-    setup_enveloppe
+@test "kind wrapper : create cluster -> kubeconfig made reachable" {
+    setup_wrapper
     export KUBECONFIG="$BATS_TEST_TMPDIR/k1:$BATS_TEST_TMPDIR/k2"
-    run bash "$ENVELOPPE" create cluster --name essai
+    run bash "$WRAPPER" create cluster --name trial
     [ "$status" -eq 0 ]
-    grep -q "kind-reel create cluster --name essai" "$BATS_TEST_TMPDIR/kind-reel.log"
+    grep -q "kind-reel create cluster --name trial" "$BATS_TEST_TMPDIR/kind-reel.log"
     grep -q -- "--server=https://host.docker.internal:6443" "$BATS_TEST_TMPDIR/kubectl.log"
 }
 
-@test "enveloppe kind : --kubeconfig respecté" {
-    setup_enveloppe
-    run bash "$ENVELOPPE" export kubeconfig --name essai --kubeconfig "$BATS_TEST_TMPDIR/autre"
+@test "kind wrapper : --kubeconfig respected" {
+    setup_wrapper
+    run bash "$WRAPPER" export kubeconfig --name trial --kubeconfig "$BATS_TEST_TMPDIR/other"
     [ "$status" -eq 0 ]
     grep -q "config set-cluster" "$BATS_TEST_TMPDIR/kubectl.log"
 }
 
-@test "enveloppe kind : autre sous-commande -> rien n'est réécrit" {
-    setup_enveloppe
-    run bash "$ENVELOPPE" get clusters
+@test "kind wrapper : other subcommand -> nothing rewritten" {
+    setup_wrapper
+    run bash "$WRAPPER" get clusters
     [ "$status" -eq 0 ]
     ! grep -q "set-cluster" "$BATS_TEST_TMPDIR/kubectl.log" || false
 }
 
-@test "enveloppe kind : échec de kind transmis, rien n'est réécrit" {
-    setup_enveloppe
-    export FAUX_KIND_CODE=3
-    run bash "$ENVELOPPE" create cluster --name essai
+@test "kind wrapper : kind failure passed on, nothing rewritten" {
+    setup_wrapper
+    export FAKE_KIND_CODE=3
+    run bash "$WRAPPER" create cluster --name trial
     [ "$status" -eq 3 ]
     ! grep -q "set-cluster" "$BATS_TEST_TMPDIR/kubectl.log" || false
 }
 
-@test "desinstallation dans le conteneur : aucune action Docker sur le poste" {
-    # docker y parle au Docker de l'hôte : les volumes vus seraient ceux du poste
+@test "uninstall in the container: no Docker action on the workstation" {
+    # docker talks to the host Docker there: the volumes seen would be the workstation's
     export CONFIRMER=oui
     export DEVZONE_DANS_CONTENEUR=oui
     cat >"$BATS_TEST_TMPDIR/bin/docker" <<'DOCKER'
@@ -257,7 +257,7 @@ DOCKER
 }
 
 
-@test "cluster_preparer : kind create échoue une fois -> supprimé puis recréé" {
+@test "cluster_prepare : kind create fails once -> deleted then recreated" {
     setup_kubectl_view
     cat >"$BATS_TEST_TMPDIR/bin/kind" <<'KIND'
 #!/usr/bin/env bash
@@ -265,27 +265,27 @@ echo "kind $*" >>"$BATS_TEST_TMPDIR/kind.log"
 case "$*" in
     "get clusters") exit 0 ;;
     create*)
-        # premier essai en échec, le suivant réussit
-        if [ -f "$BATS_TEST_TMPDIR/deja" ]; then exit 0; fi
-        : >"$BATS_TEST_TMPDIR/deja"; exit 1 ;;
+        # first attempt fails, the next one succeeds
+        if [ -f "$BATS_TEST_TMPDIR/done_marker" ]; then exit 0; fi
+        : >"$BATS_TEST_TMPDIR/done_marker"; exit 1 ;;
 esac
 exit 0
 KIND
     chmod +x "$BATS_TEST_TMPDIR/bin/kind"
     : >"$BATS_TEST_TMPDIR/kind.log"
     source "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
-    run cluster_preparer kind-devzone
+    run cluster_prepare kind-devzone
     [ "$status" -eq 0 ]
     [ "$(grep -c '^kind create cluster' "$BATS_TEST_TMPDIR/kind.log")" -eq 2 ]
     grep -q "^kind delete cluster --name devzone" "$BATS_TEST_TMPDIR/kind.log"
 }
 
-@test "kube_joignable_depuis_conteneur : nœud kind trouvé -> réseau rejoint, adresse du nœud" {
+@test "kube_reachable_from_container : kind node found -> network joined, node address" {
     setup_kubectl_view
-    export FAUX_NOEUD=essai-control-plane
+    export FAKE_NODE=trial-control-plane
     source "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
-    kube_joignable_depuis_conteneur "$BATS_TEST_TMPDIR/kubeconfig"
-    grep -q -- "--server=https://essai-control-plane:6443" "$BATS_TEST_TMPDIR/kubectl.log"
+    kube_reachable_from_container "$BATS_TEST_TMPDIR/kubeconfig"
+    grep -q -- "--server=https://trial-control-plane:6443" "$BATS_TEST_TMPDIR/kubectl.log"
     grep -q "docker network connect kind" "$BATS_TEST_TMPDIR/docker.log"
     ! grep -q -- "--tls-server-name" "$BATS_TEST_TMPDIR/kubectl.log" || false
 }

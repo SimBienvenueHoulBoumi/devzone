@@ -141,7 +141,7 @@ attendre_nohup() {
 @test "activer --context inconnu ou injoignable : refus code 2, rien installé, module inactif" {
     run bash "$DEVZONE" enable postgres --context inconnu </dev/null
     [ "$status" -eq 2 ]
-    [[ "$output" == *"cluster inconnu ou injoignable : inconnu"* ]] || false
+    [[ "$output" == *"unknown or unreachable cluster: inconnu"* ]] || false
     grep -qx 'postgres=off' "$DEVZONE_ETAT"
     ! grep -q '^cluster=' "$DEVZONE_ETAT" || false
     [ ! -f "$BATS_TEST_TMPDIR/apply.log" ]
