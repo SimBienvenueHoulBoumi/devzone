@@ -66,7 +66,7 @@ second_run() { sed -n 2p "$FAKE_OP_LOG"; }
     agent_lance
     [ "$status" -eq 0 ]
     [ "$(premier_run)" = big-pickle ]
-    grep -qxF "=== --modele : aucun" "$(agent_journal)" || false
+    grep -qxF "=== --modele : none" "$(agent_journal)" || false
     [ "$(cat "$DEVZONE_AGENT_ETAT/rang")" = 1 ]
     [ "$(bash "$DEVZONE" agent etat --json | jq -r '.sessions[0].demande')" = null ]
 }
@@ -96,5 +96,5 @@ second_run() { sed -n 2p "$FAKE_OP_LOG"; }
     run bash "$DEVZONE" agent etat
     [ "$status" -eq 0 ]
     [[ "$output" == *"opencode/hy4-flash-free"* ]] || false
-    [[ "$output" == *"(demand"*"hy4-flash-free)"* ]] || false
+    [[ "$output" == *"(requested: hy4-flash-free)"* ]] || false
 }

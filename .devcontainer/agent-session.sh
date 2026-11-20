@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# Session du superviseur d'agent : configuration opencode, rang partagé, journal,
-# état (#328). Bibliothèque sourcée par agent.sh : aucune commande n'est lancée ici.
+# Session of the agent supervisor: opencode configuration, shared rank, journal,
+# state (#328). Library sourced by agent.sh: no command is launched here.
 
-# Chemin du journal d'un dossier dans workspace/.agents/ : hors dépôt, ignoré par git.
-journal_de() {
+# Journal path of a folder in workspace/.agents/: outside the repo, ignored by git.
+journal_of() {
     echo "$RACINE/workspace/.agents/$(basename "$1").log"
 }
 
-# Époque de dernière écriture, GNU (stat -c) ou BSD/macOS (stat -f).
+# Last write time (epoch), GNU (stat -c) or BSD/macOS (stat -f).
 mtime() {
     if stat -c %Y "$1" >/dev/null 2>&1; then
         stat -c %Y "$1"
@@ -16,8 +16,8 @@ mtime() {
     fi
 }
 
-# Date UTC lisible d'une époque, GNU puis BSD date : affichée par devzone agent etat.
-heure() {
+# Readable UTC date of an epoch, GNU then BSD date: shown by devzone agent etat.
+utc_time() {
     if date -u -d "@$1" '+%Y-%m-%d %H:%M:%S' >/dev/null 2>&1; then
         date -u -d "@$1" '+%Y-%m-%d %H:%M:%S'
     else
@@ -25,127 +25,124 @@ heure() {
     fi
 }
 
-# Trace de verrou dans le journal de l'agent ($AGENT_JOURNAL, défini par
-# agent.sh) : une ligne à la prise et une au rendu, avec l'horloge et le pid,
-# pour le diagnostic des lancements simultanés du rang en CI (#421). Sans
-# journal, rien n'est écrit. Une mention optionnelle (second argument) précise
-# le chemin, l'âge ou le pid lu.
-verrou_tracer() {
+# Lock trace in the agent journal ($AGENT_JOURNAL, set by agent.sh): one line when
+# taken and one when released, with the clock and the pid, to diagnose simultaneous
+# launches of the rank in CI (#421). Without a journal, nothing is written. An
+# optional mention (second argument) gives the path, the age or the pid read.
+lock_trace() {
     local d
     [ -n "${AGENT_JOURNAL:-}" ] || return 0
     d="$(date +%s.%N 2>/dev/null)" || d=""
     case "$d" in "" | *N*) d="$(date +%s)" ;; esac
-    echo "=== verrou $1 $d pid $$${2:+ $2}" >>"$AGENT_JOURNAL"
+    echo "=== lock $1 $d pid $$${2:+ $2}" >>"$AGENT_JOURNAL"
 }
 
-# Rang partagé : deux lancements simultanés ne doivent pas partir sur le même
-# modèle. mkdir est atomique et présent partout (flock manque sur macOS) ; seul
-# l'âge du verrou décide (#377), le pid écrit n'étant qu'un détail de
-# diagnostic : un pid lu dans un autre conteneur du volume n'existe pas ici.
-# Quand flock existe, la section rang est en outre prise sous son verrou sur
-# rang.lock (#421) : si deux mkdir réussissaient, flock sérialise quand même
-# la lecture et l'écriture du rang. Chaque branche est tracée (échec mkdir,
-# purge, prise) pour établir en CI lequel des deux lancements a réussi mkdir.
-verrou_prendre() {
-    local fin age vpid
-    fin=$(( $(date +%s) + ${DEVZONE_AGENT_VERROU_MAX:-10} ))
+# Shared rank lock: two simultaneous launches must not start on the same model.
+# mkdir is atomic and present everywhere (flock is missing on macOS); only the age
+# of the lock decides (#377), the pid written being a diagnostic detail only: a pid
+# read from another container of the volume does not exist here.
+# When flock exists, the rank section is also taken under its lock on rang.lock
+# (#421): if two mkdir succeeded, flock still serializes the read and the write of
+# the rank. Each branch is traced (mkdir failure, purge, taking) to establish in CI
+# which of the two launches succeeded in mkdir.
+lock_take() {
+    local end age lock_pid
+    end=$(( $(date +%s) + ${DEVZONE_AGENT_VERROU_MAX:-10} ))
     while ! mkdir "$AGENT_ETAT/verrou" 2>/dev/null; do
-        # Un verrou n'est orphelin que par son âge : le rang n'est tenu que
-        # quelques millisecondes, 30 s ne peut être qu'un arrêt à reprendre,
-        # sinon on attend puis on renonce (code 1).
+        # A lock is orphaned only by its age: the rank is held for a few milliseconds,
+        # 30 s can only be a stop to take over; otherwise wait, then give up (code 1).
         age=""
         if [ -d "$AGENT_ETAT/verrou" ]; then
             age="$(mtime "$AGENT_ETAT/verrou" 2>/dev/null)" || age=""
         fi
-        vpid="$(cat "$AGENT_ETAT/verrou/pid" 2>/dev/null)" || vpid=""
-        verrou_tracer "échec mkdir" "age=${age:-inconnue} pid-verrou=${vpid:-aucun}"
+        lock_pid="$(cat "$AGENT_ETAT/verrou/pid" 2>/dev/null)" || lock_pid=""
+        lock_trace "mkdir failed" "age=${age:-unknown} lock-pid=${lock_pid:-none}"
         if [ -n "$age" ] && [ "$(( $(date +%s) - age ))" -gt 30 ]; then
             rm -f "$AGENT_ETAT/verrou/pid"
             if rmdir "$AGENT_ETAT/verrou" 2>/dev/null; then
-                verrou_tracer "purgé" "age=$age"
+                lock_trace "purged" "age=$age"
                 continue
             fi
         fi
-        if [ "$(date +%s)" -ge "$fin" ]; then return 1; fi
+        if [ "$(date +%s)" -ge "$end" ]; then return 1; fi
         sleep 1
     done
-    # pid avant flock : l'autre agent ne retire jamais le dossier pendant notre
-    # attente sur rang.lock, sinon notre écriture de pid tomberait sur ENOENT.
+    # pid before flock: the other agent never removes the folder while we wait on
+    # rang.lock, otherwise our pid write would fail with ENOENT.
     echo "$$" >"$AGENT_ETAT/verrou/pid"
     if command -v flock >/dev/null 2>&1; then
-        # exec dans un if conditionne l'échec au lieu de tuer le shell (bash
-        # 3.2 comme GNU) ; sans flock, mkdir reste le seul garde-fou (macOS).
+        # exec in an if makes a failure a condition instead of killing the shell
+        # (bash 3.2 and GNU alike); without flock, mkdir remains the only guard (macOS).
         if { exec 9>"$AGENT_ETAT/rang.lock"; } && flock -w "${DEVZONE_AGENT_VERROU_MAX:-10}" 9; then
-            AGENT_VERROU_FLOCK=1
+            AGENT_LOCK_FLOCK=1
         else
-            verrou_lacher
+            lock_release
             return 1
         fi
     fi
-    verrou_tracer pris "chemin=$AGENT_ETAT/verrou"
+    lock_trace taken "path=$AGENT_ETAT/verrou"
 }
 
-# Libère le rang partagé pris par verrou_prendre : retire le pid, puis le dossier,
-# mais seulement si ce verrou appartient à l'agent appelant (pid du fichier == $$).
-# Un verrou détenu par un autre agent n'est jamais supprimé ici. flock (#421)
-# est libéré dans tous les cas, même si le pid lu ne correspond pas : sinon le
-# prochain appelant resterait bloqué sur rang.lock.
-verrou_lacher() {
+# Releases the shared rank taken by lock_take: removes the pid, then the folder, only
+# when this lock belongs to the calling agent (pid in the file == $$). A lock held by
+# another agent is never removed here. flock (#421) is released in every case, even
+# when the pid read does not match: otherwise the next caller would stay blocked on
+# rang.lock.
+lock_release() {
     local pid
     pid="$(cat "$AGENT_ETAT/verrou/pid" 2>/dev/null)" || pid=""
     if [ "$pid" = "$$" ]; then
         rm -f "$AGENT_ETAT/verrou/pid"
         rmdir "$AGENT_ETAT/verrou" 2>/dev/null || true
-        verrou_tracer rendu
+        lock_trace released
     fi
-    if [ "${AGENT_VERROU_FLOCK:-0}" = 1 ]; then
+    if [ "${AGENT_LOCK_FLOCK:-0}" = 1 ]; then
         flock -u 9 2>/dev/null || true
         exec 9>&-
-        AGENT_VERROU_FLOCK=0
+        AGENT_LOCK_FLOCK=0
     fi
 }
 
 # Takes the shared rank and returns the start of the rotation (#421). The rank
-# advances only when no requested model is available (#420). The « === rang »
-# line is written to the journal in every case. Called in a command
-# substitution: the lock is taken and released in that same process.
-rang_prendre() {
-    local etat="$1" journal="$2" debut
-    verrou_prendre || return 1
-    debut=$(( $(cat "$etat/rang" 2>/dev/null || echo 0) % ${#FREE_MODELS[@]} ))
-    if [ "$PAUSE_RANG" -gt 0 ]; then sleep "$PAUSE_RANG"; fi
-    if modele_rang_avance; then echo $(( debut + 1 )) >"$etat/rang"; fi
-    verrou_lacher
-    echo "=== rang $(( debut + 1 ))/${#FREE_MODELS[@]}" >>"$journal"
-    echo "$debut"
+# advances only when no requested model is available (#420). The "=== rank" line is
+# written to the journal in every case. Called in a command substitution: the lock is
+# taken and released in that same process.
+rank_take() {
+    local state="$1" journal="$2" start
+    lock_take || return 1
+    start=$(( $(cat "$state/rang" 2>/dev/null || echo 0) % ${#FREE_MODELS[@]} ))
+    if [ "$PAUSE_RANK" -gt 0 ]; then sleep "$PAUSE_RANK"; fi
+    if modele_rang_avance; then echo $(( start + 1 )) >"$state/rang"; fi
+    lock_release
+    echo "=== rank $(( start + 1 ))/${#FREE_MODELS[@]}" >>"$journal"
+    echo "$start"
 }
 
-# Passe permission.edit en objet et ajoute en dernier un deny par fichier de droits
-# (#361) : la dernière règle qui correspond l'emporte, l'appelant ne peut pas le retirer.
-droits_edit_deny() {
-    local motifs f
-    motifs="[]"
+# Turns permission.edit into an object and adds, last, one deny per rights file (#361):
+# the last matching rule wins, so the caller cannot remove it.
+rights_edit_deny() {
+    local patterns f
+    patterns="[]"
     for f in "${DROITS_AGENT[@]}"; do
-        motifs="$(jq -c --arg f "$f" '. + [$f, "**/" + $f]' <<<"$motifs")"
+        patterns="$(jq -c --arg f "$f" '. + [$f, "**/" + $f]' <<<"$patterns")"
     done
-    jq -ce --argjson m "$motifs" '
+    jq -ce --argjson patterns "$patterns" '
         (.permission.edit // "allow") as $e |
         (if ($e | type) == "object" then $e else {"*": $e} end) as $o |
-        .permission.edit = (reduce $m[] as $k ($o; del(.[$k])) + ($m | map({(.): "deny"}) | add))
+        .permission.edit = (reduce $patterns[] as $k ($o; del(.[$k])) + ($patterns | map({(.): "deny"}) | add))
     ' <<<"$1"
 }
 
-# Configuration sûre : agent.json par défaut, complétée par
-# OPENCODE_CONFIG_CONTENT s'il est défini. opencode applique la dernière règle
-# qui correspond : les deny de devzone sont donc retirés de la fusion puis
-# ré-ajoutés à la fin (l'ordre des clés d'un objet jq est l'ordre d'insertion),
-# si bien que l'appelant peut ajouter des permissions, jamais retirer un interdit
-# de devzone. ~/bash32 est toujours protégé : le bash 3.2 du conteneur a déjà
-# été remplacé par un lien (#210).
+# Safe configuration: agent.json by default, completed by OPENCODE_CONFIG_CONTENT when
+# it is set. opencode applies the last matching rule: devzone's deny entries are taken
+# out of the merge, then added back at the end (the key order of a jq object is the
+# insertion order), so the caller can add permissions but never remove a devzone deny.
+# ~/bash32 is always protected: the container's bash 3.2 was already replaced by a
+# link (#210). The name configurer is kept: agent-droits-gh.bats calls it.
 configurer() {
     local def config
     def="$ICI/opencode/agent.json"
-    [ -r "$def" ] || refuse "configuration par défaut absente : $def"
+    [ -r "$def" ] || refuse "default configuration missing: $def"
     if [ -n "${OPENCODE_CONFIG_CONTENT:-}" ]; then
         config="$(jq -ce -s '
             .[0] as $def | .[1] as $env |
@@ -156,9 +153,9 @@ configurer() {
              | .permission.bash = (($bashdef + $bashenv) | delpaths($deny | map([.])))
              | reduce $deny[] as $k (. ; .permission.bash[$k] = "deny"))
         ' "$def" <(printf '%s' "$OPENCODE_CONFIG_CONTENT"))" ||
-            refuse "configuration opencode illisible : rien lancé"
+            refuse "opencode configuration unreadable: nothing launched"
     else
-        config="$(jq -ce . "$def")" || refuse "configuration opencode illisible : rien lancé"
+        config="$(jq -ce . "$def")" || refuse "opencode configuration unreadable: nothing launched"
     fi
     config="$(jq -ce '.permission.bash = ((.permission.bash // {}) + {
         "git commit*": "allow",
@@ -168,18 +165,18 @@ configurer() {
         "rm *bash32*": "deny",
         "chmod *bash32*": "deny",
         "install *bash32*": "deny"
-    })' <<<"$config")" || refuse "configuration opencode illisible : rien lancé"
-    config="$(droits_edit_deny "$config")" || refuse "configuration opencode illisible : rien lancé"
-    grep -q '"git push\*":"deny"' <<<"$config" || refuse "git push non interdit : rien lancé"
+    })' <<<"$config")" || refuse "opencode configuration unreadable: nothing launched"
+    config="$(rights_edit_deny "$config")" || refuse "opencode configuration unreadable: nothing launched"
+    grep -q '"git push\*":"deny"' <<<"$config" || refuse "git push not denied: nothing launched"
     export OPENCODE_CONFIG_CONTENT="$config"
 }
 
-# Modèles gratuits de la version installée, préfixe « opencode/ » retiré :
-# « opencode models opencode » peut rendre « opencode/big-pickle ».
-liste_modeles() {
+# Free models of the installed version, "opencode/" prefix removed:
+# "opencode models opencode" may return "opencode/big-pickle".
+list_models() {
     local l
     l="$(opencode models opencode 2>/dev/null | sed 's#^opencode/##' |
-        grep -E '(-free$|^big-pickle$)' | awk 'NF && !vu[$0]++' || true)"
+        grep -E '(-free$|^big-pickle$)' | awk 'NF && !seen[$0]++' || true)"
     if [ -n "$l" ]; then
         printf '%s\n' "$l"
     else
@@ -187,59 +184,59 @@ liste_modeles() {
     fi
 }
 
-# Modèle et début d'une session (#308) : lus uniquement sur la dernière ligne
-# « === modèle opencode/? début » du superviseur ; le texte écrit par le
-# modèle dans le journal (un « opencode/agent.json » possible) n'est pas lu.
-session_modele_debut() {
-    local ligne
-    ligne="$(grep '^=== modèle opencode/' "$1" 2>/dev/null | tail -1 || true)"
-    MODELE_SESSION="$(sed -nE 's/^=== modèle opencode\/([^ ]+) début .*/\1/p' <<<"$ligne")"
-    DEBUT_SESSION="$(sed -nE 's/.* début ([^ ]+).*/\1/p' <<<"$ligne")"
+# Model and start of a session (#308): read only on the last "=== model opencode/"
+# line of the supervisor; text written by the model in the journal (a possible
+# "opencode/agent.json") is not read.
+session_model_start() {
+    local line
+    line="$(grep '^=== model opencode/' "$1" 2>/dev/null | tail -1 || true)"
+    MODEL_SESSION="$(sed -nE 's/^=== model opencode\/([^ ]+) start .*/\1/p' <<<"$line")"
+    START_SESSION="$(sed -nE 's/.* start ([^ ]+).*/\1/p' <<<"$line")"
 }
 
 # Models asked with devzone agent --modele (#420): the last header line
-# « === --modele : » of the journal, empty when nothing was asked.
-session_demande() {
-    local ligne
-    ligne="$(grep '^=== --modele : ' "$1" 2>/dev/null | tail -1 || true)"
-    DEMANDE_SESSION="${ligne#=== --modele : }"
-    if [ "$DEMANDE_SESSION" = aucun ]; then DEMANDE_SESSION=""; fi
+# "=== --modele : " of the journal, empty when nothing was asked.
+session_request() {
+    local line
+    line="$(grep '^=== --modele : ' "$1" 2>/dev/null | tail -1 || true)"
+    REQUEST_SESSION="${line#=== --modele : }"
+    if [ "$REQUEST_SESSION" = none ]; then REQUEST_SESSION=""; fi
 }
 
-# Une session est en cours (#308) si un processus agent.sh vivant a pour
-# premier argument (le dossier, absolu depuis #287) un chemin dont le nom est
-# exactement le journal sans « .log » ; un simple dossier contenant ce nom ne
-# suffit pas, ni un chemin qui ne serait pas le dossier d'un agent.
-session_en_cours() {
-    local ligne dossier
-    while IFS= read -r ligne; do
-        case "$ligne" in
-            *agent.sh\ *) dossier="${ligne#*agent.sh }" ;;
+# A session is running (#308) when a live agent.sh process has as first argument (the
+# folder, absolute since #287) a path whose name is exactly the journal without ".log";
+# a plain folder containing that name is not enough, nor a path that is not an agent
+# folder.
+session_running() {
+    local line folder
+    while IFS= read -r line; do
+        case "$line" in
+            *agent.sh\ *) folder="${line#*agent.sh }" ;;
             *) continue ;;
         esac
-        dossier="${dossier%% *}"
-        [ -n "$dossier" ] || continue
-        if [ "$(basename "$dossier")" = "$1" ]; then return 0; fi
+        folder="${folder%% *}"
+        [ -n "$folder" ] || continue
+        if [ "$(basename "$folder")" = "$1" ]; then return 0; fi
     done < <(ps -eo args= 2>/dev/null || true)
     return 1
 }
 
-# Sessions connues (journal, dernier modèle, début, dernier écrit) et modèles
-# écartés par le superviseur, avec l'heure de fin d'écart.
-agent_etat() {
-    local f m debut dernier vu=0
-    echo "devzone agent : état"
+# Known sessions (journal, last model, start, last written) and models excluded
+# by the supervisor, with the end time of each exclusion.
+agent_state() {
+    local f m start last seen=0
+    echo "devzone agent: state"
     for f in "$RACINE"/workspace/.agents/*.log; do
         [ -e "$f" ] || continue
-        vu=1
-        session_modele_debut "$f"
-        m="${MODELE_SESSION:+opencode/$MODELE_SESSION}"
-        debut="$DEBUT_SESSION"
-        dernier="$(heure "$(mtime "$f")")"
-        session_demande "$f"
-        echo "  session $(basename "$f") : modèle ${m:-inconnu}${DEMANDE_SESSION:+ (demandé : $DEMANDE_SESSION)}, depuis ${debut:-inconnu}, dernier écrit $dernier"
+        seen=1
+        session_model_start "$f"
+        m="${MODEL_SESSION:+opencode/$MODEL_SESSION}"
+        start="$START_SESSION"
+        last="$(utc_time "$(mtime "$f")")"
+        session_request "$f"
+        echo "  session $(basename "$f"): model ${m:-unknown}${REQUEST_SESSION:+ (requested: $REQUEST_SESSION)}, since ${start:-unknown}, last written $last"
     done
-    [ "$vu" = 1 ] || echo "  aucune session"
-    agent_ecarts
+    [ "$seen" = 1 ] || echo "  no session"
+    agent_exclusions
     droits_alertes
 }

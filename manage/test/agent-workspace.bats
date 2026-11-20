@@ -1,18 +1,18 @@
 #!/usr/bin/env bats
-# devzone agent dans le workspace Kubernetes (#431) : projet et journal du pod,
-# sinon lancement local ; --local force le conteneur. Faux kubectl et opencode
-# sous $BATS_TEST_TMPDIR/bin : aucun cluster n'est touche.
+# devzone agent in the Kubernetes workspace (#431): project and journal of the pod,
+# otherwise local launch; --local forces the container. Fake kubectl and opencode
+# under $BATS_TEST_TMPDIR/bin: no cluster is touched.
 
 setup() {
     load commun
     agent_isole
     unset DEVZONE_WORKSPACE
-    faux_kubectl
+    fake_kubectl
 }
 
-# Faux kubectl : journalise ses arguments ; get pod rend FAKE_KC_PHASE, test -d
-# et devzone agent rendent leur code configurable, cat rend un journal factice.
-faux_kubectl() {
+# Fake kubectl: logs its arguments; get pod returns FAKE_KC_PHASE, test -d and
+# devzone agent return a configurable code, cat returns a fake journal.
+fake_kubectl() {
     export FAKE_KC_LOG="$BATS_TEST_TMPDIR/kubectl.log"
     export FAKE_KC_PHASE="Running" FAKE_KC_GET_CODE=0 FAKE_KC_TEST_CODE=0
     export FAKE_KC_AGENT_CODE=0 FAKE_KC_CAT_CODE=0
@@ -29,7 +29,7 @@ case "$*" in
     *"exec devzone-workspace-0"*"test -d"*) exit "${FAKE_KC_TEST_CODE:-0}" ;;
     *"exec devzone-workspace-0"*"devzone agent"*) exit "${FAKE_KC_AGENT_CODE:-0}" ;;
     *"exec devzone-workspace-0"*"cat "*".agents/"*)
-        printf '=== session du pod\n'
+        printf '=== pod session\n'
         exit "${FAKE_KC_CAT_CODE:-0}"
         ;;
     *"cp "*) exit 0 ;;
@@ -39,27 +39,27 @@ KUBECTL
     chmod +x "$BATS_TEST_TMPDIR/bin/kubectl"
 }
 
-@test "agent-workspace : pod Running et projet present -> consigne copiee puis devzone agent dans le pod" {
+@test "agent-workspace : pod Running and project present -> brief copied, then devzone agent in the pod" {
     agent_consigne
     agent_lance
     [ "$status" -eq 0 ]
     grep -q -- "cp .*consigne.txt devzone-workspace-0:/tmp/devzone-agent-projet.md" "$FAKE_KC_LOG" || false
     grep -q -- "exec devzone-workspace-0 -c workspace -- env DEVZONE_RACINE=/home/vscode/.local/share/devzone" "$FAKE_KC_LOG" || false
     grep -q -- "/workspaces/projets/projet /tmp/devzone-agent-projet.md" "$FAKE_KC_LOG" || false
-    [[ "$output" == *"workspace Kubernetes"* ]] || false
+    [[ "$output" == *"Kubernetes workspace"* ]] || false
     [ ! -s "$FAKE_OP_LOG" ] || false
-    grep -q "session du pod" "$(agent_journal)" || false
+    grep -q "pod session" "$(agent_journal)" || false
 }
 
-@test "agent-workspace : code de retour du lancement dans le pod relaye" {
+@test "agent-workspace : return code of the launch in the pod is relayed" {
     agent_consigne
     export FAKE_KC_AGENT_CODE=7
     agent_lance
     [ "$status" -eq 7 ]
-    grep -q "session du pod" "$(agent_journal)" || false
+    grep -q "pod session" "$(agent_journal)" || false
 }
 
-@test "agent-workspace : projet absent du pod -> code 2, message copy-to, rien lance" {
+@test "agent-workspace : project absent from the pod -> code 2, copy-to message, nothing launched" {
     agent_consigne
     export FAKE_KC_TEST_CODE=1
     agent_lance
@@ -69,16 +69,16 @@ KUBECTL
     ! grep -q -- "devzone agent" "$FAKE_KC_LOG" || false
 }
 
-@test "agent-workspace : dossier absent -> code 2, message dossier introuvable" {
+@test "agent-workspace : folder absent -> code 2, folder not found message" {
     agent_consigne
     run bash "$DEVZONE" agent "$DEVZONE_RACINE/workspace/absent" "$DEVZONE_RACINE/workspace/consigne.txt"
     [ "$status" -eq 2 ]
-    [[ "$output" == *"dossier introuvable"* ]] || false
+    [[ "$output" == *"folder not found"* ]] || false
     ! grep -q -- " cp " "$FAKE_KC_LOG" || false
     ! grep -q -- "devzone agent" "$FAKE_KC_LOG" || false
 }
 
-@test "agent-workspace : pod absent -> lancement local" {
+@test "agent-workspace : pod absent -> local launch" {
     agent_consigne
     export FAKE_KC_PHASE=Pending
     agent_lance
@@ -87,7 +87,7 @@ KUBECTL
     ! grep -q -- " cp " "$FAKE_KC_LOG" || false
 }
 
-@test "agent-workspace : --local -> lancement local meme si le pod tourne" {
+@test "agent-workspace : --local -> local launch even if the pod runs" {
     agent_consigne
     run bash "$DEVZONE" agent --local "$DEVZONE_RACINE/workspace/projet" "$DEVZONE_RACINE/workspace/consigne.txt"
     [ "$status" -eq 0 ]
@@ -95,7 +95,7 @@ KUBECTL
     ! grep -q -- "get pod devzone-workspace-0" "$FAKE_KC_LOG" || false
 }
 
-@test "agent-workspace : dans le pod -> jamais de kubectl get pod, opencode sans KUBECONFIG" {
+@test "agent-workspace : in the pod -> never kubectl get pod, opencode without KUBECONFIG" {
     agent_consigne
     export DEVZONE_WORKSPACE=kubernetes
     agent_lance
@@ -103,10 +103,10 @@ KUBECTL
     [ -s "$FAKE_OP_LOG" ] || false
     [ ! -s "$FAKE_KC_LOG" ] || false
     [ -z "$(cat "$FAKE_OP_KUBECONFIG_LOG")" ] || false
-    [[ "$output" != *"workspace Kubernetes"* ]] || false
+    [[ "$output" != *"Kubernetes workspace"* ]] || false
 }
 
-@test "agent-workspace : chemin du pod absent du poste -> lancé dans le pod, sans copie du projet" {
+@test "agent-workspace : pod path absent from the workstation -> launched in the pod, without project copy" {
     agent_consigne
     run bash "$DEVZONE" agent /workspaces/projets/devzone-wt/dz-4242 "$DEVZONE_RACINE/workspace/consigne.txt"
     [ "$status" -eq 0 ]
@@ -116,11 +116,11 @@ KUBECTL
     [ ! -s "$FAKE_OP_LOG" ] || false
 }
 
-@test "agent-workspace : chemin du pod introuvable dans le pod -> code 2, rien lancé" {
+@test "agent-workspace : pod path not found in the pod -> code 2, nothing launched" {
     agent_consigne
     export FAKE_KC_TEST_CODE=1
     run bash "$DEVZONE" agent /workspaces/projets/devzone-wt/dz-999 "$DEVZONE_RACINE/workspace/consigne.txt"
     [ "$status" -eq 2 ]
-    [[ "$output" == *"introuvable dans le pod"* ]] || false
+    [[ "$output" == *"not found in the pod"* ]] || false
     ! grep -q -- "devzone agent" "$FAKE_KC_LOG" || false
 }
