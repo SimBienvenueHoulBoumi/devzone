@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Module gitlab : GitLab de test dans le cluster des services (#396).
-# Pour l'activer : devzone enable gitlab
-# Pour le désactiver : devzone disable gitlab
-# set -euo pipefail pour ne rien lancer en erreur silencieuse.
+# GitLab module: test GitLab in the services cluster (#396).
+# To enable it: devzone enable gitlab
+# To disable it: devzone disable gitlab
+# set -euo pipefail so that nothing fails silently.
 set -euo pipefail
 
-# Racine du dépôt devzone (deux niveaux au-dessus du module) ; DEVZONE_RACINE pour les tests
+# Root of the devzone repository (two levels above the module); DEVZONE_RACINE for the tests
 ICI="$(cd "$(dirname "$0")" && pwd)"
 RACINE="${DEVZONE_RACINE:-$(dirname "$(dirname "$ICI")")}"
 # shellcheck source=SCRIPTDIR/../cluster.sh
@@ -13,43 +13,43 @@ RACINE="${DEVZONE_RACINE:-$(dirname "$(dirname "$ICI")")}"
 # shellcheck source=SCRIPTDIR/../password.sh
 # shellcheck disable=SC1091
 . "$ICI/../password.sh"
-# Isolation réseau : namespace_isolate, posée avec le namespace devzone-gitlab
+# Network isolation: namespace_isolate, set with the devzone-gitlab namespace
 # shellcheck source=SCRIPTDIR/../isolation.sh
 # shellcheck disable=SC1091
 . "$ICI/../isolation.sh"
 
-# ---- Variables de délai (secondes) ----
-# GITLAB_ATTENTE : attente globale d'installation (défaut 1200)
+# ---- Delay variables (seconds) ----
+# GITLAB_ATTENTE: global wait for the installation (default 1200)
 GITLAB_ATTENTE="${GITLAB_ATTENTE:-1200}"
 
-# ---- Chemins secrets ----
-# Secrets stockés dans $RACINE/workspace/.gitlab/ (chmod 600), jamais affichés.
+# ---- Secret paths ----
+# Secrets stored in $RACINE/workspace/.gitlab/ (chmod 600), never shown.
 GITLAB_SECRETS_DIR="$RACINE/workspace/.gitlab"
 
-# Vue regroupée des identifiants : un échec n'empêche jamais l'opération
+# Grouped view of the credentials: a failure never prevents the operation
 regenerer_identifiants() {
     password_regenerate ||
-        echo "devzone : gitlab : identifiants regroupés non mis à jour (devzone passwords)" >&2
+        echo "devzone : gitlab : grouped credentials not updated (devzone passwords)" >&2
 }
 
-# ---- /etc/hosts du conteneur ----
-# DEVZONE_HOSTS pour les tests (jamais le /etc/hosts réel)
+# ---- /etc/hosts of the container ----
+# DEVZONE_HOSTS for the tests (never the real /etc/hosts)
 HOSTS="${DEVZONE_HOSTS:-/etc/hosts}"
-GITLAB_HOTE_MARQUE="# devzone:gitlab"
+GITLAB_HOST_MARK="# devzone:gitlab"
 
-# Secret Rails GitLab (#347) : conservation dans workspace/.gitlab, réapplication
-# avant helm upgrade --install et mot de passe régénérable
+# GitLab Rails secret (#347): kept in workspace/.gitlab, applied again
+# before helm upgrade --install, and the password can be regenerated
 # shellcheck source=SCRIPTDIR/secrets.sh
 # shellcheck disable=SC1091
 . "$ICI/secrets.sh"
 
-# ---- Installation, migration et relais du cluster des services ----
-# Nouvelle logique hors de ce fichier (#396) : namespace devzone-gitlab,
-# mémoire allouable, Helm contexte devzone, migration depuis kind-gitlab.
+# ---- Installation, migration and relay of the services cluster ----
+# New logic outside this file (#396): devzone-gitlab namespace,
+# allocatable memory, Helm with the devzone context, migration from kind-gitlab.
 # shellcheck source=SCRIPTDIR/installation.sh
 # shellcheck disable=SC1091
 . "$ICI/installation.sh"
-# Chart enveloppe (helm direct, chart.sh), Argo CD (argocd.sh), seed (seed.sh) (#538)
+# Wrapper chart (direct helm, chart.sh), Argo CD (argocd.sh), seed (seed.sh) (#538)
 # shellcheck source=SCRIPTDIR/chart.sh
 # shellcheck disable=SC1091
 . "$ICI/chart.sh"
@@ -60,79 +60,78 @@ GITLAB_HOTE_MARQUE="# devzone:gitlab"
 # shellcheck disable=SC1091
 . "$ICI/seed.sh"
 
-# ---- hote-poser / hote-retirer : gitlab.localhost dans /etc/hosts ----
-# Pourquoi : ssh (clone ssh://git@gitlab.localhost:2224/…), glab et getent
-# passent par le résolveur système. curl et git (libcurl) ignorent /etc/hosts
-# pour les noms *.localhost (RFC 6761) et passent par le relais TCP ci-dessus,
-# qui écoute sur 127.0.0.1. Le nom pointe donc vers 127.0.0.1 pour que ssh et
-# glab empruntent le même chemin. /etc/hosts est un montage Docker que Docker
-# régénère au démarrage du conteneur, d'où le re-pose à chaque démarrage
-# (startup.sh) et à chaque activation. Jamais de sed -i ni de mv : le
-# montage ne peut pas être renommé (écriture en place seulement) ; directe si
-# le fichier est inscriptible, sinon sudo -n. Un échec n'échoue jamais :
-# avertissement sur stderr et code 0, pour ne pas faire échouer l'installation
-# pour un nom d'hôte.
-gitlab_hote_poser() {
-    local ligne tmp
-    ligne="$(printf '127.0.0.1\tgitlab.localhost %s' "$GITLAB_HOTE_MARQUE")"
-    # Déjà la bonne ligne, une seule fois : rien (idempotent)
-    if [ "$(grep -c "$GITLAB_HOTE_MARQUE" "$HOSTS" 2>/dev/null || true)" = 1 ] &&
-        grep -qxF "$ligne" "$HOSTS" 2>/dev/null; then
+# ---- host-set / host-remove: gitlab.localhost in /etc/hosts ----
+# Why: ssh (clone ssh://git@gitlab.localhost:2224/…), glab and getent go through
+# the system resolver. curl and git (libcurl) ignore /etc/hosts for the
+# *.localhost names (RFC 6761) and go through the TCP relay above, which
+# listens on 127.0.0.1. The name therefore points to 127.0.0.1 so that ssh and
+# glab take the same path. /etc/hosts is a Docker mount that Docker regenerates
+# when the container starts, hence the set again at each start (startup.sh) and
+# at each activation. Never sed -i nor mv: the mount cannot be renamed (in-place
+# write only); direct if the file is writable, otherwise sudo -n. A failure never
+# fails: a warning on stderr and exit code 0, so that the installation does not
+# fail for a host name.
+gitlab_host_set() {
+    local line tmp
+    line="$(printf '127.0.0.1\tgitlab.localhost %s' "$GITLAB_HOST_MARK")"
+    # Already the right line, once: nothing (idempotent)
+    if [ "$(grep -c "$GITLAB_HOST_MARK" "$HOSTS" 2>/dev/null || true)" = 1 ] &&
+        grep -qxF "$line" "$HOSTS" 2>/dev/null; then
         return 0
     fi
-    if grep -q "$GITLAB_HOTE_MARQUE" "$HOSTS" 2>/dev/null; then
-        # Ligne marquée avec une autre adresse (IPv6 de #320) ou doublon :
-        # on la remplace par la bonne, en gardant le reste du fichier.
+    if grep -q "$GITLAB_HOST_MARK" "$HOSTS" 2>/dev/null; then
+        # Line marked with another address (IPv6 of #320) or duplicate:
+        # it is replaced by the right one, keeping the rest of the file.
         tmp="$(mktemp)"
-        grep -v "$GITLAB_HOTE_MARQUE" "$HOSTS" >"$tmp" 2>/dev/null || true
-        printf '%s\n' "$ligne" >>"$tmp"
+        grep -v "$GITLAB_HOST_MARK" "$HOSTS" >"$tmp" 2>/dev/null || true
+        printf '%s\n' "$line" >>"$tmp"
         if [ -w "$HOSTS" ]; then
             cp "$tmp" "$HOSTS" 2>/dev/null ||
-                echo "devzone : gitlab : nom gitlab.localhost non posé dans $HOSTS (droits d'écriture insuffisants)" >&2
+                echo "devzone : gitlab : gitlab.localhost name not set in $HOSTS (insufficient write rights)" >&2
         elif ! sudo -n cp "$tmp" "$HOSTS" >/dev/null 2>&1; then
-            echo "devzone : gitlab : nom gitlab.localhost non posé dans $HOSTS (sudo -n indisponible ou refusé)" >&2
+            echo "devzone : gitlab : gitlab.localhost name not set in $HOSTS (sudo -n unavailable or refused)" >&2
         fi
         rm -f "$tmp"
         return 0
     fi
     if [ -w "$HOSTS" ]; then
-        printf '%s\n' "$ligne" >>"$HOSTS" 2>/dev/null ||
-            echo "devzone : gitlab : nom gitlab.localhost non posé dans $HOSTS (droits d'écriture insuffisants)" >&2
-    elif ! printf '%s\n' "$ligne" | sudo -n tee -a "$HOSTS" >/dev/null 2>&1; then
-        echo "devzone : gitlab : nom gitlab.localhost non posé dans $HOSTS (sudo -n indisponible ou refusé)" >&2
+        printf '%s\n' "$line" >>"$HOSTS" 2>/dev/null ||
+            echo "devzone : gitlab : gitlab.localhost name not set in $HOSTS (insufficient write rights)" >&2
+    elif ! printf '%s\n' "$line" | sudo -n tee -a "$HOSTS" >/dev/null 2>&1; then
+        echo "devzone : gitlab : gitlab.localhost name not set in $HOSTS (sudo -n unavailable or refused)" >&2
     fi
     return 0
 }
 
-gitlab_hote_retirer() {
-    # Aucune ligne repérée : rien (y compris fichier illisible)
-    if ! grep -q "$GITLAB_HOTE_MARQUE" "$HOSTS" 2>/dev/null; then
+gitlab_host_remove() {
+    # No line found: nothing (including an unreadable file)
+    if ! grep -q "$GITLAB_HOST_MARK" "$HOSTS" 2>/dev/null; then
         return 0
     fi
     local tmp
     tmp="$(mktemp)"
-    grep -v "$GITLAB_HOTE_MARQUE" "$HOSTS" >"$tmp" 2>/dev/null || true
+    grep -v "$GITLAB_HOST_MARK" "$HOSTS" >"$tmp" 2>/dev/null || true
     if [ -w "$HOSTS" ]; then
         cp "$tmp" "$HOSTS" 2>/dev/null ||
-            echo "devzone : gitlab : ligne gitlab.localhost non retirée de $HOSTS (droits d'écriture insuffisants)" >&2
+            echo "devzone : gitlab : gitlab.localhost line not removed from $HOSTS (insufficient write rights)" >&2
     elif ! sudo -n cp "$tmp" "$HOSTS" >/dev/null 2>&1; then
-        echo "devzone : gitlab : ligne gitlab.localhost non retirée de $HOSTS (sudo -n indisponible ou refusé)" >&2
+        echo "devzone : gitlab : gitlab.localhost line not removed from $HOSTS (sudo -n unavailable or refused)" >&2
     fi
     rm -f "$tmp"
     return 0
 }
 
-# ---- etat : vérifier l'état de GitLab ----
-gitlab_etat() {
-    # Désactivé si le namespace devzone-gitlab n'existe pas
-    if ! gitlab_installe; then
+# ---- status: check the state of GitLab ----
+gitlab_status() {
+    # Disabled if the devzone-gitlab namespace does not exist
+    if ! gitlab_installed; then
         echo "désactivé"
         return 0
     fi
 
-    # Vérifier que GitLab répond en readiness
+    # Check that GitLab answers the readiness probe
     if curl -sf http://gitlab.localhost:8929/-/readiness >/dev/null 2>&1 || curl -sf http://gitlab.localhost:8929/users/sign_in >/dev/null 2>&1; then
-        # Vérifier le runner en ligne ou hors ligne
+        # Check whether the runner is online or offline
         local runner_status="hors ligne"
         if [ -f "$GITLAB_SECRETS_DIR/root-token" ]; then
             local token count
@@ -149,21 +148,21 @@ gitlab_etat() {
     return 0
 }
 
-# Gestion des sous-commandes
+# Subcommand dispatch
 case "${1:-}" in
-    install)    gitlab_installer ;;
-    uninstall) gitlab_desinstaller "${@:2}" ;;
-    migrate)       shift; gitlab_migrer "$@" ;;
-    installe)     gitlab_installe ;;
-    status)         gitlab_etat ;;
-    seed)         gitlab_seed_commande ;;
-    new-password)  gitlab_nouveau_mdp "${@:2}" ;;
-    relay-start) gitlab_relais_lancer ;;
-    relay-stop) gitlab_relais_arreter ;;
-    relay-status)  gitlab_relais_etat ;;
-    hote-poser)   gitlab_hote_poser ;;
-    hote-retirer) gitlab_hote_retirer ;;
-    *)            echo "devzone : commande inconnue : ${1:-} (devzone gitlab --help)" >&2
+    install)    gitlab_install ;;
+    uninstall) gitlab_uninstall "${@:2}" ;;
+    migrate)       shift; gitlab_migrate "$@" ;;
+    installe)     gitlab_installed ;;
+    status)         gitlab_status ;;
+    seed)         gitlab_seed_command ;;
+    new-password)  gitlab_new_password "${@:2}" ;;
+    relay-start) gitlab_relay_start ;;
+    relay-stop) gitlab_relay_stop ;;
+    relay-status)  gitlab_relay_status ;;
+    hote-poser)   gitlab_host_set ;;
+    hote-retirer) gitlab_host_remove ;;
+    *)            echo "devzone : unknown command : ${1:-} (devzone gitlab --help)" >&2
                   exit 1
                   ;;
 esac

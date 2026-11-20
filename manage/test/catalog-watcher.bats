@@ -1,6 +1,6 @@
 #!/usr/bin/env bats
-# Veilleur du catalogue (#414) : garde-fou et un tour qui detecte un
-# changement de date de .devzone.modules. Jamais de boucle en arriere-plan.
+# Catalog watcher (#414): guard, and one tick that detects a change of the
+# date of .devzone.modules. Never a loop in the background.
 
 setup() {
     load commun
@@ -72,19 +72,19 @@ teardown() {
     bash "$BATS_TEST_DIRNAME/../../.devcontainer/catalog/mysql/mysql.sh" relay-stop >/dev/null 2>&1 || true
 }
 
-@test "veilleur : refuse sans DEVZONE_CATALOGUE_REEL" {
+@test "watcher: refused without DEVZONE_CATALOGUE_REEL" {
     run bash "$VEILLEUR" demarrer
     [ "$status" -eq 2 ] || false
-    [[ "$output" == *"refusé ici"* ]] || false
+    [[ "$output" == *"refused here"* ]] || false
 }
 
-@test "veilleur : refuse sous bats meme avec DEVZONE_CATALOGUE_REEL=oui" {
+@test "watcher: refused under bats even with DEVZONE_CATALOGUE_REEL=oui" {
     DEVZONE_CATALOGUE_REEL=oui run bash "$VEILLEUR" demarrer
     [ "$status" -eq 2 ] || false
-    [[ "$output" == *"refusé sous bats"* ]] || false
+    [[ "$output" == *"refused under bats"* ]] || false
 }
 
-@test "veilleur : racine déduite = dépôt, deux niveaux au-dessus du script" {
+@test "watcher: root deduced = repository, two levels above the script" {
     unset DEVZONE_RACINE DEVZONE_ETAT DEVZONE_CATALOGUE_VEILLEUR_DIR
     depot="$BATS_TEST_TMPDIR/depot"
     mkdir -p "$depot/.devcontainer/catalog"
@@ -102,7 +102,7 @@ CATALOGUE
     [ "$(cat "$BATS_TEST_TMPDIR/catalogue.log")" = "apply" ] || false
 }
 
-@test "veilleur : demarrer dont la boucle meurt tout de suite rend un code non nul" {
+@test "watcher: start whose loop dies at once returns a non-zero code" {
     base="$BATS_TEST_TMPDIR/veilleur"
     mkdir -p "$base"
     cat >"$BATS_TEST_TMPDIR/bin/nohup" <<NOHUP
@@ -117,10 +117,10 @@ NOHUP
         DEVZONE_CATALOGUE_VEILLEUR_DIR="$base" \
         bash "$VEILLEUR" demarrer
     [ "$status" -ne 0 ] || false
-    [[ "$output" == *"démarrage impossible"* ]] || false
+    [[ "$output" == *"cannot start"* ]] || false
 }
 
-@test "veilleur : un tour applique quand .devzone.modules change" {
+@test "watcher: a tick applies when .devzone.modules changes" {
     touch "$BATS_TEST_TMPDIR/ns" "$BATS_TEST_TMPDIR/sts" "$BATS_TEST_TMPDIR/ready"
     printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_ETAT"
     run bash "$VEILLEUR" tour

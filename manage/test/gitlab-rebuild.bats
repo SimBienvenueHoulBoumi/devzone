@@ -1,11 +1,11 @@
 #!/usr/bin/env bats
-# Rebuild et gitlab (#366, #396) : kind_keep_context et
-# kind_create_keep_context (cluster.sh), installation dans le cluster des
-# services sans kind ni bascule de contexte, migration depuis kind-gitlab,
-# échec effacé quand gitlab est prêt (devzone apply).
-# Faux kind, kubectl, helm, docker, curl, setsid et git dans $BATS_TEST_TMPDIR/bin :
-# aucun vrai cluster, aucun vrai kubeconfig. Chaque faux outil journalise ses
-# arguments dans $BATS_TEST_TMPDIR/<outil>.log.
+# Rebuild and gitlab (#366, #396): kind_keep_context and
+# kind_create_keep_context (cluster.sh), installation in the services cluster
+# without kind nor context switch, migration from kind-gitlab, failure cleared
+# when gitlab is ready (devzone apply).
+# Fake kind, kubectl, helm, docker, curl, setsid and git in $BATS_TEST_TMPDIR/bin:
+# no real cluster, no real kubeconfig. Each fake tool logs its arguments in
+# $BATS_TEST_TMPDIR/<tool>.log.
 
 setup() {
     load commun
@@ -27,95 +27,95 @@ setup() {
     : >"$KIND_CLUSTERS"
     printf '127.0.0.1 localhost\n' >"$DEVZONE_HOSTS"
 
-    # kind : clusters dans $KIND_CLUSTERS ; create et export écrivent le
-    # contexte kind-<nom> dans --kubeconfig (défaut ~/.kube/config), comme le vrai
+    # kind: clusters in $KIND_CLUSTERS; create and export write the kind-<name>
+    # context into --kubeconfig (default ~/.kube/config), as the real one does
     cat >"$BATS_TEST_TMPDIR/bin/kind" <<'KIND'
 #!/usr/bin/env bash
 echo "kind $*" >>"$BATS_TEST_TMPDIR/kind.log"
-sous="$1 $2"
-nom="" fichier="$HOME/.kube/config"
+sub="$1 $2"
+name="" file="$HOME/.kube/config"
 while [ "$#" -gt 0 ]; do
     case "$1" in
-        --name) nom="$2"; shift ;;
-        --kubeconfig) fichier="$2"; shift ;;
+        --name) name="$2"; shift ;;
+        --kubeconfig) file="$2"; shift ;;
     esac
     shift
 done
-case "$sous" in
+case "$sub" in
     "get clusters") cat "$KIND_CLUSTERS" ;;
     "create cluster")
-        echo "$nom" >>"$KIND_CLUSTERS"
-        printf 'ctx: kind-%s\ncurrent-context: kind-%s\n' "$nom" "$nom" >>"$fichier" ;;
+        echo "$name" >>"$KIND_CLUSTERS"
+        printf 'ctx: kind-%s\ncurrent-context: kind-%s\n' "$name" "$name" >>"$file" ;;
     "export kubeconfig")
-        printf 'ctx: kind-%s\ncurrent-context: kind-%s\n' "$nom" "$nom" >>"$fichier" ;;
+        printf 'ctx: kind-%s\ncurrent-context: kind-%s\n' "$name" "$name" >>"$file" ;;
 esac
-if [ -n "${FAUX_KIND_ECHEC:-}" ]; then exit 1; fi
+if [ -n "${FAKE_KIND_FAIL:-}" ]; then exit 1; fi
 exit 0
 KIND
 
-    # kubectl : kubeconfig factice (lignes « ctx: » et « current-context: »),
-    # secret root, pod toolbox, jeton root
+    # kubectl: fake kubeconfig ("ctx:" and "current-context:" lines), root
+    # secret, toolbox pod, root token
     cat >"$BATS_TEST_TMPDIR/bin/kubectl" <<'KUBE'
 #!/usr/bin/env bash
 echo "kubectl $*" >>"$BATS_TEST_TMPDIR/kubectl.log"
-fichier="$HOME/.kube/config"
+file="$HOME/.kube/config"
 case "$*" in
-    "config current-context") sed -n 's/^current-context:[[:space:]]*//p' "$fichier" 2>/dev/null | head -1 ;;
-    "config get-contexts -o name") sed -n 's/^ctx: //p' "$fichier" 2>/dev/null ;;
+    "config current-context") sed -n 's/^current-context:[[:space:]]*//p' "$file" 2>/dev/null | head -1 ;;
+    "config get-contexts -o name") sed -n 's/^ctx: //p' "$file" 2>/dev/null ;;
     "config use-context "*)
-        { grep -v '^current-context:' "$fichier" 2>/dev/null || true; printf 'current-context: %s\n' "${3:-}"; } >"$fichier.tmp"
-        mv "$fichier.tmp" "$fichier" ;;
+        { grep -v '^current-context:' "$file" 2>/dev/null || true; printf 'current-context: %s\n' "${3:-}"; } >"$file.tmp"
+        mv "$file.tmp" "$file" ;;
     "config unset current-context")
-        { grep -v '^current-context:' "$fichier" 2>/dev/null || true; } >"$fichier.tmp"
-        mv "$fichier.tmp" "$fichier" ;;
-    *"get nodes"*) echo "${FAUX_KUBE_MEMOIRE:-16Gi}" ;;
+        { grep -v '^current-context:' "$file" 2>/dev/null || true; } >"$file.tmp"
+        mv "$file.tmp" "$file" ;;
+    *"get nodes"*) echo "${FAKE_KUBE_MEMORY:-16Gi}" ;;
     *"get namespace "*) [ -f "$BATS_TEST_TMPDIR/namespace" ] && exit 0 ; exit 1 ;;
     *"get secret"*) echo "cGFzc3dvcmQxMjM=" ;;
     *"get pod"*) echo "gitlab-toolbox-1" ;;
-    *"gitlab-rails runner"*) echo "jeton-root-secret" ;;
+    *"gitlab-rails runner"*) echo "token-root-secret" ;;
 esac
 exit 0
 KUBE
 
-    # helm : journalise les arguments
+    # helm: logs the arguments
     cat >"$BATS_TEST_TMPDIR/bin/helm" <<'HELM'
 #!/usr/bin/env bash
 echo "helm $*" >>"$BATS_TEST_TMPDIR/helm.log"
 HELM
 
-    # docker : journalise, aucun mapping ni réseau réel
+    # docker: logs, no real mapping nor network
     cat >"$BATS_TEST_TMPDIR/bin/docker" <<'DOCKER'
 #!/usr/bin/env bash
 echo "docker $*" >>"$BATS_TEST_TMPDIR/docker.log"
 exit 0
 DOCKER
 
-    # curl : API GitLab simulée (readiness, groupe, runner, jeton)
+    # curl: simulated GitLab API (readiness, group, runner, token)
     cat >"$BATS_TEST_TMPDIR/bin/curl" <<'CURL'
 #!/usr/bin/env bash
-echo "curl $*" | sed -e 's/token=[^ &]*/token=<masque>/g' -e 's/PRIVATE-TOKEN: [^ "]*/PRIVATE-TOKEN: <masque>/g' >>"$BATS_TEST_TMPDIR/curl.log"
+echo "curl $*" | sed -e 's/token=[^ &]*/token=<masked>/g' -e 's/PRIVATE-TOKEN: [^ "]*/PRIVATE-TOKEN: <masked>/g' >>"$BATS_TEST_TMPDIR/curl.log"
 case "$*" in
     *"api/v4/runners/verify"*) echo 200 ;;
     *"api/v4/groups/devzone"*) echo '{"id":42}' ;;
-    *"--request POST"*"api/v4/user/runners"*) echo '{"token":"jeton-runner-secret"}' ;;
-    # Branche main : absente tant que le faux git n'a pas poussé
-    *"api/v4/projects/devzone%2Fdemo/repository"*) [ -f "$BATS_TEST_TMPDIR/pousse" ] || exit 22 ;;
+    *"--request POST"*"api/v4/user/runners"*) echo '{"token":"token-runner-secret"}' ;;
+    # main branch: absent until the fake git has pushed
+    *"api/v4/projects/devzone%2Fdemo/repository"*) [ -f "$BATS_TEST_TMPDIR/pushed" ] || exit 22 ;;
     *"--request POST"*) ;;
     *"api/v4/projects/devzone%2Fdemo"*) exit 22 ;;
     *"api/v4/users?username=dev"*) echo '[]' ;;
-    *"api/v4/runners/all"*) echo "${FAUX_RUNNERS:-[]}" ;;
+    *"api/v4/runners/all"*) echo "${FAKE_RUNNERS:-[]}" ;;
 esac
 exit 0
 CURL
 
-    # git : journalise, touche poussée
+    # git: logs, touches pushed
     cat >"$BATS_TEST_TMPDIR/bin/git" <<'GIT'
 #!/usr/bin/env bash
 echo "git $*" >>"$BATS_TEST_TMPDIR/git.log"
-case "$*" in *" push "*) touch "$BATS_TEST_TMPDIR/pousse" ;; esac
+case "$*" in *" push "*) touch "$BATS_TEST_TMPDIR/pushed" ;; esac
 GIT
 
-    # setsid : journalise sans lancer le port-forward
+    # setsid: logs without starting the port-forward
     cat >"$BATS_TEST_TMPDIR/bin/setsid" <<'SETSID'
 #!/usr/bin/env bash
 echo "setsid $*" >>"$BATS_TEST_TMPDIR/setsid.log"
@@ -125,18 +125,18 @@ SETSID
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
 }
 
-# Écrit le contexte courant dans le faux ~/.kube/config ; vide = aucun
-poser_contexte_courant() {
+# Writes the current context into the fake ~/.kube/config; empty = none
+set_current_context() {
     printf 'current-context: %s\n' "$1" >"$HOME/.kube/config"
 }
 
-# Lit le contexte courant du faux ~/.kube/config
-contexte_courant() {
+# Reads the current context of the fake ~/.kube/config
+current_context() {
     sed -n 's/^current-context:[[:space:]]*//p' "$HOME/.kube/config" 2>/dev/null | head -1
 }
 
-@test "kind_keep_context : export sans basculer, contexte courant gardé" {
-    poser_contexte_courant docker-desktop
+@test "kind_keep_context: export without switching, current context kept" {
+    set_current_context docker-desktop
     (
         set -e
         source "$CLUSTER"
@@ -144,85 +144,85 @@ contexte_courant() {
     ) || false
     grep -qxF "kind export kubeconfig --name gitlab --kubeconfig $HOME/.kube/config" "$BATS_TEST_TMPDIR/kind.log" || false
     grep -qxF 'ctx: kind-gitlab' "$HOME/.kube/config" || false
-    [ "$(contexte_courant)" = docker-desktop ] || false
+    [ "$(current_context)" = docker-desktop ] || false
 }
 
-@test "kind_keep_context : aucun contexte au départ, aucun posé à la fin" {
-    poser_contexte_courant ""
+@test "kind_keep_context: no context at start, none set at the end" {
+    set_current_context ""
     (
         set -e
         source "$CLUSTER"
         kind_keep_context export kubeconfig --name gitlab --kubeconfig "$HOME/.kube/config"
     ) || false
     grep -qxF 'ctx: kind-gitlab' "$HOME/.kube/config" || false
-    [ -z "$(contexte_courant)" ] || false
+    [ -z "$(current_context)" ] || false
     grep -qxF 'kubectl config unset current-context' "$BATS_TEST_TMPDIR/kubectl.log" || false
     ! grep -q 'config use-context' "$BATS_TEST_TMPDIR/kubectl.log" || false
 }
 
-@test "kind_keep_context : échec de kind, code 1 rendu sous set -e, contexte remis" {
-    poser_contexte_courant docker-desktop
-    FAUX_KIND_ECHEC=1 run bash -c '
+@test "kind_keep_context: kind failure, code 1 returned under set -e, context restored" {
+    set_current_context docker-desktop
+    FAKE_KIND_FAIL=1 run bash -c '
         set -e
         source "$1"
         kind_keep_context create cluster --name gitlab
     ' _ "$CLUSTER"
     [ "$status" -eq 1 ] || false
-    [ "$(contexte_courant)" = docker-desktop ] || false
+    [ "$(current_context)" = docker-desktop ] || false
 }
 
-@test "kind_create_keep_context : appelle kind create cluster, contexte gardé" {
-    poser_contexte_courant docker-desktop
+@test "kind_create_keep_context: calls kind create cluster, context kept" {
+    set_current_context docker-desktop
     (
         set -e
         source "$CLUSTER"
         kind_create_keep_context --name devzone --wait 120s
     ) || false
     grep -qxF 'kind create cluster --name devzone --wait 120s' "$BATS_TEST_TMPDIR/kind.log" || false
-    [ "$(contexte_courant)" = docker-desktop ] || false
+    [ "$(current_context)" = docker-desktop ] || false
 }
 
-@test "installer : cluster des services, aucun kind, contexte courant gardé" {
+@test "install: services cluster, no kind, current context kept" {
     echo gitlab >"$KIND_CLUSTERS"
-    poser_contexte_courant docker-desktop
+    set_current_context docker-desktop
     run bash "$GITLAB" install
     [ "$status" -eq 0 ] || false
     ! grep -q 'kind create' "$BATS_TEST_TMPDIR/kind.log" || false
     ! grep -q 'export kubeconfig' "$BATS_TEST_TMPDIR/kind.log" || false
     grep -Eq -- "helm --kubeconfig [^ ]+ --kube-context docker-desktop upgrade --install gitlab [^ ]*charts/devzone-gitlab --namespace devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log" || false
-    [ "$(contexte_courant)" = docker-desktop ] || false
+    [ "$(current_context)" = docker-desktop ] || false
 }
 
-@test "migrer sans terminal → ancien cluster conservé, contexte gardé" {
+@test "migrate without terminal → old cluster kept, context kept" {
     echo gitlab >"$KIND_CLUSTERS"
-    poser_contexte_courant docker-desktop
+    set_current_context docker-desktop
     run bash "$GITLAB" migrate
     [ "$status" -eq 2 ] || false
-    [[ "$output" == *"confirmation impossible sans terminal"* ]] || false
+    [[ "$output" == *"confirmation impossible without a terminal"* ]] || false
     [ "$(cat "$KIND_CLUSTERS")" = gitlab ] || false
     ! grep -q 'delete cluster' "$BATS_TEST_TMPDIR/kind.log" || false
-    [ "$(contexte_courant)" = docker-desktop ] || false
+    [ "$(current_context)" = docker-desktop ] || false
 }
 
-@test "installer : mémoire du cluster des services insuffisante → refus, contexte gardé" {
-    poser_contexte_courant docker-desktop
-    FAUX_KUBE_MEMOIRE=4Gi run bash "$GITLAB" install
+@test "install: insufficient memory in the services cluster → refused, context kept" {
+    set_current_context docker-desktop
+    FAKE_KUBE_MEMORY=4Gi run bash "$GITLAB" install
     [ "$status" -eq 2 ] || false
     [[ "$output" == *"at least 8 GiB"* ]] || false
     [ ! -e "$BATS_TEST_TMPDIR/helm.log" ] || false
-    [ "$(contexte_courant)" = docker-desktop ] || false
+    [ "$(current_context)" = docker-desktop ] || false
 }
 
-@test "appliquer : gitlab prêt, runner en ligne → marque d'échec effacée, récapitulatif à ✔" {
+@test "apply: gitlab ready, runner online → failure mark cleared, summary at ✔" {
     touch "$BATS_TEST_TMPDIR/namespace"
     printf 'gitlab=on\n' >"$DEVZONE_ETAT"
-    mkdir -p "$SECRETS" && echo jeton >"$SECRETS/root-token"
+    mkdir -p "$SECRETS" && echo token >"$SECRETS/root-token"
     echo gitlab >"$DEVZONE_ETAT-echec-gitlab"
-    FAUX_RUNNERS='[{"id":1}]' run bash "$DEVZONE" apply
+    FAKE_RUNNERS='[{"id":1}]' run bash "$DEVZONE" apply
     [ "$status" -eq 0 ] || false
     [[ "$output" == *"déjà actif, rien à faire"* ]] || false
     [ ! -e "$DEVZONE_ETAT-echec-gitlab" ] || false
-    FAUX_RUNNERS='[{"id":1}]' run bash "$DEVZONE"
+    FAKE_RUNNERS='[{"id":1}]' run bash "$DEVZONE"
     [[ "$output" == *"✔ module gitlab"* ]] || false
     [[ "$output" != *"en échec"* ]] || false
 }

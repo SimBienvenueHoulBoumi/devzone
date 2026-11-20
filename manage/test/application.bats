@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
-# Application unique (#341) : devzone répare, démarre, installe metrics-server
-# et bascule le cluster de travail. Copie de devzone dans $BATS_TEST_TMPDIR avec
-# des scripts factices : aucun script réel, cluster ni socket touché.
+# Single application (#341): devzone repairs, starts, installs metrics-server
+# and switches the working cluster. Copy of devzone in $BATS_TEST_TMPDIR with
+# fake scripts: no real script, cluster or socket touched.
 
 setup() {
     load commun
@@ -30,7 +30,7 @@ setup() {
     cat >"$T/app/docker-relay.sh" <<'RELAIS'
 #!/usr/bin/env bash
 printf 'relais %s %s\n' "${DEVZONE_RELAIS_REEL:-}" "$*" >>"$BATS_TEST_TMPDIR/actions.log"
-[ ! -f "$BATS_TEST_TMPDIR/echec-relais" ] || { echo "socket indisponible"; exit 1; }
+[ ! -f "$BATS_TEST_TMPDIR/echec-relais" ] || { echo "socket unavailable"; exit 1; }
 RELAIS
     cat >"$T/app/ports.sh" <<'PORTS'
 #!/usr/bin/env bash
@@ -43,7 +43,7 @@ PORTS_AUTO
     cat >"$T/app/password.sh" <<'PASSWORD'
 #!/usr/bin/env bash
 printf 'password %s\n' "$*" >>"$BATS_TEST_TMPDIR/actions.log"
-[ ! -f "$BATS_TEST_TMPDIR/echec-password" ] || { echo "identifiants indisponibles"; exit 1; }
+[ ! -f "$BATS_TEST_TMPDIR/echec-password" ] || { echo "credentials unavailable"; exit 1; }
 PASSWORD
     cat >"$T/app/gitlab/gitlab.sh" <<'GITLAB'
 #!/usr/bin/env bash
@@ -55,7 +55,7 @@ printf 'postgres %s\n' "$*" >>"$BATS_TEST_TMPDIR/actions.log"
 POSTGRES
     cat >"$T/app/catalog/catalog-watcher.sh" <<'VEILLEUR'
 #!/usr/bin/env bash
-printf 'catalogue-veilleur %s\n' "$*" >>"$BATS_TEST_TMPDIR/actions.log"
+printf 'catalog-watcher %s\n' "$*" >>"$BATS_TEST_TMPDIR/actions.log"
 VEILLEUR
     cat >"$T/app/catalog/mysql/mysql.sh" <<'MYSQL'
 #!/usr/bin/env bash
@@ -63,7 +63,7 @@ printf 'mysql %s\n' "$*" >>"$BATS_TEST_TMPDIR/actions.log"
 MYSQL
     cat >"$T/app/startup.sh" <<'DEMARRAGE'
 #!/usr/bin/env bash
-printf 'demarrage %s\n' "$*" >>"$BATS_TEST_TMPDIR/actions.log"
+printf 'startup %s\n' "$*" >>"$BATS_TEST_TMPDIR/actions.log"
 DEMARRAGE
     cat >"$T/app/metrics-server.sh" <<'METRICS'
 #!/usr/bin/env bash
@@ -92,23 +92,23 @@ KUBE
     chmod +x "$T/bin/kubectl"
 }
 
-@test "conception : devzone est l'application et la doc n'expose plus les scripts" {
+@test "design: devzone is the application and the docs no longer expose the scripts" {
     aide="$(bash "$APP" --help)"
     for commande in repair start metrics use; do
-        [[ "$aide" == *"devzone $commande"* ]] || { echo "aide : $commande absente"; false; }
+        [[ "$aide" == *"devzone $commande"* ]] || { echo "help: $commande missing"; false; }
     done
-    for fichier in README.md manage/docs/reference.md; do
-        contenu="$(awk '/^## Pour les contributeurs/{exit} {print}' "$RACINE_TEST/$fichier")"
-        [[ "$contenu" != *"bash .devcontainer/"* ]] || { echo "$fichier : script direct"; false; }
-        [[ "$contenu" != *"kubectl config use-context"* ]] || { echo "$fichier : kubectl direct"; false; }
+    for doc in README.md manage/docs/reference.md; do
+        contenu="$(awk '/^## Pour les contributeurs/{exit} {print}' "$RACINE_TEST/$doc")"
+        [[ "$contenu" != *"bash .devcontainer/"* ]] || { echo "$doc: direct script"; false; }
+        [[ "$contenu" != *"kubectl config use-context"* ]] || { echo "$doc: direct kubectl"; false; }
         if grep -qE 'DEVZONE_[A-Z_]+=' <<<"$contenu"; then
-            echo "$fichier : variable interne"
+            echo "$doc: internal variable"
             false
         fi
     done
 }
 
-@test "reparer : chaque élément réparé et code 0" {
+@test "repair: each repaired element and code 0" {
     run bash "$APP" repair
     [ "$status" -eq 0 ]
     [[ "$output" == *"✔ relais Docker"* ]] || false
@@ -121,7 +121,7 @@ KUBE
     [[ "$(cat "$T/actions.log")" == *"password regenerer"* ]] || false
 }
 
-@test "reparer : gitlab et postgres actifs sont aussi réparés" {
+@test "repair: active gitlab and postgres are repaired too" {
     printf 'gitlab=on\npostgres=on\n' >"$DEVZONE_ETAT"
     run bash "$APP" repair
     [ "$status" -eq 0 ]
@@ -130,7 +130,7 @@ KUBE
     [[ "$(cat "$T/actions.log")" == *"postgres relay-start"* ]] || false
 }
 
-@test "reparer : le jeton du compte kubernetes est renouvelé" {
+@test "repair: the kubernetes account token is renewed" {
     faux_kubectl
     printf 'cluster=docker-desktop\n' >"$DEVZONE_ETAT"
     run bash "$APP" repair
@@ -139,41 +139,41 @@ KUBE
     grep -q 'create token devzone-agent -n devzone-system --duration=24h' "$T/kubectl.log" || false
 }
 
-@test "reparer : sans cluster des services, pas de jeton du compte kubernetes" {
+@test "repair: without a services cluster, no kubernetes account token" {
     run bash "$APP" repair
     [ "$status" -eq 0 ]
     [[ "$output" != *"compte kubernetes"* ]] || false
     ! grep -q 'create token' "$T/kubectl.log" 2>/dev/null || false
 }
 
-@test "reparer : lance le veilleur du catalogue" {
+@test "repair: starts the catalog watcher" {
     run bash "$APP" repair
     [ "$status" -eq 0 ]
     [[ "$output" == *"✔ veilleur catalogue"* ]] || false
-    [[ "$(cat "$T/actions.log")" == *"catalogue-veilleur demarrer"* ]] || false
+    [[ "$(cat "$T/actions.log")" == *"catalog-watcher demarrer"* ]] || false
 }
 
-@test "reparer : un élément en échec affiche sa raison et code 1" {
+@test "repair: a failed element shows its reason and code 1" {
     : >"$T/echec-password"
     run bash "$APP" repair
     [ "$status" -eq 1 ]
-    [[ "$output" == *"✖ identifiants : identifiants indisponibles"* ]] || false
+    [[ "$output" == *"✖ identifiants : credentials unavailable"* ]] || false
     [[ "$(cat "$T/actions.log")" == *"ports restart"* ]] || false
 }
 
-@test "demarrer : lance le démarrage complet" {
+@test "start: runs the full startup" {
     run bash "$APP" start
     [ "$status" -eq 0 ]
-    [ "$(cat "$T/actions.log")" = "demarrage " ]
+    [ "$(cat "$T/actions.log")" = "startup " ]
 }
 
-@test "metrics : transmet le contexte et les options" {
+@test "metrics: passes the context and the options" {
     run bash "$APP" metrics docker-desktop --force
     [ "$status" -eq 0 ]
     [ "$(cat "$T/actions.log")" = "metrics docker-desktop --force" ]
 }
 
-@test "utiliser : bascule le contexte sans toucher au cluster des services" {
+@test "use: switches the context without touching the services cluster" {
     faux_kubectl
     printf 'cluster=kind-devzone\n' >"$DEVZONE_ETAT"
     run bash "$APP" use docker-desktop
@@ -183,7 +183,7 @@ KUBE
     [ "$(cat "$DEVZONE_ETAT")" = "cluster=kind-devzone" ]
 }
 
-@test "utiliser : contexte inconnu refusé sans bascule" {
+@test "use: unknown context refused without switching" {
     faux_kubectl
     run bash "$APP" use inconnu
     [ "$status" -eq 2 ]
@@ -191,7 +191,7 @@ KUBE
     [[ "$(cat "$T/kubectl.log")" != *"use-context"* ]] || false
 }
 
-@test "utiliser : cluster distant refusé sans confirmation" {
+@test "use: remote cluster refused without confirmation" {
     faux_kubectl
     run bash "$APP" use prod
     [ "$status" -eq 2 ]
@@ -199,7 +199,7 @@ KUBE
     [[ "$(cat "$T/kubectl.log")" != *"use-context"* ]] || false
 }
 
-@test "utiliser : --confirm exact accepté, autre valeur refusée" {
+@test "use: exact --confirm accepted, other value refused" {
     faux_kubectl
     run bash "$APP" use prod --confirm prod
     [ "$status" -eq 0 ]
@@ -212,7 +212,7 @@ KUBE
     [[ "$(cat "$T/kubectl.log")" != *"use-context"* ]] || false
 }
 
-@test "reparer : workspace Kubernetes, pas de veilleur de ports auto (#517)" {
+@test "repair: Kubernetes workspace, no auto ports watcher (#517)" {
     DEVZONE_WORKSPACE=kubernetes run bash "$APP" repair
     [ "$status" -eq 0 ]
     [[ "$output" != *"veilleur ports auto"* ]] || false

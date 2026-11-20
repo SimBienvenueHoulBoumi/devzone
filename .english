@@ -210,3 +210,13 @@ manage/test/workspace-init.bats
 manage/test/ports.bats
 manage/test/ports-auto.bats
 manage/test/packages.bats
+.devcontainer/catalog/app.sh
+.devcontainer/catalog/catalog-watcher.sh
+.devcontainer/catalog/mysql/install.sh
+.devcontainer/catalog/mysql/volume.sh
+.devcontainer/gitlab/installation.sh
+.devcontainer/gitlab/secrets.sh
+manage/test/catalog-watcher.bats
+manage/test/chart-gitlab.bats
+manage/test/gitlab-argocd.bats
+manage/test/test-gitlab.bats

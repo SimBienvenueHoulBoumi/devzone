@@ -1,29 +1,29 @@
 #!/usr/bin/env bash
-# devzone test-gitlab : essai de bout en bout du module gitlab et de la
-# plateforme GitLab, dans le conteneur. Chaque étape est chronométrée ; le
-# résumé final dit ✔/✖/sauté et le code de sortie n'est 0 que sans ✖.
+# devzone test-gitlab: end-to-end test of the gitlab module and of the GitLab
+# platform, in the container. Each step is timed; the final summary gives
+# ✔/✖/skipped and the exit code is 0 only without ✖.
 #
-# Pourquoi un script à part : la CI GitHub n'a pas les 8 Go de RAM du module
-# gitlab. Cet essai rejoue donc à la main, sur le poste, ce que la CI ne peut
-# pas faire, et publie éventuellement son résultat comme statut de commit.
+# Why a separate script: the GitHub CI does not have the 8 GB of RAM of the gitlab
+# module. This test therefore replays by hand, on the workstation, what the CI
+# cannot do, and possibly publishes its result as a commit status.
 #
-# Options : --complet (désactive puis réinstalle), --statut (publie le statut
-# gitlab-integration sur HEAD par gh).
-# Les étapes sont appelées indirectement par lancer_etape : shellcheck ne peut
-# pas le voir et les croirait inatteignables (SC2317).
+# Options: --complet (disables then reinstalls), --statut (publishes the
+# gitlab-integration status on HEAD with gh).
+# The steps are called indirectly by run_step: shellcheck cannot see it and
+# would take them for unreachable (SC2317).
 # shellcheck disable=SC2317
 set -uo pipefail
 
 ICI="$(cd "$(dirname "$0")" && pwd)"
-# Même racine que gitlab.sh : DEVZONE_RACINE pour les tests
+# Same root as gitlab.sh: DEVZONE_RACINE for the tests
 RACINE="${DEVZONE_RACINE:-$(dirname "$(dirname "$ICI")")}"
 GITLAB="$ICI/gitlab.sh"
 SECRETS="$RACINE/workspace/.gitlab"
-FICHIER_JETON="$SECRETS/root-token"
-ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
+TOKEN_FILE="$SECRETS/root-token"
+STATE_FILE="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
 HOSTS="${DEVZONE_HOSTS:-/etc/hosts}"
-# Nom de l'instance : suffixe DEVZONE_INSTANCE calculé par cluster.sh, comme
-# gitlab.sh (namespace devzone-gitlab suffixé).
+# Instance name: DEVZONE_INSTANCE suffix computed by cluster.sh, as in
+# gitlab.sh (suffixed devzone-gitlab namespace).
 # shellcheck source=SCRIPTDIR/../cluster.sh
 # shellcheck disable=SC1091
 . "$ICI/../cluster.sh"
@@ -31,15 +31,15 @@ HOSTS="${DEVZONE_HOSTS:-/etc/hosts}"
 # shellcheck disable=SC1091
 . "$ICI/test-gitlab-restes.sh"
 URL="${GITLAB_TEST_URL:-http://gitlab.localhost:8929}"
-# Délai d'attente du pipeline : 600 s par défaut, court dans les tests
-DELAI_PIPELINE="${GITLAB_TEST_PIPELINE:-600}"
-# Intervalle d'interrogation du pipeline : 5 s par défaut, court dans les tests
-INTERVALLE="${GITLAB_TEST_INTERVALLE:-5}"
-# Réf. de la suite d'intégration repowarden (#533)
-REF_REPOWARDEN="${REPOWARDEN_TEST_REF:-develop}"
+# Pipeline timeout: 600 s by default, short in the tests
+PIPELINE_TIMEOUT="${GITLAB_TEST_PIPELINE:-600}"
+# Pipeline polling interval: 5 s by default, short in the tests
+INTERVAL="${GITLAB_TEST_INTERVALLE:-5}"
+# Ref of the repowarden integration suite (#533)
+REPOWARDEN_REF="${REPOWARDEN_TEST_REF:-develop}"
 
-# devzone lui-même : la commande du PATH (lien posé par post-create.sh), sinon
-# le script du dépôt. DEVZONE_TEST_DEVZONE permet une doublure de test.
+# devzone itself: the command of the PATH (link set by post-create.sh), otherwise
+# the script of the repository. DEVZONE_TEST_DEVZONE allows a test double.
 DEVZONE_BIN="${DEVZONE_TEST_DEVZONE:-}"
 if [ -z "$DEVZONE_BIN" ]; then
     if command -v devzone >/dev/null 2>&1; then
@@ -48,443 +48,442 @@ if [ -z "$DEVZONE_BIN" ]; then
         DEVZONE_BIN="$RACINE/.devcontainer/devzone"
     fi
 fi
-# Même chemin que devzone : glab vit dans ~/.local/bin, jamais dans le PATH
+# Same path as devzone: glab lives in ~/.local/bin, never in the PATH
 GLAB="$HOME/.local/bin/glab"
 
-COMPLET=0
-STATUT=0
-JETON=""
-CLE_ID=""
-ECHEC=0
+FULL=0
+PUBLISH=0
+TOKEN=""
+KEY_ID=""
+FAILED=0
 TOTAL=0
-RAISON=""
-PLATEFORME_CHANGEE=0
+REASON=""
+PLATFORM_CHANGED=0
 TMP_DIRS=()
-NOMS=()
-SYMBOLES=()
-DUREES=()
+NAMES=()
+SYMBOLS=()
+DURATIONS=()
 SUFFIXES=()
 
-# Plateforme d'avant, lue dans le même fichier d'état que devzone : le trap
-# doit pouvoir la remettre même si l'étape 6 échoue en cours de route.
-PLATEFORME_AVANT="$(grep -E '^plateforme=' "$ETAT" 2>/dev/null | tail -1 | cut -d= -f2 || true)"
-[ "$PLATEFORME_AVANT" = gitlab ] || PLATEFORME_AVANT=github
-URL_AVANT="$(grep -E '^gitlab_url=' "$ETAT" 2>/dev/null | tail -1 | cut -d= -f2- || true)"
+# Previous platform, read from the same state file as devzone: the trap
+# must be able to restore it even if step 6 fails midway.
+PLATFORM_BEFORE="$(grep -E '^plateforme=' "$STATE_FILE" 2>/dev/null | tail -1 | cut -d= -f2 || true)"
+[ "$PLATFORM_BEFORE" = gitlab ] || PLATFORM_BEFORE=github
+URL_BEFORE="$(grep -E '^gitlab_url=' "$STATE_FILE" 2>/dev/null | tail -1 | cut -d= -f2- || true)"
 
 usage() {
     cat <<'USAGE'
 devzone test-gitlab [--complet] [--statut]
 
-Essai de bout en bout du module gitlab et de la plateforme GitLab.
-  --complet   désactive gitlab, contrôle que rien ne reste, puis réinstalle
-  --statut    publie le résultat comme statut gitlab-integration sur HEAD (gh)
+End-to-end test of the gitlab module and of the GitLab platform.
+  --complet   disables gitlab, checks that nothing remains, then reinstalls
+  --statut    publishes the result as the gitlab-integration status on HEAD (gh)
 USAGE
 }
 
-# Appel API GitLab : le jeton ne sort jamais dans un message ni dans un fichier
-# du clone. curl le reçoit en en-tête, comme le seed de gitlab.sh.
+# GitLab API call: the token never appears in a message nor in a file of the
+# clone. curl receives it in a header, as the seed of gitlab.sh does.
 api() {
-    local methode="$1" chemin="$2"
+    local method="$1" path="$2"
     shift 2
-    curl -sS --fail --request "$methode" --header "PRIVATE-TOKEN: ${JETON:-}" \
-        "${URL}/api/v4${chemin}" "$@"
+    curl -sS --fail --request "$method" --header "PRIVATE-TOKEN: ${TOKEN:-}" \
+        "${URL}/api/v4${path}" "$@"
 }
 
-lire_jeton() {
-    if [ ! -f "$FICHIER_JETON" ]; then
-        RAISON="jeton root absent ($FICHIER_JETON) : lancer avec la commande devzone test-gitlab du PATH, ou régler DEVZONE_RACINE sur la racine du dépôt activé"
+read_token() {
+    if [ ! -f "$TOKEN_FILE" ]; then
+        REASON="root token missing ($TOKEN_FILE): run with the devzone test-gitlab command of the PATH, or set DEVZONE_RACINE to the root of the enabled repository"
         return 1
     fi
-    JETON="$(cat "$FICHIER_JETON")"
-    if [ -z "$JETON" ]; then
-        RAISON="jeton root vide ($FICHIER_JETON)"
+    TOKEN="$(cat "$TOKEN_FILE")"
+    if [ -z "$TOKEN" ]; then
+        REASON="root token empty ($TOKEN_FILE)"
         return 1
     fi
     return 0
 }
 
-# Remet la plateforme d'avant (github par défaut, ou l'instance GitLab avec son
-# URL). Le trap l'appelle aussi : une étape 6 interrompue ne laisse pas la
-# plateforme de l'utilisateur changée.
-restaurer_plateforme() {
-    if [ "$PLATEFORME_AVANT" = gitlab ] && [ -n "$URL_AVANT" ]; then
-        "$DEVZONE_BIN" platform gitlab --url "$URL_AVANT" >/dev/null 2>&1
+# Restores the previous platform (github by default, or the GitLab instance with its
+# URL). The trap calls it too: an interrupted step 6 does not leave the
+# platform of the user changed.
+restore_platform() {
+    if [ "$PLATFORM_BEFORE" = gitlab ] && [ -n "$URL_BEFORE" ]; then
+        "$DEVZONE_BIN" platform gitlab --url "$URL_BEFORE" >/dev/null 2>&1
     else
         "$DEVZONE_BIN" platform github >/dev/null 2>&1
     fi
 }
 
-# Nettoyage garanti : clé SSH jetable retirée de GitLab, dossiers temporaires
-# supprimés, plateforme d'avant restaurée. Même quand une étape a échoué.
-nettoyer() {
+# Guaranteed cleanup: throwaway SSH key removed from GitLab, temporary folders
+# deleted, previous platform restored. Even when a step failed.
+cleanup() {
     local code=$? d
     trap - EXIT
-    if [ -n "${CLE_ID:-}" ]; then
-        api DELETE "/user/keys/$CLE_ID" >/dev/null 2>&1 || true
+    if [ -n "${KEY_ID:-}" ]; then
+        api DELETE "/user/keys/$KEY_ID" >/dev/null 2>&1 || true
     fi
-    if [ "$PLATEFORME_CHANGEE" = 1 ]; then
-        restaurer_plateforme || true
+    if [ "$PLATFORM_CHANGED" = 1 ]; then
+        restore_platform || true
     fi
     for d in ${TMP_DIRS[@]+"${TMP_DIRS[@]}"}; do
         [ -n "$d" ] && rm -rf "$d"
     done
     exit "$code"
 }
-trap nettoyer EXIT
+trap cleanup EXIT
 
-# ---- Les étapes, une fonction par étape ----
+# ---- The steps, one function per step ----
 
-# 1. Module : actif, sinon activé (l'activation installe aussi si besoin).
-etape_module() {
+# 1. Module: active, otherwise enabled (the activation also installs if needed).
+step_module() {
     if "$DEVZONE_BIN" is-enabled gitlab >/dev/null 2>&1; then
         return 0
     fi
     if ! "$DEVZONE_BIN" enable gitlab >/dev/null 2>&1; then
-        RAISON="devzone enable gitlab a échoué"
+        REASON="devzone enable gitlab failed"
         return 1
     fi
     return 0
 }
 
-# 2. État : le module doit être prêt et son runner en ligne (sans runner, le
-# pipeline resterait en attente).
-etape_etat() {
-    local etat
-    etat="$(bash "$GITLAB" status 2>&1 || true)"
-    if [[ "$etat" != *"prêt"* ]]; then
-        RAISON="état : ${etat:-illisible}"
+# 2. State: the module must be ready and its runner online (without a runner, the
+# pipeline would wait forever).
+step_state() {
+    local state
+    state="$(bash "$GITLAB" status 2>&1 || true)"
+    if [[ "$state" != *"prêt"* ]]; then
+        REASON="state: ${state:-unreadable}"
         return 1
     fi
-    if [[ "$etat" != *"runner en ligne"* ]]; then
-        RAISON="runner hors ligne ($etat)"
-        return 1
-    fi
-    return 0
-}
-
-# 3. Nom et relais : ssh et glab passent par le résolveur système ; curl et
-# git en HTTP résolvent *.localhost vers la boucle locale sans lire /etc/hosts.
-# gitlab.localhost doit donc pointer vers 127.0.0.1 ET les relais 8929/2224
-# doivent tourner dans le conteneur (gitlab.sh hote-poser, relay-start).
-etape_nom() {
-    local hote ip_nom relais
-    hote="$(getent hosts gitlab.localhost 2>/dev/null || true)"
-    ip_nom="$(printf '%s\n' "$hote" | awk '{print $1; exit}')"
-    if [ -z "$ip_nom" ]; then
-        RAISON="gitlab.localhost non résolu (getent hosts)"
-        return 1
-    fi
-    if [ "$ip_nom" != "127.0.0.1" ]; then
-        RAISON="gitlab.localhost résolu vers $ip_nom, attendu 127.0.0.1"
-        return 1
-    fi
-    if ! relais="$(bash "$GITLAB" relay-status 2>&1)"; then
-        RAISON="gitlab.localhost pointe vers 127.0.0.1, mais ${relais:-relais gitlab arrêté}"
+    if [[ "$state" != *"runner en ligne"* ]]; then
+        REASON="runner offline ($state)"
         return 1
     fi
     return 0
 }
 
-# 4. Pipeline : relance celui de devzone/demo sur main et attend success.
-etape_pipeline() {
-    local reponse id web_url etat debut
-    lire_jeton || return 1
-    reponse="$(api POST "/projects/devzone%2Fdemo/pipeline" --data "ref=main" 2>/dev/null)" || {
-        RAISON="création du pipeline de devzone/demo impossible"
+# 3. Name and relays: ssh and glab go through the system resolver; curl and
+# git in HTTP resolve *.localhost to the loopback without reading /etc/hosts.
+# gitlab.localhost must therefore point to 127.0.0.1 AND the relays 8929/2224
+# must run in the container (gitlab.sh hote-poser, relay-start).
+step_name() {
+    local host ip_name relays
+    host="$(getent hosts gitlab.localhost 2>/dev/null || true)"
+    ip_name="$(printf '%s\n' "$host" | awk '{print $1; exit}')"
+    if [ -z "$ip_name" ]; then
+        REASON="gitlab.localhost not resolved (getent hosts)"
+        return 1
+    fi
+    if [ "$ip_name" != "127.0.0.1" ]; then
+        REASON="gitlab.localhost resolves to $ip_name, expected 127.0.0.1"
+        return 1
+    fi
+    if ! relays="$(bash "$GITLAB" relay-status 2>&1)"; then
+        REASON="gitlab.localhost points to 127.0.0.1, but ${relays:-gitlab relay stopped}"
+        return 1
+    fi
+    return 0
+}
+
+# 4. Pipeline: starts the one of devzone/demo on main and waits for success.
+step_pipeline() {
+    local response id web_url state start
+    read_token || return 1
+    response="$(api POST "/projects/devzone%2Fdemo/pipeline" --data "ref=main" 2>/dev/null)" || {
+        REASON="creation of the pipeline of devzone/demo impossible"
         return 1
     }
-    id="$(printf '%s' "$reponse" | jq -r '.id // empty' 2>/dev/null || true)"
-    web_url="$(printf '%s' "$reponse" | jq -r '.web_url // empty' 2>/dev/null || true)"
+    id="$(printf '%s' "$response" | jq -r '.id // empty' 2>/dev/null || true)"
+    web_url="$(printf '%s' "$response" | jq -r '.web_url // empty' 2>/dev/null || true)"
     if [ -z "$id" ]; then
-        RAISON="réponse de création du pipeline sans identifiant"
+        REASON="pipeline creation response without id"
         return 1
     fi
-    debut="$(date +%s)"
+    start="$(date +%s)"
     while :; do
-        reponse="$(api GET "/projects/devzone%2Fdemo/pipelines/$id" 2>/dev/null || true)"
-        etat="$(printf '%s' "$reponse" | jq -r '.status // empty' 2>/dev/null || true)"
-        case "$etat" in
+        response="$(api GET "/projects/devzone%2Fdemo/pipelines/$id" 2>/dev/null || true)"
+        state="$(printf '%s' "$response" | jq -r '.status // empty' 2>/dev/null || true)"
+        case "$state" in
             success) return 0 ;;
             failed | canceled | skipped)
-                RAISON="pipeline $etat : ${web_url:-$URL/devzone/demo/-/pipelines/$id}"
+                REASON="pipeline $state: ${web_url:-$URL/devzone/demo/-/pipelines/$id}"
                 return 1
                 ;;
         esac
-        if [ $(( $(date +%s) - debut )) -ge "$DELAI_PIPELINE" ]; then
-            RAISON="délai ${DELAI_PIPELINE} s dépassé (état ${etat:-inconnu}) : ${web_url:-$URL/devzone/demo/-/pipelines/$id}"
+        if [ $(( $(date +%s) - start )) -ge "$PIPELINE_TIMEOUT" ]; then
+            REASON="timeout ${PIPELINE_TIMEOUT} s exceeded (state ${state:-unknown}): ${web_url:-$URL/devzone/demo/-/pipelines/$id}"
             return 1
         fi
-        sleep "$INTERVALLE"
+        sleep "$INTERVAL"
     done
 }
 
-# 5. Clones HTTP et SSH : clé ed25519 jetable déposée sur root, puis retirée
-# par le trap. Le clone HTTP s'authentifie en Basic oauth2 + jeton, fournie
-# par un assistant d'identifiants qui lit le fichier (un en-tête git
-# http.extraHeader passerait le jeton en clair dans les arguments d'un
-# processus) : le jeton ne paraît ni dans ces arguments, ni dans l'URL, ni
-# dans .git/config.
-etape_clones() {
-    local d pub reponse
-    lire_jeton || return 1
+# 5. HTTP and SSH clones: throwaway ed25519 key placed on root, then removed
+# by the trap. The HTTP clone authenticates with Basic oauth2 + token, provided
+# by a credential helper that reads the file (a git http.extraHeader would pass
+# the token in clear in the arguments of a process): the token appears neither
+# in these arguments, nor in the URL, nor in .git/config.
+step_clones() {
+    local d pub response
+    read_token || return 1
     d="$(mktemp -d "${TMPDIR:-/tmp}/devzone-test-gitlab-clones.XXXXXX")" || {
-        RAISON="dossier temporaire impossible"
+        REASON="temporary directory impossible"
         return 1
     }
     TMP_DIRS+=("$d")
     if ! ssh-keygen -q -t ed25519 -N '' -f "$d/id_ed25519" >/dev/null 2>&1; then
-        RAISON="génération de la clé ed25519 impossible"
+        REASON="ed25519 key generation impossible"
         return 1
     fi
     pub="$(cat "$d/id_ed25519.pub" 2>/dev/null || true)"
-    reponse="$(api POST "/user/keys" --data-urlencode "title=devzone test-gitlab" \
+    response="$(api POST "/user/keys" --data-urlencode "title=devzone test-gitlab" \
         --data-urlencode "key=$pub" 2>/dev/null)" || {
-        RAISON="dépôt de la clé SSH sur GitLab impossible"
+        REASON="SSH key upload to GitLab impossible"
         return 1
     }
-    CLE_ID="$(printf '%s' "$reponse" | jq -r '.id // empty' 2>/dev/null || true)"
-    if [ -z "$CLE_ID" ]; then
-        RAISON="réponse de dépôt de clé sans identifiant"
+    KEY_ID="$(printf '%s' "$response" | jq -r '.id // empty' 2>/dev/null || true)"
+    if [ -z "$KEY_ID" ]; then
+        REASON="key upload response without id"
         return 1
     fi
     if ! git clone -q \
         -c "core.sshCommand=ssh -i $d/id_ed25519 -o UserKnownHostsFile=$d/known_hosts -o StrictHostKeyChecking=accept-new" \
         "ssh://git@gitlab.localhost:2224/devzone/demo.git" "$d/ssh-demo" >/dev/null 2>&1; then
-        RAISON="clone SSH (ssh://git@gitlab.localhost:2224/devzone/demo.git) impossible"
+        REASON="SSH clone (ssh://git@gitlab.localhost:2224/devzone/demo.git) impossible"
         return 1
     fi
     if ! git -c credential.helper= \
-        -c "credential.helper=!f() { echo username=oauth2; printf 'password='; cat \"$FICHIER_JETON\"; echo; }; f" \
+        -c "credential.helper=!f() { echo username=oauth2; printf 'password='; cat \"$TOKEN_FILE\"; echo; }; f" \
         clone -q "$URL/devzone/demo.git" "$d/http-demo" >/dev/null 2>&1; then
-        RAISON="clone HTTP de devzone/demo impossible"
+        REASON="HTTP clone of devzone/demo impossible"
         return 1
     fi
-    if grep -qF "$JETON" "$d/http-demo/.git/config" 2>/dev/null; then
-        RAISON="le jeton a été écrit dans .git/config du clone"
+    if grep -qF "$TOKEN" "$d/http-demo/.git/config" 2>/dev/null; then
+        REASON="the token was written to .git/config of the clone"
         return 1
     fi
     return 0
 }
 
-# 6. Plateforme : gitlab (glab clone), puis retour à la plateforme d'avant ;
-# au retour à github, glab et sa configuration ne doivent plus être là.
-etape_plateforme() {
+# 6. Platform: gitlab (glab clone), then back to the previous platform;
+# when back to github, glab and its configuration must no longer be there.
+step_platform() {
     local d
     d="$(mktemp -d "${TMPDIR:-/tmp}/devzone-test-gitlab-plateforme.XXXXXX")" || {
-        RAISON="dossier temporaire impossible"
+        REASON="temporary directory impossible"
         return 1
     }
     TMP_DIRS+=("$d")
-    PLATEFORME_CHANGEE=1
+    PLATFORM_CHANGED=1
     if ! "$DEVZONE_BIN" platform gitlab >/dev/null 2>&1; then
-        RAISON="devzone platform gitlab a échoué"
+        REASON="devzone platform gitlab failed"
         return 1
     fi
     if ! "$GLAB" repo clone devzone/demo "$d/demo" >/dev/null 2>&1; then
-        RAISON="glab repo clone devzone/demo a échoué"
+        REASON="glab repo clone devzone/demo failed"
         return 1
     fi
-    if ! restaurer_plateforme; then
-        RAISON="retour à la plateforme $PLATEFORME_AVANT impossible"
+    if ! restore_platform; then
+        REASON="return to platform $PLATFORM_BEFORE impossible"
         return 1
     fi
-    if [ "$PLATEFORME_AVANT" = github ]; then
+    if [ "$PLATFORM_BEFORE" = github ]; then
         if [ -e "$GLAB" ] || [ -e "$HOME/.config/glab-cli" ]; then
-            RAISON="glab ou sa configuration reste après le retour à github"
+            REASON="glab or its configuration remains after returning to github"
             return 1
         fi
     fi
-    PLATEFORME_CHANGEE=0
+    PLATFORM_CHANGED=0
     return 0
 }
 
-# 7. Intégration repowarden : suite test/gitlab/ (#533) contre l'instance du
-# module, avec l'URL et le jeton en variables d'environnement. Absente à la
-# réf choisie → étape sautée, pas en échec.
-etape_repowarden() {
+# 7. repowarden integration: test/gitlab/ suite (#533) against the instance of the
+# module, with the URL and the token as environment variables. Missing at the
+# chosen ref -> step skipped, not failed.
+step_repowarden() {
     local d log bats_exit bats_output
-    lire_jeton || return 1
+    read_token || return 1
     d="$(mktemp -d "${TMPDIR:-/tmp}/devzone-test-gitlab-repowarden.XXXXXX")" || {
-        RAISON="dossier temporaire impossible"
+        REASON="temporary directory impossible"
         return 1
     }
     TMP_DIRS+=("$d")
     log="${TMPDIR:-/tmp}/devzone-test-gitlab-repowarden.log"
-    if ! git clone -q --depth 1 --branch "$REF_REPOWARDEN" \
+    if ! git clone -q --depth 1 --branch "$REPOWARDEN_REF" \
         https://github.com/simdevWarden/repowarden.git "$d/repowarden" >/dev/null 2>&1; then
-        RAISON="clone de repowarden (réf. $REF_REPOWARDEN) impossible"
+        REASON="clone of repowarden (ref $REPOWARDEN_REF) impossible"
         return 1
     fi
     if [ ! -d "$d/repowarden/test/gitlab" ]; then
-        RAISON="test/gitlab absent à la réf. $REF_REPOWARDEN"
+        REASON="test/gitlab missing at ref $REPOWARDEN_REF"
         return 2
     fi
     if ! command -v bats >/dev/null 2>&1; then
-        RAISON="bats introuvable"
+        REASON="bats not found"
         return 1
     fi
-    if bats_output="$(REPOWARDEN_IT_GITLAB_URL="$URL" REPOWARDEN_IT_GITLAB_TOKEN="$JETON" \
+    if bats_output="$(REPOWARDEN_IT_GITLAB_URL="$URL" REPOWARDEN_IT_GITLAB_TOKEN="$TOKEN" \
         bats "$d/repowarden/test/gitlab/" 2>&1)"; then
         bats_exit=0
     else
         bats_exit=$?
     fi
-    printf '%s' "$bats_output" | sed "s/${JETON}/TOKEN_MASQUE/g" > "$log"
+    printf '%s' "$bats_output" | sed "s/${TOKEN}/TOKEN_MASKED/g" > "$log"
     if [ "$bats_exit" -ne 0 ]; then
-        RAISON="la suite test/gitlab a échoué (journal : $log)"
+        REASON="the test/gitlab suite failed (log: $log)"
         return 1
     fi
     return 0
 }
 
-# 8. --complet : désactivation d'abord, puis contrôle qu'il ne reste ni
-# namespace, ni conteneur, ni secrets, ni ligne /etc/hosts. Les étapes 1 à 7
-# réinstallent ensuite. Le namespace est suffixé par instance, comme gitlab.sh.
-etape_complet() {
-    local restes="" instance namespace conteneurs
+# 8. --complet: disabling first, then checks that no namespace, container, secret
+# or /etc/hosts line remains. Steps 1 to 7 then reinstall. The namespace is
+# suffixed per instance, as in gitlab.sh.
+step_full() {
+    local leftovers="" instance namespace containers
     instance="${DEVZONE_INSTANCE:-devzone}"
     namespace="devzone-gitlab${INSTANCE_SUFFIX}"
     if ! "$DEVZONE_BIN" disable gitlab >/dev/null 2>&1; then
-        restes="$restes désactivation en échec;"
+        leftovers="$leftovers disable failed;"
     fi
     if kubectl --context devzone get namespace "$namespace" >/dev/null 2>&1; then
-        restes="$restes namespace $namespace;"
+        leftovers="$leftovers namespace $namespace;"
     fi
-    conteneurs="$(gitlab_restes_conteneurs "$instance")"
-    if [ -n "$conteneurs" ]; then
-        restes="$restes conteneur(s) étiqueté(s) devzone.instance=$instance;"
+    containers="$(gitlab_restes_conteneurs "$instance")"
+    if [ -n "$containers" ]; then
+        leftovers="$leftovers labelled container(s) devzone.instance=$instance;"
     fi
     if [ -e "$SECRETS" ]; then
-        restes="$restes $SECRETS;"
+        leftovers="$leftovers $SECRETS;"
     fi
     if grep -q '# devzone:gitlab' "$HOSTS" 2>/dev/null; then
-        restes="$restes ligne /etc/hosts;"
+        leftovers="$leftovers /etc/hosts line;"
     fi
-    if [ -n "$restes" ]; then
-        RAISON="reste :$restes"
+    if [ -n "$leftovers" ]; then
+        REASON="remaining:$leftovers"
         return 1
     fi
     return 0
 }
 
-# ---- Cadre commun : chronomètre, mémorise ✔/✖/sauté + raison ----
+# ---- Common frame: times, records ✔/✖/skipped + reason ----
 
-lancer_etape() {
-    local nom="$1" fonction="$2" debut fin duree code symbole suffixe
-    RAISON=""
-    printf '▶ %s…\n' "$nom"
-    debut="$(date +%s)"
-    "$fonction"
+run_step() {
+    local name="$1" func="$2" start end duration code symbol suffix
+    REASON=""
+    printf '▶ %s…\n' "$name"
+    start="$(date +%s)"
+    "$func"
     code=$?
-    fin="$(date +%s)"
-    duree=$((fin - debut))
+    end="$(date +%s)"
+    duration=$((end - start))
     case "$code" in
-        0) symbole="✔"; suffixe="" ;;
-        2) symbole="–"; suffixe=" — sauté : ${RAISON:-sans raison}" ;;
-        *) symbole="✖"; ECHEC=1; suffixe=" — ${RAISON:-échec}" ;;
+        0) symbol="✔"; suffix="" ;;
+        2) symbol="–"; suffix=" — skipped: ${REASON:-no reason}" ;;
+        *) symbol="✖"; FAILED=1; suffix=" — ${REASON:-failed}" ;;
     esac
-    NOMS+=("$nom")
-    SYMBOLES+=("$symbole")
-    DUREES+=("$duree")
-    SUFFIXES+=("$suffixe")
-    printf '  %s %s (%d s)%s\n' "$symbole" "$nom" "$duree" "$suffixe"
+    NAMES+=("$name")
+    SYMBOLS+=("$symbol")
+    DURATIONS+=("$duration")
+    SUFFIXES+=("$suffix")
+    printf '  %s %s (%d s)%s\n' "$symbol" "$name" "$duration" "$suffix"
 }
 
-# Résumé court pour le statut : jamais de jeton, une description < 140 signes.
-resume_court() {
-    local i ok=0 ko=0 saute=0 premier_ko=""
-    for i in "${!SYMBOLES[@]}"; do
-        case "${SYMBOLES[$i]}" in
+# Short summary for the status: never a token, a description < 140 characters.
+short_summary() {
+    local i ok=0 failed=0 skipped=0 first_failed=""
+    for i in "${!SYMBOLS[@]}"; do
+        case "${SYMBOLS[$i]}" in
             ✔) ok=$((ok + 1)) ;;
-            ✖) ko=$((ko + 1)); [ -n "$premier_ko" ] || premier_ko="${NOMS[$i]}" ;;
-            *) saute=$((saute + 1)) ;;
+            ✖) failed=$((failed + 1)); [ -n "$first_failed" ] || first_failed="${NAMES[$i]}" ;;
+            *) skipped=$((skipped + 1)) ;;
         esac
     done
-    if [ "$ko" -gt 0 ]; then
-        printf '%d ✔, %d ✖ (%s), %d sauté — %d s' "$ok" "$ko" "$premier_ko" "$saute" "$TOTAL"
+    if [ "$failed" -gt 0 ]; then
+        printf '%d ✔, %d ✖ (%s), %d skipped — %d s' "$ok" "$failed" "$first_failed" "$skipped" "$TOTAL"
     else
-        printf '%d ✔, %d sauté — %d s' "$ok" "$saute" "$TOTAL"
+        printf '%d ✔, %d skipped — %d s' "$ok" "$skipped" "$TOTAL"
     fi
 }
 
-resume() {
-    local i ok=0 ko=0 saute=0
+summary() {
+    local i ok=0 failed=0 skipped=0
     echo
-    echo "devzone test-gitlab : résumé"
-    for i in "${!SYMBOLES[@]}"; do
-        printf '  %s %-28s %3d s%s\n' "${SYMBOLES[$i]}" "${NOMS[$i]}" "${DUREES[$i]}" "${SUFFIXES[$i]}"
-        case "${SYMBOLES[$i]}" in
+    echo "devzone test-gitlab : summary"
+    for i in "${!SYMBOLS[@]}"; do
+        printf '  %s %-28s %3d s%s\n' "${SYMBOLS[$i]}" "${NAMES[$i]}" "${DURATIONS[$i]}" "${SUFFIXES[$i]}"
+        case "${SYMBOLS[$i]}" in
             ✔) ok=$((ok + 1)) ;;
-            ✖) ko=$((ko + 1)) ;;
-            *) saute=$((saute + 1)) ;;
+            ✖) failed=$((failed + 1)) ;;
+            *) skipped=$((skipped + 1)) ;;
         esac
     done
-    printf '  total : %d étape(s), %d s, %d ✔, %d ✖, %d sauté\n' \
-        "${#NOMS[@]}" "$TOTAL" "$ok" "$ko" "$saute"
+    printf '  total: %d step(s), %d s, %d ✔, %d ✖, %d skipped\n' \
+        "${#NAMES[@]}" "$TOTAL" "$ok" "$failed" "$skipped"
 }
 
-# --statut : publie le résultat sur le commit HEAD du dépôt courant, par l'API
-# GitHub de gh (jeton du mainteneur). Refus clair si gh n'est pas connecté.
-publier_statut() {
-    local depot sha etat description
+# --statut: publishes the result on the HEAD commit of the current repository, through
+# the GitHub API of gh (maintainer token). Clear refusal if gh is not logged in.
+publish_status() {
+    local repo sha state description
     if ! gh auth status >/dev/null 2>&1; then
-        echo "devzone test-gitlab : gh non connecté, statut gitlab-integration non publié (gh auth login -s workflow)" >&2
+        echo "devzone test-gitlab : gh not logged in, gitlab-integration status not published (gh auth login -s workflow)" >&2
         return 1
     fi
-    depot="$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || true)"
-    if [ -z "$depot" ]; then
-        echo "devzone test-gitlab : dépôt GitHub courant introuvable, statut non publié" >&2
+    repo="$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || true)"
+    if [ -z "$repo" ]; then
+        echo "devzone test-gitlab : current GitHub repository not found, status not published" >&2
         return 1
     fi
     sha="$(git rev-parse HEAD 2>/dev/null || true)"
     if [ -z "$sha" ]; then
-        echo "devzone test-gitlab : commit HEAD introuvable, statut non publié" >&2
+        echo "devzone test-gitlab : HEAD commit not found, status not published" >&2
         return 1
     fi
-    if [ "$ECHEC" -eq 0 ]; then etat=success; else etat=failure; fi
-    description="$(resume_court)"
-    if ! gh api -X POST "repos/$depot/statuses/$sha" \
-        -f state="$etat" -f context=gitlab-integration -f description="$description" >/dev/null; then
-        echo "devzone test-gitlab : publication du statut gitlab-integration impossible" >&2
+    if [ "$FAILED" -eq 0 ]; then state=success; else state=failure; fi
+    description="$(short_summary)"
+    if ! gh api -X POST "repos/$repo/statuses/$sha" \
+        -f state="$state" -f context=gitlab-integration -f description="$description" >/dev/null; then
+        echo "devzone test-gitlab : publishing the gitlab-integration status impossible" >&2
         return 1
     fi
-    echo "devzone test-gitlab : statut gitlab-integration ($etat) publié sur $depot@$sha"
+    echo "devzone test-gitlab : gitlab-integration status ($state) published on $repo@$sha"
 }
 
-# ---- Options et déroulement ----
+# ---- Options and run ----
 
 for arg in "$@"; do
     case "$arg" in
-        --complet) COMPLET=1 ;;
-        --statut) STATUT=1 ;;
+        --complet) FULL=1 ;;
+        --statut) PUBLISH=1 ;;
         -h | --help) usage; exit 0 ;;
         *)
-            echo "devzone test-gitlab : option inconnue : $arg" >&2
+            echo "devzone test-gitlab : unknown option: $arg" >&2
             usage >&2
             exit 2
             ;;
     esac
 done
 
-DEBUT="$(date +%s)"
+START_TIME="$(date +%s)"
 
-if [ "$COMPLET" = 1 ]; then
-    lancer_etape "8. complet : désactivation" etape_complet
+if [ "$FULL" = 1 ]; then
+    run_step "8. full: disable" step_full
 fi
-lancer_etape "1. module" etape_module
-lancer_etape "2. état" etape_etat
-lancer_etape "3. nom d'hôte" etape_nom
-lancer_etape "4. pipeline" etape_pipeline
-lancer_etape "5. clones HTTP et SSH" etape_clones
-lancer_etape "6. plateforme" etape_plateforme
-lancer_etape "7. intégration repowarden" etape_repowarden
+run_step "1. module" step_module
+run_step "2. state" step_state
+run_step "3. host name" step_name
+run_step "4. pipeline" step_pipeline
+run_step "5. HTTP and SSH clones" step_clones
+run_step "6. platform" step_platform
+run_step "7. repowarden integration" step_repowarden
 
-TOTAL=$(( $(date +%s) - DEBUT ))
-resume
+TOTAL=$(( $(date +%s) - START_TIME ))
+summary
 
 CODE=0
-[ "$ECHEC" -eq 0 ] || CODE=1
-if [ "$STATUT" = 1 ]; then
-    publier_statut || CODE=1
+[ "$FAILED" -eq 0 ] || CODE=1
+if [ "$PUBLISH" = 1 ]; then
+    publish_status || CODE=1
 fi
 exit "$CODE"

@@ -1,6 +1,6 @@
 #!/usr/bin/env bats
-# Module argocd (#411) : installation isolée, mot de passe admin et accès par
-# relais. Faux helm, kubectl et nohup dans le PATH : aucun cluster touché.
+# Module argocd (#411): isolated install, admin password and relay access.
+# Fake helm, kubectl and nohup in the PATH: no cluster touched.
 
 setup() {
     bats_require_minimum_version 1.5.0
@@ -14,7 +14,7 @@ setup() {
     SECRETS="$DEVZONE_RACINE/workspace/.argocd"
     mkdir -p "$HOME" "$DEVZONE_RACINE/workspace" "$BATS_TEST_TMPDIR/bin"
     printf 'argocd=off\ncluster=docker-desktop\n' >"$DEVZONE_ETAT"
-    # Cluster de l'hôte : docker-desktop, avec son kubeconfig vide (isolé)
+    # Host cluster: docker-desktop, with its empty kubeconfig (isolated)
     : >"$DEVZONE_KUBE_HOTE"
 
     cat >"$BATS_TEST_TMPDIR/bin/kubectl" <<'KUBE'
@@ -74,8 +74,8 @@ teardown() {
     bash "$ARGOCD" relay-stop >/dev/null 2>&1 || true
 }
 
-# Prépare un module déjà installé : namespace présent, admin.env et relais.
-argocd_installe() {
+# Prepares an already installed module: namespace present, admin.env and relay.
+argocd_installed() {
     touch "$BATS_TEST_TMPDIR/ns"
     mkdir -p "$SECRETS"
     printf 'ARGOCD_URL=https://127.0.0.1:8443\nARGOCD_USER=admin\nARGOCD_PASSWORD=secret-admin\n' \
@@ -83,18 +83,18 @@ argocd_installe() {
     printf 'argocd=on\ncluster=docker-desktop\n' >"$DEVZONE_ETAT"
 }
 
-attendre_nohup() {
-    local motif="$1" i=0
+wait_nohup() {
+    local pattern="$1" i=0
     while [ "$i" -lt 50 ]; do
-        if grep -q -- "$motif" "$BATS_TEST_TMPDIR/nohup.log" 2>/dev/null; then return 0; fi
+        if grep -q -- "$pattern" "$BATS_TEST_TMPDIR/nohup.log" 2>/dev/null; then return 0; fi
         i=$((i + 1))
         sleep 0.1
     done
-    echo "nohup.log : ligne absente après 5 s : $motif" >&2
+    echo "nohup.log: line missing after 5 s: $pattern" >&2
     return 1
 }
 
-@test "argocd : désactivé par défaut, état du module facultatif" {
+@test "argocd: disabled by default, module status optional" {
     run bash "$DEVZONE" is-enabled argocd
     [ "$status" -ne 0 ]
     run bash "$ARGOCD" status
@@ -102,17 +102,16 @@ attendre_nohup() {
     [ "$output" = "désactivé" ]
 }
 
-@test "activer argocd : namespace isolé, chart figé, mot de passe rangé, relais lancé" {
+@test "enable argocd: isolated namespace, pinned chart, password stored, relay started" {
     run bash "$DEVZONE" enable argocd </dev/null
     [ "$status" -eq 0 ]
     grep -qx 'argocd=on' "$DEVZONE_ETAT"
     grep -q 'kind: NetworkPolicy' "$BATS_TEST_TMPDIR/apply.log"
     grep -q 'name: devzone-meme-namespace' "$BATS_TEST_TMPDIR/apply.log"
-    # Étiquette du namespace posée par l'administrateur, pas par le compte
-    # limité (#430)
+    # Namespace label set by the administrator, not by the limited account (#430)
     grep -q -- '--context docker-desktop label namespace devzone-argocd app.kubernetes.io/managed-by=devzone' "$BATS_TEST_TMPDIR/kubectl.log"
-    # Chart enveloppe charts/devzone-argocd : dépendance construite puis
-    # installation du chart local, avec le contexte devzone (#538)
+    # Wrapper chart charts/devzone-argocd: dependency built, then the local chart
+    # installed with the devzone context (#538)
     grep -Eq 'helm dependency build .*charts/devzone-argocd' "$BATS_TEST_TMPDIR/helm.log"
     grep -Eq 'helm --kubeconfig [^ ]+ --kube-context docker-desktop upgrade --install argocd .*charts/devzone-argocd --namespace devzone-argocd' "$BATS_TEST_TMPDIR/helm.log"
     ! grep -q 'argo/argo-cd' "$BATS_TEST_TMPDIR/helm.log" || false
@@ -123,38 +122,38 @@ attendre_nohup() {
     [ -f "$DEVZONE_RACINE/.password" ]
     [ "$(stat -c '%a' "$DEVZONE_RACINE/.password")" = 600 ]
     grep -q "$(printf 'argocd\thttps://127.0.0.1:8443\tadmin\tsecret-admin')" "$DEVZONE_RACINE/.password"
-    attendre_nohup '8443:443'
-    [[ "$output" == *"✔ module argocd prêt : https://127.0.0.1:8443"* ]] || false
+    wait_nohup '8443:443'
+    [[ "$output" == *"✔ argocd module ready: https://127.0.0.1:8443"* ]] || false
     [[ "$output" != *"secret-admin"* ]] || false
 }
 
-@test "activer argocd : moins de 1 Go de mémoire allouable → refus, rien installé" {
+@test "enable argocd: less than 1 GB of allocatable memory → refused, nothing installed" {
     run env FAUX_MEMOIRE_CLUSTER=512Mi bash "$DEVZONE" enable argocd </dev/null
     [ "$status" -ne 0 ]
-    [[ "$output" == *"au moins 1 Go de mémoire allouable"* ]] || false
+    [[ "$output" == *"at least 1 GB of allocatable memory"* ]] || false
     [ ! -f "$BATS_TEST_TMPDIR/ns" ]
     [ ! -f "$BATS_TEST_TMPDIR/helm.log" ]
 }
 
-@test "etat après installation : prêt, relais arrêté signalé" {
-    argocd_installe
+@test "status after installation: ready, relay stopped reported" {
+    argocd_installed
     run bash "$ARGOCD" status
     [ "$status" -eq 0 ]
     [[ "$output" == *"relais arrêté"* ]] || false
 }
 
-@test "activer argocd déjà installé : relais relancé, pas de nouvelle installation" {
-    argocd_installe
+@test "enable argocd already installed: relay restarted, no new installation" {
+    argocd_installed
     rm -f "$BATS_TEST_TMPDIR/helm.log"
     run bash "$DEVZONE" enable argocd </dev/null
     [ "$status" -eq 0 ]
     [[ "$output" == *"relais relancé"* ]] || false
     [ ! -f "$BATS_TEST_TMPDIR/helm.log" ]
-    attendre_nohup '8443:443'
+    wait_nohup '8443:443'
 }
 
-@test "argocd app add : Application of the project applied with the devzone context (#516)" {
-    argocd_installe
+@test "argocd app add: Application of the project applied with the devzone context (#516)" {
+    argocd_installed
     run bash "$DEVZONE" argocd app add https://github.com/argoproj/argocd-example-apps guestbook
     [ "$status" -eq 0 ]
     [[ "$output" == *"✔ Application app-argocd-example-apps"* ]] || false
@@ -166,8 +165,8 @@ attendre_nohup() {
     grep -q -- '--context devzone apply -f -' "$BATS_TEST_TMPDIR/kubectl.log"
 }
 
-@test "argocd app add : GitLab de devzone, URL interne et jeton root du module dans un Secret de dépôt" {
-    argocd_installe
+@test "argocd app add: devzone GitLab, internal URL and module root token in a repository Secret" {
+    argocd_installed
     mkdir -p "$DEVZONE_RACINE/workspace/.gitlab"
     printf 'glpat-SECRET' >"$DEVZONE_RACINE/workspace/.gitlab/root-token"
     run bash "$DEVZONE" argocd app add http://gitlab.localhost:8929/devzone/demo.git k8s
@@ -179,33 +178,33 @@ attendre_nohup() {
     grep -q -- '--context devzone -n devzone-gitlab patch networkpolicy devzone-meme-namespace' "$BATS_TEST_TMPDIR/kubectl.log"
 }
 
-@test "argocd app : module inactif refusé, et renvoi au poste dans le pod du workspace" {
+@test "argocd app: module disabled refused, and redirect to the workstation in the workspace pod" {
     run bash "$DEVZONE" argocd app list
     [ "$status" -eq 2 ]
     [[ "$output" == *"module off: devzone enable argocd"* ]] || false
-    argocd_installe
+    argocd_installed
     run env DEVZONE_WORKSPACE=kubernetes bash "$DEVZONE" argocd app list
     [ "$status" -eq 2 ]
     [[ "$output" == *"devzone workspace argocd app list"* ]] || false
 }
 
-@test "desactiver argocd : helm uninstall, namespace supprimé, services conservés" {
-    argocd_installe
+@test "disable argocd: helm uninstall, namespace deleted, services kept" {
+    argocd_installed
     run bash "$DEVZONE" disable argocd
     [ "$status" -eq 0 ]
     grep -qx 'argocd=off' "$DEVZONE_ETAT"
     grep -Eq 'helm --kubeconfig [^ ]+ --kube-context docker-desktop uninstall argocd -n devzone-argocd' "$BATS_TEST_TMPDIR/helm.log"
-    # Namespace supprimé par l'administrateur, pas par le compte limité (#430)
+    # Namespace deleted by the administrator, not by the limited account (#430)
     grep -q -- '--context docker-desktop delete namespace devzone-argocd' "$BATS_TEST_TMPDIR/kubectl.log"
     [ ! -e "$SECRETS" ]
-    [[ "$output" == *"les services restent, sous helm direct"* ]] || false
+    [[ "$output" == *"the services stay, under direct helm"* ]] || false
 }
 
-# ---- Noms français (#557) : même résultat que le nom anglais, avec l'avertissement ----
-# argocd n'a aucune option française (sa table ne contient que des sous-commandes)
+# ---- French names (#557): same result as the English name, with the warning ----
+# argocd has no French option (its table only holds subcommands)
 
-@test "argocd : les noms anglais ne donnent aucun avertissement" {
-    argocd_installe
+@test "argocd: English names give no warning" {
+    argocd_installed
     run --separate-stderr bash "$ARGOCD" status
     [ "$status" -eq 0 ] || false
     [[ "$stderr" != *"deprecated"* ]] || false
