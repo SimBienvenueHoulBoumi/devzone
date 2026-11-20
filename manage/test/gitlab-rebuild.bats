@@ -208,7 +208,7 @@ contexte_courant() {
     poser_contexte_courant docker-desktop
     FAUX_KUBE_MEMOIRE=4Gi run bash "$GITLAB" install
     [ "$status" -eq 2 ] || false
-    [[ "$output" == *"au moins 8 Go"* ]] || false
+    [[ "$output" == *"at least 8 GiB"* ]] || false
     [ ! -e "$BATS_TEST_TMPDIR/helm.log" ] || false
     [ "$(contexte_courant)" = docker-desktop ] || false
 }

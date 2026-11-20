@@ -193,7 +193,7 @@ GH
 
 @test "docker-hote : desactiver concurrent avec une écriture d'état : aucune ligne perdue" {
     printf 'docker-hote=off\nia=on\n' >"$DEVZONE_RACINE/.devzone.modules"
-    ETAT="$DEVZONE_RACINE/.devzone.modules" bash -c '. "$1"; etat_ecrire postgres on' _ "$BATS_TEST_DIRNAME/../../.devcontainer/etat.sh" & pid_w=$!
+    ETAT="$DEVZONE_RACINE/.devzone.modules" bash -c '. "$1"; state_write postgres on' _ "$BATS_TEST_DIRNAME/../../.devcontainer/etat.sh" & pid_w=$!
     bash "$DEVZONE" disable docker-hote & pid_d=$!
     wait "$pid_w"
     wait "$pid_d"
@@ -541,7 +541,7 @@ KUBE
     run bash "$DEVZONE" disable kubernetes
     [ "$status" -eq 0 ]
     [ "$(cat "$KUBE_DELETE_LOG")" = "delete -f kind-dev" ]
-    [[ "$output" == *"metrics-server présent sans repère devzone, laissé : kind-staging"* ]] || false
+    [[ "$output" == *"metrics-server present without a devzone mark, left: kind-staging"* ]] || false
 }
 
 @test "désactiver kubernetes : cycle activer + désactiver → ~/.kube identique" {
@@ -600,7 +600,7 @@ KUBE
     mkdir -p "$HOME/.claude" && echo '{}' >"$HOME/.claude/.credentials.json"
     run bash "$DEVZONE" is-enabled ia
     [ "$status" -ne 0 ]
-    [[ "$output" == *"connexion Claude Code/opencode partagée trouvée : devzone enable ia pour l'utiliser ici"* ]] || false
+    [[ "$output" == *"shared Claude Code/opencode connection found: devzone enable ia to use it here"* ]] || false
     run bash "$DEVZONE" is-enabled ia
     [ "$status" -ne 0 ]
     [ -z "$output" ]
@@ -610,7 +610,7 @@ KUBE
     mkdir -p "$HOME/.local/share/opencode" && echo '{}' >"$HOME/.local/share/opencode/auth.json"
     run bash "$DEVZONE" is-enabled ia
     [ "$status" -ne 0 ]
-    [[ "$output" == *"connexion Claude Code/opencode partagée trouvée"* ]] || false
+    [[ "$output" == *"shared Claude Code/opencode connection found"* ]] || false
     run bash "$DEVZONE" is-enabled ia
     [ "$status" -ne 0 ]
     [ -z "$output" ]

@@ -18,7 +18,7 @@ ports_auto_actif() { local v; v="$(grep -E '^ports_auto=' "$ETAT" 2>/dev/null | 
 # Liste des ports exclus par l'utilisateur (ports_exclus=, virgules).
 ports_exclus_lus() { grep -E '^ports_exclus=' "$ETAT" 2>/dev/null | tail -1 | cut -d= -f2- || true; }
 # Ecrit une ligne cle=valeur dans l'etat, comme ecrire_ports pour ports=
-ecrire() { etat_ecrire "$1" "${2:-}" || { echo "devzone : port : etat non enregistre : $ETAT" >&2; return 1; }; }
+ecrire() { state_write "$1" "${2:-}" || { echo "devzone : port : etat non enregistre : $ETAT" >&2; return 1; }; }
 # Un port est exclu quand il figure dans la liste ports_exclus=.
 port_exclu() { case ",$(ports_exclus_lus)," in *",$1,"*) return 0 ;; esac; return 1; }
 # Nom du relais automatique d'un port : devzone-<instance>-auto-<port>.
@@ -87,10 +87,10 @@ verrou_rafraichir() { touch "$VERROU" 2>/dev/null || true; echo "$$" >"$VERROU/p
 ports_auto_tour() {
     local port now delay sortie
     # État restauré ou reconstruit : rien pendant 60 s (#417, étape 4)
-    etat_recouvrement_attente && return 0
+    state_recovery_wait && return 0
     if [ "$(ports_auto_actif)" = off ]; then
         # Jamais de désinstallation sur un état non confirmé (#417, étape 4)
-        etat_recouvrement_en_attente || nettoyer_auto_tout
+        state_recovery_pending || nettoyer_auto_tout
         return 0
     fi
     if ! reseau_ip; then echo "devzone : ports-auto : conteneur devzone introuvable" >&2; return 1; fi
@@ -141,7 +141,7 @@ ports_auto_tour() {
         if grep -q "^$port " "$PENDING" 2>/dev/null; then
             ancien="$(grep "^$port " "$PENDING" | head -1 | cut -d' ' -f2)"
             # Rien ne se retire sur un état restauré non confirmé (#417)
-            if etat_recouvrement_en_attente; then continue; fi
+            if state_recovery_pending; then continue; fi
             if [ -n "$ancien" ] && [ "$(( now - ancien ))" -ge "$delay" ]; then
                 fermer_auto "$port"
                 grep -v "^$port " "$PENDING" >"$PENDING.tmp" 2>/dev/null || true; mv "$PENDING.tmp" "$PENDING" 2>/dev/null || true
@@ -168,7 +168,7 @@ ports_auto_boucle() {
     trap 'nettoyer_auto_tout; rm -rf "$VERROU"' EXIT INT TERM
     while true; do
         # État restauré ou reconstruit : rien pendant 60 s (#417, étape 4)
-        if etat_recouvrement_attente; then
+        if state_recovery_wait; then
             verrou_rafraichir
             sleep "${DEVZONE_PORTS_AUTO_PAS:-2}"
             continue
@@ -178,7 +178,7 @@ ports_auto_boucle() {
         verrou_rafraichir
         if [ "$(ports_auto_actif)" = off ]; then
             # Jamais de désinstallation sur un état non confirmé (#417)
-            etat_recouvrement_en_attente || nettoyer_auto_tout
+            state_recovery_pending || nettoyer_auto_tout
             break
         fi
         ports_auto_tour || true
