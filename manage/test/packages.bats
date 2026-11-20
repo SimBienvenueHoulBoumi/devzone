@@ -1,7 +1,10 @@
 #!/usr/bin/env bats
-# Paquets systeme gardes apres un rebuild (#351) : liste <racine>/.devzone.paquets,
-# reinstallee a la creation du conteneur (post-create.sh). Faux apt-get, apt-cache,
-# dpkg-query, kubectl et gh dans le PATH : aucun paquet reellement installe.
+# System packages kept after a rebuild (#351): list <root>/.devzone.paquets,
+# reinstalled at container creation (post-create.sh). Fake apt-get, apt-cache,
+# dpkg-query, kubectl and gh in the PATH: no package really installed.
+
+# Stored mark « already present », byte for byte as packages.sh writes it
+PRESENT_MARK=$'# d\303\251j\303\240 pr\303\251sent'
 
 setup() {
     load commun
@@ -18,8 +21,8 @@ setup() {
     : >"$BATS_TEST_TMPDIR/apt.log"
     : >"$BATS_TEST_TMPDIR/apt-cache.log"
     : >"$BATS_TEST_TMPDIR/apt-cache.list"
-    : >"$BATS_TEST_TMPDIR/apt-echoues"
-    : >"$BATS_TEST_TMPDIR/installe"
+    : >"$BATS_TEST_TMPDIR/apt-failing"
+    : >"$BATS_TEST_TMPDIR/installed"
     : >"$BATS_TEST_TMPDIR/apt-cache.list"
     cat >"$BATS_TEST_TMPDIR/bin/apt-get" <<'APT'
 #!/usr/bin/env bash
@@ -35,8 +38,8 @@ case "${1:-}" in
             case "$arg" in
                 -y | --no-install-recommends) ;;
                 *)
-                    grep -qx "$arg" "$BATS_TEST_TMPDIR/apt-echoues" && exit 1
-                    echo "$arg" >>"$BATS_TEST_TMPDIR/installe"
+                    grep -qx "$arg" "$BATS_TEST_TMPDIR/apt-failing" && exit 1
+                    echo "$arg" >>"$BATS_TEST_TMPDIR/installed"
                     ;;
             esac
         done
@@ -49,8 +52,8 @@ case "${1:-}" in
                 -y) ;;
                 *)
                     tmp="$(mktemp)"
-                    grep -vx "$arg" "$BATS_TEST_TMPDIR/installe" >"$tmp" || true
-                    mv "$tmp" "$BATS_TEST_TMPDIR/installe"
+                    grep -vx "$arg" "$BATS_TEST_TMPDIR/installed" >"$tmp" || true
+                    mv "$tmp" "$BATS_TEST_TMPDIR/installed"
                     ;;
             esac
         done
@@ -62,15 +65,15 @@ APT
     cat >"$BATS_TEST_TMPDIR/bin/apt-cache" <<'APT'
 #!/usr/bin/env bash
 echo "apt-cache $*" >>"$BATS_TEST_TMPDIR/apt-cache.log"
-paquet="${2:-}"
-grep -qx "$paquet" "$BATS_TEST_TMPDIR/apt-cache.list" && exit 0
+package="${2:-}"
+grep -qx "$package" "$BATS_TEST_TMPDIR/apt-cache.list" && exit 0
 exit 1
 APT
     cat >"$BATS_TEST_TMPDIR/bin/dpkg-query" <<'DPKG'
 #!/usr/bin/env bash
 if [ "${1:-}" = -W ]; then
-    paquet="${3:-}"
-    if grep -qx "$paquet" "$BATS_TEST_TMPDIR/installe"; then
+    package="${3:-}"
+    if grep -qx "$package" "$BATS_TEST_TMPDIR/installed"; then
         echo "install ok installed"
     else
         echo "install ok not-installed"
@@ -82,10 +85,10 @@ DPKG
     printf '#!/usr/bin/env bash\nexit 0\n' >"$BATS_TEST_TMPDIR/bin/kubectl"
     cat >"$BATS_TEST_TMPDIR/bin/gh" <<'GH'
 #!/usr/bin/env bash
-case "${GH_ETAT:-absent}" in
+case "${GH_STATE:-absent}" in
     absent) echo "You are not logged into any GitHub hosts." >&2; exit 1 ;;
-    sans) echo "  - Token scopes: 'gist', 'read:org', 'repo'" ;;
-    avec) echo "  - Token scopes: 'gist', 'read:org', 'repo', 'workflow'" ;;
+    without) echo "  - Token scopes: 'gist', 'read:org', 'repo'" ;;
+    with) echo "  - Token scopes: 'gist', 'read:org', 'repo', 'workflow'" ;;
 esac
 GH
     cat >"$BATS_TEST_TMPDIR/bin/npm" <<'NPM'
@@ -105,13 +108,13 @@ NPM
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
 }
 
-@test "paquets : liste vide -> aucun paquet, et la commande pour en ajouter" {
+@test "packages: empty list -> no package, and the command to add one" {
     run bash "$DEVZONE" packages
     [ "$status" -eq 0 ]
-    [[ "$output" == *"aucun paquet"* ]] || false
+    [[ "$output" == *"no package"* ]] || false
 }
 
-@test "paquets : le nom anglais des sous-commandes ne donne aucun avertissement" {
+@test "packages: the English names of the subcommands give no warning" {
     run --separate-stderr bash "$DEVZONE" packages list
     [ "$status" -eq 0 ]
     [[ "$stderr" != *"deprecated"* ]] || false
@@ -120,7 +123,7 @@ NPM
     [[ "$stderr" != *"deprecated"* ]] || false
 }
 
-@test "paquets : ajouter valide installe et ajoute a la liste" {
+@test "packages: add installs and adds to the list" {
     run bash "$DEVZONE" packages add tree
     [ "$status" -eq 0 ]
     grep -q -- "apt-get install -y --no-install-recommends tree" "$BATS_TEST_TMPDIR/apt.log"
@@ -128,33 +131,33 @@ NPM
     grep -qx "tree" "$DEVZONE_RACINE/.devzone.paquets"
 }
 
-@test "paquets : ajouter un nom inconnu est refuse, liste inchon due, code 1" {
-    run bash "$DEVZONE" packages add inconnome
+@test "packages: adding an unknown name is refused, list unchanged, code 1" {
+    run bash "$DEVZONE" packages add nosuchpkg
     [ "$status" -eq 1 ]
-    [[ "$output" == *"paquet inconnu"* ]] || false
+    [[ "$output" == *"unknown package"* ]] || false
     [ ! -f "$DEVZONE_RACINE/.devzone.paquets" ]
 }
 
-@test "paquets : retirer retire la liste et desinstalle" {
+@test "packages: remove drops it from the list and uninstalls" {
     run bash "$DEVZONE" packages add tree
     [ "$status" -eq 0 ]
     run bash "$DEVZONE" packages remove tree
     [ "$status" -eq 0 ]
     grep -q -- "apt-get remove -y tree" "$BATS_TEST_TMPDIR/apt.log"
     run bash "$DEVZONE" packages
-    [[ "$output" == *"aucun paquet"* ]] || false
+    [[ "$output" == *"no package"* ]] || false
 }
 
-@test "paquets : retirer un paquet non liste (fourni par l image) est refuse" {
+@test "packages: removing a package not listed (from the image) is refused" {
     run bash "$DEVZONE" packages remove tree
     [ "$status" -eq 1 ]
-    [[ "$output" == *"paquet non list"* ]] || false
+    [[ "$output" == *"package not listed"* ]] || false
 }
 
 
-@test "paquets : appliquer n installe que les paquets manquants" {
-    printf '# paquets ajoutes par devzone paquets ; reinstalle a chaque creation du conteneur\ntree\nhtop\n' >"$DEVZONE_RACINE/.devzone.paquets"
-    printf 'tree\n' >"$BATS_TEST_TMPDIR/installe"
+@test "packages: apply installs only the missing packages" {
+    printf '# packages added by devzone packages ; reinstalled at each container creation\ntree\nhtop\n' >"$DEVZONE_RACINE/.devzone.paquets"
+    printf 'tree\n' >"$BATS_TEST_TMPDIR/installed"
     : >"$BATS_TEST_TMPDIR/apt.log"
     run bash "$DEVZONE" packages apply
     [ "$status" -eq 0 ]
@@ -162,17 +165,17 @@ NPM
     [ ! -e "$DEVZONE_PAQUETS_MARQUE" ]
 }
 
-@test "paquets : liste trie et sans doublon" {
-    printf '# paquets ajoutes par devzone paquets ; reinstalle a chaque creation du conteneur\ntree\nhtop\ntree\n' >"$DEVZONE_RACINE/.devzone.paquets"
+@test "packages: list sorted and without duplicate" {
+    printf '# packages added by devzone packages ; reinstalled at each container creation\ntree\nhtop\ntree\n' >"$DEVZONE_RACINE/.devzone.paquets"
     run bash "$DEVZONE" packages
     [ "$status" -eq 0 ]
     [ "$(grep -c "○ htop" <<<"$output")" -eq 1 ]
     [ "$(grep -c "○ tree" <<<"$output")" -eq 1 ]
 }
 
-@test "paquets : paquet introuvable a l appliquer -> marque et ⚠ dans le recapitulatif" {
-    printf '# paquets ajoutes par devzone paquets ; reinstalle a chaque creation du conteneur\nghost\n' >"$DEVZONE_RACINE/.devzone.paquets"
-    printf 'ghost\n' >"$BATS_TEST_TMPDIR/apt-echoues"
+@test "packages: package not found at apply -> mark and ⚠ in the recap" {
+    printf '# packages added by devzone packages ; reinstalled at each container creation\nghost\n' >"$DEVZONE_RACINE/.devzone.paquets"
+    printf 'ghost\n' >"$BATS_TEST_TMPDIR/apt-failing"
     run bash "$DEVZONE" packages apply
     [ "$status" -ne 0 ]
     [ -f "$DEVZONE_PAQUETS_MARQUE" ]
@@ -182,58 +185,58 @@ NPM
     [[ "$output" == *"devzone packages"* ]] || false
 }
 
-@test "paquets : ajouter valide fait apt-get update avant apt-get install" {
+@test "packages: add runs apt-get update before apt-get install" {
     run bash "$DEVZONE" packages add tree
     [ "$status" -eq 0 ]
     grep -q -- "apt-get update" "$BATS_TEST_TMPDIR/apt.log"
     grep -q -- "apt-get install -y --no-install-recommends tree" "$BATS_TEST_TMPDIR/apt.log"
-    ligne_update="$(grep -n "apt-get update" "$BATS_TEST_TMPDIR/apt.log" | head -1 | cut -d: -f1)"
-    ligne_install="$(grep -n "apt-get install" "$BATS_TEST_TMPDIR/apt.log" | head -1 | cut -d: -f1)"
-    [ "$ligne_update" -lt "$ligne_install" ] || false
+    line_update="$(grep -n "apt-get update" "$BATS_TEST_TMPDIR/apt.log" | head -1 | cut -d: -f1)"
+    line_install="$(grep -n "apt-get install" "$BATS_TEST_TMPDIR/apt.log" | head -1 | cut -d: -f1)"
+    [ "$line_update" -lt "$line_install" ] || false
 }
 
-@test "paquets : appliquer fait apt-get update avant apt-get install pour un paquet manquant" {
-    printf '# paquets ajoutes par devzone paquets ; reinstalle a chaque creation du conteneur\ntree\n' >"$DEVZONE_RACINE/.devzone.paquets"
-    : >"$BATS_TEST_TMPDIR/installe"
+@test "packages: apply runs apt-get update before apt-get install for a missing package" {
+    printf '# packages added by devzone packages ; reinstalled at each container creation\ntree\n' >"$DEVZONE_RACINE/.devzone.paquets"
+    : >"$BATS_TEST_TMPDIR/installed"
     run bash "$DEVZONE" packages apply
     [ "$status" -eq 0 ]
     grep -q -- "apt-get update" "$BATS_TEST_TMPDIR/apt.log"
     grep -q -- "apt-get install -y --no-install-recommends tree" "$BATS_TEST_TMPDIR/apt.log"
-    ligne_update="$(grep -n "apt-get update" "$BATS_TEST_TMPDIR/apt.log" | head -1 | cut -d: -f1)"
-    ligne_install="$(grep -n "apt-get install" "$BATS_TEST_TMPDIR/apt.log" | head -1 | cut -d: -f1)"
-    [ "$ligne_update" -lt "$ligne_install" ] || false
+    line_update="$(grep -n "apt-get update" "$BATS_TEST_TMPDIR/apt.log" | head -1 | cut -d: -f1)"
+    line_install="$(grep -n "apt-get install" "$BATS_TEST_TMPDIR/apt.log" | head -1 | cut -d: -f1)"
+    [ "$line_update" -lt "$line_install" ] || false
 }
 
-@test "paquets : appliquer installe le valide et ne marque que l inconnu" {
-    printf '# paquets ajoutes par devzone paquets ; reinstalle a chaque creation du conteneur\ninconnu\ntree\n' >"$DEVZONE_RACINE/.devzone.paquets"
-    printf 'inconnu\n' >"$BATS_TEST_TMPDIR/apt-echoues"
-    : >"$BATS_TEST_TMPDIR/installe"
+@test "packages: apply installs the valid one and marks only the unknown one" {
+    printf '# packages added by devzone packages ; reinstalled at each container creation\nunknown\ntree\n' >"$DEVZONE_RACINE/.devzone.paquets"
+    printf 'unknown\n' >"$BATS_TEST_TMPDIR/apt-failing"
+    : >"$BATS_TEST_TMPDIR/installed"
     run bash "$DEVZONE" packages apply
     [ "$status" -ne 0 ]
     grep -q -- "apt-get update" "$BATS_TEST_TMPDIR/apt.log"
-    grep -qx "tree" "$BATS_TEST_TMPDIR/installe"
+    grep -qx "tree" "$BATS_TEST_TMPDIR/installed"
     [ -f "$DEVZONE_PAQUETS_MARQUE" ]
-    grep -qx "inconnu" "$DEVZONE_PAQUETS_MARQUE"
+    grep -qx "unknown" "$DEVZONE_PAQUETS_MARQUE"
     [ "$(wc -l < "$DEVZONE_PAQUETS_MARQUE")" -eq 1 ] || false
-    [[ "$(cat "$DEVZONE_PAQUETS_MARQUE")" == "inconnu" ]] || false
+    [[ "$(cat "$DEVZONE_PAQUETS_MARQUE")" == "unknown" ]] || false
 }
 
-@test "paquets : paquet deja installe avant ajouter est marque, retirer ne le desinstalle pas" {
-    printf 'tree\n' >"$BATS_TEST_TMPDIR/installe"
+@test "packages: package already installed before add is marked, remove does not uninstall it" {
+    printf 'tree\n' >"$BATS_TEST_TMPDIR/installed"
     run bash "$DEVZONE" packages add tree
     [ "$status" -eq 0 ]
-    grep -qxF -e "tree # déjà présent" "$DEVZONE_RACINE/.devzone.paquets"
+    grep -qxF -e "tree $PRESENT_MARK" "$DEVZONE_RACINE/.devzone.paquets"
     : >"$BATS_TEST_TMPDIR/apt.log"
     run bash "$DEVZONE" packages remove tree
     [ "$status" -eq 0 ]
-    [[ "$output" == *"laissé installé"* ]] || false
+    [[ "$output" == *"left installed"* ]] || false
     ! grep -q "apt-get remove" "$BATS_TEST_TMPDIR/apt.log" || false
-    grep -qx "tree" "$BATS_TEST_TMPDIR/installe"
+    grep -qx "tree" "$BATS_TEST_TMPDIR/installed"
     run bash "$DEVZONE" packages
-    [[ "$output" == *"aucun paquet"* ]] || false
+    [[ "$output" == *"no package"* ]] || false
 }
 
-@test "paquets : apres ajouter a, ajouter b, retirer a, un seul en-tete et seulement b" {
+@test "packages: after add a, add b, remove a, a single header and only b" {
     run bash "$DEVZONE" packages add tree
     [ "$status" -eq 0 ]
     run bash "$DEVZONE" packages add htop
@@ -244,9 +247,9 @@ NPM
     [ "$(grep -v '^#' "$DEVZONE_RACINE/.devzone.paquets")" = "htop" ]
 }
 
-@test "paquets : noms_liste ignore la marque deja present" {
-    printf '# paquets ajoutes par devzone paquets ; reinstalle a chaque creation du conteneur\ntree # déjà présent\nhtop\n' >"$DEVZONE_RACINE/.devzone.paquets"
-    printf 'tree\n' >"$BATS_TEST_TMPDIR/installe"
+@test "packages: names_list ignores the already-present mark" {
+    printf '# packages added by devzone packages ; reinstalled at each container creation\ntree %s\nhtop\n' "$PRESENT_MARK" >"$DEVZONE_RACINE/.devzone.paquets"
+    printf 'tree\n' >"$BATS_TEST_TMPDIR/installed"
     : >"$BATS_TEST_TMPDIR/apt.log"
     run bash "$DEVZONE" packages
     [ "$status" -eq 0 ]

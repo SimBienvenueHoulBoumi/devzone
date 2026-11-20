@@ -204,3 +204,9 @@ manage/test/kube-account.bats
 manage/test/post-create.bats
 manage/test/startup.bats
 manage/test/workspace-init.bats
+.devcontainer/ports.sh
+.devcontainer/ports-auto.sh
+.devcontainer/packages.sh
+manage/test/ports.bats
+manage/test/ports-auto.bats
+manage/test/packages.bats
