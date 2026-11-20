@@ -27,7 +27,7 @@ if [ "${1:-}" = retirer ]; then
         # Local clusters only: removal on a remote cluster has nothing to remove
         # (devzone never installs there)
         mapfile -t contexts < <(printf '%s\n' ${known[@]+"${known[@]}"} |
-            while IFS= read -r c; do cluster_est_local "$c" && echo "$c"; done || true)
+            while IFS= read -r c; do cluster_is_local "$c" && echo "$c"; done || true)
         set -- ${contexts[@]+"${contexts[@]}"}
     fi
     code=0
@@ -56,7 +56,7 @@ if [ "$requested" -eq 0 ]; then
     # Local clusters only: never an automatic installation on a remote cluster
     # of the host (prod, staging…); for another one, name it as an argument
     mapfile -t contexts < <(printf '%s\n' ${known[@]+"${known[@]}"} |
-        while IFS= read -r c; do cluster_est_local "$c" && echo "$c"; done || true)
+        while IFS= read -r c; do cluster_is_local "$c" && echo "$c"; done || true)
     set -- ${contexts[@]+"${contexts[@]}"}
 fi
 

@@ -13,7 +13,7 @@ RACINE="${DEVZONE_RACINE:-$(dirname "$(dirname "$ICI")")}"
 # shellcheck source=SCRIPTDIR/../password.sh
 # shellcheck disable=SC1091
 . "$ICI/../password.sh"
-# Isolation réseau : namespace_isoler, posée avec le namespace devzone-gitlab
+# Isolation réseau : namespace_isolate, posée avec le namespace devzone-gitlab
 # shellcheck source=SCRIPTDIR/../isolation.sh
 # shellcheck disable=SC1091
 . "$ICI/../isolation.sh"

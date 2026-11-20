@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Docker du poste non partagé (option docker-hote=off, #432). post-create.sh
-# installe ce script comme commande docker quand la feature
-# docker-outside-of-docker est absente : au lieu d'un « command not found »,
-# un message clair renvoie au workspace Kubernetes.
+# Docker of the workstation not shared (option docker-hote=off, #432). post-create.sh
+# installs this script as the docker command when the docker-outside-of-docker
+# feature is absent: instead of a « command not found », a clear message points
+# to the Kubernetes workspace.
 cat >&2 <<'MESSAGE'
-✖ Docker du poste non partagé (option docker-hote=off) : docker n'est pas disponible ici.
-  Pour lancer des conteneurs, utilise le workspace Kubernetes : devzone workspace
-  (docker et Testcontainers y parlent à kubedock, les images sont construites par BuildKit).
-  Pour partager le socket Docker de l'hôte : devzone enable docker-hote, puis make rebuild sur le poste.
+✖ Docker of the workstation not shared (option docker-hote=off): docker is not available here.
+  To run containers, use the Kubernetes workspace: devzone workspace
+  (docker and Testcontainers talk to kubedock there, images are built by BuildKit).
+  To share the host Docker socket: devzone enable docker-hote, then make rebuild on the workstation.
 MESSAGE
 exit 1

@@ -144,7 +144,7 @@ conteneur "devzone : état" 60 0 "○ module kubernetes" "devzone"
 conteneur "devzone --help" 60 0 "devzone enable <module>" "devzone --help"
 conteneur "devzone enable ia" 600 0 "ia actif" "devzone enable ia"
 conteneur "devzone disable ia" 300 0 "ia désactivé" "devzone disable ia"
-conteneur "devzone enable kubernetes (aucun cluster de l'hôte)" 180 0 "aucun cluster joignable" "devzone enable kubernetes"
+conteneur "devzone enable kubernetes (aucun cluster de l'hôte)" 180 0 "no reachable cluster" "devzone enable kubernetes"
 conteneur "devzone disable kubernetes" 60 0 "kubernetes désactivé" "devzone disable kubernetes"
 conteneur "devzone enable <module inconnu> : refusé" 60 1 "module inconnu" "devzone enable nexistepas"
 conteneur "devzone <commande inconnue> : refusée" 60 1 "commande inconnue" "devzone nexistepas"
@@ -156,7 +156,7 @@ conteneur "startup.sh : sans question" 180 0 "devzone: state" "bash .devcontaine
 git -C "$COPIE" init -q
 git -C "$COPIE" remote add origin https://github.com/exemple/mon-devzone.git
 FAUX_GH='mkdir -p /tmp/faux && printf "%s\n" "#!/bin/sh" "case \"\$*\" in" "\"auth status\"*) exit 0 ;;" "\"repo view\"*) echo exemple/mon-devzone ;;" "*permissions.admin*) echo true ;;" "esac" >/tmp/faux/gh && chmod +x /tmp/faux/gh'
-conteneur "post-create.sh : sans question (dépôt GitHub, gh administrateur)" 600 0 "devzone prêt" \
+conteneur "post-create.sh : sans question (dépôt GitHub, gh administrateur)" 600 0 "devzone up" \
     "$FAUX_GH && PATH=/tmp/faux:\$PATH bash .devcontainer/post-create.sh"
 # Scénario réel atteint : repowarden aurait posé la question avec un terminal
 verifier "post-create.sh : bots proposés plus tard, sans attendre" grep -q "pas de terminal pour répondre" <<<"$SORTIE"

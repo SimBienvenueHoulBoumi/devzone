@@ -2,7 +2,7 @@
 # Argo CD for the catalogue applications in the container (#538): the module
 # mysql and the catalogue install their application as the Application
 # devzone-<app> (services.sh) when the module argocd is active, instead of
-# the manifest applied by hand. The namespace (compte_namespace of
+# the manifest applied by hand. The namespace (account_namespace of
 # cluster.sh, isolation.sh) and the secret <app>-admin (mirror
 # workspace/.<app>/) stay created apart, out of Git; Argo CD holds the chart
 # charts/devzone-<app> of the devzone repository at the revision.
@@ -79,7 +79,7 @@ catalogue_argocd_active() {
     local app="$1"
     catalogue_argocd_module_on || return 1
     [ -d "$RACINE/charts/devzone-$app" ] || return 1
-    compte_admin "$(compte_ctx)" get namespace devzone-argocd >/dev/null 2>&1 || return 1
+    account_admin "$(account_context)" get namespace devzone-argocd >/dev/null 2>&1 || return 1
     catalogue_argocd_load
     [ -n "$(argocd_revision)" ]
 }

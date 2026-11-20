@@ -31,7 +31,7 @@ KUBE
 }
 
 @test "kubernetes workspace: no docker and no kubectl call, kubeconfig kept (#517)" {
-    DEVZONE_WORKSPACE=kubernetes run bash -c '. "$1"; kube_joignable_depuis_conteneur "$2"; echo rc=$?' _ "$LIB" "$CFG"
+    DEVZONE_WORKSPACE=kubernetes run bash -c '. "$1"; kube_reachable_from_container "$2"; echo rc=$?' _ "$LIB" "$CFG"
     [ "$status" -eq 0 ] || false
     [[ "$output" == *"rc=0"* ]] || false
     [ ! -s "$BATS_TEST_TMPDIR/docker.log" ] || false
@@ -40,7 +40,7 @@ KUBE
 }
 
 @test "outside the Kubernetes workspace: the cluster address is rewritten (#291)" {
-    run bash -c 'unset DEVZONE_WORKSPACE; . "$1"; kube_joignable_depuis_conteneur "$2"' _ "$LIB" "$CFG"
+    run bash -c 'unset DEVZONE_WORKSPACE; . "$1"; kube_reachable_from_container "$2"' _ "$LIB" "$CFG"
     [ "$status" -eq 0 ] || false
     grep -q -- "--server=https://host.docker.internal:6443" "$BATS_TEST_TMPDIR/kubectl.log" || false
 }

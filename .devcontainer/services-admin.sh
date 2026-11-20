@@ -11,7 +11,7 @@
 # two contexts on the cluster of the pod (API server kubernetes.default.svc,
 # CA of the pod): devzone-admin, the administrator the installers use through
 # the line cluster=devzone-admin of the state, and devzone, the context the
-# module scripts use (compte_jeton may replace it by the limited account).
+# module scripts use (account_token may replace it by the limited account).
 # The cluster line of the state is put back afterwards, and the relays
 # started by the installer are stopped: in the pod the services are reached
 # by the cluster DNS, and a relay would keep the token in use.

@@ -188,8 +188,8 @@ state_json() {
         fi
     fi
 
-    services_cluster="$(cluster_lu)"
-    if [ -n "$services_cluster" ] && ! cluster_est_local "$services_cluster"; then
+    services_cluster="$(cluster_saved)"
+    if [ -n "$services_cluster" ] && ! cluster_is_local "$services_cluster"; then
         services_remote=true
     fi
     clusters_services_raw="$services_cluster"
@@ -197,7 +197,7 @@ state_json() {
     case "$work_ctx" in
         kind-gitlab* | kind-devzone*)
             host_ctx="$(KUBECONFIG="${DEVZONE_KUBE_HOTE:-$HOME/.kube/hote.config}" kubectl config current-context 2>/dev/null || true)"
-            if [ -n "$host_ctx" ] && cluster_joignable "$host_ctx" 2>/dev/null; then
+            if [ -n "$host_ctx" ] && cluster_reachable "$host_ctx" 2>/dev/null; then
                 work_internal=true
             fi
             ;;
@@ -248,7 +248,7 @@ state_json() {
         [ -n "$path" ] || continue
         append_alert worktree "$path missing here (created outside the container?)" ""
     done <<<"$wt_out"
-    if [ -n "$services_cluster" ] && ! cluster_est_local "$services_cluster"; then
+    if [ -n "$services_cluster" ] && ! cluster_is_local "$services_cluster"; then
         append_alert cluster_distant "remote cluster: $services_cluster — services on a remote cluster" ""
     fi
     if [ "$work_internal" = true ]; then

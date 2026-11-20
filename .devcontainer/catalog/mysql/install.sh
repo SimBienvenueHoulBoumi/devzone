@@ -50,7 +50,7 @@ mysql_installer_argocd() {
         "$MYSQL_MEMOIRE" "$MYSQL_TAILLE" "$extra" || return 1
     mysql_attendre "$CTX" || return 1
     mysql_secret
-    relais_lancer mysql "$CTX" "$NS" svc/mysql 3306:3306
+    relay_start mysql "$CTX" "$NS" svc/mysql 3306:3306
     echo "✔ MySQL prêt : 127.0.0.1:$MYSQL_PORT dans le conteneur"
     regenerer_identifiants
 }
@@ -66,13 +66,13 @@ mysql_appliquer_chart() {
 mysql_installer_claim() {
     local ns="$1" claim="$2" CTX
     CTX="$(contexte)"
-    if ! contexte_devzone_poser "$CTX"; then
+    if ! devzone_context_set "$CTX"; then
         echo "devzone : catalogue mysql : impossible de poser le contexte devzone sur $CTX" >&2
         return 1
     fi
     echo "▶ MySQL sur le cluster $CTX (namespace $ns, volume ${claim}-mysql-0)…"
-    compte_namespace "$CTX" "$ns"
-    namespace_isoler "$ns" >/dev/null
+    account_namespace "$CTX" "$ns"
+    namespace_isolate "$ns" >/dev/null
     mysql_secret
     k delete statefulset mysql --ignore-not-found >/dev/null 2>&1 || true
     mysql_appliquer_chart "$ns" "$claim" || return 1
@@ -81,7 +81,7 @@ mysql_installer_claim() {
         return 1
     fi
     mysql_secret
-    relais_lancer mysql "$CTX" "$ns" svc/mysql 3306:3306
+    relay_start mysql "$CTX" "$ns" svc/mysql 3306:3306
     echo "✔ MySQL prêt : 127.0.0.1:$MYSQL_PORT dans le conteneur"
     regenerer_identifiants
 }

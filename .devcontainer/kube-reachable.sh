@@ -1,64 +1,64 @@
 #!/usr/bin/env bash
-# Clusters joignables depuis le conteneur (#291). Avec le Docker de l'hôte,
-# l'API d'un cluster kind écoute sur 127.0.0.1 DU POSTE : dans le conteneur,
-# 127.0.0.1 est le conteneur lui-même.
-# 1. Nœud kind trouvé (conteneur qui publie ce port) : le conteneur devzone
-#    rejoint le réseau Docker du nœud et vise https://<nœud>:6443, l'adresse
-#    que kind prévoit pour les conteneurs (kind get kubeconfig --internal) ;
-#    le nom du nœud est dans le certificat de l'API. Marche sous Linux comme
-#    avec Docker Desktop, sans rien exposer sur le réseau du poste.
-# 2. Sinon : https://host.docker.internal:<port>, avec le nom d'origine pour
-#    la vérification TLS (--tls-server-name) ; suffit avec Docker Desktop, où
-#    host.docker.internal mène au 127.0.0.1 du poste.
-# Bibliothèque sourcée (cluster.sh, enveloppe kind) ; exécutée directement :
-#   kube-reachable.sh FICHIER
-#   kube_joignable_depuis_conteneur FICHIER   réécrit 127.0.0.1/localhost, idempotent
+# Clusters reachable from the container (#291). With the host's Docker, the API
+# of a kind cluster listens on 127.0.0.1 OF THE WORKSTATION: inside the
+# container, 127.0.0.1 is the container itself.
+# 1. kind node found (container publishing this port): the devzone container
+#    joins the Docker network of the node and targets https://<node>:6443, the
+#    address kind provides for containers (kind get kubeconfig --internal);
+#    the node name is in the API certificate. Works under Linux as with Docker
+#    Desktop, without exposing anything on the workstation's network.
+# 2. Otherwise: https://host.docker.internal:<port>, with the original name for
+#    the TLS check (--tls-server-name); enough with Docker Desktop, where
+#    host.docker.internal leads to the workstation's 127.0.0.1.
+# Sourced library (cluster.sh, kind wrapper); run directly:
+#   kube-reachable.sh FILE
+#   kube_reachable_from_container FILE   rewrites 127.0.0.1/localhost, idempotent
 
-# Nœud kind de plan de contrôle qui publie ce port sur le poste (vide sinon)
-kube_noeud_kind() {
+# kind control-plane node that publishes this port on the workstation (empty otherwise)
+kube_kind_node() {
     docker ps --filter "label=io.x-k8s.kind.role=control-plane" --filter "publish=$1" \
         --format '{{.Names}}' 2>/dev/null | head -1
 }
 
-# Le conteneur devzone rejoint le réseau du nœud (idempotent : déjà membre = rien)
-kube_rejoindre_reseau() {
-    local noeud="$1" moi reseau
-    moi="$(hostname)"
-    for reseau in $(docker inspect "$noeud" \
-        --format '{{range $nom, $v := .NetworkSettings.Networks}}{{$nom}} {{end}}' 2>/dev/null); do
-        docker network connect "$reseau" "$moi" >/dev/null 2>&1 || true
+# The devzone container joins the node's network (idempotent: already a member = nothing)
+kube_join_network() {
+    local node="$1" me network
+    me="$(hostname)"
+    for network in $(docker inspect "$node" \
+        --format '{{range $name, $v := .NetworkSettings.Networks}}{{$name}} {{end}}' 2>/dev/null); do
+        docker network connect "$network" "$me" >/dev/null 2>&1 || true
     done
 }
 
-kube_joignable_depuis_conteneur() {
-    local fichier="${1:-}" nom serveur hote port noeud
-    [ -n "$fichier" ] || return 0
+kube_reachable_from_container() {
+    local file="${1:-}" name server host port node
+    [ -n "$file" ] || return 0
     # Kubernetes workspace (#517): the pod reaches the API through the cluster service, no docker call
     if [ "${DEVZONE_WORKSPACE:-}" = kubernetes ]; then return 0; fi
-    KUBECONFIG="$fichier" kubectl config view \
+    KUBECONFIG="$file" kubectl config view \
         -o jsonpath='{range .clusters[*]}{.name}{"\t"}{.cluster.server}{"\n"}{end}' 2>/dev/null |
-        while IFS=$'\t' read -r nom serveur; do
-            case "$serveur" in
+        while IFS=$'\t' read -r name server; do
+            case "$server" in
                 https://127.0.0.1:* | https://localhost:*) ;;
                 *) continue ;;
             esac
-            hote="${serveur#https://}"
-            hote="${hote%%:*}"
-            port="${serveur##*:}"
-            noeud="$(kube_noeud_kind "$port")"
-            if [ -n "$noeud" ]; then
-                kube_rejoindre_reseau "$noeud"
-                KUBECONFIG="$fichier" kubectl config set-cluster "$nom" \
-                    --server="https://${noeud}:6443" >/dev/null 2>&1 || true
+            host="${server#https://}"
+            host="${host%%:*}"
+            port="${server##*:}"
+            node="$(kube_kind_node "$port")"
+            if [ -n "$node" ]; then
+                kube_join_network "$node"
+                KUBECONFIG="$file" kubectl config set-cluster "$name" \
+                    --server="https://${node}:6443" >/dev/null 2>&1 || true
             else
-                KUBECONFIG="$fichier" kubectl config set-cluster "$nom" \
+                KUBECONFIG="$file" kubectl config set-cluster "$name" \
                     --server="https://host.docker.internal:${port}" \
-                    --tls-server-name="$hote" >/dev/null 2>&1 || true
+                    --tls-server-name="$host" >/dev/null 2>&1 || true
             fi
         done
     return 0
 }
 
 if [ "${BASH_SOURCE[0]}" = "$0" ]; then
-    kube_joignable_depuis_conteneur "${1:-}"
+    kube_reachable_from_container "${1:-}"
 fi

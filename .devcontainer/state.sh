@@ -140,7 +140,7 @@ host_context_of_cluster() {
 # cluster= of the devzone context); returns 1 otherwise.
 state_rebuild() {
     local namespaces m v stage seen=0 code=0 cluster_ctx cluster_host label
-    label="${CLUSTER_ETIQUETTE:-app.kubernetes.io/managed-by=devzone}"
+    label="${CLUSTER_LABEL:-app.kubernetes.io/managed-by=devzone}"
     command -v kubectl >/dev/null 2>&1 || return 1
     namespaces="$(kubectl get namespaces -l "$label" -o name 2>/dev/null || true)"
     [ -n "$namespaces" ] || return 1

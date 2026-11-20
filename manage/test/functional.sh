@@ -144,7 +144,7 @@ reussit "Docker répond dans le conteneur" "docker info"
 # un docker exec sans entrée standard est coupé à 0,5 s sous Docker Desktop
 reussit "docker exec long non coupé (relais du socket)" "docker exec \"\$(hostname)\" sh -c 'sleep 2; echo ok' </dev/null" "^ok$"
 # Une seconde tentative si l'API du nœud redémarre pendant l'initialisation
-# (Docker de l'hôte chargé), comme cluster_preparer ; --retain garde le nœud
+# (Docker de l'hôte chargé), comme cluster_prepare ; --retain garde le nœud
 # pour le diagnostic en cas de second échec
 reussit "kind create cluster (sur le Docker de l'hôte)" "kind create cluster --name $KIND_TEST --wait 120s || { kind delete cluster --name $KIND_TEST; kind create cluster --name $KIND_TEST --wait 120s --retain; }"
 # Échec : journaux du nœud (gardé par --retain, supprimé par nettoyer) pour le diagnostic

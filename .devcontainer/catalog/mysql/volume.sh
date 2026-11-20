@@ -46,7 +46,7 @@ mysql_volume() {
         monte="$(mysql_claim_monte "$ns")"
         [ "${pvc%-mysql-0}" != "$monte" ] || refuse "volume monté, suppression refusée : $nom"
         if [ -z "$oui" ]; then
-            cluster_interactif || refuse "confirmation impossible sans terminal : devzone mysql volume --delete $nom --yes"
+            cluster_interactive || refuse "confirmation impossible sans terminal : devzone mysql volume --delete $nom --yes"
             printf 'Supprimer le volume %s ? [o/N] ' "$pvc" >&2
             read -r reponse || reponse=""
             case "$reponse" in

@@ -1,8 +1,8 @@
 #!/usr/bin/env bats
-# Relais du socket Docker (#293) : le socat de la feature sans -t est remplacé
-# par le même avec -t 86400, puis un docker exec long est contrôlé. Faux ps,
-# sudo, kill, setsid et docker dans le PATH, chemins sous $BATS_TEST_TMPDIR :
-# aucun vrai socat, sudo ni kill.
+# Docker socket relay (#293): the feature's socat without -t is replaced
+# by the same with -t 86400, then a long docker exec is checked. Fake ps,
+# sudo, kill, setsid and docker in the PATH, paths under $BATS_TEST_TMPDIR:
+# no real socat, sudo nor kill.
 
 setup() {
     load commun
@@ -20,18 +20,18 @@ setup() {
     : >"$T/outils.log"
     : >"$DEVZONE_RELAIS_SOCKET"
 
-    # ps -eo pid=,args= : la liste du test
+    # ps -eo pid=,args=: the test's list
     cat >"$T/bin/ps" <<'OUTIL'
 #!/usr/bin/env bash
 cat "$BATS_TEST_TMPDIR/ps.txt"
 OUTIL
-    # sudo : journalisé, puis exécuté sans privilège
+    # sudo: logged, then run without privilege
     cat >"$T/bin/sudo" <<'OUTIL'
 #!/usr/bin/env bash
 echo "sudo $*" >>"$BATS_TEST_TMPDIR/outils.log"
 exec "$@"
 OUTIL
-    # kill : journalisé ; kill -0 → processus déjà terminé
+    # kill: logged; kill -0 → process already ended
     cat >"$T/bin/kill" <<'OUTIL'
 #!/usr/bin/env bash
 echo "kill $*" >>"$BATS_TEST_TMPDIR/outils.log"
@@ -39,44 +39,44 @@ echo "kill $*" >>"$BATS_TEST_TMPDIR/outils.log"
 exit 0
 OUTIL
 
-    # setsid -f socat … : journalisé ; le nouveau socat apparaît dans ps
+    # setsid -f socat … : logged; the new socat appears in ps
     cat >"$T/bin/setsid" <<'OUTIL'
 #!/usr/bin/env bash
 echo "setsid $*" >>"$BATS_TEST_TMPDIR/outils.log"
 [ "${1:-}" = -f ] && shift
 echo "4242 $*" >"$BATS_TEST_TMPDIR/ps.txt"
 OUTIL
-    # docker : version selon FAUX_VERSION, exec affiche FAUX_EXEC
+    # docker: version according to FAKE_VERSION, exec shows FAKE_EXEC
     cat >"$T/bin/docker" <<'OUTIL'
 #!/usr/bin/env bash
 echo "docker $*" >>"$BATS_TEST_TMPDIR/outils.log"
 case "${1:-}" in
-    version) exit "${FAUX_VERSION:-0}" ;;
-    exec) printf '%s\n' "${FAUX_EXEC-ok}" ;;
+    version) exit "${FAKE_VERSION:-0}" ;;
+    exec) printf '%s\n' "${FAKE_EXEC-ok}" ;;
 esac
 OUTIL
     chmod +x "$T/bin/"*
     export PATH="$T/bin:$PATH"
 }
 
-relais_feature() {
+relay_feature() {
     printf '39 socat UNIX-LISTEN:%s,fork,mode=660,user=vscode,backlog=128 UNIX-CONNECT:%s\n' \
         "$DEVZONE_RELAIS_SOCKET" "$DEVZONE_RELAIS_SOURCE" >"$T/ps.txt"
 }
 
-@test "garde : vrai socket refusé sous bats même avec DEVZONE_RELAIS_REEL=oui (code 2, rien touché)" {
+@test "guard : real socket refused under bats even with DEVZONE_RELAIS_REEL=oui (code 2, nothing touched)" {
     export DEVZONE_RELAIS_SOCKET=/var/run/docker.sock
     export DEVZONE_RELAIS_REEL=oui
-    relais_feature
+    relay_feature
     run bash "$RELAIS"
     [ "$status" -eq 2 ]
-    [[ "$output" == *"docker-relais : refus sous bats (tests)"* ]] || false
+    [[ "$output" == *"docker-relay : refused under bats (tests)"* ]] || false
     [ ! -s "$T/outils.log" ]
     [ ! -e "$DEVZONE_RELAIS_MARQUE" ]
 }
 
-@test "relais de la feature sans -t : remplacé par socat -t 86400, mêmes options" {
-    relais_feature
+@test "feature relay without -t: replaced by socat -t 86400, same options" {
+    relay_feature
     run bash "$RELAIS"
     [ "$status" -eq 0 ]
     grep -qx "sudo kill 39" "$T/outils.log"
@@ -87,7 +87,7 @@ relais_feature() {
     [[ "$output" == *"socat -t 86400"* ]] || false
 }
 
-@test "relais déjà avec -t : laissé tel quel, contrôle fait" {
+@test "relay already with -t: left as is, check done" {
     printf '39 socat -t 86400 UNIX-LISTEN:%s,fork,mode=660,user=vscode,backlog=128 UNIX-CONNECT:%s\n' \
         "$DEVZONE_RELAIS_SOCKET" "$DEVZONE_RELAIS_SOURCE" >"$T/ps.txt"
     run bash "$RELAIS"
@@ -96,76 +96,76 @@ relais_feature() {
     grep -q "docker exec" "$T/outils.log"
 }
 
-@test "socat sur un autre socket, ou sudo parent : ignorés" {
-    printf '7 socat UNIX-LISTEN:/autre.sock,fork UNIX-CONNECT:/x\n8 sudo socat UNIX-LISTEN:%s,fork UNIX-CONNECT:/x\n' \
+@test "socat on another socket, or parent sudo: ignored" {
+    printf '7 socat UNIX-LISTEN:/other.sock,fork UNIX-CONNECT:/x\n8 sudo socat UNIX-LISTEN:%s,fork UNIX-CONNECT:/x\n' \
         "$DEVZONE_RELAIS_SOCKET" >"$T/ps.txt"
     run bash "$RELAIS"
     [ "$status" -eq 0 ]
     ! grep -q "kill\|setsid" "$T/outils.log" || false
 }
 
-@test "sans relais socat (Linux, socket par groupe) : seul le contrôle" {
+@test "no socat relay (Linux, socket by group): only the check" {
     run bash "$RELAIS"
     [ "$status" -eq 0 ]
     ! grep -q "kill\|setsid" "$T/outils.log" || false
     grep -q "docker exec .* sh -c sleep 1; echo ok" "$T/outils.log"
 }
 
-@test "docker exec long coupé : code 1, marque écrite" {
-    export FAUX_EXEC=""
+@test "long docker exec cut: code 1, mark written" {
+    export FAKE_EXEC=""
     run bash "$RELAIS"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"docker exec long coupé"* ]] || false
-    grep -q "docker exec long coupé" "$DEVZONE_RELAIS_MARQUE"
+    [[ "$output" == *"long docker exec cut"* ]] || false
+    grep -q "long docker exec cut" "$DEVZONE_RELAIS_MARQUE"
 }
 
-@test "socket qui ne répond pas : code 1, marque écrite" {
-    export FAUX_VERSION=1
+@test "socket not answering: code 1, mark written" {
+    export FAKE_VERSION=1
     run bash "$RELAIS"
     [ "$status" -eq 1 ]
-    grep -q "ne répond pas" "$DEVZONE_RELAIS_MARQUE"
+    grep -q "does not answer" "$DEVZONE_RELAIS_MARQUE"
 }
 
-@test "contrôle réussi : marque d'un échec précédent effacée" {
-    echo "ancien échec" >"$DEVZONE_RELAIS_MARQUE"
+@test "check succeeded: mark of a previous failure erased" {
+    echo "previous failure" >"$DEVZONE_RELAIS_MARQUE"
     run bash "$RELAIS"
     [ "$status" -eq 0 ]
     [ ! -e "$DEVZONE_RELAIS_MARQUE" ]
 }
 
-@test "en root : pas de sudo" {
+@test "as root: no sudo" {
     export DEVZONE_RELAIS_SUDO=""
-    relais_feature
+    relay_feature
     run bash "$RELAIS"
     [ "$status" -eq 0 ]
     ! grep -q "^sudo" "$T/outils.log" || false
     grep -qx "kill 39" "$T/outils.log"
 }
 
-@test "sans socket (docker-hote=off) : code 0, aucun contrôle Docker, pas de marque" {
+@test "no socket (docker-hote=off): code 0, no Docker check, no mark" {
     rm -f "$DEVZONE_RELAIS_SOCKET"
-    echo "ancien échec" >"$DEVZONE_RELAIS_MARQUE"
+    echo "previous failure" >"$DEVZONE_RELAIS_MARQUE"
     run bash "$RELAIS"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"pas de socket Docker"* ]] || false
+    [[ "$output" == *"no host Docker socket"* ]] || false
     ! grep -q docker "$T/outils.log" || false
     [ ! -e "$DEVZONE_RELAIS_MARQUE" ]
 }
 
-@test "docker sans hôte : message clair vers le workspace Kubernetes" {
+@test "docker without host: clear message towards the Kubernetes workspace" {
     run bash "$BATS_TEST_DIRNAME/../../.devcontainer/docker-without-host.sh"
     [ "$status" -ne 0 ]
     [[ "$output" == *"devzone workspace"* ]] || false
     [[ "$output" == *"docker-hote"* ]] || false
 }
 
-@test "devzone : récapitulatif ⚠ relais Docker si la marque existe" {
+@test "devzone : summary ⚠ Docker relay if the mark exists" {
     export HOME="$T/home" DEVZONE_RACINE="$T/racine" DEVZONE_ETAT="$T/etat"
     mkdir -p "$HOME" "$DEVZONE_RACINE/workspace"
     : >"$DEVZONE_ETAT"
     run bash "$DEVZONE"
-    [[ "$output" != *"relais Docker"* ]] || false
-    echo "docker exec long coupé (sortie : vide)" >"$DEVZONE_RELAIS_MARQUE"
+    [[ "$output" != *"Docker relay"* ]] || false
+    echo "long docker exec cut (output: empty)" >"$DEVZONE_RELAIS_MARQUE"
     run bash "$DEVZONE"
-    [[ "$output" == *"⚠ Docker relay     docker exec long coupé"*"devzone repair"* ]] || false
+    [[ "$output" == *"⚠ Docker relay     long docker exec cut"*"devzone repair"* ]] || false
 }

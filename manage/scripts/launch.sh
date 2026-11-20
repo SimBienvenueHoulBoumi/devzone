@@ -97,7 +97,7 @@ show_steps() {
             *"Start: Run: docker run"*) announce container "Creating container" ;;
             *"Running the postCreateCommand"*) announce postcreate "Installing in container (repowarden, modules)" ;;
             *"Running the postStartCommand"*) announce poststart "Starting (git identity, clusters, state)" ;;
-            "devzone ready"* | "devzone started"* | "devzone rebuilt"* | "devzone : "* | "devzone: "* | "  ✔ "* | "  ✖ "* | "  ○ "* | "  ⚠ "* | "                    "[!\ ]* | "git-identite : "* | "kube-config : "* | "metrics-server : "*)
+            "devzone ready"* | "devzone started"* | "devzone rebuilt"* | "devzone : "* | "devzone: "* | "  ✔ "* | "  ✖ "* | "  ○ "* | "  ⚠ "* | "                    "[!\ ]* | "git-identity : "* | "kube-config : "* | "metrics-server : "*)
                 echo "  $line"
                 last_announce="$(date +%s)"
                 ;;
