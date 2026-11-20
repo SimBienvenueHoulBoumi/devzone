@@ -23,18 +23,6 @@ ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
 # shellcheck source=SCRIPTDIR/../../argocd/catalogue-argocd.sh
 # shellcheck disable=SC1091
 . "$ICI/../../argocd/catalogue-argocd.sh"
-# English command names are accepted (#557) : a copied script may miss the file
-# shellcheck source=SCRIPTDIR/../../command-aliases.sh
-# shellcheck disable=SC1091
-if [ -f "$ICI/../../command-aliases.sh" ]; then
-    . "$ICI/../../command-aliases.sh"
-fi
-# Subcommand and options become their canonical English names ; the old
-# French names warn on use (#557)
-if command -v canonical_args >/dev/null 2>&1; then
-    canonical_args mysql "$@"
-    set -- "${ARGS_CANONICAL[@]+"${ARGS_CANONICAL[@]}"}"
-fi
 NS=devzone-mysql
 SECRETS="$RACINE/workspace/.mysql"
 MYSQL_PORT="${MYSQL_PORT:-3306}"

@@ -25,18 +25,6 @@ ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
 # shellcheck source=SCRIPTDIR/../isolement.sh
 # shellcheck disable=SC1091
 . "$ICI/../isolement.sh"
-# English command names are accepted (#557) : a copied script may miss the file
-# shellcheck source=SCRIPTDIR/../command-aliases.sh
-# shellcheck disable=SC1091
-if [ -f "$ICI/../command-aliases.sh" ]; then
-    . "$ICI/../command-aliases.sh"
-fi
-# Subcommand and options become their canonical English names ; the old
-# French names warn on use (#557)
-if command -v canonical_args >/dev/null 2>&1; then
-    canonical_args postgres "$@"
-    set -- "${ARGS_CANONICAL[@]+"${ARGS_CANONICAL[@]}"}"
-fi
 
 NS=devzone-postgres
 SECRETS="$RACINE/workspace/.postgres"

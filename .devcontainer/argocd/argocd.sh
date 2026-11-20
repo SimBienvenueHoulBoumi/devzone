@@ -190,18 +190,6 @@ ARGOCD_CONF="${DEVZONE_ARGOCD_CONF:-$RACINE/.argocd.conf}"
 # shellcheck disable=SC1091
 . "$ICI/apps.sh"
 argocd_kubectl() { kubectl --context devzone "$@"; }
-# English command names are accepted (#557) : a copied script may miss the file
-# shellcheck source=SCRIPTDIR/../command-aliases.sh
-# shellcheck disable=SC1091
-if [ -f "$ICI/../command-aliases.sh" ]; then
-    . "$ICI/../command-aliases.sh"
-fi
-# Subcommand and options become their canonical English names ; the old
-# French names warn on use (#557)
-if command -v canonical_args >/dev/null 2>&1; then
-    canonical_args argocd "$@"
-    set -- "${ARGS_CANONICAL[@]+"${ARGS_CANONICAL[@]}"}"
-fi
 
 case "${1:-}" in
     install) installer ;;

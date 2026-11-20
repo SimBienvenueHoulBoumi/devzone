@@ -67,7 +67,7 @@ agent_workspace() {
         nom="$(basename "$(cd "$dossier" && pwd -P)")"
         dans_pod="/workspaces/projets/$nom"
         if ! agent_kc exec devzone-workspace-0 -c workspace -- test -d "$dans_pod" 2>/dev/null; then
-            refuse "projet $nom absent du workspace Kubernetes : devzone workspace copier-vers $dossier (sur la machine), ou --local"
+            refuse "projet $nom absent du workspace Kubernetes : devzone workspace copy-to $dossier (sur la machine), ou --local"
         fi
     fi
     echo "devzone agent : workspace Kubernetes (pod devzone-workspace-0, $dans_pod) ; --local pour le conteneur"

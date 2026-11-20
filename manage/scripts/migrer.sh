@@ -33,14 +33,10 @@ fail() {
 # Reads the single accepted flag ($1) from following args ($3…): prints 1 if
 # present, 0 otherwise; any other flag: error with usage ($2), exit code 1.
 read_flag() {
-    local flag="$1" usage="$2" a found=0 legacy=""
+    local flag="$1" usage="$2" a found=0
     shift 2
-    case "$flag" in
-        --yes) legacy="--oui" ;;
-        --bring-back) legacy="--rapatrier" ;;
-    esac
     for a in "$@"; do
-        if [ "$a" = "$flag" ] || { [ -n "$legacy" ] && [ "$a" = "$legacy" ]; }; then found=1; continue; fi
+        if [ "$a" = "$flag" ]; then found=1; continue; fi
         fail "unknown option: $a (devzone workspace $usage)"
         return 1
     done

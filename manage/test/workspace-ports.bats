@@ -205,14 +205,14 @@ wait_stopped() {
     [[ "$output" == *"stopped"* ]] || false
 }
 
-@test "ports start and demarrer: same behavior" {
+@test "ports start and stop: the watcher starts and stops" {
     listening 5173
     cd "$T/workstation"
-    run bash "$CLI" workspace ports demarrer
+    run bash "$CLI" workspace ports start
     [ "$status" -eq 0 ]
     wait_watcher_pid || false
     watcher="$(cat .devzone.ports-workspace/pid)"
-    run bash "$CLI" workspace ports arreter
+    run bash "$CLI" workspace ports stop
     [ "$status" -eq 0 ]
     wait_stopped "$watcher" || false
 }

@@ -97,18 +97,6 @@ DOCKER
     grep -q -- "--namespace devzone-workspace" "$T/helm.log" || false
 }
 
-@test "workspace start and demarrer are equivalent" {
-    export FAKE_CONTEXTS="devzone docker-desktop"
-    : >"$T/helm.log"
-    run bash "$CLI" workspace start
-    [ "$status" -eq 0 ]
-    cp "$T/helm.log" "$T/start.log"
-    : >"$T/helm.log"
-    run bash "$CLI" workspace demarrer
-    [ "$status" -eq 0 ]
-    [ "$(cat "$T/helm.log")" = "$(cat "$T/start.log")" ]
-}
-
 @test "workspace start: cluster stopped (Docker Desktop), one message, no helm, no Argo CD" {
     export FAKE_KUBE_CLUSTER_INFO=fail FAKE_DOCKER=down FAKE_CONTEXTS=docker-desktop
     export FAKE_CURRENT_CONTEXT=docker-desktop

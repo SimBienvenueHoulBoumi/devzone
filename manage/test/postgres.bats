@@ -386,26 +386,6 @@ attendre_nohup() {
     [ ! -f "$BATS_TEST_TMPDIR/apply.log" ]
 }
 
-@test "postgres : l alias français donne le même résultat que le nom anglais, avec l avertissement" {
-    run --separate-stderr bash "$POSTGRES" status
-    [ "$status" -eq 0 ]
-    [[ "$stderr" != *"deprecated"* ]] || false
-    attendu="$output"
-    run --separate-stderr bash "$POSTGRES" etat
-    [ "$status" -eq 0 ]
-    [ "$output" = "$attendu" ]
-    [[ "$stderr" == *"devzone: \"etat\" is deprecated, use \"status\""* ]] || false
-}
-
-@test "postgres : sous-commande et option françaises : même effet, avec l avertissement" {
-    actif_sur docker-desktop
-    run --separate-stderr bash "$POSTGRES" creer taskmanager --nouveau-mdp
-    [ "$status" -eq 0 ]
-    [[ "$stderr" == *"devzone: \"creer\" is deprecated, use \"create\""* ]] || false
-    [[ "$stderr" == *"devzone: \"--nouveau-mdp\" is deprecated, use \"--new-password\""* ]] || false
-    grep -qx 'DB_PASSWORD=mdpsecret1' "$SECRETS/taskmanager.env"
-}
-
 @test "postgres : les noms anglais ne donnent aucun avertissement" {
     actif_sur docker-desktop
     run --separate-stderr bash "$POSTGRES" create taskmanager --new-password
@@ -417,15 +397,4 @@ attendre_nohup() {
     run --separate-stderr bash "$POSTGRES" delete taskmanager --yes
     [ "$status" -eq 0 ]
     [[ "$stderr" != *"deprecated"* ]] || false
-}
-
-@test "enable et cluster : options anglaises silencieuses, françaises avertissent" {
-    run --separate-stderr bash "$DEVZONE" enable postgres --context docker-desktop </dev/null
-    [ "$status" -eq 0 ]
-    [[ "$stderr" != *"deprecated"* ]] || false
-    run --separate-stderr bash "$DEVZONE" enable postgres --contexte docker-desktop </dev/null
-    [ "$status" -eq 0 ]
-    [[ "$stderr" == *"devzone: \"--contexte\" is deprecated, use \"--context\""* ]] || false
-    run --separate-stderr bash "$DEVZONE" cluster docker-desktop --oui </dev/null
-    [[ "$stderr" == *"devzone: \"--oui\" is deprecated, use \"--yes\""* ]] || false
 }

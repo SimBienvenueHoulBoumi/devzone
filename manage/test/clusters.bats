@@ -209,13 +209,3 @@ KUBE
     grep -q "invite-kube.sh" "$script" || false
     grep -q 'PS1=.*devzone_invite_kube' "$script" || false
 }
-
-@test "utiliser : --confirm silencieux, --confirmer avertit" {
-    faux_kubectl
-    printf 'docker-desktop\n' >"$BATS_TEST_TMPDIR/contexts"
-    printf 'docker-desktop\n' >"$BATS_TEST_TMPDIR/current"
-    run --separate-stderr bash "$DEVZONE" use docker-desktop --confirm docker-desktop
-    [[ "$stderr" != *"deprecated"* ]] || false
-    run --separate-stderr bash "$DEVZONE" use docker-desktop --confirmer docker-desktop
-    [[ "$stderr" == *"devzone: \"--confirmer\" is deprecated, use \"--confirm\""* ]] || false
-}

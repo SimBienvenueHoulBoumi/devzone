@@ -59,12 +59,12 @@ KUBECTL
     grep -q "session du pod" "$(agent_journal)" || false
 }
 
-@test "agent-workspace : projet absent du pod -> code 2, message copier-vers, rien lance" {
+@test "agent-workspace : projet absent du pod -> code 2, message copy-to, rien lance" {
     agent_consigne
     export FAKE_KC_TEST_CODE=1
     agent_lance
     [ "$status" -eq 2 ]
-    [[ "$output" == *"copier-vers"* ]] || false
+    [[ "$output" == *"copy-to"* ]] || false
     ! grep -q -- " cp " "$FAKE_KC_LOG" || false
     ! grep -q -- "devzone agent" "$FAKE_KC_LOG" || false
 }
