@@ -22,9 +22,9 @@ ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
 # shellcheck disable=SC1091
 . "$ICI/../chart-direct.sh"
 # Isolation réseau : namespace_isoler, d'où viennent les NetworkPolicies
-# shellcheck source=SCRIPTDIR/../isolement.sh
+# shellcheck source=SCRIPTDIR/../isolation.sh
 # shellcheck disable=SC1091
-. "$ICI/../isolement.sh"
+. "$ICI/../isolation.sh"
 
 NS=devzone-postgres
 SECRETS="$RACINE/workspace/.postgres"

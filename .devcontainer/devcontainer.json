@@ -61,7 +61,7 @@
 
   "postCreateCommand": "bash .devcontainer/post-create.sh",
   // Identité git, clusters, puis récapitulatif de ce qui reste à faire
-  "postStartCommand": "bash .devcontainer/demarrage.sh",
+  "postStartCommand": "bash .devcontainer/startup.sh",
   // Clusters kind du conteneur (config) + cluster de l'hôte (hote.config,
   // refait à chaque démarrage par kube-config.sh)
   "remoteEnv": {

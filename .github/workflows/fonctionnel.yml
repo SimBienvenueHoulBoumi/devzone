@@ -14,7 +14,7 @@
 # runs on every PR (no paths filter: the summary must always exist); the
 # changements job decides by path: fonctionnel, cli, windows and ia-arm64 (about
 # ten minutes each, 15 for windows) only run when the PR touches the container,
-# the tests, the CLI, .gitattributes or package.json (manage/test/ci-conteneur.sh);
+# the tests, the CLI, .gitattributes or package.json (manage/test/ci-container.sh);
 # a docs-only PR does not wait. Job bats: bats manage/test/ (unit tests) on every
 # PR, with no path decision (a test can read the docs or a workflow), on ubuntu
 # and on macOS with the system bash 3.2 (host scripts). tests-conteneur passes
@@ -56,7 +56,7 @@ jobs:
             pull_request)
               git diff --name-only "$BASE...$TETE" >changes.txt
               cat changes.txt
-              tester="$(bash manage/test/ci-conteneur.sh a-tester <changes.txt)"
+              tester="$(bash manage/test/ci-container.sh a-tester <changes.txt)"
               ;;
             push) tester=false ;; # develop and main: already tested by the PR, bats only
             *) tester=true ;;     # by hand: everything runs
@@ -74,7 +74,7 @@ jobs:
       # Public DNS for the runner Docker: its DNS sometimes fails on archive.ubuntu.com (#468)
       - name: Runner Docker DNS
         run: bash manage/scripts/ci-dns.sh
-      - run: bash manage/test/fonctionnel.sh
+      - run: bash manage/test/functional.sh
 
   cli:
     needs: changements
@@ -144,8 +144,8 @@ jobs:
           if not %SORTIE% equ 0 exit /b 1
           if not exist %RUNNER_TEMP%\dzcmd\Makefile exit /b 1
           if not exist %RUNNER_TEMP%\dzcmd\.devcontainer\devzone exit /b 1
-          if not exist %RUNNER_TEMP%\dzcmd\manage\scripts\lancer.sh exit /b 1
-          if not exist %RUNNER_TEMP%\dzcmd\manage\scripts\desinstaller.sh exit /b 1
+          if not exist %RUNNER_TEMP%\dzcmd\manage\scripts\launch.sh exit /b 1
+          if not exist %RUNNER_TEMP%\dzcmd\manage\scripts\uninstall.sh exit /b 1
           mkdir %RUNNER_TEMP%\plein || exit /b 1
           echo important > %RUNNER_TEMP%\plein\notes.txt
           call devzone %RUNNER_TEMP%\plein > %RUNNER_TEMP%\sortie.txt 2>&1
@@ -188,7 +188,7 @@ jobs:
   # Unit tests (bats manage/test/) on every PR and every push of develop and
   # main (#192). ubuntu: the whole suite. macOS: /bin/bash (3.2, the system one)
   # first in PATH, for the scripts that run on the host or in CI (npm command,
-  # lancer.sh, docker.sh, desinstaller.sh, versions.sh, ci-conteneur.sh);
+  # launch.sh, docker.sh, uninstall.sh, versions.sh, ci-container.sh);
   # devzone.bats tests the container command (Linux)
   bats:
     # Whole suite on ubuntu split into four shards (manage/test/shard.sh):
@@ -227,7 +227,7 @@ jobs:
         run: |
           bash --version | head -1
           bash -c '[ "${BASH_VERSINFO[0]}" = 3 ]'
-          npx --yes bats@1.10.0 manage/test/cli.bats manage/test/versions.bats manage/test/ci-conteneur.bats manage/test/agent.bats manage/test/agent-ecarts.bats manage/test/agent-droits.bats manage/test/agent-droits-gh.bats manage/test/agent-quota.bats manage/test/agent-parallele.bats manage/test/agent-chemins.bats manage/test/agent-etat-json.bats
+          npx --yes bats@1.10.0 manage/test/cli.bats manage/test/versions.bats manage/test/ci-container.bats manage/test/agent.bats manage/test/agent-gaps.bats manage/test/agent-rights.bats manage/test/agent-rights-gh.bats manage/test/agent-quota.bats manage/test/agent-parallel.bats manage/test/agent-paths.bats manage/test/agent-state-json.bats
 
   # Code in English: files listed in .english are checked on every run (#502).
   # The charts convention (#554) is checked here too: manage/scripts/check-charts.sh
@@ -241,6 +241,8 @@ jobs:
           persist-credentials: false
       - name: english check
         run: bash manage/scripts/check-english.sh
+      - name: names check (files and folders in English, #716)
+        run: bash manage/scripts/check-names.sh
       # helm is installed on the runner: lint and render of each chart, wrapper
       # dependency pulled anonymously (OCI)
       - name: charts convention (manage/scripts/check-charts.sh)
@@ -269,7 +271,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           RUN_ID: ${{ github.run_id }}
-        run: bash manage/test/ci-conteneur.sh diagnostic "$REPO" "$RUN_ID"
+        run: bash manage/test/ci-container.sh diagnostic "$REPO" "$RUN_ID"
       - name: Container tests passed, or not needed
         env:
           TESTER: ${{ needs.changements.outputs.tester }}
@@ -279,4 +281,4 @@ jobs:
           WINDOWS: ${{ needs.windows.result }}
           IA_ARM64: ${{ needs.ia-arm64.result }}
           BATS: ${{ needs.bats.result }}
-        run: bash manage/test/ci-conteneur.sh synthese "$TESTER" "$CHANGEMENTS" "$FONCTIONNEL" "$CLI" "$WINDOWS" "$IA_ARM64" "$BATS"
+        run: bash manage/test/ci-container.sh synthese "$TESTER" "$CHANGEMENTS" "$FONCTIONNEL" "$CLI" "$WINDOWS" "$IA_ARM64" "$BATS"

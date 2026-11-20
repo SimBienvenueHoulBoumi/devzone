@@ -47,7 +47,7 @@ KIND
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
 }
 
-# Aide de devzone agent (#328, tests agent.bats et agent-ecarts.bats) : faux
+# Aide de devzone agent (#328, tests agent.bats et agent-gaps.bats) : faux
 # npm, getent, curl et opencode sous $BATS_TEST_TMPDIR/bin, état et réseau
 # isolés, délais réduits. Le faux opencode se pilote par FAKE_OP_* (voir ci-dessous).
 agent_isole() {

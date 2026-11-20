@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Common helpers for migration tests (#403, workspace-migration.bats and
-# workspace-retour.bats): fake docker and kubectl under $BATS_TEST_TMPDIR/bin.
+# workspace-revert.bats): fake docker and kubectl under $BATS_TEST_TMPDIR/bin.
 # The "pod" is $T/pod, "Docker volumes" are folders under $T/volumes, the
 # workstation is $T/workstation. No real volume or cluster is touched.
 

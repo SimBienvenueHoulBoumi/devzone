@@ -72,7 +72,7 @@ create_workstation() {
     # npm never includes .gitignore: written here
     : >"$target/.gitignore"
     complete_gitignore "$target"
-    chmod +x "$target/manage/scripts/desinstaller.sh" "$target/manage/scripts/lancer.sh"
+    chmod +x "$target/manage/scripts/uninstall.sh" "$target/manage/scripts/launch.sh"
     create_mode_write "$target" "$CREATE_MODE"
     # The GitOps repository of the new devzone (#539): github, an existing URL,
     # or none, written in the .argocd.conf of the new devzone (conf.sh writes
@@ -132,7 +132,7 @@ create_workstation() {
     if command -v make >/dev/null 2>&1; then
         make -C "$target" up
     else
-        bash "$target/manage/scripts/lancer.sh" up "$target"
+        bash "$target/manage/scripts/launch.sh" up "$target"
     fi
     echo "Ensuite : cd $target && make shell (ou ouvre le dossier dans VS Code : Reopen in Container)."
 }

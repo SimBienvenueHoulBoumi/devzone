@@ -18,7 +18,7 @@
 #   kube_joignable_depuis_conteneur FICHIER   réécrit 127.0.0.1/localhost
 #   relais_lancer NOM CTX NS CIBLE PORTS…   port-forward gardé en vie
 #   relais_actif NOM / relais_arreter NOM
-#   compte_* (kube-compte.sh #430)    compte limité et contexte administrateur
+#   compte_* (kube-account.sh #430)    compte limité et contexte administrateur
 
 # Clusters kind et de l'hôte, comme remoteEnv de devcontainer.json : un
 # docker exec ou un script lancé hors du terminal du conteneur ne l'a pas,
@@ -31,9 +31,9 @@ export KUBECONFIG
 
 # Écriture sûre de l'état (#417) : verrou, temporaire dans le dossier de
 # l'état, copie de secours .prec — partagée par devzone, ports et ports-auto
-# shellcheck source=SCRIPTDIR/etat.sh
+# shellcheck source=SCRIPTDIR/state.sh
 # shellcheck disable=SC1091
-. "$(dirname "${BASH_SOURCE[0]}")/etat.sh"
+. "$(dirname "${BASH_SOURCE[0]}")/state.sh"
 
 # Nom d'instance : vide ou « devzone » = instance par défaut (pas de suffixe)
 : "${DEVZONE_INSTANCE:=}"
@@ -50,14 +50,14 @@ CLUSTER_ETIQUETTE=app.kubernetes.io/managed-by=devzone
 
 # Réécriture 127.0.0.1 → host.docker.internal (#291) : partagée avec
 # l'enveloppe kind, qui l'applique aussi aux clusters créés à la main
-# shellcheck source=SCRIPTDIR/kube-joignable.sh
-. "$(dirname "${BASH_SOURCE[0]}")/kube-joignable.sh"
+# shellcheck source=SCRIPTDIR/kube-reachable.sh
+. "$(dirname "${BASH_SOURCE[0]}")/kube-reachable.sh"
 
 # Compte Kubernetes limité (#430) : compte_poser, compte_autoriser,
 # compte_retirer, compte_jeton, compte_admin (contexte administrateur) ;
 # les installeurs l'utilisent, cluster_liberer aussi
-# shellcheck source=SCRIPTDIR/kube-compte.sh
-. "$(dirname "${BASH_SOURCE[0]}")/kube-compte.sh"
+# shellcheck source=SCRIPTDIR/kube-account.sh
+. "$(dirname "${BASH_SOURCE[0]}")/kube-account.sh"
 
 cluster_lu() {
     grep -E '^cluster=' "$ETAT" 2>/dev/null | tail -1 | cut -d= -f2- || true

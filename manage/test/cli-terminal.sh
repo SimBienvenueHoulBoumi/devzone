@@ -6,8 +6,8 @@
 # Couvre : cibles make (help, up, shell, status, stop, down, rebuild,
 # desinstaller), commande npm (manage/devzone <dossier>, desinstaller, --version,
 # --help), commande devzone du conteneur (état, modules, module inconnu),
-# scripts de démarrage (post-create.sh, demarrage.sh).
-# Isolation, comme fonctionnel.sh : devzone créé dans un dossier temporaire
+# scripts de démarrage (post-create.sh, startup.sh).
+# Isolation, comme functional.sh : devzone créé dans un dossier temporaire
 # (autre conteneur, autre image, autre Docker interne), volumes propres au
 # test (DEVZONE_VOLUMES), tout supprimé à la fin même en cas d'échec. Les
 # clusters de l'hôte ne sont jamais touchés : KUBECONFIG vide sur l'hôte,
@@ -17,8 +17,8 @@
 set -uo pipefail
 
 RACINE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-# shellcheck source=SCRIPTDIR/journal-erreur.sh
-. "$(dirname "${BASH_SOURCE[0]}")/journal-erreur.sh"
+# shellcheck source=SCRIPTDIR/journal-error.sh
+. "$(dirname "${BASH_SOURCE[0]}")/journal-error.sh"
 export DEVZONE_VOLUMES="devzone-test-cli-$$"
 # Désinstallation : aucun cluster de l'hôte examiné
 export KUBECONFIG=/nexiste/pas
@@ -150,7 +150,7 @@ conteneur "devzone enable <module inconnu> : refusé" 60 1 "module inconnu" "dev
 conteneur "devzone <commande inconnue> : refusée" 60 1 "commande inconnue" "devzone nexistepas"
 
 echo "▶ Scripts de démarrage, sous terminal"
-conteneur "demarrage.sh : sans question" 180 0 "devzone: state" "bash .devcontainer/demarrage.sh"
+conteneur "startup.sh : sans question" 180 0 "devzone: state" "bash .devcontainer/startup.sh"
 # Conditions de make rebuild figé : dépôt GitHub, gh connecté et administrateur
 # (simulé) ; repowarden install proposait alors les bots et attendait
 git -C "$COPIE" init -q

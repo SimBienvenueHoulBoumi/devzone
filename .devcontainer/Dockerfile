@@ -108,10 +108,10 @@ RUN set -eu; \
     rm -rf "$tmp"
 
 # kind passe par une enveloppe (#291) : avec le Docker de l'hôte, un cluster
-# créé à la main doit être rendu joignable depuis le conteneur (kube-joignable.sh)
-COPY kube-joignable.sh /usr/local/lib/devzone/kube-joignable.sh
-COPY kind-enveloppe.sh /usr/local/bin/kind
-RUN chmod 0644 /usr/local/lib/devzone/kube-joignable.sh && chmod 0755 /usr/local/bin/kind
+# créé à la main doit être rendu joignable depuis le conteneur (kube-reachable.sh)
+COPY kube-reachable.sh /usr/local/lib/devzone/kube-reachable.sh
+COPY kind-wrapper.sh /usr/local/bin/kind
+RUN chmod 0644 /usr/local/lib/devzone/kube-reachable.sh && chmod 0755 /usr/local/bin/kind
 
 COPY --from=uv /uv /uvx /usr/local/bin/
 

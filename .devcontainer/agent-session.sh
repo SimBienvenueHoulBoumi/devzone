@@ -138,7 +138,7 @@ rights_edit_deny() {
 # out of the merge, then added back at the end (the key order of a jq object is the
 # insertion order), so the caller can add permissions but never remove a devzone deny.
 # ~/bash32 is always protected: the container's bash 3.2 was already replaced by a
-# link (#210). The name configurer is kept: agent-droits-gh.bats calls it.
+# link (#210). The name configurer is kept: agent-rights-gh.bats calls it.
 configurer() {
     local def config
     def="$ICI/opencode/agent.json"

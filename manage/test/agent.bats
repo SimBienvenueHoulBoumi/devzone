@@ -1,6 +1,6 @@
 #!/usr/bin/env bats
 # devzone agent command: launch, rotation, resume, configuration (#221, #328).
-# Causes of exclusion, network, state and liberer are in agent-ecarts.bats.
+# Causes of exclusion, network, state and liberer are in agent-gaps.bats.
 
 setup() {
     load commun

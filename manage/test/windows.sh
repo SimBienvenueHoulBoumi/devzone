@@ -3,7 +3,7 @@
 # global dans un préfixe isolé sous $TMP (jamais celui de la machine), puis
 # comportement de la commande devzone — sans conteneur, donc sans Docker ni make.
 #   bash manage/test/windows.sh     (en local, et dans le job windows de la CI)
-# Style identique à manage/test/fonctionnel.sh (✔/✖, compteurs).
+# Style identique à manage/test/functional.sh (✔/✖, compteurs).
 set -euo pipefail
 
 RACINE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -81,7 +81,7 @@ fi
 
 echo "▶ devzone <dossier> avec DEVZONE_SANS_DEMARRER=1"
 reussit "crée un devzone complet" "DEVZONE_SANS_DEMARRER=1 devzone '$TESTDIR' --docker" "créé dans"
-for f in .devcontainer/devcontainer.json .devcontainer/devzone Makefile .gitattributes manage/scripts/lancer.sh manage/scripts/desinstaller.sh README.md LICENSE workspace/.gitkeep .gitignore; do
+for f in .devcontainer/devcontainer.json .devcontainer/devzone Makefile .gitattributes manage/scripts/launch.sh manage/scripts/uninstall.sh README.md LICENSE workspace/.gitkeep .gitignore; do
     reussit "existe : $f" "[ -e '$TESTDIR/$f' ]"
 done
 reussit ".gitignore : workspace ignoré sauf .gitkeep" "grep -q '^workspace/\\*\$' '$TESTDIR/.gitignore'"

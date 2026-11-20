@@ -9,8 +9,8 @@ setup() {
     DEVZONE_RACINE="$BATS_TEST_TMPDIR/racine"
     LOG="$BATS_TEST_TMPDIR/log"
     export DEVZONE_RACINE LOG
-    mkdir -p "$DEVZONE_RACINE/.devcontainer/catalogue/mysql"
-    cp "$BATS_TEST_DIRNAME/../../.devcontainer/catalogue/mysql/app.conf" "$DEVZONE_RACINE/.devcontainer/catalogue/mysql/app.conf"
+    mkdir -p "$DEVZONE_RACINE/.devcontainer/catalog/mysql"
+    cp "$BATS_TEST_DIRNAME/../../.devcontainer/catalog/mysql/app.conf" "$DEVZONE_RACINE/.devcontainer/catalog/mysql/app.conf"
     : >"$LOG"
     HELD=yes
     APP_PRESENT=yes

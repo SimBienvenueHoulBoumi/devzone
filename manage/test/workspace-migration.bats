@@ -115,7 +115,7 @@ setup() {
 }
 
 @test "migrate: volume paths identical to persistence.state.paths in chart" {
-    run grep -oE '^        [a-z0-9-]+\) echo \.[A-Za-z0-9_./-]+' "$RACINE/manage/scripts/migrer.sh"
+    run grep -oE '^        [a-z0-9-]+\) echo \.[A-Za-z0-9_./-]+' "$RACINE/manage/scripts/migrate.sh"
     [ "$status" -eq 0 ]
     [ "$(wc -l <<<"$output")" -eq 9 ]
     while read -r path; do

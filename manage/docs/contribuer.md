@@ -4,7 +4,7 @@
 
 | Tests | Commande | Où | Durée |
 |---|---|---|---|
-| Commande `devzone` du conteneur et commande npm (unitaires) | `bats manage/test/` | dans le conteneur ; en CI, job `bats` (ubuntu, et macOS sous bash 3.2 pour cli.bats, versions.bats, ci-conteneur.bats) sur chaque PR et chaque push de develop et main. Règles tests bats sous bash 3.2 : chaque `[[ … ]]` ou `! commande` doit finir par `|| false` ; pas d'apostrophe dans un commentaire à l'intérieur d'un `$( … )` (bash 3.2 ne charge plus le fichier), contrôlé par `ci-conteneur.bats`. Vérification sous bash 3.2 : `devzone test-bash32`. | quelques secondes |
+| Commande `devzone` du conteneur et commande npm (unitaires) | `bats manage/test/` | dans le conteneur ; en CI, job `bats` (ubuntu, et macOS sous bash 3.2 pour cli.bats, versions.bats, ci-container.bats) sur chaque PR et chaque push de develop et main. Règles tests bats sous bash 3.2 : chaque `[[ … ]]` ou `! commande` doit finir par `|| false` ; pas d'apostrophe dans un commentaire à l'intérieur d'un `$( … )` (bash 3.2 ne charge plus le fichier), contrôlé par `ci-container.bats`. Vérification sous bash 3.2 : `devzone test-bash32`. | quelques secondes |
 | Fonctionnels : un devzone construit et utilisé comme par un utilisateur (outils, modules, Kubernetes avec kind, hooks repowarden, redémarrage, rebuild) | `make test-fonctionnel` | sur ta machine (Docker, Node) | 5 à 10 min |
 | CLI dans un vrai terminal : chaque commande tapée comme par un humain (pseudo-terminal), avec un délai maximal ; une commande qui attend une entrée échoue. Cibles `make` (`help`, `up`, `shell`, `status`, `stop`, `down`, `rebuild`, `desinstaller`), commande npm (`devzone <dossier>`, `desinstaller`, `--version`, `--help`), commande `devzone` du conteneur, scripts de démarrage | `make test-cli` | sur ta machine (Docker, Node, Python 3) | 10 à 15 min |
 | Windows (local et CI) | `bash manage/test/windows.sh` | macOS/Linux (local) ou Windows Git Bash (CI) | quelques secondes |
@@ -15,7 +15,7 @@
 
 Les tests fonctionnels et ceux de la CLI travaillent sur une copie du dépôt, avec leurs propres volumes (`devzone-test-…`), puis suppriment tout (conteneur, volumes, image), même en cas d'échec : ton devzone, tes connexions et le cluster de ta machine ne sont jamais touchés (seul un cluster kind de test est utilisé). En CI, le workflow `fonctionnel` les lance (jobs fonctionnel, cli et windows, plus `ia-arm64` : `devzone enable ia` sur un runner arm64 `ubuntu-24.04-arm`, comme un Mac Apple Silicon, puis `claude --version` et `opencode --version` aux versions figées) sur chaque PR qui modifie `.devcontainer/`, `manage/` (commande npm, scripts, tests), le `Makefile`, `.gitattributes` ou `package.json`, et à la main (*Actions → fonctionnel → Run workflow*).
 
-**Exigés pour merger.** Le workflow tourne sur chaque PR ; le job `bats` tourne sur ubuntu-latest et macos-latest (bash 3.2 du système en tête du PATH) sans décision par chemin, sur `manage/test/` entier sous ubuntu, et sur `manage/test/cli.bats`, `manage/test/versions.bats`, `manage/test/ci-conteneur.bats` sous macOS (les autres `.bats` n'y tournent pas, dont `devzone.bats`). Son job `changements` décide par chemin si les quatre jobs du conteneur doivent tourner (`fonctionnel`, `cli`, `windows`, `ia-arm64`, `manage/test/ci-conteneur.sh`) ; la vérification de synthèse **`tests-conteneur`** est exigée pour merger dans `develop` comme dans `main` (`requiredChecks` de `.repowarden.conf`) et dépend du job `bats` en plus des quatre : elle réussit si `bats` a réussi et si `fonctionnel`, `cli`, `windows` et `ia-arm64` ont réussi, ou s'ils n'avaient pas à tourner (PR de docs seule : quelques secondes) ; un échec ou une annulation la fait échouer. Une PR qui touche le conteneur ne peut donc pas être mergée tant que ses tests tournent. Sur `push` vers `develop` et `main`, seul le job `bats` tourne (`changements` répond `false`). Après un changement de `requiredChecks` : `repowarden proteger --checks "repowarden,tests-conteneur"` (droits d'administration), vérifié par `repowarden proteger --verifier --checks "repowarden,tests-conteneur"`.
+**Exigés pour merger.** Le workflow tourne sur chaque PR ; le job `bats` tourne sur ubuntu-latest et macos-latest (bash 3.2 du système en tête du PATH) sans décision par chemin, sur `manage/test/` entier sous ubuntu, et sur `manage/test/cli.bats`, `manage/test/versions.bats`, `manage/test/ci-container.bats` sous macOS (les autres `.bats` n'y tournent pas, dont `devzone.bats`). Son job `changements` décide par chemin si les quatre jobs du conteneur doivent tourner (`fonctionnel`, `cli`, `windows`, `ia-arm64`, `manage/test/ci-container.sh`) ; la vérification de synthèse **`tests-conteneur`** est exigée pour merger dans `develop` comme dans `main` (`requiredChecks` de `.repowarden.conf`) et dépend du job `bats` en plus des quatre : elle réussit si `bats` a réussi et si `fonctionnel`, `cli`, `windows` et `ia-arm64` ont réussi, ou s'ils n'avaient pas à tourner (PR de docs seule : quelques secondes) ; un échec ou une annulation la fait échouer. Une PR qui touche le conteneur ne peut donc pas être mergée tant que ses tests tournent. Sur `push` vers `develop` et `main`, seul le job `bats` tourne (`changements` répond `false`). Après un changement de `requiredChecks` : `repowarden proteger --checks "repowarden,tests-conteneur"` (droits d'administration), vérifié par `repowarden proteger --verifier --checks "repowarden,tests-conteneur"`.
 
 
 
@@ -53,7 +53,7 @@ devzone/
 │   ├── devcontainer-lock.json  # versions figées des features
 │   ├── devzone                 # commande devzone : modules (ia, kubernetes), versions des assistants IA
 │   ├── post-create.sh          # premier démarrage : droits des volumes, git, repowarden, modules actifs (sans question)
-│   ├── demarrage.sh            # chaque démarrage : identité git, clusters, puis récapitulatif (devzone)
+│   ├── startup.sh            # chaque démarrage : identité git, clusters, puis récapitulatif (devzone)
 │   ├── kube-config.sh          # contextes kind ; module kubernetes : cluster de l'hôte, metrics-server
 │   ├── metrics-server.sh       # metrics-server sur les clusters locaux (CPU et RAM dans k9s)
 │   └── git-identite.sh         # identité git déduite du compte gh si elle manque
@@ -69,14 +69,14 @@ devzone/
 ├── manage/                       # l'outil devzone (à la racine : seulement ce qui doit y être)
 │   ├── devzone                 # commande npm : npx devzone <dossier>, devzone uninstall
 │   ├── scripts/
-│   │   ├── lancer.sh           # make up / rebuild : étapes affichées, question du conteneur signalée
-│   │   └── desinstaller.sh     # make desinstaller : retire tout ce que devzone a créé
+│   │   ├── launch.sh           # make up / rebuild : étapes affichées, question du conteneur signalée
+│   │   └── uninstall.sh     # make desinstaller : retire tout ce que devzone a créé
 │   └── test/
 │       ├── devzone.bats        # tests de la commande devzone (bats manage/test/)
-│       ├── cli.bats            # commande npm, contenu du paquet, manage/scripts/lancer.sh, chemins de l'arborescence
-│       ├── fonctionnel.sh      # tests fonctionnels (make test-fonctionnel)
+│       ├── cli.bats            # commande npm, contenu du paquet, manage/scripts/launch.sh, chemins de l'arborescence
+│       ├── functional.sh      # tests fonctionnels (make test-fonctionnel)
 │       ├── cli-terminal.sh     # tests de la CLI dans un vrai terminal (make test-cli)
-│       ├── ci-conteneur.sh     # CI : tests du conteneur à lancer (par chemin) et synthèse tests-conteneur
+│       ├── ci-container.sh     # CI : tests du conteneur à lancer (par chemin) et synthèse tests-conteneur
 │       └── terminal.py         # lance une commande sous pseudo-terminal, avec délai maximal
 └── workspace/                  # tes projets (ignorés par git, chacun son dépôt)
 ```
