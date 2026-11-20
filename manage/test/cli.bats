@@ -15,11 +15,11 @@ setup() {
     run bash "$CLI" mon-devzone --docker
     [ "$status" -eq 0 ]
     [[ "$output" == *"créé dans"* ]] || false
-    for f in .devcontainer/devcontainer.json .devcontainer/devzone Makefile .gitattributes manage/scripts/lancer.sh manage/scripts/desinstaller.sh README.md LICENSE workspace/.gitkeep .gitignore .devzone.version; do
+    for f in .devcontainer/devcontainer.json .devcontainer/devzone Makefile .gitattributes manage/scripts/launch.sh manage/scripts/uninstall.sh README.md LICENSE workspace/.gitkeep .gitignore .devzone.version; do
         [ -e "mon-devzone/$f" ] || { echo "manquant : $f"; return 1; }
     done
-    [ -x mon-devzone/manage/scripts/desinstaller.sh ]
-    [ -x mon-devzone/manage/scripts/lancer.sh ]
+    [ -x mon-devzone/manage/scripts/uninstall.sh ]
+    [ -x mon-devzone/manage/scripts/launch.sh ]
     # Neither the npm command nor the tests in a devzone
     [ ! -e mon-devzone/manage/devzone ]
     [ ! -e mon-devzone/manage/test ]
@@ -30,7 +30,7 @@ setup() {
 @test "devzone <folder>: .devzone.version holds the version and one checksum per copied file" {
     bash "$CLI" mon-devzone --docker
     [ "$(sed -n '1p' mon-devzone/.devzone.version)" = "version $(bash "$CLI" --version)" ]
-    for f in .devcontainer/devcontainer.json .devcontainer/devzone Makefile .gitattributes manage/scripts/lancer.sh manage/scripts/desinstaller.sh README.md LICENSE; do
+    for f in .devcontainer/devcontainer.json .devcontainer/devzone Makefile .gitattributes manage/scripts/launch.sh manage/scripts/uninstall.sh README.md LICENSE; do
         attendue="$(node -e 'const fs = require("fs"), crypto = require("crypto"); const h = crypto.createHash("sha256"); h.update(fs.readFileSync(process.argv[1])); process.stdout.write(h.digest("hex"))' "mon-devzone/$f")"
         grep -qxF "$attendue  $f" mon-devzone/.devzone.version || { echo "empreinte absente : $f"; return 1; }
     done
@@ -108,33 +108,33 @@ GH
     [[ "$output" == *"dossier devzone"* ]] || false
 }
 
-@test "devzone uninstall: old devzone (desinstaller.sh at the root) accepted" {
-    # devzone created before the move into scripts/: desinstaller.sh at the
+@test "devzone uninstall: old devzone (uninstall.sh at the root) accepted" {
+    # devzone created before the move into scripts/: uninstall.sh at the
     # root, no scripts/; the command must keep working
     mkdir -p vieux/.devcontainer
-    printf '#!/usr/bin/env bash\necho ancien\n' >vieux/desinstaller.sh
-    chmod +x vieux/desinstaller.sh
+    printf '#!/usr/bin/env bash\necho ancien\n' >vieux/uninstall.sh
+    chmod +x vieux/uninstall.sh
     cd vieux
     run bash "$CLI" uninstall
     [ "$status" -eq 0 ]
     [[ "$output" == *ancien* ]] || false
 }
 
-@test "devzone uninstall: devzone from before manage/ (scripts/desinstaller.sh) accepted" {
-    # devzone created before the move into manage/: its desinstaller.sh is
+@test "devzone uninstall: devzone from before manage/ (scripts/uninstall.sh) accepted" {
+    # devzone created before the move into manage/: its uninstall.sh is
     # in scripts/; the command must keep working
     mkdir -p avant-core/.devcontainer avant-core/scripts
-    printf '#!/usr/bin/env bash\necho avant-core\n' >avant-core/scripts/desinstaller.sh
-    chmod +x avant-core/scripts/desinstaller.sh
+    printf '#!/usr/bin/env bash\necho avant-core\n' >avant-core/scripts/uninstall.sh
+    chmod +x avant-core/scripts/uninstall.sh
     cd avant-core
     run bash "$CLI" uninstall
     [ "$status" -eq 0 ]
     [[ "$output" == *avant-core* ]] || false
 }
 
-@test "devzone uninstall: desinstaller.sh without .devcontainer refused" {
+@test "devzone uninstall: uninstall.sh without .devcontainer refused" {
     mkdir pas-devzone
-    printf '#!/usr/bin/env bash\necho appele\n' >pas-devzone/desinstaller.sh
+    printf '#!/usr/bin/env bash\necho appele\n' >pas-devzone/uninstall.sh
     cd pas-devzone
     run bash "$CLI" uninstall
     [ "$status" -eq 1 ]
@@ -154,7 +154,7 @@ GH
 @test "npm package: expected content, no local nor development file" {
     command -v npm >/dev/null || skip "npm absent"
     fichiers="$(cd "$RACINE" && npm pack --dry-run --json 2>/dev/null | node -e 'for (const f of JSON.parse(require("fs").readFileSync(0))[0].files) console.log(f.path)')"
-    for f in manage/devzone .devcontainer/devcontainer.json .devcontainer/devzone Makefile manage/scripts/lancer.sh manage/scripts/desinstaller.sh README.md LICENSE package.json; do
+    for f in manage/devzone .devcontainer/devcontainer.json .devcontainer/devzone Makefile manage/scripts/launch.sh manage/scripts/uninstall.sh README.md LICENSE package.json; do
         grep -qx "$f" <<<"$fichiers" || { echo "absent du paquet : $f"; return 1; }
     done
     ! grep -qE '^(manage/test/|\.github/|workspace/|\.devzone\.|\.repowarden\.conf)' <<<"$fichiers" || false
@@ -184,7 +184,7 @@ GH
     done <<<"$mots"
 }
 
-# manage/scripts/lancer.sh (make up, make rebuild) with a fake devcontainer CLI: $1 = its script
+# manage/scripts/launch.sh (make up, make rebuild) with a fake devcontainer CLI: $1 = its script
 fake_cli() {
     mkdir -p "$BATS_TEST_TMPDIR/faux"
     { echo '#!/usr/bin/env bash'; echo "echo \"\$*\" >\"$BATS_TEST_TMPDIR/args\""; echo "$1"; } >"$BATS_TEST_TMPDIR/faux/npx"
@@ -217,20 +217,20 @@ fake_docker() {
     export PATH="$BATS_TEST_TMPDIR/faux:$PATH"
 }
 
-@test "lancer.sh: Docker absent → how to install it, devcontainer CLI never started" {
+@test "launch.sh: Docker absent → how to install it, devcontainer CLI never started" {
     fake_cli 'echo "{\"outcome\":\"error\"}"; exit 1'
     fake_docker absent
-    run bash "$RACINE/manage/scripts/lancer.sh" up "$PWD/dz"
+    run bash "$RACINE/manage/scripts/launch.sh" up "$PWD/dz"
     [ "$status" -ne 0 ]
     [[ "$output" == *"Docker not found"*"Docker Desktop"*"Docker Engine"*"make up"* ]] || false
     [ ! -e "$BATS_TEST_TMPDIR/args" ]
     [[ "$output" != *outcome* ]] || false
 }
 
-@test "lancer.sh: Docker stopped → start Docker Desktop then retry, without a raw error" {
+@test "launch.sh: Docker stopped → start Docker Desktop then retry, without a raw error" {
     fake_cli 'echo "{\"outcome\":\"error\"}"; exit 1'
     fake_docker arrete
-    run bash "$RACINE/manage/scripts/lancer.sh" rebuild "$PWD/dz"
+    run bash "$RACINE/manage/scripts/launch.sh" rebuild "$PWD/dz"
     [ "$status" -ne 0 ]
     [[ "$output" == *"Start Docker Desktop"*"make rebuild"* ]] || false
     [ ! -e "$BATS_TEST_TMPDIR/args" ]
@@ -238,21 +238,21 @@ fake_docker() {
     [[ "$output" != *"failed to connect"* ]] || false
 }
 
-@test "lancer.sh: Docker without rights → the docker group command" {
+@test "launch.sh: Docker without rights → the docker group command" {
     fake_cli 'exit 0'
     fake_docker droits
-    run bash "$RACINE/manage/scripts/lancer.sh" up "$PWD/dz"
+    run bash "$RACINE/manage/scripts/launch.sh" up "$PWD/dz"
     [ "$status" -ne 0 ]
     [[ "$output" == *"sudo usermod -aG docker"*"make up"* ]] || false
     [[ "$output" != *"permission denied while"* ]] || false
     [ ! -e "$BATS_TEST_TMPDIR/args" ]
 }
 
-@test "desinstaller.sh: Docker stopped → clear message, once, nothing else started" {
+@test "uninstall.sh: Docker stopped → clear message, once, nothing else started" {
     bash "$CLI" dz-des --docker
     fake_cli 'exit 1'
     fake_docker arrete
-    run bash dz-des/manage/scripts/desinstaller.sh
+    run bash dz-des/manage/scripts/uninstall.sh
     [ "$status" -ne 0 ]
     [[ "$output" == *"Start Docker Desktop"*"make desinstaller"* ]] || false
     [[ "$output" != *"failed to connect"* ]] || false
@@ -288,9 +288,9 @@ fake_docker() {
     [[ "$output" != *outcome* ]] || false
 }
 
-@test "lancer.sh: key steps and state shown, full log kept" {
+@test "launch.sh: key steps and state shown, full log kept" {
     fake_cli 'printf "Start: Run: docker buildx build x\r\nbruit\r\nRunning the postStartCommand from devcontainer.json...\r\ndevzone : état\r\n  ○ module ia        facultatif\r\n"'
-    run bash "$RACINE/manage/scripts/lancer.sh" up "$PWD/dz"
+    run bash "$RACINE/manage/scripts/launch.sh" up "$PWD/dz"
     [ "$status" -eq 0 ]
     [[ "$output" == *"▶ Building image"*"▶ Starting (git identity, clusters, state)"*"○ module ia"*"devzone started"* ]] || false
     [[ "$output" != *bruit* ]] || false
@@ -298,53 +298,53 @@ fake_docker() {
     [[ "$(cat "$BATS_TEST_TMPDIR/args")" == *"up --workspace-folder $PWD/dz"* ]] || false
 }
 
-@test "lancer.sh: « devzone: state » summary (English form) shown" {
+@test "launch.sh: « devzone: state » summary (English form) shown" {
     fake_cli 'printf "Running the postStartCommand from devcontainer.json...\r\ndevzone: state\r\n  ○ module ia        facultatif\r\n"'
-    run bash "$RACINE/manage/scripts/lancer.sh" up "$PWD/dz"
+    run bash "$RACINE/manage/scripts/launch.sh" up "$PWD/dz"
     [ "$status" -eq 0 ]
     [[ "$output" == *"devzone: state"*"○ module ia"* ]] || false
 }
 
-@test "lancer.sh rebuild: container recreated" {
+@test "launch.sh rebuild: container recreated" {
     fake_cli 'exit 0'
-    run bash "$RACINE/manage/scripts/lancer.sh" rebuild "$PWD/dz"
+    run bash "$RACINE/manage/scripts/launch.sh" rebuild "$PWD/dz"
     [ "$status" -eq 0 ]
     [[ "$output" == *"devzone rebuilt"* ]] || false
     [[ "$(cat "$BATS_TEST_TMPDIR/args")" == *"--remove-existing-container"* ]] || false
 }
 
-@test "lancer.sh: question asked in the container reported, start stopped instead of waiting" {
+@test "launch.sh: question asked in the container reported, start stopped instead of waiting" {
     fake_cli 'printf "Running the postCreateCommand from devcontainer.json...\r\nConfigurer les bots de ce dépôt ? [o/N] "; sleep 60'
     export DEVZONE_ATTENTE_QUESTION=2
     debut="$(date +%s)"
-    run bash "$RACINE/manage/scripts/lancer.sh" up "$PWD/dz"
+    run bash "$RACINE/manage/scripts/launch.sh" up "$PWD/dz"
     [ "$status" -eq 1 ]
     [ $(($(date +%s) - debut)) -lt 20 ]
     [[ "$output" == *"asks a question"*"Configurer les bots de ce dépôt ? [o/N]"* ]] || false
 }
 
-@test "lancer.sh: silence reported (sign of life), not taken for a question" {
+@test "launch.sh: silence reported (sign of life), not taken for a question" {
     fake_cli 'printf "npm install en cours\r\n"; sleep 4'
     export DEVZONE_SIGNE_DE_VIE=1 DEVZONE_ATTENTE_QUESTION=1
-    run bash "$RACINE/manage/scripts/lancer.sh" up "$PWD/dz"
+    run bash "$RACINE/manage/scripts/launch.sh" up "$PWD/dz"
     [ "$status" -eq 0 ]
     [[ "$output" == *"no new line for"*"npm install en cours"* ]] || false
     [[ "$output" == *"devzone started"* ]] || false
 }
 
-@test "lancer.sh: failure, end of the log shown" {
+@test "launch.sh: failure, end of the log shown" {
     fake_cli 'echo "erreur de construction"; exit 1'
-    run bash "$RACINE/manage/scripts/lancer.sh" up "$PWD/dz"
+    run bash "$RACINE/manage/scripts/launch.sh" up "$PWD/dz"
     [ "$status" -eq 1 ]
     [[ "$output" == *"erreur de construction"*"failed"* ]] || false
 }
 
-@test "lancer.sh: docker-hote=off → config without the feature, build paths fixed, --config passed" {
+@test "launch.sh: docker-hote=off → config without the feature, build paths fixed, --config passed" {
     fake_cli 'exit 0'
     mkdir -p dz/.devcontainer
     cp "$RACINE/.devcontainer/devcontainer.json" dz/.devcontainer/devcontainer.json
     printf 'docker-hote=off\n' >dz/.devzone.modules
-    run bash "$RACINE/manage/scripts/lancer.sh" up "$PWD/dz"
+    run bash "$RACINE/manage/scripts/launch.sh" up "$PWD/dz"
     [ "$status" -eq 0 ]
     cfg="$PWD/dz/.devcontainer/without-host-docker/devcontainer.json"
     [ -f "$cfg" ]
@@ -356,14 +356,14 @@ fake_docker() {
     [[ "$(cat "$BATS_TEST_TMPDIR/args")" == *"up --workspace-folder $PWD/dz --config $cfg"* ]] || false
 }
 
-@test "lancer.sh: docker-hote absent or on → normal config, no --config" {
+@test "launch.sh: docker-hote absent or on → normal config, no --config" {
     fake_cli 'exit 0'
-    run bash "$RACINE/manage/scripts/lancer.sh" up "$PWD/dz"
+    run bash "$RACINE/manage/scripts/launch.sh" up "$PWD/dz"
     [ "$status" -eq 0 ]
     [ ! -e dz/.devcontainer/without-host-docker/devcontainer.json ]
     [[ "$(cat "$BATS_TEST_TMPDIR/args")" != *"--config"* ]] || false
     printf 'docker-hote=on\n' >dz/.devzone.modules
-    run bash "$RACINE/manage/scripts/lancer.sh" rebuild "$PWD/dz"
+    run bash "$RACINE/manage/scripts/launch.sh" rebuild "$PWD/dz"
     [ "$status" -eq 0 ]
     [ ! -e dz/.devcontainer/without-host-docker/devcontainer.json ]
     [[ "$(cat "$BATS_TEST_TMPDIR/args")" != *"--config"* ]] || false

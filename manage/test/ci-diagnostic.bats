@@ -1,12 +1,12 @@
 #!/usr/bin/env bats
 # Diagnostic of the bats jobs cancelled before they ran (#636):
-# ci-conteneur.sh diagnostic prints one line per cancelled bats job. A fake gh
+# ci-container.sh diagnostic prints one line per cancelled bats job. A fake gh
 # on the PATH answers the jobs of the run. The verdict of synthese does not
 # change: a cancelled bats job still fails.
 
 setup() {
     RACINE="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
-    SCRIPT="$RACINE/manage/test/ci-conteneur.sh"
+    SCRIPT="$RACINE/manage/test/ci-container.sh"
     mkdir -p "$BATS_TEST_TMPDIR/bin"
     # The fake gh logs its arguments, then prints the fixture (already filtered
     # by jq in the real command), or fails when FAUX_GH_ECHEC is set

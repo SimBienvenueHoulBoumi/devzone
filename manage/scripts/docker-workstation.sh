@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Docker workstation put to sleep when the Kubernetes workspace takes over (#517).
-# Sourced by migrer.sh (stop) and migrer-retour.sh (start). Containers of the
+# Sourced by migrate.sh (stop) and migrate-revert.sh (start). Containers of the
 # workstation folder (label devcontainer.local_folder) and the automatic port
 # relays of this instance (labels devzone.auto=true, devzone.instance) are
 # stopped, never removed. Without Docker,
@@ -12,7 +12,7 @@ docker_workstation_ready() {
 }
 
 # Ids, one per line, of the containers of folder $1 and of the automatic relays
-# of this instance (DEVZONE_VOLUMES, default devzone, as in desinstaller.sh): the
+# of this instance (DEVZONE_VOLUMES, default devzone, as in uninstall.sh): the
 # relays of another devzone on the same machine are not touched.
 # $2 is "running" (docker ps) or "exited" (stopped containers, docker ps -a).
 docker_workstation_ids() {

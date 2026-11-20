@@ -175,10 +175,10 @@ copy_from() {
 . "$HERE/scripts/workspace-clone.sh"
 # shellcheck source=manage/scripts/workspace-copies.sh
 . "$HERE/scripts/workspace-copies.sh"
-# shellcheck source=manage/scripts/migrer.sh
-. "$HERE/scripts/migrer.sh"
-# shellcheck source=manage/scripts/migrer-retour.sh
-. "$HERE/scripts/migrer-retour.sh"
+# shellcheck source=manage/scripts/migrate.sh
+. "$HERE/scripts/migrate.sh"
+# shellcheck source=manage/scripts/migrate-revert.sh
+. "$HERE/scripts/migrate-revert.sh"
 # shellcheck source=manage/scripts/ports-workspace.sh
 . "$HERE/scripts/ports-workspace.sh"
 # shellcheck source=manage/scripts/services-workspace.sh

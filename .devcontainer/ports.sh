@@ -18,9 +18,9 @@ ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
 INSTANCE="${DEVZONE_INSTANCE:-devzone}"
 
 # Écriture sûre de l'état (#417) : verrou, temporaire dans l'état, .prec
-# shellcheck source=SCRIPTDIR/etat.sh
+# shellcheck source=SCRIPTDIR/state.sh
 # shellcheck disable=SC1091
-. "$ICI/etat.sh"
+. "$ICI/state.sh"
 
 refuse() { echo "devzone : port : $*" >&2; exit 1; }
 
@@ -41,7 +41,7 @@ trier_ports() {
     printf '%s\n' "${1:-}" | tr ',' '\n' | awk 'NF && $0 ~ /^[0-9]+$/ { print }' | sort -n -u | paste -sd, -
 }
 
-# Écrit la ligne ports= de l'état (#417 : jamais de mv hors de etat.sh)
+# Écrit la ligne ports= de l'état (#417 : jamais de mv hors de state.sh)
 ecrire_ports() {
     state_write ports "${1:-}" || { echo "devzone : port : état non enregistré : $ETAT" >&2; exit 1; }
 }

@@ -9,9 +9,9 @@ LOCAL_HOTE_REEL=""
 # Internal (slash-free) name of the host model chosen for this attempt.
 LOCAL_HOTE_INTERNE=""
 
-# shellcheck source=SCRIPTDIR/ia/host-models.sh
+# shellcheck source=SCRIPTDIR/ai/host-models.sh
 # shellcheck disable=SC1091
-. "$ICI/ia/host-models.sh"
+. "$ICI/ai/host-models.sh"
 
 # Sanitizes a model name into an internal name: every character outside
 # [A-Za-z0-9._-] becomes '_'. Used for ecart-<name> files, the journal and

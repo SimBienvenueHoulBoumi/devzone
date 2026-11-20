@@ -11,7 +11,7 @@ setup() {
     kind_vide
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
     GITLAB="$BATS_TEST_DIRNAME/../../.devcontainer/gitlab/gitlab.sh"
-    DEMARRAGE="$BATS_TEST_DIRNAME/../../.devcontainer/demarrage.sh"
+    DEMARRAGE="$BATS_TEST_DIRNAME/../../.devcontainer/startup.sh"
     relais_docker_isole
     kube_isole
     export HOME="$BATS_TEST_TMPDIR/home"
@@ -20,7 +20,7 @@ setup() {
     export DEVZONE_MEMINFO="$BATS_TEST_TMPDIR/meminfo"
     export DEVZONE_HOSTS="$BATS_TEST_TMPDIR/hosts"
     export KIND_CLUSTERS="$BATS_TEST_TMPDIR/clusters"
-    # demarrage.sh lance le veilleur de ports auto : son dossier reste sous le test (#394)
+    # startup.sh lance le veilleur de ports auto : son dossier reste sous le test (#394)
     export DEVZONE_PORTS_AUTO_DIR="$BATS_TEST_TMPDIR/ports-auto"
     SECRETS="$DEVZONE_RACINE/workspace/.gitlab"
     mkdir -p "$HOME" "$DEVZONE_RACINE/workspace" "$BATS_TEST_TMPDIR/bin"
@@ -674,7 +674,7 @@ marque_reelle() {
     attendre_journal "$BATS_TEST_TMPDIR/setsid.log" 'devzone devzone-gitlab svc/gitlab-gitlab-shell 2224:22'
     grep -q 'devzone devzone-gitlab svc/gitlab-gitlab-shell 2224:22' "$BATS_TEST_TMPDIR/setsid.log"
     # Isolation (#346) : la marque réelle du poste est inchangée après le
-    # démarrage (relevée avant le premier lancement de demarrage.sh)
+    # démarrage (relevée avant le premier lancement de startup.sh)
     [[ "$DEVZONE_RELAIS_MARQUE" == "$BATS_TEST_TMPDIR"/* ]] || false
     [ "$(marque_reelle)" = "$avant" ]
 }

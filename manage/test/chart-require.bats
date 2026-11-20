@@ -17,7 +17,7 @@ setup() {
     # shellcheck disable=SC1091
     . "$BATS_TEST_DIRNAME/../../.devcontainer/argocd/services.sh"
     # shellcheck disable=SC1091
-    . "$BATS_TEST_DIRNAME/../../.devcontainer/argocd/catalogue-argocd.sh"
+    . "$BATS_TEST_DIRNAME/../../.devcontainer/argocd/catalog-argocd.sh"
     services_state_of() { echo on; }
     services_namespace_prepare() { echo "namespace $1" >>"$LOG"; }
     services_secret_postgres() { echo "secret postgres" >>"$LOG"; }

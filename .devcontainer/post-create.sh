@@ -63,7 +63,7 @@ bash /workspaces/devzone/.devcontainer/kube-config.sh || echo "devzone : configu
 # Sans la feature docker-outside-of-docker (option docker-hote=off, #432),
 # docker n'est pas installé : un message clair renvoie au workspace Kubernetes
 if ! command -v docker >/dev/null 2>&1; then
-    sudo install -m 0755 /workspaces/devzone/.devcontainer/docker-sans-hote.sh /usr/local/bin/docker
+    sudo install -m 0755 /workspaces/devzone/.devcontainer/docker-without-host.sh /usr/local/bin/docker
 fi
 devzone apply || echo "devzone : modules incomplets (détail ci-dessus), réessayer : devzone apply" >&2
 # Paquets systeme gardes (#351) : reinstallees a chaque creation ; un echec n arrete pas la creation
@@ -81,7 +81,7 @@ INVITE
 fi
 
 # Ce qui reste à faire (identité git, GitHub, modules) : récapitulatif de
-# devzone, affiché à chaque démarrage (demarrage.sh)
+# devzone, affiché à chaque démarrage (startup.sh)
 
 recap="java $(java -version 2>&1 | head -1 | cut -d'"' -f2), node $(node -v), python $(python3 --version | cut -d' ' -f2), repowarden $(repowarden --version)"
 ! command -v claude >/dev/null || recap+=", claude $(claude --version | cut -d' ' -f1)"

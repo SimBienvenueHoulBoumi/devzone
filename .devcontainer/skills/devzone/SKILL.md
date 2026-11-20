@@ -52,7 +52,7 @@ Le journal est `workspace/.agents/<dossier>.log`. `--auto` évite l'attente d'un
 
 Avec `ia` actif, le garde-fou repowarden est branché pour Claude Code et opencode : l'agent est arrêté avant de modifier `main`/`develop`, de commiter sans `repowarden cc` ou de contourner les hooks. `repowarden cc -m "…"` pour commiter.
 
-Fichiers de droits protégés (jamais écrits par un agent, listés fixes, qu'aucune variable ne change) : `.devcontainer/opencode/agent.json`, `.devcontainer/opencode.jsonc`, `.repowarden.conf`, `.devcontainer/agent-droits.sh`. Un agent qui les touche est refusé et le changement est annulé dans l'arbre.
+Fichiers de droits protégés (jamais écrits par un agent, listés fixes, qu'aucune variable ne change) : `.devcontainer/opencode/agent.json`, `.devcontainer/opencode.jsonc`, `.repowarden.conf`, `.devcontainer/agent-rights.sh`. Un agent qui les touche est refusé et le changement est annulé dans l'arbre.
 
 ## Kubernetes seulement
 

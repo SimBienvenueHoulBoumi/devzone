@@ -8,9 +8,9 @@
 
 # Shared memory check of the services cluster (#608): quantity_ki,
 # memory_cluster_ki and check_module_memory.
-# shellcheck source=SCRIPTDIR/../memoire.sh
+# shellcheck source=SCRIPTDIR/../memory.sh
 # shellcheck disable=SC1091
-. "$ICI/../memoire.sh"
+. "$ICI/../memory.sh"
 
 # Namespace isolé du module : un par instance, comme postgres
 GITLAB_NS="devzone-gitlab${INSTANCE_SUFFIX}"

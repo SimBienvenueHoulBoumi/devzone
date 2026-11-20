@@ -14,9 +14,9 @@ RACINE="${DEVZONE_RACINE:-$(dirname "$(dirname "$ICI")")}"
 # shellcheck disable=SC1091
 . "$ICI/../password.sh"
 # Isolation réseau : namespace_isoler, posée avec le namespace devzone-gitlab
-# shellcheck source=SCRIPTDIR/../isolement.sh
+# shellcheck source=SCRIPTDIR/../isolation.sh
 # shellcheck disable=SC1091
-. "$ICI/../isolement.sh"
+. "$ICI/../isolation.sh"
 
 # ---- Variables de délai (secondes) ----
 # GITLAB_ATTENTE : attente globale d'installation (défaut 1200)
@@ -67,7 +67,7 @@ GITLAB_HOTE_MARQUE="# devzone:gitlab"
 # qui écoute sur 127.0.0.1. Le nom pointe donc vers 127.0.0.1 pour que ssh et
 # glab empruntent le même chemin. /etc/hosts est un montage Docker que Docker
 # régénère au démarrage du conteneur, d'où le re-pose à chaque démarrage
-# (demarrage.sh) et à chaque activation. Jamais de sed -i ni de mv : le
+# (startup.sh) et à chaque activation. Jamais de sed -i ni de mv : le
 # montage ne peut pas être renommé (écriture en place seulement) ; directe si
 # le fichier est inscriptible, sinon sudo -n. Un échec n'échoue jamais :
 # avertissement sur stderr et code 0, pour ne pas faire échouer l'installation

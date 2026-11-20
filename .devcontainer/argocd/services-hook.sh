@@ -19,17 +19,17 @@ ICI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # (workspace/ secrets, .argocd.conf), the same folder unless DEVZONE_RACINE says so
 RACINE="$(dirname "$(dirname "$ICI")")"
 STATE_RACINE="${DEVZONE_RACINE:-$RACINE}"
-# shellcheck disable=SC2034 # read by catalogue-argocd.sh
+# shellcheck disable=SC2034 # read by catalog-argocd.sh
 ETAT="${DEVZONE_ETAT:-$STATE_RACINE/.devzone.modules}"
-APP_CONF="$RACINE/.devcontainer/catalogue/mysql/app.conf"
+APP_CONF="$RACINE/.devcontainer/catalog/mysql/app.conf"
 HOOK_SERVICES="postgres mysql"
 
 # shellcheck source=SCRIPTDIR/../cluster.sh
 # shellcheck disable=SC1091
 . "$ICI/../cluster.sh"
-# shellcheck source=SCRIPTDIR/catalogue-argocd.sh
+# shellcheck source=SCRIPTDIR/catalog-argocd.sh
 # shellcheck disable=SC1091
-. "$ICI/catalogue-argocd.sh"
+. "$ICI/catalog-argocd.sh"
 
 # Loads the Argo CD pieces (conf, gitops, services with the context devzone)
 # and the list of services reconciled here
@@ -45,7 +45,7 @@ hook_load() {
 hook_script() {
     case "$1" in
         postgres) printf '%s' "$ICI/../postgres/postgres.sh" ;;
-        mysql) printf '%s' "$ICI/../catalogue/mysql/mysql.sh" ;;
+        mysql) printf '%s' "$ICI/../catalog/mysql/mysql.sh" ;;
     esac
 }
 

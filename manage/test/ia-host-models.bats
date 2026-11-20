@@ -4,8 +4,8 @@
 
 setup() {
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
-    HM="$BATS_TEST_DIRNAME/../../.devcontainer/ia/host-models.sh"
-    HC="$BATS_TEST_DIRNAME/../../.devcontainer/ia/host-check.sh"
+    HM="$BATS_TEST_DIRNAME/../../.devcontainer/ai/host-models.sh"
+    HC="$BATS_TEST_DIRNAME/../../.devcontainer/ai/host-check.sh"
     export HOME="$BATS_TEST_TMPDIR/home"
     export DEVZONE_RACINE="$BATS_TEST_TMPDIR/racine"
     export DEVZONE_OLLAMA_URL="http://host.docker.internal:11434"

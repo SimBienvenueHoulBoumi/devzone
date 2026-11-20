@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR/.devcontainer/ia/docker-garde.sh\" --format claude"
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.devcontainer/ai/docker-guard.sh\" --format claude"
           }
         ]
       }

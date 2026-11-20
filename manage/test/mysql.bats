@@ -10,7 +10,7 @@ setup() {
     kube_isole
     # shellcheck disable=SC2034
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
-    MYSQL="$BATS_TEST_DIRNAME/../../.devcontainer/catalogue/mysql/mysql.sh"
+    MYSQL="$BATS_TEST_DIRNAME/../../.devcontainer/catalog/mysql/mysql.sh"
     SECRETS="$BATS_TEST_TMPDIR/racine/workspace/.mysql"
     export HOME="$BATS_TEST_TMPDIR/home"
     export DEVZONE_RACINE="$BATS_TEST_TMPDIR/racine"

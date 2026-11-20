@@ -146,8 +146,8 @@ admin_setup() {
     # services-admin.sh runs the devzone beside it (#591): a copy of the script
     # and of its state helpers in $T/pod, with a fake devzone next to them
     mkdir -p "$T/pod"
-    cp "$RACINE/.devcontainer/services-admin.sh" "$RACINE/.devcontainer/etat.sh" \
-        "$RACINE/.devcontainer/etat-verrou.sh" "$T/pod/"
+    cp "$RACINE/.devcontainer/services-admin.sh" "$RACINE/.devcontainer/state.sh" \
+        "$RACINE/.devcontainer/state-lock.sh" "$T/pod/"
     ADMIN="$T/pod/services-admin.sh"
     # Fake devzone beside the script: logs its arguments, keeps a copy of the
     # kubeconfig and of the state as seen during the run
