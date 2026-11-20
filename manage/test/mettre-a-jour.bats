@@ -60,7 +60,7 @@ poisoned_manifest() {
     printf 'secret\n' >"$T/dehors/secret"
     printf '%064d  %s\n' 0 "$rel" >>"$DZ/.devzone.version"
     cd "$DZ"
-    run bash "$MAJ" update --oui --sans-reconstruire
+    run bash "$MAJ" update --yes --sans-reconstruire
     [ "$status" -eq 0 ]
     [ "$(cat "$T/dehors/secret")" = secret ]
     [[ "$output" == *"devzone : manifeste : chemin refusé : $rel"* ]] || false
@@ -129,25 +129,25 @@ poisoned_manifest() {
     [ ! -e "$T/reconstruction.log" ]
 }
 
-@test "modified file without --oui and without terminal → refused with exit 1, nothing touched" {
+@test "modified file without --yes and without terminal → refused with exit 1, nothing touched" {
     create_v1
     printf 'modifie a la main\n' >"$DZ/Makefile"
     cd "$DZ"
     run bash "$MAJ" update
     [ "$status" -eq 1 ]
     [[ "$output" == *"Makefile"* ]] || false
-    [[ "$output" == *"--oui"* ]] || false
+    [[ "$output" == *"--yes"* ]] || false
     [ "$(cat "$DZ/Makefile")" = 'modifie a la main' ]
     [ "$(sed -n '1p' "$DZ/.devzone.version")" = "version 0.0.1" ]
     [ ! -e "$DZ/.devzone.sauvegarde" ]
     [ ! -e "$T/reconstruction.log" ]
 }
 
-@test "modified file with --oui → backed up, then replaced" {
+@test "modified file with --yes → backed up, then replaced" {
     create_v1
     printf 'modifie a la main\n' >"$DZ/Makefile"
     cd "$DZ"
-    run bash "$MAJ" update --oui
+    run bash "$MAJ" update --yes
     [ "$status" -eq 0 ]
     grep -q '# makefile nouveau' "$DZ/Makefile"
     backup="$(backup_of)"
@@ -161,7 +161,7 @@ poisoned_manifest() {
     create_v1
     printf '[argocd]\n    repo = https://github.com/tester/devzone-argocd.git\n' >"$DZ/.argocd.conf"
     cd "$DZ"
-    run bash "$MAJ" update --oui --sans-reconstruire
+    run bash "$MAJ" update --yes --sans-reconstruire
     [ "$status" -eq 0 ]
     grep -q '^    repo = https://github.com/tester/devzone-argocd.git$' "$DZ/.argocd.conf"
     [ ! -e "$DZ/.devzone.sauvegarde/.argocd.conf" ]
@@ -187,7 +187,7 @@ echo moi' ]
     mkdir -p "$DZ/scripts"
     printf 'mon outil\n' >"$DZ/scripts/mon-outil.sh"
     cd "$DZ"
-    run bash "$MAJ" update --oui --sans-reconstruire
+    run bash "$MAJ" update --yes --sans-reconstruire
     [ "$status" -eq 0 ]
     [ "$(cat "$DZ/scripts/mon-outil.sh")" = 'mon outil' ]
     [ "$(sed -n '1p' "$DZ/.devzone.version")" = "version 0.0.2" ]
@@ -200,7 +200,7 @@ echo moi' ]
     printf 'vieux lancer\n' >"$DZ/scripts/lancer.sh"
     printf 'mon outil\n' >"$DZ/scripts/mon-outil.sh"
     cd "$DZ"
-    run bash "$MAJ" update --oui --sans-reconstruire
+    run bash "$MAJ" update --yes --sans-reconstruire
     [ "$status" -eq 0 ]
     [ ! -e "$DZ/scripts/desinstaller.sh" ]
     [ ! -e "$DZ/scripts/lancer.sh" ]
@@ -219,7 +219,7 @@ echo moi' ]
     printf 'vieux test\n' >"$DZ/core/test/ancien.bats"
     printf 'vieille doc\n' >"$DZ/core/docs/ancien.md"
     cd "$DZ"
-    run bash "$MAJ" update --oui --sans-reconstruire
+    run bash "$MAJ" update --yes --sans-reconstruire
     [ "$status" -eq 0 ]
     [ ! -e "$DZ/core" ]
     backup="$(backup_of)"
@@ -237,7 +237,7 @@ echo moi' ]
     printf 'fichier a moi\n' >"$DZ/core/autre/mon-fichier"
     printf 'projet\n' >"$DZ/workspace/projet/fichier"
     cd "$DZ"
-    run bash "$MAJ" update --oui --sans-reconstruire
+    run bash "$MAJ" update --yes --sans-reconstruire
     [ "$status" -eq 0 ]
     [[ "$output" == *"inconnue"* ]] || false
     [ ! -e "$DZ/core/scripts" ]
@@ -261,7 +261,7 @@ echo moi' ]
     run bash "$MAJ" update
     [ "$status" -eq 1 ]
     [[ "$output" == *"scripts/desinstaller.sh"* ]] || false
-    [[ "$output" == *"--oui"* ]] || false
+    [[ "$output" == *"--yes"* ]] || false
     [ "$(cat "$DZ/scripts/desinstaller.sh")" = 'vieux desinstaller' ]
     [ "$(cat "$DZ/scripts/lancer.sh")" = 'vieux lancer' ]
     [ "$(cat "$DZ/scripts/mon-outil.sh")" = 'mon outil' ]
@@ -271,7 +271,7 @@ echo moi' ]
     [ ! -e "$DZ/.devzone.sauvegarde" ]
 }
 
-@test "old folder without a manifest: all differing files are modified → --oui required" {
+@test "old folder without a manifest: all differing files are modified → --yes required" {
     create_v1
     rm "$DZ/.devzone.version"
     cd "$DZ"
@@ -298,16 +298,16 @@ echo moi' ]
 @test "without a terminal: rebuild suggested, never started" {
     create_v1
     cd "$DZ"
-    run bash "$MAJ" update --oui
+    run bash "$MAJ" update --yes
     [ "$status" -eq 0 ]
     [[ "$output" == *"make -C $DZ rebuild"* ]] || false
     [ ! -e "$T/reconstruction.log" ]
 }
 
-@test "--sans-reconstruire: no rebuild, even with --oui" {
+@test "--sans-reconstruire: no rebuild, even with --yes" {
     create_v1
     cd "$DZ"
-    run bash "$MAJ" update --oui --sans-reconstruire
+    run bash "$MAJ" update --yes --sans-reconstruire
     [ "$status" -eq 0 ]
     [[ "$output" == *"Reconstruction non lancée (--sans-reconstruire)"* ]] || false
     [ ! -e "$T/reconstruction.log" ]
@@ -318,7 +318,7 @@ echo moi' ]
     create_v1
     printf 'workspace=kubernetes\n' >"$DZ/.devzone.modules"
     cd "$DZ"
-    run bash "$MAJ" update --oui
+    run bash "$MAJ" update --yes
     [ "$status" -eq 0 ]
     [[ "$output" == *"next devzone workspace start"* ]] || false
     [[ "$output" != *"rebuild"* ]] || false
@@ -349,7 +349,7 @@ echo moi' ]
     printf 'a moi\n' >"$DZ/workspace/x"
     printf '%064d  %s\n' 0 'workspace/x' >>"$DZ/.devzone.version"
     cd "$DZ"
-    run bash "$MAJ" update --oui --sans-reconstruire
+    run bash "$MAJ" update --yes --sans-reconstruire
     [ "$status" -eq 0 ]
     [ "$(cat "$T/dehors/secret")" = secret ]
     [ "$(cat "$DZ/workspace/x")" = 'a moi' ]
@@ -363,7 +363,7 @@ echo moi' ]
     ln -s "$T/dehors" "$DZ/.devcontainer/lien"
     printf '%064d  %s\n' 0 '.devcontainer/lien/secret' >>"$DZ/.devzone.version"
     cd "$DZ"
-    run bash "$MAJ" update --oui --sans-reconstruire
+    run bash "$MAJ" update --yes --sans-reconstruire
     [ "$status" -eq 0 ]
     [ "$(cat "$T/dehors/secret")" = secret ]
     [[ "$output" == *"devzone : manifeste : chemin refusé : .devcontainer/lien/secret"* ]] || false
@@ -376,7 +376,7 @@ echo moi' ]
     rm -f "$DZ/.devcontainer/devcontainer.json"
     ln -s "$T/dehors/cible" "$DZ/.devcontainer/devcontainer.json"
     cd "$DZ"
-    run bash "$MAJ" update --oui --sans-reconstruire
+    run bash "$MAJ" update --yes --sans-reconstruire
     [ "$status" -eq 0 ]
     [ "$(cat "$T/dehors/cible")" = intact ]
     [ ! -L "$DZ/.devcontainer/devcontainer.json" ] || false
@@ -391,7 +391,7 @@ echo moi' ]
     rm -f "$DZ/.devcontainer/devcontainer.json"
     ln -s "$T/dehors/cible" "$DZ/.devcontainer/devcontainer.json"
     cd "$DZ"
-    run bash "$MAJ" update --oui --sans-reconstruire
+    run bash "$MAJ" update --yes --sans-reconstruire
     [ "$status" -eq 0 ]
     [ -L "$(backup_of)/.devcontainer/devcontainer.json" ] || false
     [ "$(cat "$T/dehors/cible")" = intact ]

@@ -109,7 +109,7 @@ KUBE
 }
 
 @test "reparer : chaque élément réparé et code 0" {
-    run bash "$APP" reparer
+    run bash "$APP" repair
     [ "$status" -eq 0 ]
     [[ "$output" == *"✔ relais Docker"* ]] || false
     [[ "$output" == *"✔ relais de ports"* ]] || false
@@ -123,7 +123,7 @@ KUBE
 
 @test "reparer : gitlab et postgres actifs sont aussi réparés" {
     printf 'gitlab=on\npostgres=on\n' >"$DEVZONE_ETAT"
-    run bash "$APP" reparer
+    run bash "$APP" repair
     [ "$status" -eq 0 ]
     [[ "$(cat "$T/actions.log")" == *"gitlab hote-poser"* ]] || false
     [[ "$(cat "$T/actions.log")" == *"gitlab relay-start"* ]] || false
@@ -133,21 +133,21 @@ KUBE
 @test "reparer : le jeton du compte kubernetes est renouvelé" {
     faux_kubectl
     printf 'cluster=docker-desktop\n' >"$DEVZONE_ETAT"
-    run bash "$APP" reparer
+    run bash "$APP" repair
     [ "$status" -eq 0 ]
     [[ "$output" == *"✔ compte kubernetes"* ]] || false
     grep -q 'create token devzone-agent -n devzone-system --duration=24h' "$T/kubectl.log" || false
 }
 
 @test "reparer : sans cluster des services, pas de jeton du compte kubernetes" {
-    run bash "$APP" reparer
+    run bash "$APP" repair
     [ "$status" -eq 0 ]
     [[ "$output" != *"compte kubernetes"* ]] || false
     ! grep -q 'create token' "$T/kubectl.log" 2>/dev/null || false
 }
 
 @test "reparer : lance le veilleur du catalogue" {
-    run bash "$APP" reparer
+    run bash "$APP" repair
     [ "$status" -eq 0 ]
     [[ "$output" == *"✔ veilleur catalogue"* ]] || false
     [[ "$(cat "$T/actions.log")" == *"catalogue-veilleur demarrer"* ]] || false
@@ -155,14 +155,14 @@ KUBE
 
 @test "reparer : un élément en échec affiche sa raison et code 1" {
     : >"$T/echec-password"
-    run bash "$APP" reparer
+    run bash "$APP" repair
     [ "$status" -eq 1 ]
     [[ "$output" == *"✖ identifiants : identifiants indisponibles"* ]] || false
     [[ "$(cat "$T/actions.log")" == *"ports restart"* ]] || false
 }
 
 @test "demarrer : lance le démarrage complet" {
-    run bash "$APP" demarrer
+    run bash "$APP" start
     [ "$status" -eq 0 ]
     [ "$(cat "$T/actions.log")" = "demarrage " ]
 }
@@ -176,7 +176,7 @@ KUBE
 @test "utiliser : bascule le contexte sans toucher au cluster des services" {
     faux_kubectl
     printf 'cluster=kind-devzone\n' >"$DEVZONE_ETAT"
-    run bash "$APP" utiliser docker-desktop
+    run bash "$APP" use docker-desktop
     [ "$status" -eq 0 ]
     [[ "$output" == *"cluster de travail : docker-desktop"* ]] || false
     [[ "$(cat "$T/kubectl.log")" == *"config use-context docker-desktop"* ]] || false
@@ -185,7 +185,7 @@ KUBE
 
 @test "utiliser : contexte inconnu refusé sans bascule" {
     faux_kubectl
-    run bash "$APP" utiliser inconnu
+    run bash "$APP" use inconnu
     [ "$status" -eq 2 ]
     [[ "$output" == *"contexte inconnu : inconnu"* ]] || false
     [[ "$(cat "$T/kubectl.log")" != *"use-context"* ]] || false
@@ -193,7 +193,7 @@ KUBE
 
 @test "utiliser : cluster distant refusé sans confirmation" {
     faux_kubectl
-    run bash "$APP" utiliser prod
+    run bash "$APP" use prod
     [ "$status" -eq 2 ]
     [[ "$output" == *"cluster distant refusé : prod"* ]] || false
     [[ "$(cat "$T/kubectl.log")" != *"use-context"* ]] || false
@@ -201,19 +201,19 @@ KUBE
 
 @test "utiliser : --confirm exact accepté, autre valeur refusée" {
     faux_kubectl
-    run bash "$APP" utiliser prod --confirm prod
+    run bash "$APP" use prod --confirm prod
     [ "$status" -eq 0 ]
     [[ "$(cat "$T/kubectl.log")" == *"config use-context prod"* ]] || false
 
     : >"$T/kubectl.log"
-    run bash "$APP" utiliser prod --confirm autre
+    run bash "$APP" use prod --confirm autre
     [ "$status" -eq 2 ]
     [[ "$output" == *"cluster distant refusé : prod"* ]] || false
     [[ "$(cat "$T/kubectl.log")" != *"use-context"* ]] || false
 }
 
 @test "reparer : workspace Kubernetes, pas de veilleur de ports auto (#517)" {
-    DEVZONE_WORKSPACE=kubernetes run bash "$APP" reparer
+    DEVZONE_WORKSPACE=kubernetes run bash "$APP" repair
     [ "$status" -eq 0 ]
     [[ "$output" != *"veilleur ports auto"* ]] || false
     [[ "$(cat "$T/actions.log")" != *"ports-auto demarrer"* ]] || false

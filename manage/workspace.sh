@@ -192,24 +192,19 @@ copy_from() {
 # shellcheck source=manage/scripts/workspace-egress.sh
 . "$HERE/scripts/workspace-egress.sh"
 
-# English command names are accepted, French ones unchanged and warned (#502,
-# #532). A copied devzone may miss the aliases file: then no normalization.
+# Renamed names (#695): an old French name is refused before anything runs, with
+# its English name (« devzone workspace start »). A copied devzone may miss the
+# aliases file: then no check.
 # shellcheck source=../.devcontainer/command-aliases.sh
 # shellcheck disable=SC1091
 if [ -f "$ROOT/.devcontainer/command-aliases.sh" ]; then
     . "$ROOT/.devcontainer/command-aliases.sh"
-    if [ "$#" -gt 0 ]; then
-        if command -v command_deprecated_warning >/dev/null 2>&1; then
-            command_deprecated_warning "$1"
-        fi
-        set -- "$(command_canonical "$1")" "${@:2}"
+    reject_renamed workspace "$@" || exit 1
+    if [ "${1:-}" = ports ] && [ "$#" -gt 1 ]; then
+        reject_renamed "workspace ports" "${@:2}" || exit 1
     fi
 fi
 
-if [ "$#" -gt 0 ]; then set -- "$(workspace_command "$1")" "${@:2}"; fi
-if [ "${1:-}" = "ports" ] && [ "$#" -gt 1 ]; then
-    set -- "$1" "$(workspace_ports_command "$2")" "${@:3}"
-fi
 
 case "${1:-}" in
     start) start_workspace "${@:2}" ;;
@@ -228,7 +223,7 @@ case "${1:-}" in
     services) services "${@:2}" ;;
     argocd) argocd_cmd "${@:2}" ;;
     egress) egress_workspace "${@:2}" ;;
-    '' | -h | --help | aide)
+    '' | -h | --help | help)
         echo "devzone workspace start|stop|status|shell|vscode|copy-to|copy-from|clone|ports|services|argocd|migrate|revert|clean-docker|update|egress"
         echo "  start [--image repository:tag]  install workspace (image for devzone version by default)"
         echo "  update [--version X.Y.Z] [--yes]  move to the latest stable release (or X.Y.Z); the pod is recreated"

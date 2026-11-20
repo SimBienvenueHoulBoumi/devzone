@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
-# English command names (#502): command_canonical maps every entry of the
-# table to the internal (French) name, unknown names pass through, and the
-# host scripts normalize their first argument.
+# Noms retirés de la CLI devzone (#695) : chaque ancien nom (commande,
+# sous-commande, option) est refusé sur stderr avec son nouveau nom, code 1,
+# sans rien faire ni créer. Les noms anglais marchent sans avertissement.
 
 setup() {
     bats_require_minimum_version 1.5.0
@@ -31,60 +31,220 @@ HELM
     cd "$T" || return 1
 }
 
-@test "command_canonical: every entry of the table maps to the internal name" {
-    # shellcheck source=../.devcontainer/command-aliases.sh
-    # shellcheck disable=SC1090
-    . "$ALIASES"
-    while IFS='|' read -r english french; do
-        [ -n "$english" ] || continue
-        [ "$(command_canonical "$english")" = "$french" ] || {
-            echo "unexpected mapping: $english -> $(command_canonical "$english") (expected $french)";
-            return 1;
-        }
+# refus <commande> <args...> : reject_renamed chargé depuis le fichier d'alias
+refus() {
+    bash -c ". '$ALIASES'; reject_renamed \"\$@\"" _ "$@"
+}
+
+@test "renamed_command: chaque commande retirée donne son nouveau nom, code 1" {
+    while IFS='|' read -r old new; do
+        [ -n "$old" ] || continue
+        run --separate-stderr refus "$old"
+        [ "$status" -eq 1 ] || { echo "code $status pour $old"; false; }
+        [ "$stderr" = "✖ « $old » a été renommé : devzone $new" ] || { echo "message pour $old : $stderr"; false; }
+        [ -z "$output" ] || false
     done <<'TABLE'
-is-enabled|actif
-enable|activer
-disable|desactiver
-help|aide
-apply|appliquer
-catalog|catalogue
-start|demarrer
-stop|arreter
-status|etat
-passwords|mots-de-passe
-packages|paquets
-platform|plateforme
-repair|reparer
-use|utiliser
-update|mettre-a-jour
-uninstall|desinstaller
-copy-to|copier-vers
-copy-from|copier-depuis
-migrate|migrer
-revert|revenir
-clean-docker|nettoyer-docker
+actif|is-enabled
+activer|enable
+desactiver|disable
+ia|ai
+aide|help
+appliquer|apply
+catalogue|catalog
+demarrer|start
+arreter|stop
+etat|status
+mots-de-passe|passwords
+paquets|packages
+plateforme|platform
+reparer|repair
+utiliser|use
+mettre-a-jour|update
+desinstaller|uninstall
+copier-vers|workspace copy-to
+copier-depuis|workspace copy-from
+migrer|workspace migrate
+revenir|workspace revert
+nettoyer-docker|workspace clean-docker
 TABLE
 }
 
-@test "command_canonical: unknown name unchanged, empty stays empty" {
-    # shellcheck source=../.devcontainer/command-aliases.sh
-    # shellcheck disable=SC1090
-    . "$ALIASES"
-    [ "$(command_canonical nexistepas)" = "nexistepas" ]
-    [ -z "$(command_canonical "")" ]
-    [ -z "$(command_canonical)" ]
+@test "renamed_subcommand: chaque sous-commande retirée donne son nouveau nom, code 1" {
+    while IFS='|' read -r command old new; do
+        [ -n "$command" ] || continue
+        run --separate-stderr refus "$command" "$old"
+        [ "$status" -eq 1 ] || { echo "code $status pour $command $old"; false; }
+        [ "$stderr" = "✖ « $old » a été renommé : devzone $command $new" ] || { echo "message : $stderr"; false; }
+    done <<'TABLE'
+postgres|creer|create
+postgres|liste|list
+postgres|supprimer|delete
+postgres|supprimer-donnees|delete-data
+postgres|etat|status
+postgres|installer|install
+postgres|desinstaller|uninstall
+postgres|relais-lancer|relay-start
+postgres|relais-arreter|relay-stop
+postgres|autoriser|authorize
+postgres|interdire|forbid
+mysql|creer|create
+mysql|liste|list
+mysql|supprimer|delete
+mysql|supprimer-donnees|delete-data
+mysql|installer|install
+mysql|desinstaller|uninstall
+mysql|autoriser|authorize
+mysql|interdire|forbid
+gitlab|migrer|migrate
+gitlab|nouveau-mdp|new-password
+gitlab|etat|status
+gitlab|installer|install
+gitlab|desinstaller|uninstall
+gitlab|relais-lancer|relay-start
+gitlab|relais-arreter|relay-stop
+gitlab|relais-etat|relay-status
+argocd|etat|status
+argocd|installer|install
+argocd|desinstaller|uninstall
+argocd|relais-lancer|relay-start
+argocd|relais-arreter|relay-stop
+packages|ajouter|add
+packages|retirer|remove
+packages|appliquer|apply
+packages|lister|list
+catalog|synchroniser|sync
+catalog|appliquer|apply
+catalog|lister|list
+catalog|desinstaller|remove
+port|ouvrir|open
+port|fermer|close
+port|liste|list
+port|relancer|restart
+port|exclure|exclude
+port|inclure|include
+workspace|demarrer|start
+workspace|mettre-a-jour|update
+workspace|arreter|stop
+workspace|etat|status
+workspace|copier-vers|copy-to
+workspace|copier-depuis|copy-from
+workspace|migrer|migrate
+workspace|revenir|revert
+workspace|nettoyer-docker|clean-docker
+workspace|aide|help
+workspace ports|demarrer|start
+workspace ports|arreter|stop
+workspace ports|etat|status
+TABLE
 }
 
-@test "manage/workspace.sh status behaves like etat" {
+@test "renamed_option: chaque option retirée donne la nouvelle, code 1" {
+    while IFS='|' read -r old new; do
+        [ -n "$old" ] || continue
+        run --separate-stderr refus postgres create proj "$old"
+        [ "$status" -eq 1 ] || { echo "code $status pour $old"; false; }
+        [ "$stderr" = "✖ « $old » a été renommé : $new" ] || { echo "message : $stderr"; false; }
+    done <<'TABLE'
+--fermer|--close
+--supprimer|--delete
+--nouveau-mdp|--new-password
+--oui|--yes
+--confirmer|--confirm
+--contexte|--context
+--rapatrier|--bring-back
+TABLE
+}
+
+@test "reject_renamed: noms anglais, inconnus et absence d'argument passent sans message" {
+    run --separate-stderr refus enable ia --yes
+    [ "$status" -eq 0 ]
+    [ -z "$stderr" ]
+    run --separate-stderr refus nexistepas
+    [ "$status" -eq 0 ]
+    [ -z "$stderr" ]
+    run --separate-stderr refus
+    [ "$status" -eq 0 ]
+    [ -z "$stderr" ]
+}
+
+@test "reject_renamed: un module nommé comme un ancien nom n'est pas refusé" {
+    run --separate-stderr refus enable ia
+    [ "$status" -eq 0 ]
+    [ -z "$stderr" ]
+}
+
+@test "hôte : chaque ancien nom est refusé, code 1, aucun dossier créé" {
+    for old in activer desactiver appliquer actif reparer demarrer arreter etat utiliser \
+        catalogue paquets mots-de-passe plateforme ia aide mettre-a-jour desinstaller \
+        copier-vers migrer revenir nettoyer-docker; do
+        run --separate-stderr bash "$CLI" "$old"
+        [ "$status" -eq 1 ] || { echo "code $status pour $old"; false; }
+        [[ "$stderr" == *"« $old » a été renommé : devzone "* ]] || { echo "message : $stderr"; false; }
+        [ -z "$output" ] || false
+        [ ! -e "$old" ] || { echo "dossier créé : $old"; false; }
+    done
+}
+
+@test "hôte : une sous-commande ou une option retirée est refusée avec le nouveau nom" {
+    run --separate-stderr bash "$CLI" argocd etat
+    [ "$status" -eq 1 ]
+    [ "$stderr" = "✖ « etat » a été renommé : devzone argocd status" ]
+    run --separate-stderr bash "$CLI" update --oui
+    [ "$status" -eq 1 ]
+    [ "$stderr" = "✖ « --oui » a été renommé : --yes" ]
+    [ ! -e argocd ]
+}
+
+@test "conteneur : un ancien nom est refusé avant toute action" {
+    run --separate-stderr bash "$RACINE/.devcontainer/devzone" activer ia
+    [ "$status" -eq 1 ]
+    [ "$stderr" = "✖ « activer » a été renommé : devzone enable" ]
+    run --separate-stderr bash "$RACINE/.devcontainer/devzone" catalogue lister
+    [ "$status" -eq 1 ]
+    [ "$stderr" = "✖ « catalogue » a été renommé : devzone catalog" ]
+}
+
+@test "workspace.sh: les anciens noms sont refusés, sans appel à kubectl ni docker" {
+    cat >"$T/bin/docker" <<'DOCKER'
+#!/usr/bin/env bash
+echo "docker $*" >>"$BATS_TEST_TMPDIR/docker.log"
+exit 1
+DOCKER
+    chmod +x "$T/bin/docker"
+    run --separate-stderr bash "$WS" etat
+    [ "$status" -eq 1 ]
+    [ "$stderr" = "✖ « etat » a été renommé : devzone workspace status" ]
+    run --separate-stderr bash "$WS" migrer --oui
+    [ "$status" -eq 1 ]
+    [ "$stderr" = "✖ « migrer » a été renommé : devzone workspace migrate" ]
+    run --separate-stderr bash "$WS" ports demarrer
+    [ "$status" -eq 1 ]
+    [ "$stderr" = "✖ « demarrer » a été renommé : devzone workspace ports start" ]
+    [ ! -e "$T/kubectl.log" ]
+    [ ! -e "$T/docker.log" ]
+}
+
+@test "workspace.sh: les noms anglais marchent sans avertissement" {
     : >"$T/kubectl.log"
-    run bash "$WS" status
+    run --separate-stderr bash "$WS" status
     [ "$status" -eq 0 ]
     grep -q -- "get pods" "$T/kubectl.log" || false
-    cp "$T/kubectl.log" "$T/status.log"
-    : >"$T/kubectl.log"
-    run bash "$WS" etat
+    [[ "$stderr" != *"renomm"* ]] || false
+}
+
+@test "hôte : les noms anglais marchent sans avertissement" {
+    run --separate-stderr bash "$CLI" help
     [ "$status" -eq 0 ]
-    [ "$(cat "$T/kubectl.log")" = "$(cat "$T/status.log")" ]
+    [[ "$output" == *"--version"* ]] || false
+    [[ "$stderr" != *"renomm"* ]] || false
+    run --separate-stderr bash "$CLI" update
+    [ "$status" -eq 1 ]
+    [[ "$stderr" == *".devcontainer introuvable"* ]] || false
+    [[ "$stderr" != *"renomm"* ]] || false
+    run --separate-stderr bash "$CLI" uninstall
+    [ "$status" -eq 1 ]
+    [[ "$stderr" == *"introuvable"* ]] || false
+    [[ "$stderr" != *"renomm"* ]] || false
 }
 
 @test "manage/devzone enable x is refused on the host like a container command" {
@@ -102,216 +262,8 @@ TABLE
     [ -n "$output" ]
 }
 
-@test "manage/devzone stop creates ./stop, not ./arreter" {
+@test "manage/devzone stop creates ./stop" {
     DEVZONE_SANS_DEMARRER=1 run bash "$CLI" stop
     [ "$status" -eq 0 ]
     [ -d stop ]
-    [ ! -e arreter ]
-}
-
-@test "old French name warns on stderr and still runs" {
-    run --separate-stderr bash "$CLI" activer ia
-    [ "$status" -eq 2 ]
-    [[ "$stderr" == *"devzone: \"activer\" is deprecated, use \"enable\""* ]] || false
-    [[ "$stderr" == *"commande du conteneur"* ]] || false
-    [[ "$output" != *"deprecated"* ]] || false
-}
-
-@test "English name is silent" {
-    run --separate-stderr bash "$CLI" enable ia
-    [ "$status" -eq 2 ]
-    [[ "$stderr" == *"commande du conteneur"* ]] || false
-    [[ "$stderr" != *"deprecated"* ]] || false
-    [[ "$output" != *"deprecated"* ]] || false
-}
-
-@test "DEVZONE_NO_DEPRECATION=1 silences the warning" {
-    DEVZONE_NO_DEPRECATION=1 run --separate-stderr bash "$CLI" activer ia
-    [ "$status" -eq 2 ]
-    [[ "$stderr" == *"commande du conteneur"* ]] || false
-    [[ "$stderr" != *"deprecated"* ]] || false
-}
-
-@test "devzone update and uninstall: English names work, no warning" {
-    run --separate-stderr bash "$CLI" update
-    [ "$status" -eq 1 ]
-    [[ "$stderr" == *".devcontainer introuvable"* ]] || false
-    [[ "$stderr" != *"deprecated"* ]] || false
-    run --separate-stderr bash "$CLI" uninstall
-    [ "$status" -eq 1 ]
-    [[ "$stderr" == *"introuvable"* ]] || false
-    [[ "$stderr" != *"renomm"* ]] || false
-}
-
-@test "devzone help: English name shows the help, no warning" {
-    run --separate-stderr bash "$CLI" help
-    [ "$status" -eq 0 ]
-    [[ "$output" == *"--version"* ]] || false
-    [[ "$stderr" != *"renomm"* ]] || false
-}
-
-@test "old French host names are renamed: message, exit 1, no folder created" {
-    for pair in mettre-a-jour:update desinstaller:uninstall aide:help; do
-        old="${pair%%:*}"
-        new="${pair#*:}"
-        run --separate-stderr bash "$CLI" "$old"
-        [ "$status" -eq 1 ]
-        [[ "$stderr" == *"$old"*"renomm"*"devzone $new"* ]] || { echo "message absent : $old"; false; }
-        [ ! -e "$old" ]
-        [ -z "$output" ]
-    done
-}
-
-@test "workspace migrer warns, migrate is silent" {
-    # fake docker: the migration stops at its first check, nothing is touched
-    cat >"$T/bin/docker" <<'DOCKER'
-#!/usr/bin/env bash
-echo "docker $*" >>"$T/docker.log"
-exit 1
-DOCKER
-    chmod +x "$T/bin/docker"
-    run --separate-stderr bash "$WS" migrer
-    [ "$status" -ne 0 ]
-    [[ "$stderr" == *"devzone: \"migrer\" is deprecated, use \"migrate\""* ]] || false
-    run --separate-stderr bash "$WS" migrate
-    [ "$status" -ne 0 ]
-    [[ "$stderr" != *"deprecated"* ]] || false
-}
-
-@test "subcommand_canonical: every entry of the table maps to the English name" {
-    # shellcheck source=../.devcontainer/command-aliases.sh
-    # shellcheck disable=SC1090
-    . "$ALIASES"
-    while IFS='|' read -r command french english; do
-        [ -n "$command" ] || continue
-        [ "$(subcommand_canonical "$command" "$french")" = "$english" ] || {
-            echo "unexpected mapping: $command $french -> $(subcommand_canonical "$command" "$french") (expected $english)";
-            return 1;
-        }
-    done <<'TABLE'
-postgres|creer|create
-postgres|liste|list
-postgres|supprimer|delete
-postgres|supprimer-donnees|delete-data
-postgres|etat|status
-postgres|relais-lancer|relay-start
-postgres|relais-arreter|relay-stop
-postgres|installer|install
-postgres|desinstaller|uninstall
-postgres|autoriser|authorize
-postgres|interdire|forbid
-mysql|creer|create
-mysql|liste|list
-mysql|supprimer|delete
-mysql|supprimer-donnees|delete-data
-mysql|installer|install
-mysql|desinstaller|uninstall
-mysql|autoriser|authorize
-mysql|interdire|forbid
-gitlab|migrer|migrate
-gitlab|nouveau-mdp|new-password
-gitlab|relais-etat|relay-status
-gitlab|installer|install
-gitlab|desinstaller|uninstall
-argocd|etat|status
-argocd|relais-lancer|relay-start
-argocd|relais-arreter|relay-stop
-argocd|installer|install
-argocd|desinstaller|uninstall
-packages|ajouter|add
-packages|retirer|remove
-packages|appliquer|apply
-packages|lister|list
-catalog|synchroniser|sync
-catalog|appliquer|apply
-catalog|lister|list
-catalog|desinstaller|remove
-port|ouvrir|open
-port|fermer|close
-port|liste|list
-port|relancer|restart
-port|exclure|exclude
-port|inclure|include
-TABLE
-}
-
-@test "subcommand_canonical: unknown subcommand and unknown command unchanged" {
-    # shellcheck source=../.devcontainer/command-aliases.sh
-    # shellcheck disable=SC1090
-    . "$ALIASES"
-    [ "$(subcommand_canonical postgres nexistepas)" = "nexistepas" ]
-    [ "$(subcommand_canonical nexistepas creer)" = "creer" ]
-    [ -z "$(subcommand_canonical postgres "")" ]
-}
-
-@test "option_canonical: every option of the table maps to the English name" {
-    # shellcheck source=../.devcontainer/command-aliases.sh
-    # shellcheck disable=SC1090
-    . "$ALIASES"
-    while IFS='|' read -r french english; do
-        [ -n "$french" ] || continue
-        [ "$(option_canonical "$french")" = "$english" ] || {
-            echo "unexpected mapping: $french -> $(option_canonical "$french") (expected $english)";
-            return 1;
-        }
-    done <<'TABLE'
---fermer|--close
---supprimer|--delete
---nouveau-mdp|--new-password
---oui|--yes
---confirmer|--confirm
---contexte|--context
-TABLE
-    [ "$(option_canonical --nexistepas)" = "--nexistepas" ]
-    [ -z "$(option_canonical "")" ]
-}
-
-@test "the old French subcommand warns, the English one is silent" {
-    # shellcheck source=../.devcontainer/command-aliases.sh
-    # shellcheck disable=SC1090
-    . "$ALIASES"
-    run --separate-stderr subcommand_deprecated_warning postgres liste
-    [ "$status" -eq 0 ]
-    [[ "$stderr" == *"devzone: \"liste\" is deprecated, use \"list\""* ]] || false
-    run --separate-stderr subcommand_deprecated_warning postgres list
-    [ "$status" -eq 0 ]
-    [ -z "$stderr" ]
-    run --separate-stderr subcommand_deprecated_warning postgres nexistepas
-    [ "$status" -eq 0 ]
-    [ -z "$stderr" ]
-}
-
-@test "the old French option warns, the English one is silent" {
-    # shellcheck source=../.devcontainer/command-aliases.sh
-    # shellcheck disable=SC1090
-    . "$ALIASES"
-    run --separate-stderr option_deprecated_warning --oui
-    [ "$status" -eq 0 ]
-    [[ "$stderr" == *"devzone: \"--oui\" is deprecated, use \"--yes\""* ]] || false
-    run --separate-stderr option_deprecated_warning --yes
-    [ "$status" -eq 0 ]
-    [ -z "$stderr" ]
-}
-
-@test "DEVZONE_NO_DEPRECATION=1 silences the subcommand and option warnings" {
-    # shellcheck source=../.devcontainer/command-aliases.sh
-    # shellcheck disable=SC1090
-    . "$ALIASES"
-    run --separate-stderr env DEVZONE_NO_DEPRECATION=1 bash -c ". '$ALIASES'; subcommand_deprecated_warning postgres liste; option_deprecated_warning --oui"
-    [ "$status" -eq 0 ]
-    [ -z "$stderr" ]
-}
-
-@test "canonical_args: the subcommand and the options become English names" {
-    # shellcheck source=../.devcontainer/command-aliases.sh
-    # shellcheck disable=SC1090
-    . "$ALIASES"
-    run --separate-stderr bash -c ". '$ALIASES'; canonical_args postgres create proj --nouveau-mdp; printf '%s\n' \"\${ARGS_CANONICAL[*]}\""
-    [ "$status" -eq 0 ]
-    [[ "$output" == *"create proj --new-password"* ]] || false
-    [[ "$stderr" == *"devzone: \"--nouveau-mdp\" is deprecated, use \"--new-password\""* ]] || false
-    run --separate-stderr bash -c ". '$ALIASES'; canonical_args use --confirmer ctx; printf '%s\n' \"\${ARGS_CANONICAL[*]}\""
-    [ "$status" -eq 0 ]
-    [[ "$output" == *"--confirm ctx"* ]] || false
-    [[ "$stderr" == *"devzone: \"--confirmer\" is deprecated, use \"--confirm\""* ]] || false
 }

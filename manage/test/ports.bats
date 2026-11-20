@@ -229,31 +229,6 @@ CURL
     [[ "$output" == *"port invalide"* ]] || false
 }
 
-@test "fermer : l alias francais donne le meme resultat que le nom anglais, avec l avertissement" {
-    bash "$PORTS" 8080
-    run --separate-stderr bash "$PORTS" --close 8080
-    [ "$status" -eq 0 ]
-    [[ "$stderr" != *"deprecated"* ]] || false
-    grep -qx 'ports=' "$DEVZONE_ETAT"
-    bash "$PORTS" 8080
-    run --separate-stderr bash "$PORTS" --fermer 8080
-    [ "$status" -eq 0 ]
-    [[ "$stderr" == *"devzone: \"--fermer\" is deprecated, use \"--close\""* ]] || false
-    grep -qx 'ports=' "$DEVZONE_ETAT"
-}
-
-@test "liste : l alias francais liste donne le meme resultat que le nom anglais" {
-    printf 'ports=3000\n' >"$DEVZONE_ETAT"
-    run --separate-stderr bash "$PORTS" list
-    [ "$status" -eq 0 ]
-    [[ "$stderr" != *"deprecated"* ]] || false
-    [[ "$output" == *"3000"* ]] || false
-    run --separate-stderr bash "$PORTS" liste
-    [ "$status" -eq 0 ]
-    [[ "$stderr" == *"devzone: \"liste\" is deprecated, use \"list\""* ]] || false
-    [[ "$output" == *"3000"* ]] || false
-}
-
 @test "relancer : chaque relais recréé vers l'IP actuelle, état inchangé" {
     printf 'ports=3000,8080\n' >"$DEVZONE_ETAT"
     : >"$BATS_TEST_TMPDIR/relais/devzone-devzone-port-3000"

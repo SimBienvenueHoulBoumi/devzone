@@ -49,7 +49,7 @@ setup() {
 }
 
 @test "migrate and migrer with --oui/--yes are equivalent" {
-    ws migrer --oui
+    ws migrate --yes
     [ "$status" -eq 0 ]
     grep -qx "workspace=kubernetes" "$T/workstation/.devzone.modules" || false
 }

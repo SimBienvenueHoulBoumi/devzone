@@ -4,7 +4,8 @@
 # The authorized names are built by the test itself from:
 #   - bash manage/devzone --help
 #   - the "  devzone" lines of the help text of .devcontainer/help.sh (#557)
-#   - the keys and values of command_canonical in .devcontainer/command-aliases.sh
+#   - the English names (values) of renamed_command, renamed_subcommand and
+#     renamed_option in .devcontainer/command-aliases.sh (#695)
 #   - the Makefile targets
 
 setup() {
@@ -47,16 +48,14 @@ setup() {
         esac
     done < "$RACINE/.devcontainer/help.sh"
 
-    # 3. command_canonical : keys and values
+    # 3. command-aliases.sh : English names only (values of the case tables);
+    # the renamed French names are not authorized outside the removed-names sections
     while IFS= read -r line; do
         case "$line" in
-            *') echo '*)
-                key="${line%%)*}"
-                key="${key// /}"
+            *") echo "*)
                 val="${line#*echo }"
                 val="${val%% ;;*}"
                 val="${val// /}"
-                add_word "$key"
                 add_word "$val"
                 ;;
         esac
@@ -119,7 +118,9 @@ verify_command() {
     unknown=""
     verify_file() {
         local file
-        file="$1"
+        file="$BATS_TEST_TMPDIR/$(basename "$1").filtered"
+        # The removed-names sections cite the old names on purpose: skipped.
+        awk '/^## Noms retir/{skip=1;next} /^## /{skip=0} !skip' "$1" > "$file"
         : > "$BATS_TEST_TMPDIR/candidates.txt"
         # Inline code between backticks.
         pattern="\`[^\`]+\`"

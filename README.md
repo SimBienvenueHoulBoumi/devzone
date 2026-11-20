@@ -227,7 +227,7 @@ cd mon-devzone
 npx devzone@latest update
 ```
 
-La commande affiche la version du dossier et celle du paquet, et ne fait rien si elles sont égales. Sinon, elle sauvegarde dans `.devzone.sauvegarde/<date>/` les fichiers remplacés ou supprimés, liste les fichiers modifiés localement et demande confirmation (`--oui` pour un script ; sans terminal, `--oui` est nécessaire), remplace les fichiers du paquet, retire les anciennes arborescences (`core/`, `scripts/`), complète `.gitignore` sans l'écraser, puis propose `make rebuild`. `--sans-reconstruire` saute cette proposition ; sans terminal, la reconstruction n'est jamais lancée.
+La commande affiche la version du dossier et celle du paquet, et ne fait rien si elles sont égales. Sinon, elle sauvegarde dans `.devzone.sauvegarde/<date>/` les fichiers remplacés ou supprimés, liste les fichiers modifiés localement et demande confirmation (`--yes` pour un script ; sans terminal, `--yes` est nécessaire), remplace les fichiers du paquet, retire les anciennes arborescences (`core/`, `scripts/`), complète `.gitignore` sans l'écraser, puis propose `make rebuild`. `--sans-reconstruire` saute cette proposition ; sans terminal, la reconstruction n'est jamais lancée.
 
 `workspace/`, `.devzone.modules`, `.devzone.paquets`, `.password`, `.app`, `.devzone.log` et les volumes Docker ne sont jamais touchés.
 
@@ -431,6 +431,16 @@ npm uninstall -g devzone
 ```
 
 Cette commande retire seulement la commande `devzone` de ta machine ; elle ne supprime ni conteneur, ni volume, ni dossier.
+
+## Noms retirés
+
+Les commandes, sous-commandes et options s'écrivent en anglais. Les anciens noms français sont retirés : devzone les refuse, affiche le nouveau nom et ne fait rien.
+
+```
+✖ « activer » a été renommé : devzone enable
+```
+
+La table complète (commandes, sous-commandes, options) est dans [la référence](manage/docs/reference.md#noms-retirés).
 
 ## Pour aller plus loin
 

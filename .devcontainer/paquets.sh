@@ -26,18 +26,6 @@ FORMAT="-f=\${Status}"
 ENTETE="# paquets ajoutés par devzone packages add ; réinstallés à chaque création du conteneur"
 PRESENT="# déjà présent"
 
-# English command names are accepted (#557) : a copied script may miss the file
-# shellcheck source=SCRIPTDIR/command-aliases.sh
-# shellcheck disable=SC1091
-if [ -f "$ICI/command-aliases.sh" ]; then
-    . "$ICI/command-aliases.sh"
-fi
-# Subcommand and options become their canonical English names ; the old
-# French names warn on use (#557)
-if command -v canonical_args >/dev/null 2>&1; then
-    canonical_args packages "$@"
-    set -- "${ARGS_CANONICAL[@]+"${ARGS_CANONICAL[@]}"}"
-fi
 
 refuse() { echo "devzone : paquets : $*" >&2; exit 1; }
 

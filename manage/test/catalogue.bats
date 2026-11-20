@@ -151,19 +151,6 @@ attendre_nohup() {
     [ "$(grep -c '^mysql=' "$DEVZONE_ETAT")" -eq 1 ] || false
 }
 
-@test "synchroniser : l alias francais donne le meme resultat que le nom anglais, avec l avertissement" {
-    printf 'autre=off\n' >"$DEVZONE_ETAT"
-    run --separate-stderr bash "$CATALOGUE" sync
-    [ "$status" -eq 0 ] || false
-    [[ "$stderr" != *"deprecated"* ]] || false
-    grep -qx 'mysql=off' "$DEVZONE_ETAT" || false
-    printf 'autre=off\n' >"$DEVZONE_ETAT"
-    run --separate-stderr bash "$CATALOGUE" synchroniser
-    [ "$status" -eq 0 ] || false
-    [[ "$stderr" == *"devzone: \"synchroniser\" is deprecated, use \"sync\""* ]] || false
-    grep -qx 'mysql=off' "$DEVZONE_ETAT" || false
-}
-
 @test "appliquer : mysql=on installe (manifest, secret, relais 127.0.0.1:3306)" {    printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_ETAT"
     run bash "$DEVZONE" apply
     [ "$status" -eq 0 ] || false
@@ -284,18 +271,6 @@ attendre_nohup() {
     [[ "$output" == *"✔ mysql retiré du cluster ; volume donnees-mysql-0 et bases gardés : devzone mysql volume"* ]] || false
 }
 
-@test "desactiver mysql --oui : confirmation donnée, namespace et volumes supprimés" {
-    touch "$BATS_TEST_TMPDIR/ns" "$BATS_TEST_TMPDIR/sts" "$BATS_TEST_TMPDIR/secret"
-    printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_ETAT"
-    run bash "$DEVZONE" disable mysql --oui
-    [ "$status" -eq 0 ] || false
-    grep -q 'delete statefulset/mysql service/mysql' "$BATS_TEST_TMPDIR/kubectl.log" || false
-    grep -q 'delete namespace devzone-mysql' "$BATS_TEST_TMPDIR/kubectl.log" || false
-    grep -qx 'mysql=off' "$DEVZONE_ETAT" || false
-    [[ "$output" == *"✔ namespace devzone-mysql et volume supprimés ; workspace/.mysql/root.env gardé"* ]] || false
-    [[ "$output" == *"devzone: \"--oui\" is deprecated, use \"--yes\""* ]] || false
-}
-
 @test "desactiver mysql --yes : même suppression, sans avertissement (#557)" {
     touch "$BATS_TEST_TMPDIR/ns" "$BATS_TEST_TMPDIR/sts" "$BATS_TEST_TMPDIR/secret"
     printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_ETAT"
@@ -346,16 +321,6 @@ attendre_nohup() {
     [ "$status" -eq 0 ] || false
     [[ "$output" == *"mysql"* ]] || false
     [[ "$output" == *"disponible"* ]] || false
-}
-
-@test "devzone catalog : l ancien nom francais avertit et donne le meme resultat" {
-    run --separate-stderr bash "$DEVZONE" catalog
-    [ "$status" -eq 0 ] || false
-    [[ "$stderr" != *"deprecated"* ]] || false
-    run --separate-stderr bash "$DEVZONE" catalogue
-    [ "$status" -eq 0 ] || false
-    [[ "$stderr" == *"devzone: \"catalogue\" is deprecated, use \"catalog\""* ]] || false
-    [[ "$output" == *"mysql"* ]] || false
 }
 
 @test "etat --json contient une rubrique applications" {

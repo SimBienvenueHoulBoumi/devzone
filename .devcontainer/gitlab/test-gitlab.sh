@@ -150,7 +150,7 @@ etape_module() {
 # pipeline resterait en attente).
 etape_etat() {
     local etat
-    etat="$(bash "$GITLAB" etat 2>&1 || true)"
+    etat="$(bash "$GITLAB" status 2>&1 || true)"
     if [[ "$etat" != *"prêt"* ]]; then
         RAISON="état : ${etat:-illisible}"
         return 1

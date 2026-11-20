@@ -737,8 +737,8 @@ appliquer_mysql() {
 
 # Toutes les bases disparaissent : confirmation en terminal (sans terminal, la
 # commande est explicite) ; un oui ou --yes marque SUPPRIMER_DONNEES, lu par
-# appliquer_mysql pour lancer supprimer-donnees (#441). Les arguments passent
-# par canonical_args : --oui arrive ici déjà traduit en --yes (#557).
+# appliquer_mysql pour lancer delete-data (#441). Les arguments passent
+# par reject_renamed : --oui est refusé avant d'arriver ici, seul --yes passe (#695).
 confirmer_suppression() {
     local app="$1" reponse arg
     SUPPRIMER_DONNEES=""
@@ -1523,32 +1523,17 @@ if [ -f "$ICI/etat-json.sh" ]; then
     . "$ICI/etat-json.sh"
 fi
 
-# English command name of the first argument becomes the French one (#502);
-# without any argument, nothing changes. The old French names warn (#532).
-if [ "$#" -gt 0 ]; then
-    canon="$(command_canonical "$1" 2>/dev/null)" || canon="$1"
-    if command -v command_deprecated_warning >/dev/null 2>&1; then
-        command_deprecated_warning "$1"
-    fi
-    set -- "$canon" "${@:2}"
+# Renamed names (#695): an old French name is refused with its new name, before
+# anything runs (exit 1). Without the aliases file (copied devzone): no check.
+if command -v reject_renamed >/dev/null 2>&1; then
+    reject_renamed "$@" || exit 1
 fi
 
-# Options of activer, desactiver, cluster and utiliser take their English names
-# (#557) : --context, --confirm, --yes ; the French ones warn (--oui included).
 case "${1:-}" in
-    activer | desactiver | cluster | utiliser)
-        if command -v canonical_args >/dev/null 2>&1; then
-            canonical_args "$1" "${@:2}"
-            set -- "$1" "${ARGS_CANONICAL[@]+"${ARGS_CANONICAL[@]}"}"
-        fi
-        ;;
-esac
-
-case "${1:-}" in
-    "" | etat | modules) if [ "${2:-}" = "--json" ]; then etat_json; else etat; fi ;;
-    activer) changer on "${2:-}" "${@:3}" ;;
-    desactiver) changer off "${2:-}" "${@:3}" ;;
-    appliquer)
+    "" | status | modules) if [ "${2:-}" = "--json" ]; then etat_json; else etat; fi ;;
+    enable) changer on "${2:-}" "${@:3}" ;;
+    disable) changer off "${2:-}" "${@:3}" ;;
+    apply)
         migrer_llm
         # L'utilisateur confirme l'état courant (#417, étape 4) : les
         # veilleurs peuvent de nouveau désinstaller
@@ -1562,7 +1547,7 @@ case "${1:-}" in
         [ "$(valeur mysql)" = off ] || appliquer_mysql on
         [ "$(valeur argocd)" = off ] || appliquer_service argocd
         ;;
-    actif)
+    is-enabled)
         connu "${2:-}" || { echo "devzone : module inconnu : ${2:-(aucun)}" >&2; exit 2; }
         # Test silencieux, appelé par les scripts de démarrage : code 0 si le
         # module est actif, 1 sinon, sans rien écrire (kube-config.sh:16)
@@ -1571,7 +1556,7 @@ case "${1:-}" in
     agent)
         bash "$ICI/agent.sh" "${@:2}"
         ;;
-    ia)
+    ai)
         case "${2:-}" in
             check)
                 # Read-only: update state of each detected host model (#668).
@@ -1601,28 +1586,28 @@ case "${1:-}" in
     build)
         bash "$ICI/workspace-build.sh" "${@:2}"
         ;;
-    reparer) reparer ;;
-    demarrer) bash "$ICI/demarrage.sh" ;;
+    repair) reparer ;;
+    start) bash "$ICI/demarrage.sh" ;;
     metrics) bash "$ICI/metrics-server.sh" "${@:2}" ;;
-    utiliser) utiliser "${@:2}" ;;
+    use) utiliser "${@:2}" ;;
     clusters) DEVZONE_ETAT="$ETAT" bash "$ICI/clusters.sh" "${@:2}" ;;
     cluster) changer_cluster "${@:2}" ;;
     postgres) DEVZONE_ETAT="$ETAT" bash "$ICI/postgres/postgres.sh" "${@:2}" ;;
     mysql) DEVZONE_ETAT="$ETAT" bash "$ICI/catalogue/mysql/mysql.sh" "${@:2}" ;;
     gitlab) DEVZONE_ETAT="$ETAT" bash "$ICI/gitlab/gitlab.sh" "${@:2}" ;;
-    catalogue) DEVZONE_ETAT="$ETAT" bash "$ICI/catalogue.sh" list ;;
+    catalog) DEVZONE_ETAT="$ETAT" bash "$ICI/catalogue.sh" list ;;
     argocd) DEVZONE_ETAT="$ETAT" bash "$ICI/argocd/argocd.sh" "${@:2}" ;;
     port) DEVZONE_ETAT="$ETAT" bash "$ICI/ports.sh" "${@:2}" ;;
-    paquets) bash "$ICI/paquets.sh" "${@:2}" ;;
-    mots-de-passe)
+    packages) bash "$ICI/paquets.sh" "${@:2}" ;;
+    passwords)
         bash "$ICI/password.sh" regenerer ||
             echo "devzone : identifiants regroupés non mis à jour" >&2
         bash "$ICI/password.sh" chemin
         ;;
-    -h | --help | aide) devzone_aide ;;
+    -h | --help | help) devzone_aide ;;
     test-bash32) bash "$RACINE/manage/test/bash32.sh" ;;
     test-gitlab) DEVZONE_ETAT="$ETAT" bash "$ICI/gitlab/test-gitlab.sh" "${@:2}" ;;
-    plateforme)
+    platform)
         if [ -n "${2:-}" ]; then
             changer_plateforme "${@:2}"
         else

@@ -181,7 +181,7 @@ gitops_ready() {
 
 @test "workspace start: Argo CD installed when missing, then the workspace Application at the revision (gh not connected: direct)" {
     export FAKE_GH_OUT=1
-    run bash "$CLI" workspace demarrer
+    run bash "$CLI" workspace start
     [ "$status" -eq 0 ]
     grep -q 'upgrade --install argocd .*charts/devzone-argocd' "$T/helm.log"
     ! grep -q 'upgrade --install devzone-workspace' "$T/helm.log" || false
@@ -200,7 +200,7 @@ gitops_ready() {
 @test "workspace start --image: repository and tag as Helm parameters, no pullPolicy" {
     export FAKE_GH_OUT=1
     argocd_installed
-    run bash "$CLI" workspace demarrer --image registre.local/ws:essai
+    run bash "$CLI" workspace start --image registre.local/ws:essai
     [ "$status" -eq 0 ]
     grep -q 'name: image.repository' "$T/application.yaml"
     grep -q 'value: "registre.local/ws"' "$T/application.yaml"
@@ -212,7 +212,7 @@ gitops_ready() {
 @test "workspace start on a development clone without revision: helm direct and the notice" {
     unset DEVZONE_ARGOCD_REVISION
     argocd_installed
-    run bash "$CLI" workspace demarrer
+    run bash "$CLI" workspace start
     [ "$status" -eq 0 ]
     [[ "$output" == *"development clone (version 0.0.0): helm direct"* ]] || false
     grep -q 'upgrade --install devzone-workspace' "$T/helm.log"
@@ -221,7 +221,7 @@ gitops_ready() {
 
 @test "workspace start with argocd=off: no Argo CD, helm direct, no notice" {
     printf 'workspace=kubernetes\nargocd=off\n' >"$T/.devzone.modules"
-    run bash "$CLI" workspace demarrer
+    run bash "$CLI" workspace start
     [ "$status" -eq 0 ]
     ! grep -q 'argo/argo-cd' "$T/helm.log" || false
     grep -q 'upgrade --install devzone-workspace' "$T/helm.log"
@@ -231,7 +231,7 @@ gitops_ready() {
 
 @test "workspace start: Argo CD refused (memory), warning and helm direct" {
     export FAKE_MEMORY=512Mi
-    run bash "$CLI" workspace demarrer
+    run bash "$CLI" workspace start
     [ "$status" -eq 0 ]
     [[ "$output" == *"⚠ Argo CD not installed: the workspace is deployed with helm directly"* ]] || false
     grep -q 'upgrade --install devzone-workspace' "$T/helm.log"
@@ -250,12 +250,12 @@ gitops_ready() {
 @test "workspace stop: the Application is deleted when it exists, helm uninstall otherwise" {
     argocd_installed
     touch "$T/app-workspace"
-    run bash "$CLI" workspace arreter
+    run bash "$CLI" workspace stop
     [ "$status" -eq 0 ]
     grep -q 'delete application.argoproj.io devzone-workspace --ignore-not-found --wait=true' "$T/kubectl.log"
     ! grep -q 'uninstall devzone-workspace' "$T/helm.log" || false
     rm -f "$T/app-workspace"
-    run bash "$CLI" workspace arreter
+    run bash "$CLI" workspace stop
     [ "$status" -eq 0 ]
     grep -q 'uninstall devzone-workspace --namespace devzone-workspace' "$T/helm.log"
 }
@@ -563,13 +563,13 @@ gitops_ready() {
 @test "workspace start with a GitOps repository: the workspace Application goes to apps/, written once" {
     argocd_installed
     gitops_ready
-    run bash "$CLI" workspace demarrer
+    run bash "$CLI" workspace start
     [ "$status" -eq 0 ]
     grep -q 'targetRevision: feat/essai' "$T/gitops/apps/devzone-workspace.yaml"
     grep -q 'name: image.tag' "$T/gitops/apps/devzone-workspace.yaml"
     grep -q 'name: devzone$' "$T/application.yaml"
     grep -q 'annotate application.argoproj.io devzone argocd.argoproj.io/refresh=normal' "$T/kubectl.log"
-    run bash "$CLI" workspace demarrer
+    run bash "$CLI" workspace start
     [ "$status" -eq 0 ]
     [ "$(grep -c 'put apps/devzone-workspace.yaml' "$T/gitops.log")" -eq 1 ]
 }
