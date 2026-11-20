@@ -204,3 +204,8 @@ manage/test/kube-account.bats
 manage/test/post-create.bats
 manage/test/startup.bats
 manage/test/workspace-init.bats
+manage/test/go-parity.bats
+internal/command/version.go
+internal/command/version_test.go
+internal/command/help.go
+internal/command/help_test.go
