@@ -8,9 +8,10 @@ import (
 
 func noop(args []string, out, errOut io.Writer) int { return 0 }
 
-func TestPortedEmpty(t *testing.T) {
-	if got := Ported(); len(got) != 0 {
-		t.Fatalf("Ported() = %v, want no command ported yet", got)
+func TestPortedCommands(t *testing.T) {
+	want := []string{"--help", "--version", "-h", "-v", "help"}
+	if got := Ported(); !reflect.DeepEqual(got, want) {
+		t.Fatalf("Ported() = %v, want %v", got, want)
 	}
 }
 
@@ -24,7 +25,7 @@ func TestPortedSorted(t *testing.T) {
 			delete(ported, name)
 		}
 	})
-	want := []string{"alpha", "mid", "zeta"}
+	want := []string{"--help", "--version", "-h", "-v", "alpha", "help", "mid", "zeta"}
 	if got := Ported(); !reflect.DeepEqual(got, want) {
 		t.Fatalf("Ported() = %v, want %v", got, want)
 	}
