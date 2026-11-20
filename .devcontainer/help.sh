@@ -6,6 +6,7 @@ devzone_aide() {
     cat <<'AIDE'
   Optional modules of devzone, enabled on demand, without rebuild:
   devzone                                  state of the modules
+  devzone --version                        version of the workspace image (DEVZONE_VERSION)
   devzone platform                         GitHub (default) or GitLab
   devzone platform github                  back to GitHub: glab and config removed
   devzone platform gitlab                  GitLab, [--url URL] (default: gitlab module)

@@ -1605,6 +1605,7 @@ case "${1:-}" in
         bash "$ICI/password.sh" chemin
         ;;
     -h | --help | help) devzone_aide ;;
+    -v | --version) echo "devzone ${DEVZONE_VERSION:-unknown}" ;;
     test-bash32) bash "$RACINE/manage/test/bash32.sh" ;;
     test-gitlab) DEVZONE_ETAT="$ETAT" bash "$ICI/gitlab/test-gitlab.sh" "${@:2}" ;;
     platform)
