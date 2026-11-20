@@ -600,7 +600,7 @@ KUBE
     mkdir -p "$HOME/.claude" && echo '{}' >"$HOME/.claude/.credentials.json"
     run bash "$DEVZONE" is-enabled ia
     [ "$status" -ne 0 ]
-    [[ "$output" == *"connexion Claude Code/opencode partagée trouvée : devzone enable ia pour l'utiliser ici"* ]] || false
+    [[ "$output" == *"shared Claude Code/opencode connection found: devzone enable ia to use it here"* ]] || false
     run bash "$DEVZONE" is-enabled ia
     [ "$status" -ne 0 ]
     [ -z "$output" ]
@@ -610,7 +610,7 @@ KUBE
     mkdir -p "$HOME/.local/share/opencode" && echo '{}' >"$HOME/.local/share/opencode/auth.json"
     run bash "$DEVZONE" is-enabled ia
     [ "$status" -ne 0 ]
-    [[ "$output" == *"connexion Claude Code/opencode partagée trouvée"* ]] || false
+    [[ "$output" == *"shared Claude Code/opencode connection found"* ]] || false
     run bash "$DEVZONE" is-enabled ia
     [ "$status" -ne 0 ]
     [ -z "$output" ]
