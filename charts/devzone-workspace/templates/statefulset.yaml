@@ -159,6 +159,9 @@ spec:
             # Marker of the Kubernetes workspace: devzone agent runs opencode here (#431)
             - name: DEVZONE_WORKSPACE
               value: kubernetes
+            # Version of the workspace image, shown by devzone --version (#707)
+            - name: DEVZONE_VERSION
+              value: {{ .Values.image.tag | default .Chart.AppVersion | quote }}
             # Root of the devzone projects in the Kubernetes workspace (#503)
             - name: DEVZONE_RACINE
               value: /workspaces/projets
