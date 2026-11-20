@@ -145,4 +145,16 @@ manage/test/docker-garde.bats
 .devcontainer/ia/plugins/devzone-garde-v2.js
 .devcontainer/agent-modele.sh
 manage/test/agent-modele.bats
+.devcontainer/agent-erreurs.sh
+.devcontainer/agent-etat-json.sh
+.devcontainer/agent-session.sh
+.devcontainer/agent-workspace.sh
+.devcontainer/agent.sh
+manage/test/agent-chemins.bats
+manage/test/agent-ecarts.bats
+manage/test/agent-etat-json.bats
+manage/test/agent-parallele.bats
+manage/test/agent-quota.bats
+manage/test/agent-workspace.bats
+manage/test/agent.bats
 manage/scripts/devzone-manifest.sh

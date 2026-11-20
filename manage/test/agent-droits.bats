@@ -83,7 +83,7 @@ FAKE
     agent_lance
     [ "$status" -eq 0 ]
     [ "$(cat "$P/.devcontainer/opencode.jsonc")" = "defaut" ]
-    grep -q "figé" "$(agent_journal)" || false
+    grep -q "frozen" "$(agent_journal)" || false
     grep -q "droits modifiés : .devcontainer/opencode.jsonc" "$(agent_journal)" || false
 }
 

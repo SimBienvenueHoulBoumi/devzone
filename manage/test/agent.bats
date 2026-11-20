@@ -1,13 +1,13 @@
 #!/usr/bin/env bats
-# Commande devzone agent : lancement, rotation, reprise, configuration (#221, #328).
-# Les causes d'écart, le réseau, l'état et liberer sont dans agent-ecarts.bats.
+# devzone agent command: launch, rotation, resume, configuration (#221, #328).
+# Causes of exclusion, network, state and liberer are in agent-ecarts.bats.
 
 setup() {
     load commun
     agent_isole
 }
 
-@test "agent : appelant sans git push -> accepté, deny fourni par devzone" {
+@test "agent : caller without git push -> accepted, deny supplied by devzone" {
     agent_consigne
     export OPENCODE_CONFIG_CONTENT='{"permission":{"bash":{"*":"ask"}}}'
     agent_lance
@@ -16,19 +16,19 @@ setup() {
     jq -e '.permission.bash["git push*"] == "deny"' "$FAKE_OP_CONFIG_LOG"
 }
 
-@test "agent : appelant avec * allow -> les deny de devzone restent et gagnent" {
+@test "agent : caller with * allow -> devzone deny entries stay and win" {
     agent_consigne
     export OPENCODE_CONFIG_CONTENT='{"permission":{"bash":{"*":"allow"}}}'
     agent_lance
     [ "$status" -eq 0 ]
     for r in 'git push*' 'gh api*' 'repowarden ticket nouveau*' 'git checkout*' 'git reset*' 'git restore*' 'git stash*' 'git clean*' 'git branch -D*' 'repowarden proteger*' 'repowarden run*'; do
-        jq -e --arg r "$r" '.permission.bash[$r] == "deny"' "$FAKE_OP_CONFIG_LOG" || { echo "deny perdu : $r"; false; }
+        jq -e --arg r "$r" '.permission.bash[$r] == "deny"' "$FAKE_OP_CONFIG_LOG" || { echo "deny lost: $r"; false; }
     done
     jq -e '.permission.bash["*"] == "allow"' "$FAKE_OP_CONFIG_LOG"
     jq -e '(.permission.bash | keys_unsorted | index("*")) < (.permission.bash | keys_unsorted | index("git push*"))' "$FAKE_OP_CONFIG_LOG"
 }
 
-@test "agent : configuration fournie completee (git commit permis, bash32 protege)" {
+@test "agent : supplied configuration completed (git commit allowed, bash32 protected)" {
     agent_consigne
     export OPENCODE_CONFIG_CONTENT='{"permission":{"bash":{"*":"ask","git push*":"deny"}}}'
     agent_lance
@@ -38,17 +38,17 @@ setup() {
     grep -q '"git push\*":"deny"' "$FAKE_OP_CONFIG_LOG" || false
 }
 
-@test "agent : lance opencode sur la consigne, journal ecrit, fin de session" {
+@test "agent : launches opencode on the brief, journal written, end of session" {
     agent_consigne
     agent_lance
     [ "$status" -eq 0 ]
     [ -f "$(agent_journal)" ]
-    grep -q "fin avec opencode/" "$(agent_journal)" || false
+    grep -q "end with opencode/" "$(agent_journal)" || false
     grep -qx "big-pickle" "$FAKE_OP_LOG" || false
     grep -q "construis la feature" "$FAKE_OP_CONSIGNE_LOG" || false
 }
 
-@test "agent : deux lancements -> deux modeles differents" {
+@test "agent : two launches -> two different models" {
     agent_consigne
     agent_lance
     [ "$status" -eq 0 ]
@@ -58,47 +58,47 @@ setup() {
     [ "$(sed -n '1p' "$FAKE_OP_LOG")" != "$(sed -n '2p' "$FAKE_OP_LOG")" ]
 }
 
-@test "agent : Free usage limit dans le code affiche, fin normale -> fin avec" {
+@test "agent : Free usage limit in the printed code, normal end -> end with" {
     agent_consigne
     export FAKE_OP_TEXTE_MODELS="big-pickle"
     agent_lance
     [ "$status" -eq 0 ]
     [ "$(grep -c . "$FAKE_OP_LOG")" -eq 1 ]
-    grep -q "fin avec opencode/big-pickle" "$(agent_journal)" || false
-    ! grep -q "écarté" "$(agent_journal)" || false
+    grep -q "end with opencode/big-pickle" "$(agent_journal)" || false
+    ! grep -q "excluded" "$(agent_journal)" || false
 }
 
-@test "agent : erreur ancienne hors des 30 dernieres lignes -> arrete en erreur, pas refus" {
+@test "agent : old error outside the last 30 lines -> stopped on error, not refused" {
     agent_consigne
     export FAKE_OP_ANCIEN_ERREUR_MODELS="big-pickle"
     agent_lance
     [ "$status" -eq 0 ]
     [ "$(grep -c . "$FAKE_OP_LOG")" -eq 2 ]
-    grep -q "arrêté en erreur (code 1)" "$(agent_journal)" || false
-    ! grep -q "écarté" "$(agent_journal)" || false
+    grep -q "stopped on error (code 1)" "$(agent_journal)" || false
+    ! grep -q "excluded" "$(agent_journal)" || false
 }
 
-@test "agent : session figee -> relancee, consigne de reprise" {
+@test "agent : frozen session -> relaunched, resume brief" {
     agent_consigne
     export FAKE_OP_FIGEE_MODELS="big-pickle"
     agent_lance
     [ "$status" -eq 0 ]
     [ "$(grep -c . "$FAKE_OP_LOG")" -eq 2 ]
     [ "$(sed -n '2p' "$FAKE_OP_LOG")" = "deepseek-v4.1-flash-free" ]
-    grep -q "REPRISE" "$FAKE_OP_CONSIGNE_LOG" || false
+    grep -q "RESUME" "$FAKE_OP_CONSIGNE_LOG" || false
     grep -q "git log" "$FAKE_OP_CONSIGNE_LOG" || false
-    grep -q "figé" "$(agent_journal)" || false
+    grep -q "frozen" "$(agent_journal)" || false
 }
 
-@test "agent : tous les modeles ecartes -> code 3" {
+@test "agent : all models excluded -> code 3" {
     agent_consigne
     export FAKE_OP_ECHEC_MODELS="big-pickle deepseek-v4.1-flash-free hy4-flash-free nemotron-3.5-super-vl-free nemotron-3.5-lightning-free mimo-v2.6-flash-free beam-free flint-40b-free longcat-2.5-free"
     agent_lance
     [ "$status" -eq 3 ]
-    grep -q "aucun modèle gratuit disponible" "$(agent_journal)" || false
+    grep -q "no free model available" "$(agent_journal)" || false
 }
 
-@test "agent : ia désactivé → refuse de lancer, code 2, message pour l'activer" {
+@test "agent : ia disabled -> refuses to launch, code 2, message to enable it" {
     bash "$DEVZONE" disable ia
     agent_consigne
     agent_lance
@@ -106,7 +106,7 @@ setup() {
     [[ "$output" == *"devzone enable ia"* ]] || false
 }
 
-@test "agent : session opencode avec KUBECONFIG dédié, sans hote.config" {
+@test "agent : opencode session with dedicated KUBECONFIG, without the host config" {
     mkdir -p "$HOME/.kube"
     printf 'current-context: docker-desktop\n' >"$HOME/.kube/config"
     agent_consigne
@@ -117,9 +117,9 @@ setup() {
     ! grep -q 'hote.config' "$FAKE_OP_KUBECONFIG_LOG" || false
 }
 
-# Faux kubectl : « config view --minify --flatten --context devzone » ne rend que
-# le contexte devzone de $KUBECONFIG, et échoue s'il n'existe pas (#470)
-faux_kubectl_devzone() {
+# Fake kubectl: "config view --minify --flatten --context devzone" only renders the
+# devzone context of $KUBECONFIG, and fails when it does not exist (#470).
+fake_kubectl_devzone() {
     cat >"$BATS_TEST_TMPDIR/bin/kubectl" <<'KUBECTL'
 #!/usr/bin/env bash
 [ "$*" = "config view --minify --flatten --context devzone" ] || exit 1
@@ -129,8 +129,8 @@ KUBECTL
     chmod +x "$BATS_TEST_TMPDIR/bin/kubectl"
 }
 
-@test "agent : kubeconfig de session sans les autres contextes, en 600 (#470)" {
-    faux_kubectl_devzone
+@test "agent : session kubeconfig without the other contexts, in 600 (#470)" {
+    fake_kubectl_devzone
     printf 'contexts:\n- name: devzone\n- name: kind-x\n' >"$HOME/.kube/config"
     agent_consigne
     agent_lance
@@ -140,59 +140,59 @@ KUBECTL
     [ "$(stat -c %a "$DEVZONE_AGENT_ETAT/kubeconfig" 2>/dev/null || stat -f %Lp "$DEVZONE_AGENT_ETAT/kubeconfig")" = 600 ]
 }
 
-@test "agent : sans contexte devzone -> kubeconfig vide et ligne de journal (#470)" {
-    faux_kubectl_devzone
+@test "agent : no devzone context -> empty kubeconfig and journal line (#470)" {
+    fake_kubectl_devzone
     printf 'contexts:\n- name: kind-x\n' >"$HOME/.kube/config"
     agent_consigne
     agent_lance
     [ "$status" -eq 0 ]
     [ ! -s "$DEVZONE_AGENT_ETAT/kubeconfig" ]
     [ "$(stat -c %a "$DEVZONE_AGENT_ETAT/kubeconfig" 2>/dev/null || stat -f %Lp "$DEVZONE_AGENT_ETAT/kubeconfig")" = 600 ]
-    grep -q "=== kubernetes : aucun contexte devzone, session sans accès" "$(agent_journal)" || false
+    grep -q "=== kubernetes: no devzone context, session without access" "$(agent_journal)" || false
 }
 
-@test "agent : verrou recent sans pid -> pas repris, attente puis refus" {
-    # Un verrou sans pid n'est volé que si son âge dépasse 30 s (#377)
+@test "agent : recent lock without pid -> not taken over, wait then refusal" {
+    # A lock without pid is only taken over when its age exceeds 30 s (#377)
     source "$BATS_TEST_DIRNAME/../../.devcontainer/agent-session.sh"
     AGENT_ETAT="$DEVZONE_AGENT_ETAT"
     export DEVZONE_AGENT_VERROU_MAX=2
     mkdir -p "$AGENT_ETAT/verrou"
-    debut="$(date +%s)"
-    run verrou_prendre
+    start="$(date +%s)"
+    run lock_take
     [ "$status" -eq 1 ] || false
-    [ $(( $(date +%s) - debut )) -ge 1 ] || false
-    [ $(( $(date +%s) - debut )) -le 5 ] || false
+    [ $(( $(date +%s) - start )) -ge 1 ] || false
+    [ $(( $(date +%s) - start )) -le 5 ] || false
     [ -d "$AGENT_ETAT/verrou" ] || false
     [ ! -e "$AGENT_ETAT/verrou/pid" ] || false
 }
 
-@test "agent : verrou recent avec pid inconnu (autre conteneur) -> pas repris" {
-    # Pid absent de cet espace de pids : seul l'âge du verrou décide (#377)
+@test "agent : recent lock with unknown pid (other container) -> not taken over" {
+    # Pid absent from this pid space: only the age of the lock decides (#377)
     source "$BATS_TEST_DIRNAME/../../.devcontainer/agent-session.sh"
     AGENT_ETAT="$DEVZONE_AGENT_ETAT"
     export DEVZONE_AGENT_VERROU_MAX=2
     mkdir -p "$AGENT_ETAT/verrou"
     echo 999999 >"$AGENT_ETAT/verrou/pid"
-    debut="$(date +%s)"
-    run verrou_prendre
+    start="$(date +%s)"
+    run lock_take
     [ "$status" -eq 1 ] || false
-    [ $(( $(date +%s) - debut )) -ge 1 ] || false
+    [ $(( $(date +%s) - start )) -ge 1 ] || false
     grep -qx 999999 "$AGENT_ETAT/verrou/pid" || false
 }
 
-@test "agent : verrou de plus de 30 s -> repris aussitôt, verrou laché nettoyé" {
-    # Verrou abandonné par un arrêt : âge de plus de 30 s, repris sans attendre
-    # même si son pid est encore vivant, l'âge seul décide (#377)
+@test "agent : lock older than 30 s -> taken at once, released lock cleaned up" {
+    # Lock left by a stop: age over 30 s, taken over without waiting even if its pid
+    # is still alive, the age alone decides (#377)
     source "$BATS_TEST_DIRNAME/../../.devcontainer/agent-session.sh"
     AGENT_ETAT="$DEVZONE_AGENT_ETAT"
     mkdir -p "$AGENT_ETAT/verrou"
     echo "$$" >"$AGENT_ETAT/verrou/pid"
     touch -d '-60 seconds' "$AGENT_ETAT/verrou" 2>/dev/null || touch -t 200001010000 "$AGENT_ETAT/verrou" || false
-    debut="$(date +%s)"
-    run verrou_prendre
+    start="$(date +%s)"
+    run lock_take
     [ "$status" -eq 0 ] || false
-    [ $(( $(date +%s) - debut )) -le 5 ] || false
+    [ $(( $(date +%s) - start )) -le 5 ] || false
     [ -s "$AGENT_ETAT/verrou/pid" ] || false
-    verrou_lacher
+    lock_release
     [ ! -e "$AGENT_ETAT/verrou" ] || false
 }
