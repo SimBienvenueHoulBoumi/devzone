@@ -29,7 +29,7 @@ modeles_charger() {
     FREE_MODELS=()
     while IFS= read -r m; do
         if [ -n "$m" ]; then FREE_MODELS+=("$m"); fi
-    done < <(liste_modeles)
+    done < <(list_models)
     [ "${#FREE_MODELS[@]}" -gt 0 ] || refuse "$MSG_AUCUN_MODELE"
     MODELES_DEMANDES=()
     if [ -n "$MODELE_LISTE" ]; then
@@ -40,7 +40,7 @@ modeles_charger() {
             esac
         done < <(printf '%s\n' "$MODELE_LISTE" | tr ',' '\n')
     fi
-    echo "=== --modele : ${MODELE_LISTE:-aucun}" >>"$journal"
+    echo "=== --modele : ${MODELE_LISTE:-none}" >>"$journal"
 }
 
 # True when model $1 was asked with --modele.
@@ -107,7 +107,7 @@ modele_ordre() {
 modele_rang_avance() {
     local k
     for ((k = 0; k < ${#MODELES_DEMANDES[@]}; k++)); do
-        if ! modele_ecarte "${MODELES_DEMANDES[$k]}"; then return 1; fi
+        if ! model_excluded "${MODELES_DEMANDES[$k]}"; then return 1; fi
     done
     return 0
 }

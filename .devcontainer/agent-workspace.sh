@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# Pourquoi : hors du pod, devzone agent lance opencode dans le workspace
-# Kubernetes deja demarre (projets et journaux du pod), ou localement avec
-# --local ; le journal du pod est rapatrie dans celui du poste (#431).
-# Bibliothèque sourcée par agent.sh : aucune commande n'est lancée ici.
+# Why: outside the pod, devzone agent launches opencode in the Kubernetes workspace
+# already started (projects and journals of the pod), or locally with --local; the
+# journal of the pod is brought back into that of the workstation (#431).
+# Library sourced by agent.sh: no command is launched here.
 
-# Vrai dans le conteneur workspace du cluster, qui porte le repere du chart.
-agent_dans_pod() {
+# True in the workspace container of the cluster, which carries the chart marker.
+agent_in_pod() {
     [ "${DEVZONE_WORKSPACE:-}" = kubernetes ]
 }
 
-# kubectl du poste : contexte devzone s'il existe, puis namespace du workspace.
+# kubectl of the workstation: devzone context if it exists, then the workspace namespace.
 agent_kc() {
     if kubectl config get-contexts -o name 2>/dev/null | grep -qx devzone; then
         kubectl --context devzone --namespace devzone-workspace "$@"
@@ -18,80 +18,80 @@ agent_kc() {
     fi
 }
 
-# Pourquoi : lancer opencode est commun à chaque tentative de modèle, et la
-# préparation de la kubeconfig dépend du workspace Kubernetes ; ce bloc vit ici
-# avec le reste du pod (#431), agent.sh ne garde que la boucle des modèles.
-opencode_lancer() {
-    local dossier="$1" m="$2" consigne="$3" journal="$4" etat="$5"
-    local agent_kube="$etat/kubeconfig"
-    if agent_dans_pod; then
-        # Dans le pod, le compte de service limité est le seul accès : aucun
-        # kubeconfig du poste n'entre dans l'environnement d'opencode.
-        (cd "$dossier" && env -u KUBECONFIG DEVZONE_AGENT_SESSION=1 opencode run --print-logs --log-level ERROR --auto -m "$(modele_ref "$m")" "$(cat "$consigne")" </dev/null >>"$journal" 2>&1) &
+# Why: launching opencode is common to each model attempt, and the kubeconfig
+# preparation depends on the Kubernetes workspace; this block lives here with the rest
+# of the pod (#431), agent.sh only keeps the model loop.
+opencode_launch() {
+    local folder="$1" m="$2" brief="$3" journal="$4" state="$5"
+    local agent_kube="$state/kubeconfig"
+    if agent_in_pod; then
+        # In the pod, the limited service account is the only access: no workstation
+        # kubeconfig enters the environment of opencode.
+        (cd "$folder" && env -u KUBECONFIG DEVZONE_AGENT_SESSION=1 opencode run --print-logs --log-level ERROR --auto -m "$(modele_ref "$m")" "$(cat "$brief")" </dev/null >>"$journal" 2>&1) &
     else
         if [ -f "$HOME/.kube/config" ]; then
             (umask 077; KUBECONFIG="$HOME/.kube/config" kubectl config view --minify --flatten --context devzone >"$agent_kube") 2>/dev/null || : >"$agent_kube"
             chmod 600 "$agent_kube"
-            [ -s "$agent_kube" ] || echo "=== kubernetes : aucun contexte devzone, session sans accès" >>"$journal"
+            [ -s "$agent_kube" ] || echo "=== kubernetes: no devzone context, session without access" >>"$journal"
         else
             : >"$agent_kube"
         fi
-        (cd "$dossier" && KUBECONFIG="$agent_kube" DEVZONE_AGENT_SESSION=1 opencode run --print-logs --log-level ERROR --auto -m "$(modele_ref "$m")" "$(cat "$consigne")" </dev/null >>"$journal" 2>&1) &
+        (cd "$folder" && KUBECONFIG="$agent_kube" DEVZONE_AGENT_SESSION=1 opencode run --print-logs --log-level ERROR --auto -m "$(modele_ref "$m")" "$(cat "$brief")" </dev/null >>"$journal" 2>&1) &
     fi
 }
 
-# Vrai si le pod du workspace tourne et que la commande vient du poste.
-workspace_disponible() {
-    if agent_dans_pod; then return 1; fi
+# True when the pod of the workspace runs and the command comes from the workstation.
+workspace_available() {
+    if agent_in_pod; then return 1; fi
     local phase
     phase="$(agent_kc get pod devzone-workspace-0 -o jsonpath='{.status.phase}' --request-timeout=5s 2>/dev/null)" || return 1
     [ "$phase" = Running ]
 }
 
-# Lance la consigne dans le pod, puis rapatrie son journal même en échec.
-# Un chemin /workspaces/projets/... absent du poste désigne un dossier du pod
-# (clone ou worktree de devzone ticket, #558) : rien n'est copié.
+# Runs the brief in the pod, then brings its journal back even on failure.
+# A /workspaces/projets/... path absent from here designates a folder of the pod
+# (clone or worktree of devzone ticket, #558): nothing is copied.
 agent_workspace() {
-    local dossier="$1" consigne="$2" nom journal code=0 dans_pod=""
-    local racine_pod=/home/vscode/.local/share/devzone
-    case "$dossier" in
-        /workspaces/projets/*) [ -d "$dossier" ] || dans_pod="$dossier" ;;
+    local folder="$1" brief="$2" name journal code=0 in_pod=""
+    local pod_root=/home/vscode/.local/share/devzone
+    case "$folder" in
+        /workspaces/projets/*) [ -d "$folder" ] || in_pod="$folder" ;;
     esac
-    if [ -n "$dans_pod" ]; then
-        nom="$(basename "$dans_pod")"
-        if ! agent_kc exec devzone-workspace-0 -c workspace -- test -d "$dans_pod" 2>/dev/null; then
-            refuse "dossier introuvable dans le pod : $dans_pod (devzone workspace clone, puis devzone ticket <n> dans le pod)"
+    if [ -n "$in_pod" ]; then
+        name="$(basename "$in_pod")"
+        if ! agent_kc exec devzone-workspace-0 -c workspace -- test -d "$in_pod" 2>/dev/null; then
+            refuse "folder not found in the pod: $in_pod (devzone workspace clone, then devzone ticket <n> in the pod)"
         fi
     else
-        [ -d "$dossier" ] || refuse "dossier introuvable : $dossier (cherché depuis $(pwd))"
-        nom="$(basename "$(cd "$dossier" && pwd -P)")"
-        dans_pod="/workspaces/projets/$nom"
-        if ! agent_kc exec devzone-workspace-0 -c workspace -- test -d "$dans_pod" 2>/dev/null; then
-            refuse "projet $nom absent du workspace Kubernetes : devzone workspace copy-to $dossier (sur la machine), ou --local"
+        [ -d "$folder" ] || refuse "folder not found: $folder (searched from $(pwd))"
+        name="$(basename "$(cd "$folder" && pwd -P)")"
+        in_pod="/workspaces/projets/$name"
+        if ! agent_kc exec devzone-workspace-0 -c workspace -- test -d "$in_pod" 2>/dev/null; then
+            refuse "project $name missing from the Kubernetes workspace: devzone workspace copy-to $folder (on this machine), or --local"
         fi
     fi
-    echo "devzone agent : workspace Kubernetes (pod devzone-workspace-0, $dans_pod) ; --local pour le conteneur"
-    agent_kc cp "$consigne" "devzone-workspace-0:/tmp/devzone-agent-$nom.md" -c workspace
-    # shellcheck disable=SC2016 # the pod shell expands MODELE_OPT, not this one
-    agent_kc exec devzone-workspace-0 -c workspace -- env DEVZONE_RACINE="$racine_pod" MODELE_OPT="$MODELE_LISTE" bash -lc 'devzone agent ${MODELE_OPT:+--modele "$MODELE_OPT"} "$1" "$2"' _ "$dans_pod" "/tmp/devzone-agent-$nom.md" || code=$?
-    journal="$(journal_de "$nom")"
+    echo "devzone agent: Kubernetes workspace (pod devzone-workspace-0, $in_pod); --local for the container"
+    agent_kc cp "$brief" "devzone-workspace-0:/tmp/devzone-agent-$name.md" -c workspace
+    # shellcheck disable=SC2016 # the pod shell expands MODEL_OPT, not this one
+    agent_kc exec devzone-workspace-0 -c workspace -- env DEVZONE_RACINE="$pod_root" MODEL_OPT="$MODELE_LISTE" bash -lc 'devzone agent ${MODEL_OPT:+--modele "$MODEL_OPT"} "$1" "$2"' _ "$in_pod" "/tmp/devzone-agent-$name.md" || code=$?
+    journal="$(journal_of "$name")"
     mkdir -p "$(dirname "$journal")"
-    if ! agent_kc exec devzone-workspace-0 -c workspace -- cat "$racine_pod/workspace/.agents/$nom.log" >>"$journal"; then
-        echo "=== journal du pod introuvable" >>"$journal"
+    if ! agent_kc exec devzone-workspace-0 -c workspace -- cat "$pod_root/workspace/.agents/$name.log" >>"$journal"; then
+        echo "=== pod journal not found" >>"$journal"
     fi
     return "$code"
 }
 
 agent_aide() {
     cat <<'AGENTEOF2'
-usage : devzone agent [--modele <m>[,<m2>…]] [--local] <dossier> <fichier-consigne>
-        lance opencode sur la consigne, modèles gratuits en rotation
-        --modele : modèles essayés d'abord, dans l'ordre, puis la rotation
-        workspace Kubernetes d'abord s'il tourne ; --local : ce conteneur
-        un chemin /workspaces/projets/... absent d'ici est un dossier du pod, sans copie
+usage: devzone agent [--modele <m>[,<m2>…]] [--local] <folder> <brief-file>
+        runs opencode on the brief, free models in rotation
+        --modele: models tried first, in order, then the rotation
+        Kubernetes workspace first if it runs; --local: this container
+        a /workspaces/projets/... path absent from here is a folder of the pod, without copy
         devzone agent etat
-        sessions connues et modèles écartés
-        devzone agent liberer [<modèle>|--tous]
-        lève un écart de modèle
+        known sessions and excluded models
+        devzone agent liberer [<model>|--tous]
+        lifts a model exclusion
 AGENTEOF2
 }
