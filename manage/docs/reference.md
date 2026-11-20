@@ -130,7 +130,7 @@ devzone disable docker-hote     # écrit docker-hote=off, puis demande une recon
 make rebuild                       # sur le poste, pas dans le conteneur
 ```
 
-Au lancement sur le poste, `manage/scripts/lancer.sh` lit la ligne `docker-hote` (absente = `on`). À `off`, il génère `.devcontainer/without-host-docker/devcontainer.json` (copie sans la feature, chemins de build adaptés au sous-dossier, dossier ignoré par git) et passe ce fichier au CLI devcontainers avec `--config`. Pour remettre le socket : `devzone enable docker-hote`, puis `make rebuild`.
+Au lancement sur le poste, `manage/scripts/launch.sh` lit la ligne `docker-hote` (absente = `on`). À `off`, il génère `.devcontainer/without-host-docker/devcontainer.json` (copie sans la feature, chemins de build adaptés au sous-dossier, dossier ignoré par git) et passe ce fichier au CLI devcontainers avec `--config`. Pour remettre le socket : `devzone enable docker-hote`, puis `make rebuild`.
 
 Sans socket, `docker` n'existe plus dans le conteneur : la commande affiche un message qui renvoie au workspace Kubernetes (`devzone workspace`, kubedock et BuildKit). Le relais du socket ne bloque pas le démarrage, et la connexion au cluster Kubernetes de l'hôte reste disponible ; en revanche, kind et les conteneurs lancés sur le Docker du poste ne le sont plus. `devzone status --json` porte l'option dans le champ `docker_hote` et l'état réel du montage dans `docker_hote_actif`.
 
@@ -160,8 +160,8 @@ Avec le module `ia` actif, devzone branche le [garde-fou de repowarden](https://
 
 devzone est **Kubernetes d'abord** : le vocabulaire est **le cluster**, **le pod**, **les nœuds** ; seuls les pods sont des conteneurs. Un essai jetable se fait dans un pod ou un namespace jetable (`kubectl run`, `kubectl create ns`, puis suppression). Un garde-fou arrête les agents qui lancent `docker` ou `docker-compose` comme mot de commande (début de ligne, après `;`, `&&`, `||`, `|`, `$(`, un accent grave, `(`, `sudo` ou une affectation `VAR=valeur`), avec un message qui renvoie à kubectl ; une simple mention (`grep docker fichier`, `git commit -m "docker"`) passe.
 
-- **Deux niveaux** : dans le dépôt, des fichiers de projet versionnés couvrent tout agent qui y travaille, où qu'il tourne et que `ia` soit actif ou non : `.claude/settings.json` (hook `PreToolUse` `Bash`) et `.opencode/plugins/devzone-garde.js` (opencode 1.x) / `devzone-garde-v2.js` (opencode 2.x), de simples réexports du plugin embarqué `.devcontainer/ia/plugins/` (présent dans le clone et dans l'image). Pour les dossiers qui ne sont pas ce dépôt, `devzone enable ia` pose les mêmes entrées dans `~/.claude/settings.json` (par `jq`, sans doublon) et copie les deux plugins dans `~/.config/opencode/plugins/` ; `devzone disable ia` retire seulement ces entrées (commandes contenant `docker-garde.sh`) et ces plugins, le reste de `settings.json` et des plugins intact.
-- **Chemin du script** : le plugin embarqué (`.devcontainer/ia/plugins/`) résout `../docker-garde.sh` depuis son propre emplacement ; la copie globale reçoit à la pose le chemin installé (à côté du script `devzone`), et la variable `DEVZONE_DOCKER_GARDE` le remplace au besoin.
+- **Deux niveaux** : dans le dépôt, des fichiers de projet versionnés couvrent tout agent qui y travaille, où qu'il tourne et que `ia` soit actif ou non : `.claude/settings.json` (hook `PreToolUse` `Bash`) et `.opencode/plugins/devzone-guard.js` (opencode 1.x) / `devzone-guard-v2.js` (opencode 2.x), de simples réexports du plugin embarqué `.devcontainer/ai/plugins/` (présent dans le clone et dans l'image). Pour les dossiers qui ne sont pas ce dépôt, `devzone enable ia` pose les mêmes entrées dans `~/.claude/settings.json` (par `jq`, sans doublon) et copie les deux plugins dans `~/.config/opencode/plugins/` ; `devzone disable ia` retire seulement ces entrées (commandes contenant `docker-guard.sh`) et ces plugins, le reste de `settings.json` et des plugins intact.
+- **Chemin du script** : le plugin embarqué (`.devcontainer/ai/plugins/`) résout `../docker-guard.sh` depuis son propre emplacement ; la copie globale reçoit à la pose le chemin installé (à côté du script `devzone`), et la variable `DEVZONE_DOCKER_GARDE` le remplace au besoin.
 - **Contournement** : la variable d'environnement `DEVZONE_ALLOW_DOCKER` de l'agent, positionnée à 1, laisse passer ; réservé à une action sur l'**hôte** lui-même, jamais au cluster.
 - **Limite** : un filet, pas un mur. Une commande `docker` cachée dans un script n'est pas vue ; sans `python3` ni `jq`, rien n'est bloqué.
 
@@ -211,7 +211,7 @@ devzone agent --pod <dossier> <consigne>     # session agent dans un pod éphém
 - **Modèle demandé** (`--modele`, #420) : liste ordonnée de noms de modèles gratuits (sans préfixe `opencode/`), séparés par des virgules. Ils sont essayés dans cet ordre, sauf ceux écartés ; puis la rotation habituelle reprend depuis le rang partagé, sans réessayer un modèle déjà tenté. Un nom inconnu est refusé avant tout lancement (code 2) avec la liste des modèles gratuits. Un modèle demandé qui démarre ne fait pas avancer le rang partagé. Le journal écrit `=== modèle choisi : <m> (demandé)` au démarrage et `=== modèle demandé <m> écarté (<cause>), suivant` pour un modèle demandé écarté. `devzone agent etat` (et `--json`, champ `demande`) montre le modèle demandé et le modèle utilisé. Non géré avec `--pod`.
 - Une session figée (rien écrit depuis 10 min) est arrêtée et reprise sur une session neuve, modèle suivant, avec une consigne de reprise (`git status`, `git diff`, `git log`). Tous les modèles écartés : « aucun modèle gratuit disponible », code 3.
 - **Permissions** : `.devcontainer/opencode/agent.json` est la configuration par défaut, fusionnée avec `OPENCODE_CONFIG_CONTENT` s'il est défini. opencode applique la dernière règle qui correspond : les `deny` de devzone sont ré-ajoutés en dernier après la fusion, donc l'appelant peut ajouter des permissions mais jamais retirer un interdit de devzone. `webfetch` est permis ; `git push`, `git checkout/reset/restore/stash/clean`, `git branch -D`, les écritures GitHub, `gh api`, `curl`, `sudo`, `rm -rf` (sauf `./.essai`) et la gestion des tickets/PR par repowarden (`repowarden ticket …`, `repowarden proteger`, `repowarden run`) sont interdits ; `git commit` reste permis pour `repowarden cc`. `~/bash32` est toujours protégé (le bash 3.2 du conteneur).
-- **Fichiers de droits protégés** : pendant une session, `agent.json`, `.devcontainer/opencode.jsonc`, `.repowarden.conf` et `.devcontainer/agent-droits.sh` (liste fixe, qu'aucune variable ne change) sont interdits à l'écriture d'opencode (`permission.edit`, `deny` ajoutés en dernier). Comme un agent peut aussi écrire par le shell, `devzone agent` photographie ces fichiers au lancement et les compare après **chaque** session (fin normale, erreur, muet, figée) : tout changement est annulé dans l'arbre (jamais de `reset` ni de `rebase`), le journal reçoit `=== ⚠ droits modifiés : <fichier>` (avec le commit à retirer avant tout push si l'agent a commité) et `devzone agent etat` affiche `⚠ droits modifiés (<projet>)` jusqu'au prochain lancement sur ce projet. Le code de sortie ne change pas. De plus, le garde-fou repowarden (réglage `agentsProtectedPaths` de `.repowarden.conf`, repowarden 4.17.1) refuse à tout agent, Claude Code comme opencode, d'écrire ou de commiter ces fichiers, avant même la fin de la session ; un humain peut toujours les modifier.
+- **Fichiers de droits protégés** : pendant une session, `agent.json`, `.devcontainer/opencode.jsonc`, `.repowarden.conf` et `.devcontainer/agent-rights.sh` (liste fixe, qu'aucune variable ne change) sont interdits à l'écriture d'opencode (`permission.edit`, `deny` ajoutés en dernier). Comme un agent peut aussi écrire par le shell, `devzone agent` photographie ces fichiers au lancement et les compare après **chaque** session (fin normale, erreur, muet, figée) : tout changement est annulé dans l'arbre (jamais de `reset` ni de `rebase`), le journal reçoit `=== ⚠ droits modifiés : <fichier>` (avec le commit à retirer avant tout push si l'agent a commité) et `devzone agent etat` affiche `⚠ droits modifiés (<projet>)` jusqu'au prochain lancement sur ce projet. Le code de sortie ne change pas. De plus, le garde-fou repowarden (réglage `agentsProtectedPaths` de `.repowarden.conf`, repowarden 4.17.1) refuse à tout agent, Claude Code comme opencode, d'écrire ou de commiter ces fichiers, avant même la fin de la session ; un humain peut toujours les modifier.
 - **Quota des modèles gratuits** : ces modèles sont limités ; la rotation et l'écart d'une heure évitent de bloquer un ticket quand l'un est épuisé. Pour un fournisseur payant : `opencode auth login`.
 
 
@@ -466,7 +466,7 @@ Reste sur le poste : `make up` et `make rebuild`, `devzone workspace start` et l
 
 ### Securite : workspace sans Docker
 
-- **Aucun conteneur privilegie** : ni kubedock, ni BuildKit, ni le workspace n'ont `privileged: true`. Un test `helm template` (`manage/test/workspace-sans-docker.bats`) echoue si un tel conteneur apparait.
+- **Aucun conteneur privilegie** : ni kubedock, ni BuildKit, ni le workspace n'ont `privileged: true`. Un test `helm template` (`manage/test/workspace-without-docker.bats`) echoue si un tel conteneur apparait.
 - **BuildKit rootless** : UID 1000, `--oci-worker-no-process-sandbox` (la doc BuildKit le recommande pour Kubernetes, avec ses caveats). seccomp et AppArmor sont `Unconfined` (`buildkit.unconfined`), sans quoi `mount` et `unshare` sont bloques. Le profil est le seul relache de securite du workspace : il ne donne pas de privilege.
 - **Pas de socket du poste** : le socket Docker de l'hote (#291) n'est pas monte, et aucun socket du noeud n'est partage.
 - **Ecoute** : kubedock et BuildKit n'ecoutent que sur `127.0.0.1` du pod, sans TLS. Aucun port n'est declare (ni `containerPort`, ni `hostPort`), et le Service n'expose que le HTTP du workspace.
@@ -574,7 +574,7 @@ Chaque chart se vérifie par `helm lint` et `helm template` (`manage/test/chart-
 
 ### Convention des charts devzone
 
-Le code suppose que chaque service a un chart `charts/devzone-<service>` (#554) : les appels (`services.sh`, `catalogue-argocd.sh`, `argocd-services*.sh`, `argocd-workspace.sh`) construisent ce chemin à partir du nom du service. La convention ci-dessous est la règle que ces appels supposent.
+Le code suppose que chaque service a un chart `charts/devzone-<service>` (#554) : les appels (`services.sh`, `catalog-argocd.sh`, `argocd-services*.sh`, `argocd-workspace.sh`) construisent ce chemin à partir du nom du service. La convention ci-dessous est la règle que ces appels supposent.
 
 **Dossier et `Chart.yaml`**
 
@@ -948,14 +948,14 @@ outil peut relancer la consigne ensuite avec `devzone agent`.
 
 Le job `fonctionnel` construit le conteneur avec le CLI des devcontainers. SDKMAN (Java, Maven) sert parfois une archive corrompue (« Stop! The archive was corrupt ») : ses 5 tentatives tombent alors dans la même panne, le build échoue sans rapport avec le code (constaté deux fois, #661 et le run 44596691628).
 
-`build_with_retry` (`manage/test/journal-erreur.sh`, utilisée par `manage/test/fonctionnel.sh`) refait **une seule fois** la construction quand la partie nouvelle du journal contient ce motif, **après une pause** de 120 s (réglable par `BUILD_RETRY_WAIT`) : une reprise immédiate retombait dans la même panne du serveur de téléchargement (run 44612039534, deux builds corrompus à 75 s d'écart). Le message (« one retry of the build in 120s ») et une ligne du journal le disent. Un autre échec n'est jamais repris, et une seconde panne identique fait échouer le job : un vrai problème n'est pas masqué. Un motif resté dans un journal d'un lancement précédent ne compte pas.
+`build_with_retry` (`manage/test/journal-error.sh`, utilisée par `manage/test/functional.sh`) refait **une seule fois** la construction quand la partie nouvelle du journal contient ce motif, **après une pause** de 120 s (réglable par `BUILD_RETRY_WAIT`) : une reprise immédiate retombait dans la même panne du serveur de téléchargement (run 44612039534, deux builds corrompus à 75 s d'écart). Le message (« one retry of the build in 120s ») et une ligne du journal le disent. Un autre échec n'est jamais repris, et une seconde panne identique fait échouer le job : un vrai problème n'est pas masqué. Un motif resté dans un journal d'un lancement précédent ne compte pas.
 
 ### Relance automatique de la CI (#656)
 
 Le job `bats (macos-latest)` n'obtient parfois aucun runner : il reste en file une quinzaine de minutes, puis est annulé sans une seule étape (« jamais démarré »), et `tests-conteneur` échoue alors, volontairement (#522). Le workflow `.github/workflows/relance-ci.yml` relance ce cas **une seule fois**, sans intervention.
 
 - **Déclencheur** : le run `fonctionnel` se termine en échec (`workflow_run`).
-- **Décision** (`bash manage/test/ci-conteneur.sh relancer <dépôt> <run> <tentative>`) : relance (`gh run rerun --failed`) seulement si au moins un job est jamais démarré (annulé, sans runner, sans étape) **et** qu'aucun autre job, hors `tests-conteneur`, n'a échoué, expiré ou été annulé en cours d'exécution. Un vrai échec de test n'est jamais masqué, ni un job annulé par un run plus récent.
+- **Décision** (`bash manage/test/ci-container.sh relancer <dépôt> <run> <tentative>`) : relance (`gh run rerun --failed`) seulement si au moins un job est jamais démarré (annulé, sans runner, sans étape) **et** qu'aucun autre job, hors `tests-conteneur`, n'a échoué, expiré ou été annulé en cours d'exécution. Un vrai échec de test n'est jamais masqué, ni un job annulé par un run plus récent.
 - **Une seule relance** : le workflow ne tourne qu'à la tentative 1 ; le run relancé est la tentative 2, donc aucune boucle. Le journal du job dit ce qui a été décidé.
 - **Droits minimaux** : `actions: write` sur ce workflow seul. Il récupère la branche par défaut (jamais le code de la PR) et n'utilise que l'identifiant du run.
 - **Limite** : un workflow `workflow_run` ne s'exécute que depuis la branche par défaut : il n'agit qu'après la première livraison qui le contient dans `main`. Le dépôt repowarden a le même défaut, à traiter là-bas.
@@ -1034,8 +1034,8 @@ Les commandes de l'application (`devzone repair`, `start`, `metrics`,
 internes restent appelables pendant le développement et par les tests :
 
 ```bash
-bash .devcontainer/demarrage.sh
-bash .devcontainer/docker-relais.sh
+bash .devcontainer/startup.sh
+bash .devcontainer/docker-relay.sh
 bash .devcontainer/metrics-server.sh
 ```
 

@@ -16,18 +16,18 @@ while [ -L "$SOURCE" ]; do
 done
 ICI="$(cd -P "$(dirname "$SOURCE")" && pwd)"
 RACINE="${DEVZONE_RACINE:-$(dirname "$ICI")}"
-# shellcheck source=agent-erreurs.sh disable=SC1091
-. "$ICI/agent-erreurs.sh"
-# shellcheck source=agent-droits.sh disable=SC1091
-. "$ICI/agent-droits.sh"
+# shellcheck source=agent-errors.sh disable=SC1091
+. "$ICI/agent-errors.sh"
+# shellcheck source=agent-rights.sh disable=SC1091
+. "$ICI/agent-rights.sh"
 # shellcheck source=SCRIPTDIR/agent-session.sh disable=SC1091
 . "$ICI/agent-session.sh"
 # shellcheck source=agent-workspace.sh disable=SC1091
 . "$ICI/agent-workspace.sh"
 # shellcheck source=agent-local.sh disable=SC1091
 . "$ICI/agent-local.sh"
-# shellcheck source=SCRIPTDIR/agent-modele.sh disable=SC1091
-. "$ICI/agent-modele.sh"
+# shellcheck source=SCRIPTDIR/agent-model.sh disable=SC1091
+. "$ICI/agent-model.sh"
 FREE_MODELS=(big-pickle deepseek-v4.1-flash-free hy4-flash-free nemotron-3.5-super-vl-free
     nemotron-3.5-lightning-free mimo-v2.6-flash-free beam-free flint-40b-free longcat-2.5-free)
 # Session pod ephemere (#222)
@@ -207,7 +207,7 @@ agent_launch() {
 }
 case "${1:-}" in
     status) agent_pod_status ;;
-    etat) if [ "${2:-}" = "--json" ]; then exec bash "$ICI/agent-etat-json.sh"; else agent_state; fi ;;
+    etat) if [ "${2:-}" = "--json" ]; then exec bash "$ICI/agent-state-json.sh"; else agent_state; fi ;;
     liberer)
         [ -n "${2:-}" ] || { agent_aide >&2; exit 2; }
         exclusion_clear "$2"

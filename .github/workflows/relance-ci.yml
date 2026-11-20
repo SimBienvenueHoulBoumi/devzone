@@ -2,7 +2,7 @@
 # sometimes never come, the job is cancelled after about 15 minutes without a
 # single step, and tests-conteneur then fails. When the fonctionnel run ends in
 # failure, this workflow asks GitHub to rerun the failed jobs, but only if
-# manage/test/ci-conteneur.sh relancer finds a job that never started and no
+# manage/test/ci-container.sh relancer finds a job that never started and no
 # other failure (a real failure is never hidden), and only on the first attempt
 # (run_attempt == 1: no loop). Limit: a workflow_run only runs from the default
 # branch, so it acts once the first delivery containing it has reached main.
@@ -33,4 +33,4 @@ jobs:
           REPO: ${{ github.repository }}
           RUN_ID: ${{ github.event.workflow_run.id }}
           ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
-        run: bash manage/test/ci-conteneur.sh relancer "$REPO" "$RUN_ID" "$ATTEMPT"
+        run: bash manage/test/ci-container.sh relancer "$REPO" "$RUN_ID" "$ATTEMPT"

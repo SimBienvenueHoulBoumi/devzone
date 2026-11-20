@@ -28,7 +28,7 @@ relais_auto_actif() { local nom; nom="$(nom_relais_auto "$1")"; command -v docke
 # Délai après disparition d'un port avant de retirer le pont et le relais.
 delai_disparition() { local v; for v in DEVZONE_PORTS_AUTO_DELAI_DISPARITION DEVZONE_PORTS_AUTO_DELAI DEVZONE_PORTS_AUTO_RETARD PORTS_AUTO_DELAI PORTS_AUTO_RETARD; do [ -n "${!v:-}" ] && { echo "${!v}"; return 0; }; done; echo 10; }
 
-# Garde-fou (règle docker-relais.sh #293) : la boucle et demarrer ne tournent
+# Garde-fou (règle docker-relay.sh #293) : la boucle et demarrer ne tournent
 # jamais sous bats, et hors du conteneur que si le contexte réel est posé.
 garde_veilleur() {
     if [ -n "${BATS_TEST_TMPDIR:-}" ]; then

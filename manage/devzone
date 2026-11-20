@@ -109,16 +109,16 @@ case "${1:-}" in
         update_workstation "${@:2}"
         ;;
     uninstall)
-        # Devzone folder (.devcontainer/); an older devzone has its desinstaller.sh
+        # Devzone folder (.devcontainer/); an older devzone has its uninstall.sh
         # in manage/scripts/ (new), core/scripts or scripts/ (old), or at the root
         uninstaller=""
         if [ -d .devcontainer ]; then
-            for f in manage/scripts/desinstaller.sh core/scripts/desinstaller.sh scripts/desinstaller.sh desinstaller.sh; do
+            for f in manage/scripts/uninstall.sh core/scripts/uninstall.sh scripts/uninstall.sh uninstall.sh; do
                 if [ -f "$f" ]; then uninstaller="$f" && break; fi
             done
         fi
         if [ -z "$uninstaller" ]; then
-            echo "✖ À lancer dans un dossier devzone (desinstaller.sh introuvable ici)." >&2
+            echo "✖ À lancer dans un dossier devzone (uninstall.sh introuvable ici)." >&2
             exit 1
         fi
         DEVZONE_COMMANDE="devzone uninstall" bash "$uninstaller"

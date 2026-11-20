@@ -34,9 +34,9 @@ refuse() {
     exit 2
 }
 
-# shellcheck source=SCRIPTDIR/etat.sh
+# shellcheck source=SCRIPTDIR/state.sh
 # shellcheck disable=SC1091
-. "$HERE/etat.sh"
+. "$HERE/state.sh"
 
 action="${1:-}"
 service="${2:-}"

@@ -11,23 +11,23 @@ setup() {
     APP="$T/app/devzone"
     export DEVZONE_RACINE="$T/racine"
     export DEVZONE_ETAT="$T/modules"
-    mkdir -p "$T/app/gitlab" "$T/app/postgres" "$T/app/catalogue/mysql" "$T/bin" "$DEVZONE_RACINE"
+    mkdir -p "$T/app/gitlab" "$T/app/postgres" "$T/app/catalog/mysql" "$T/bin" "$DEVZONE_RACINE"
     cp "$RACINE_TEST/.devcontainer/devzone" "$APP"
     cp "$RACINE_TEST/.devcontainer/help.sh" "$T/app/help.sh"
     cp "$RACINE_TEST/.devcontainer/cluster.sh" "$T/app/cluster.sh"
-    cp "$RACINE_TEST/.devcontainer/etat.sh" "$T/app/etat.sh"
-    cp "$RACINE_TEST/.devcontainer/etat-verrou.sh" "$T/app/etat-verrou.sh"
-    cp "$RACINE_TEST/.devcontainer/etat-gitops.sh" "$T/app/etat-gitops.sh"
-    cp "$RACINE_TEST/.devcontainer/kube-joignable.sh" "$T/app/kube-joignable.sh"
-    cp "$RACINE_TEST/.devcontainer/kube-compte.sh" "$T/app/kube-compte.sh"
-    mkdir -p "$T/app/ia"
-    cp "$RACINE_TEST/.devcontainer/ia/host-models.sh" "$T/app/ia/host-models.sh"
-    cp "$RACINE_TEST/.devcontainer/ia/host-check.sh" "$T/app/ia/host-check.sh"
-    cp "$RACINE_TEST/.devcontainer/ia/host-check.message" "$T/app/ia/host-check.message"
+    cp "$RACINE_TEST/.devcontainer/state.sh" "$T/app/state.sh"
+    cp "$RACINE_TEST/.devcontainer/state-lock.sh" "$T/app/state-lock.sh"
+    cp "$RACINE_TEST/.devcontainer/state-gitops.sh" "$T/app/state-gitops.sh"
+    cp "$RACINE_TEST/.devcontainer/kube-reachable.sh" "$T/app/kube-reachable.sh"
+    cp "$RACINE_TEST/.devcontainer/kube-account.sh" "$T/app/kube-account.sh"
+    mkdir -p "$T/app/ai"
+    cp "$RACINE_TEST/.devcontainer/ai/host-models.sh" "$T/app/ai/host-models.sh"
+    cp "$RACINE_TEST/.devcontainer/ai/host-check.sh" "$T/app/ai/host-check.sh"
+    cp "$RACINE_TEST/.devcontainer/ai/host-check.message" "$T/app/ai/host-check.message"
     chmod +x "$APP"
     export PATH="$T/bin:$PATH"
 
-    cat >"$T/app/docker-relais.sh" <<'RELAIS'
+    cat >"$T/app/docker-relay.sh" <<'RELAIS'
 #!/usr/bin/env bash
 printf 'relais %s %s\n' "${DEVZONE_RELAIS_REEL:-}" "$*" >>"$BATS_TEST_TMPDIR/actions.log"
 [ ! -f "$BATS_TEST_TMPDIR/echec-relais" ] || { echo "socket indisponible"; exit 1; }
@@ -53,15 +53,15 @@ GITLAB
 #!/usr/bin/env bash
 printf 'postgres %s\n' "$*" >>"$BATS_TEST_TMPDIR/actions.log"
 POSTGRES
-    cat >"$T/app/catalogue/catalogue-veilleur.sh" <<'VEILLEUR'
+    cat >"$T/app/catalog/catalog-watcher.sh" <<'VEILLEUR'
 #!/usr/bin/env bash
 printf 'catalogue-veilleur %s\n' "$*" >>"$BATS_TEST_TMPDIR/actions.log"
 VEILLEUR
-    cat >"$T/app/catalogue/mysql/mysql.sh" <<'MYSQL'
+    cat >"$T/app/catalog/mysql/mysql.sh" <<'MYSQL'
 #!/usr/bin/env bash
 printf 'mysql %s\n' "$*" >>"$BATS_TEST_TMPDIR/actions.log"
 MYSQL
-    cat >"$T/app/demarrage.sh" <<'DEMARRAGE'
+    cat >"$T/app/startup.sh" <<'DEMARRAGE'
 #!/usr/bin/env bash
 printf 'demarrage %s\n' "$*" >>"$BATS_TEST_TMPDIR/actions.log"
 DEMARRAGE
@@ -69,7 +69,7 @@ DEMARRAGE
 #!/usr/bin/env bash
 printf 'metrics %s\n' "$*" >>"$BATS_TEST_TMPDIR/actions.log"
 METRICS
-    chmod +x "$T/app"/*.sh "$T/app/gitlab/gitlab.sh" "$T/app/postgres/postgres.sh" "$T/app/catalogue/catalogue-veilleur.sh" "$T/app/catalogue/mysql/mysql.sh"
+    chmod +x "$T/app"/*.sh "$T/app/gitlab/gitlab.sh" "$T/app/postgres/postgres.sh" "$T/app/catalog/catalog-watcher.sh" "$T/app/catalog/mysql/mysql.sh"
 }
 
 faux_kubectl() {

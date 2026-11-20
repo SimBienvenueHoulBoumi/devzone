@@ -139,10 +139,10 @@ old_tree() {
     local folder="$1" tree="$2"
     case "$tree" in
         core)
-            [ -f "$folder/core/devzone" ] || [ -f "$folder/core/scripts/desinstaller.sh" ]
+            [ -f "$folder/core/devzone" ] || [ -f "$folder/core/scripts/uninstall.sh" ]
             ;;
         scripts)
-            [ -f "$folder/scripts/desinstaller.sh" ] && [ -f "$folder/scripts/lancer.sh" ]
+            [ -f "$folder/scripts/uninstall.sh" ] && [ -f "$folder/scripts/launch.sh" ]
             ;;
         *) return 1 ;;
     esac

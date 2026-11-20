@@ -19,13 +19,13 @@ help: ## Liste les commandes
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  make %-16s %s\n", $$1, $$2}'
 
 # up et rebuild : étapes affichées, journal complet dans .devzone.log, question
-# posée dans le conteneur signalée au lieu d'attendre (manage/scripts/lancer.sh)
+# posée dans le conteneur signalée au lieu d'attendre (manage/scripts/launch.sh)
 # En workspace Kubernetes, up/shell/stop pilotent le pod (#472).
 up: hors-conteneur ## Lance le conteneur (le crée si absent)
-	@bash manage/scripts/poste.sh up "$(CURDIR)"; c=$$?; [ $$c = 3 ] || exit $$c; bash manage/scripts/lancer.sh up "$(CURDIR)"
+	@bash manage/scripts/poste.sh up "$(CURDIR)"; c=$$?; [ $$c = 3 ] || exit $$c; bash manage/scripts/launch.sh up "$(CURDIR)"
 
 shell: hors-conteneur ## Ouvre un shell dans le conteneur
-	@bash manage/scripts/poste.sh shell "$(CURDIR)"; c=$$?; [ $$c = 3 ] || exit $$c; bash manage/scripts/lancer.sh up "$(CURDIR)" && $(DC) exec $(WS) bash
+	@bash manage/scripts/poste.sh shell "$(CURDIR)"; c=$$?; [ $$c = 3 ] || exit $$c; bash manage/scripts/launch.sh up "$(CURDIR)" && $(DC) exec $(WS) bash
 
 stop: hors-conteneur ## Arrête le conteneur (état conservé)
 	@bash manage/scripts/poste.sh stop "$(CURDIR)"; c=$$?; [ $$c = 3 ] || exit $$c; ids=$$(docker ps -q $(FILTRE)); if [ -z "$$ids" ]; then echo "déjà arrêté"; else docker stop $$ids >/dev/null && echo "devzone arrêté"; fi
@@ -36,19 +36,19 @@ down: hors-conteneur ## Supprime le conteneur (volumes et image conservés)
 		docker rm -f $$ids >/dev/null && echo "devzone supprimé (désinstallation complète : make desinstaller)"; fi
 
 rebuild: hors-conteneur ## Reconstruit de zéro (après modif de .devcontainer/)
-	@bash manage/scripts/poste.sh rebuild "$(CURDIR)"; c=$$?; [ $$c = 3 ] || exit $$c; bash manage/scripts/lancer.sh rebuild "$(CURDIR)"
+	@bash manage/scripts/poste.sh rebuild "$(CURDIR)"; c=$$?; [ $$c = 3 ] || exit $$c; bash manage/scripts/launch.sh rebuild "$(CURDIR)"
 
 status: hors-conteneur ## État du conteneur
 	@docker ps -a $(FILTRE) --format '{{.Status}}' | grep . || echo "aucun conteneur"
 
 test-fonctionnel: hors-conteneur ## Tests fonctionnels : devzone isolé, construit puis supprimé (5 à 10 min)
-	@bash manage/test/fonctionnel.sh
+	@bash manage/test/functional.sh
 
 test-cli: hors-conteneur ## Tests de la CLI dans un vrai terminal : devzone isolé, puis supprimé (10 à 15 min)
 	@bash manage/test/cli-terminal.sh
 
 desinstaller: hors-conteneur ## Supprime tout ce que devzone a créé, après confirmation (GARDER=connexions : garde les connexions)
-	@GARDER="$(GARDER)" bash manage/scripts/desinstaller.sh
+	@GARDER="$(GARDER)" bash manage/scripts/uninstall.sh
 
 uninstall: hors-conteneur ## Supprime tout ce que devzone a créé, après confirmation (alias de desinstaller)
-	@GARDER="$(GARDER)" bash manage/scripts/desinstaller.sh
+	@GARDER="$(GARDER)" bash manage/scripts/uninstall.sh

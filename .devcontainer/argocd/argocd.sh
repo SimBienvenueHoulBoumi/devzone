@@ -18,14 +18,14 @@ ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
 # shellcheck disable=SC1091
 . "$ICI/../password.sh"
 # Isolation réseau : namespace_isoler, posée avec le namespace devzone-argocd
-# shellcheck source=SCRIPTDIR/../isolement.sh
+# shellcheck source=SCRIPTDIR/../isolation.sh
 # shellcheck disable=SC1091
-. "$ICI/../isolement.sh"
+. "$ICI/../isolation.sh"
 # Shared memory check of the services cluster (#608): quantity_ki and
 # memory_cluster_ki.
-# shellcheck source=SCRIPTDIR/../memoire.sh
+# shellcheck source=SCRIPTDIR/../memory.sh
 # shellcheck disable=SC1091
-. "$ICI/../memoire.sh"
+. "$ICI/../memory.sh"
 
 NS=devzone-argocd
 SECRETS="$RACINE/workspace/.argocd"

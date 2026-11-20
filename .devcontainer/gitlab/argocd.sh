@@ -13,9 +13,9 @@
 #   gitlab_application_retirer        the Application removed (namespace kept)
 
 # The catalogue side of Argo CD (module on, chart, revision, Application)
-# shellcheck source=SCRIPTDIR/../argocd/catalogue-argocd.sh
+# shellcheck source=SCRIPTDIR/../argocd/catalog-argocd.sh
 # shellcheck disable=SC1091
-. "$ICI/../argocd/catalogue-argocd.sh"
+. "$ICI/../argocd/catalog-argocd.sh"
 
 # The module argocd is on, the namespace devzone-argocd is installed, the chart
 # is in the repository and the revision is known: a development clone (version
