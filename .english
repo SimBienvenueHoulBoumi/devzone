@@ -1,6 +1,7 @@
 # Files already written in English (#502), checked on every CI run by
 # manage/scripts/check-english.sh. Add any new code file here.
 manage/scripts/check-english.sh
+manage/scripts/check-go-layout.sh
 manage/scripts/check-utf8-vars.sh
 manage/test/check-utf8-vars.bats
 manage/scripts/ci-dns.sh
@@ -24,6 +25,7 @@ manage/test/check-english.bats
 manage/test/readme.bats
 manage/test/services-hook.bats
 manage/test/gitops-gitlab.bats
+manage/test/go-layout.bats
 manage/test/chart-direct.bats
 manage/test/commun-helm.bash
 manage/test/shard.sh
@@ -168,3 +170,12 @@ manage/test/etat-json.bats
 manage/test/etat.bats
 manage/test/memoire.bats
 manage/test/password.bats
+cmd/devzone/main.go
+internal/bashbridge/bridge.go
+internal/bashbridge/bridge_test.go
+internal/bashbridge/locate.go
+internal/bashbridge/locate_test.go
+internal/command/registry.go
+internal/command/registry_test.go
+internal/command/run.go
+internal/command/run_test.go

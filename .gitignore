@@ -16,3 +16,5 @@ workspace/*
 # are committed
 charts/devzone-argocd/charts/
 charts/devzone-gitlab/charts/
+/bin/
+/dist/
