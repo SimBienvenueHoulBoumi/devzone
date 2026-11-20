@@ -1,0 +1,48 @@
+# Go checks of the migration to Go (#358, #710): go vet, gofmt, unit tests, a
+# cross build of ./cmd/devzone (linux, darwin, windows; amd64, arm64) and the
+# 250-line limit of the Go files (manage/scripts/check-go-layout.sh). The bash
+# entry point is checked by the bats job of fonctionnel.yml, not here.
+name: go
+
+on:
+  pull_request:
+  push:
+    branches: [develop, 'refactor/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: go-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  go:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version: '1.27'
+      - name: go vet
+        run: go vet ./...
+      - name: gofmt (a listed file fails the job)
+        run: |
+          unformatted="$(gofmt -l .)"
+          if [ -n "$unformatted" ]; then
+            echo "$unformatted"
+            exit 1
+          fi
+      - name: unit tests
+        run: go test ./... -count=1
+      - name: cross build of the binary
+        run: |
+          for goos in linux darwin windows; do
+            for goarch in amd64 arm64; do
+              GOOS="$goos" GOARCH="$goarch" go build -o "$RUNNER_TEMP/devzone-$goos-$goarch" ./cmd/devzone
+            done
+          done
+      - name: line limit of the Go files
+        run: bash manage/scripts/check-go-layout.sh
