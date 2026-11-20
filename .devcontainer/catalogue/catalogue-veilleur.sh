@@ -54,8 +54,8 @@ tour() {
     [ -f "$ETAT" ] || return 0
     # État restauré ou reconstruit : le veilleur ne suit pas un état douteux,
     # et ne désinstalle jamais tant que devzone apply ne l'a pas confirmé
-    etat_recouvrement_attente && return 0
-    etat_recouvrement_en_attente && return 0
+    state_recovery_wait && return 0
+    state_recovery_pending && return 0
     mkdir -p "$BASE"
     maintenant="$(stat -c %Y "$ETAT" 2>/dev/null || stat -f %m "$ETAT" 2>/dev/null || true)"
     [ -n "$maintenant" ] || return 0

@@ -28,7 +28,7 @@ GITLAB_SECRETS_DIR="$RACINE/workspace/.gitlab"
 
 # Vue regroupée des identifiants : un échec n'empêche jamais l'opération
 regenerer_identifiants() {
-    password_regenerer ||
+    password_regenerate ||
         echo "devzone : gitlab : identifiants regroupés non mis à jour (devzone passwords)" >&2
 }
 

@@ -6,8 +6,8 @@
 # Le chart enveloppe charts/devzone-gitlab (#538) porte les dépendances et les
 # valeurs ; chart.sh (helm direct) et argocd.sh (Application) l'installent.
 
-# Shared memory check of the services cluster (#608): quantite_ki,
-# memoire_cluster_ki and verifier_memoire_module.
+# Shared memory check of the services cluster (#608): quantity_ki,
+# memory_cluster_ki and check_module_memory.
 # shellcheck source=SCRIPTDIR/../memoire.sh
 # shellcheck disable=SC1091
 . "$ICI/../memoire.sh"
@@ -36,7 +36,7 @@ gitlab_namespace_preparer() {
 # l'accès (relais web/SSH, /etc/hosts) et le seed des données de test.
 gitlab_installer() {
     echo "▶ Vérification de la mémoire allouable du cluster des services…"
-    verifier_memoire_module gitlab 8 || return 2
+    check_module_memory gitlab 8 || return 2
 
     mkdir -p "$GITLAB_SECRETS_DIR"
     gitlab_namespace_preparer

@@ -73,9 +73,9 @@ cleanup() {
     rm -f "$kubeconfig"
     "$DEVZONE_CMD" "$service" relay-stop >/dev/null 2>&1 || true
     if [ -n "$cluster_before" ]; then
-        etat_ecrire cluster "$cluster_before" || true
+        state_write cluster "$cluster_before" || true
     else
-        etat_retirer cluster || true
+        state_remove cluster || true
     fi
 }
 trap cleanup EXIT
@@ -109,7 +109,7 @@ unset token ca_data
 export KUBECONFIG="$kubeconfig"
 export DEVZONE_KUBE_CONFIG="$kubeconfig"
 export DEVZONE_SERVICES_ADMIN=1
-etat_ecrire cluster "$ADMIN_CONTEXT" || refuse "cannot write the state: $ETAT"
+state_write cluster "$ADMIN_CONTEXT" || refuse "cannot write the state: $ETAT"
 echo "devzone services: $action $service in the cluster of the pod (temporary administrator)"
 case "$action" in
     # The seed is a module command: devzone gitlab seed (#538)

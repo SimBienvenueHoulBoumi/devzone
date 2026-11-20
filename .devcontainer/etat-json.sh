@@ -1,73 +1,73 @@
 #!/usr/bin/env bash
-# Sortie machine de devzone status (--json) : objet JSON stable et versionné.
-# Sourcé par devzone : réutilise ses fonctions (valeur, description, …), ne
-# réécrit pas etat(). Construit uniquement avec jq (échappement garanti).
+# Machine output of devzone status (--json): stable, versioned JSON object.
+# Sourced by devzone: reuses its functions (valeur, description, …), does not
+# rewrite etat(). Built only with jq. JSON keys are a contract: French names kept.
 
-# Ajoute une entrée à $erreurs : la rubrique qui a échoué et pourquoi.
-ajouter_erreur() {
-    erreurs="$(jq -c --arg k "$1" --arg v "$2" '. + {($k): $v}' <<<"$erreurs")"
+# Adds an entry to $errors: the section that failed and why.
+add_error() {
+    errors="$(jq -c --arg k "$1" --arg v "$2" '. + {($k): $v}' <<<"$errors")"
 }
 
-# Ajoute une alerte (code, message, commande devzone à lancer) à $alertes_json.
-append_alerte() {
-    local code="$1" message="$2" commande="${3:-}"
-    alertes_json="$(jq -c \
+# Adds an alert (code, message, devzone command to run) to $alerts_json.
+append_alert() {
+    local code="$1" message="$2" command="${3:-}"
+    alerts_json="$(jq -c \
         --arg code "$code" \
         --arg message "$message" \
-        --arg commande "$commande" \
-        '. + [{code:$code,message:$message,commande:(if $commande=="" then null else $commande end)}]' \
-        <<<"$alertes_json")"
+        --arg command "$command" \
+        '. + [{code:$code,message:$message,commande:(if $command=="" then null else $command end)}]' \
+        <<<"$alerts_json")"
 }
 
-# État complet du poste en JSON : reprend chaque rubrique de etat() avec les
-# mêmes commandes, en isolant chaque calcul (échec → valeur null et erreurs).
-etat_json() {
-    local erreurs='{}'
-    local alertes_json='[]'
+# Full state of the machine in JSON: repeats each section of etat() with the
+# same commands, isolating each computation (failure → null value and errors).
+state_json() {
+    local errors='{}'
+    local alerts_json='[]'
     local dv_raw="" dvp_raw=""
-    local id_nom="" id_email="" id_ok=false id_commande=""
-    local plat_nom plat_url="" github_json="null"
-    local outils_retards_json='[]' outils_commande=""
-    local modules_json='[]' m actif desc ef content etat_val echec_val commande_val s argocd_repo=""
-    local docker_hote=false docker_hote_actif=false relais_source
-    local services_cluster="" services_distant=false
-    local travail_ctx="" travail_interne=false ctx_hote=""
-    local clusters_services_raw="" clusters_travail_raw="" clusters_commande=""
+    local id_name="" id_email="" id_ok=false id_command=""
+    local platform_name platform_url="" github_json="null"
+    local tools_late_json='[]' tools_command=""
+    local modules_json='[]' m active desc failure_file content state_value failure_value command_value out argocd_repo=""
+    local docker_host=false docker_host_active=false relay_source
+    local services_cluster="" services_remote=false
+    local work_ctx="" work_internal=false host_ctx=""
+    local clusters_services_raw="" clusters_work_raw="" clusters_command=""
     local ports_json='[]' ports_out
     local applications_json='[]'
-    local identifiants_raw=""
-    local retards_out paquet figee installee count
-    local relais_marque paquets_marque paquets_noms n chemin wt_out
-    local gh_statut gh_code
+    local credentials_raw=""
+    local late_out package frozen installed count
+    local relay_marker packages_marker packages_names n path wt_out
+    local gh_status gh_code
 
     if v="$(version_du_dossier 2>/dev/null)"; then
         dv_raw="$v"
     else
-        ajouter_erreur devzone "version_du_dossier indisponible"
+        add_error devzone "version_du_dossier unavailable"
     fi
     dvp_raw="$(version_publiee 2>/dev/null || true)"
 
-    id_nom="$(git config --get user.name 2>/dev/null || true)"
+    id_name="$(git config --get user.name 2>/dev/null || true)"
     id_email="$(git config --get user.email 2>/dev/null || true)"
-    if [ -n "$id_nom" ] && [ -n "$id_email" ]; then
+    if [ -n "$id_name" ] && [ -n "$id_email" ]; then
         id_ok=true
     else
-        id_commande='gh auth login -s workflow (automatique), ou git config --file ~/.config/git/config user.name "<nom>" et user.email "<email>"'
+        id_command='gh auth login -s workflow (automatic), or git config --file ~/.config/git/config user.name "<name>" and user.email "<email>"'
     fi
 
-    plat_nom="$(plateforme_lue)"
-    if [ "$plat_nom" = gitlab ]; then
-        plat_url="$(url_gitlab_lue)"
+    platform_name="$(plateforme_lue)"
+    if [ "$platform_name" = gitlab ]; then
+        platform_url="$(url_gitlab_lue)"
     else
-        plat_url=""
+        platform_url=""
     fi
-    if [ "$plat_nom" = github ]; then
-        gh_statut="$(gh auth status 2>&1)" && gh_code=0 || gh_code=$?
+    if [ "$platform_name" = github ]; then
+        gh_status="$(gh auth status 2>&1)" && gh_code=0 || gh_code=$?
         if [ "$gh_code" -ne 0 ]; then
             github_json="null"
-            ajouter_erreur github "gh auth status a échoué"
+            add_error github "gh auth status failed"
         else
-            if printf '%s\n' "$gh_statut" | grep -q "Token scopes:" && ! printf '%s\n' "$gh_statut" | grep -q "'workflow'"; then
+            if printf '%s\n' "$gh_status" | grep -q "Token scopes:" && ! printf '%s\n' "$gh_status" | grep -q "'workflow'"; then
                 github_json="$(jq -cn '{connecte:true,workflow:false,commande:"gh auth refresh -h github.com -s workflow"}')"
             else
                 github_json="$(jq -cn '{connecte:true,workflow:true,commande:null}')"
@@ -77,134 +77,134 @@ etat_json() {
         github_json="null"
     fi
 
-    if retards_out="$(outils_retard 2>/dev/null)"; then
-        outils_retards_json='[]'
-        while IFS= read -r ligne; do
-            [ -n "$ligne" ] || continue
+    if late_out="$(outils_retard 2>/dev/null)"; then
+        tools_late_json='[]'
+        while IFS= read -r line; do
+            [ -n "$line" ] || continue
             # shellcheck disable=SC2086
-            set -- $ligne
-            paquet="${1:-}"; figee="${2:-}"; installee="${3:-}"
-            [ -n "$paquet" ] || continue
-            outils_retards_json="$(jq -c \
-                --arg p "$paquet" --arg f "$figee" --arg i "$installee" \
-                '. + [{paquet:$p,figee:$f,installee:$i}]' <<<"$outils_retards_json")"
-        done <<<"$retards_out"
-        count="$(jq 'length' <<<"$outils_retards_json" 2>/dev/null || echo 0)"
+            set -- $line
+            package="${1:-}"; frozen="${2:-}"; installed="${3:-}"
+            [ -n "$package" ] || continue
+            tools_late_json="$(jq -c \
+                --arg p "$package" --arg f "$frozen" --arg i "$installed" \
+                '. + [{paquet:$p,figee:$f,installee:$i}]' <<<"$tools_late_json")"
+        done <<<"$late_out"
+        count="$(jq 'length' <<<"$tools_late_json" 2>/dev/null || echo 0)"
         if [ "$count" -gt 0 ]; then
-            outils_commande="devzone apply"
+            tools_command="devzone apply"
         fi
     else
-        outils_retards_json="null"
-        ajouter_erreur outils "outils_retard indisponible"
+        tools_late_json="null"
+        add_error outils "outils_retard unavailable"
     fi
 
     modules_json='[]'
     for m in "${MODULES[@]}"; do
-        actif=false
-        [ "$(valeur "$m")" = on ] && actif=true
+        active=false
+        [ "$(valeur "$m")" = on ] && active=true
         desc="$(description "$m")"
-        echec_val=""
-        etat_val=""
-        commande_val=""
+        failure_value=""
+        state_value=""
+        command_value=""
         if dans_pod && service_module "$m"; then
             # Kubernetes workspace pod (#528): presence by the cluster DNS,
             # installation from the workstation; no failure marker read here
             if service_present "$m"; then
-                etat_val="active: $(service_dns "$m")"
-            elif [ "$actif" = true ]; then
-                etat_val="not in the cluster"
-                commande_val="devzone workspace services enable $m"
+                state_value="active: $(service_dns "$m")"
+            elif [ "$active" = true ]; then
+                state_value="not in the cluster"
+                command_value="devzone workspace services enable $m"
             else
-                etat_val="facultatif"
-                commande_val="devzone workspace services enable $m"
+                state_value="optional"
+                command_value="devzone workspace services enable $m"
             fi
-        elif [ "$actif" = true ]; then
-            ef="$(fichier_echec "$m")"
-            if [ -f "$ef" ]; then
-                content="$(cat "$ef" 2>/dev/null || true)"
-                echec_val="$content"
-                etat_val="en échec"
-                commande_val="devzone apply"
+        elif [ "$active" = true ]; then
+            failure_file="$(fichier_echec "$m")"
+            if [ -f "$failure_file" ]; then
+                content="$(cat "$failure_file" 2>/dev/null || true)"
+                failure_value="$content"
+                state_value="failed"
+                command_value="devzone apply"
             elif [ "$m" = gitlab ]; then
-                if s="$(bash "$ICI/gitlab/gitlab.sh" status 2>/dev/null)"; then
-                    etat_val="$s"
+                if out="$(bash "$ICI/gitlab/gitlab.sh" status 2>/dev/null)"; then
+                    state_value="$out"
                 else
-                    etat_val=""
-                    ajouter_erreur modules "gitlab.sh status indisponible"
+                    state_value=""
+                    add_error modules "gitlab.sh status unavailable"
                 fi
             elif [ "$m" = postgres ] || [ "$m" = llm ]; then
-                if s="$(bash "$ICI/$m/$m.sh" status 2>/dev/null)"; then
-                    etat_val="$s"
+                if out="$(bash "$ICI/$m/$m.sh" status 2>/dev/null)"; then
+                    state_value="$out"
                 else
-                    etat_val=""
-                    ajouter_erreur modules "$m.sh etat indisponible"
+                    state_value=""
+                    add_error modules "$m.sh state unavailable"
                 fi
             elif [ "$m" = argocd ]; then
-                if s="$(bash "$ICI/argocd/argocd.sh" status 2>/dev/null)"; then
-                    etat_val="$s"
+                if out="$(bash "$ICI/argocd/argocd.sh" status 2>/dev/null)"; then
+                    state_value="$out"
                 else
-                    etat_val=""
-                    ajouter_erreur modules "argocd.sh status indisponible"
+                    state_value=""
+                    add_error modules "argocd.sh status unavailable"
                 fi
             elif [ "$m" = mysql ]; then
-                if s="$(bash "$ICI/catalogue/mysql/mysql.sh" status 2>/dev/null)"; then
-                    etat_val="$s"
+                if out="$(bash "$ICI/catalogue/mysql/mysql.sh" status 2>/dev/null)"; then
+                    state_value="$out"
                 else
-                    etat_val=""
-                    ajouter_erreur modules "mysql.sh status indisponible"
+                    state_value=""
+                    add_error modules "mysql.sh status unavailable"
                 fi
             else
-                etat_val="actif"
+                state_value="active"
             fi
         else
-            etat_val="facultatif"
-            commande_val="devzone enable $m"
+            state_value="optional"
+            command_value="devzone enable $m"
         fi
         modules_json="$(jq -c \
-            --arg nom "$m" \
-            --argjson actif "$actif" \
+            --arg name "$m" \
+            --argjson active "$active" \
             --arg description "$desc" \
-            --arg etat "$etat_val" \
-            --arg echec "$echec_val" \
-            --arg commande "$commande_val" \
-            '. + [{nom:$nom,actif:$actif,description:$description,etat:(if $etat=="" then null else $etat end),echec:(if $echec=="" then null else $echec end),commande:(if $commande=="" then null else $commande end)}]' \
+            --arg state "$state_value" \
+            --arg failure "$failure_value" \
+            --arg command "$command_value" \
+            '. + [{nom:$name,actif:$active,description:$description,etat:(if $state=="" then null else $state end),echec:(if $failure=="" then null else $failure end),commande:(if $command=="" then null else $command end)}]' \
             <<<"$modules_json")"
     done
 
-    # Option docker-hote (#432) : absente = on ; socket réellement monté
-    # (même source que docker-relais.sh), peut différer jusqu'au make rebuild
+    # docker-hote option (#432): absent = on; socket really mounted (same
+    # source as docker-relais.sh), may differ until make rebuild
     # In the Kubernetes workspace (DEVZONE_WORKSPACE=kubernetes), the pod has
     # no Docker host socket: the socket is absent (#515)
     if [ "${DEVZONE_WORKSPACE:-}" = kubernetes ]; then
-        docker_hote=false
-        docker_hote_actif=false
+        docker_host=false
+        docker_host_active=false
     else
         if [ "$(valeur docker-hote)" = on ]; then
-            docker_hote=true
+            docker_host=true
         fi
-        relais_source="${DEVZONE_RELAIS_SOURCE:-/var/run/docker-host.sock}"
-        if [ -e "$relais_source" ]; then
-            docker_hote_actif=true
+        relay_source="${DEVZONE_RELAIS_SOURCE:-/var/run/docker-host.sock}"
+        if [ -e "$relay_source" ]; then
+            docker_host_active=true
         fi
     fi
 
     services_cluster="$(cluster_lu)"
     if [ -n "$services_cluster" ] && ! cluster_est_local "$services_cluster"; then
-        services_distant=true
+        services_remote=true
     fi
     clusters_services_raw="$services_cluster"
-    travail_ctx="$(kubectl config current-context 2>/dev/null || true)"
-    case "$travail_ctx" in
+    work_ctx="$(kubectl config current-context 2>/dev/null || true)"
+    case "$work_ctx" in
         kind-gitlab* | kind-devzone*)
-            ctx_hote="$(KUBECONFIG="${DEVZONE_KUBE_HOTE:-$HOME/.kube/hote.config}" kubectl config current-context 2>/dev/null || true)"
-            if [ -n "$ctx_hote" ] && cluster_joignable "$ctx_hote" 2>/dev/null; then
-                travail_interne=true
+            host_ctx="$(KUBECONFIG="${DEVZONE_KUBE_HOTE:-$HOME/.kube/hote.config}" kubectl config current-context 2>/dev/null || true)"
+            if [ -n "$host_ctx" ] && cluster_joignable "$host_ctx" 2>/dev/null; then
+                work_internal=true
             fi
             ;;
     esac
-    clusters_travail_raw="$travail_ctx"
-    if [ "$travail_interne" = true ]; then
-        clusters_commande="devzone use $ctx_hote"
+    clusters_work_raw="$work_ctx"
+    if [ "$work_internal" = true ]; then
+        clusters_command="devzone use $host_ctx"
     fi
 
     if ports_out="$(bash "$ICI/ports.sh" list --json 2>/dev/null)"; then
@@ -212,47 +212,47 @@ etat_json() {
             ports_json="$ports_out"
         else
             ports_json="null"
-            ajouter_erreur ports "sortie ports illisible"
+            add_error ports "ports output unreadable"
         fi
     else
         ports_json="null"
-        ajouter_erreur ports "ports.sh indisponible"
+        add_error ports "ports.sh unavailable"
     fi
 
     applications_json="$(bash "$ICI/catalogue.sh" json 2>/dev/null || echo '[]')"
     if ! printf '%s' "$applications_json" | jq -e . >/dev/null 2>&1; then
         applications_json='[]'
-        ajouter_erreur modules "catalogue.sh json indisponible"
+        add_error modules "catalogue.sh json unavailable"
     fi
 
     if [ -f "$RACINE/.password" ]; then
-        identifiants_raw="$RACINE/.password"
+        credentials_raw="$RACINE/.password"
     fi
 
-    relais_marque="${DEVZONE_RELAIS_MARQUE:-/tmp/devzone-relais-docker.echec}"
-    if [ -f "$relais_marque" ]; then
-        msg="$(head -1 "$relais_marque" 2>/dev/null || true)"
-        append_alerte relais_docker "$msg" "devzone repair"
+    relay_marker="${DEVZONE_RELAIS_MARQUE:-/tmp/devzone-relais-docker.echec}"
+    if [ -f "$relay_marker" ]; then
+        msg="$(head -1 "$relay_marker" 2>/dev/null || true)"
+        append_alert relais_docker "$msg" "devzone repair"
     fi
-    paquets_marque="${DEVZONE_PAQUETS_MARQUE:-/tmp/devzone-paquets.echec}"
-    if [ -f "$paquets_marque" ]; then
-        paquets_noms=""
+    packages_marker="${DEVZONE_PAQUETS_MARQUE:-/tmp/devzone-paquets.echec}"
+    if [ -f "$packages_marker" ]; then
+        packages_names=""
         while IFS= read -r n; do
             [ -n "$n" ] || continue
-            paquets_noms="${paquets_noms:+$paquets_noms, }$n"
-        done < "$paquets_marque"
-        append_alerte paquets "$paquets_noms" "devzone packages"
+            packages_names="${packages_names:+$packages_names, }$n"
+        done < "$packages_marker"
+        append_alert paquets "$packages_names" "devzone packages"
     fi
     wt_out="$(worktrees_absents 2>/dev/null || true)"
-    while IFS= read -r chemin; do
-        [ -n "$chemin" ] || continue
-        append_alerte worktree "$chemin absent ici (créé hors du conteneur ?)" ""
+    while IFS= read -r path; do
+        [ -n "$path" ] || continue
+        append_alert worktree "$path missing here (created outside the container?)" ""
     done <<<"$wt_out"
     if [ -n "$services_cluster" ] && ! cluster_est_local "$services_cluster"; then
-        append_alerte cluster_distant "cluster distant : $services_cluster — services sur un cluster distant" ""
+        append_alert cluster_distant "remote cluster: $services_cluster — services on a remote cluster" ""
     fi
-    if [ "$travail_interne" = true ]; then
-        append_alerte cluster_interne "cluster de travail : $travail_ctx (cluster interne de devzone)" "devzone use $ctx_hote"
+    if [ "$work_internal" = true ]; then
+        append_alert cluster_interne "work cluster: $work_ctx (devzone internal cluster)" "devzone use $host_ctx"
     fi
 
     argocd_repo="$(conf_get argocd repo)"
@@ -262,47 +262,47 @@ etat_json() {
         --arg dv "$dv_raw" \
         --arg dvp "$dvp_raw" \
         --argjson id_ok "$id_ok" \
-        --arg id_nom "$id_nom" \
+        --arg id_name "$id_name" \
         --arg id_email "$id_email" \
-        --arg id_commande "$id_commande" \
-        --arg plat_nom "$plat_nom" \
-        --arg plat_url "$plat_url" \
+        --arg id_command "$id_command" \
+        --arg platform_name "$platform_name" \
+        --arg platform_url "$platform_url" \
         --argjson github "$github_json" \
-        --argjson retards "$outils_retards_json" \
-        --arg outils_commande "$outils_commande" \
+        --argjson tools_late "$tools_late_json" \
+        --arg tools_command "$tools_command" \
         --argjson modules "$modules_json" \
         --arg argocd_repo "$argocd_repo" \
-        --argjson docker_hote "$docker_hote" \
-        --argjson docker_hote_actif "$docker_hote_actif" \
+        --argjson docker_host "$docker_host" \
+        --argjson docker_host_active "$docker_host_active" \
         --arg clusters_services "$clusters_services_raw" \
-        --argjson services_distant "$services_distant" \
-        --arg clusters_travail "$clusters_travail_raw" \
-        --argjson travail_interne "$travail_interne" \
-        --arg clusters_commande "$clusters_commande" \
+        --argjson services_remote "$services_remote" \
+        --arg clusters_work "$clusters_work_raw" \
+        --argjson work_internal "$work_internal" \
+        --arg clusters_command "$clusters_command" \
         --argjson ports "$ports_json" \
         --argjson applications "$applications_json" \
-        --arg identifiants "$identifiants_raw" \
-        --argjson alertes "$alertes_json" \
-        --argjson erreurs "$erreurs" \
+        --arg credentials "$credentials_raw" \
+        --argjson alerts "$alerts_json" \
+        --argjson errors "$errors" \
         '{
             schema: $schema,
             devzone: { version: (if $dv=="" then null else $dv end), disponible: (if $dvp=="" then null else $dvp end) },
-            identite_git: { ok: $id_ok, nom: (if $id_nom=="" then null else $id_nom end), email: (if $id_email=="" then null else $id_email end), commande: (if $id_commande=="" then null else $id_commande end) },
-            plateforme: { nom: $plat_nom, url: (if $plat_url=="" then null else $plat_url end), github: $github },
+            identite_git: { ok: $id_ok, nom: (if $id_name=="" then null else $id_name end), email: (if $id_email=="" then null else $id_email end), commande: (if $id_command=="" then null else $id_command end) },
+            plateforme: { nom: $platform_name, url: (if $platform_url=="" then null else $platform_url end), github: $github },
             argocd_repo: (if $argocd_repo == "" then null else $argocd_repo end),
-            outils: { retards: $retards, commande: (if $outils_commande=="" then null else $outils_commande end) },
+            outils: { retards: $tools_late, commande: (if $tools_command=="" then null else $tools_command end) },
             modules: $modules,
-            docker_hote: $docker_hote,
-            docker_hote_actif: $docker_hote_actif,
-            clusters: { services: (if $clusters_services=="" then null else $clusters_services end), services_distant: $services_distant, travail: (if $clusters_travail=="" then null else $clusters_travail end), travail_interne: $travail_interne, commande: (if $clusters_commande=="" then null else $clusters_commande end) },
+            docker_hote: $docker_host,
+            docker_hote_actif: $docker_host_active,
+            clusters: { services: (if $clusters_services=="" then null else $clusters_services end), services_distant: $services_remote, travail: (if $clusters_work=="" then null else $clusters_work end), travail_interne: $work_internal, commande: (if $clusters_command=="" then null else $clusters_command end) },
             ports: $ports,
             applications: (if $applications=="" then null else $applications end),
-            identifiants: (if $identifiants=="" then null else $identifiants end),
-            alertes: $alertes,
-            erreurs: $erreurs
+            identifiants: (if $credentials=="" then null else $credentials end),
+            alertes: $alerts,
+            erreurs: $errors
         }'
 }
 
 if [ "${BASH_SOURCE[0]}" = "$0" ]; then
-    etat_json
+    state_json
 fi

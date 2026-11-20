@@ -226,7 +226,7 @@ devzone passwords          # régénère le fichier et affiche seulement son che
 
 - **Format** : en-tête en commentaire, puis une ligne par compte, colonnes séparées par des tabulations : `service`, `adresse`, `utilisateur`, `mot de passe`. Tri stable par service puis utilisateur ; aucune ligne vide.
 - **Source** : les fichiers des modules restent la référence (`workspace/.gitlab/root-password`, `workspace/.gitlab/dev-password`, `workspace/.postgres/admin-password`, `workspace/.postgres/<projet>.env`, `workspace/.argocd/admin.env`). `.password` est une vue régénérée, jamais une seconde copie à tenir à jour.
-- **Mise à jour** : `password_regenerer` (`.devcontainer/password.sh`) est appelée à la fin de chaque création, suppression ou changement de compte : installation, `create`, `delete` et `--new-password` de postgres ; seed et désinstallation de gitlab ; installation et désinstallation d'argocd ; démarrage de devzone. Un échec n'empêche jamais l'opération, il affiche un avertissement.
+- **Mise à jour** : `password_regenerate` (`.devcontainer/password.sh`) est appelée à la fin de chaque création, suppression ou changement de compte : installation, `create`, `delete` et `--new-password` de postgres ; seed et désinstallation de gitlab ; installation et désinstallation d'argocd ; démarrage de devzone. Un échec n'empêche jamais l'opération, il affiche un avertissement.
 - **Protection** : fichier ignoré par git (`.gitignore`) et droits **600** posés avant l'écriture (`umask 077`, fichier temporaire dans le même dossier puis `mv`). Aucune commande ne lit ni n'affiche son contenu ; le récapitulatif et `devzone passwords` citent seulement le chemin. Sans aucun compte, le fichier est supprimé.
 
 

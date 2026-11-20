@@ -103,7 +103,7 @@ connu() {
 # ancien état global repris, copie de secours restaurée, état reconstruit
 # depuis le cluster des services, sinon première installation
 initialiser() {
-    etat_initialiser "${MODULES[@]}"
+    state_init "${MODULES[@]}"
 }
 
 valeur() {
@@ -122,24 +122,24 @@ valeur() {
 # Verrou tenu de l'initialisation à l'écriture (#417) : l'état n'est jamais
 # recréé à vide entre les deux
 ecrire() {
-    etat_verrou_prendre || return 1
-    if ! initialiser || ! etat_ecrire "$1" "$2"; then
-        etat_verrou_lacher
+    state_lock_take || return 1
+    if ! initialiser || ! state_write "$1" "$2"; then
+        state_lock_release
         return 1
     fi
-    etat_verrou_lacher
+    state_lock_release
     return 0
 }
 
 # Retire une clé du fichier d'état : la configuration d'un service n'existe
 # que pendant qu'il est choisi (#242)
 retirer_cle() {
-    etat_verrou_prendre || return 1
-    if ! initialiser || ! etat_retirer "$1"; then
-        etat_verrou_lacher
+    state_lock_take || return 1
+    if ! initialiser || ! state_remove "$1"; then
+        state_lock_release
         return 1
     fi
-    etat_verrou_lacher
+    state_lock_release
     return 0
 }
 
@@ -1454,7 +1454,7 @@ llm_retire_msg() {
 migrer_llm() {
     [ -f "$ETAT" ] || return 0
     grep -qE '^llm=' "$ETAT" 2>/dev/null || return 0
-    etat_retirer llm
+    state_remove llm
     llm_retire_msg
 }
 
@@ -1468,7 +1468,7 @@ changer() {
     if [ "$m" = llm ]; then
         initialiser 2>/dev/null || true
         if [ -f "$ETAT" ] && grep -qE '^llm=' "$ETAT" 2>/dev/null; then
-            etat_retirer llm
+            state_remove llm
         fi
         llm_retire_msg
         return 1
@@ -1530,14 +1530,14 @@ if command -v reject_renamed >/dev/null 2>&1; then
 fi
 
 case "${1:-}" in
-    "" | status | modules) if [ "${2:-}" = "--json" ]; then etat_json; else etat; fi ;;
+    "" | status | modules) if [ "${2:-}" = "--json" ]; then state_json; else etat; fi ;;
     enable) changer on "${2:-}" "${@:3}" ;;
     disable) changer off "${2:-}" "${@:3}" ;;
     apply)
         migrer_llm
         # L'utilisateur confirme l'état courant (#417, étape 4) : les
         # veilleurs peuvent de nouveau désinstaller
-        etat_recouvrement_confirmer
+        state_recovery_confirm
         appliquer_repowarden
         [ "$(valeur ia)" = off ] || appliquer_ia on
         # gitlab, postgres, argocd: installed from the workstation in the

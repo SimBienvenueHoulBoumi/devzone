@@ -1,169 +1,168 @@
 #!/usr/bin/env bash
-# Écriture sûre de l'état des modules (#417) : le seul endroit qui pose,
-# remplace ou retire une ligne de $ETAT. Un verrou mkdir empêche deux
-# écritures simultanées, le temporaire est créé dans le dossier de l'état
-# (le mv reste atomique : le fichier n'est jamais absent ni incomplet pour
-# un lecteur) et une copie de secours $ETAT.prec précède chaque
-# remplacement. Le même fichier crée l'état quand il manque : ancien état
-# global repris une fois, copie de secours restaurée, état reconstruit
-# depuis le cluster des services, sinon première installation.
-# Bibliothèque sourcée : l'appelant définit ETAT.
-#   etat_ecrire <clé> <valeur>    pose ou remplace la ligne <clé>=<valeur>
-#   etat_retirer <clé>            retire la ligne <clé>=
-#   etat_poser <fichier>          remplace tout l'état par ce fichier
-#   etat_verrou_prendre / etat_verrou_lacher    verrou d'écriture
-#   etat_recouvrement_*           état restauré ou reconstruit (étape 4)
-#   etat_initialiser [modules…]   crée l'état s'il manque
+# Safe write of the module state (#417): the only place that sets, replaces
+# or removes a line of $ETAT. A mkdir lock prevents two simultaneous writes,
+# the temporary file is created in the state folder (the mv stays atomic: the
+# file is never missing or incomplete for a reader) and a backup copy
+# $ETAT.prec precedes each replacement. The same file creates the state when
+# it is missing: former global state taken over once, backup copy restored,
+# state rebuilt from the services cluster, otherwise first installation.
+# Sourced library: the caller defines ETAT (file name kept: shared by callers).
+#   state_write <key> <value>     sets or replaces the line <key>=<value>
+#   state_remove <key>            removes the line <key>=
+#   state_replace <file>          replaces the whole state with this file
+#   state_lock_take / state_lock_release    write lock
+#   state_recovery_*              state restored or rebuilt (step 4)
+#   state_init [modules…]         creates the state if it is missing
 
-# Verrou d'écriture (#476) : etat_verrou_prendre, etat_verrou_lacher
+# Write lock (#476): state_lock_take, state_lock_release
 # shellcheck source=SCRIPTDIR/etat-verrou.sh
 # shellcheck disable=SC1091
 . "$(dirname "${BASH_SOURCE[0]}")/etat-verrou.sh"
 
-# Abandon sous verrou : le temporaire part, le verrou est lâché
-etat_echec() {
+# Abort under lock: the temporary file goes, the lock is released
+state_abort() {
     rm -f "${1:-}"
-    etat_verrou_lacher
+    state_lock_release
     return 1
 }
 
-# Copie de secours de l'état courant, avant remplacement
-etat_sauvegarder() {
+# Backup copy of the current state, before replacement
+state_backup() {
     [ -f "$ETAT" ] || return 0
     cp "$ETAT" "${ETAT}.prec"
 }
 
-# L'état sans la ligne $1, écrit dans le fichier temporaire $2
-etat_filtrer() {
-    local cle="$1" dst="$2" code=0
+# The state without the line $1, written to the temporary file $2
+state_filter() {
+    local key="$1" dst="$2" code=0
     [ -f "$ETAT" ] || return 0
-    grep -vE "^${cle}=" "$ETAT" >"$dst" || code=$?
+    grep -vE "^${key}=" "$ETAT" >"$dst" || code=$?
     [ "$code" -le 1 ] || return 1
     return 0
 }
 
-# Sous verrou : remplace tout l'état par un fichier, $ETAT.prec sauvegardé
-etat_poser() {
+# Under lock: replaces the whole state with a file, $ETAT.prec backed up
+state_replace() {
     local src="$1" tmp
     [ -f "$src" ] || return 1
-    etat_verrou_prendre || return 1
-    etat_sauvegarder || { etat_verrou_lacher; return 1; }
-    tmp="$(mktemp "${ETAT}.XXXXXX")" || { etat_verrou_lacher; return 1; }
-    cat "$src" >"$tmp" || { etat_echec "$tmp"; return 1; }
-    mv "$tmp" "$ETAT" || { etat_echec "$tmp"; return 1; }
-    etat_verrou_lacher
+    state_lock_take || return 1
+    state_backup || { state_lock_release; return 1; }
+    tmp="$(mktemp "${ETAT}.XXXXXX")" || { state_lock_release; return 1; }
+    cat "$src" >"$tmp" || { state_abort "$tmp"; return 1; }
+    mv "$tmp" "$ETAT" || { state_abort "$tmp"; return 1; }
+    state_lock_release
     return 0
 }
 
-# Sous verrou : nouvelle valeur d'une clé, sans perdre les autres lignes
-etat_ecrire() {
-    local cle="$1" valeur="$2" tmp
-    etat_verrou_prendre || return 1
-    etat_sauvegarder || { etat_verrou_lacher; return 1; }
-    tmp="$(mktemp "${ETAT}.XXXXXX")" || { etat_verrou_lacher; return 1; }
-    etat_filtrer "$cle" "$tmp" || { etat_echec "$tmp"; return 1; }
-    printf '%s=%s\n' "$cle" "$valeur" >>"$tmp" || { etat_echec "$tmp"; return 1; }
-    mv "$tmp" "$ETAT" || { etat_echec "$tmp"; return 1; }
-    etat_verrou_lacher
+# Under lock: new value of a key, without losing the other lines
+state_write() {
+    local key="$1" value="$2" tmp
+    state_lock_take || return 1
+    state_backup || { state_lock_release; return 1; }
+    tmp="$(mktemp "${ETAT}.XXXXXX")" || { state_lock_release; return 1; }
+    state_filter "$key" "$tmp" || { state_abort "$tmp"; return 1; }
+    printf '%s=%s\n' "$key" "$value" >>"$tmp" || { state_abort "$tmp"; return 1; }
+    mv "$tmp" "$ETAT" || { state_abort "$tmp"; return 1; }
+    state_lock_release
     return 0
 }
 
-# Sous verrou : retire une clé (#417) ; sans état, rien à retirer
-etat_retirer() {
-    local cle="$1" tmp
-    etat_verrou_prendre || return 1
-    [ -f "$ETAT" ] || { etat_verrou_lacher; return 0; }
-    etat_sauvegarder || { etat_verrou_lacher; return 1; }
-    tmp="$(mktemp "${ETAT}.XXXXXX")" || { etat_verrou_lacher; return 1; }
-    etat_filtrer "$cle" "$tmp" || { etat_echec "$tmp"; return 1; }
-    mv "$tmp" "$ETAT" || { etat_echec "$tmp"; return 1; }
-    etat_verrou_lacher
+# Under lock: removes a key (#417); without state, nothing to remove
+state_remove() {
+    local key="$1" tmp
+    state_lock_take || return 1
+    [ -f "$ETAT" ] || { state_lock_release; return 0; }
+    state_backup || { state_lock_release; return 1; }
+    tmp="$(mktemp "${ETAT}.XXXXXX")" || { state_lock_release; return 1; }
+    state_filter "$key" "$tmp" || { state_abort "$tmp"; return 1; }
+    mv "$tmp" "$ETAT" || { state_abort "$tmp"; return 1; }
+    state_lock_release
     return 0
 }
 
-# Signale un état restauré ou reconstruit : les veilleurs attendent (#417)
-etat_recouvrement_marquer() {
+# Marks a restored or rebuilt state: the watchers wait (#417)
+state_recovery_mark() {
     date +%s >"${ETAT}.recouvre" 2>/dev/null || true
 }
 
-# 0 (à attendre) moins de 60 s après une restauration ou une reconstruction
-etat_recouvrement_attente() {
-    local marque
+# 0 (to wait) less than 60 s after a restore or a rebuild
+state_recovery_wait() {
+    local mark
     [ -f "${ETAT}.recouvre" ] || return 1
-    marque="$(cat "${ETAT}.recouvre" 2>/dev/null || true)"
-    case "$marque" in
+    mark="$(cat "${ETAT}.recouvre" 2>/dev/null || true)"
+    case "$mark" in
         '' | *[!0-9]*) return 1 ;;
     esac
-    [ "$(( $(date +%s) - marque ))" -lt 60 ]
+    [ "$(( $(date +%s) - mark ))" -lt 60 ]
 }
 
-# 0 si l'état restauré ou reconstruit n'est pas encore confirmé (#417)
-etat_recouvrement_en_attente() {
+# 0 if the restored or rebuilt state is not yet confirmed (#417)
+state_recovery_pending() {
     [ -f "${ETAT}.recouvre" ]
 }
 
-# L'utilisateur a confirmé l'état (devzone apply) : plus de garde
-etat_recouvrement_confirmer() {
+# The user confirmed the state (devzone apply): no more guard
+state_recovery_confirm() {
     rm -f "${ETAT}.recouvre" 2>/dev/null || true
     return 0
 }
 
-# Première installation (#417) : l'état par défaut, écrit d'un bloc
-etat_defaut() {
+# First installation (#417): the default state, written in one go
+state_default() {
     local stage code=0
     stage="$(mktemp)" || return 1
     printf 'ia=off\nkubernetes=off\ngitlab=off\n' >"$stage"
-    etat_poser "$stage" || code=$?
+    state_replace "$stage" || code=$?
     rm -f "$stage"
     return "$code"
 }
 
-# Contexte de l'hôte (KUBECONFIG de l'hôte) qui pointe sur le cluster donné :
-# le cluster= de l'état attend ce contexte, pas « devzone » (cluster des services)
-contexte_hote_du_cluster() {
-    local cluster="$1" hote ctx
-    hote="${DEVZONE_KUBE_HOTE:-$HOME/.kube/hote.config}"
+# Host context (host KUBECONFIG) that points to the given cluster: the
+# cluster= line of the state expects this context, not "devzone" (services cluster)
+host_context_of_cluster() {
+    local cluster="$1" host ctx
+    host="${DEVZONE_KUBE_HOTE:-$HOME/.kube/hote.config}"
     while IFS= read -r ctx; do
         [ -n "$ctx" ] || continue
-        # Le contexte « devzone » est posé sur le cluster des services : on
-        # cherche le contexte de l'hôte qui y pointe
+        # The "devzone" context is set on the services cluster: we look for the
+        # host context that points to it
         [ "$ctx" = devzone ] && continue
-        if [ "$(KUBECONFIG="$hote" kubectl config view -o jsonpath="{.contexts[?(@.name=\"$ctx\")].context.cluster}" 2>/dev/null || true)" = "$cluster" ]; then
+        if [ "$(KUBECONFIG="$host" kubectl config view -o jsonpath="{.contexts[?(@.name==\"$ctx\")].context.cluster}" 2>/dev/null || true)" = "$cluster" ]; then
             echo "$ctx"
             return 0
         fi
-    done < <(KUBECONFIG="$hote" kubectl config get-contexts -o name 2>/dev/null)
+    done < <(KUBECONFIG="$host" kubectl config get-contexts -o name 2>/dev/null)
     return 1
 }
 
-# État absent sans copie de secours (#417, étape 3) : reconstruit depuis les
-# namespaces étiquetés devzone du cluster des services (module à on si son
-# namespace existe, cluster= du contexte devzone) ; rend 1 sinon.
-etat_reconstruire() {
-    local nss m v stage vu=0 code=0 cluster_ctx cluster_hote etiquette
-    etiquette="${CLUSTER_ETIQUETTE:-app.kubernetes.io/managed-by=devzone}"
+# State missing without backup copy (#417, step 3): rebuilt from the namespaces
+# labelled devzone of the services cluster (module on if its namespace exists,
+# cluster= of the devzone context); returns 1 otherwise.
+state_rebuild() {
+    local namespaces m v stage seen=0 code=0 cluster_ctx cluster_host label
+    label="${CLUSTER_ETIQUETTE:-app.kubernetes.io/managed-by=devzone}"
     command -v kubectl >/dev/null 2>&1 || return 1
-    nss="$(kubectl get namespaces -l "$etiquette" -o name 2>/dev/null || true)"
-    [ -n "$nss" ] || return 1
+    namespaces="$(kubectl get namespaces -l "$label" -o name 2>/dev/null || true)"
+    [ -n "$namespaces" ] || return 1
     stage="$(mktemp)" || return 1
     for m in "$@"; do
         v=off
-        printf '%s\n' "$nss" | grep -qx "namespace/devzone-$m" && { v=on; vu=1; }
+        printf '%s\n' "$namespaces" | grep -qx "namespace/devzone-$m" && { v=on; seen=1; }
         printf '%s=%s\n' "$m" "$v" >>"$stage" || code=1
     done
-    # Contexte devzone -> cluster des services ; le cluster= attend le contexte
-    # réel de l'hôte qui y pointe (ex. docker-desktop). Sans hôte : aucune ligne.
-    cluster_ctx="$(kubectl config view -o jsonpath="{.contexts[?(@.name=\"devzone\")].context.cluster}" 2>/dev/null || true)"
-    cluster_hote=""
+    # devzone context -> services cluster; the cluster= expects the real host
+    # context that points to it (e.g. docker-desktop). Without host: no line.
+    cluster_ctx="$(kubectl config view -o jsonpath="{.contexts[?(@.name==\"devzone\")].context.cluster}" 2>/dev/null || true)"
+    cluster_host=""
     if [ -n "$cluster_ctx" ]; then
-        cluster_hote="$(contexte_hote_du_cluster "$cluster_ctx")"
-        if [ -n "$cluster_hote" ]; then
-            printf 'cluster=%s\n' "$cluster_hote" >>"$stage" || code=1
+        cluster_host="$(host_context_of_cluster "$cluster_ctx")"
+        if [ -n "$cluster_host" ]; then
+            printf 'cluster=%s\n' "$cluster_host" >>"$stage" || code=1
         fi
     fi
-    if [ "$code" -eq 0 ] && [ "$vu" -eq 1 ] && etat_poser "$stage"; then
-        echo "devzone : état reconstruit depuis les namespaces du cluster des services : $ETAT (confirmez par devzone apply)" >&2
-        [ -n "$cluster_hote" ] || echo "devzone : aucun contexte d'hôte ne pointe sur le cluster des services : pas de ligne cluster= dans $ETAT" >&2
+    if [ "$code" -eq 0 ] && [ "$seen" -eq 1 ] && state_replace "$stage"; then
+        echo "devzone : state rebuilt from the namespaces of the services cluster: $ETAT (confirm with devzone apply)" >&2
+        [ -n "$cluster_host" ] || echo "devzone : no host context points to the services cluster: no cluster= line in $ETAT" >&2
         rm -f "$stage"
         return 0
     fi
@@ -171,50 +170,50 @@ etat_reconstruire() {
     return 1
 }
 
-# Premier démarrage (aucun état) : ancien état global repris une fois, sinon
-# copie de secours restaurée, sinon état reconstruit, sinon tout désactivé
-etat_initialiser() {
+# First start (no state): former global state taken over once, otherwise backup
+# copy restored, otherwise state rebuilt, otherwise everything disabled
+state_init() {
     [ -f "$ETAT" ] && return 0
 
-    # Migration : ancien état global (~/.config/devzone/modules) vers l'état
-    # de l'instance ; déplacé, pas copié : le premier devzone démarré après
-    # la mise à jour garde ses choix
+    # Migration: former global state (~/.config/devzone/modules) to the state of
+    # the instance; moved, not copied: the first devzone started after the update
+    # keeps its choices
     if [ -f "$HOME/.config/devzone/modules" ]; then
-        if etat_poser "$HOME/.config/devzone/modules"; then
+        if state_replace "$HOME/.config/devzone/modules"; then
             rm -f "$HOME/.config/devzone/modules"
             return 0
         fi
     fi
 
-    etat_verrou_prendre || return 1
+    state_lock_take || return 1
     if [ -f "$ETAT" ]; then
-        etat_verrou_lacher
+        state_lock_release
         return 0
     fi
-    # 1. Copie de secours laissée par la dernière écriture (#417)
-    if [ -f "${ETAT}.prec" ] && etat_poser "${ETAT}.prec"; then
-        echo "devzone : état restauré depuis la copie de secours : $ETAT (confirmez par devzone apply)" >&2
-        etat_recouvrement_marquer
-        etat_verrou_lacher
+    # 1. Backup copy left by the last write (#417)
+    if [ -f "${ETAT}.prec" ] && state_replace "${ETAT}.prec"; then
+        echo "devzone : state restored from the backup copy: $ETAT (confirm with devzone apply)" >&2
+        state_recovery_mark
+        state_lock_release
         return 0
     fi
-    # 2. Reconstruction depuis le cluster des services (#417)
-    if etat_reconstruire "$@"; then
-        etat_recouvrement_marquer
-        etat_verrou_lacher
+    # 2. Rebuild from the services cluster (#417)
+    if state_rebuild "$@"; then
+        state_recovery_mark
+        state_lock_release
         return 0
     fi
-    # 3. Première installation : tout désactivé (#417)
-    if ! etat_defaut; then
-        etat_verrou_lacher
+    # 3. First installation: everything disabled (#417)
+    if ! state_default; then
+        state_lock_release
         return 1
     fi
-    etat_verrou_lacher
-    # Connexion déjà établie par une autre devzone (volumes partagés) :
-    # signalée une seule fois, à la création de l'état de cette instance ;
-    # stderr : initialiser est aussi appelé dans $(valeur …)
+    state_lock_release
+    # Connection already set up by another devzone (shared volumes): reported
+    # once, when the state of this instance is created; stderr: init is also
+    # called inside $(value …)
     if [ -f "$HOME/.claude/.credentials.json" ] || [ -f "$HOME/.local/share/opencode/auth.json" ]; then
-        echo "devzone : connexion Claude Code/opencode partagée trouvée : devzone enable ia pour l'utiliser ici" >&2
+        echo "devzone : shared Claude Code/opencode connection found: devzone enable ia to use it here" >&2
     fi
     return 0
 }

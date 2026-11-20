@@ -99,9 +99,9 @@ catalogue_synchroniser() (
     local app entete manque="" tmp
     [ -f "$ETAT" ] || return 0
     entete="# Applications du catalogue : passer à on pour installer (devzone catalog)"
-    etat_verrou_prendre || return 1
+    state_lock_take || return 1
     # Le verrou est rendu à la sortie, y compris sur une erreur sous set -e
-    trap 'etat_verrou_lacher' EXIT
+    trap 'state_lock_release' EXIT
     while IFS= read -r app; do
         [ -n "$app" ] || continue
         grep -qE "^${app}=" "$ETAT" 2>/dev/null && continue
@@ -114,7 +114,7 @@ catalogue_synchroniser() (
         grep -qF "$entete" "$ETAT" || echo "$entete"
         echo "$manque"
     } >"$tmp"
-    etat_poser "$tmp"
+    state_replace "$tmp"
     rm -f "$tmp"
 )
 
