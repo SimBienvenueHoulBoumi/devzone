@@ -1,9 +1,9 @@
 #!/usr/bin/env bats
-# GitLab dans le cluster des services (#396 étape B) : Helm avec le contexte
-# devzone et le namespace devzone-gitlab, valeurs ClusterIP, aucune création
-# kind, refus sous 8 Go de mémoire allouable, relais port-forward et migration
-# depuis l'ancien cluster kind-gitlab. Faux kubectl, helm, kind, curl, git et
-# setsid dans $BATS_TEST_TMPDIR/bin : aucun cluster n'est touché.
+# GitLab in the services cluster (#396 step B): Helm with the context
+# devzone and the devzone-gitlab namespace, ClusterIP values, no creation
+# kind, refusal under 8 GB of allocatable memory, port-forward relay and migration
+# from the old kind-gitlab cluster. Fake kubectl, helm, kind, curl, git and
+# setsid in $BATS_TEST_TMPDIR/bin: no cluster is touched.
 
 setup() {
     load commun
@@ -22,15 +22,15 @@ setup() {
     : >"$KIND_CLUSTERS"
     printf '127.0.0.1 localhost\n' >"$DEVZONE_HOSTS"
 
-    # kubectl : mémoire des nœuds (FAUX_MEMOIRE_CLUSTER), namespace présent
-    # dès qu'une création ou un apply a eu lieu, secrets et API du seed.
+    # kubectl: node memory (FAKE_MEMORY_CLUSTER), namespace present
+    # as soon as a creation or an apply took place, secrets and seed API.
     cat >"$BATS_TEST_TMPDIR/bin/kubectl" <<'KUBE'
 #!/usr/bin/env bash
 echo "kubectl $*" >>"$BATS_TEST_TMPDIR/kubectl.log"
 T="$BATS_TEST_TMPDIR"
 case "$*" in
     *"get nodes -o jsonpath"*)
-        printf '%s\n' "${FAUX_MEMOIRE_CLUSTER:-16777216Ki}" ;;
+        printf '%s\n' "${FAKE_MEMORY_CLUSTER:-16777216Ki}" ;;
     *"create namespace"*)
         printf 'kind: Namespace\nmetadata:\n  name: devzone-gitlab\n' ;;
     *"apply -f -"*)
@@ -52,7 +52,7 @@ esac
 exit 0
 KUBE
 
-    # helm : journalise chaque appel et le contenu des fichiers de valeurs
+    # helm: logs each call and the content of the values files
     cat >"$BATS_TEST_TMPDIR/bin/helm" <<'HELM'
 #!/usr/bin/env bash
 echo "helm $*" >>"$BATS_TEST_TMPDIR/helm.log"
@@ -66,38 +66,38 @@ done
 exit 0
 HELM
 
-    # kind : clusters dans $KIND_CLUSTERS ; create est journalisé (il ne doit
-    # plus être appelé pour GitLab), delete retire le nom
+    # kind: clusters in $KIND_CLUSTERS; create is logged (it must no longer
+    # be called for GitLab), delete removes the name
     cat >"$BATS_TEST_TMPDIR/bin/kind" <<'KIND'
 #!/usr/bin/env bash
 echo "kind $*" >>"$BATS_TEST_TMPDIR/kind.log"
 sous="$1 $2"
-nom=""
+name=""
 while [ "$#" -gt 0 ]; do
     case "$1" in
-        --name) nom="$2"; shift ;;
+        --name) name="$2"; shift ;;
     esac
     shift
 done
 case "$sous" in
     "get clusters") cat "$KIND_CLUSTERS" ;;
     "delete cluster")
-        grep -vx "$nom" "$KIND_CLUSTERS" >"$KIND_CLUSTERS.tmp" || true
+        grep -vx "$name" "$KIND_CLUSTERS" >"$KIND_CLUSTERS.tmp" || true
         mv "$KIND_CLUSTERS.tmp" "$KIND_CLUSTERS"
         ;;
 esac
 exit 0
 KIND
 
-    # curl : GitLab prêt et API du seed simulée ; la branche main n'existe
-    # qu'après le push du faux git (fichier pousse)
+    # curl: GitLab ready and seed API simulated; the main branch exists
+    # only after the push of the fake git (file pushed)
     cat >"$BATS_TEST_TMPDIR/bin/curl" <<'CURL'
 #!/usr/bin/env bash
 case "$*" in
     *"api/v4/runners/verify"*) echo 200 ;;
     *"api/v4/groups/devzone"*) echo '{"id":42}' ;;
     *"--request POST"*"api/v4/user/runners"*) echo '{"token":"jeton-runner"}' ;;
-    *"api/v4/projects/devzone%2Fdemo/repository"*) [ -f "$BATS_TEST_TMPDIR/pousse" ] || exit 22 ;;
+    *"api/v4/projects/devzone%2Fdemo/repository"*) [ -f "$BATS_TEST_TMPDIR/pushed" ] || exit 22 ;;
     *"--request POST"*) ;;
     *"api/v4/projects/devzone%2Fdemo"*) exit 22 ;;
     *"api/v4/users?username=dev"*) echo '[]' ;;
@@ -106,28 +106,28 @@ esac
 exit 0
 CURL
 
-    # git : le push du seed marque la branche main comme poussée
+    # git: the seed push marks the main branch as pushed
     cat >"$BATS_TEST_TMPDIR/bin/git" <<'GIT'
 #!/usr/bin/env bash
 echo "git $*" >>"$BATS_TEST_TMPDIR/git.log"
-case "$*" in *" push "*) touch "$BATS_TEST_TMPDIR/pousse" ;; esac
+case "$*" in *" push "*) touch "$BATS_TEST_TMPDIR/pushed" ;; esac
 exit 0
 GIT
 
-    # setsid : journalise le relais sans lancer de vrai port-forward
+    # setsid: logs the relay without starting a real port-forward
     cat >"$BATS_TEST_TMPDIR/bin/setsid" <<'SETSID'
 #!/usr/bin/env bash
 echo "setsid $*" >>"$BATS_TEST_TMPDIR/setsid.log"
 exit 0
 SETSID
 
-    # openssl : mot de passe de test, jamais utilisé pour un vrai secret
-    printf '#!/usr/bin/env bash\necho motdepasse-test\n' >"$BATS_TEST_TMPDIR/bin/openssl"
+    # openssl: test password, never used for a real secret
+    printf '#!/usr/bin/env bash\necho password-test\n' >"$BATS_TEST_TMPDIR/bin/openssl"
     chmod +x "$BATS_TEST_TMPDIR"/bin/*
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
 }
 
-@test "gitlab : helm dans le contexte devzone et le namespace devzone-gitlab, aucun kind créé" {
+@test "gitlab : helm in the devzone context and the devzone-gitlab namespace, no kind created" {
     run bash "$GITLAB" install
     [ "$status" -eq 0 ] || false
     # Wrapper chart charts/devzone-gitlab (#538): dependencies built, then one
@@ -138,7 +138,7 @@ SETSID
     ! grep -q "create cluster" "$BATS_TEST_TMPDIR/kind.log" || false
 }
 
-@test "gitlab : namespace devzone-gitlab étiqueté et isolé par NetworkPolicy" {
+@test "gitlab : devzone-gitlab namespace labelled and isolated by NetworkPolicy" {
     run bash "$GITLAB" install
     [ "$status" -eq 0 ] || false
     grep -q "label namespace devzone-gitlab app.kubernetes.io/managed-by=devzone" "$BATS_TEST_TMPDIR/kubectl.log" || false
@@ -146,7 +146,7 @@ SETSID
     grep -q "kind: NetworkPolicy" "$BATS_TEST_TMPDIR/apply.log" || false
 }
 
-@test "gitlab : valeurs ClusterIP sans NodePort, LoadBalancer ni Ingress ouvert" {
+@test "gitlab : ClusterIP values without NodePort, LoadBalancer nor open Ingress" {
     local values="$BATS_TEST_DIRNAME/../../charts/devzone-gitlab/values.yaml"
     grep -q "type: ClusterIP" "$values" || false
     grep -q "nginx-ingress:" "$values" || false
@@ -157,21 +157,21 @@ SETSID
     [ ! -e "$BATS_TEST_DIRNAME/../../.devcontainer/gitlab/kind.yaml" ] || false
 }
 
-@test "gitlab : runner pointe vers le namespace de l'instance" {
+@test "gitlab : runner points to the instance namespace" {
     run bash "$GITLAB" install
     [ "$status" -eq 0 ] || false
     grep -q "gitlab-webservice-default.devzone-gitlab.svc:8181" "$BATS_TEST_TMPDIR/helm.log" || false
     ! grep -q "__NAMESPACE__" "$BATS_TEST_TMPDIR/helm.log" || false
 }
 
-@test "gitlab : moins de 8 Go de mémoire allouable dans le cluster → refus, rien lancé" {
-    FAUX_MEMOIRE_CLUSTER='4000000Ki' run bash "$GITLAB" install
+@test "gitlab : less than 8 GB of allocatable memory in the cluster → refusal, nothing started" {
+    FAKE_MEMORY_CLUSTER='4000000Ki' run bash "$GITLAB" install
     [ "$status" -eq 2 ] || false
     [[ "$output" == *"8 GiB"* ]] || false
     [ ! -e "$BATS_TEST_TMPDIR/helm.log" ] || false
 }
 
-@test "gitlab : relais web et SSH en port-forward vers les services du namespace" {
+@test "gitlab : web and SSH relay by port-forward to the namespace services" {
     run bash "$GITLAB" relay-start
     [ "$status" -eq 0 ] || false
     grep -q "devzone devzone-gitlab svc/gitlab-webservice-default 8929:8181" "$BATS_TEST_TMPDIR/setsid.log" || false
@@ -180,24 +180,24 @@ SETSID
     ! grep -q "network connect" "$BATS_TEST_TMPDIR/setsid.log" || false
 }
 
-@test "gitlab : instance suffixée → namespace devzone-gitlab-<instance>" {
-    DEVZONE_INSTANCE=autre run bash "$GITLAB" install
+@test "gitlab : suffixed instance → namespace devzone-gitlab-<instance>" {
+    DEVZONE_INSTANCE=other run bash "$GITLAB" install
     [ "$status" -eq 0 ] || false
-    grep -q -- "--namespace devzone-gitlab-autre" "$BATS_TEST_TMPDIR/helm.log" || false
-    grep -q "label namespace devzone-gitlab-autre" "$BATS_TEST_TMPDIR/kubectl.log" || false
+    grep -q -- "--namespace devzone-gitlab-other" "$BATS_TEST_TMPDIR/helm.log" || false
+    grep -q "label namespace devzone-gitlab-other" "$BATS_TEST_TMPDIR/kubectl.log" || false
 }
 
-@test "gitlab migrate : sans confirmation, ancien cluster kind-gitlab gardé" {
+@test "gitlab migrate : without confirmation, old kind-gitlab cluster kept" {
     printf 'gitlab\n' >"$KIND_CLUSTERS"
     run bash "$DEVZONE" gitlab migrate </dev/null
     [ "$status" -eq 2 ] || false
     grep -qx "gitlab" "$KIND_CLUSTERS" || false
     ! grep -q "delete cluster" "$BATS_TEST_TMPDIR/kind.log" || false
-    # L'installation dans le cluster des services a bien eu lieu avant la question
+    # The installation in the services cluster took place before the question
     grep -Eq -- "--kubeconfig [^ ]+ upgrade --install gitlab [^ ]*charts/devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log" || false
 }
 
-@test "gitlab migrate --yes : installe, refait le seed, puis supprime kind-gitlab" {
+@test "gitlab migrate --yes : installs, redoes the seed, then deletes kind-gitlab" {
     printf 'gitlab\n' >"$KIND_CLUSTERS"
     run bash "$DEVZONE" gitlab migrate --yes
     [ "$status" -eq 0 ] || false
@@ -208,14 +208,14 @@ SETSID
     [ ! -s "$KIND_CLUSTERS" ] || false
 }
 
-@test "devzone : récapitulatif signale l'ancien cluster kind-gitlab" {
+@test "devzone : summary reports the old kind-gitlab cluster" {
     printf 'gitlab\n' >"$KIND_CLUSTERS"
     run bash "$DEVZONE"
     [ "$status" -eq 0 ] || false
     [[ "$output" == *"⚠ old kind-gitlab cluster: devzone gitlab migrate"* ]] || false
 }
 
-@test "devzone : récapitulatif sans avertissement quand kind-gitlab a disparu" {
+@test "devzone : summary without warning when kind-gitlab is gone" {
     run bash "$DEVZONE"
     [ "$status" -eq 0 ] || false
     [[ "$output" != *"old kind-gitlab cluster"* ]] || false

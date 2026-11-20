@@ -65,7 +65,7 @@ DEVZONE
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
 }
 
-@test "premier passage : installation, safe.directory et bloc du prompt" {
+@test "first run: installation, safe.directory and prompt block" {
     run bash "$SCRIPT"
     [ "$status" -eq 0 ]
     grep -qx "npm install -g ${RPW}@$REPOWARDEN_VERSION" "$JOURNAL"
@@ -74,11 +74,11 @@ DEVZONE
     grep -qxF '/workspaces/projets/*' "$SAFE"
     grep -qF '# >>> devzone prompt >>>' "$HOME/.bashrc"
     grep -qF '# <<< devzone prompt <<<' "$HOME/.bashrc"
-    grep -qF '. /usr/local/share/devzone/.devcontainer/invite-kube.sh' "$HOME/.bashrc"
+    grep -qF '. /usr/local/share/devzone/.devcontainer/kube-prompt.sh' "$HOME/.bashrc"
     [[ "$output" == *"devzone init: done"* ]] || false
 }
 
-@test "second passage : pas de second bloc ni de nouvelle installation npm" {
+@test "second run: no second block nor new npm installation" {
     bash "$SCRIPT"
     : >"$JOURNAL"
     run bash "$SCRIPT"
@@ -88,7 +88,24 @@ DEVZONE
     grep -qx "devzone apply" "$JOURNAL"
 }
 
-@test "devzone apply en échec : les étapes suivantes tournent et done est écrit" {
+@test "old prompt block (invite-kube.sh): migrated to kube-prompt.sh, not duplicated" {
+    {
+        echo "# >>> devzone prompt >>>"
+        echo ". /usr/local/share/devzone/.devcontainer/invite-kube.sh"
+        echo "PS1='\$(devzone_invite_kube) '\"\$PS1\""
+        echo "# <<< devzone prompt <<<"
+    } >"$HOME/.bashrc"
+    run bash "$SCRIPT"
+    [ "$status" -eq 0 ]
+    ! grep -q "invite" "$HOME/.bashrc" || false
+    grep -qF "kube-prompt.sh" "$HOME/.bashrc"
+    grep -qF "devzone_kube_prompt" "$HOME/.bashrc"
+    [ "$(grep -cF '# >>> devzone prompt >>>' "$HOME/.bashrc")" -eq 1 ]
+    run bash "$SCRIPT"
+    [ "$(grep -cF 'kube-prompt.sh' "$HOME/.bashrc")" -eq 1 ]
+}
+
+@test "devzone apply failing: the following steps run and done is written" {
     export DEVZONE_ECHEC=1
     run bash "$SCRIPT"
     [ "$status" -eq 0 ]

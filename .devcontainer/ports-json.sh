@@ -13,7 +13,7 @@ liste_json() {
     fi
     # shellcheck disable=SC2046 # list of ports separated by commas
     for port in $(printf '%s' "$ports" | tr ',' ' '); do
-        if relais_actif "$port"; then
+        if relay_active "$port"; then
             actif=true
         else
             actif=false

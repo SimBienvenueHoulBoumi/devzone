@@ -43,11 +43,11 @@ regenerer_identifiants() {
 k() { kubectl --context devzone -n "$NS" "$@"; }
 # Le namespace devzone-mysql existe-t-il ? Lecture des namespaces réservée à
 # l'administrateur (#430)
-installe() { compte_admin "$(compte_ctx)" get namespace "$NS" >/dev/null 2>&1; }
+installe() { account_admin "$(account_context)" get namespace "$NS" >/dev/null 2>&1; }
 # Contexte du module : celui du cluster de devzone
 contexte() {
     local c
-    c="$(cluster_lu)"
+    c="$(cluster_saved)"
     [ -n "$c" ] || refuse "aucun cluster choisi : devzone enable mysql"
     echo "$c"
 }
@@ -83,7 +83,7 @@ nombre_bases() {
 installer() {
     local CTX claim
     CTX="$(contexte)"
-    if ! contexte_devzone_poser "$CTX"; then
+    if ! devzone_context_set "$CTX"; then
         echo "devzone : catalogue mysql : impossible de poser le contexte devzone sur $CTX" >&2
         return 1
     fi
@@ -92,8 +92,8 @@ installer() {
         mysql_installer_argocd "$CTX"
         return
     fi
-    compte_namespace "$CTX" "$NS"
-    namespace_isoler "$NS" >/dev/null
+    account_namespace "$CTX" "$NS"
+    namespace_isolate "$NS" >/dev/null
     if k get statefulset mysql >/dev/null 2>&1; then
         echo "devzone : catalogue mysql : installation existante dans $NS, adoptée (volume et root.env gardés)"
     else
@@ -106,7 +106,7 @@ installer() {
         fi
     fi
     mysql_secret
-    relais_lancer mysql "$CTX" "$NS" svc/mysql 3306:3306
+    relay_start mysql "$CTX" "$NS" svc/mysql 3306:3306
     echo "✔ MySQL prêt : 127.0.0.1:$MYSQL_PORT dans le conteneur"
     regenerer_identifiants
 }
@@ -121,7 +121,7 @@ supprimer_donnees() {
         esac
     done
     if [ -z "$oui" ]; then
-        cluster_interactif || refuse "confirmation impossible sans terminal : devzone mysql delete-data --yes"
+        cluster_interactive || refuse "confirmation impossible sans terminal : devzone mysql delete-data --yes"
         printf 'Supprimer le namespace %s et tous ses volumes ? [o/N] ' "$NS" >&2
         read -r reponse || reponse=""
         case "$reponse" in
@@ -129,16 +129,16 @@ supprimer_donnees() {
             *) echo "Abandon : rien n'a été supprimé."; return 0 ;;
         esac
     fi
-    CTX="$(cluster_lu)"
+    CTX="$(cluster_saved)"
     [ -n "$CTX" ] || refuse "aucun cluster choisi : devzone enable mysql"
     installe || refuse "module inactif : devzone enable mysql"
     echo "▶ Suppression de MySQL et de ses volumes sur ${CTX}…"
     # L'Application part d'abord (#538) : sinon Argo CD recrée le namespace
     catalogue_argocd_delete mysql >/dev/null 2>&1 || true
     # RoleBinding retiré puis namespace supprimé par l'administrateur (#430)
-    compte_retirer "$CTX" "$NS" >/dev/null 2>&1 || true
-    compte_admin "$CTX" delete namespace "$NS" --wait=true >/dev/null
-    relais_arreter mysql
+    account_remove "$CTX" "$NS" >/dev/null 2>&1 || true
+    account_admin "$CTX" delete namespace "$NS" --wait=true >/dev/null
+    relay_stop mysql
     rm -f "$(fichier_echec)"
     echo "✔ namespace $NS et volume supprimés ; workspace/.mysql/root.env gardé"
     regenerer_identifiants
@@ -146,7 +146,7 @@ supprimer_donnees() {
 # État : désactivé, en échec, prêt, relais arrêté
 etat() {
     local CTX
-    CTX="$(cluster_lu)"
+    CTX="$(cluster_saved)"
     if [ -z "$CTX" ] || ! installe; then
         echo "désactivé"
         return 0
@@ -155,7 +155,7 @@ etat() {
         echo "en échec sur $CTX : devzone apply"
         return 0
     fi
-    if ! relais_actif mysql; then
+    if ! relay_active mysql; then
         echo "prêt sur $CTX, relais arrêté : devzone apply"
         return 0
     fi
@@ -223,7 +223,7 @@ supprimer() {
     CTX="$(contexte)"
     installe || refuse "module inactif : devzone enable mysql"
     if [ -z "$oui" ]; then
-        cluster_interactif || refuse "confirmation impossible sans terminal : devzone mysql delete $projet --yes"
+        cluster_interactive || refuse "confirmation impossible sans terminal : devzone mysql delete $projet --yes"
         printf 'Supprimer la base %s et son utilisateur ? [o/N] ' "$projet" >&2
         read -r reponse || reponse=""
         case "$reponse" in
@@ -242,8 +242,8 @@ SQL
 # Relance le relais 127.0.0.1:3306 si le namespace existe
 relais() {
     local CTX
-    CTX="$(cluster_lu)"
-    [ -n "$CTX" ] && installe && relais_lancer mysql "$CTX" "$NS" svc/mysql 3306:3306
+    CTX="$(cluster_saved)"
+    [ -n "$CTX" ] && installe && relay_start mysql "$CTX" "$NS" svc/mysql 3306:3306
 }
 case "${1:-}" in
     install) installer ;;
@@ -254,7 +254,7 @@ case "${1:-}" in
     delete) supprimer "${@:2}" ;;
     volume) mysql_volume "$NS" "${@:2}" ;;
     relay-start) relais ;;
-    relay-stop) relais_arreter mysql ;;
+    relay-stop) relay_stop mysql ;;
     *)
         echo "devzone : catalogue mysql : create <projet> [--new-password] | list | delete <projet> [--yes] | volume [<nom>] [--delete <nom>] [--yes] | delete-data [--yes]" >&2
         exit 1

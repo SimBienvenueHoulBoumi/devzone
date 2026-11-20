@@ -132,7 +132,7 @@ GETENT
     run bash "$DEVZONE" enable postgres --context nulle-part
     [[ "$output" != *"devzone workspace services enable"* ]] || false
     # The installer itself was reached: the unknown cluster is refused by it
-    [[ "$output" == *"cluster inconnu"* ]] || false
+    [[ "$output" == *"unknown or unreachable cluster"* ]] || false
 }
 
 # ---- services-admin.sh: temporary administrator inside the pod ----

@@ -1,6 +1,6 @@
 #!/usr/bin/env bats
-# Démarrage (#429) : chaque script lancé par .devcontainer/startup.sh existe
-# sous .devcontainer/. Le script est seulement lu, jamais exécuté.
+# Startup (#429): each script run by .devcontainer/startup.sh exists
+# under .devcontainer/. The script is only read, never executed.
 
 setup() {
     load commun
@@ -10,7 +10,7 @@ setup() {
     DEMARRAGE="$ICI/startup.sh"
 }
 
-@test "demarrage : chaque chemin \$ICI/….sh existe sous .devcontainer" {
+@test "startup : each path \$ICI/….sh exists under .devcontainer" {
     [ -f "$DEMARRAGE" ] || false
     trouves=0
     manquants=""
@@ -23,19 +23,19 @@ setup() {
         [ -f "$ICI/$chemin" ] || manquants="${manquants}${manquants:+, }$chemin"
     done <<<"$(grep -oE '"\$ICI/[^"]+\.sh"' "$DEMARRAGE" || true)"
     [ "$trouves" -gt 0 ] || {
-        echo "aucun chemin \$ICI/….sh trouvé dans startup.sh"
+        echo "no path \$ICI/….sh found in startup.sh"
         false
     }
     [ -z "$manquants" ] || {
-        echo "scripts absents sous .devcontainer : $manquants"
+        echo "scripts missing under .devcontainer: $manquants"
         false
     }
 }
 
-@test "demarrage : aucune ligne deprecated sur stdout ni stderr (#532)" {
-    # Environnement factice : aucun docker, kubectl, gh ni socat réels ; l'état
-    # et le HOME restent sous $BATS_TEST_TMPDIR. Chaque étape en échec passe
-    # à la suivante (startup.sh), le récapitulatif termine.
+@test "startup : no deprecated line on stdout nor stderr (#532)" {
+    # Fake environment: no real docker, kubectl, gh nor socat; the state
+    # and the HOME stay under $BATS_TEST_TMPDIR. Each failing step passes
+    # to the next one (startup.sh), the summary ends.
     bats_require_minimum_version 1.5.0
     mkdir -p "$BATS_TEST_TMPDIR/bin" "$BATS_TEST_TMPDIR/racine/workspace" \
         "$BATS_TEST_TMPDIR/ports-auto" "$BATS_TEST_TMPDIR/home"
@@ -55,9 +55,9 @@ setup() {
     [[ "$stderr" != *"deprecated"* ]] || false
 }
 
-@test "demarrage : workspace Kubernetes, pas de veilleur de ports auto (#517)" {
-    # Même environnement factice que le test précédent. Sous bats le veilleur
-    # refuse (code 2) : le message « non lancé » ne paraît que hors Kubernetes.
+@test "startup : Kubernetes workspace, no auto ports watcher (#517)" {
+    # Same fake environment as the previous test. Under bats the watcher
+    # refuses (code 2): the « not started » message only shows outside Kubernetes.
     mkdir -p "$BATS_TEST_TMPDIR/bin" "$BATS_TEST_TMPDIR/racine/workspace" \
         "$BATS_TEST_TMPDIR/ports-auto" "$BATS_TEST_TMPDIR/home"
     for outil in docker kubectl gh socat; do
@@ -72,8 +72,8 @@ setup() {
     export GIT_CONFIG_NOSYSTEM=1
     DEVZONE_WORKSPACE=kubernetes run bash "$DEMARRAGE"
     [ "$status" -eq 0 ]
-    [[ "$output" != *"veilleur de ports auto non lancé"* ]] || false
+    [[ "$output" != *"auto ports watcher not started"* ]] || false
     run bash "$DEMARRAGE"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"veilleur de ports auto non lancé"* ]] || false
+    [[ "$output" == *"auto ports watcher not started"* ]] || false
 }

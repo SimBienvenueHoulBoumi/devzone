@@ -30,8 +30,8 @@ KUBE
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
     # The common function reads the nodes through the admin account (#430):
     # the test provides it, the fake kubectl answers.
-    compte_ctx() { echo docker-desktop; }
-    compte_admin() { kubectl --context "$1" "${@:2}"; }
+    account_context() { echo docker-desktop; }
+    account_admin() { kubectl --context "$1" "${@:2}"; }
     . "$MEMORY_SH"
     # One "<providerID>|<memory>" line per node, exported for the fake kubectl.
     faux_noeuds() {

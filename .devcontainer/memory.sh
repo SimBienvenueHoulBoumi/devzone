@@ -55,7 +55,7 @@ memory_cluster_ki() {
     local output line providerID memory node total=0 max=0 n=0 all_kind=1
     MEMORY_KI=""
     MEMORY_RULE=""
-    output="$(compte_admin "$(compte_ctx)" get nodes \
+    output="$(account_admin "$(account_context)" get nodes \
         -o jsonpath='{range .items[*]}{.spec.providerID}{"|"}{.status.allocatable.memory}{"\n"}{end}' 2>/dev/null)" || return 1
     [ -n "$output" ] || return 1
     while IFS= read -r line; do

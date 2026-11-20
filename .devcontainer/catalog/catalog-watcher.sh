@@ -84,7 +84,7 @@ boucle() {
 lancer_detache() {
     local i pid stable=0 detache=()
     mkdir -p "$BASE"
-    # Même détachement que relais_lancer : setsid si présent, sinon nohup.
+    # Même détachement que relay_start : setsid si présent, sinon nohup.
     command -v setsid >/dev/null 2>&1 && detache=(setsid)
     ${detache[@]+"${detache[@]}"} nohup env DEVZONE_CATALOGUE_REEL=oui bash "$0" boucle >"$BASE/veilleur.log" 2>&1 &
     i=0

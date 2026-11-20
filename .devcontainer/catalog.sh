@@ -77,9 +77,9 @@ presente() {
         getent hosts "$(app_lire "$1" nom).${ns}.svc" >/dev/null 2>&1
         return
     fi
-    ctx="$(cluster_lu)"
+    ctx="$(cluster_saved)"
     [ -n "$ctx" ] || return 1
-    compte_admin "$ctx" get namespace "$ns" >/dev/null 2>&1 &&
+    account_admin "$ctx" get namespace "$ns" >/dev/null 2>&1 &&
         kubectl --context devzone -n "$ns" get statefulset "$1" >/dev/null 2>&1
 }
 
@@ -160,7 +160,7 @@ app_relais_arrete() {
         etat="$(bash "$script" status 2>/dev/null || true)"
         case "$etat" in *"relais arrêté"*) return 0 ;; esac
     fi
-    ! relais_actif "$app"
+    ! relay_active "$app"
 }
 
 # Lignes Applications du récapitulatif de devzone : ○ disponible, ✔ installée

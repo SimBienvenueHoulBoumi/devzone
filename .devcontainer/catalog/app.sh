@@ -73,20 +73,20 @@ app_installer() {
     ns="$(app_ns "$app")"
     port="$(app_lire "$app" port)"
     image="$(app_lire "$app" image)"
-    CTX="$(cluster_lu)"
+    CTX="$(cluster_saved)"
     [ -n "$CTX" ] || refuse "aucun cluster choisi : devzone enable $app"
-    if ! contexte_devzone_poser "$CTX"; then
+    if ! devzone_context_set "$CTX"; then
         echo "devzone : catalogue : impossible de poser le contexte devzone sur $CTX" >&2
         return 1
     fi
     echo "▶ Application $app sur le cluster $CTX (namespace $ns)…"
     # Namespace créé et étiqueté par l'administrateur (#430), puis compte
     # limité autorisé dans le namespace
-    compte_admin "$CTX" create namespace "$ns" --dry-run=client -o yaml |
-        compte_admin "$CTX" apply -f - >/dev/null
-    compte_admin "$CTX" label namespace "$ns" "$CLUSTER_ETIQUETTE" --overwrite >/dev/null
-    compte_autoriser "$CTX" "$ns"
-    namespace_isoler "$ns" >/dev/null
+    account_admin "$CTX" create namespace "$ns" --dry-run=client -o yaml |
+        account_admin "$CTX" apply -f - >/dev/null
+    account_admin "$CTX" label namespace "$ns" "$CLUSTER_LABEL" --overwrite >/dev/null
+    account_allow "$CTX" "$ns"
+    namespace_isolate "$ns" >/dev/null
     app_secret "$app" "$ns"
     local claim=donnees
     if [ "$app" = mysql ]; then
@@ -107,7 +107,7 @@ app_installer() {
             "memory=$(app_lire "$app" memoire)" "size=$(app_lire "$app" taille)" "claim=$claim" || return 1
     fi
     app_attendre "$app" "$ns" "$argo" || return 1
-    relais_lancer "$app" "$CTX" "$ns" "svc/$app" "$port:$port"
+    relay_start "$app" "$CTX" "$ns" "svc/$app" "$port:$port"
     echo "✔ $app prêt : 127.0.0.1:$port dans le conteneur"
     regenerer_identifiants
 }
@@ -119,13 +119,13 @@ app_installer() {
 app_desinstaller() {
     local app="$1" ns claim pvc CTX
     ns="$(app_ns "$app")"
-    relais_arreter "$app"
+    relay_stop "$app"
     rm -f "$(fichier_echec "$app")"
     # RoleBinding retiré par l'administrateur (#430) : le namespace et le
     # volume restent, l'autorisation du compte ne doit pas traîner
-    CTX="$(cluster_lu)" || true
+    CTX="$(cluster_saved)" || true
     if [ -n "$CTX" ]; then
-        compte_retirer "$CTX" "$ns" >/dev/null 2>&1 || true
+        account_remove "$CTX" "$ns" >/dev/null 2>&1 || true
     fi
     claim="$(kubectl --context devzone -n "$ns" get statefulset "$app" \
         -o jsonpath='{.spec.volumeClaimTemplates[0].metadata.name}' 2>/dev/null || true)"
@@ -154,10 +154,10 @@ app_echec() {
 # namespaces réservée à l'administrateur (#430).
 app_mysql_volumes_inutilises() {
     local ctx ns monte pvc liste
-    ctx="$(cluster_lu)"
+    ctx="$(cluster_saved)"
     [ -n "$ctx" ] || return 0
     ns="$(app_ns mysql)"
-    compte_admin "$ctx" get namespace "$ns" >/dev/null 2>&1 || return 0
+    account_admin "$ctx" get namespace "$ns" >/dev/null 2>&1 || return 0
     monte="$(kubectl --context devzone -n "$ns" get statefulset mysql -o jsonpath='{.spec.volumeClaimTemplates[0].metadata.name}' 2>/dev/null || true)"
     [ -n "$monte" ] || return 0
     liste="$(kubectl --context devzone -n "$ns" get pvc -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null | grep -E '\-mysql-0$' || true)"
@@ -190,10 +190,10 @@ catalogue_appliquer() {
                 rm -f "$(fichier_echec "$app")"
             fi
             # Relais permanent : relancé s'il est arrêté
-            CTX="$(cluster_lu)" || true
+            CTX="$(cluster_saved)" || true
             ns="$(app_ns "$app")"
             if [ -n "$CTX" ]; then
-                if ! sortie="$(relais_lancer "$app" "$CTX" "$ns" "svc/$app" "$port:$port" 2>&1)"; then
+                if ! sortie="$(relay_start "$app" "$CTX" "$ns" "svc/$app" "$port:$port" 2>&1)"; then
                     code=1; app_echec "$app" "$sortie"
                 else
                     [ -n "$sortie" ] && printf '%s\n' "$sortie"

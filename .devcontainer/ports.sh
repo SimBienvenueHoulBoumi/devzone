@@ -82,7 +82,7 @@ relais_existe() {
         grep -Fx "$nom" || true)" ]
 }
 
-relais_actif() {
+relay_active() {
     local nom
     nom="$(nom_relais "$1")"
     command -v docker >/dev/null 2>&1 || return 1
@@ -119,7 +119,7 @@ lancer() {
 ouvrir() {
     local port="${1:-}"
     valider_port "$port"
-    if relais_actif "$port"; then
+    if relay_active "$port"; then
         ajouter_port "$port"
         echo "✔ relais déjà ouvert : 127.0.0.1:$port du poste → $port du conteneur"
         return 0
@@ -150,7 +150,7 @@ liste() {
     fi
     # shellcheck disable=SC2046 # liste de ports séparés par des virgules
     for port in $(printf '%s' "$ports" | tr ',' ' '); do
-        if relais_actif "$port"; then
+        if relay_active "$port"; then
             marque="● actif"
         else
             marque="○ arrêté"
@@ -174,7 +174,7 @@ resume() {
     fi
     # shellcheck disable=SC2046 # liste de ports séparés par des virgules
     for port in $(printf '%s' "$ports" | tr ',' ' '); do
-        if relais_actif "$port"; then
+        if relay_active "$port"; then
             sortie="$sortie${sortie:+, }$port ●"
         else
             sortie="$sortie${sortie:+, }$port ○"

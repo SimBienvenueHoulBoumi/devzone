@@ -21,7 +21,7 @@ ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
 # shellcheck source=SCRIPTDIR/../chart-direct.sh
 # shellcheck disable=SC1091
 . "$ICI/../chart-direct.sh"
-# Isolation réseau : namespace_isoler, d'où viennent les NetworkPolicies
+# Isolation réseau : namespace_isolate, d'où viennent les NetworkPolicies
 # shellcheck source=SCRIPTDIR/../isolation.sh
 # shellcheck disable=SC1091
 . "$ICI/../isolation.sh"
@@ -45,7 +45,7 @@ regenerer_identifiants() {
 # installé (devzone enable postgres le fixe)
 contexte() {
     local c
-    c="$(cluster_lu)"
+    c="$(cluster_saved)"
     [ -n "$c" ] || refuse "aucun cluster choisi : devzone enable postgres"
     echo "$c"
 }
@@ -57,7 +57,7 @@ k() {
 # Namespace présent dans le cluster des services : lecture des namespaces
 # réservée à l'administrateur (#430)
 installe() {
-    compte_admin "$(compte_ctx)" get namespace "$NS" >/dev/null 2>&1
+    account_admin "$(account_context)" get namespace "$NS" >/dev/null 2>&1
 }
 
 # psql en superutilisateur dans le pod : connexion locale (socket), sans mot
@@ -101,21 +101,21 @@ secret_admin() {
 
 installer() {
     CTX="$(contexte)"
-    cluster_preparer "$CTX"
+    cluster_prepare "$CTX"
     # Sur une machine neuve, le contexte devzone doit viser le cluster choisi
     # avant toute pose de ressource (#396) ; sinon, tout s'arrête : message et code
-    if ! contexte_devzone_poser "$CTX"; then
+    if ! devzone_context_set "$CTX"; then
         echo "devzone : postgres : impossible de poser le contexte devzone sur $CTX" >&2
         return 1
     fi
     echo "▶ PostgreSQL sur le cluster $CTX (namespace $NS)…"
     # Namespace créé et étiqueté par l'administrateur (#430) : le compte limité
     # n'a pas le droit de créer d'objets hors des namespaces devzone-*
-    compte_admin "$CTX" create namespace "$NS" --dry-run=client -o yaml |
-        compte_admin "$CTX" apply -f - >/dev/null
-    compte_admin "$CTX" label namespace "$NS" "$CLUSTER_ETIQUETTE" --overwrite >/dev/null
+    account_admin "$CTX" create namespace "$NS" --dry-run=client -o yaml |
+        account_admin "$CTX" apply -f - >/dev/null
+    account_admin "$CTX" label namespace "$NS" "$CLUSTER_LABEL" --overwrite >/dev/null
     # Compte limité autorisé dans le namespace : RoleBinding vers edit
-    compte_autoriser "$CTX" "$NS"
+    account_allow "$CTX" "$NS"
     secret_admin
     chart_install postgres "$NS" "size=$POSTGRES_TAILLE" || return 1
     echo "▶ Attente de PostgreSQL (timeout ${POSTGRES_ATTENTE}s)…"
@@ -123,29 +123,29 @@ installer() {
         echo "devzone : postgres : pas prêt après ${POSTGRES_ATTENTE}s : kubectl --context $CTX -n $NS describe pod postgres-0" >&2
         return 1
     fi
-    relais_arreter postgres
-    relais_lancer postgres "$CTX" "$NS" svc/postgres "$POSTGRES_PORT:5432"
+    relay_stop postgres
+    relay_start postgres "$CTX" "$NS" svc/postgres "$POSTGRES_PORT:5432"
     echo "✔ PostgreSQL prêt : 127.0.0.1:$POSTGRES_PORT dans le conteneur"
     echo "  Base d'un projet : devzone postgres create <projet>"
     regenerer_identifiants
 }
 
 desinstaller() {
-    CTX="$(cluster_lu)"
-    relais_arreter postgres
+    CTX="$(cluster_saved)"
+    relay_stop postgres
     # Désinstallation sur une machine neuve : le contexte devzone est reposé sur
     # le cluster choisi (sinon il vise l'ancien) ; sans lui, seulement le
     # nettoyage local a lieu
     if [ -n "$CTX" ]; then
-        contexte_devzone_poser "$CTX" ||
+        devzone_context_set "$CTX" ||
             echo "devzone : postgres : contexte devzone non posé sur $CTX ; nettoyage local seulement" >&2
     fi
     if [ -n "$CTX" ] && installe; then
         echo "▶ Suppression de PostgreSQL et de toutes ses bases sur ${CTX}…"
         # RoleBinding retiré puis namespace supprimé par l'administrateur (#430)
-        compte_retirer "$CTX" "$NS" >/dev/null 2>&1 || true
-        compte_admin "$CTX" delete namespace "$NS" --wait=true >/dev/null
-        cluster_liberer "$CTX"
+        account_remove "$CTX" "$NS" >/dev/null 2>&1 || true
+        account_admin "$CTX" delete namespace "$NS" --wait=true >/dev/null
+        cluster_release "$CTX"
     fi
     rm -rf "$SECRETS"
     echo "✔ PostgreSQL désinstallé."
@@ -157,14 +157,14 @@ nombre_bases() {
 }
 
 etat() {
-    CTX="$(cluster_lu)"
+    CTX="$(cluster_saved)"
     if [ -z "$CTX" ] || ! installe; then
         echo "désactivé"
         return 0
     fi
     if [ "$(k get statefulset postgres -o jsonpath='{.status.readyReplicas}' 2>/dev/null || true)" != 1 ]; then
         echo "en échec sur $CTX : devzone apply"
-    elif ! relais_actif postgres; then
+    elif ! relay_active postgres; then
         echo "prêt sur $CTX, relais arrêté : devzone apply"
     else
         echo "prêt sur $CTX : 127.0.0.1:$POSTGRES_PORT, $(nombre_bases) base(s)"
@@ -245,7 +245,7 @@ supprimer() {
     CTX="$(contexte)"
     installe || refuse "module inactif : devzone enable postgres"
     if [ -z "$oui" ]; then
-        cluster_interactif || refuse "confirmation impossible sans terminal : devzone postgres delete $projet --yes"
+        cluster_interactive || refuse "confirmation impossible sans terminal : devzone postgres delete $projet --yes"
         printf 'Supprimer la base %s et toutes ses données ? [o/N] ' "$projet" >&2
         read -r reponse || reponse=""
         case "$reponse" in
@@ -263,16 +263,16 @@ SQL
 }
 
 relais() {
-    CTX="$(cluster_lu)"
+    CTX="$(cluster_saved)"
     if [ -n "$CTX" ] && installe; then
-        relais_lancer postgres "$CTX" "$NS" svc/postgres "$POSTGRES_PORT:5432"
+        relay_start postgres "$CTX" "$NS" svc/postgres "$POSTGRES_PORT:5432"
     fi
 }
 
 autoriser() {
     local ns="${1:-}"
     [ -n "$ns" ] || { echo "devzone postgres : namespace manquant" >&2; return 2; }
-    namespace_isoler "$ns"
+    namespace_isolate "$ns"
     echo "devzone postgres : accès autorisé depuis $ns vers le service PostgreSQL"
 }
 
@@ -299,7 +299,7 @@ case "${1:-}" in
     psql) console "${@:2}" ;;
     delete) supprimer "${@:2}" ;;
     relay-start) relais ;;
-    relay-stop) relais_arreter postgres ;;
+    relay-stop) relay_stop postgres ;;
     authorize) autoriser "${@:2}" ;;
     forbid) interdire "${@:2}" ;;
     *)
