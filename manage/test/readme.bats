@@ -49,7 +49,7 @@ setup() {
     done < "$RACINE/.devcontainer/help.sh"
 
     # 3. command-aliases.sh : English names only (values of the case tables);
-    # the renamed French names are not authorized outside the « Noms retirés » sections
+    # the renamed French names are not authorized outside the removed-names sections
     while IFS= read -r line; do
         case "$line" in
             *") echo "*)
@@ -118,9 +118,9 @@ verify_command() {
     unknown=""
     verify_file() {
         local file
-        file="$BATS_TEST_TMPDIR/$(basename "$1").sans-retires"
-        # The « Noms retirés » sections cite the old names on purpose: skipped.
-        awk '/^## Noms retirés/{skip=1;next} /^## /{skip=0} !skip' "$1" > "$file"
+        file="$BATS_TEST_TMPDIR/$(basename "$1").filtered"
+        # The removed-names sections cite the old names on purpose: skipped.
+        awk '/^## Noms retir/{skip=1;next} /^## /{skip=0} !skip' "$1" > "$file"
         : > "$BATS_TEST_TMPDIR/candidates.txt"
         # Inline code between backticks.
         pattern="\`[^\`]+\`"

@@ -38,6 +38,6 @@ devzone_aide() {
   devzone port [<n>|--close <n>]           relay of a container port to the workstation
   devzone passwords                        regenerate .password and print its path
   devzone packages [add|remove|apply] …    system packages kept after a rebuild
-  Old French names are refused and print the new name (README, Noms retirés).
+  Old French names are refused and print the new name (see the reference).
 AIDE
 }

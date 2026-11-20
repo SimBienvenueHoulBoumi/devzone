@@ -1,6 +1,5 @@
 # Files already written in English (#502), checked on every CI run by
 # manage/scripts/check-english.sh. Add any new code file here.
-.devcontainer/command-aliases.sh
 manage/scripts/check-english.sh
 manage/scripts/check-utf8-vars.sh
 manage/test/check-utf8-vars.bats
@@ -21,7 +20,6 @@ manage/scripts/ports-apps.sh
 manage/scripts/ports-workspace.sh
 manage/workspace.sh
 manage/scripts/workspace-aliases.sh
-manage/test/command-aliases.bats
 manage/test/check-english.bats
 manage/test/readme.bats
 manage/test/services-hook.bats
