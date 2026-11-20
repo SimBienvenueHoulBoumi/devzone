@@ -28,7 +28,9 @@ refuse() { echo "devzone : port : $*" >&2; exit 1; }
 # French values (read by the tools, #557): a contract, UTF-8 written as byte escapes.
 APP_RESPONDS="application responds"
 APP_NONE="no application"
+# shellcheck disable=SC2034 # read by ports-json.sh and ports-auto.sh (sourced)
 JSON_APP_RESPONDS=$'application r\303\251pond'
+# shellcheck disable=SC2034 # read by ports-json.sh and ports-auto.sh (sourced)
 JSON_APP_NONE="aucune application"
 
 relay_name() { echo "devzone-$INSTANCE-port-$1"; }
