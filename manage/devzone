@@ -57,7 +57,7 @@ devzone $(version) : environnement de développement conteneurisé
                            fails with nothing created without one)
                            --docker: deprecated Docker workstation, no cluster check
                            (without a cluster nothing is created, no silent Docker)
-  devzone update [--oui] [--sans-reconstruire]
+  devzone update [--yes] [--sans-reconstruire]
                            dans un dossier devzone : passe à la version du paquet
                            (sauvegarde les fichiers remplacés, propose make rebuild)
   devzone uninstall        dans un dossier devzone : retire conteneur, image, volumes
@@ -69,7 +69,7 @@ devzone $(version) : environnement de développement conteneurisé
                            services (gitlab, postgres, argocd) du workspace Kubernetes
   devzone workspace argocd status|init|apply|app add|list|remove
                            Argo CD du workspace : dépôt GitOps, .argocd.conf, projets
-  (noms français renommés : mettre-a-jour, desinstaller, aide ; demarrer… reste accepté)
+  (anciens noms français : refusés avec le nouveau nom, voir README, « Noms retirés »)
   devzone --version
 EOT
 }
@@ -78,49 +78,25 @@ EOT
 # of .devcontainer/devzone (consistency test in manage/test/cli.bats)
 container_command() {
     case "$1" in
-        actif | activer | agent | appliquer | argocd | build | catalogue | cluster | clusters | \
-            demarrer | desactiver | etat | gitlab | metrics | modules | mots-de-passe | \
-            ia | llm | mysql | paquets | plateforme | port | postgres | reparer | test-bash32 | \
-            test-gitlab | ticket | utiliser) return 0 ;;
-        # English names of the container commands (#502)
-        ai | is-enabled | enable | disable | apply | catalog | start | status | \
-            passwords | packages | platform | repair | use) return 0 ;;
+        ai | agent | apply | argocd | build | catalog | cluster | clusters | disable | \
+            enable | gitlab | is-enabled | llm | metrics | modules | mysql | packages | \
+            passwords | platform | port | postgres | repair | start | status | \
+            test-bash32 | test-gitlab | ticket | use) return 0 ;;
         *) return 1 ;;
     esac
 }
 
-# The host commands have English names (#532). The old French names are
-# renamed, not accepted: they refuse with the new name and create nothing
-# (otherwise « devzone mettre-a-jour » would create a folder of that name).
-renamed_command() {
-    case "${1:-}" in
-        mettre-a-jour) echo update ;;
-        desinstaller) echo uninstall ;;
-        aide) echo help ;;
-        *) return 1 ;;
-    esac
-}
-if [ "$#" -gt 0 ] && new_name="$(renamed_command "$1")"; then
-    echo "✖ « $1 » a été renommé : devzone $new_name" >&2
-    exit 1
-fi
-
-# English names of the container commands are accepted, French ones unchanged
-# and warned (#502, #532). A copied devzone may miss the aliases file: then no
-# normalization. On the host, translate only to a known container command; any
-# other name stays as typed (so « devzone stop » creates ./stop, not ./arreter).
+# Renamed names (#695): the French names of the host and container commands are
+# refused before anything is created (« devzone mettre-a-jour » must not create a
+# folder; « devzone stop » still creates ./stop). A copied devzone may miss the
+# aliases file: then no check.
 # shellcheck source=SCRIPTDIR/../.devcontainer/command-aliases.sh
 # shellcheck disable=SC1091
 if [ -f "$PAQUET/.devcontainer/command-aliases.sh" ]; then
     . "$PAQUET/.devcontainer/command-aliases.sh"
-    if [ "$#" -gt 0 ]; then
-        command_deprecated_warning "$1"
-        canonical="$(command_canonical "$1")"
-        if container_command "$canonical"; then
-            set -- "$canonical" "${@:2}"
-        fi
-    fi
+    reject_renamed "$@" || exit 1
 fi
+
 
 case "${1:-}" in
     "" | -h | --help | help) show_help ;;

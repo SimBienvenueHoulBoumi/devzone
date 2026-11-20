@@ -19,15 +19,6 @@ setup() {
     [ -f "$T/workstation/workspace/alpha/a.txt" ]
 }
 
-@test "revert and revenir with --bring-back/--rapatrier are equivalent" {
-    mkdir -p "$T/pod/workspaces/projets/gamma"
-    echo "g" >"$T/pod/workspaces/projets/gamma/g.txt"
-    ws revenir --rapatrier
-    [ "$status" -eq 0 ]
-    [ -f "$T/workstation/workspace/gamma/g.txt" ]
-    grep -qx "workspace=docker" "$T/workstation/.devzone.modules" || false
-}
-
 @test "revert --bring-back: pod projects copied into ./workspace" {
     mkdir -p "$T/pod/workspaces/projets/gamma" "$T/pod/workspaces/projets/alpha"
     echo "g" >"$T/pod/workspaces/projets/gamma/g.txt"
@@ -105,13 +96,6 @@ setup() {
     [ ! -d "$T/volumes/devzone-m2" ]
     [ -d "$T/volumes/other-volume" ]
     ! grep -q "volume rm other-volume" "$T/docker.log" || false
-}
-
-@test "clean-docker and nettoyer-docker with --oui/--yes are equivalent" {
-    fake_volumes
-    ws nettoyer-docker --oui
-    [ "$status" -eq 0 ]
-    [ ! -d "$T/volumes/devzone-gh" ]
 }
 
 @test "clean-docker: no volume, nothing to do" {

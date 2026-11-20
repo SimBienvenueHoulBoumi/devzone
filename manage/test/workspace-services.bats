@@ -60,12 +60,6 @@ KUBE
     [ "$(grep -n 'exec -i' "$T/kubectl.log" | cut -d: -f1)" -lt "$(grep -n 'delete clusterrolebinding' "$T/kubectl.log" | cut -d: -f1)" ]
 }
 
-@test "services disable postgres --oui: the options reach the installer" {
-    run bash "$CLI" workspace services disable postgres --oui
-    [ "$status" -eq 0 ]
-    grep -q 'services-admin.sh disable postgres --oui$' "$T/kubectl.log"
-}
-
 @test "services disable postgres --yes: reaches the installer as --yes, no deprecation (#557)" {
     run --separate-stderr bash "$CLI" workspace services disable postgres --yes
     [ "$status" -eq 0 ]

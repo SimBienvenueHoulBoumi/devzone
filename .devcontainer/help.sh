@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Help of devzone (devzone --help, #557), sourced by devzone : English command
-# names first ; the French names are still accepted and warn (deprecated).
+# names only ; the French names are refused and print the new name (#695).
 # devzone_aide prints the list, indented like the other usage texts.
 devzone_aide() {
     cat <<'AIDE'
@@ -21,7 +21,7 @@ devzone_aide() {
   devzone test-bash32                      run the bats tests under bash 3.2 (Docker container)
   devzone test-gitlab                      end-to-end test of the GitLab module and platform
   devzone agent <folder> <instructions>    drive opencode with the instructions file
-  devzone ai | ia             list the host (Ollama) models detected and the default model
+  devzone ai                               list the host (Ollama) models detected and the default model
   devzone ticket <n> [--repo devzone|repowarden]  ticket worktree (ticket done <n> removes it)
   devzone build <folder> [--tag <name>]    build an image in the Kubernetes workspace (BuildKit)
   devzone enable postgres [--context CTX] [--confirm CTX]  shared PostgreSQL, cluster of choice
@@ -38,6 +38,6 @@ devzone_aide() {
   devzone port [<n>|--close <n>]           relay of a container port to the workstation
   devzone passwords                        regenerate .password and print its path
   devzone packages [add|remove|apply] …    system packages kept after a rebuild
-  Old French names are still accepted (deprecated).
+  Old French names are refused and print the new name (README, Noms retirés).
 AIDE
 }

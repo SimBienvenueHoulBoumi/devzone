@@ -22,13 +22,13 @@ MYSQL_NS="devzone-mysql"
 # shellcheck disable=SC2034 # read by services.sh
 SERVICES_LIST="postgres mysql"
 
-# The only option of a removal: --yes (--oui still accepted); prints 1 or 0
+# The only option of a removal: --yes; prints 1 or 0
 yes_flag() {
     local usage="$1" arg found=0
     shift
     for arg in "$@"; do
         case "$arg" in
-            --yes | --oui) found=1 ;;
+            --yes) found=1 ;;
             *) echo "✖ unknown option: $arg (devzone workspace $usage)" >&2; return 1 ;;
         esac
     done

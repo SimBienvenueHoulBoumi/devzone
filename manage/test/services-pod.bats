@@ -126,15 +126,6 @@ GETENT
     grep -qx 'postgres=on' "$DEVZONE_ETAT"
 }
 
-@test "disable postgres --oui in the pod: same refusal, with the deprecation warning (#557)" {
-    printf 'postgres=on\n' >"$DEVZONE_ETAT"
-    run --separate-stderr bash "$DEVZONE" disable postgres --oui
-    [ "$status" -eq 2 ]
-    [[ "$stderr" == *"devzone: \"--oui\" is deprecated, use \"--yes\""* ]] || false
-    [[ "$stderr" == *"devzone workspace services disable postgres"* ]] || false
-    grep -qx 'postgres=on' "$DEVZONE_ETAT"
-}
-
 @test "enable in the pod with DEVZONE_SERVICES_ADMIN=1: the installer runs" {
     printf 'postgres=off\n' >"$DEVZONE_ETAT"
     export DEVZONE_SERVICES_ADMIN=1

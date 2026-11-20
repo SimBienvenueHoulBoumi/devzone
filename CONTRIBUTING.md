@@ -5,8 +5,8 @@
 - Le **code** est en anglais : identifiants, noms de fichiers, commentaires,
   tests, messages et commandes de la CLI.
 - La **documentation** est en français : README, `manage/docs/` et ce fichier.
-- Les commandes françaises de la CLI restent des alias : les noms anglais sont
-  acceptés dès maintenant (table de `.devcontainer/command-aliases.sh`).
+- Les noms français de la CLI sont retirés (#695) : devzone les refuse et
+  affiche le nouveau nom (table dans `manage/docs/reference.md`, « Noms retirés »).
 
 ## Bascule progressive par lots (#502)
 

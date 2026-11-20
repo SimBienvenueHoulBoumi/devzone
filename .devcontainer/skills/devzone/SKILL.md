@@ -36,7 +36,7 @@ Les modules sont désactivés par défaut, activés à la demande, sans rebuild 
 - `devzone repair` : relance relais Docker, gitlab, postgres, mysql, argocd, ports étiquetés et le veilleur du catalogue.
 - `devzone status --json` : récapitulatif complet en JSON, pour les outils (aucun secret, commande à lancer par point à traiter).
 
-Le catalogue d'applications se consulte avec `devzone catalog` ; un veilleur applique à chaud les changements de `.devzone.modules`, et `devzone repair` le relance. MySQL se pilote avec `devzone mysql create <projet>`, `devzone mysql list`, `devzone mysql delete <projet>`, `devzone mysql volume [<nom>|--supprimer <nom>]` et `devzone mysql delete-data` (données gardées par défaut).
+Le catalogue d'applications se consulte avec `devzone catalog` ; un veilleur applique à chaud les changements de `.devzone.modules`, et `devzone repair` le relance. MySQL se pilote avec `devzone mysql create <projet>`, `devzone mysql list`, `devzone mysql delete <projet>`, `devzone mysql volume [<nom>|--delete <nom>]` et `devzone mysql delete-data` (données gardées par défaut).
 
 Le choix est propre à chaque devzone, gardé dans `.devzone.modules` du dossier devzone.
 
@@ -66,7 +66,7 @@ Un garde-fou arrête les agents qui lancent `docker` ou `docker-compose` ; `DEVZ
 
 Les services (PostgreSQL, MySQL, GitLab, Argo CD) vivent sur le **cluster des services de devzone**, choisi une fois (`devzone cluster CTX`) et gardé dans l'état. Le contexte `devzone` de kubectl est posé sur ce cluster. Namespaces des services : `devzone-*`. `devzone cluster` affiche le cluster et les possibles, `devzone clusters` donne la vue travail/services ; le module `kubernetes` actif relie au cluster de la machine et installe metrics-server au démarrage.
 
-Le poste de développement peut tourner dans le cluster : `devzone workspace demarrer|arreter|etat|shell|vscode|copier-vers <dossier>|copier-depuis <dossier>` pilote le workspace Kubernetes (lancé du poste).
+Le poste de développement peut tourner dans le cluster : `devzone workspace start|stop|status|shell|vscode|copy-to <dossier>|copy-from <dossier>` pilote le workspace Kubernetes (lancé du poste).
 
 ## Ce qui revient au mainteneur
 

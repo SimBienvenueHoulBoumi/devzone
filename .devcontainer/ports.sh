@@ -21,12 +21,6 @@ INSTANCE="${DEVZONE_INSTANCE:-devzone}"
 # shellcheck source=SCRIPTDIR/etat.sh
 # shellcheck disable=SC1091
 . "$ICI/etat.sh"
-# English command names are accepted (#557) : a copied script may miss the file
-# shellcheck source=SCRIPTDIR/command-aliases.sh
-# shellcheck disable=SC1091
-if [ -f "$ICI/command-aliases.sh" ]; then
-    . "$ICI/command-aliases.sh"
-fi
 
 refuse() { echo "devzone : port : $*" >&2; exit 1; }
 
@@ -216,12 +210,6 @@ relancer() {
 # shellcheck disable=SC1091
 . "$ICI/ports-json.sh"
 if [ "${BASH_SOURCE[0]}" = "$0" ]; then
-    # Subcommand and options become their canonical English names ; the old
-    # French names warn on use (#557)
-    if command -v canonical_args >/dev/null 2>&1; then
-        canonical_args port "$@"
-        set -- "${ARGS_CANONICAL[@]+"${ARGS_CANONICAL[@]}"}"
-    fi
 case "${1:-}" in
     '' | list)
         if [ "${2:-}" = "--json" ]; then liste_json; else liste; fi

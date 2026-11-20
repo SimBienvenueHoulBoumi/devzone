@@ -1,47 +1,21 @@
 #!/usr/bin/env bash
-# English command names for the devzone CLI (#502).
+# Renamed names of the devzone CLI (#695): the French names of the commands,
+# subcommands and options are no longer accepted, they are refused. Each old
+# name prints « ✖ « old » a été renommé : devzone new » on stderr, exits with
+# code 1 and does nothing (no folder is created: « devzone stop » creates ./stop,
+# « devzone mettre-a-jour » must not create ./mettre-a-jour).
 #
-# Why: English command names are accepted now; the French names stay valid
-# and warn on use (#532).
+# renamed_command <name>              : English name of a renamed command, or 1
+# renamed_subcommand <command> <name> : English name of a renamed subcommand, or 1
+# renamed_option <option>             : English name of a renamed option, or 1
+# reject_renamed <command> <args...>  : refuses the first renamed name of a call
+#                                       (command, first word that is not an
+#                                       option, then each option); 0 if none
 #
-# command_canonical <name>: prints the current internal (French) name for an
-# English name; otherwise the name unchanged (empty stays empty).
-#
-# Subcommands and options follow the same rule (#557): the table below gives
-# the canonical English name of each French subcommand, per command, and the
-# canonical English name of each French option.
+# bash 3.2 (macOS): case only, no associative array.
 
-command_canonical() {
-    case "${1:-}" in
-        is-enabled) echo actif ;;
-        enable) echo activer ;;
-        disable) echo desactiver ;;
-        ai) echo ia ;;
-        help) echo aide ;;
-        apply) echo appliquer ;;
-        catalog) echo catalogue ;;
-        start) echo demarrer ;;
-        stop) echo arreter ;;
-        status) echo etat ;;
-        passwords) echo mots-de-passe ;;
-        packages) echo paquets ;;
-        platform) echo plateforme ;;
-        repair) echo reparer ;;
-        use) echo utiliser ;;
-        update) echo mettre-a-jour ;;
-        uninstall) echo desinstaller ;;
-        copy-to) echo copier-vers ;;
-        copy-from) echo copier-depuis ;;
-        migrate) echo migrer ;;
-        revert) echo revenir ;;
-        clean-docker) echo nettoyer-docker ;;
-        *) printf '%s\n' "${1:-}" ;;
-    esac
-}
-
-# English name of a French (internal) name; any other name unchanged.
-# Mirror of command_canonical, used by the deprecation warning (#532).
-command_english() {
+# English name of a renamed command, or return 1.
+renamed_command() {
     case "${1:-}" in
         actif) echo is-enabled ;;
         activer) echo enable ;;
@@ -65,29 +39,12 @@ command_english() {
         migrer) echo migrate ;;
         revenir) echo revert ;;
         nettoyer-docker) echo clean-docker ;;
-        *) printf '%s\n' "${1:-}" ;;
+        *) return 1 ;;
     esac
 }
 
-# Deprecation warning for the old French names (#532): called at the
-# normalization points, with the word as typed. Writes one line on stderr
-# for a French name of the table; silent for an English name, an unknown
-# name and DEVZONE_NO_DEPRECATION=1. The exit code is always 0.
-command_deprecated_warning() {
-    local word="${1:-}" english
-    [ -n "$word" ] || return 0
-    english="$(command_english "$word")"
-    [ "$english" != "$word" ] || return 0
-    if [ "${DEVZONE_NO_DEPRECATION:-}" != 1 ]; then
-        echo "devzone: \"$word\" is deprecated, use \"$english\"" >&2
-    fi
-    return 0
-}
-
-# subcommand_canonical <command> <word> : the canonical English name of a
-# subcommand of a command (#557). The French names are accepted and warn on
-# use; an unknown word is printed unchanged.
-subcommand_canonical() {
+# English name of a renamed subcommand of <command> (English name), or return 1.
+renamed_subcommand() {
     local command="${1:-}" word="${2:-}"
     case "$command" in
         postgres | mysql)
@@ -103,7 +60,7 @@ subcommand_canonical() {
                 relais-arreter) echo relay-stop ;;
                 autoriser) echo authorize ;;
                 interdire) echo forbid ;;
-                *) printf '%s\n' "$word" ;;
+                *) return 1 ;;
             esac
             ;;
         gitlab)
@@ -116,7 +73,7 @@ subcommand_canonical() {
                 relais-lancer) echo relay-start ;;
                 relais-arreter) echo relay-stop ;;
                 relais-etat) echo relay-status ;;
-                *) printf '%s\n' "$word" ;;
+                *) return 1 ;;
             esac
             ;;
         argocd)
@@ -126,7 +83,7 @@ subcommand_canonical() {
                 desinstaller) echo uninstall ;;
                 relais-lancer) echo relay-start ;;
                 relais-arreter) echo relay-stop ;;
-                *) printf '%s\n' "$word" ;;
+                *) return 1 ;;
             esac
             ;;
         packages)
@@ -135,7 +92,7 @@ subcommand_canonical() {
                 retirer) echo remove ;;
                 appliquer) echo apply ;;
                 lister) echo list ;;
-                *) printf '%s\n' "$word" ;;
+                *) return 1 ;;
             esac
             ;;
         catalog)
@@ -144,7 +101,7 @@ subcommand_canonical() {
                 appliquer) echo apply ;;
                 lister) echo list ;;
                 desinstaller) echo remove ;;
-                *) printf '%s\n' "$word" ;;
+                *) return 1 ;;
             esac
             ;;
         port)
@@ -155,16 +112,38 @@ subcommand_canonical() {
                 relancer) echo restart ;;
                 exclure) echo exclude ;;
                 inclure) echo include ;;
-                *) printf '%s\n' "$word" ;;
+                *) return 1 ;;
             esac
             ;;
-        *) printf '%s\n' "$word" ;;
+        workspace)
+            case "$word" in
+                demarrer) echo start ;;
+                mettre-a-jour) echo update ;;
+                arreter) echo stop ;;
+                etat) echo status ;;
+                copier-vers) echo copy-to ;;
+                copier-depuis) echo copy-from ;;
+                migrer) echo migrate ;;
+                revenir) echo revert ;;
+                nettoyer-docker) echo clean-docker ;;
+                aide) echo help ;;
+                *) return 1 ;;
+            esac
+            ;;
+        "workspace ports")
+            case "$word" in
+                demarrer) echo start ;;
+                arreter) echo stop ;;
+                etat) echo status ;;
+                *) return 1 ;;
+            esac
+            ;;
+        *) return 1 ;;
     esac
 }
 
-# option_canonical <word> : the canonical English name of an option (#557);
-# an unknown option is printed unchanged.
-option_canonical() {
+# English name of a renamed option, or return 1.
+renamed_option() {
     case "${1:-}" in
         --fermer) echo --close ;;
         --supprimer) echo --delete ;;
@@ -172,58 +151,43 @@ option_canonical() {
         --oui) echo --yes ;;
         --confirmer) echo --confirm ;;
         --contexte) echo --context ;;
-        *) printf '%s\n' "${1:-}" ;;
+        --rapatrier) echo --bring-back ;;
+        *) return 1 ;;
     esac
 }
 
-# Deprecation warning for the old French subcommands (#557): same format and
-# same DEVZONE_NO_DEPRECATION as command_deprecated_warning.
-subcommand_deprecated_warning() {
-    local command="${1:-}" word="${2:-}" english
-    [ -n "$word" ] || return 0
-    english="$(subcommand_canonical "$command" "$word")"
-    [ "$english" != "$word" ] || return 0
-    if [ "${DEVZONE_NO_DEPRECATION:-}" != 1 ]; then
-        echo "devzone: \"$word\" is deprecated, use \"$english\"" >&2
+# reject_renamed <command> <args...> : checks the command itself (top level),
+# the first word of <args> that is not an option (subcommand), then every
+# option. The first renamed name prints its message on stderr and returns 1;
+# nothing is run. Returns 0 when no name is renamed.
+reject_renamed() {
+    local command="${1:-}" word new
+    if [ "$#" -gt 0 ]; then shift; fi
+    if new="$(renamed_command "$command")"; then
+        # these commands only exist under « devzone workspace »
+        case "$command" in
+            migrer | revenir | copier-vers | copier-depuis | nettoyer-docker) new="workspace $new" ;;
+        esac
+        printf '✖ « %s » a été renommé : devzone %s\n' "$command" "$new" >&2
+        return 1
     fi
-    return 0
-}
-
-# Deprecation warning for the old French options (#557): same format and same
-# DEVZONE_NO_DEPRECATION as command_deprecated_warning.
-option_deprecated_warning() {
-    local word="${1:-}" english
-    [ -n "$word" ] || return 0
-    english="$(option_canonical "$word")"
-    [ "$english" != "$word" ] || return 0
-    if [ "${DEVZONE_NO_DEPRECATION:-}" != 1 ]; then
-        echo "devzone: \"$word\" is deprecated, use \"$english\"" >&2
-    fi
-    return 0
-}
-
-# canonical_args <command> <args...> : fills the global array ARGS_CANONICAL
-# with the canonical English names of the arguments: the first word that is
-# not an option is the subcommand, every option keeps its canonical English
-# name. The old French names warn on use (#557).
-canonical_args() {
-    local command="${1:-}" word canon premier=1
-    shift || true
-    ARGS_CANONICAL=()
+    for word in "$@"; do
+        case "$word" in
+            -*) continue ;;
+        esac
+        if new="$(renamed_subcommand "$command" "$word")"; then
+            printf '✖ « %s » a été renommé : devzone %s %s\n' "$word" "$command" "$new" >&2
+            return 1
+        fi
+        break
+    done
     for word in "$@"; do
         case "$word" in
             -*)
-                option_deprecated_warning "$word"
-                ARGS_CANONICAL+=("$(option_canonical "$word")")
-                ;;
-            *)
-                if [ "$premier" = 1 ]; then
-                    premier=0
-                    canon="$(subcommand_canonical "$command" "$word")"
-                    subcommand_deprecated_warning "$command" "$word"
-                    word="$canon"
+                if new="$(renamed_option "$word")"; then
+                    printf '✖ « %s » a été renommé : %s\n' "$word" "$new" >&2
+                    return 1
                 fi
-                ARGS_CANONICAL+=("$word")
                 ;;
         esac
     done

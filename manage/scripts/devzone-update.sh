@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Update of a devzone (devzone update [--oui] [--sans-reconstruire]): replaces
+# Update of a devzone (devzone update [--yes] [--sans-reconstruire]): replaces
 # the files of the package, backs up the replaced or removed ones, removes the
 # old layout, then offers the rebuild. Sourced by manage/devzone, after
 # devzone-manifest.sh, which provides the manifest helpers.
@@ -11,10 +11,10 @@ update_workstation() {
     local missing rel current expected answer backup base n old f
     for arg in "$@"; do
         case "$arg" in
-            --oui) assume_yes=1 ;;
+            --yes) assume_yes=1 ;;
             --sans-reconstruire) no_rebuild=1 ;;
             *)
-                echo "✖ option inconnue : $arg (devzone update [--oui] [--sans-reconstruire])" >&2
+                echo "✖ option inconnue : $arg (devzone update [--yes] [--sans-reconstruire])" >&2
                 exit 1
                 ;;
         esac
@@ -116,7 +116,7 @@ update_workstation() {
         done <"$work/modified"
         if [ -z "$assume_yes" ]; then
             if [ ! -t 0 ]; then
-                echo "✖ Fichiers modifiés localement : relance avec --oui pour les remplacer (sauvegarde dans .devzone.sauvegarde/)." >&2
+                echo "✖ Fichiers modifiés localement : relance avec --yes pour les remplacer (sauvegarde dans .devzone.sauvegarde/)." >&2
                 exit 1
             fi
             printf 'Remplacer ces fichiers (sauvegarde dans .devzone.sauvegarde/) ? [o/N] ' >&2
