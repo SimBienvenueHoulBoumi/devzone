@@ -9,7 +9,7 @@
 set -u
 
 ICI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT="$(cd "$ICI/../.." && pwd)"
+ROOT="$(cd "$ICI/../../.." && pwd)"
 LIST="$ROOT/.english"
 
 # Byte escapes and split fragments, so this file never matches its own rules

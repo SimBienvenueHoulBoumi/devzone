@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# Creation of a devzone with its mode (#497): devzone <folder> [--kubernetes|--docker].
+# Creation of a devzone with its mode (#497): devzone <folder> [--kubernetes].
 # Fake kubectl, helm, docker and workspace script under $BATS_TEST_TMPDIR;
 # no real cluster, Docker, make or workspace start.
 
@@ -76,16 +76,6 @@ WS
     [ ! -e mon ]
 }
 
-@test "cluster unreachable, --docker: docker recorded with the deprecation notice" {
-    FAKE_KUBE_CLUSTER_INFO=fail
-    export FAKE_KUBE_CLUSTER_INFO
-    run bash "$CLI" mon --docker --gitops none
-    [ "$status" -eq 0 ]
-    [ "$(cat mon/.devzone.modules)" = "workspace=docker" ]
-    [[ "$output" == *"is deprecated and will be removed"* ]] || false
-    [[ "$output" == *"cd "*"make up"* ]] || false
-}
-
 @test "--kubernetes, cluster unreachable: status 1, folder not created" {
     FAKE_KUBE_CLUSTER_INFO=fail
     export FAKE_KUBE_CLUSTER_INFO
@@ -95,18 +85,10 @@ WS
     [ ! -e mon ]
 }
 
-@test "--docker, cluster ready: docker recorded, cluster not asked" {
+@test "--docker is refused as an unknown option: folder not created" {
     run bash "$CLI" mon --docker --gitops none
-    [ "$status" -eq 0 ]
-    [ "$(cat mon/.devzone.modules)" = "workspace=docker" ]
-    [[ "$output" == *"Docker workstation (--docker) is deprecated"* ]] || false
-    [[ "$(cat "$FAKE_LOG")" != *"cluster-info"* ]] || false
-}
-
-@test "--kubernetes and --docker together: usage error, folder not created" {
-    run bash "$CLI" mon --kubernetes --docker --gitops none
     [ "$status" -eq 1 ]
-    [[ "$output" == *"choose one"* ]] || false
+    [[ "$output" == *"option inconnue : --docker"* ]] || false
     [ ! -e mon ]
 }
 

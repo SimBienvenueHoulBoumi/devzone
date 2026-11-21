@@ -21,6 +21,26 @@ outils_isoles() {
     done
 }
 
+# Aide de devzone <dossier> en mode Kubernetes (#735, le poste Docker est retiré) :
+# faux kubectl et helm sous $BATS_TEST_TMPDIR/bin-cluster, cluster « devzone »
+# joignable, aucun workspace installé. Le cluster réel du poste n'est jamais touché.
+cluster_pret() {
+    mkdir -p "$BATS_TEST_TMPDIR/bin-cluster"
+    cat >"$BATS_TEST_TMPDIR/bin-cluster/kubectl" <<'KUBECTL'
+#!/usr/bin/env bash
+case "$*" in
+    *"get-contexts"* | *"current-context"*) echo devzone ;;
+esac
+exit 0
+KUBECTL
+    cat >"$BATS_TEST_TMPDIR/bin-cluster/helm" <<'HELM'
+#!/usr/bin/env bash
+exit 1
+HELM
+    chmod +x "$BATS_TEST_TMPDIR/bin-cluster/kubectl" "$BATS_TEST_TMPDIR/bin-cluster/helm"
+    export PATH="$BATS_TEST_TMPDIR/bin-cluster:$PATH"
+}
+
 # Aide du récapitulatif devzone (#396) : faux kind sous $BATS_TEST_TMPDIR/bin qui
 # ne liste aucun cluster, pour qu'un vrai cluster kind-gitlab du poste ne fasse
 # pas apparaître l'avertissement d'ancien cluster dans les tests.

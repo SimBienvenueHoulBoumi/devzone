@@ -10,7 +10,7 @@
 set -u
 
 ICI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT="$(cd "$ICI/../.." && pwd)"
+ROOT="$(cd "$ICI/../../.." && pwd)"
 MAX=250
 
 if ! files="$(git -C "$ROOT" ls-files --cached --others --exclude-standard -- '*.go')"; then

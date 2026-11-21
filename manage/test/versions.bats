@@ -6,9 +6,9 @@ setup() {
     ROOT="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
     export HOME="$BATS_TEST_TMPDIR/home"
     mkdir -p "$HOME" "$BATS_TEST_TMPDIR/bin" \
-        "$BATS_TEST_TMPDIR/dz/manage/scripts" "$BATS_TEST_TMPDIR/dz/.devcontainer"
-    cp "$ROOT/manage/scripts/versions.sh" "$BATS_TEST_TMPDIR/dz/manage/scripts/"
-    VERSIONS="$BATS_TEST_TMPDIR/dz/manage/scripts/versions.sh"
+        "$BATS_TEST_TMPDIR/dz/manage/scripts/ci" "$BATS_TEST_TMPDIR/dz/.devcontainer"
+    cp "$ROOT/manage/scripts/ci/versions.sh" "$BATS_TEST_TMPDIR/dz/manage/scripts/ci/"
+    VERSIONS="$BATS_TEST_TMPDIR/dz/manage/scripts/ci/versions.sh"
     VERSIONS_ENV="$BATS_TEST_TMPDIR/dz/.devcontainer/versions.env"
     DEVZONE="$BATS_TEST_TMPDIR/dz/.devcontainer/devzone"
     cat >"$VERSIONS_ENV" <<'EOFENV'
@@ -185,7 +185,7 @@ open_tickets() {
 
 @test "real devzone file: both AI assistants read by versions.sh" {
     npm_versions repowarden 999.0.0 @anthropic-ai/claude-code 999.0.0 opencode-ai 999.0.0
-    run bash "$ROOT/manage/scripts/versions.sh"
+    run bash "$ROOT/manage/scripts/ci/versions.sh"
     [ "$status" -eq 0 ]
     [[ "$output" == *"@anthropic-ai/claude-code "*" 999.0.0"* ]] || false
     [[ "$output" == *"opencode-ai "*" 999.0.0"* ]] || false

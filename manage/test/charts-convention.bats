@@ -1,11 +1,11 @@
 #!/usr/bin/env bats
-# Convention of the devzone charts (#554): manage/scripts/check-charts.sh on
+# Convention of the devzone charts (#554): manage/scripts/ci/check-charts.sh on
 # fake charts under BATS_TEST_TMPDIR (CHARTS_DIR), never on the real charts
 # (that is the CI's job). helm is not run here (CHARTS_NO_HELM=1).
 
 setup() {
     RACINE="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
-    SCRIPT="$RACINE/manage/scripts/check-charts.sh"
+    SCRIPT="$RACINE/manage/scripts/ci/check-charts.sh"
     export CHARTS_DIR="$BATS_TEST_TMPDIR/charts"
     export CHARTS_CODE_DIRS="$BATS_TEST_TMPDIR/code"
     export CHARTS_NO_HELM=1
@@ -194,7 +194,7 @@ edit_demo() {
 
 @test "check-charts: the charts of the repository conform (helm not run here)" {
     RACINE="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
-    run env -u CHARTS_DIR -u CHARTS_CODE_DIRS CHARTS_NO_HELM=1 bash "$RACINE/manage/scripts/check-charts.sh"
+    run env -u CHARTS_DIR -u CHARTS_CODE_DIRS CHARTS_NO_HELM=1 bash "$RACINE/manage/scripts/ci/check-charts.sh"
     [ "$status" -eq 0 ]
     [[ "$output" == *"✔ charts : 5 charts conformes"* ]] || false
 }

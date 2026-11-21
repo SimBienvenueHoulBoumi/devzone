@@ -3,17 +3,12 @@
 # humain : chaque commande a un délai maximal ; une commande qui attend une
 # entrée au lieu de finir échoue (« attend une entrée »). Ticket #109.
 #   make test-cli     (ou bash manage/test/cli-terminal.sh)
-# Couvre : cibles make (help, up, shell, status, stop, down, rebuild,
-# desinstaller), commande npm (manage/devzone <dossier>, desinstaller, --version,
-# --help), commande devzone du conteneur (état, modules, unknown module),
-# scripts de démarrage (post-create.sh, startup.sh).
-# Isolation, comme functional.sh : devzone créé dans un dossier temporaire
-# (autre conteneur, autre image, autre Docker interne), volumes propres au
-# test (DEVZONE_VOLUMES), tout supprimé à la fin même en cas d'échec. Les
-# clusters de l'hôte ne sont jamais touchés : KUBECONFIG vide sur l'hôte,
-# DEVZONE_KUBE_SOURCE vers un fichier absent dans le conteneur, module
-# kubernetes disabled avant chaque démarrage.
-# Prérequis : Docker, Node (npx), Python 3. Durée : 10 à 15 min.
+# Couvre, sans cluster ni conteneur (#735, le poste Docker est retiré) : aide
+# de make, commande npm (manage/devzone --version, --help, uninstall hors d'un
+# dossier devzone, --docker refusé, dossier non vide refusé).
+# Les scénarios qui créaient et lançaient un conteneur sont retirés : la
+# création exige désormais un cluster Kubernetes.
+# Prérequis : Node, Python 3, make. Durée : moins d'une minute.
 set -uo pipefail
 
 RACINE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -116,72 +111,12 @@ humain "devzone --version" 30 0 "^$(node -p "require('$RACINE/package.json').ver
 humain "devzone --help" 30 0 "devzone <dossier>" -- bash "$RACINE/manage/devzone" --help
 cd "$TMP" || exit 1
 humain "devzone uninstall hors d'un dossier devzone : refusé" 30 1 "dossier devzone" -- bash "$RACINE/manage/devzone" uninstall
-# Question posée pendant le lancement (CLI devcontainer simulé) : make up
-# doit la montrer et s'arrêter, pas attendre en silence
-FAUX="$TMP/faux-devzone"
-DEVZONE_NO_START=1 bash "$RACINE/manage/devzone" "$FAUX" --docker >/dev/null
-mkdir -p "$TMP/faux-bin"
-printf '#!/usr/bin/env bash\nprintf "Running the postCreateCommand from devcontainer.json...\\r\\nConfigurer les bots de ce dépôt ? [o/N] "\nsleep 600\n' >"$TMP/faux-bin/npx"
-chmod +x "$TMP/faux-bin/npx"
-# (code 2 : celui de make quand la recette échoue)
-humain "make up : question dans le conteneur signalée au lieu d'attendre" 90 2 "asks a question" \
-    -- env PATH="$TMP/faux-bin:$PATH" DEVZONE_QUESTION_WAIT=5 make -C "$FAUX" up
-
-echo "▶ Création et lancement : devzone <dossier> (npm)"
-humain "devzone <dossier> : créé et lancé, avancement affiché" 1800 0 "▶ Installing in container" --envoyer 'GitOps repository for Argo CD\?' $'n\n' -- bash "$RACINE/manage/devzone" "$COPIE" --docker
-# Question du dépôt GitOps (#539) : répondue « n » ci-dessus, le choix est écrit
-verifier "question GitOps : aucun dépôt, Applications appliquées directement" grep -q "no GitOps repository: the Applications are applied directly" <<<"$SORTIE"
-verifier ".argocd.conf du devzone créé : repo = none" grep -q "repo = none" "$COPIE/.argocd.conf"
-if ! grep -q "devzone started" <<<"$SORTIE" || [ -z "$(docker ps -q --filter "label=devcontainer.local_folder=$COPIE")" ]; then
-    echo "✖ devzone non lancé : suite arrêtée"
-    exit 1
-fi
-mk status 60 0 "^Up "
-mk shell 180 0 "○ module ia" --envoyer '\$ ' $'devzone\nexit\n'
-
-echo "▶ Commande devzone du conteneur"
-conteneur "devzone : état" 60 0 "○ module kubernetes" "devzone"
-conteneur "devzone --help" 60 0 "devzone enable <module>" "devzone --help"
-conteneur "devzone enable ia" 600 0 "ai active" "devzone enable ia"
-conteneur "devzone disable ia" 300 0 "ai disabled" "devzone disable ia"
-conteneur "devzone enable kubernetes (aucun cluster de l'hôte)" 180 0 "no reachable cluster" "devzone enable kubernetes"
-conteneur "devzone disable kubernetes" 60 0 "kubernetes disabled" "devzone disable kubernetes"
-conteneur "devzone enable <unknown module> : refusé" 60 1 "unknown module" "devzone enable nexistepas"
-conteneur "devzone <unknown command> : refusée" 60 1 "unknown command" "devzone nexistepas"
-
-echo "▶ Scripts de démarrage, sous terminal"
-conteneur "startup.sh : sans question" 180 0 "devzone: state" "bash .devcontainer/startup.sh"
-# Conditions de make rebuild figé : dépôt GitHub, gh connecté et administrateur
-# (simulé) ; repowarden install proposait alors les bots et attendait
-git -C "$COPIE" init -q
-git -C "$COPIE" remote add origin https://github.com/exemple/mon-devzone.git
-FAUX_GH='mkdir -p /tmp/faux && printf "%s\n" "#!/bin/sh" "case \"\$*\" in" "\"auth status\"*) exit 0 ;;" "\"repo view\"*) echo exemple/mon-devzone ;;" "*permissions.admin*) echo true ;;" "esac" >/tmp/faux/gh && chmod +x /tmp/faux/gh'
-conteneur "post-create.sh : sans question (dépôt GitHub, gh administrateur)" 600 0 "devzone up" \
-    "$FAUX_GH && PATH=/tmp/faux:\$PATH bash .devcontainer/post-create.sh"
-# Scénario réel atteint : repowarden aurait posé la question avec un terminal
-verifier "post-create.sh : bots proposés plus tard, sans attendre" grep -q "pas de terminal pour répondre" <<<"$SORTIE"
-rm -rf "$COPIE/.git"
-
-echo "▶ Arrêt, redémarrage, reconstruction"
-mk stop 120 0 "devzone arrêté"
-mk status 60 0 "^Exited"
-mk up 600 0 "devzone started"
-verifier "make up : avancement affiché" grep -q "▶ Starting" <<<"$SORTIE"
-mk rebuild 1800 0 "devzone rebuilt"
-verifier "make rebuild : avancement affiché" grep -q "▶ Installing in container" <<<"$SORTIE"
-mk down 120 0 "devzone supprimé"
-mk status 60 0 "aucun conteneur"
-
-echo "▶ Désinstallation, confirmation tapée"
-avant="$(volumes)"
-mk desinstaller 300 0 "Canceled" --envoyer 'Type yes' $'no\n'
-SORTIE="volumes : $avant → $(volumes)"
-verifier "réponse non : rien supprimé" test "$(volumes)" = "$avant" -a "$avant" -gt 0
-cd "$COPIE" || exit 1
-humain "devzone uninstall : réponse oui" 300 0 "volume removed" --envoyer 'Type yes' $'yes\n' -- bash "$RACINE/manage/devzone" uninstall
-cd "$RACINE" || exit 1
-SORTIE="volumes restants : $(volumes)"
-verifier "réponse oui : volumes supprimés" test "$(volumes)" = 0
+humain "devzone <dossier> --docker : option retirée, refusée" 30 1 "option inconnue : --docker" -- bash "$RACINE/manage/devzone" "$TMP/mon-devzone" --docker
+verifier "--docker : dossier non créé" test ! -e "$TMP/mon-devzone"
+mkdir -p "$TMP/plein"
+echo important >"$TMP/plein/fichier"
+humain "devzone <dossier> : dossier non vide refusé" 30 1 "pas vide" -- bash "$RACINE/manage/devzone" "$TMP/plein"
+verifier "fichier existant préservé" grep -qx important "$TMP/plein/fichier"
 
 echo
 echo "Résultat : $reussis réussi(s), $failures échec(s)"

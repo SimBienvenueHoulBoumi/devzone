@@ -286,9 +286,6 @@ devzone workspace argocd app add <repo> [path] | app list | app remove <N>  # pr
 devzone workspace egress observation|strict|off  # egress proxy of --pod sessions (#633)
 devzone workspace egress status                  # mode, ready or not, domains contacted
 devzone workspace egress allow|deny <domain>    # adds or removes a domain from the strict list
-devzone workspace migrate [--yes]          # copies the Docker workstation to the Kubernetes workspace
-devzone workspace revert [--bring-back]   # back to the Docker workstation (deprecated, #682)
-devzone workspace clean-docker [--yes] # deletes the devzone-* Docker volumes (confirmation)
 ```
 
 The commands use the workstation's helm and kubectl, with the devzone context if it exists, otherwise the current context. The image is built by CI at each PR and published to ghcr.io at delivery.
@@ -327,34 +324,14 @@ devzone workspace status                  # follow the deployment; the last line
 
 `devzone <folder>` chooses the workstation mode from the cluster (#497):
 
-- **Kubernetes** if `kubectl` and `helm` are present and the cluster answers (the `devzone` context if declared, otherwise the current context, within 5 s). The folder is created with `workspace=kubernetes` in `.devzone.modules`, then the workspace is installed in the cluster from the folder (like `devzone workspace start`). No `devzone workspace migrate`: there are no Docker volumes to copy.
-- **Nothing** otherwise (#671): no more silent fallback to Docker. The command fails with exit code 1, creates nothing, says why the cluster does not answer, and shows, without running them, the ways to get one: a remote cluster (`aws eks update-kubeconfig`, `gcloud container clusters get-credentials`, `az aks get-credentials`, which declare it in your kubeconfig; it must be made the current kubectl context), Docker Desktop with Kubernetes enabled, or `minikube start -p devzone`. No cloud credential passes through devzone. **In a terminal** (#653), without options, the command offers a menu instead of the failure: 1) a **remote cluster**, a context of your kubeconfig (local clusters such as `docker-desktop`, `kind-*`, `minikube` or a `127.0.0.1` server are never offered as remote); you must **retype its name** to confirm, after a reminder of what will be installed (a pod, a volume, the `devzone-workspace` namespace, rights, a possible cost); devzone then makes it the current kubectl context; 2) a local **minikube** cluster: if minikube is absent, devzone shows the official installation command for the platform and never runs it; if present, it asks for confirmation, then runs `minikube start -p devzone` (`devzone` profile, driver chosen by minikube). The choice is kept only if the cluster then answers; otherwise the command fails as it does without a terminal. With `--kubernetes` or `--docker`, no menu. Still to do in #653: real tests (a remote context provided by its owner, a minikube created on a machine), choice of the minikube driver per platform, memory sizing.
+- **Kubernetes** if `kubectl` and `helm` are present and the cluster answers (the `devzone` context if declared, otherwise the current context, within 5 s). The folder is created with `workspace=kubernetes` in `.devzone.modules`, then the workspace is installed in the cluster from the folder (like `devzone workspace start`).
+- **Nothing** otherwise (#671): no more silent fallback to Docker. The command fails with exit code 1, creates nothing, says why the cluster does not answer, and shows, without running them, the ways to get one: a remote cluster (`aws eks update-kubeconfig`, `gcloud container clusters get-credentials`, `az aks get-credentials`, which declare it in your kubeconfig; it must be made the current kubectl context), Docker Desktop with Kubernetes enabled, or `minikube start -p devzone`. No cloud credential passes through devzone. **In a terminal** (#653), without options, the command offers a menu instead of the failure: 1) a **remote cluster**, a context of your kubeconfig (local clusters such as `docker-desktop`, `kind-*`, `minikube` or a `127.0.0.1` server are never offered as remote); you must **retype its name** to confirm, after a reminder of what will be installed (a pod, a volume, the `devzone-workspace` namespace, rights, a possible cost); devzone then makes it the current kubectl context; 2) a local **minikube** cluster: if minikube is absent, devzone shows the official installation command for the platform and never runs it; if present, it asks for confirmation, then runs `minikube start -p devzone` (`devzone` profile, driver chosen by minikube). The choice is kept only if the cluster then answers; otherwise the command fails as it does without a terminal. With `--kubernetes`, no menu. Still to do in #653: real tests (a remote context provided by its owner, a minikube created on a machine), choice of the minikube driver per platform, memory sizing.
 
-Options: `--kubernetes` requires the cluster and fails without creating anything (the check happens before the files are copied); `--docker` creates the Docker workstation, **deprecated** (warning, removal planned: two minor versions after this delivery, at least 30 days), without checking the cluster; both together are refused. Without an option, the cluster must answer.
+Options: `--kubernetes` requires the cluster and fails without creating anything (the check happens before the files are copied). Without an option, the cluster must answer. The former `--docker` option (Docker workstation) is removed (#735): it is refused as an unknown option.
 
 In this mode, Docker is not required on the workstation. The gh and opencode logins are done in the pod, at the first `make shell`.
 
 A workspace already installed in the cluster (helm release `devzone-workspace`, or Argo CD Application of the same name) is announced at creation: the new folder drives it too, and `devzone workspace start` updates it by `helm upgrade`, without loss (volumes remain).
-
-### Migration from the Docker workstation
-
-`devzone workspace migrate [--yes]` is run on the workstation, in the devzone folder. It asks for a `[y/N]` confirmation (`--yes` to skip it; without a terminal and without `--yes`, it refuses), then goes through five steps, each announced, and stops at the first error with a clear message. It copies, it deletes nothing.
-
-1. **Checks**: cluster reachable, pod `devzone-workspace-0` starts (otherwise `devzone workspace start`), workstation Docker running, enough space on `/workspaces/projets`.
-2. **Projects**: each `./workspace/<project>` is copied to `/workspaces/projets/<project>` (`.git` included, like `copy-to`), then checked by file count and size.
-3. **Identities and caches**: each Docker volume `devzone-<x>` (or `$DEVZONE_VOLUMES-<x>`) is read read-only by a `docker run --rm -v … :/src:ro` container (image `busybox:1.36`, `DEVZONE_IMAGE_COPY` for another), then copied by `kubectl cp` to its path in the `etat` volume (`persistence.state.paths` of the chart): `gh` → `~/.config/gh`, `git` → `~/.config/git`, `claude` → `~/.claude`, `opencode-config` → `~/.config/opencode`, `opencode-data` → `~/.local/share/opencode`, `agent` → `~/.local/state/oc-lancer`, `m2`, `gradle`, `pnpm`. An absent volume is ignored; `config` (`~/.config/devzone`, old state) has no path in the chart and is ignored. Each copy is verified.
-4. **State**: `.devzone.modules` and `.devzone.packages` of the workstation (if they exist) are copied to `/workspaces/projets/` in the pod.
-5. **Switch**: the line `workspace=kubernetes` is noted in the workstation's `.devzone.modules`.
-
-After `devzone workspace migrate`, `make up`, `make shell` and `make stop` drive the Kubernetes workspace; `make rebuild` refuses; `devzone workspace revert` gives back the Docker workstation.
-
-**Rollback** (deprecated, #682: a warning is shown, removal planned two minor versions and at least 30 days after this delivery; `migrate` remains): `devzone workspace revert` sets `workspace=docker` back and recalls `make shell`. The Docker workstation and its volumes were never touched by `migrate`: nothing else to do. `--bring-back` first copies all the pod's projects back into `./workspace` (`copy-from`; workstation folders with the same name are overwritten); on failure, the switch does not happen.
-
-**Cleanup**: Docker volumes are never deleted by `migrate` or `revert`. `devzone workspace clean-docker` lists the `devzone-*` volumes present, then asks `[y/N]` before deleting them (`--yes` without a terminal; otherwise refused). Irreversible: afterwards, `revert` starts from empty volumes.
-
-**Docker workstation on standby (#517)**: at the switch (step 5), `migrate` stops the container of the workstation folder (label `devcontainer.local_folder`) and the `devzone-<instance>-auto-*` automatic port relays with `docker stop`; it never deletes them. `revert` restarts them with `docker start`. Docker absent or stopped: a warning, the migration does not fail for all that. In the Kubernetes pod (`DEVZONE_WORKSPACE` set to `kubernetes`), the automatic port watcher does not start (`devzone repair` skips it) and the kind network is not joined: ports go through `devzone workspace ports`.
-
-Still legitimate on Docker: the Docker workstation mode (`make`, launch), the reading of volumes by `migrate` and `revert`, `uninstall`, CI, and kubedock (Docker API emulated by Kubernetes in the pod).
 
 ### The cluster does not answer
 
@@ -593,9 +570,9 @@ The family is deduced from the chart: `dependencies:` present = wrapper, otherwi
 
 **Check**
 
-The script `manage/scripts/check-charts.sh` applies the convention to each folder of `charts/` and to any `charts/devzone-<x>` reference in the code; it runs `helm lint` and the rendering when helm is present. A failure is shown as `✖ charts/<x> : <rule>` and fails the check. Before applying a chart, devzone checks that `charts/devzone-<service>/Chart.yaml` exists and carries `name: devzone-<service>`; otherwise it stops before any call to `kubectl` or `helm`, exits with code 2 and shows `✖ <service> : chart charts/devzone-<service> missing or misnamed (manage/docs/reference.md#devzone-charts)`. The catalog callers (`app.sh`, `mysql.sh`) receive this failure as an ordinary failure and exit with code 1.
+The script `manage/scripts/ci/check-charts.sh` applies the convention to each folder of `charts/` and to any `charts/devzone-<x>` reference in the code; it runs `helm lint` and the rendering when helm is present. A failure is shown as `✖ charts/<x> : <rule>` and fails the check. Before applying a chart, devzone checks that `charts/devzone-<service>/Chart.yaml` exists and carries `name: devzone-<service>`; otherwise it stops before any call to `kubectl` or `helm`, exits with code 2 and shows `✖ <service> : chart charts/devzone-<service> missing or misnamed (manage/docs/reference.md#devzone-charts)`. The catalog callers (`app.sh`, `mysql.sh`) receive this failure as an ordinary failure and exit with code 1.
 
-**Adding a service**: create `charts/devzone-<service>` according to the family, add the useful common values, run `bash manage/scripts/check-charts.sh`, then a test `chart-<service>.bats` (lint and rendering).
+**Adding a service**: create `charts/devzone-<service>` according to the family, add the useful common values, run `bash manage/scripts/ci/check-charts.sh`, then a test `chart-<service>.bats` (lint and rendering).
 
 ## Argo CD
 
@@ -824,7 +801,7 @@ In the container, the `devzone` summary reads `$RACINE/.devzone.version` and the
 
 Fingerprint of an archive: `curl -fsSL <url> | shasum -a 256`.
 
-**Automatic upgrades**: the versions of `repowarden` and of the AI assistants (`IA_CLAUDE`, `IA_OPENCODE`) are compared every hour with npm by the `versions` workflow (`.github/workflows/versions.yml`). For each outdated package, it opens or updates a ticket, proposes a design there (“Conception proposée”, *proposed design*), creates its branch, applies the upgrade (`manage/scripts/versions.sh --appliquer`), commits and pushes: the draft PR opens and CI tests the container. The maintainer confirms the design on the ticket (“Conception retenue”, *retained design*, expected by the `ticket` check), then moves the PR to ready. One line per package: two upgrades open at the same time (Claude Code and opencode) are merged one after the other without conflict. By hand: *Actions → versions → Run workflow*; locally, `bash manage/scripts/versions.sh` lists the outdated packages. Without a new version, the job stops after the comparison; there is no cross-trigger from repowarden, which would require a token from another owner.
+**Automatic upgrades**: the versions of `repowarden` and of the AI assistants (`IA_CLAUDE`, `IA_OPENCODE`) are compared every hour with npm by the `versions` workflow (`.github/workflows/versions.yml`). For each outdated package, it opens or updates a ticket, proposes a design there (“Conception proposée”, *proposed design*), creates its branch, applies the upgrade (`manage/scripts/ci/versions.sh --appliquer`), commits and pushes: the draft PR opens and CI tests the container. The maintainer confirms the design on the ticket (“Conception retenue”, *retained design*, expected by the `ticket` check), then moves the PR to ready. One line per package: two upgrades open at the same time (Claude Code and opencode) are merged one after the other without conflict. By hand: *Actions → versions → Run workflow*; locally, `bash manage/scripts/ci/versions.sh` lists the outdated packages. Without a new version, the job stops after the comparison; there is no cross-trigger from repowarden, which would require a token from another owner.
 
 **Catching up without a rebuild**: the state shown at startup (and by `devzone`) compares the installed tools with their frozen version. A line `⚠ outils          repowarden 4.9.2 installé, 4.12.0 figé : devzone apply` signals a gap; `devzone apply` reinstalls repowarden at the frozen version and the active modules. `✔ outils          versions figées` indicates that everything matches. Tools installed by `apt` or by the image (Java, Node, Python, …) are not concerned.
 
@@ -960,7 +937,6 @@ The commands, subcommands and options of devzone are written in English (#502, #
 | `devzone mettre-a-jour` / `desinstaller` | `devzone update` / `uninstall` |
 | `devzone workspace demarrer` / `arreter` / `etat` | `devzone workspace start` / `stop` / `status` |
 | `devzone workspace copier-vers` / `copier-depuis` | `devzone workspace copy-to` / `copy-from` |
-| `devzone workspace migrer` / `revenir` / `nettoyer-docker` | `devzone workspace migrate` / `revert` / `clean-docker` |
 | `devzone workspace aide` | `devzone workspace help` |
 | `devzone workspace ports demarrer` / `arreter` / `etat` | `devzone workspace ports start` / `stop` / `status` |
 
@@ -987,7 +963,6 @@ The commands, subcommands and options of devzone are written in English (#502, #
 | `--nouveau-mdp` | `--new-password` |
 | `--fermer` | `--close` |
 | `--supprimer` (`mysql volume`) | `--delete` |
-| `--rapatrier` | `--bring-back` |
 
 The following environment variables are not commands: they are not covered by this refusal.
 
