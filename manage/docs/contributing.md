@@ -47,9 +47,18 @@ Prerequisite of the automatic delivery: the repository's GitHub App (`repowarden
 
 The npm package (what `npm pack` produces and `devzone <folder>` copies) is checked by `manage/test/package-contents.bats`. The test reads `npm pack --dry-run --json --ignore-scripts`: nothing is published, no lifecycle script runs, and there is no network access. It is skipped when npm is absent.
 
-- **Shipped**: `manage/devzone` (the command), `manage/scripts/`, `manage/workspace.sh`, `.devcontainer/` (including `isolation.sh` and `ticket.sh`, which are used at run time, not only by the tests), `charts/`, `Makefile`, `.gitattributes`, `README.md`, `LICENSE`, `package.json`.
+- **Shipped**: `manage/devzone` (the command), `manage/scripts/`, `manage/workspace.sh`, `.devcontainer/` (including `isolation.sh` and `ticket.sh`, which are used at run time, not only by the tests), `charts/`, `Makefile`, `.gitattributes`, `README.md`, `LICENSE`, `package.json`, and `bin/` when it has been built (see below).
 - **Excluded**: `manage/test/`, `manage/docs/`, `cmd/`, `internal/`, `.github/`, `.claude/`, `.opencode/`, `go.mod`, `go.sum`, `.english`, `.repowarden.conf`, `CLAUDE.md`, `AGENTS.md`, `CONTRIBUTING.md`. The exclusion comes from the `files` list of `package.json`: a path added there is shipped.
-- **Ceilings**: 175 files and 872000 bytes unpacked, measured at #772 (159 files, 792412 bytes) plus 10 %. The test fails when a ceiling is passed; raise one only with the reason in the commit.
+- **Ceilings** (without `bin/`): 175 files and 872000 bytes unpacked, measured at #772 (159 files, 792412 bytes) plus 10 %. The test fails when a ceiling is passed; raise one only with the reason in the commit.
+
+### The Go binaries (#773)
+
+- **Content**: `bin/devzone-<os>-<arch>` for linux, darwin and windows (`.exe`) on amd64 and arm64, and `bin/SHA256SUMS` (one `<sum>  <name>` line per binary). `bin/` is ignored by git and never committed; `package-contents.bats` accepts exactly these seven files, and only when `bin/` exists.
+- **Build**: the `prepack` script of `package.json` runs `manage/scripts/ci/build-binaries.sh`, so `npm publish` and `npm pack` build them; `npm pack --ignore-scripts` (the test) and a developer without Go do not. The script reads `ARG GO_VERSION` of `.devcontainer/Dockerfile` and sets `GOTOOLCHAIN` to it (Go 1.21 or newer downloads the exact toolchain, 3 attempts, 5 s apart; without Go or with an older one it fails with the reason). A missing binary makes it fail: a half-built package is never produced. The version printed by `--version` is not injected: the binary reads the `package.json` of the package, like the bash command.
+- **Launcher**: `manage/devzone` picks `bin/devzone-<os>-<arch>` from `uname -s` and `uname -m`, checks its sum in `bin/SHA256SUMS`, copies it once to `${XDG_CACHE_HOME:-~/.cache}/devzone/bin/<version>/devzone[.exe]` (mode 755: npm does not keep the executable bit outside `bin`; the copy is atomic) and runs it with `DEVZONE_BASH_ENTRY` set to the launcher, so the binary finds `manage/devzone` and `package.json` from the cache. A wrong or missing sum, a copy that fails or a platform without binary keeps the bash command (a message tells why for the first cases).
+- **`DEVZONE_NO_GO=1`**: forces the bash command. **`DEVZONE_FROM_GO`**: set to 1 by the bridge `internal/bashbridge` in the environment of the bash it starts for the commands not ported to Go; the launcher then does not launch the binary again (no loop). Do not set it by hand.
+- **Ceilings** (with `bin/`): 185 files, 20146000 bytes unpacked and 8572000 bytes packed, measured at #773 (168 files, 18314524 bytes unpacked, 7792088 packed) plus 10 %. The `package` job of `.github/workflows/go.yml` builds the binaries, runs `npm pack --dry-run`, checks the seven files and the packed size, and compares `bin/devzone-linux-amd64 --version` with `package.json`.
+- **Tests**: `manage/test/launcher-go.bats` (fake binary per platform, fake `uname`, cache, wrong sum, `DEVZONE_NO_GO`, no loop with a fake and with the real binary).
 
 ## Organization
 

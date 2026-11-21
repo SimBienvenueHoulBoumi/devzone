@@ -352,9 +352,12 @@ fake_docker() {
 @test "layout: paths cited by Makefile, package.json, .gitattributes and fonctionnel.yml exist" {
     cd "$RACINE"
     # Old root locations: must not come back (everything is under manage/)
-    for d in bin scripts test; do
+    for d in scripts test; do
         [ ! -e "$d" ] || { echo "ancien dossier revenu à la racine : $d/"; return 1; }
     done
+    # bin/ at the root holds the Go binaries built by prepack (#773): present only
+    # after a build, ignored by git, never tracked
+    [ -z "$(git ls-files bin)" ] || { echo "bin/ is tracked by git"; return 1; }
     chemins="$(
         grep -oE 'manage/[A-Za-z0-9_./-]+' Makefile
         grep -oE 'bash [A-Za-z0-9_./-]+' Makefile | awk '{ print $2 }'
@@ -369,6 +372,8 @@ fake_docker() {
     [ -n "$chemins" ]
     while IFS= read -r c; do
         [ -n "$c" ] || continue
+        # bin/ is built by prepack: absent from a checkout
+        [ "$c" != "bin/" ] || continue
         [ -e "${c%/}" ] || { echo "chemin cité mais absent : $c"; return 1; }
     done <<<"$chemins"
 }
