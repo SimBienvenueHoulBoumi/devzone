@@ -111,7 +111,7 @@ state_recovery_confirm() {
 state_default() {
     local stage code=0
     stage="$(mktemp)" || return 1
-    printf 'ia=off\nkubernetes=off\ngitlab=off\n' >"$stage"
+    printf 'ai=off\nkubernetes=off\ngitlab=off\n' >"$stage"
     state_replace "$stage" || code=$?
     rm -f "$stage"
     return "$code"
@@ -213,7 +213,7 @@ state_init() {
     # once, when the state of this instance is created; stderr: init is also
     # called inside $(value …)
     if [ -f "$HOME/.claude/.credentials.json" ] || [ -f "$HOME/.local/share/opencode/auth.json" ]; then
-        echo "devzone : shared Claude Code/opencode connection found: devzone enable ia to use it here" >&2
+        echo "devzone : shared Claude Code/opencode connection found: devzone enable ai to use it here" >&2
     fi
     return 0
 }

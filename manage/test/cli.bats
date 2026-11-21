@@ -271,20 +271,20 @@ fake_docker() {
 }
 
 @test "launch.sh: key steps and state shown, full log kept" {
-    fake_cli 'printf "Start: Run: docker buildx build x\r\nbruit\r\nRunning the postStartCommand from devcontainer.json...\r\ndevzone : état\r\n  ○ module ia        facultatif\r\n"'
+    fake_cli 'printf "Start: Run: docker buildx build x\r\nbruit\r\nRunning the postStartCommand from devcontainer.json...\r\ndevzone : état\r\n  ○ module ai        facultatif\r\n"'
     run bash "$RACINE/manage/scripts/launch.sh" up "$PWD/dz"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"▶ Building image"*"▶ Starting (git identity, clusters, state)"*"○ module ia"*"devzone started"* ]] || false
+    [[ "$output" == *"▶ Building image"*"▶ Starting (git identity, clusters, state)"*"○ module ai"*"devzone started"* ]] || false
     [[ "$output" != *bruit* ]] || false
     grep -q bruit dz/.devzone.log
     [[ "$(cat "$BATS_TEST_TMPDIR/args")" == *"up --workspace-folder $PWD/dz"* ]] || false
 }
 
 @test "launch.sh: « devzone: state » summary (English form) shown" {
-    fake_cli 'printf "Running the postStartCommand from devcontainer.json...\r\ndevzone: state\r\n  ○ module ia        facultatif\r\n"'
+    fake_cli 'printf "Running the postStartCommand from devcontainer.json...\r\ndevzone: state\r\n  ○ module ai        facultatif\r\n"'
     run bash "$RACINE/manage/scripts/launch.sh" up "$PWD/dz"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"devzone: state"*"○ module ia"* ]] || false
+    [[ "$output" == *"devzone: state"*"○ module ai"* ]] || false
 }
 
 @test "launch.sh rebuild: container recreated" {

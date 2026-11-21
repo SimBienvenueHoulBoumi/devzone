@@ -28,7 +28,7 @@ VERSIONS="$ICI/../manage/scripts/ci/versions.sh"
 RACINE="${DEVZONE_ROOT:-$(dirname "$ICI")}"
 # Default state of the instance; DEVZONE_STATE takes precedence (tests, CI)
 ETAT="${DEVZONE_STATE:-$RACINE/.devzone.modules}"
-MODULES=(ia kubernetes gitlab postgres argocd mysql)
+MODULES=(ai kubernetes gitlab postgres argocd mysql)
 # shellcheck source=SCRIPTDIR/cluster.sh
 # shellcheck disable=SC1091
 . "$ICI/cluster.sh"
@@ -136,7 +136,7 @@ case "${1:-}" in
         # may uninstall again
         state_recovery_confirm
         apply_repowarden
-        [ "$(value_of ia)" = off ] || apply_ia on
+        [ "$(value_of ai)" = off ] || apply_ai on
         # gitlab, postgres, argocd: installed from the workstation in the
         # Kubernetes workspace pod (#528), by their installer elsewhere
         [ "$(value_of gitlab)" = off ] || apply_service gitlab

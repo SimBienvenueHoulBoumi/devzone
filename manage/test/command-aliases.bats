@@ -148,7 +148,7 @@ TABLE
 }
 
 @test "reject_renamed: noms anglais, inconnus et absence d'argument passent sans message" {
-    run --separate-stderr refus enable ia --yes
+    run --separate-stderr refus enable ai --yes
     [ "$status" -eq 0 ]
     [ -z "$stderr" ]
     run --separate-stderr refus nexistepas
@@ -160,7 +160,7 @@ TABLE
 }
 
 @test "reject_renamed: un module nommé comme un ancien nom n'est pas refusé" {
-    run --separate-stderr refus enable ia
+    run --separate-stderr refus enable ai
     [ "$status" -eq 0 ]
     [ -z "$stderr" ]
 }
@@ -337,4 +337,72 @@ removed_refus() {
     [ "$status" -eq 1 ] || { echo "code $status"; false; }
     [[ "$stderr" == *"--all"* ]] || { echo "message : $stderr"; false; }
     [ -z "$output" ] || false
+}
+
+@test "renamed_module: ia gives ai, any other name returns 1" {
+    run bash -c ". '$ALIASES'; renamed_module ia"
+    [ "$status" -eq 0 ]
+    [ "$output" = "ai" ]
+    run bash -c ". '$ALIASES'; renamed_module ai"
+    [ "$status" -eq 1 ]
+    run bash -c ". '$ALIASES'; renamed_module kubernetes"
+    [ "$status" -eq 1 ]
+}
+
+@test "reject_renamed: enable ia is refused with the new module name" {
+    run --separate-stderr refus enable ia
+    [ "$status" -eq 1 ]
+    [ "$stderr" = "✖ « ia » was renamed: ai" ]
+    [ -z "$output" ]
+}
+
+@test "reject_renamed: disable ia is refused with the new module name" {
+    run --separate-stderr refus disable ia
+    [ "$status" -eq 1 ]
+    [ "$stderr" = "✖ « ia » was renamed: ai" ]
+}
+
+@test "reject_renamed: is-enabled ia is refused with the new module name" {
+    run --separate-stderr refus is-enabled ia
+    [ "$status" -eq 1 ]
+    [ "$stderr" = "✖ « ia » was renamed: ai" ]
+}
+
+@test "reject_renamed: apply ia is refused with the new module name" {
+    run --separate-stderr refus apply ia
+    [ "$status" -eq 1 ]
+    [ "$stderr" = "✖ « ia » was renamed: ai" ]
+}
+
+@test "reject_renamed: the old module name is refused after an option too" {
+    run --separate-stderr refus enable --yes ia
+    [ "$status" -eq 1 ]
+    [ "$stderr" = "✖ « ia » was renamed: ai" ]
+}
+
+@test "reject_renamed: ia is only a renamed module for enable, disable, is-enabled and apply" {
+    run --separate-stderr refus postgres ia
+    [ "$status" -eq 0 ]
+    [ -z "$stderr" ]
+}
+
+@test "conteneur : enable, disable, is-enabled et apply refusent ia, code 1, aucun effet" {
+    export DEVZONE_ROOT="$T/racine"
+    for c in enable disable is-enabled apply; do
+        run --separate-stderr bash "$RACINE/.devcontainer/devzone" "$c" ia
+        [ "$status" -eq 1 ] || { echo "code $status pour $c"; false; }
+        [ "$stderr" = "✖ « ia » was renamed: ai" ] || { echo "message pour $c : $stderr"; false; }
+        [ -z "$output" ] || false
+    done
+    [ ! -e "$T/racine" ]
+    [ ! -e "$T/ia" ]
+}
+
+@test "hôte : devzone enable ia est refusé avant toute action, aucun dossier créé" {
+    run --separate-stderr bash "$CLI" enable ia
+    [ "$status" -eq 1 ]
+    [ "$stderr" = "✖ « ia » was renamed: ai" ]
+    [ -z "$output" ]
+    [ ! -e ia ]
+    [ ! -e "$T/kubectl.log" ]
 }

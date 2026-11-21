@@ -3,11 +3,11 @@ name: devzone
 description: Use to work in a devzone container — modules and catalog, devzone agent, worktrees, guard.
 ---
 
-<!-- devzone : skill set by devzone enable ia -->
+<!-- devzone : skill set by devzone enable ai -->
 
 # devzone skill (AI assistants)
 
-This skill is for Claude Code (lead) and opencode (developer) in a devzone container. It is set by `devzone enable ia` in `~/.claude/skills/devzone/` and `~/.config/opencode/skills/devzone/` (volumes, kept across rebuilds). To customize it without it being replaced, remove the marker line above.
+This skill is for Claude Code (lead) and opencode (developer) in a devzone container. It is set by `devzone enable ai` in `~/.claude/skills/devzone/` and `~/.config/opencode/skills/devzone/` (volumes, kept across rebuilds). To customize it without it being replaced, remove the marker line above.
 
 ## Golden rule
 
@@ -23,8 +23,8 @@ Projects live in `workspace/`; ticket worktrees under `workspace/wt/`. A worktre
 
 Modules are disabled by default, enabled on demand, without a rebuild:
 
-- `devzone enable ia`: Claude Code and opencode (pinned versions), repowarden guard, default opencode configuration. Then log in: `claude` (then `/login`), `opencode auth login`.
-- `devzone disable ia`: uninstalls the assistants; removes the guard and the default opencode configuration; keeps the state of `devzone agent`, the logs `workspace/.agents/` and the logins.
+- `devzone enable ai`: Claude Code and opencode (pinned versions), repowarden guard, default opencode configuration. Then log in: `claude` (then `/login`), `opencode auth login`.
+- `devzone disable ai`: uninstalls the assistants; removes the guard and the default opencode configuration; keeps the state of `devzone agent`, the logs `workspace/.agents/` and the logins.
 - `devzone enable kubernetes`: connects to the machine's cluster at each startup and installs metrics-server on local clusters.
 - `devzone enable gitlab`: installs a test GitLab in the services cluster (namespace `devzone-gitlab*`).
 - `devzone enable postgres`: shared PostgreSQL, one database per project (`devzone postgres create <project>`).
@@ -49,7 +49,7 @@ The log is `workspace/.agents/<folder>.log`. `--auto` avoids waiting for a permi
 
 ## Guard and protected files
 
-With `ia` active, the repowarden guard is plugged in for Claude Code and opencode: the agent is stopped before modifying `main`/`develop`, committing without `repowarden cc` or bypassing the hooks. `repowarden cc -m "…"` to commit.
+With `ai` active, the repowarden guard is plugged in for Claude Code and opencode: the agent is stopped before modifying `main`/`develop`, committing without `repowarden cc` or bypassing the hooks. `repowarden cc -m "…"` to commit.
 
 Protected rights files (never written by an agent, fixed list, no variable changes it): `.devcontainer/opencode/agent.json`, `.devcontainer/opencode.jsonc`, `.repowarden.conf`, `.devcontainer/agent-rights.sh`. An agent that touches them is refused and the change is reverted in the tree.
 

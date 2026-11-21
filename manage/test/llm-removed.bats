@@ -27,12 +27,12 @@ setup() {
 }
 
 @test "disable llm with llm=on in the state: the line is dropped, the others kept" {
-    printf 'ia=on\nllm=on\npostgres=off\n' >"$DEVZONE_STATE"
+    printf 'ai=on\nllm=on\npostgres=off\n' >"$DEVZONE_STATE"
     run bash "$DEVZONE" disable llm
     [ "$status" -eq 1 ]
     [[ "$output" == *"llm module removed"* ]] || false
     ! grep -q '^llm=' "$DEVZONE_STATE" || false
-    grep -qx 'ia=on' "$DEVZONE_STATE"
+    grep -qx 'ai=on' "$DEVZONE_STATE"
     grep -qx 'postgres=off' "$DEVZONE_STATE"
 }
 

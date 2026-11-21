@@ -83,7 +83,7 @@ agent_isole() {
     export FAKE_OP_TEXTE_MODELS="" FAKE_OP_ANCIEN_ERREUR_MODELS="" FAKE_OP_DUREE=30
     : >"$FAKE_OP_LOG"
     : >"$FAKE_OP_CONSIGNE_LOG"
-    # npm simulé : l'activation du module ia installe de faux claude et opencode
+    # npm simulé : l'activation du module ai installe de faux claude et opencode
     export NPM_LOG="$BATS_TEST_TMPDIR/npm.log"
     : >"$NPM_LOG"
     cat >"$BATS_TEST_TMPDIR/bin/npm" <<'NPM'
@@ -107,7 +107,7 @@ GETENT
     printf '#!/usr/bin/env bash\nexit 0\n' >"$BATS_TEST_TMPDIR/bin/curl"
     chmod +x "$BATS_TEST_TMPDIR/bin/npm" "$BATS_TEST_TMPDIR/bin/getent" "$BATS_TEST_TMPDIR/bin/curl"
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
-    bash "$DEVZONE" enable ia >/dev/null 2>&1 || true
+    bash "$DEVZONE" enable ai >/dev/null 2>&1 || true
     cat >"$BATS_TEST_TMPDIR/bin/opencode" <<'OPCODEFAKE'
 #!/usr/bin/env bash
 # Faux opencode. FAKE_OP_ECHEC_MODELS : erreur $FAKE_OP_MESSAGE ; FAKE_OP_RESEAU_MODELS :

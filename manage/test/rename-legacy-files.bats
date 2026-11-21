@@ -218,3 +218,61 @@ legacy_tree() {
     [ "$(cat "$DEVZONE_ROOT/.devzone.backup/other")" = "d" ]
     [ ! -e "$DEVZONE_ROOT/.devzone.sauvegarde/other" ]
 }
+
+@test "rename-legacy-files: the ia= line becomes ai= with its value" {
+    printf 'ia=on\n' >"$DEVZONE_ROOT/.devzone.modules"
+    run bash "$SCRIPT"
+    [ "$status" -eq 0 ]
+    [ "$output" = "devzone : ia= renamed to ai=" ]
+    [ "$(cat "$DEVZONE_ROOT/.devzone.modules")" = "ai=on" ]
+    printf 'ia=off\n' >"$DEVZONE_ROOT/.devzone.modules"
+    bash "$SCRIPT" >/dev/null
+    [ "$(cat "$DEVZONE_ROOT/.devzone.modules")" = "ai=off" ]
+}
+
+@test "rename-legacy-files: the old ia= line is dropped when ai= exists" {
+    printf 'ai=off\nia=on\n' >"$DEVZONE_ROOT/.devzone.modules"
+    run bash "$SCRIPT"
+    [ "$status" -eq 0 ]
+    [ "$(cat "$DEVZONE_ROOT/.devzone.modules")" = "ai=off" ]
+}
+
+@test "rename-legacy-files: the other lines are unchanged by the ia= migration" {
+    printf 'kubernetes=on\nia=on\ngitlab=off\nports=3000\n' >"$DEVZONE_ROOT/.devzone.modules"
+    printf 'kubernetes=on\nai=on\ngitlab=off\nports=3000\n' >"$T/expected"
+    run bash "$SCRIPT"
+    [ "$status" -eq 0 ]
+    cmp -s "$T/expected" "$DEVZONE_ROOT/.devzone.modules"
+}
+
+@test "rename-legacy-files: a second run after the ia= migration changes nothing" {
+    printf 'ia=on\nplateforme=github\n' >"$DEVZONE_ROOT/.devzone.modules"
+    bash "$SCRIPT" >/dev/null
+    run bash "$SCRIPT"
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+    [ "$(cat "$DEVZONE_ROOT/.devzone.modules")" = "$(printf 'ai=on\nplatform=github')" ]
+}
+
+@test "rename-legacy-files: a key that only starts like ia is left alone" {
+    printf 'iam=on\nmedia=on\n' >"$DEVZONE_ROOT/.devzone.modules"
+    run bash "$SCRIPT"
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+    [ "$(cat "$DEVZONE_ROOT/.devzone.modules")" = "$(printf 'iam=on\nmedia=on')" ]
+}
+
+@test "rename-legacy-files: the failure marker of the AI module is renamed" {
+    echo "npm log" >"$DEVZONE_ROOT/.devzone.modules-failed-ia"
+    run bash "$SCRIPT"
+    [ "$status" -eq 0 ]
+    [ ! -e "$DEVZONE_ROOT/.devzone.modules-failed-ia" ]
+    [ "$(cat "$DEVZONE_ROOT/.devzone.modules-failed-ai")" = "npm log" ]
+}
+
+@test "devzone: a state with ia=on migrated at the startup is read as ai on" {
+    printf 'ia=on\nkubernetes=off\n' >"$DEVZONE_ROOT/.devzone.modules"
+    bash "$SCRIPT" >/dev/null
+    run bash "$BATS_TEST_DIRNAME/../../.devcontainer/devzone" is-enabled ai
+    [ "$status" -eq 0 ]
+}

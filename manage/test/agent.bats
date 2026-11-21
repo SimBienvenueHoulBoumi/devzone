@@ -99,11 +99,11 @@ setup() {
 }
 
 @test "agent : ia disabled -> refuses to launch, code 2, message to enable it" {
-    bash "$DEVZONE" disable ia
+    bash "$DEVZONE" disable ai
     agent_consigne
     agent_lance
     [ "$status" -eq 2 ]
-    [[ "$output" == *"devzone enable ia"* ]] || false
+    [[ "$output" == *"devzone enable ai"* ]] || false
 }
 
 @test "agent : opencode session with dedicated KUBECONFIG, without the host config" {

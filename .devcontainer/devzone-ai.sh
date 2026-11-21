@@ -98,17 +98,17 @@ install_ai() {
     [ "${#IA_FAILED[@]}" -eq 0 ]
 }
 
-apply_ia() {
+apply_ai() {
     local log tmp detected
     if [ "$1" = on ]; then
         echo "devzone : installing Claude Code and opencode (a few minutes)…"
         if ! install_ai; then
             log="$(last_npm_log)"
-            echo "npm log: $log" >"$(failure_marker_file ia)"
+            echo "npm log: $log" >"$(failure_marker_file ai)"
             echo "devzone : installation of ${IA_FAILED[*]} failed (npm install -g, 3 tries); npm log: $log; retry: devzone apply" >&2
             return 1
         fi
-        rm -f "$(failure_marker_file ia)"
+        rm -f "$(failure_marker_file ai)"
         echo "devzone : Claude Code and opencode installed"
         # repowarden guard (Claude Code PreToolUse hook, opencode plugin): the
         # agent is stopped before changing main/develop, committing without
@@ -151,7 +151,7 @@ apply_ia() {
         echo "devzone : ai active: claude (then /login), opencode auth login"
     else
         npm uninstall -g "${IA_NOMS[@]}" >/dev/null 2>&1 || true
-        rm -f "$(failure_marker_file ia)"
+        rm -f "$(failure_marker_file ai)"
         # repowarden guard: removed on disable (symmetrical with the enable).
         # repowarden does it itself when present; otherwise removal by jq of only
         # the PreToolUse entries calling the guard, the rest of settings.json

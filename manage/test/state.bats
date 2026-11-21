@@ -131,7 +131,7 @@ reader() {
         rm -f /dev/shm/devzone-state-$$
         export TMPDIR=/dev/shm
     fi
-    printf 'ia=off\n' >"$DEVZONE_STATE"
+    printf 'ai=off\n' >"$DEVZONE_STATE"
     reader &
     pid_r=$!
     writer a 25 &
@@ -147,7 +147,7 @@ reader() {
 }
 
 @test "state removed with a backup copy: restored" {
-    printf 'ia=on\nkubernetes=off\ngitlab=on\npostgres=on\n' >"$DEVZONE_STATE.prec"
+    printf 'ai=on\nkubernetes=off\ngitlab=on\npostgres=on\n' >"$DEVZONE_STATE.prec"
     rm -f "$DEVZONE_STATE"
     run bash "$DEVZONE" is-enabled postgres
     [ "$status" -eq 0 ]
@@ -158,7 +158,7 @@ reader() {
 }
 
 @test "state removed without a backup copy, devzone namespaces: rebuilt" {
-    printf 'ia=on\n' >"$DEVZONE_STATE"
+    printf 'ai=on\n' >"$DEVZONE_STATE"
     rm -f "$DEVZONE_STATE"
     FAUX_NS="devzone-postgres devzone-gitlab devzone-mysql" run bash "$DEVZONE" is-enabled postgres
     [ "$status" -eq 0 ]
@@ -166,7 +166,7 @@ reader() {
     grep -qx 'postgres=on' "$DEVZONE_STATE"
     grep -qx 'gitlab=on' "$DEVZONE_STATE"
     grep -qx 'mysql=on' "$DEVZONE_STATE"
-    grep -qx 'ia=off' "$DEVZONE_STATE"
+    grep -qx 'ai=off' "$DEVZONE_STATE"
     # cluster= expects the real host context that points to the services
     # cluster (docker-desktop here), not the "devzone" context
     grep -qx 'cluster=docker-desktop' "$DEVZONE_STATE"
@@ -179,7 +179,7 @@ reader() {
 case "$*" in "config get-contexts -o name"|"config view") exit 1 ;; get\ namespaces*) for n in ${FAUX_NS:-}; do printf 'namespace/%s\n' "$n"; done ;; esac
 KUBE
     chmod +x "$BATS_TEST_TMPDIR/bin/kubectl"
-    printf 'ia=on\n' >"$DEVZONE_STATE"
+    printf 'ai=on\n' >"$DEVZONE_STATE"
     rm -f "$DEVZONE_STATE"
     FAUX_NS="devzone-postgres devzone-gitlab" run bash "$DEVZONE" is-enabled postgres
     [ "$status" -eq 0 ]
@@ -191,9 +191,9 @@ KUBE
 }
 
 @test "first installation: default state, without backup copy" {
-    run bash "$DEVZONE" is-enabled ia
+    run bash "$DEVZONE" is-enabled ai
     [ "$status" -eq 1 ]
-    grep -qx 'ia=off' "$DEVZONE_STATE"
+    grep -qx 'ai=off' "$DEVZONE_STATE"
     grep -qx 'kubernetes=off' "$DEVZONE_STATE"
     grep -qx 'gitlab=off' "$DEVZONE_STATE"
     run test -e "$DEVZONE_STATE.prec"
@@ -223,9 +223,9 @@ KUBE
 }
 
 @test "fresh restore: the port watcher does nothing for 60 s" {
-    printf 'ia=on\nports_auto=on\n' >"$DEVZONE_STATE.prec"
+    printf 'ai=on\nports_auto=on\n' >"$DEVZONE_STATE.prec"
     rm -f "$DEVZONE_STATE"
-    run bash "$DEVZONE" is-enabled ia
+    run bash "$DEVZONE" is-enabled ai
     [ "$status" -eq 0 ]
     [ -f "$DEVZONE_STATE.recouvre" ]
     # Port that the watcher would normally relay (0.0.0.0, not the container IP)
@@ -236,7 +236,7 @@ KUBE
 }
 
 @test "restored state not confirmed: the watcher does not uninstall" {
-    printf 'ia=on\nports_auto=off\n' >"$DEVZONE_STATE"
+    printf 'ai=on\nports_auto=off\n' >"$DEVZONE_STATE"
     # Mark older than 60 s: the delay has passed, nothing is confirmed
     echo $(( $(date +%s) - 120 )) >"$DEVZONE_STATE.recouvre"
     mkdir -p "$DEVZONE_PORTS_AUTO_DIR/devzone"
@@ -248,7 +248,7 @@ KUBE
 }
 
 @test "devzone apply confirms the state: uninstall resumes" {
-    printf 'ia=off\ngitlab=off\npostgres=off\nkubernetes=off\nports_auto=off\n' >"$DEVZONE_STATE"
+    printf 'ai=off\ngitlab=off\npostgres=off\nkubernetes=off\nports_auto=off\n' >"$DEVZONE_STATE"
     echo $(( $(date +%s) - 120 )) >"$DEVZONE_STATE.recouvre"
     mkdir -p "$DEVZONE_PORTS_AUTO_DIR/devzone"
     printf '8080\n' >"$DEVZONE_PORTS_AUTO_DIR/devzone/actifs"
@@ -265,12 +265,12 @@ KUBE
 
 @test "state: no deprecated line on stdout nor stderr (#532)" {
     bats_require_minimum_version 1.5.0
-    printf 'ia=on\nports_auto=off\n' >"$DEVZONE_STATE"
+    printf 'ai=on\nports_auto=off\n' >"$DEVZONE_STATE"
     run --separate-stderr bash "$DEVZONE" status
     [ "$status" -eq 0 ]
     [[ "$output" != *"deprecated"* ]] || false
     [[ "$stderr" != *"deprecated"* ]] || false
-    run --separate-stderr bash "$DEVZONE" is-enabled ia
+    run --separate-stderr bash "$DEVZONE" is-enabled ai
     [ "$status" -eq 0 ]
     [[ "$stderr" != *"deprecated"* ]] || false
 }
