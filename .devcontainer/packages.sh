@@ -1,35 +1,36 @@
 #!/usr/bin/env bash
-# Paquets système gardés après un rebuild (#351) : une liste dans le dossier
-# devzone (<racine>/.devzone.paquets, entête de commentaire + un nom de paquet
-# par ligne, triés, sans doublon), réinstallée à chaque création du conteneur
-# (post-create.sh). Un paquet installé à la main est perdu par un rebuild, sauf
-# s'il est dans cette liste.
-#   packages.sh ou packages.sh list        liste avec l'état de chaque paquet
-#   packages.sh add <nom>…                valide, installe, ajoute à la liste
-#   packages.sh remove <nom>…             retire de la liste et désinstalle (sauf paquet de l'image)
-#   packages.sh apply                     installe tout ce qui manque (post-create.sh)
-# L'état d'un paquet vient de dpkg-query -W -f='${Status}' ; les commandes
-# système passent par des variables surchargeables pour les tests (sudo, apt-get,
-# apt-cache, dpkg-query, marque, horodatage). Compatible bash 3.2 (macOS).
+# System packages kept after a rebuild (#351): a list in the devzone folder
+# (<root>/.devzone.paquets, a comment header + one package name per line, sorted,
+# without duplicates), reinstalled at each container creation (post-create.sh).
+# A package installed by hand is lost by a rebuild, unless it is in this list.
+#   packages.sh or packages.sh list        list with the state of each package
+#   packages.sh add <name>…                validates, installs, adds to the list
+#   packages.sh remove <name>…             removes from the list and uninstalls (except image packages)
+#   packages.sh apply                      installs everything missing (post-create.sh)
+# The state of a package comes from dpkg-query -W -f='${Status}'; the system
+# commands go through overridable variables for the tests (sudo, apt-get,
+# apt-cache, dpkg-query, mark, timestamp). Compatible with bash 3.2 (macOS).
 set -euo pipefail
 
-ICI="$(cd "$(dirname "$0")" && pwd)"
-RACINE="${DEVZONE_RACINE:-$(dirname "$ICI")}"
-LISTE="${RACINE}/.devzone.paquets"
-MARQUE="${DEVZONE_PAQUETS_MARQUE:-/tmp/devzone-paquets.echec}"
-MAJ="${DEVZONE_PAQUETS_MAJ:-/tmp/devzone-paquets.maj}"
+HERE="$(cd "$(dirname "$0")" && pwd)"
+ROOT="${DEVZONE_RACINE:-$(dirname "$HERE")}"
+LIST="${ROOT}/.devzone.paquets"
+MARK="${DEVZONE_PAQUETS_MARQUE:-/tmp/devzone-paquets.echec}"
+UPDATED="${DEVZONE_PAQUETS_MAJ:-/tmp/devzone-paquets.maj}"
 SUDO="${DEVZONE_PAQUETS_SUDO-sudo}"
 APT="${DEVZONE_PAQUETS_APT:-apt-get}"
 APTCACHE="${DEVZONE_PAQUETS_APTCACHE:-apt-cache}"
 DPKGQUERY="${DEVZONE_PAQUETS_DPKG_QUERY:-dpkg-query}"
 FORMAT="-f=\${Status}"
-ENTETE="# paquets ajoutés par devzone packages add ; réinstallés à chaque création du conteneur"
-PRESENT="# déjà présent"
+# Stored values, kept byte for byte (the users' list file): the header and the
+# « already present » mark are written in UTF-8 as byte escapes (contract).
+HEADER=$'# paquets ajout\303\251s par devzone packages add ; r\303\251install\303\251s \303\240 chaque cr\303\251ation du conteneur'
+PRESENT_MARK=$'# d\303\251j\303\240 pr\303\251sent'
 
 
-refuse() { echo "devzone : paquets : $*" >&2; exit 1; }
+refuse() { echo "devzone : packages : $*" >&2; exit 1; }
 
-en_root() {
+as_root() {
     if [ -n "$SUDO" ]; then
         "$SUDO" "$@"
     else
@@ -37,191 +38,191 @@ en_root() {
     fi
 }
 
-installe() {
+is_installed() {
     "$DPKGQUERY" -W "$FORMAT" "$1" 2>/dev/null | grep -q 'install ok installed'
 }
 
-# Lignes de la liste telles quelles (nom, ou nom suivi de la marque PRESENT).
-lignes_liste() {
-    [ -f "$LISTE" ] || return 0
-    grep -vE '^[[:space:]]*(#|$)' "$LISTE" 2>/dev/null |
+# List lines as they are (name, or name followed by the present mark).
+list_lines() {
+    [ -f "$LIST" ] || return 0
+    grep -vE '^[[:space:]]*(#|$)' "$LIST" 2>/dev/null |
         sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e '/^$/d' |
         sort -k1,1 -u || true
 }
 
-# Noms seuls : la marque de fin de ligne est ignorée.
-noms_liste() {
-    lignes_liste | sed -e 's/[[:space:]]*#.*$//' | sort -u || true
+# Names only: the end-of-line mark is ignored.
+list_names() {
+    list_lines | sed -e 's/[[:space:]]*#.*$//' | sort -u || true
 }
 
-nom_listee() {
-    local nom
-    while IFS= read -r nom; do
-        [ "$nom" = "$1" ] && return 0
-    done < <(noms_liste)
+name_listed() {
+    local name
+    while IFS= read -r name; do
+        [ "$name" = "$1" ] && return 0
+    done < <(list_names)
     return 1
 }
 
-# Vrai si le paquet a été marqué comme déjà présent dans l'image.
-marque_presente() {
-    grep -qxF -e "$1 $PRESENT" "$LISTE" 2>/dev/null
+# True if the package was marked as already present in the image.
+mark_present() {
+    grep -qxF -e "$1 $PRESENT_MARK" "$LIST" 2>/dev/null
 }
 
-# Réécrit la liste : un seul en-tête, puis les lignes données (triées par nom).
-ecrire_liste() {
+# Rewrites the list: a single header, then the given lines (sorted by name).
+write_list() {
     local tmp
     tmp="$(mktemp)"
     {
-        echo "$ENTETE"
+        echo "$HEADER"
         [ "$#" -eq 0 ] || printf '%s\n' "$@" | sort -k1,1 -u
     } >"$tmp"
-    mv "$tmp" "$LISTE"
+    mv "$tmp" "$LIST"
 }
 
-maj_index() {
-    local dernier
-    dernier="$(cat "$MAJ" 2>/dev/null || true)"
-    if [ -n "$dernier" ] && [ $(( $(date +%s) - dernier )) -lt 3600 ]; then
+update_index() {
+    local last
+    last="$(cat "$UPDATED" 2>/dev/null || true)"
+    if [ -n "$last" ] && [ $(( $(date +%s) - last )) -lt 3600 ]; then
         return 0
     fi
-    en_root "$APT" update || return 1
-    date +%s >"$MAJ"
+    as_root "$APT" update || return 1
+    date +%s >"$UPDATED"
 }
 
-lister() {
-    local paquets paquet
-    paquets="$(noms_liste)"
-    if [ -z "$paquets" ]; then
-        echo "aucun paquet (devzone packages add <nom>)"
+list_packages() {
+    local packages package
+    packages="$(list_names)"
+    if [ -z "$packages" ]; then
+        echo "no package (devzone packages add <name>)"
         return 0
     fi
-    while IFS= read -r paquet; do
-        [ -n "$paquet" ] || continue
-        if installe "$paquet"; then
-            echo "  ✔ $paquet"
+    while IFS= read -r package; do
+        [ -n "$package" ] || continue
+        if is_installed "$package"; then
+            echo "  ✔ $package"
         else
-            echo "  ○ $paquet"
+            echo "  ○ $package"
         fi
-    done < <(printf '%s\n' "$paquets")
+    done < <(printf '%s\n' "$packages")
 }
 
-ajouter() {
+add_packages() {
     local -a a=()
-    local -a entrees=()
-    local arg nom ligne deja=""
+    local -a entries=()
+    local arg name line already=""
     for arg in "$@"; do
         case "$arg" in
-            -*) refuse "argument inconnu : $arg (devzone packages add <nom>…)" ;;
+            -*) refuse "unknown argument: $arg (devzone packages add <name>…)" ;;
             *) a+=("$arg") ;;
         esac
     done
-    [ "${#a[@]}" -gt 0 ] || refuse "ajouter attend au moins un nom : devzone packages add <nom>…"
-    maj_index || echo "index apt non mis à jour" >&2
-    for nom in "${a[@]}"; do
-        if ! "$APTCACHE" show "$nom" >/dev/null 2>&1; then
-            refuse "paquet inconnu : $nom (liste inchangée)"
+    [ "${#a[@]}" -gt 0 ] || refuse "add expects at least one name: devzone packages add <name>…"
+    update_index || echo "apt index not updated" >&2
+    for name in "${a[@]}"; do
+        if ! "$APTCACHE" show "$name" >/dev/null 2>&1; then
+            refuse "unknown package: $name (list unchanged)"
         fi
     done
-    # Ce qui est déjà installé avant l'installation vient de l'image : marqué.
-    for nom in "${a[@]}"; do
-        if installe "$nom"; then
-            deja="$deja $nom"
+    # What is already installed before the installation comes from the image: marked
+    for name in "${a[@]}"; do
+        if is_installed "$name"; then
+            already="$already $name"
         fi
     done
-    if en_root DEBIAN_FRONTEND=noninteractive "$APT" install -y --no-install-recommends "${a[@]}"; then
-        while IFS= read -r ligne; do
-            entrees+=("$ligne")
-        done < <(lignes_liste)
-        for nom in "${a[@]}"; do
-            if nom_listee "$nom"; then
+    if as_root DEBIAN_FRONTEND=noninteractive "$APT" install -y --no-install-recommends "${a[@]}"; then
+        while IFS= read -r line; do
+            entries+=("$line")
+        done < <(list_lines)
+        for name in "${a[@]}"; do
+            if name_listed "$name"; then
                 continue
             fi
-            case " $deja " in
-                *" $nom "*)
-                    entrees+=("$nom $PRESENT")
-                    echo "$nom : déjà présent avant devzone packages (marqué ; retirer le laissera installé)"
+            case " $already " in
+                *" $name "*)
+                    entries+=("$name $PRESENT_MARK")
+                    echo "$name : already present before devzone packages (marked ; removing will leave it installed)"
                     ;;
-                *) entrees+=("$nom") ;;
+                *) entries+=("$name") ;;
             esac
         done
-        ecrire_liste "${entrees[@]}"
+        write_list "${entries[@]}"
     else
-        refuse "installation impossible : ${a[*]} (liste inchangée)"
+        refuse "installation failed: ${a[*]} (list unchanged)"
     fi
 }
 
-retirer() {
+remove_packages() {
     local -a a=()
-    local -a desinstalles=()
-    local -a restantes=()
-    local arg nom ligne nom_ligne
+    local -a removals=()
+    local -a remaining=()
+    local arg name line name_line
     for arg in "$@"; do
         case "$arg" in
-            -*) refuse "argument inconnu : $arg (devzone packages remove <nom>…)" ;;
+            -*) refuse "unknown argument: $arg (devzone packages remove <name>…)" ;;
             *) a+=("$arg") ;;
         esac
     done
-    [ "${#a[@]}" -gt 0 ] || refuse "retirer attend au moins un nom : devzone packages remove <nom>…"
-    for nom in "${a[@]}"; do
-        nom_listee "$nom" ||
-            refuse "paquet non listé : $nom (fourni par l'image ?) : devzone packages remove n'ajoute pas les paquets de l'image"
-        if ! marque_presente "$nom"; then
-            desinstalles+=("$nom")
+    [ "${#a[@]}" -gt 0 ] || refuse "remove expects at least one name: devzone packages remove <name>…"
+    for name in "${a[@]}"; do
+        name_listed "$name" ||
+            refuse "package not listed: $name (provided by the image?) : devzone packages remove does not add image packages"
+        if ! mark_present "$name"; then
+            removals+=("$name")
         fi
     done
-    if [ "${#desinstalles[@]}" -gt 0 ] && ! en_root "$APT" remove -y "${desinstalles[@]}"; then
-        refuse "désinstallation impossible : ${desinstalles[*]} (liste inchangée)"
+    if [ "${#removals[@]}" -gt 0 ] && ! as_root "$APT" remove -y "${removals[@]}"; then
+        refuse "removal failed: ${removals[*]} (list unchanged)"
     fi
-    for nom in "${a[@]}"; do
-        if marque_presente "$nom"; then
-            echo "$nom : retiré de la liste, laissé installé (présent avant devzone packages)"
+    for name in "${a[@]}"; do
+        if mark_present "$name"; then
+            echo "$name : removed from the list, left installed (present before devzone packages)"
         fi
     done
-    while IFS= read -r ligne; do
-        nom_ligne="${ligne%% *}"
+    while IFS= read -r line; do
+        name_line="${line%% *}"
         case " ${a[*]} " in
-            *" $nom_ligne "*) ;;
-            *) restantes+=("$ligne") ;;
+            *" $name_line "*) ;;
+            *) remaining+=("$line") ;;
         esac
-    done < <(lignes_liste)
-    ecrire_liste "${restantes[@]+"${restantes[@]}"}"
+    done < <(list_lines)
+    write_list "${remaining[@]+"${remaining[@]}"}"
 }
 
-appliquer() {
-    local paquet
-    local -a manquants=()
-    while IFS= read -r paquet; do
-        [ -n "$paquet" ] || continue
-        if ! installe "$paquet"; then
-            manquants+=("$paquet")
+apply_packages() {
+    local package
+    local -a missing=()
+    while IFS= read -r package; do
+        [ -n "$package" ] || continue
+        if ! is_installed "$package"; then
+            missing+=("$package")
         fi
-    done < <(printf '%s\n' "$(noms_liste)")
-    if [ "${#manquants[@]}" -eq 0 ]; then
-        rm -f "$MARQUE"
+    done < <(printf '%s\n' "$(list_names)")
+    if [ "${#missing[@]}" -eq 0 ]; then
+        rm -f "$MARK"
         return 0
     fi
-    maj_index || echo "index apt non mis à jour" >&2
-    for paquet in "${manquants[@]}"; do
-        en_root DEBIAN_FRONTEND=noninteractive "$APT" install -y --no-install-recommends "$paquet" || true
+    update_index || echo "apt index not updated" >&2
+    for package in "${missing[@]}"; do
+        as_root DEBIAN_FRONTEND=noninteractive "$APT" install -y --no-install-recommends "$package" || true
     done
-    local -a restants=()
-    for paquet in "${manquants[@]}"; do
-        if ! installe "$paquet"; then
-            restants+=("$paquet")
+    local -a still_missing=()
+    for package in "${missing[@]}"; do
+        if ! is_installed "$package"; then
+            still_missing+=("$package")
         fi
     done
-    if [ "${#restants[@]}" -gt 0 ]; then
-        printf '%s\n' "${restants[@]}" >"$MARQUE"
+    if [ "${#still_missing[@]}" -gt 0 ]; then
+        printf '%s\n' "${still_missing[@]}" >"$MARK"
         return 1
     fi
-    rm -f "$MARQUE"
+    rm -f "$MARK"
 }
 
 case "${1:-}" in
-    '' | list) lister ;;
-    add) ajouter "${@:2}" ;;
-    remove) retirer "${@:2}" ;;
-    apply) appliquer ;;
+    '' | list) list_packages ;;
+    add) add_packages "${@:2}" ;;
+    remove) remove_packages "${@:2}" ;;
+    apply) apply_packages ;;
     -h | --help | aide) awk 'NR==1{next} /^#$/{exit} /^#/{sub(/^# ?/,""); print; next} {exit}' "${BASH_SOURCE[0]}" ;;
-    *) refuse "commande inconnue : ${1:-(aucune)} (devzone packages --help)" ;;
+    *) refuse "unknown command: ${1:-(none)} (devzone packages --help)" ;;
 esac

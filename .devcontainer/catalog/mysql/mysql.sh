@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# MySQL du catalogue (#414) : create, list, delete, status, relay-start, relay-stop, install, delete-data.
+# MySQL of the catalog (#414): create, list, delete, status, relay-start, relay-stop, install, delete-data.
 set -euo pipefail
 ICI="$(cd "$(dirname "$0")" && pwd)"
 RACINE="${DEVZONE_RACINE:-$(dirname "$(dirname "$(dirname "$ICI")")")}"
@@ -19,7 +19,7 @@ ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
 # shellcheck source=SCRIPTDIR/install.sh
 # shellcheck disable=SC1091
 . "$ICI/install.sh"
-# Le module argocd actif : MySQL installé par une Application (#538)
+# The argocd module on: MySQL installed by an Application (#538)
 # shellcheck source=SCRIPTDIR/../../argocd/catalog-argocd.sh
 # shellcheck disable=SC1091
 . "$ICI/../../argocd/catalog-argocd.sh"
@@ -30,124 +30,124 @@ MYSQL_IMAGE="${MYSQL_IMAGE:-mysql:8.4}"
 MYSQL_MEMOIRE="${MYSQL_MEMOIRE:-1Gi}"
 MYSQL_TAILLE="${MYSQL_TAILLE:-5Gi}"
 MYSQL_ATTENTE="${MYSQL_ATTENTE:-300}"
-# Refus standard avec message et code 2
-refuse() { echo "devzone : catalogue mysql : $*" >&2; exit 2; }
-# Secret mysql-admin du hook services.sh : le même que l'installation directe
+# Standard refusal with a message and code 2
+refuse() { echo "devzone : catalog mysql : $*" >&2; exit 2; }
+# Secret mysql-admin of the services.sh hook: the same as the direct installation
 services_secret_mysql() { mysql_secret; }
-# Régénère la vue .password (échec non bloquant)
+# Regenerates the .password view (non-blocking failure)
 regenerer_identifiants() {
     password_regenerate ||
-        echo "devzone : catalogue mysql : identifiants regroupés non mis à jour (devzone passwords)" >&2
+        echo "devzone : catalog mysql : grouped credentials not updated (devzone passwords)" >&2
 }
-# Raccourci kubectl dans le namespace devzone-mysql
+# Shortcut for kubectl in the devzone-mysql namespace
 k() { kubectl --context devzone -n "$NS" "$@"; }
-# Le namespace devzone-mysql existe-t-il ? Lecture des namespaces réservée à
-# l'administrateur (#430)
-installe() { account_admin "$(account_context)" get namespace "$NS" >/dev/null 2>&1; }
-# Contexte du module : celui du cluster de devzone
-contexte() {
+# Does the devzone-mysql namespace exist? Administrator only (#430)
+installed() { account_admin "$(account_context)" get namespace "$NS" >/dev/null 2>&1; }
+# Context of the module: the one of the devzone cluster
+module_context() {
     local c
     c="$(cluster_saved)"
-    [ -n "$c" ] || refuse "aucun cluster choisi : devzone enable mysql"
+    [ -n "$c" ] || refuse "no cluster chosen: devzone enable mysql"
     echo "$c"
 }
-# Marque d'échec du module (même schéma que fichier_echec de devzone)
-fichier_echec() { echo "$ETAT-echec-mysql"; }
-# Nom de projet : identifiant SQL simple, jamais à échapper, pas un nom réservé
-valider_projet() {
+# Failure marker of the module (same scheme as devzone's failure_file)
+failure_file() { echo "$ETAT-echec-mysql"; }
+# Project name: a simple SQL identifier, never escaped, not a reserved name
+check_project_name() {
     local p="${1:-}"
-    [ -n "$p" ] || refuse "nom de projet manquant"
-    [[ "$p" =~ ^[a-z][a-z0-9_]{0,62}$ ]] || refuse "nom de projet invalide : $p (minuscules, chiffres, _ ; commence par une lettre)"
+    [ -n "$p" ] || refuse "missing project name"
+    [[ "$p" =~ ^[a-z][a-z0-9_]{0,62}$ ]] || refuse "invalid project name: $p (lowercase, digits, _; starts with a letter)"
     case "$p" in
-        mysql | information_schema | performance_schema | sys) refuse "nom réservé : $p" ;;
+        mysql | information_schema | performance_schema | sys) refuse "reserved name: $p" ;;
     esac
 }
-# Mot de passe aléatoire pour un nouveau projet
-mot_de_passe() { openssl rand -hex 24; }
-# Mot de passe root : root.env d'une installation existante, sinon admin-password
+# Random password for a new project
+new_password() { openssl rand -hex 24; }
+# Root password: from root.env of an existing installation, else admin-password
 root_password() {
-    local mdp
-    mdp="$(sed -n 's/^MYSQL_PASSWORD=//p' "$SECRETS/root.env" 2>/dev/null | tail -1 || true)"
-    [ -z "$mdp" ] && [ -f "$SECRETS/admin-password" ] && mdp="$(cat "$SECRETS/admin-password" 2>/dev/null || true)"
-    [ -n "$mdp" ] || refuse "mot de passe root MySQL introuvable (workspace/.mysql/root.env)"
-    echo "$mdp"
+    local password
+    password="$(sed -n 's/^MYSQL_PASSWORD=//p' "$SECRETS/root.env" 2>/dev/null | tail -1 || true)"
+    [ -z "$password" ] && [ -f "$SECRETS/admin-password" ] && password="$(cat "$SECRETS/admin-password" 2>/dev/null || true)"
+    [ -n "$password" ] || refuse "MySQL root password not found (workspace/.mysql/root.env)"
+    echo "$password"
 }
-# mysql en superutilisateur dans le pod ; le mot de passe n'est jamais affiché
+# mysql as superuser in the pod; the password is never shown
 mysql_admin() { k exec -i mysql-0 -c mysql -- mysql -uroot -p"$(root_password)" "$@"; }
-# Nombre de bases hors bases système
-nombre_bases() {
+# Number of databases, system databases excluded
+database_count() {
     local n
     n="$(mysql_admin -N -B -e "SHOW DATABASES" 2>/dev/null | grep -vE '^(information_schema|mysql|performance_schema|sys)$' | grep -c . || true)"
     echo "${n:-0}"
 }
-installer() {
+# Installs the module (the Argo CD path when the argocd module is on)
+install_module() {
     local CTX claim
-    CTX="$(contexte)"
+    CTX="$(module_context)"
     if ! devzone_context_set "$CTX"; then
-        echo "devzone : catalogue mysql : impossible de poser le contexte devzone sur $CTX" >&2
+        echo "devzone : catalog mysql : cannot set the devzone context on $CTX" >&2
         return 1
     fi
-    echo "▶ MySQL sur le cluster $CTX (namespace $NS)…"
+    echo "▶ MySQL on cluster $CTX (namespace $NS)…"
     if catalogue_argocd_active mysql; then
-        mysql_installer_argocd "$CTX"
+        mysql_install_argocd "$CTX"
         return
     fi
     account_namespace "$CTX" "$NS"
     namespace_isolate "$NS" >/dev/null
     if k get statefulset mysql >/dev/null 2>&1; then
-        echo "devzone : catalogue mysql : installation existante dans $NS, adoptée (volume et root.env gardés)"
+        echo "devzone : catalog mysql : existing installation in $NS, adopted (volume and root.env kept)"
     else
         mysql_secret
-        claim="$(mysql_claim_choisir "$NS")" || return 2
-        mysql_appliquer_chart "$NS" "$claim" || return 1
+        claim="$(mysql_claim_choose "$NS")" || return 2
+        mysql_apply_chart "$NS" "$claim" || return 1
         if ! k rollout status statefulset/mysql --timeout="${MYSQL_ATTENTE}s" >/dev/null; then
-            echo "devzone : catalogue mysql : pas prêt après ${MYSQL_ATTENTE}s : kubectl --context $CTX -n $NS describe pod mysql-0" >&2
+            echo "devzone : catalog mysql : not ready after ${MYSQL_ATTENTE}s: kubectl --context $CTX -n $NS describe pod mysql-0" >&2
             return 1
         fi
     fi
     mysql_secret
     relay_start mysql "$CTX" "$NS" svc/mysql 3306:3306
-    echo "✔ MySQL prêt : 127.0.0.1:$MYSQL_PORT dans le conteneur"
+    echo "✔ MySQL ready: 127.0.0.1:$MYSQL_PORT in the container"
     regenerer_identifiants
 }
-# Supprime le namespace (donc les PVC), garde workspace/.mysql (#441) :
-# confirmation en terminal [o/N], --yes obligatoire sinon (refus, code 2)
-supprimer_donnees() {
-    local CTX oui="" arg reponse
+# Deletes the namespace (so the PVCs), keeps workspace/.mysql (#441):
+# terminal confirmation [o/N], --yes required otherwise (refusal, code 2)
+delete_data() {
+    local CTX yes="" arg answer
     for arg in "$@"; do
         case "$arg" in
-            --yes) oui=1 ;;
-            *) refuse "argument inconnu : $arg" ;;
+            --yes) yes=1 ;;
+            *) refuse "unknown argument: $arg" ;;
         esac
     done
-    if [ -z "$oui" ]; then
-        cluster_interactive || refuse "confirmation impossible sans terminal : devzone mysql delete-data --yes"
-        printf 'Supprimer le namespace %s et tous ses volumes ? [o/N] ' "$NS" >&2
-        read -r reponse || reponse=""
-        case "$reponse" in
+    if [ -z "$yes" ]; then
+        cluster_interactive || refuse "confirmation needs a terminal: devzone mysql delete-data --yes"
+        printf 'Delete namespace %s and all its volumes? [o/N] ' "$NS" >&2
+        read -r answer || answer=""
+        case "$answer" in
             o | O | oui) ;;
-            *) echo "Abandon : rien n'a été supprimé."; return 0 ;;
+            *) echo "Aborted: nothing was deleted."; return 0 ;;
         esac
     fi
     CTX="$(cluster_saved)"
-    [ -n "$CTX" ] || refuse "aucun cluster choisi : devzone enable mysql"
-    installe || refuse "module inactif : devzone enable mysql"
-    echo "▶ Suppression de MySQL et de ses volumes sur ${CTX}…"
-    # L'Application part d'abord (#538) : sinon Argo CD recrée le namespace
+    [ -n "$CTX" ] || refuse "no cluster chosen: devzone enable mysql"
+    installed || refuse "module disabled: devzone enable mysql"
+    echo "▶ Deleting MySQL and its volumes on ${CTX}…"
+    # The Application goes first (#538): otherwise Argo CD recreates the namespace
     catalogue_argocd_delete mysql >/dev/null 2>&1 || true
-    # RoleBinding retiré puis namespace supprimé par l'administrateur (#430)
+    # RoleBinding removed, then the namespace deleted by the administrator (#430)
     account_remove "$CTX" "$NS" >/dev/null 2>&1 || true
     account_admin "$CTX" delete namespace "$NS" --wait=true >/dev/null
     relay_stop mysql
-    rm -f "$(fichier_echec)"
-    echo "✔ namespace $NS et volume supprimés ; workspace/.mysql/root.env gardé"
+    rm -f "$(failure_file)"
+    echo "✔ namespace $NS and volume deleted; workspace/.mysql/root.env kept"
     regenerer_identifiants
 }
-# État : désactivé, en échec, prêt, relais arrêté
-etat() {
+# State (disabled, failed, ready, relay stopped): read by devzone, keep the words
+module_status() {
     local CTX
     CTX="$(cluster_saved)"
-    if [ -z "$CTX" ] || ! installe; then
+    if [ -z "$CTX" ] || ! installed; then
         echo "désactivé"
         return 0
     fi
@@ -159,104 +159,104 @@ etat() {
         echo "prêt sur $CTX, relais arrêté : devzone apply"
         return 0
     fi
-    echo "prêt sur $CTX : 127.0.0.1:$MYSQL_PORT, $(nombre_bases) base(s)"
+    echo "prêt sur $CTX : 127.0.0.1:$MYSQL_PORT, $(database_count) base(s)"
 }
-# Crée l'utilisateur et la base d'un projet ; .env en 600, mot de passe gardé
-creer() {
-    local projet="${1:-}" nouveau="" fichier mdp arg
-    valider_projet "$projet"
+# Creates the user and the database of a project; .env in 600, password kept
+create_project() {
+    local project="${1:-}" renew="" file password arg
+    check_project_name "$project"
     for arg in "${@:2}"; do
         case "$arg" in
-            --new-password) nouveau=1 ;;
-            *) refuse "argument inconnu : $arg" ;;
+            --new-password) renew=1 ;;
+            *) refuse "unknown argument: $arg" ;;
         esac
     done
-    CTX="$(contexte)"
-    installe || refuse "module inactif : devzone enable mysql"
-    fichier="$SECRETS/$projet.env"
-    if [ -z "$nouveau" ] && [ -s "$fichier" ]; then
-        mdp="$(sed -n 's/^MYSQL_PASSWORD=//p' "$fichier" 2>/dev/null | tail -1)"
+    CTX="$(module_context)"
+    installed || refuse "module disabled: devzone enable mysql"
+    file="$SECRETS/$project.env"
+    if [ -z "$renew" ] && [ -s "$file" ]; then
+        password="$(sed -n 's/^MYSQL_PASSWORD=//p' "$file" 2>/dev/null | tail -1)"
     else
-        mdp="$(mot_de_passe)"
+        password="$(new_password)"
     fi
     mysql_admin <<SQL
-CREATE USER IF NOT EXISTS '$projet'@'%' IDENTIFIED BY '$mdp';
-ALTER USER '$projet'@'%' IDENTIFIED BY '$mdp';
-CREATE DATABASE IF NOT EXISTS $projet;
-GRANT ALL ON $projet.* TO '$projet'@'%';
+CREATE USER IF NOT EXISTS '$project'@'%' IDENTIFIED BY '$password';
+ALTER USER '$project'@'%' IDENTIFIED BY '$password';
+CREATE DATABASE IF NOT EXISTS $project;
+GRANT ALL ON $project.* TO '$project'@'%';
 SQL
     mkdir -p "$SECRETS"
     chmod 700 "$SECRETS"
     (
         umask 077
-        cat >"$fichier" <<ENV
+        cat >"$file" <<ENV
 MYSQL_HOST=127.0.0.1
 MYSQL_PORT=$MYSQL_PORT
-MYSQL_USER=$projet
-MYSQL_PASSWORD=$mdp
-MYSQL_URL=jdbc:mysql://127.0.0.1:$MYSQL_PORT/$projet
+MYSQL_USER=$project
+MYSQL_PASSWORD=$password
+MYSQL_URL=jdbc:mysql://127.0.0.1:$MYSQL_PORT/$project
 ENV
     )
-    echo "✔ base $projet prête ; identifiants : $fichier"
+    echo "✔ database $project ready; credentials: $file"
     regenerer_identifiants
 }
-# Liste les bases du serveur
-liste() {
+# Lists the databases of the server
+list_databases() {
     local CTX
-    CTX="$(contexte)"
-    installe || refuse "module inactif : devzone enable mysql"
-    # grep -v sort 1 sans base utilisateur : sous pipefail, liste reste à 0
+    CTX="$(module_context)"
+    installed || refuse "module disabled: devzone enable mysql"
+    # grep -v exits 1 with no user database: under pipefail, the list stays at 0
     mysql_admin -N -B -e "SHOW DATABASES" 2>/dev/null |
         { grep -vE '^(information_schema|mysql|performance_schema|sys)$' || true; } |
-        awk 'BEGIN { n = 0 } { printf "  %-30s\n", $1; n++ } END { if (n == 0) print "  (aucune base : devzone mysql create <projet>)" }'
+        awk 'BEGIN { n = 0 } { printf "  %-30s\n", $1; n++ } END { if (n == 0) print "  (no database: devzone mysql create <project>)" }'
 }
-# Supprime la base et l'utilisateur d'un projet (confirmation sans --yes)
-supprimer() {
-    local projet="${1:-}" oui="" arg reponse
-    valider_projet "$projet"
+# Deletes the database and the user of a project (confirmation without --yes)
+delete_project() {
+    local project="${1:-}" yes="" arg answer
+    check_project_name "$project"
     for arg in "${@:2}"; do
         case "$arg" in
-            --yes) oui=1 ;;
-            *) refuse "argument inconnu : $arg" ;;
+            --yes) yes=1 ;;
+            *) refuse "unknown argument: $arg" ;;
         esac
     done
-    CTX="$(contexte)"
-    installe || refuse "module inactif : devzone enable mysql"
-    if [ -z "$oui" ]; then
-        cluster_interactive || refuse "confirmation impossible sans terminal : devzone mysql delete $projet --yes"
-        printf 'Supprimer la base %s et son utilisateur ? [o/N] ' "$projet" >&2
-        read -r reponse || reponse=""
-        case "$reponse" in
+    CTX="$(module_context)"
+    installed || refuse "module disabled: devzone enable mysql"
+    if [ -z "$yes" ]; then
+        cluster_interactive || refuse "confirmation needs a terminal: devzone mysql delete $project --yes"
+        printf 'Delete database %s and its user? [o/N] ' "$project" >&2
+        read -r answer || answer=""
+        case "$answer" in
             o | O | oui) ;;
-            *) echo "Abandon : rien n'a été supprimé."; return 0 ;;
+            *) echo "Aborted: nothing was deleted."; return 0 ;;
         esac
     fi
     mysql_admin <<SQL
-DROP DATABASE IF EXISTS $projet;
-DROP USER IF EXISTS '$projet'@'%';
+DROP DATABASE IF EXISTS $project;
+DROP USER IF EXISTS '$project'@'%';
 SQL
-    rm -f "$SECRETS/$projet.env"
-    echo "✔ base $projet supprimée"
+    rm -f "$SECRETS/$project.env"
+    echo "✔ database $project deleted"
     regenerer_identifiants
 }
-# Relance le relais 127.0.0.1:3306 si le namespace existe
-relais() {
+# Restarts the relay 127.0.0.1:3306 if the namespace exists
+relay_restart() {
     local CTX
     CTX="$(cluster_saved)"
-    [ -n "$CTX" ] && installe && relay_start mysql "$CTX" "$NS" svc/mysql 3306:3306
+    [ -n "$CTX" ] && installed && relay_start mysql "$CTX" "$NS" svc/mysql 3306:3306
 }
 case "${1:-}" in
-    install) installer ;;
-    delete-data) supprimer_donnees "${@:2}" ;;
-    status) etat ;;
-    create) creer "${@:2}" ;;
-    list) liste ;;
-    delete) supprimer "${@:2}" ;;
+    install) install_module ;;
+    delete-data) delete_data "${@:2}" ;;
+    status) module_status ;;
+    create) create_project "${@:2}" ;;
+    list) list_databases ;;
+    delete) delete_project "${@:2}" ;;
     volume) mysql_volume "$NS" "${@:2}" ;;
-    relay-start) relais ;;
+    relay-start) relay_restart ;;
     relay-stop) relay_stop mysql ;;
     *)
-        echo "devzone : catalogue mysql : create <projet> [--new-password] | list | delete <projet> [--yes] | volume [<nom>] [--delete <nom>] [--yes] | delete-data [--yes]" >&2
+        echo "devzone : catalog mysql : create <project> [--new-password] | list | delete <project> [--yes] | volume [<name>] [--delete <name>] [--yes] | delete-data [--yes]" >&2
         exit 1
         ;;
 esac

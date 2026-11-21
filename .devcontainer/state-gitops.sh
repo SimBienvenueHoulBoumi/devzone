@@ -3,7 +3,7 @@
 # The pod has no kubeconfig and its service account cannot read Applications
 # today: one short read of the root Application tells whether Argo CD manages
 # the cluster from Git; a refusal or an absence falls back to the workstation
-# state. Sourced by devzone, called only when dans_pod is true.
+# state. Sourced by devzone, called only when in_pod is true.
 
 # Namespace of the Argo CD of devzone: GITOPS_NS when the includer knows it
 # (argocd/gitops.sh), otherwise the namespace of the module.

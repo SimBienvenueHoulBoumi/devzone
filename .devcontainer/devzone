@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# Aide de devzone (devzone --help) : .devcontainer/help.sh, sourcé ci-dessous.
+# shellcheck disable=SC2034 # shared variables, read by the sourced devzone-*.sh
+# devzone help (devzone --help): .devcontainer/help.sh, sourced below.
 #
-# État propre à chaque instance : $RACINE/.devzone.modules (dossier monté
-# de l'hôte, survit aux rebuilds), une ligne « module=on|off » ; la plateforme
-# choisie y est gardée aussi (plateforme=, gitlab_url=), et le cluster des
-# services (cluster=, voir cluster.sh) ; l'ancien état
-# global (~/.config/devzone/modules) est repris une fois
+# Per-instance state: $RACINE/.devzone.modules (a folder mounted from the host,
+# survives rebuilds), one line "module=on|off"; the chosen platform is kept
+# there too (plateforme=, gitlab_url=), and the services cluster (cluster=, see
+# cluster.sh); the old global state (~/.config/devzone/modules) is read once
 set -euo pipefail
 
-# Dossier du script, liens symboliques suivis à la main : readlink -f n'existe
-# pas sur macOS (tests sous bash 3.2).
+# Script folder, symbolic links followed by hand: readlink -f does not exist
+# on macOS (tests under bash 3.2).
 SOURCE="${BASH_SOURCE[0]}"
 while [ -L "$SOURCE" ]; do
     DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
@@ -24,9 +24,9 @@ ICI="$(cd -P "$(dirname "$SOURCE")" && pwd)"
 # shellcheck disable=SC1091
 . "$ICI/help.sh"
 VERSIONS="$ICI/../manage/scripts/versions.sh"
-# Dossier de devzone (/workspaces/devzone) ; DEVZONE_RACINE pour les tests
+# devzone folder (/workspaces/devzone); DEVZONE_RACINE for the tests
 RACINE="${DEVZONE_RACINE:-$(dirname "$ICI")}"
-# État par défaut de l'instance ; DEVZONE_ETAT garde la priorité (tests, CI)
+# Default state of the instance; DEVZONE_ETAT takes precedence (tests, CI)
 ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
 MODULES=(ia kubernetes gitlab postgres argocd mysql)
 # shellcheck source=SCRIPTDIR/cluster.sh
@@ -59,10 +59,10 @@ fi
 # shellcheck disable=SC1091
 . "$ICI/ai/host-check.sh"
 
-# Assistants IA, versions figées : mettre à jour ici, puis devzone apply
-# (ou Rebuild Container). Une ligne par paquet, séparées par une ligne qui ne
-# change pas : deux montées simultanées (workflow versions) se fusionnent sans
-# conflit, git n'en signalant qu'entre lignes voisines modifiées.
+# AI assistants, pinned versions: update here, then devzone apply (or Rebuild
+# Container). One line per package, separated by a line that does not change:
+# two simultaneous bumps (versions workflow) merge without conflict, git only
+# reporting neighbouring lines changed.
 # Claude Code
 IA_CLAUDE=@anthropic-ai/claude-code@2.1.330
 # opencode
@@ -70,1452 +70,49 @@ IA_OPENCODE=opencode-ai@1.19.6
 IA_PAQUETS=("$IA_CLAUDE" "$IA_OPENCODE")
 IA_NOMS=("${IA_CLAUDE%@*}" "${IA_OPENCODE%@*}")
 
-# glab (CLI GitLab), installé seulement quand la plateforme gitlab est
-# choisie : binaire de la release officielle (gitlab.com/gitlab-org/cli)
-# dans ~/.local/bin, somme SHA-256 de son archive vérifiée ; retiré au
-# retour à github. Tous ses appels passent par ce chemin (jamais le PATH :
-# ~/.local/bin n'y est pas forcément) ; l'état et la connexion aussi.
+# glab (GitLab CLI), installed only when the gitlab platform is chosen: binary
+# of the official release (gitlab.com/gitlab-org/cli) in ~/.local/bin, SHA-256
+# sum of its archive checked; removed when going back to github. All its calls
+# go through this path (never PATH: ~/.local/bin is not necessarily in it); the
+# state and the login too.
 GLAB="$HOME/.local/bin/glab"
 GLAB_VERSION=v1.126.0
 GLAB_SOMME_ARM64=de5e92c9c8b306eeebb19daa854d48101b78328850e7b9cd677ecd6f98cd4391
 GLAB_SOMME_AMD64=f386519ba83e9482979992ee7f60eeebee4d95b950f95f4fe7289e0a1b1ea74c
-# Instance du module gitlab : son URL d'office et le jeton root de son seed
+# gitlab module instance: its default URL and the root token of its seed
 GITLAB_URL_MODULE=http://gitlab.localhost:8929
 
-description() {
-    case "$1" in
-        ia) echo "assistants IA : Claude Code, opencode" ;;
-        kubernetes) echo "connexion au cluster de l'hôte et metrics-server au démarrage" ;;
-        gitlab) echo "GitLab de test dans le cluster des services" ;;
-        postgres) echo "PostgreSQL partagé, une base par projet" ;;
-        argocd) echo "Argo CD, interface de déploiement du cluster des services" ;;
-        mysql) echo "MySQL partagé, une base par projet" ;;
-    esac
-}
-
-connu() {
-    local m
-    for m in "${MODULES[@]}"; do [ "$m" = "$1" ] && return 0; done
-    return 1
-}
-
-# Premier démarrage (aucun état) : l'état est créé par state.sh (#417) :
-# ancien état global repris, copie de secours restaurée, état reconstruit
-# depuis le cluster des services, sinon première installation
-initialiser() {
-    state_init "${MODULES[@]}"
-}
-
-valeur() {
-    initialiser
-    local v
-    v="$(grep -E "^$1=" "$ETAT" | tail -1 | cut -d= -f2 || true)"
-    # Option docker-hote (#432) : ligne absente = on (socket de l'hôte
-    # partagé, comportement historique) ; les modules restent off par défaut
-    if [ "$1" = docker-hote ] && [ -z "$v" ]; then
-        echo on
-        return 0
-    fi
-    [ "$v" = on ] && echo on || echo off
-}
-
-# Verrou tenu de l'initialisation à l'écriture (#417) : l'état n'est jamais
-# recréé à vide entre les deux
-ecrire() {
-    state_lock_take || return 1
-    if ! initialiser || ! state_write "$1" "$2"; then
-        state_lock_release
-        return 1
-    fi
-    state_lock_release
-    return 0
-}
-
-# Retire une clé du fichier d'état : la configuration d'un service n'existe
-# que pendant qu'il est choisi (#242)
-retirer_cle() {
-    state_lock_take || return 1
-    if ! initialiser || ! state_remove "$1"; then
-        state_lock_release
-        return 1
-    fi
-    state_lock_release
-    return 0
-}
-
-# Vrai si le fichier ne contient que la clé $schema (créé d'office par opencode)
-contient_seulement_schema() {
-    local autres
-    autres="$(grep -vcE '^[[:space:]]*([{}]|"?[$]schema"?[[:space:]]*:.*)?[[:space:]]*$' "$1" || true)"
-    [ "$autres" -eq 0 ] && grep -qF "\$schema" "$1"
-}
-
-# Configuration opencode par défaut (modèle versionné) : écrite au premier
-# usage, mise à jour tant qu'elle garde le repère devzone, personnalisée sinon.
-config_opencode() {
-    local modele="$ICI/opencode.jsonc" repere cible
-    repere='// devzone : configuration opencode par défaut'
-    if [ -f "$HOME/.config/opencode/opencode.jsonc" ]; then
-        cible="$HOME/.config/opencode/opencode.jsonc"
-    elif [ -f "$HOME/.config/opencode/opencode.json" ]; then
-        cible="$HOME/.config/opencode/opencode.json"
-    else
-        cible="$HOME/.config/opencode/opencode.jsonc"
-    fi
-    mkdir -p "$(dirname "$cible")"
-    if [ ! -f "$cible" ]; then
-        cp "$modele" "$cible"
-        echo "opencode : configuration par défaut écrite"
-    elif grep -qF "$repere" "$cible"; then
-        if ! cmp -s "$modele" "$cible"; then
-            cp "$modele" "$cible"
-            echo "opencode : configuration par défaut mise à jour"
-        fi
-    elif contient_seulement_schema "$cible"; then
-        cp "$modele" "$cible"
-        echo "opencode : configuration par défaut mise à jour"
-    else
-        echo "opencode : configuration personnalisée, gardée"
-    fi
-}
-
-# Retire la configuration opencode écrite par devzone si elle porte encore son
-# repère et n'a pas été modifiée ; une config personnalisée (sans repère ou
-# modifiée) est gardée. Symétrique de config_opencode.
-retirer_config_opencode() {
-    local repere modele cible
-    repere='// devzone : configuration opencode par défaut'
-    modele="$ICI/opencode.jsonc"
-    if [ -f "$HOME/.config/opencode/opencode.jsonc" ]; then
-        cible="$HOME/.config/opencode/opencode.jsonc"
-    elif [ -f "$HOME/.config/opencode/opencode.json" ]; then
-        cible="$HOME/.config/opencode/opencode.json"
-    else
-        return 0
-    fi
-    if grep -qF "$repere" "$cible" && cmp -s "$modele" "$cible"; then
-        rm -f "$cible"
-        echo "opencode : configuration par défaut retirée"
-    else
-        echo "opencode : configuration personnalisée, gardée"
-    fi
-}
-
-# Repère de la skill devzone : posée si absente, mise à jour si elle porte le
-# repère et n'a pas été modifiée, gardée si personnalisée (#161, règle opencode).
-SKILL_REPERE='<!-- devzone : skill posée par devzone enable ia -->'
-# Empreinte de la version posée, à côté de SKILL.md : elle distingue une skill
-# non modifiée d'une skill personnalisée qui garde encore le repère.
-SKILL_EMPREINTE='.devzone-empreinte'
-
-# Dossiers de la skill devzone, dans les volumes de Claude Code et opencode.
-skill_dossiers() {
-    echo "$HOME/.claude/skills/devzone"
-    echo "$HOME/.config/opencode/skills/devzone"
-}
-
-# Somme sha256 d'un fichier (sha256sum sous Linux, shasum sous macOS).
-skill_somme() {
-    if command -v sha256sum >/dev/null 2>&1; then
-        sha256sum "$1" | cut -d' ' -f1
-    else
-        shasum -a 256 "$1" | cut -d' ' -f1
-    fi
-}
-
-# Vrai si la skill cible est encore celle posée : empreinte enregistrée, ou à
-# défaut contenu identique au modèle.
-skill_inchangee() {
-    local cible="$1" empreinte="$2" modele="$3"
-    if [ -n "$empreinte" ]; then
-        [ "$(skill_somme "$cible")" = "$empreinte" ]
-    else
-        cmp -s "$modele" "$cible"
-    fi
-}
-
-# Pose la skill devzone (modèle versionné) : écrite si absente, mise à jour
-# tant qu'elle garde le repère et l'empreinte posée, gardée si personnalisée.
-poser_skill_devzone() {
-    local modele="$ICI/skills/devzone/SKILL.md" repere cible d empreinte
-    repere="$SKILL_REPERE"
-    for d in $(skill_dossiers); do
-        mkdir -p "$d"
-        cible="$d/SKILL.md"
-        if [ ! -f "$cible" ]; then
-            cp "$modele" "$cible"
-            skill_somme "$cible" >"$d/$SKILL_EMPREINTE"
-            echo "devzone : skill devzone posée dans $d"
-            continue
-        fi
-        empreinte=""
-        if [ -f "$d/$SKILL_EMPREINTE" ]; then
-            empreinte="$(cat "$d/$SKILL_EMPREINTE")"
-        fi
-        if grep -qF "$repere" "$cible" && skill_inchangee "$cible" "$empreinte" "$modele"; then
-            if ! cmp -s "$modele" "$cible"; then
-                cp "$modele" "$cible"
-                echo "devzone : skill devzone mise à jour dans $d"
-            fi
-            skill_somme "$cible" >"$d/$SKILL_EMPREINTE"
-        else
-            echo "devzone : skill devzone personnalisée dans $d, gardée"
-        fi
-    done
-}
-
-# Retire la skill devzone écrite par devzone si elle porte encore son repère
-# et n'a pas été modifiée ; une skill personnalisée est gardée. Symétrique de
-# poser_skill_devzone.
-retirer_skill_devzone() {
-    local repere modele cible d empreinte
-    repere="$SKILL_REPERE"
-    modele="$ICI/skills/devzone/SKILL.md"
-    for d in $(skill_dossiers); do
-        cible="$d/SKILL.md"
-        if [ ! -f "$cible" ]; then
-            rm -f "$d/$SKILL_EMPREINTE"
-            continue
-        fi
-        empreinte=""
-        if [ -f "$d/$SKILL_EMPREINTE" ]; then
-            empreinte="$(cat "$d/$SKILL_EMPREINTE")"
-        fi
-        if grep -qF "$repere" "$cible" && skill_inchangee "$cible" "$empreinte" "$modele"; then
-            rm -f "$cible" "$d/$SKILL_EMPREINTE"
-            echo "devzone : skill devzone retirée de $d"
-        else
-            echo "devzone : skill devzone personnalisée dans $d, gardée"
-        fi
-    done
-}
-
-# Lance une commande longue en écrivant « toujours en cours » toutes les
-# DEVZONE_PROGRESSION s sur stderr : une installation muette semble bloquée (#195)
-avec_progression() {
-    local pas="${DEVZONE_PROGRESSION:-30}" ecoule=0 pid code=0
-    "$@" &
-    pid=$!
-    while kill -0 "$pid" 2>/dev/null; do
-        sleep 1
-        ecoule=$((ecoule + 1))
-        if [ $((ecoule % pas)) -eq 0 ] && kill -0 "$pid" 2>/dev/null; then
-            echo "devzone : … toujours en cours (${ecoule} s)" >&2
-        fi
-    done
-    wait "$pid" || code=$?
-    return "$code"
-}
-
-# Fichier qui marque un module actif en échec (contenu : où regarder) ; à côté
-# de l'état, dans son volume : l'état l'affiche à chaque démarrage
-fichier_echec() {
-    echo "$ETAT-echec-$1"
-}
-
-# Services in the Kubernetes workspace pod (#528): gitlab, postgres and argocd
-# live in the cluster, installed from the workstation (devzone workspace
-# services). The pod has no kubeconfig and a limited account (#430): their
-# presence is the cluster DNS (like #515), never an installer failure marker.
-dans_pod() {
-    [ "${DEVZONE_WORKSPACE:-}" = kubernetes ]
-}
-
-service_module() {
-    case "$1" in
-        gitlab | postgres | argocd) return 0 ;;
-    esac
-    return 1
-}
-
-# DNS name of the service of a module: <service>.<namespace>.svc
-service_dns() {
-    case "$1" in
-        gitlab) echo "gitlab-webservice-default.devzone-gitlab${INSTANCE_SUFFIX}.svc" ;;
-        postgres) echo "postgres.devzone-postgres.svc" ;;
-        argocd) echo "argocd-server.devzone-argocd.svc" ;;
-    esac
-}
-
-service_present() {
-    getent hosts "$(service_dns "$1")" >/dev/null 2>&1
-}
-
-# Status line of a service module in the pod: present → active; absent → the
-# workstation command that installs it
-service_ligne_pod() {
-    local m="$1"
-    if service_present "$m"; then
-        printf '  ✔ module %-10s active: %s (%s)\n' "$m" "$(description "$m")" "$(service_dns "$m")"
-    elif [ "$(valeur "$m")" = on ]; then
-        printf '  ⚠ module %-10s not in the cluster: on the workstation, devzone workspace services enable %s\n' "$m" "$m"
-    else
-        printf '  ○ module %-10s optional, %s: on the workstation, devzone workspace services enable %s\n' "$m" "$(description "$m")" "$m"
-    fi
-}
-
-# devzone apply of a service module: in the Kubernetes workspace pod nothing
-# is installed (the workstation does it, #528) and the failure marker of an
-# earlier start is cleared; elsewhere, the installer of the module
-appliquer_service() {
-    if dans_pod; then
-        rm -f "$(fichier_echec "$1")"
-        echo "devzone: $1 is installed from the workstation (devzone workspace services enable $1): nothing to do in the pod"
-        return 0
-    fi
-    "appliquer_$1" on
-}
-
-# Journal du dernier npm (son chemin est à donner en cas d'échec), ou son
-# dossier ; noms horodatés : le dernier dans l'ordre du glob est le plus récent
-dernier_journal_npm() {
-    local journal="" f
-    for f in "$HOME"/.npm/_logs/*-debug-0.log; do
-        if [ -f "$f" ]; then journal="$f"; fi
-    done
-    echo "${journal:-$HOME/.npm/_logs}"
-}
-
-# Installs each pinned AI assistant with its own npm command (3 tries each),
-# then checks its binary: npm silently drops a platform binary it failed to
-# download (#194), and one assistant failing must not block the other.
-installer_ia() {
-    local package binary attempt
-    IA_FAILED=()
-    for package in "${IA_PAQUETS[@]}"; do
-        case "$package" in
-            opencode-ai@*) binary=opencode ;;
-            *) binary=claude ;;
-        esac
-        for attempt in 1 2 3; do
-            if avec_progression npm install -g --no-fund --no-audit --loglevel=error "$package" >/dev/null &&
-                "$binary" --version >/dev/null 2>&1; then
-                break
-            fi
-            if [ "$attempt" -lt 3 ]; then
-                echo "devzone : installation de ${package%@*} incomplète, nouvel essai ($((attempt + 1))/3)…" >&2
-            else
-                IA_FAILED+=("$package")
-            fi
-        done
-    done
-    [ "${#IA_FAILED[@]}" -eq 0 ]
-}
-
-# Docker guard for the folders that are not this repository: a Claude Code
-# PreToolUse hook in the global settings and the two opencode plugins in the
-# global plugins folder. Idempotent, other user settings and hooks preserved.
-poser_garde_docker() {
-    local script="$ICI/ai/docker-guard.sh" config="$HOME/.claude/settings.json"
-    local src="$ICI/ai/plugins" dst="$HOME/.config/opencode/plugins"
-    local tmp f
-    if ! command -v jq >/dev/null 2>&1; then
-        echo "devzone : jq absent : garde-fou docker non posé pour Claude Code" >&2
-    elif [ ! -f "$config" ]; then
-        echo "devzone : $config absent : garde-fou docker non posé pour Claude Code" >&2
-    elif ! jq -e . "$config" >/dev/null 2>&1; then
-        echo "devzone : $config illisible (JSON invalide) : garde-fou docker non posé pour Claude Code" >&2
-    else
-        tmp="$(mktemp)"
-        if jq --arg cmd "bash \"$script\" --format claude" '
-            .hooks = (.hooks // {}) |
-            .hooks.PreToolUse = (.hooks.PreToolUse // []) |
-            if ([.hooks.PreToolUse[]? | .hooks[]? | (.command // "")] | any(contains("docker-guard.sh")))
-            then .
-            else .hooks.PreToolUse += [{"matcher": "Bash", "hooks": [{"type": "command", "command": $cmd}]}]
-            end
-        ' "$config" >"$tmp" 2>/dev/null; then
-            mv "$tmp" "$config"
-        else
-            rm -f "$tmp"
-            echo "devzone : $config inchangé : garde-fou docker non posé pour Claude Code" >&2
-        fi
-    fi
-    mkdir -p "$dst"
-    for f in devzone-guard.js devzone-guard-v2.js; do
-        [ -f "$src/$f" ] || continue
-        sed "s|__DEVZONE_DOCKER_GARDE__|$script|g" "$src/$f" >"$dst/$f"
-    done
-    echo "devzone : garde-fou docker actif pour Claude Code et opencode"
-}
-
-# Removes only the Docker guard entries (commands containing docker-guard.sh)
-# and the two plugins; the rest of settings.json and of the plugins is kept.
-retirer_garde_docker() {
-    local config="$HOME/.claude/settings.json" tmp
-    if [ -f "$config" ] && jq -e . "$config" >/dev/null 2>&1; then
-        tmp="$(mktemp)"
-        if jq '
-            if (.hooks.PreToolUse // null) != null then
-                .hooks.PreToolUse = [
-                    .hooks.PreToolUse[] |
-                    if (.hooks // null) != null then
-                        .hooks = [ .hooks[] | select(((.command // "") | contains("docker-guard.sh")) | not) ] |
-                        select((.hooks | length) > 0)
-                    else
-                        select(((.command // "") | contains("docker-guard.sh")) | not)
-                    end
-                ] |
-                if (.hooks.PreToolUse | length) == 0 then del(.hooks.PreToolUse) else . end |
-                if ((.hooks // {}) | keys | length) == 0 then del(.hooks) else . end
-            else . end
-        ' "$config" >"$tmp" 2>/dev/null; then
-            if [ "$(cat "$tmp")" = "{}" ]; then
-                rm -f "$tmp" "$config"
-            else
-                mv "$tmp" "$config"
-            fi
-        else
-            rm -f "$tmp"
-        fi
-    fi
-    rm -f "$HOME/.config/opencode/plugins/devzone-guard.js" \
-          "$HOME/.config/opencode/plugins/devzone-guard-v2.js"
-}
-
-appliquer_ia() {
-    local journal tmp detectes
-    if [ "$1" = on ]; then
-        echo "devzone : installation de Claude Code et opencode (quelques minutes)…"
-        if ! installer_ia; then
-            journal="$(dernier_journal_npm)"
-            echo "journal npm : $journal" >"$(fichier_echec ia)"
-            echo "devzone : échec de l'installation de ${IA_FAILED[*]} (npm install -g, 3 essais) ; journal npm : $journal ; réessayer : devzone apply" >&2
-            return 1
-        fi
-        rm -f "$(fichier_echec ia)"
-        echo "devzone : Claude Code et opencode installés"
-        # Garde-fou repowarden (hook PreToolUse de Claude Code, plugin opencode) :
-        # agent arrêté avant de modifier main/develop, de commiter sans
-        # repowarden cc ou de contourner les hooks. Global, dans les volumes
-        # ~/.claude et ~/.config/opencode : gardé aux rebuilds ; relancé, rien ne change
-        if command -v repowarden >/dev/null 2>&1 && repowarden agents init --global >/dev/null 2>&1; then
-            echo "devzone : garde-fou repowarden actif pour Claude Code et opencode"
-        else
-            echo "devzone : garde-fou repowarden non branché (repowarden 4.10 ou plus requis) : repowarden agents init --global" >&2
-        fi
-        poser_garde_docker
-        config_opencode
-        # Remove the provider of the removed llm module from old configs (#669).
-        if [ -f "$HOME/.config/opencode/config.json" ] && command -v jq >/dev/null 2>&1; then
-            tmp="$(mktemp)"
-            if jq '
-                if .provider then del(.provider["devzone-llm"]) | (if .provider == {} then del(.provider) else . end) else . end
-            ' "$HOME/.config/opencode/config.json" >"$tmp" 2>/dev/null; then
-                if [ "$(cat "$tmp")" = "{}" ] || [ "$(jq -c 'del(."$schema") | length' "$tmp" 2>/dev/null)" = 0 ]; then
-                    rm -f "$tmp" "$HOME/.config/opencode/config.json"
-                else
-                    mv "$tmp" "$HOME/.config/opencode/config.json"
-                fi
-            else
-                rm -f "$tmp"
-            fi
-        fi
-        # Provider opencode des modèles de l'hôte (Ollama), détection à chaud :
-        # silencieux et sans effet si Ollama ne répond pas.
-        set_provider || true
-        # Signale l'état de la détection (succès dans les deux cas).
-        detectes="$(modeles 2>/dev/null || true)"
-        if [ -n "$detectes" ]; then
-            printf "devzone : %s modèle(s) de l'hôte (Ollama) branché(s)\n" "$(printf '%s\n' "$detectes" | grep -c .)"
-        else
-            printf "devzone : aucun modèle Ollama détecté sur %s (modèles de l'hôte non branchés)\n" "$URL"
-        fi
-        # Skill devzone : posée si absente, mise à jour si inchangée, gardée si personnalisée.
-        poser_skill_devzone
-        echo "devzone : ia actif : claude (puis /login), opencode auth login"
-    else
-        npm uninstall -g "${IA_NOMS[@]}" >/dev/null 2>&1 || true
-        rm -f "$(fichier_echec ia)"
-        # Garde-fou repowarden : retiré à la désactivation (symétrique de
-        # l'activation). repowarden le fait lui-même s'il est présent ; sinon
-        # retrait par jq des seules entrées PreToolUse qui appellent le garde-fou,
-        # le reste de settings.json intact. Le garde-fou s'appelle « repowarden
-        # guard » depuis repowarden 4.17.3 ; « repowarden garde » est son ancien
-        # nom, toujours alias côté repowarden et reconnu ici.
-        if command -v repowarden >/dev/null 2>&1; then
-            repowarden agents retirer --global >/dev/null 2>&1 || true
-        elif [ -f "$HOME/.claude/settings.json" ]; then
-            tmp="$(mktemp)"
-            if jq '
-                if (.hooks.PreToolUse // null) != null then
-                    .hooks.PreToolUse = [
-                        .hooks.PreToolUse[] |
-                        if (.hooks // null) != null then
-                            .hooks = [ .hooks[] | select(((.command // "") | (contains("repowarden garde") or contains("repowarden guard"))) | not) ] |
-                            select((.hooks | length) > 0)
-                        else
-                            select(((.command // "") | (contains("repowarden garde") or contains("repowarden guard"))) | not)
-                        end
-                    ] |
-                    if (.hooks.PreToolUse | length) == 0 then del(.hooks.PreToolUse) else . end |
-                    if ((.hooks // {}) | keys | length) == 0 then del(.hooks) else . end
-                else . end
-            ' "$HOME/.claude/settings.json" >"$tmp" 2>/dev/null; then
-                mv "$tmp" "$HOME/.claude/settings.json"
-            else
-                rm -f "$tmp"
-            fi
-        fi
-        # Plugin opencode du garde-fou (retiré aussi par repowarden ci-dessus)
-        rm -f "$HOME/.config/opencode/plugins/repowarden-garde.js" \
-              "$HOME/.config/opencode/plugins/repowarden-garde-v2.js"
-        # Garde-fou docker : seules ses entrées et ses plugins sont retirés.
-        retirer_garde_docker
-        # Configuration opencode : retirée seulement si elle porte le repère devzone
-        # et n'a pas été modifiée ; personnalisée → gardée.
-        retirer_config_opencode
-        # Retire le fournisseur opencode des modèles de l'hôte, garde le reste du fichier.
-        unset_provider || true
-        # Skill devzone : retirée seulement si non modifiée ; personnalisée → gardée.
-        retirer_skill_devzone
-        # État de devzone agent : gardé dans le volume partagé (désactivation
-        # dans l'une des devzone ne supprime pas l'état des autres).
-        echo "devzone : ia désactivé (connexions et état de devzone agent gardés dans leurs volumes ; journaux workspace/.agents/ gardés)"
-    fi
-}
-
-appliquer_kubernetes() {
-    if [ "$1" = on ]; then
-        bash "$ICI/kube-config.sh"
-    else
-        rm -f "$HOME/.kube/hote.config"
-        # metrics-server retiré des clusters où devzone l'a installé (marqueur
-        # devzone=installe posé par metrics-server.sh) ; via sa sous-commande
-        bash "$ICI/metrics-server.sh" retirer || true
-        echo "devzone : kubernetes désactivé"
-    fi
-}
-
-appliquer_gitlab() {
-    local etat_courant
-    if [ "$1" = on ]; then
-        # Saut si l'état est prêt et le runner en ligne ; sinon installer reprend
-        etat_courant="$(bash "$ICI/gitlab/gitlab.sh" status)"
-        if [[ "$etat_courant" == *"prêt"* && "$etat_courant" == *"runner en ligne"* ]]; then
-            echo "devzone : gitlab déjà actif, rien à faire."
-            # /etc/hosts régénéré par Docker : gitlab.localhost re-pose ici aussi
-            bash "$ICI/gitlab/gitlab.sh" hote-poser
-            # Échec d'un ancien passage effacé : gitlab est prêt (#366)
-            rm -f "$(fichier_echec gitlab)"
-        else
-            echo "devzone : gitlab activation via installer…"
-            if ! bash "$ICI/gitlab/gitlab.sh" install; then
-                echo "gitlab" > "$(fichier_echec gitlab)"
-                return 1
-            fi
-            rm -f "$(fichier_echec gitlab)"
-        fi
-    else
-        # Désactiver gitlab seulement si son namespace existe encore
-        if bash "$ICI/gitlab/gitlab.sh" installe; then
-            echo "devzone : gitlab désactivation…"
-            if [ -n "${SUPPRIMER_DONNEES:-}" ]; then
-                bash "$ICI/gitlab/gitlab.sh" uninstall --yes
-            else
-                bash "$ICI/gitlab/gitlab.sh" uninstall
-            fi
-        else
-            echo "devzone : gitlab déjà désactivé (aucun namespace devzone-gitlab)."
-        fi
-    fi
-}
-
-# PostgreSQL partagé (#280) : installé sur le cluster de devzone, choisi à la
-# première activation (--context, menu en terminal, kind dédié sinon)
-appliquer_postgres() {
-    local voulu="" confirmer="" attendre="" arg ctx actuel etat_courant
-    if [ "$1" = on ]; then
-        for arg in "${@:2}"; do
-            if [ -n "$attendre" ]; then
-                case "$attendre" in
-                    contexte) voulu="$arg" ;;
-                    confirmer) confirmer="$arg" ;;
-                esac
-                attendre=""
-                continue
-            fi
-            case "$arg" in
-                --context) attendre=contexte ;;
-                --confirm) attendre=confirmer ;;
-                *) echo "devzone : argument inconnu : $arg (devzone enable postgres --context CTX [--confirm CTX])" >&2; ecrire postgres off; return 2 ;;
-            esac
-        done
-        if [ -n "$attendre" ]; then
-            echo "devzone : $attendre attend un contexte" >&2
-            ecrire postgres off
-            return 2
-        fi
-        actuel="$(cluster_saved)"
-        if [ -n "$voulu" ] && [ -n "$actuel" ] && [ "$voulu" != "$actuel" ]; then
-            echo "devzone : les services de devzone sont sur $actuel ; pour en changer : devzone cluster $voulu" >&2
-            ecrire postgres off
-            return 2
-        fi
-        if [ -n "$confirmer" ]; then
-            ctx="$(cluster_choose "$voulu" --confirm "$confirmer")" || { ecrire postgres off; return 2; }
-        else
-            ctx="$(cluster_choose "$voulu")" || { ecrire postgres off; return 2; }
-        fi
-        # Choix gardé avant l'installation : une reprise vise le même cluster
-        cluster_save "$ctx"
-        etat_courant="$(bash "$ICI/postgres/postgres.sh" status)"
-        # « relais arrêté » d'abord : cette ligne commence aussi par « prêt sur »
-        if [[ "$etat_courant" == *"relais arrêté"* ]]; then
-            bash "$ICI/postgres/postgres.sh" relay-start
-            echo "devzone : postgres : relais relancé"
-        elif [[ "$etat_courant" == "prêt sur"* ]]; then
-            echo "devzone : postgres déjà actif, rien à faire."
-        elif ! bash "$ICI/postgres/postgres.sh" install; then
-            echo "postgres" >"$(fichier_echec postgres)"
-            return 1
-        fi
-        rm -f "$(fichier_echec postgres)"
-    else
-        bash "$ICI/postgres/postgres.sh" uninstall
-        rm -f "$(fichier_echec postgres)"
-    fi
-}
-
-# Argo CD (#411) : installé dans le cluster des services, accès par le relais
-# 127.0.0.1:8443 ; un échec est marqué dans l'état et repris par devzone apply
-appliquer_argocd() {
-    local etat_courant
-    if [ "$1" = on ]; then
-        etat_courant="$(bash "$ICI/argocd/argocd.sh" status)"
-        # « relais arrêté » d'abord : cette ligne commence aussi par « prêt »
-        if [[ "$etat_courant" == *"relais arrêté"* ]]; then
-            bash "$ICI/argocd/argocd.sh" relay-start
-            echo "devzone : argocd : relais relancé"
-        elif [[ "$etat_courant" == "prêt"* ]]; then
-            echo "devzone : argocd déjà actif, rien à faire."
-        elif ! bash "$ICI/argocd/argocd.sh" install; then
-            echo "argocd" >"$(fichier_echec argocd)"
-            return 1
-        fi
-        rm -f "$(fichier_echec argocd)"
-    else
-        bash "$ICI/argocd/argocd.sh" uninstall
-        rm -f "$(fichier_echec argocd)"
-    fi
-}
-
-# MySQL du catalogue (#414) : même logique que postgres (relais relancé s'il
-# est arrêté), installation déléguée à mysql.sh
-appliquer_mysql() {
-    local etat_courant ctx
-    if [ "$1" = on ]; then
-        ctx="$(cluster_saved)"
-        if [ -z "$ctx" ]; then
-            echo "devzone : mysql : aucun cluster choisi : devzone enable mysql" >&2
-            ecrire mysql off
-            echo mysql >"$(fichier_echec mysql)"
-            return 2
-        fi
-        etat_courant="$(bash "$ICI/catalog/mysql/mysql.sh" status)"
-        # « relais arrêté » d'abord : cette ligne commence aussi par « prêt sur »
-        if [[ "$etat_courant" == *"relais arrêté"* ]]; then
-            bash "$ICI/catalog/mysql/mysql.sh" relay-start
-            echo "devzone : mysql : relais relancé"
-        elif [[ "$etat_courant" == "prêt sur"* ]]; then
-            echo "devzone : mysql déjà actif, rien à faire."
-        elif ! bash "$ICI/catalog/mysql/mysql.sh" install; then
-            echo mysql >"$(fichier_echec mysql)"
-            return 1
-        fi
-        rm -f "$(fichier_echec mysql)"
-    else
-        # Retrait sans suppression des données : volume gardé (#441) ; les
-        # bases ne partent qu'avec un oui (confirmer_suppression)
-        bash "$ICI/catalog.sh" remove mysql
-        if [ -n "${SUPPRIMER_DONNEES:-}" ]; then
-            bash "$ICI/catalog/mysql/mysql.sh" delete-data --yes
-        fi
-        rm -f "$(fichier_echec mysql)"
-    fi
-}
-
-# Toutes les bases disparaissent : confirmation en terminal (sans terminal, la
-# commande est explicite) ; un oui ou --yes marque SUPPRIMER_DONNEES, lu par
-# appliquer_mysql pour lancer delete-data (#441). Les arguments passent
-# par reject_renamed : --oui est refusé avant d'arriver ici, seul --yes passe (#695).
-confirmer_suppression() {
-    local app="$1" reponse arg
-    SUPPRIMER_DONNEES=""
-    [ "$(valeur "$app")" = on ] || return 0
-    for arg in "${@:2}"; do
-        case "$arg" in --yes) SUPPRIMER_DONNEES=1 ;; esac
-    done
-    [ -z "$SUPPRIMER_DONNEES" ] || return 0
-    cluster_interactive || return 0
-    # mysql : la question porte sur le namespace (volume et bases restent) ;
-    # postgres : tout part, le refus annule ; gitlab : le secret Rails reste,
-    # sa suppression n'a lieu que sur une désinstallation complète voulue
-    if [ "$app" = mysql ]; then
-        printf 'Désactiver mysql retire le serveur, le volume et les bases restent. Supprimer aussi le namespace devzone-mysql et ses volumes ? [o/N] ' >&2
-    elif [ "$app" = gitlab ]; then
-        printf 'Désactiver gitlab garde le secret Rails (sessions du navigateur valides à la réinstallation). Supprimer aussi le secret Rails ? [o/N] ' >&2
-    else
-        printf 'Désactiver %s supprime toutes ses bases. Continuer ? [o/N] ' "$app" >&2
-    fi
-    read -r reponse || reponse=""
-    case "$reponse" in
-        o | O | oui) SUPPRIMER_DONNEES=1; return 0 ;;
-    esac
-    # refus : mysql et gitlab désactivent quand même (données gardées), postgres annule
-    case "$app" in
-        mysql | gitlab) return 0 ;;
-        *) echo "Abandon : rien n'a été supprimé."; return 1 ;;
-    esac
-}
-
-# devzone cluster [CTX] [--yes] : affiche le cluster des services, ou les y
-# déplace (désinstallés de l'ancien, installés sur le nouveau : données non
-# migrées, d'où la confirmation)
-changer_cluster() {
-    local voulu="" oui="" confirmer="" attendre="" arg actuel nouveau reponse ctx_ancien ctx_new NS
-    NS=devzone-postgres
-    for arg in "$@"; do
-        if [ -n "$attendre" ]; then
-            confirmer="$arg"
-            attendre=""
-            continue
-        fi
-        case "$arg" in
-            --yes) oui=1 ;;
-            --confirm) attendre=1 ;;
-            -*) echo "devzone : argument inconnu : $arg (devzone cluster [CTX] [--yes] [--confirm CTX])" >&2; return 2 ;;
-            *) voulu="$arg" ;;
-        esac
-    done
-    if [ -n "$attendre" ]; then
-        echo "devzone : --confirm attend un contexte" >&2
-        return 2
-    fi
-    actuel="$(cluster_saved)"
-    if [ -z "$voulu" ]; then
-        if [ -z "$actuel" ]; then
-            echo "devzone : aucun cluster choisi (fixé à l'activation d'un module : devzone enable postgres)"
-        elif cluster_is_dedicated "$actuel"; then
-            echo "devzone : cluster $actuel (kind dédié, dans le conteneur)"
-        else
-            echo "devzone : cluster $actuel (cluster de l'hôte)"
-        fi
-        echo "  possibles : $(cluster_candidates | tr '\n' ' ')"
-        return 0
-    fi
-    if [ -n "$confirmer" ]; then
-        nouveau="$(cluster_choose "$voulu" --confirm "$confirmer")" || return 2
-    else
-        nouveau="$(cluster_choose "$voulu")" || return 2
-    fi
-    if [ "$nouveau" = "$actuel" ]; then
-        echo "devzone : déjà sur $nouveau, rien à faire."
-        return 0
-    fi
-    ctx_ancien="$actuel"
-    ctx_new="$nouveau"
-    if [ "$(valeur postgres)" = on ]; then
-        if [ -z "$oui" ]; then
-            if ! cluster_interactive; then
-                echo "devzone : les bases postgres seront supprimées de $ctx_ancien (non migrées) : devzone cluster $ctx_new --yes" >&2
-                return 1
-            fi
-            printf 'postgres sera réinstallé sur %s, ses bases supprimées de %s (non migrées). Continuer ? [o/N] ' "$ctx_new" "$ctx_ancien" >&2
-            read -r reponse || reponse=""
-            case "$reponse" in
-                o | O | oui) ;;
-                *) echo "Abandon : rien n'a changé."; return 0 ;;
-            esac
-        fi
-        # Retire PostgreSQL de l'ancien cluster (contexte explicite) ;
-        # namespace et RoleBinding par l'administrateur (#430)
-        export KUBECONFIG="$HOME/.kube/config:$HOME/.kube/hote.config"
-        account_remove "$ctx_ancien" "$NS" >/dev/null 2>&1 || true
-        account_admin "$ctx_ancien" delete namespace "$NS" --wait=true >/dev/null 2>&1 || true
-        cluster_release "$ctx_ancien"
-        # Le nouveau cluster devient le contexte devzone
-        cluster_save "$ctx_new"
-        # Pose le contexte devzone sur le nouveau cluster (cluster + user :
-        # commande importante, échec affiché et rendu #396)
-        if ! devzone_context_set "$ctx_new"; then
-            echo "devzone : impossible de poser le contexte devzone sur $ctx_new" >&2
-            return 1
-        fi
-        # Installe PostgreSQL sur le nouveau cluster (via --context devzone qui pointe maintenant dessus)
-        bash "$ICI/postgres/postgres.sh" install
-    else
-        cluster_save "$ctx_new"
-        # Pose le contexte devzone sur le nouveau cluster (cluster + user :
-        # commande importante, échec affiché et rendu #396)
-        if ! devzone_context_set "$ctx_new"; then
-            echo "devzone : impossible de poser le contexte devzone sur $ctx_new" >&2
-            return 1
-        fi
-    fi
-    echo "devzone : cluster des services : $ctx_new"
-}
-
-# ---- Plateforme : GitHub (défaut) ou GitLab (#240) ----
-# Choix gardé dans le fichier d'état (plateforme=, gitlab_url=), propre à
-# chaque instance ; la configuration d'un service n'existe que pendant qu'il
-# est choisi (#242) : glab et l'URL disparaissent au retour à github.
-
-# Plateforme courante : github en l'absence de ligne (défaut)
-plateforme_lue() {
-    local v
-    v="$(grep -E '^plateforme=' "$ETAT" 2>/dev/null | tail -1 | cut -d= -f2 || true)"
-    [ "$v" = gitlab ] && echo gitlab || echo github
-}
-
-# URL de l'instance GitLab, rien si absente
-url_gitlab_lue() {
-    grep -E '^gitlab_url=' "$ETAT" 2>/dev/null | tail -1 | cut -d= -f2- || true
-}
-
-# Hôte d'une URL, sans son protocole (glab --hostname)
-hote_de() {
-    echo "$1" | sed -E 's#^[a-z]+://##; s#/$##'
-}
-
-# Retire glab et sa configuration (retour à github)
-retirer_glab() {
-    rm -f "$GLAB"
-    rm -rf "$HOME/.config/glab-cli"
-}
-
-# Ligne de l'état pour la plateforme : github par défaut, ou l'instance GitLab
-# avec son instance connectée (glab) sur la commande de connexion sinon
-ligne_plateforme() {
-    local url hote
-    if [ "$(plateforme_lue)" = gitlab ]; then
-        url="$(url_gitlab_lue)"
-        hote="$(hote_de "$url")"
-        if [ -x "$GLAB" ] && "$GLAB" auth status --hostname "$hote" >/dev/null 2>&1; then
-            printf '  ✔ plateforme     gitlab : %s, glab connecté\n' "$url"
-        else
-            printf '  ⚠ plateforme     gitlab : %s, glab non connecté : glab auth login --hostname %s\n' "$url" "$hote"
-        fi
-    else
-        echo "  ✔ plateforme     github"
-    fi
-}
-
-# Affichage simple de la plateforme (devzone platform)
-resume_plateforme() {
-    local url hote
-    if [ "$(plateforme_lue)" = gitlab ]; then
-        url="$(url_gitlab_lue)"
-        hote="$(hote_de "$url")"
-        if [ -x "$GLAB" ] && "$GLAB" auth status --hostname "$hote" >/dev/null 2>&1; then
-            echo "devzone : plateforme gitlab : $url, glab connecté"
-        else
-            echo "devzone : plateforme gitlab : $url, glab non connecté : glab auth login --hostname $hote"
-        fi
-    else
-        echo "devzone : plateforme github (défaut)"
-    fi
-}
-
-# Installe glab (release officielle, somme SHA-256 vérifiée), rien s'il est
-# déjà là ; le binaire finit dans ~/.local/bin (retirer_glab l'enlève)
-installer_glab() {
-    local arch="" somme archive dossier glab_tmp
-    if [ -x "$GLAB" ] && "$GLAB" --version >/dev/null 2>&1; then
-        return 0
-    fi
-    case "$(uname -m)" in
-        arm64 | aarch64) arch=arm64 somme="$GLAB_SOMME_ARM64" ;;
-        *) arch=amd64 somme="$GLAB_SOMME_AMD64" ;;
-    esac
-    echo "devzone : téléchargement de glab $GLAB_VERSION (somme SHA-256 vérifiée)…"
-    archive="$(mktemp)"
-    if ! curl -fsSL -o "$archive" "https://gitlab.com/gitlab-org/cli/-/releases/$GLAB_VERSION/downloads/glab_${GLAB_VERSION#v}_linux_${arch}.tar.gz"; then
-        rm -f "$archive"
-        echo "devzone : téléchargement de glab impossible (release officielle de gitlab.com) ; réessayer : devzone platform gitlab --url URL" >&2
-        return 1
-    fi
-    if [ "$(sha256sum "$archive" | cut -d' ' -f1)" != "$somme" ]; then
-        rm -f "$archive"
-        echo "devzone : somme SHA-256 de glab inattendue, abandon ; archive refusée" >&2
-        return 1
-    fi
-    dossier="$(mktemp -d)"
-    glab_tmp="$dossier/bin/glab"
-    if ! tar -xzf "$archive" -C "$dossier" || [ ! -f "$glab_tmp" ]; then
-        glab_tmp="$dossier/glab"
-    fi
-    if [ ! -f "$glab_tmp" ]; then
-        rm -rf "$dossier" "$archive"
-        echo "devzone : binaire glab absent de l'archive, abandon" >&2
-        return 1
-    fi
-    mkdir -p "$HOME/.local/bin"
-    mv "$glab_tmp" "$GLAB"
-    chmod +x "$GLAB"
-    rm -rf "$dossier" "$archive"
-}
-
-# Connexion à l'instance GitLab : instance du module gitlab → jeton root du
-# module (protocole http, jamais affiché) ; autre instance → interactive, un
-# navigateur demandant le code de connexion. Vérifie : code de sortie de
-# l'auth login, puis auth status --hostname ; sans contrôle, pas « connecté ».
-connexion_glab() {
-    local hote="$1" url="$2" jeton
-    if [ "$url" = "$GITLAB_URL_MODULE" ]; then
-        if [ ! -f "$RACINE/workspace/.gitlab/root-token" ]; then
-            echo "devzone : jeton root du module gitlab introuvable ($RACINE/workspace/.gitlab/root-token) : devzone enable gitlab, ou à la main : glab auth login --hostname $hote" >&2
-            return 1
-        fi
-        jeton="$(cat "$RACINE/workspace/.gitlab/root-token")"
-        if ! "$GLAB" auth login --hostname "$hote" --api-protocol http --git-protocol http --token "$jeton"; then
-            echo "devzone : connexion à l'instance gitlab impossible : devzone enable gitlab, ou à la main : glab auth login --hostname $hote" >&2
-            return 1
-        fi
-    elif ! "$GLAB" auth login --hostname "$hote"; then
-        echo "devzone : connexion à l'instance gitlab impossible : glab auth login --hostname $hote" >&2
-        return 1
-    fi
-    if ! "$GLAB" auth status --hostname "$hote" >/dev/null 2>&1; then
-        echo "devzone : verification de la connexion impossible : glab auth status --hostname $hote" >&2
-        return 1
-    fi
-}
-
-# Change la plateforme : github (par défaut, comportement actuel) ou gitlab
-changer_plateforme() {
-    local cible="${1:-}" url="" attendre="" arg hote
-    case "$cible" in
-        github)
-            # Retire le réglage credential du dernier hôte gitlab, s'il y en a un
-            if [ -n "$(url_gitlab_lue)" ]; then
-                git config --global --unset-all "credential.$(url_gitlab_lue).helper" 2>/dev/null || true
-            fi
-            retirer_glab
-            retirer_cle plateforme
-            retirer_cle gitlab_url
-            echo "devzone : plateforme github (défaut) : contrôles gh ; glab et sa configuration retirés s'ils étaient installés"
-            ;;
-        gitlab)
-            for arg in "${@:2}"; do
-                if [ -n "$attendre" ]; then url="$arg"; attendre=""; continue; fi
-                case "$arg" in
-                    --url) attendre=1 ;;
-                    *) echo "devzone : argument inconnu : $arg (devzone platform gitlab --url URL)" >&2; return 1 ;;
-                esac
-            done
-            if [ -n "$attendre" ]; then
-                echo "devzone : --url attend une URL" >&2
-                return 1
-            fi
-            if [ -z "$url" ]; then
-                if [ "$(valeur gitlab)" = on ]; then
-                    url="$GITLAB_URL_MODULE"
-                else
-                    echo "devzone : URL manquante : devzone platform gitlab --url URL (ou un module gitlab actif pour l'instance locale)" >&2
-                    return 1
-                fi
-            fi
-            hote="$(hote_de "$url")"
-            if ! installer_glab; then
-                return 1
-            fi
-            if ! connexion_glab "$hote" "$url"; then
-                echo "devzone : connexion à refaire : glab auth login --hostname $hote" >&2
-                return 1
-            fi
-            if ! git config --global "credential.$url.helper" "!$GLAB auth git-credential"; then
-                echo "devzone : réglage git credential impossible" >&2
-                return 1
-            fi
-            ecrire plateforme gitlab
-            ecrire gitlab_url "$url"
-            echo "devzone : plateforme gitlab : $url, glab connecté"
-            ;;
-        *)
-            echo "devzone : plateforme inconnue : ${cible:-(aucune)} ; choix : github (défaut) ou gitlab [--url URL]" >&2
-            return 1
-            ;;
-    esac
-}
-
-# Lignes « paquet figée installée » des outils en retard ; échoue si le script
-# versions.sh est absent ou ne peut pas répondre (l'état omet alors la ligne)
-outils_retard() {
-    [ -f "$VERSIONS" ] || return 1
-    bash "$VERSIONS" --installees 2>/dev/null
-}
-
-# Remet repowarden à la version figée s'il en diffère, comme post-create.sh
-# (il installe les hooks git globaux)
-appliquer_repowarden() {
-    local ligne figee installee paquet=repowarden
-    [ -f "$VERSIONS" ] || return 0
-    ligne="$(bash "$VERSIONS" --installees 2>/dev/null | awk '$1 == "repowarden"' || true)"
-    [ -n "$ligne" ] || return 0
-    read -r _ figee installee <<<"$ligne"
-    echo "devzone : installation de repowarden ${figee}…"
-    npm install -g "$paquet@$figee" >/dev/null
-    repowarden install --global --lang fr
-    echo "devzone : repowarden $installee → $figee"
-}
-
-# Chemins des worktrees du dépôt devzone et des dépôts du workspace absents
-# ici : créés de l'autre côté (hôte), un git worktree prune les casserait.
-# Lecture seule : rien n'est supprimé ni réparé.
-worktrees_absents() {
-    local depot ligne chemin
-    {
-        [ -e "$RACINE/.git" ] && echo "$RACINE"
-        find "$RACINE/workspace" -mindepth 2 -maxdepth 3 -name .git -type d 2>/dev/null | sed 's|/\.git$||'
-    } | while IFS= read -r depot; do
-        { git -C "$depot" worktree list --porcelain 2>/dev/null || true; } | while IFS= read -r ligne; do
-            case "$ligne" in
-                "worktree "*)
-                    chemin="${ligne#worktree }"
-                    [ -d "$chemin" ] || echo "$chemin"
-                    ;;
-            esac
-        done
-    done || true
-}
-
-# Version du dossier devzone (manifeste écrit par la CLI du poste), rien si
-# le dossier vient d'avant le manifeste
-version_du_dossier() {
-    local v
-    [ -f "$RACINE/.devzone.version" ] || return 1
-    v="$(sed -n '1s/^version //p' "$RACINE/.devzone.version" 2>/dev/null | head -1 || true)"
-    [ -n "$v" ] || return 1
-    printf '%s\n' "$v"
-}
-
-# Vrai si la première version est plus récente que la seconde
-version_plus_recente() {
-    awk -v a="$1" -v b="$2" 'BEGIN {
-        na = split(a, x, ".")
-        nb = split(b, y, ".")
-        n = (na > nb ? na : nb)
-        for (i = 1; i <= n; i++) {
-            p = (i <= na ? x[i] : 0) + 0
-            q = (i <= nb ? y[i] : 0) + 0
-            if (p > q) exit 0
-            if (p < q) exit 1
-        }
-        exit 1
-    }'
-}
-
-# Version publiée sur npm, au plus une fois par jour, en cache sous
-# ~/.cache/devzone/ ; 5 s au plus, silencieux hors ligne
-version_publiee() {
-    local cache jour npm v temporal pid attente
-    cache="$HOME/.cache/devzone/version-publiee"
-    jour="$(date +%Y-%m-%d)"
-    if [ -f "$cache" ] && [ "$(sed -n '1p' "$cache" 2>/dev/null || true)" = "$jour" ]; then
-        sed -n '2p' "$cache" 2>/dev/null || true
-        return 0
-    fi
-    npm="${DEVZONE_NPM:-npm}"
-    v=""
-    if command -v "$npm" >/dev/null 2>&1; then
-        mkdir -p "$(dirname "$cache")" 2>/dev/null || true
-        temporal="$cache.$$"
-        "$npm" view devzone version >"$temporal" 2>/dev/null &
-        pid=$!
-        attente=0
-        while kill -0 "$pid" 2>/dev/null; do
-            sleep 1
-            attente=$((attente + 1))
-            if [ "$attente" -ge 5 ]; then
-                kill "$pid" 2>/dev/null || true
-                break
-            fi
-        done
-        wait "$pid" 2>/dev/null || true
-        v="$(sed -n '1p' "$temporal" 2>/dev/null | tr -d '[:space:]' || true)"
-        rm -f "$temporal"
-    fi
-    mkdir -p "$(dirname "$cache")" 2>/dev/null || true
-    printf '%s\n%s\n' "$jour" "$v" >"$cache" 2>/dev/null || true
-    [ -n "$v" ] && printf '%s\n' "$v"
-    return 0
-}
-
-ligne_version_disponible() {
-    local dossier publiee
-    dossier="$(version_du_dossier)" || return 0
-    publiee="$(version_publiee)" || return 0
-    publiee="${publiee#v}"
-    [ -n "$publiee" ] || return 0
-    if version_plus_recente "$publiee" "$dossier"; then
-        printf '  ○ devzone %s available: on the workstation, devzone update\n' "$publiee"
-    fi
-}
-
-# Réparation (#341) : reprend la suite de startup.sh sans l'identité git ni
-# les clusters. Chaque élément est réparé pour de vrai ; ✔ ou ✖ avec la raison.
-reparer_element() {
-    local nom="$1" sortie code raison
-    shift
-    if sortie="$("$@" 2>&1)"; then
-        echo "✔ $nom"
-    else
-        code=$?
-        raison="$(printf '%s\n' "$sortie" | sed '/^[[:space:]]*$/d' | tail -1)"
-        [ -n "$raison" ] || raison="échec (code $code)"
-        echo "✖ $nom : $raison"
-        reparer_echec=1
-    fi
-}
-
-# Réparations de l'application (#341) : relais Docker, services actifs, ports
-# et identifiants ; un échec n'empêche pas les suivants.
-reparer() {
-    reparer_echec=0
-    reparer_element "relais Docker" env DEVZONE_RELAIS_REEL=oui bash "$ICI/docker-relay.sh"
-    # Jeton du compte Kubernetes limité (#430) : 24 h, renouvelé ici ; sans
-    # module kubernetes et sans cluster des services, rien à faire
-    if [ "$(valeur kubernetes)" = on ] || [ -n "$(cluster_saved)" ]; then
-        reparer_element "compte kubernetes" bash "$ICI/kube-account.sh" jeton
-    fi
-    if [ "$(valeur gitlab)" = on ]; then
-        reparer_element "nom gitlab" bash "$ICI/gitlab/gitlab.sh" hote-poser
-        reparer_element "relais gitlab" bash "$ICI/gitlab/gitlab.sh" relay-start
-    fi
-    if [ "$(valeur postgres)" = on ]; then
-        reparer_element "relais postgres" bash "$ICI/postgres/postgres.sh" relay-start
-    fi
-    if [ "$(valeur argocd)" = on ]; then
-        reparer_element "relais argocd" bash "$ICI/argocd/argocd.sh" relay-start
-    fi
-    if [ "$(valeur mysql)" = on ]; then
-        reparer_element "relais mysql" bash "$ICI/catalog/mysql/mysql.sh" relay-start
-    fi
-    reparer_element "relais de ports" bash "$ICI/ports.sh" restart
-    # Kubernetes workspace (#517): no automatic port watcher
-    if ! dans_pod; then
-        reparer_element "veilleur ports auto" env DEVZONE_PORTS_AUTO_REEL=oui bash "$ICI/ports-auto.sh" demarrer
-    fi
-    reparer_element "veilleur catalogue" env DEVZONE_CATALOGUE_REEL=oui bash "$ICI/catalog/catalog-watcher.sh" demarrer
-    reparer_element "identifiants" bash "$ICI/password.sh" regenerer
-    return "$reparer_echec"
-}
-
-# Bascule le cluster de travail de l'utilisateur (#341). Ne touche jamais au
-# cluster des services de devzone : aucun cluster_save, aucune ligne
-# cluster= dans l'état.
-utiliser() {
-    local ctx="" confirmer="" namespace="" reponse arg courant
-    while [ "$#" -gt 0 ]; do
-        arg="$1"
-        shift
-        case "$arg" in
-            -n | --namespace)
-                if [ "$#" -eq 0 ]; then
-                    echo "devzone : -n attend un namespace" >&2
-                    return 2
-                fi
-                namespace="$1"
-                shift
-                ;;
-            --namespace=*) namespace="${arg#*=}" ;;
-            --confirm)
-                if [ "$#" -eq 0 ]; then
-                    echo "devzone : --confirm attend un contexte" >&2
-                    return 2
-                fi
-                confirmer="$1"
-                shift
-                ;;
-            --confirm=*) confirmer="${arg#*=}" ;;
-            -*)
-                echo "devzone : argument inconnu : $arg (devzone use CTX [-n NS] [--confirm CTX])" >&2
-                return 2
-                ;;
-            *)
-                if [ -n "$ctx" ]; then
-                    echo "devzone : argument inconnu : $arg (devzone use CTX [-n NS] [--confirm CTX])" >&2
-                    return 2
-                fi
-                ctx="$arg"
-                ;;
-        esac
-    done
-    if [ -z "$ctx" ]; then
-        if [ -z "$namespace" ]; then
-            echo "devzone : contexte manquant : devzone use CTX" >&2
-            return 2
-        fi
-        courant="$(kubectl config current-context 2>/dev/null || true)"
-        if [ -z "$courant" ]; then
-            echo "devzone : aucun contexte courant" >&2
-            return 2
-        fi
-        ctx="$courant"
-    fi
-    if ! kubectl config get-contexts -o name 2>/dev/null | grep -qxF -- "$ctx"; then
-        echo "devzone : contexte inconnu : $ctx (voir kubectl config get-contexts)" >&2
-        return 2
-    fi
-    courant="$(kubectl config current-context 2>/dev/null || true)"
-    if [ "$ctx" != "$courant" ]; then
-        if ! cluster_is_local "$ctx"; then
-            if [ -n "$confirmer" ]; then
-                if [ "$confirmer" != "$ctx" ]; then
-                    echo "devzone : cluster distant refusé : $ctx (--confirm $ctx)" >&2
-                    return 2
-                fi
-            elif cluster_interactive; then
-                printf 'cluster distant : %s ; tape son nom pour confirmer : ' "$ctx" >&2
-                read -r reponse || reponse=""
-                if [ "$reponse" != "$ctx" ]; then
-                    echo "devzone : cluster distant refusé : $ctx (--confirm $ctx)" >&2
-                    return 2
-                fi
-            else
-                echo "devzone : cluster distant refusé : $ctx (--confirm $ctx)" >&2
-                return 2
-            fi
-        fi
-        kubectl config use-context "$ctx" >/dev/null
-    fi
-    if [ -n "$namespace" ]; then
-        kubectl config set-context "$ctx" --namespace "$namespace" >/dev/null
-    fi
-    echo "cluster de travail : $ctx"
-    [ -z "$namespace" ] || echo "namespace : $namespace"
-}
-
-# État complet : ✔ prêt, ✖ nécessaire, ○ facultatif, ⚠ à corriger ; chaque
-# point à faire avec sa commande (affiché à chaque démarrage)
-etat() {
-    local nom email statut m retards chemin ports_etat relais_marque ctx_travail ctx_hote paquets_marque paquets_noms argocd_repo
-    echo "devzone: state (devzone to show it again)"
-    ligne_version_disponible
-    nom="$(git config --get user.name || true)"
-    email="$(git config --get user.email || true)"
-    if [ -n "$nom" ] && [ -n "$email" ]; then
-        echo "  ✔ git identity    $nom <$email>"
-    else
-        echo "  ✖ git identity    needed to commit: gh auth login -s workflow (automatic),"
-        echo "                    ou git config --file ~/.config/git/config user.name \"<nom>\" et user.email \"<email>\""
-    fi
-    if [ "$(plateforme_lue)" = gitlab ]; then
-        # Plateforme gitlab : l'instance et glab, puis les lignes propres à
-        # GitHub (contrôles gh) signalées comme non applicables ici, en
-        # attendant le support GitLab de repowarden (#531)
-        ligne_plateforme
-        url="$(url_gitlab_lue)"
-        if git config --global --get "credential.$url.helper" 2>/dev/null | grep -q 'glab auth git-credential'; then
-            echo "  ✔ git via glab"
-        else
-            echo "  ⚠ git via glab    to set: devzone platform gitlab"
-        fi
-        echo "  ○ GitHub          inutile ici (plateforme gitlab choisie)"
-        echo "  ⚠ repowarden      reste sur GitHub (bots et tickets) : support GitLab à venir (simdevWarden/repowarden#531)"
-    else
-        ligne_plateforme
-        if ! statut="$(gh auth status 2>&1)"; then
-            echo "  ○ GitHub          optional (push and PR, repowarden tickets) : gh auth login -s workflow"
-        elif grep -q "Token scopes:" <<<"$statut" && ! grep -q "'workflow'" <<<"$statut"; then
-            echo "  ⚠ GitHub          connecté, sans permission workflow (push de .github/workflows/ refusé) : gh auth refresh -h github.com -s workflow"
-        else
-            echo "  ✔ GitHub          connecté"
-        fi
-    fi
-    if retards="$(outils_retard)"; then
-        if [ -z "$retards" ]; then
-            echo "  ✔ tools          pinned versions"
-        else
-            while read -r paquet figee installee; do
-                [ -n "$paquet" ] || continue
-                echo "  ⚠ tools          $paquet $installee installed, $figee pinned: devzone apply"
-            done <<<"$retards"
-        fi
-    fi
-    while IFS= read -r chemin; do
-        [ -n "$chemin" ] || continue
-        echo "  ⚠ worktree        $chemin absent ici (créé hors du conteneur ?) : le gérer de ce côté-là, jamais git worktree prune ici (manage/docs/reference.md, Worktrees git)"
-    done < <(worktrees_absents)
-    for m in "${MODULES[@]}"; do
-        if dans_pod && service_module "$m"; then
-            # Kubernetes workspace pod (#528): presence by the cluster DNS
-            service_ligne_pod "$m"
-        elif [ "$(valeur "$m")" = on ] && [ -f "$(fichier_echec "$m")" ]; then
-            printf '  ✖ module %-10s failed: incomplete install (%s): devzone apply\n' "$m" "$(cat "$(fichier_echec "$m")")"
-        elif [ "$(valeur "$m")" = on ] && [ "$m" = gitlab ]; then
-            # GitLab actif : son état réel (prêt, runner, en échec)
-            printf '  ✔ module %-10s %s\n' "$m" "$(bash "$ICI/gitlab/gitlab.sh" status)"
-        elif [ "$(valeur "$m")" = on ] && [ "$m" = postgres ]; then
-            printf '  ✔ module %-10s %s\n' "$m" "$(bash "$ICI/$m/$m.sh" status)"
-        elif [ "$(valeur "$m")" = on ] && [ "$m" = argocd ]; then
-            printf '  ✔ module %-10s %s\n' "$m" "$(bash "$ICI/argocd/argocd.sh" status)"
-        elif [ "$(valeur "$m")" = on ] && [ "$m" = mysql ]; then
-            printf '  ✔ module %-10s %s\n' "$m" "$(bash "$ICI/catalog/mysql/mysql.sh" status)"
-        elif [ "$(valeur "$m")" = on ]; then
-            printf '  ✔ module %-10s active: %s\n' "$m" "$(description "$m")"
-        else
-            printf '  ○ module %-10s optional, %s: devzone enable %s\n' "$m" "$(description "$m")" "$m"
-        fi
-    done
-    # GitOps repository of the instance (#539): the designation of .argocd.conf
-    argocd_repo="$(conf_get argocd repo)"
-    if [ -n "$argocd_repo" ] && [ "$argocd_repo" != none ]; then
-        printf '  ○ argocd          GitOps repository: %s\n' "$argocd_repo"
-    elif dans_pod; then
-        gitops_state_line
-    else
-        printf '  ○ argocd          no GitOps repository: devzone argocd init\n'
-    fi
-    # Socket Docker de l'hôte (#432) : l'avertissement montre l'état réel,
-    # le socket monté (même variable que docker-relay.sh), pas l'option :
-    # le montage ne change qu'au make rebuild (faux rassurant en attendant)
-    # In the Kubernetes workspace (DEVZONE_WORKSPACE=kubernetes), the pod has
-    # no Docker host socket: no alert, the service account is the cluster access
-    if [ "${DEVZONE_WORKSPACE:-}" = kubernetes ]; then
-        printf '  ✔ workspace       Kubernetes pod, service account access only (no Docker socket)\n'
-    else
-        relais_source="${DEVZONE_RELAIS_SOURCE:-/var/run/docker-host.sock}"
-        if [ -e "$relais_source" ] && [ "$(valeur docker-hote)" = on ]; then
-            printf '  ⚠ socket Docker de l hôte partagé (agents compris)\n'
-        elif [ -e "$relais_source" ]; then
-            printf '  ⚠ socket Docker de l hôte encore partagé : make rebuild sur le poste\n'
-        elif [ "$(valeur docker-hote)" = on ]; then
-            printf '  ⚠ socket Docker de l hôte absent : make rebuild sur le poste\n'
-        fi
-    fi
-    # Applications du catalogue (#414)
-    if [ -d "$ICI/catalog" ]; then
-        bash "$ICI/catalog.sh" resume
-    fi
-    # Secret Rails GitLab (#347) : avertissement si les secrets ont été perdus
-    if [ "$(valeur gitlab)" = on ] && [ ! -f "$RACINE/workspace/.gitlab/rails-secret.yaml" ]; then
-        echo "  ⚠ gitlab          GitLab réinstallé : si le navigateur affiche 422, supprimez les données de site de gitlab.localhost"
-    fi
-    # Cluster de devzone distant : avertissement dans le récapitulatif
-    cluster_actuel="$(cluster_saved)"
-    if [ -n "$cluster_actuel" ] && ! cluster_is_local "$cluster_actuel"; then
-        printf '  ⚠ cluster        remote: %s — services on a remote cluster\n' "$cluster_actuel"
-    fi
-    # Ancien cluster kind-gitlab encore présent : inviter à migrer (#396)
-    if kind get clusters 2>/dev/null | grep -qx "gitlab${INSTANCE_SUFFIX}"; then
-        printf '  ⚠ old kind-gitlab cluster%s: devzone gitlab migrate\n' "$INSTANCE_SUFFIX"
-    fi
-    # Cluster de travail interne (kind) : avertissement dans le recapitulatif
-    ctx_travail="$(kubectl config current-context 2>/dev/null || true)"
-    case "$ctx_travail" in
-        kind-gitlab* | kind-devzone*)
-            ctx_hote="$(KUBECONFIG="${DEVZONE_KUBE_HOTE:-$HOME/.kube/hote.config}" kubectl config current-context 2>/dev/null || true)"
-            if [ -n "$ctx_hote" ] && cluster_reachable "$ctx_hote"; then
-                printf '  ⚠ cluster de travail : %s (cluster interne de devzone) ; revenir : devzone use %s\n' "$ctx_travail" "$ctx_hote"
-            fi
-            ;;
-    esac
-    # Contrôle RBAC : vérification d'accès aux secrets PostgreSQL
-    ctx_rbac="$(kubectl auth can-i --as=system:serviceaccount:default:default get secrets -n devzone-postgres 2>/dev/null || true)"
-    if [ "$ctx_rbac" = "yes" ]; then
-        printf '  ⚠ rbac          : accès aux secrets devzone-postgres non restreint\n'
-    fi
-    ports_etat="$(bash "$ICI/ports.sh" resume 2>/dev/null || true)"
-    case "$ports_etat" in
-        none*) printf '  ○ ports to the workstation %s\n' "$ports_etat" ;;
-        *) printf '  ✔ ports to the workstation %s\n' "$ports_etat" ;;
-    esac
-    # Identifiants regroupés (#332) : le chemin seulement, jamais le contenu
-    if [ -f "$RACINE/.password" ]; then
-        printf '  ○ credentials: %s\n' "$RACINE/.password"
-    fi
-    # Marque posée par docker-relay.sh au démarrage (#293) : docker exec
-    # longs coupés, kind et modules en échec
-    relais_marque="${DEVZONE_RELAIS_MARQUE:-/tmp/devzone-relais-docker.echec}"
-    if [ -f "$relais_marque" ]; then
-        printf '  ⚠ Docker relay     %s: devzone repair\n' "$(head -1 "$relais_marque")"
-    fi
-    # Marque posee par packages.sh a l echec de reapplication (351) : noms des paquets non installes
-    paquets_marque="${DEVZONE_PAQUETS_MARQUE:-/tmp/devzone-paquets.echec}"
-    if [ -f "$paquets_marque" ]; then
-        paquets_noms=""
-        while IFS= read -r n; do
-            if [ -n "$n" ]; then
-                paquets_noms="${paquets_noms:+$paquets_noms, }$n"
-            fi
-        done < "$paquets_marque"
-        echo "  ⚠ packages         $paquets_noms: devzone packages"
-    fi
-}
-
-# Message for the removed llm module (migration, #669).
-llm_retire_msg() {
-    echo "devzone : module llm retiré : devzone n'héberge plus de modèle ; les modèles de l'hôte (Ollama) sont détectés à la place (devzone ai). Pour libérer le disque : kubectl delete namespace devzone-llm"
-}
-
-# Drops the llm= state line when present and reports the removal once (#669).
-migrer_llm() {
-    [ -f "$ETAT" ] || return 0
-    grep -qE '^llm=' "$ETAT" 2>/dev/null || return 0
-    state_remove llm
-    llm_retire_msg
-}
-
-changer() {
-    local m="${2:-}"
-    if [ -z "$m" ]; then
-        echo "devzone : module inconnu : (aucun) ; modules : ${MODULES[*]}" >&2
-        exit 1
-    fi
-    # llm removed (#669): migration message, never unknown module.
-    if [ "$m" = llm ]; then
-        initialiser 2>/dev/null || true
-        if [ -f "$ETAT" ] && grep -qE '^llm=' "$ETAT" 2>/dev/null; then
-            state_remove llm
-        fi
-        llm_retire_msg
-        return 1
-    fi
-    migrer_llm
-    # Option docker-hote (#432) : le socket de l'hôte, partagé par défaut.
-    # Le choix ne s'applique qu'à la création du conteneur ; sans rebuild,
-    # le conteneur courant garde son montage.
-    if [ "$m" = docker-hote ]; then
-        ecrire docker-hote "$1"
-        if [ "$1" = on ]; then
-            echo "devzone : socket Docker de l'hôte partagé après reconstruction"
-        else
-            echo "devzone : socket Docker de l'hôte non partagé après reconstruction"
-        fi
-        echo "devzone : reconstruction nécessaire : sur le poste, make rebuild"
-        return 0
-    fi
-    if ! connu "$m"; then
-        # Une application du catalogue : on écrit la ligne, on applique
-        if [ -f "$ICI/catalog/$m/app.conf" ]; then
-            ecrire "$m" "$1"
-            bash "$ICI/catalog.sh" apply
-            return
-        fi
-        echo "devzone : module inconnu : $m ; modules : ${MODULES[*]}" >&2
-        exit 1
-    fi
-    # In the Kubernetes workspace pod the services are installed from the
-    # workstation (#528): the pod has no administrator access to the cluster.
-    # DEVZONE_SERVICES_ADMIN=1: run by services-admin.sh with a temporary one.
-    if dans_pod && service_module "$m" && [ -z "${DEVZONE_SERVICES_ADMIN:-}" ]; then
-        if [ "$1" = on ]; then
-            echo "devzone: in the workspace pod, $m is installed from the workstation: devzone workspace services enable $m" >&2
-        else
-            echo "devzone: in the workspace pod, $m is removed from the workstation: devzone workspace services disable $m" >&2
-        fi
-        return 2
-    fi
-    if [ "$1" = off ] && { [ "$m" = postgres ] || [ "$m" = mysql ] || [ "$m" = gitlab ]; }; then
-        confirmer_suppression "$m" "${@:3}" || return 0
-    fi
-    ecrire "$m" "$1"
-    # Services held by Argo CD (#559): 0 done, 3 helm direct as before, else failed
-    if DEVZONE_ETAT="$ETAT" bash "$ICI/argocd/services-hook.sh" "$m" "$1" "${@:3}"; then return 0; elif [ $? -ne 3 ]; then return 1; fi
-    "appliquer_$m" "$1" "${@:3}"
-}
+# Functions of devzone, by topic (sourced here, defined before any command runs)
+# shellcheck source=SCRIPTDIR/devzone-modules.sh
+# shellcheck disable=SC1091
+. "$ICI/devzone-modules.sh"
+# shellcheck source=SCRIPTDIR/devzone-ai.sh
+# shellcheck disable=SC1091
+. "$ICI/devzone-ai.sh"
+# shellcheck source=SCRIPTDIR/devzone-ai-guard.sh
+# shellcheck disable=SC1091
+. "$ICI/devzone-ai-guard.sh"
+# shellcheck source=SCRIPTDIR/devzone-skill.sh
+# shellcheck disable=SC1091
+. "$ICI/devzone-skill.sh"
+# shellcheck source=SCRIPTDIR/devzone-services.sh
+# shellcheck disable=SC1091
+. "$ICI/devzone-services.sh"
+# shellcheck source=SCRIPTDIR/devzone-cluster.sh
+# shellcheck disable=SC1091
+. "$ICI/devzone-cluster.sh"
+# shellcheck source=SCRIPTDIR/devzone-repair.sh
+# shellcheck disable=SC1091
+. "$ICI/devzone-repair.sh"
+# shellcheck source=SCRIPTDIR/devzone-platform.sh
+# shellcheck disable=SC1091
+. "$ICI/devzone-platform.sh"
+# shellcheck source=SCRIPTDIR/devzone-version.sh
+# shellcheck disable=SC1091
+. "$ICI/devzone-version.sh"
+# shellcheck source=SCRIPTDIR/devzone-status.sh
+# shellcheck disable=SC1091
+. "$ICI/devzone-status.sh"
 
 # shellcheck source=state-json.sh
 # shellcheck disable=SC1091
@@ -1530,28 +127,28 @@ if command -v reject_renamed >/dev/null 2>&1; then
 fi
 
 case "${1:-}" in
-    "" | status | modules) if [ "${2:-}" = "--json" ]; then state_json; else etat; fi ;;
-    enable) changer on "${2:-}" "${@:3}" ;;
-    disable) changer off "${2:-}" "${@:3}" ;;
+    "" | status | modules) if [ "${2:-}" = "--json" ]; then state_json; else show_state; fi ;;
+    enable) change_module on "${2:-}" "${@:3}" ;;
+    disable) change_module off "${2:-}" "${@:3}" ;;
     apply)
-        migrer_llm
-        # L'utilisateur confirme l'état courant (#417, étape 4) : les
-        # veilleurs peuvent de nouveau désinstaller
+        migrate_llm
+        # The user confirms the current state (#417, step 4): the watchers
+        # may uninstall again
         state_recovery_confirm
-        appliquer_repowarden
-        [ "$(valeur ia)" = off ] || appliquer_ia on
+        apply_repowarden
+        [ "$(value_of ia)" = off ] || apply_ia on
         # gitlab, postgres, argocd: installed from the workstation in the
         # Kubernetes workspace pod (#528), by their installer elsewhere
-        [ "$(valeur gitlab)" = off ] || appliquer_service gitlab
-        [ "$(valeur postgres)" = off ] || appliquer_service postgres
-        [ "$(valeur mysql)" = off ] || appliquer_mysql on
-        [ "$(valeur argocd)" = off ] || appliquer_service argocd
+        [ "$(value_of gitlab)" = off ] || apply_service gitlab
+        [ "$(value_of postgres)" = off ] || apply_service postgres
+        [ "$(value_of mysql)" = off ] || apply_mysql on
+        [ "$(value_of argocd)" = off ] || apply_service argocd
         ;;
     is-enabled)
-        connu "${2:-}" || { echo "devzone : module inconnu : ${2:-(aucun)}" >&2; exit 2; }
-        # Test silencieux, appelé par les scripts de démarrage : code 0 si le
-        # module est actif, 1 sinon, sans rien écrire (kube-config.sh:16)
-        [ "$(valeur "$2")" = on ]
+        is_known "${2:-}" || { echo "devzone : unknown module : ${2:-(none)}" >&2; exit 2; }
+        # Silent test, called by the startup scripts: code 0 if the module is
+        # active, 1 otherwise, without writing anything (kube-config.sh:16)
+        [ "$(value_of "$2")" = on ]
         ;;
     agent)
         bash "$ICI/agent.sh" "${@:2}"
@@ -1568,16 +165,16 @@ case "${1:-}" in
                 ;;
             *)
                 # Read-only: lists the host (Ollama) models detected and the default model.
-                liste="$(modeles)"
-                def="$(premier)"
-                if [ -z "$liste" ]; then
-                    echo "devzone : aucun modèle Ollama détecté sur ${URL} (répondez sur /api/tags)"
+                models_list="$(modeles)"
+                default_model="$(premier)"
+                if [ -z "$models_list" ]; then
+                    echo "devzone : no Ollama model detected on ${URL} (answer on /api/tags)"
                 else
-                    echo "devzone : modèles détectés sur l'hôte (Ollama) :"
+                    echo "devzone : models detected on the host (Ollama):"
                     while IFS= read -r m; do
                         [ -n "$m" ] && printf '  %s\n' "$m"
-                    done <<<"$liste"
-                    echo "modèle par défaut : ${def:-aucun}"
+                    done <<<"$models_list"
+                    echo "default model: ${default_model:-none}"
                 fi
                 ;;
         esac
@@ -1586,12 +183,12 @@ case "${1:-}" in
     build)
         bash "$ICI/workspace-build.sh" "${@:2}"
         ;;
-    repair) reparer ;;
+    repair) repair_workstation ;;
     start) bash "$ICI/startup.sh" ;;
     metrics) bash "$ICI/metrics-server.sh" "${@:2}" ;;
-    use) utiliser "${@:2}" ;;
+    use) use_cluster "${@:2}" ;;
     clusters) DEVZONE_ETAT="$ETAT" bash "$ICI/clusters.sh" "${@:2}" ;;
-    cluster) changer_cluster "${@:2}" ;;
+    cluster) change_cluster "${@:2}" ;;
     postgres) DEVZONE_ETAT="$ETAT" bash "$ICI/postgres/postgres.sh" "${@:2}" ;;
     mysql) DEVZONE_ETAT="$ETAT" bash "$ICI/catalog/mysql/mysql.sh" "${@:2}" ;;
     gitlab) DEVZONE_ETAT="$ETAT" bash "$ICI/gitlab/gitlab.sh" "${@:2}" ;;
@@ -1601,7 +198,7 @@ case "${1:-}" in
     packages) bash "$ICI/packages.sh" "${@:2}" ;;
     passwords)
         bash "$ICI/password.sh" regenerer ||
-            echo "devzone : identifiants regroupés non mis à jour" >&2
+            echo "devzone : grouped credentials not updated" >&2
         bash "$ICI/password.sh" chemin
         ;;
     -h | --help | help) devzone_aide ;;
@@ -1610,13 +207,13 @@ case "${1:-}" in
     test-gitlab) DEVZONE_ETAT="$ETAT" bash "$ICI/gitlab/test-gitlab.sh" "${@:2}" ;;
     platform)
         if [ -n "${2:-}" ]; then
-            changer_plateforme "${@:2}"
+            change_platform "${@:2}"
         else
-            resume_plateforme
+            platform_summary
         fi
         ;;
     *)
-        echo "devzone : commande inconnue : $1 (devzone --help)" >&2
+        echo "devzone : unknown command : $1 (devzone --help)" >&2
         exit 1
         ;;
 esac

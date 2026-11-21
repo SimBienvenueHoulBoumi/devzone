@@ -1,8 +1,8 @@
 #!/usr/bin/env bats
-# devzone test-gitlab (#263) : essai de bout en bout du module gitlab et de la
-# plateforme. Faux kind, kubectl, curl, git, ssh-keygen, glab, gh, getent et
-# devzone dans le PATH : aucun cluster, aucun réseau, aucun vrai GitLab.
-# Chaque faux binaire journalise ses arguments dans $BATS_TEST_TMPDIR/<outil>.log.
+# devzone test-gitlab (#263): end-to-end test of the gitlab module and of the
+# platform. Fake kind, kubectl, curl, git, ssh-keygen, glab, gh, getent and
+# devzone in the PATH: no cluster, no network, no real GitLab.
+# Each fake binary logs its arguments in $BATS_TEST_TMPDIR/<tool>.log.
 
 setup() {
     load commun
@@ -21,50 +21,50 @@ setup() {
     export DEVZONE_TEST_DEVZONE="$BATS_TEST_TMPDIR/bin/devzone"
     mkdir -p "$HOME/.local/bin" "$DEVZONE_RACINE/workspace/.gitlab" \
         "$BATS_TEST_TMPDIR/bin" "$TMPDIR"
-    printf 'jeton-root-secret' >"$DEVZONE_RACINE/workspace/.gitlab/root-token"
+    printf 'token-root-secret' >"$DEVZONE_RACINE/workspace/.gitlab/root-token"
     touch "$BATS_TEST_TMPDIR/namespace"
-    # Relais web et SSH actifs : PID vivant (celui du test) dans leur dossier
-    for nom in web ssh; do
-        mkdir -p "$DEVZONE_RACINE/workspace/.gitlab-$nom"
-        echo $$ >"$DEVZONE_RACINE/workspace/.gitlab-$nom/relais.pid"
+    # Web and SSH relays running: live PID (the test's own) in their folder
+    for relay in web ssh; do
+        mkdir -p "$DEVZONE_RACINE/workspace/.gitlab-$relay"
+        echo $$ >"$DEVZONE_RACINE/workspace/.gitlab-$relay/relais.pid"
     done
     printf 'gitlab%s\n' "$INSTANCE_TEST" >"$KIND_CLUSTERS"
-    printf 'kind-gitlab%s\nkind-dev\n' "$INSTANCE_TEST" >"$BATS_TEST_TMPDIR/contextes"
+    printf 'kind-gitlab%s\nkind-dev\n' "$INSTANCE_TEST" >"$BATS_TEST_TMPDIR/contexts"
     printf '127.0.0.1 localhost\n127.0.0.1\tgitlab.localhost # devzone:gitlab\n' >"$DEVZONE_HOSTS"
     : >"$DEVZONE_ETAT"
-    touch "$BATS_TEST_TMPDIR/module_actif"
+    touch "$BATS_TEST_TMPDIR/module_active"
 
-    # devzone : doublure des commandes utilisées par test-gitlab.sh
+    # devzone: double of the commands used by test-gitlab.sh
     cat >"$BATS_TEST_TMPDIR/bin/devzone" <<'DEVZONE'
 #!/usr/bin/env bash
 echo "devzone $*" >>"$BATS_TEST_TMPDIR/devzone.log"
 case "$1 $2" in
     "is-enabled gitlab")
-        [ -f "$BATS_TEST_TMPDIR/module_actif" ]
+        [ -f "$BATS_TEST_TMPDIR/module_active" ]
         exit $?
         ;;
     "enable gitlab")
-        [ -n "${FAUX_ACTIVER_KO:-}" ] && exit 1
-        touch "$BATS_TEST_TMPDIR/module_actif" "$BATS_TEST_TMPDIR/namespace"
+        [ -n "${FAKE_ENABLE_FAIL:-}" ] && exit 1
+        touch "$BATS_TEST_TMPDIR/module_active" "$BATS_TEST_TMPDIR/namespace"
         mkdir -p "$DEVZONE_RACINE/workspace/.gitlab"
-        printf 'jeton-root-secret' >"$DEVZONE_RACINE/workspace/.gitlab/root-token"
+        printf 'token-root-secret' >"$DEVZONE_RACINE/workspace/.gitlab/root-token"
         ;;
     "disable gitlab")
-        [ -n "${FAUX_DESACTIVER_KO:-}" ] && exit 1
-        rm -f "$BATS_TEST_TMPDIR/module_actif"
-        if [ "${FAUX_DESACTIVER_LAISSE:-}" != namespace ]; then
+        [ -n "${FAKE_DISABLE_FAIL:-}" ] && exit 1
+        rm -f "$BATS_TEST_TMPDIR/module_active"
+        if [ "${FAKE_DISABLE_LEFT:-}" != namespace ]; then
             rm -f "$BATS_TEST_TMPDIR/namespace"
         fi
-        if [ "${FAUX_DESACTIVER_LAISSE:-}" != secrets ]; then
+        if [ "${FAKE_DISABLE_LEFT:-}" != secrets ]; then
             rm -rf "$DEVZONE_RACINE/workspace/.gitlab"
         fi
-        if [ "${FAUX_DESACTIVER_LAISSE:-}" != hosts ]; then
+        if [ "${FAKE_DISABLE_LEFT:-}" != hosts ]; then
             grep -v 'devzone:gitlab' "$DEVZONE_HOSTS" >"$DEVZONE_HOSTS.tmp" 2>/dev/null || true
             mv "$DEVZONE_HOSTS.tmp" "$DEVZONE_HOSTS"
         fi
         ;;
     "platform gitlab")
-        [ -n "${FAUX_PLATEFORME_KO:-}" ] && exit 1
+        [ -n "${FAKE_PLATFORM_FAIL:-}" ] && exit 1
         mkdir -p "$HOME/.local/bin" "$HOME/.config/glab-cli"
         cp "$BATS_TEST_TMPDIR/bin/glab" "$HOME/.local/bin/glab"
         chmod +x "$HOME/.local/bin/glab"
@@ -82,14 +82,14 @@ case "$1 $2" in
         echo "devzone : plateforme gitlab"
         ;;
     *)
-        echo "devzone : commande inconnue : $*" >&2
+        echo "devzone : unknown command: $*" >&2
         exit 1
         ;;
 esac
 exit 0
 DEVZONE
 
-    # kind : clusters tenus dans $KIND_CLUSTERS
+    # kind: clusters held in $KIND_CLUSTERS
     cat >"$BATS_TEST_TMPDIR/bin/kind" <<'KIND'
 #!/usr/bin/env bash
 echo "kind $*" >>"$BATS_TEST_TMPDIR/kind.log"
@@ -99,41 +99,41 @@ case "$1 $2" in
 esac
 KIND
 
-    # kubectl : contextes tenus dans un fichier
+    # kubectl: contexts held in a file
     cat >"$BATS_TEST_TMPDIR/bin/kubectl" <<'KUBE'
 #!/usr/bin/env bash
 echo "kubectl $*" >>"$BATS_TEST_TMPDIR/kubectl.log"
 case "$*" in
-    *"config get-contexts"*) cat "$BATS_TEST_TMPDIR/contextes" 2>/dev/null || true ;;
-    *"config current-context"*) echo "${FAUX_CONTEXTE:-kind-dev}" ;;
+    *"config get-contexts"*) cat "$BATS_TEST_TMPDIR/contexts" 2>/dev/null || true ;;
+    *"config current-context"*) echo "${FAKE_CONTEXT:-kind-dev}" ;;
     *"get namespace "*) [ -f "$BATS_TEST_TMPDIR/namespace" ] && exit 0 ; exit 1 ;;
 esac
 exit 0
 KUBE
 
-    # docker : conteneurs de l'instance sur le Docker de l'hôte
+    # docker: instance containers on the host's Docker
     cat >"$BATS_TEST_TMPDIR/bin/docker" <<'DOCKER'
 #!/usr/bin/env bash
 echo "docker $*" >>"$BATS_TEST_TMPDIR/docker.log"
 case "$*" in
-    "ps -aq"*) [ -z "${FAUX_CONTENEURS_ETIQUETES:-}" ] || echo "$FAUX_CONTENEURS_ETIQUETES" ;;
+    "ps -aq"*) [ -z "${FAKE_LABELLED_CONTAINERS:-}" ] || echo "$FAKE_LABELLED_CONTAINERS" ;;
 esac
 exit 0
 DOCKER
 
-    # curl : API GitLab simulée (pipeline, clés, état du module)
+    # curl: simulated GitLab API (pipeline, keys, module state)
     export CURL_SETUP="$BATS_TEST_TMPDIR/curl_setup"
     mkdir -p "$CURL_SETUP"
     printf '0' >"$CURL_SETUP/pipeline_count"
     cat >"$BATS_TEST_TMPDIR/bin/curl" <<'CURL'
 #!/usr/bin/env bash
 echo "curl $*" >>"$BATS_TEST_TMPDIR/curl.log"
-[ -n "${FAUX_GITLAB_KO:-}" ] && exit 7
-methode=GET
+[ -n "${FAKE_GITLAB_FAIL:-}" ] && exit 7
+method=GET
 url=""
 while [ $# -gt 0 ]; do
     case "$1" in
-        --request) methode="$2"; shift 2 ;;
+        --request) method="$2"; shift 2 ;;
         --header | --data | --data-urlencode) shift 2 ;;
         -*) shift ;;
         *) url="$1"; shift ;;
@@ -142,18 +142,18 @@ done
 pipeline_file="$CURL_SETUP/pipeline_count"
     case "$url" in
     *"/api/v4/projects/devzone%2Fdemo/pipeline")
-        [ -n "${FAUX_PIPELINE_CREATION_KO:-}" ] && exit 22
+        [ -n "${FAKE_PIPELINE_CREATE_FAIL:-}" ] && exit 22
         printf '{"id":42,"web_url":"http://gitlab.localhost:8929/devzone/demo/-/pipelines/42"}\n'
         ;;
     *"/api/v4/projects/devzone%2Fdemo/pipelines/42")
-        if [ -n "${FAUX_PIPELINE_ETAT:-}" ]; then
-            case "${FAUX_PIPELINE_ETAT}" in
+        if [ -n "${FAKE_PIPELINE_STATE:-}" ]; then
+            case "${FAKE_PIPELINE_STATE}" in
                 success) printf '{"status":"success"}\n' ;;
                 failed) printf '{"status":"failed"}\n' ;;
                 *) printf '{"status":"running"}\n' ;;
             esac
         else
-            # Par défaut : transition running → success au prochain appel
+            # Default: running -> success at the next call
             pipeline_count="$(cat "$pipeline_file" 2>/dev/null || echo 0)"
             if [ "$pipeline_count" -eq 0 ]; then
                 printf '{"status":"running"}\n'
@@ -165,12 +165,12 @@ pipeline_file="$CURL_SETUP/pipeline_count"
         ;;
     *"/api/v4/user/keys/7") exit 0 ;;
     *"/api/v4/user/keys")
-        [ -n "${FAUX_CLE_KO:-}" ] && exit 22
+        [ -n "${FAKE_KEY_FAIL:-}" ] && exit 22
         printf '{"id":7}\n'
         ;;
     *"/api/v4/runners/all"*)
-        if [ -n "${FAUX_RUNNERS:-}" ]; then
-            printf '%s\n' "$FAUX_RUNNERS"
+        if [ -n "${FAKE_RUNNERS:-}" ]; then
+            printf '%s\n' "$FAKE_RUNNERS"
         else
             printf '%s\n' '[{"id":1}]'
         fi
@@ -181,7 +181,7 @@ esac
 exit 0
 CURL
 
-    # git : clone simulé ; la suite repowarden est un vrai fichier bats
+    # git: simulated clone; the repowarden suite is a real bats file
     cat >"$BATS_TEST_TMPDIR/bin/git" <<'GIT'
 #!/usr/bin/env bash
 echo "git $*" >>"$BATS_TEST_TMPDIR/git.log"
@@ -193,45 +193,45 @@ for a in "$@"; do
     [ "$a" = clone ] && clone=1
 done
 if [ "$clone" = 1 ]; then
-    for a in "$@"; do cible="$a"; done
+    for a in "$@"; do target="$a"; done
     case "$*" in
         *repowarden*)
-            [ -n "${FAUX_REPOWARDEN_CLONE_KO:-}" ] && exit 1
-            if [ -z "${FAUX_REPOWARDEN_SANS_TEST:-}" ]; then
-                mkdir -p "$cible/test/gitlab"
-                : >"$cible/test/gitlab/forge.bats"
+            [ -n "${FAKE_REPOWARDEN_CLONE_FAIL:-}" ] && exit 1
+            if [ -z "${FAKE_REPOWARDEN_NO_TEST:-}" ]; then
+                mkdir -p "$target/test/gitlab"
+                : >"$target/test/gitlab/forge.bats"
             else
-                mkdir -p "$cible"
+                mkdir -p "$target"
             fi
             ;;
         *"ssh://git@"*)
-            [ "${FAUX_CLONE_KO:-}" = ssh ] && exit 1
-            mkdir -p "$cible/.git"
-            : >"$cible/.git/config"
+            [ "${FAKE_CLONE_FAIL:-}" = ssh ] && exit 1
+            mkdir -p "$target/.git"
+            : >"$target/.git/config"
             ;;
         *"http://"* | *"https://"*)
-            [ "${FAUX_CLONE_KO:-}" = http ] && exit 1
-            mkdir -p "$cible/.git"
-            if [ -n "${FAUX_JETON_DANS_CONFIG:-}" ]; then
-                printf 'extraheader = PRIVATE-TOKEN: jeton-root-secret\n' >"$cible/.git/config"
+            [ "${FAKE_CLONE_FAIL:-}" = http ] && exit 1
+            mkdir -p "$target/.git"
+            if [ -n "${FAKE_TOKEN_IN_CONFIG:-}" ]; then
+                printf 'extraheader = PRIVATE-TOKEN: token-root-secret\n' >"$target/.git/config"
             else
-                : >"$cible/.git/config"
+                : >"$target/.git/config"
             fi
             ;;
         *)
-            mkdir -p "$cible/.git"
-            : >"$cible/.git/config"
+            mkdir -p "$target/.git"
+            : >"$target/.git/config"
             ;;
     esac
 fi
 exit 0
 GIT
 
-    # ssh-keygen : clé jetable factice
+    # ssh-keygen: fake throwaway key
     cat >"$BATS_TEST_TMPDIR/bin/ssh-keygen" <<'SSHKEYGEN'
 #!/usr/bin/env bash
 echo "ssh-keygen $*" >>"$BATS_TEST_TMPDIR/ssh-keygen.log"
-[ -n "${FAUX_SSH_KEYGEN_KO:-}" ] && exit 1
+[ -n "${FAKE_SSH_KEYGEN_FAIL:-}" ] && exit 1
 f=""
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -240,58 +240,58 @@ while [ $# -gt 0 ]; do
     esac
 done
 [ -n "$f" ] || exit 1
-printf 'cle-privee\n' >"$f"
+printf 'private-key\n' >"$f"
 printf 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI test@devzone\n' >"$f.pub"
 SSHKEYGEN
 
-    # glab : clone simulé
+    # glab: simulated clone
     cat >"$BATS_TEST_TMPDIR/bin/glab" <<'GLAB'
 #!/usr/bin/env bash
 echo "glab $*" >>"$BATS_TEST_TMPDIR/glab.log"
 case "$*" in
     "repo clone"*)
-        [ -n "${FAUX_GLAB_CLONE_KO:-}" ] && exit 1
-        for a in "$@"; do cible="$a"; done
-        mkdir -p "$cible/.git"
-        : >"$cible/.git/config"
+        [ -n "${FAKE_GLAB_CLONE_FAIL:-}" ] && exit 1
+        for a in "$@"; do target="$a"; done
+        mkdir -p "$target/.git"
+        : >"$target/.git/config"
         ;;
     "--version") echo "glab 1.0.0" ;;
 esac
 exit 0
 GLAB
 
-    # bats : la suite d'intégration repowarden, simulée ; en échec, elle
-    # affiche le jeton reçu pour vérifier qu'il est masqué dans le journal
+    # bats: the simulated repowarden integration suite; on failure, it
+    # prints the token received, to check that it is masked in the log
     cat >"$BATS_TEST_TMPDIR/bin/bats" <<'BATS'
 #!/usr/bin/env bash
 echo "bats $*" >>"$BATS_TEST_TMPDIR/bats.log"
-if [ -n "${FAUX_SUITE_KO:-}" ]; then
-    echo "échec de la suite avec le jeton ${REPOWARDEN_IT_GITLAB_TOKEN:-}"
+if [ -n "${FAKE_SUITE_FAIL:-}" ]; then
+    echo "suite failed with token ${REPOWARDEN_IT_GITLAB_TOKEN:-}"
     exit 1
 fi
 exit 0
 BATS
 
-    # gh : connexion et API simulées
+    # gh: simulated login and API
     cat >"$BATS_TEST_TMPDIR/bin/gh" <<'GH'
 #!/usr/bin/env bash
 echo "gh $*" >>"$BATS_TEST_TMPDIR/gh.log"
 case "$*" in
-    "auth status"*) exit "${FAUX_GH_AUTH_KO:-0}" ;;
+    "auth status"*) exit "${FAKE_GH_AUTH_FAIL:-0}" ;;
     "repo view"*) echo "SimBienvenueHoulBoumi/devzone" ;;
 esac
 exit 0
 GH
 
-    # getent : gitlab.localhost vers 127.0.0.1 (relais), hôte en IPv6 par
-    # « hosts » mais IPv4 par « ahostsv4 » (comme Docker Desktop, #320)
+    # getent: gitlab.localhost to 127.0.0.1 (relays), host in IPv6 by
+    # "hosts" but IPv4 by "ahostsv4" (as Docker Desktop, #320)
     cat >"$BATS_TEST_TMPDIR/bin/getent" <<'GETENT'
 #!/usr/bin/env bash
 echo "getent $*" >>"$BATS_TEST_TMPDIR/getent.log"
-[ -n "${FAUX_GETENT_KO:-}" ] && exit 2
+[ -n "${FAKE_GETENT_FAIL:-}" ] && exit 2
 case "$*" in
     "hosts gitlab.localhost")
-        if [ -n "${FAUX_GETENT_AUTRE:-}" ]; then
+        if [ -n "${FAKE_GETENT_OTHER:-}" ]; then
             echo "172.17.0.1 gitlab.localhost"
         else
             echo "127.0.0.1 gitlab.localhost"
@@ -311,84 +311,84 @@ GETENT
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
 }
 
-@test "test-gitlab : tout vert, résumé, code 0, clé retirée, jeton jamais affiché" {
+@test "test-gitlab : all green, summary, code 0, key removed, token never shown" {
     run bash "$SCRIPT"
     [ "$status" -eq 0 ]
     [[ "$output" == *"✔ 1. module"* ]] || false
-    [[ "$output" == *"✔ 2. état"* ]] || false
-    [[ "$output" == *"✔ 3. nom d'hôte"* ]] || false
+    [[ "$output" == *"✔ 2. state"* ]] || false
+    [[ "$output" == *"✔ 3. host name"* ]] || false
     [[ "$output" == *"✔ 4. pipeline"* ]] || false
-    [[ "$output" == *"✔ 5. clones HTTP et SSH"* ]] || false
-    [[ "$output" == *"✔ 6. plateforme"* ]] || false
-    [[ "$output" == *"✔ 7. intégration repowarden"* ]] || false
-    [[ "$output" == *"devzone test-gitlab : résumé"* ]] || false
-    [[ "$output" != *"jeton-root-secret"* ]] || false
+    [[ "$output" == *"✔ 5. HTTP and SSH clones"* ]] || false
+    [[ "$output" == *"✔ 6. platform"* ]] || false
+    [[ "$output" == *"✔ 7. repowarden integration"* ]] || false
+    [[ "$output" == *"devzone test-gitlab : summary"* ]] || false
+    [[ "$output" != *"token-root-secret"* ]] || false
     grep -q "DELETE" "$BATS_TEST_TMPDIR/curl.log" || false
     grep -q "/user/keys/7" "$BATS_TEST_TMPDIR/curl.log" || false
     [ ! -e "$HOME/.local/bin/glab" ]
     ! grep -q '^plateforme=' "$DEVZONE_ETAT" || false
 }
 
-@test "test-gitlab : étape 1 en échec → ✖ avec la raison, code non nul" {
-    rm -f "$BATS_TEST_TMPDIR/module_actif"
-    export FAUX_ACTIVER_KO=1
+@test "test-gitlab : step 1 failed → ✖ with the reason, non-zero code" {
+    rm -f "$BATS_TEST_TMPDIR/module_active"
+    export FAKE_ENABLE_FAIL=1
     run bash "$SCRIPT"
     [ "$status" -ne 0 ]
     [[ "$output" == *"✖ 1. module"* ]] || false
-    [[ "$output" == *"devzone enable gitlab a échoué"* ]] || false
+    [[ "$output" == *"devzone enable gitlab failed"* ]] || false
 }
 
-@test "test-gitlab : étape 2 en échec (runner hors ligne) → ✖ avec la raison" {
-    export FAUX_RUNNERS='[]'
+@test "test-gitlab : step 2 failed (runner offline) → ✖ with the reason" {
+    export FAKE_RUNNERS='[]'
     run bash "$SCRIPT"
     [ "$status" -ne 0 ]
-    [[ "$output" == *"✖ 2. état"* ]] || false
-    [[ "$output" == *"runner hors ligne"* ]] || false
+    [[ "$output" == *"✖ 2. state"* ]] || false
+    [[ "$output" == *"runner offline"* ]] || false
 }
 
-@test "test-gitlab : étape 3 en échec (nom non résolu) → ✖ avec la raison" {
-    export FAUX_GETENT_KO=1
+@test "test-gitlab : step 3 failed (name not resolved) → ✖ with the reason" {
+    export FAKE_GETENT_FAIL=1
     run bash "$SCRIPT"
     [ "$status" -ne 0 ]
-    [[ "$output" == *"✖ 3. nom d'hôte"* ]] || false
-    [[ "$output" == *"gitlab.localhost non résolu"* ]] || false
+    [[ "$output" == *"✖ 3. host name"* ]] || false
+    [[ "$output" == *"gitlab.localhost not resolved"* ]] || false
 }
 
-@test "test-gitlab : étape 3 en échec (nom vers une autre adresse) → ✖, 127.0.0.1 attendu" {
-    export FAUX_GETENT_AUTRE=1
+@test "test-gitlab : step 3 failed (name to another address) → ✖, 127.0.0.1 expected" {
+    export FAKE_GETENT_OTHER=1
     run bash "$SCRIPT"
     [ "$status" -ne 0 ]
-    [[ "$output" == *"✖ 3. nom d'hôte"* ]] || false
-    [[ "$output" == *"résolu vers 172.17.0.1, attendu 127.0.0.1"* ]] || false
+    [[ "$output" == *"✖ 3. host name"* ]] || false
+    [[ "$output" == *"resolves to 172.17.0.1, expected 127.0.0.1"* ]] || false
 }
 
-@test "test-gitlab : étape 3 en échec (relais 2224 arrêté) → ✖ avec la raison" {
+@test "test-gitlab : step 3 failed (relay 2224 stopped) → ✖ with the reason" {
     rm -f "$DEVZONE_RACINE/workspace/.gitlab-ssh/relais.pid"
     run bash "$SCRIPT"
     [ "$status" -ne 0 ]
-    [[ "$output" == *"✖ 3. nom d'hôte"* ]] || false
-    [[ "$output" == *"relais gitlab arrêté sur 2224"* ]] || false
+    [[ "$output" == *"✖ 3. host name"* ]] || false
+    [[ "$output" == *"gitlab relay stopped on 2224"* ]] || false
 }
 
-@test "test-gitlab : étape 3 en échec (aucun relais) → ✖ avec les deux ports" {
+@test "test-gitlab : step 3 failed (no relay) → ✖ with both ports" {
     rm -f "$DEVZONE_RACINE/workspace/.gitlab-web/relais.pid"
     rm -f "$DEVZONE_RACINE/workspace/.gitlab-ssh/relais.pid"
     run bash "$SCRIPT"
     [ "$status" -ne 0 ]
-    [[ "$output" == *"✖ 3. nom d'hôte"* ]] || false
-    [[ "$output" == *"relais gitlab arrêté sur 8929 2224"* ]] || false
+    [[ "$output" == *"✖ 3. host name"* ]] || false
+    [[ "$output" == *"gitlab relay stopped on 8929 2224"* ]] || false
 }
 
-@test "test-gitlab : étape 4, création du pipeline impossible → ✖ avec la raison" {
-    export FAUX_PIPELINE_CREATION_KO=1
+@test "test-gitlab : step 4, pipeline creation impossible → ✖ with the reason" {
+    export FAKE_PIPELINE_CREATE_FAIL=1
     run bash "$SCRIPT"
     [ "$status" -ne 0 ]
     [[ "$output" == *"✖ 4. pipeline"* ]] || false
-    [[ "$output" == *"création du pipeline"* ]] || false
+    [[ "$output" == *"creation of the pipeline"* ]] || false
 }
 
-@test "test-gitlab : étape 4, pipeline en échec → ✖ avec l'URL du pipeline" {
-    export FAUX_PIPELINE_ETAT=failed
+@test "test-gitlab : step 4, pipeline failed → ✖ with the pipeline URL" {
+    export FAKE_PIPELINE_STATE=failed
     run bash "$SCRIPT"
     [ "$status" -ne 0 ]
     [[ "$output" == *"✖ 4. pipeline"* ]] || false
@@ -396,146 +396,146 @@ GETENT
     [[ "$output" == *"/devzone/demo/-/pipelines/42"* ]] || false
 }
 
-@test "test-gitlab : étape 4, délai du pipeline dépassé → ✖ avec la raison" {
-    export FAUX_PIPELINE_ETAT=running
+@test "test-gitlab : step 4, pipeline timeout exceeded → ✖ with the reason" {
+    export FAKE_PIPELINE_STATE=running
     run bash "$SCRIPT"
     [ "$status" -ne 0 ]
     [[ "$output" == *"✖ 4. pipeline"* ]] || false
-    [[ "$output" == *"délai 2 s dépassé"* ]] || false
+    [[ "$output" == *"timeout 2 s exceeded"* ]] || false
 }
 
-@test "test-gitlab : étape 4, pipeline running puis success" {
+@test "test-gitlab : step 4, pipeline running then success" {
     run bash "$SCRIPT"
     [ "$status" -eq 0 ]
     [[ "$output" == *"✔ 4. pipeline"* ]] || false
 }
 
-@test "test-gitlab : étape 5, clone HTTP par assistant d'identifiants, jeton absent des arguments" {
+@test "test-gitlab : step 5, HTTP clone through a credential helper, token absent from the arguments" {
     run bash "$SCRIPT"
     [ "$status" -eq 0 ]
     grep -q 'credential.helper=!f()' "$BATS_TEST_TMPDIR/git.log" || false
     grep -q 'username=oauth2' "$BATS_TEST_TMPDIR/git.log" || false
-    ! grep -q 'jeton-root-secret' "$BATS_TEST_TMPDIR/git.log" || false
-    # Le script refuse un clone dont .git/config contient le jeton : le
-    # succès de ce test prouve aussi que la doublure ne l'y a pas écrit.
+    ! grep -q 'token-root-secret' "$BATS_TEST_TMPDIR/git.log" || false
+    # The script refuses a clone whose .git/config holds the token: the
+    # success of this test also proves that the double did not write it there.
 }
 
-@test "test-gitlab : étape 5, dépôt de la clé SSH impossible → ✖ avec la raison" {
-    export FAUX_CLE_KO=1
+@test "test-gitlab : step 5, SSH key upload impossible → ✖ with the reason" {
+    export FAKE_KEY_FAIL=1
     run bash "$SCRIPT"
     [ "$status" -ne 0 ]
-    [[ "$output" == *"✖ 5. clones HTTP et SSH"* ]] || false
-    [[ "$output" == *"dépôt de la clé SSH"* ]] || false
+    [[ "$output" == *"✖ 5. HTTP and SSH clones"* ]] || false
+    [[ "$output" == *"SSH key upload"* ]] || false
 }
 
-@test "test-gitlab : étape 5, clone SSH impossible → ✖ avec la raison" {
-    export FAUX_CLONE_KO=ssh
+@test "test-gitlab : step 5, SSH clone impossible → ✖ with the reason" {
+    export FAKE_CLONE_FAIL=ssh
     run bash "$SCRIPT"
     [ "$status" -ne 0 ]
-    [[ "$output" == *"✖ 5. clones HTTP et SSH"* ]] || false
-    [[ "$output" == *"clone SSH"* ]] || false
+    [[ "$output" == *"✖ 5. HTTP and SSH clones"* ]] || false
+    [[ "$output" == *"SSH clone"* ]] || false
 }
 
-@test "test-gitlab : étape 5, clone HTTP impossible → ✖, clé retirée, jeton absent" {
-    export FAUX_CLONE_KO=http
+@test "test-gitlab : step 5, HTTP clone impossible → ✖, key removed, token absent" {
+    export FAKE_CLONE_FAIL=http
     run bash "$SCRIPT"
     [ "$status" -ne 0 ]
-    [[ "$output" == *"✖ 5. clones HTTP et SSH"* ]] || false
-    [[ "$output" == *"clone HTTP"* ]] || false
-    [[ "$output" != *"jeton-root-secret"* ]] || false
+    [[ "$output" == *"✖ 5. HTTP and SSH clones"* ]] || false
+    [[ "$output" == *"HTTP clone"* ]] || false
+    [[ "$output" != *"token-root-secret"* ]] || false
     grep -q "DELETE" "$BATS_TEST_TMPDIR/curl.log" || false
     grep -q "/user/keys/7" "$BATS_TEST_TMPDIR/curl.log" || false
 }
 
-@test "test-gitlab : étape 5, jeton écrit dans .git/config du clone → ✖" {
-    export FAUX_JETON_DANS_CONFIG=1
+@test "test-gitlab : step 5, token written to the clone's .git/config → ✖" {
+    export FAKE_TOKEN_IN_CONFIG=1
     run bash "$SCRIPT"
     [ "$status" -ne 0 ]
-    [[ "$output" == *"✖ 5. clones HTTP et SSH"* ]] || false
-    [[ "$output" == *"écrit dans .git/config"* ]] || false
-    [[ "$output" != *"jeton-root-secret"* ]] || false
+    [[ "$output" == *"✖ 5. HTTP and SSH clones"* ]] || false
+    [[ "$output" == *"written to .git/config"* ]] || false
+    [[ "$output" != *"token-root-secret"* ]] || false
 }
 
-@test "test-gitlab : étape 6, changement de plateforme impossible → ✖" {
-    export FAUX_PLATEFORME_KO=1
+@test "test-gitlab : step 6, platform change impossible → ✖" {
+    export FAKE_PLATFORM_FAIL=1
     run bash "$SCRIPT"
     [ "$status" -ne 0 ]
-    [[ "$output" == *"✖ 6. plateforme"* ]] || false
-    [[ "$output" == *"devzone platform gitlab a échoué"* ]] || false
+    [[ "$output" == *"✖ 6. platform"* ]] || false
+    [[ "$output" == *"devzone platform gitlab failed"* ]] || false
 }
 
-@test "test-gitlab : étape 6, glab clone impossible → ✖, plateforme d'avant restaurée" {
-    export FAUX_GLAB_CLONE_KO=1
+@test "test-gitlab : step 6, glab clone impossible → ✖, previous platform restored" {
+    export FAKE_GLAB_CLONE_FAIL=1
     run bash "$SCRIPT"
     [ "$status" -ne 0 ]
-    [[ "$output" == *"✖ 6. plateforme"* ]] || false
-    [[ "$output" == *"glab repo clone devzone/demo a échoué"* ]] || false
+    [[ "$output" == *"✖ 6. platform"* ]] || false
+    [[ "$output" == *"glab repo clone devzone/demo failed"* ]] || false
     [ ! -e "$HOME/.local/bin/glab" ]
     [ ! -e "$HOME/.config/glab-cli" ]
     ! grep -q '^plateforme=' "$DEVZONE_ETAT" || false
 }
 
-@test "test-gitlab : étape 7, clone de repowarden impossible → ✖" {
-    export FAUX_REPOWARDEN_CLONE_KO=1
+@test "test-gitlab : step 7, repowarden clone impossible → ✖" {
+    export FAKE_REPOWARDEN_CLONE_FAIL=1
     run bash "$SCRIPT"
     [ "$status" -ne 0 ]
-    [[ "$output" == *"✖ 7. intégration repowarden"* ]] || false
-    [[ "$output" == *"clone de repowarden"* ]] || false
+    [[ "$output" == *"✖ 7. repowarden integration"* ]] || false
+    [[ "$output" == *"clone of repowarden"* ]] || false
 }
 
-@test "test-gitlab : étape 7, suite test/gitlab en échec → ✖" {
-    export FAUX_SUITE_KO=1
+@test "test-gitlab : step 7, test/gitlab suite failed → ✖" {
+    export FAKE_SUITE_FAIL=1
     run bash "$SCRIPT"
     [ "$status" -ne 0 ]
-    [[ "$output" == *"✖ 7. intégration repowarden"* ]] || false
-    [[ "$output" == *"suite test/gitlab a échoué"* ]] || false
+    [[ "$output" == *"✖ 7. repowarden integration"* ]] || false
+    [[ "$output" == *"the test/gitlab suite failed"* ]] || false
 }
 
-@test "test-gitlab : étape 7, journal conservé avec le jeton masqué" {
-    export FAUX_SUITE_KO=1
+@test "test-gitlab : step 7, log kept with the token masked" {
+    export FAKE_SUITE_FAIL=1
     run bash "$SCRIPT"
     [ "$status" -ne 0 ]
     [[ "$output" == *"devzone-test-gitlab-repowarden.log"* ]] || false
     [ -f "$TMPDIR/devzone-test-gitlab-repowarden.log" ]
-    grep -q 'TOKEN_MASQUE' "$TMPDIR/devzone-test-gitlab-repowarden.log" || false
-    ! grep -q 'jeton-root-secret' "$TMPDIR/devzone-test-gitlab-repowarden.log" || false
+    grep -q 'TOKEN_MASKED' "$TMPDIR/devzone-test-gitlab-repowarden.log" || false
+    ! grep -q 'token-root-secret' "$TMPDIR/devzone-test-gitlab-repowarden.log" || false
 }
 
-@test "test-gitlab : étape 7, test/gitlab absent à la réf → sauté, code 0" {
-    export FAUX_REPOWARDEN_SANS_TEST=1
+@test "test-gitlab : step 7, test/gitlab missing at the ref → skipped, code 0" {
+    export FAKE_REPOWARDEN_NO_TEST=1
     run bash "$SCRIPT"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"sauté : test/gitlab absent à la réf. develop"* ]] || false
+    [[ "$output" == *"skipped: test/gitlab missing at ref develop"* ]] || false
 }
 
-@test "test-gitlab : --complet désactive, contrôle qu'il ne reste rien, puis réinstalle" {
+@test "test-gitlab : --complet disables, checks that nothing remains, then reinstalls" {
     run bash "$SCRIPT" --complet
     [ "$status" -eq 0 ]
-    [[ "$output" == *"✔ 8. complet : désactivation"* ]] || false
+    [[ "$output" == *"✔ 8. full: disable"* ]] || false
     grep -q "devzone disable gitlab" "$BATS_TEST_TMPDIR/devzone.log" || false
     grep -q "label=devzone.instance=mon-devzone" "$BATS_TEST_TMPDIR/docker.log" || false
     grep -q "kubectl --context devzone get namespace devzone-gitlab-mon-devzone" "$BATS_TEST_TMPDIR/kubectl.log" || false
-    [ -f "$BATS_TEST_TMPDIR/module_actif" ]
+    [ -f "$BATS_TEST_TMPDIR/module_active" ]
 }
 
-@test "test-gitlab : --complet, le namespace reste → ✖ avec la raison" {
-    export FAUX_DESACTIVER_LAISSE=namespace
+@test "test-gitlab : --complet, the namespace stays → ✖ with the reason" {
+    export FAKE_DISABLE_LEFT=namespace
     run bash "$SCRIPT" --complet
     [ "$status" -ne 0 ]
-    [[ "$output" == *"✖ 8. complet : désactivation"* ]] || false
+    [[ "$output" == *"✖ 8. full: disable"* ]] || false
     [[ "$output" == *"namespace devzone-gitlab-mon-devzone"* ]] || false
 }
 
-@test "test-gitlab : --complet, un conteneur étiqueté de l'instance reste → ✖" {
-    export FAUX_CONTENEURS_ETIQUETES=abc123
+@test "test-gitlab : --complet, a container labelled for the instance stays → ✖" {
+    export FAKE_LABELLED_CONTAINERS=abc123
     run bash "$SCRIPT" --complet
     [ "$status" -ne 0 ]
-    [[ "$output" == *"✖ 8. complet : désactivation"* ]] || false
-    [[ "$output" == *"conteneur(s) étiqueté(s) devzone.instance=mon-devzone"* ]] || false
+    [[ "$output" == *"✖ 8. full: disable"* ]] || false
+    [[ "$output" == *"labelled container(s) devzone.instance=mon-devzone"* ]] || false
     grep -q "label=devzone.instance=mon-devzone" "$BATS_TEST_TMPDIR/docker.log" || false
 }
 
-@test "test-gitlab : --statut publie gitlab-integration sur HEAD par gh api" {
+@test "test-gitlab : --statut publishes gitlab-integration on HEAD through gh api" {
     run bash "$SCRIPT" --statut
     [ "$status" -eq 0 ]
     grep -q "gh api -X POST repos/SimBienvenueHoulBoumi/devzone/statuses/0123456789abcdef" "$BATS_TEST_TMPDIR/gh.log" || false
@@ -543,18 +543,18 @@ GETENT
     grep -q "state=success" "$BATS_TEST_TMPDIR/gh.log" || false
 }
 
-@test "test-gitlab : --statut en échec publie failure, code non nul" {
-    export FAUX_CLONE_KO=http
+@test "test-gitlab : --statut on failure publishes failure, non-zero code" {
+    export FAKE_CLONE_FAIL=http
     run bash "$SCRIPT" --statut
     [ "$status" -ne 0 ]
     grep -q "context=gitlab-integration" "$BATS_TEST_TMPDIR/gh.log" || false
     grep -q "state=failure" "$BATS_TEST_TMPDIR/gh.log" || false
 }
 
-@test "test-gitlab : --statut sans gh connecté → refus clair, code non nul" {
-    export FAUX_GH_AUTH_KO=1
+@test "test-gitlab : --statut without gh logged in → clear refusal, non-zero code" {
+    export FAKE_GH_AUTH_FAIL=1
     run bash "$SCRIPT" --statut
     [ "$status" -ne 0 ]
-    [[ "$output" == *"gh non connecté"* ]] || false
+    [[ "$output" == *"gh not logged in"* ]] || false
     ! grep -q "gh api" "$BATS_TEST_TMPDIR/gh.log" || false
 }

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Détection à chaud du catalogue (#414) : quand .devzone.modules change,
-# catalog.sh appliquer est lancé. Une seule instance (verrou, comme #394).
+# Catalog hot detection (#414): when .devzone.modules changes, catalog.sh apply
+# runs. A single instance (lock, as #394).
 #   catalog-watcher.sh demarrer | arreter | tour
 set -euo pipefail
 
@@ -11,120 +11,120 @@ ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
 # shellcheck disable=SC1091
 . "$(dirname "$ICI")/state.sh"
 BASE="${DEVZONE_CATALOGUE_VEILLEUR_DIR:-$RACINE/.devzone.catalogue-veilleur}"
-VERROU="$BASE/verrou"
-DERNIER="$BASE/dernier"
+LOCK_DIR="$BASE/verrou"
+LAST_FILE="$BASE/dernier"
 
-refuse() { echo "devzone : catalogue-veilleur : $*" >&2; exit 2; }
+refuse() { echo "devzone : catalog-watcher : $*" >&2; exit 2; }
 
-# Garde-fou (#293) : jamais sous bats, seulement avec DEVZONE_CATALOGUE_REEL=oui
-garde_veilleur() {
+# Guard (#293): never under bats, only with DEVZONE_CATALOGUE_REEL=oui
+guard_watcher() {
     if [ "${DEVZONE_CATALOGUE_REEL:-}" != oui ]; then
-        echo "devzone : catalogue-veilleur : refusé ici (DEVZONE_CATALOGUE_REEL=oui)" >&2
+        echo "devzone : catalog-watcher : refused here (DEVZONE_CATALOGUE_REEL=oui)" >&2
         return 2
     fi
     if [ -n "${BATS_TEST_TMPDIR:-}" ]; then
-        echo "devzone : catalogue-veilleur : refusé sous bats (tests)" >&2
+        echo "devzone : catalog-watcher : refused under bats (tests)" >&2
         return 2
     fi
     return 0
 }
 
-# Verrou exclusif (mkdir) avec pid ; une seule instance du veilleur
-verrou_prendre() {
-    local debut now age pid
-    debut="$(date +%s)"
+# Exclusive lock (mkdir) with the pid; a single watcher instance
+lock_take() {
+    local start now age pid
+    start="$(date +%s)"
     while true; do
-        if mkdir "$VERROU" 2>/dev/null; then echo "$$" >"$VERROU/pid"; return 0; fi
+        if mkdir "$LOCK_DIR" 2>/dev/null; then echo "$$" >"$LOCK_DIR/pid"; return 0; fi
         now="$(date +%s)"
-        age=""; [ -d "$VERROU" ] && age="$(stat -c %Y "$VERROU" 2>/dev/null || stat -f %m "$VERROU" 2>/dev/null || true)"
-        pid="$(cat "$VERROU/pid" 2>/dev/null || true)"
-        if [ -n "$age" ] && [ "$(( now - age ))" -gt 30 ]; then rm -rf "$VERROU"; continue; fi
-        if [ -n "$pid" ] && ! kill -0 "$pid" 2>/dev/null; then rm -rf "$VERROU"; continue; fi
-        [ "$(( now - debut ))" -ge 5 ] && return 1
+        age=""; [ -d "$LOCK_DIR" ] && age="$(stat -c %Y "$LOCK_DIR" 2>/dev/null || stat -f %m "$LOCK_DIR" 2>/dev/null || true)"
+        pid="$(cat "$LOCK_DIR/pid" 2>/dev/null || true)"
+        if [ -n "$age" ] && [ "$(( now - age ))" -gt 30 ]; then rm -rf "$LOCK_DIR"; continue; fi
+        if [ -n "$pid" ] && ! kill -0 "$pid" 2>/dev/null; then rm -rf "$LOCK_DIR"; continue; fi
+        [ "$(( now - start ))" -ge 5 ] && return 1
         sleep 1
     done
 }
 
-# Marque le verrou vivant (date et pid à jour)
-verrou_rafraichir() { touch "$VERROU" 2>/dev/null || true; echo "$$" >"$VERROU/pid" 2>/dev/null || true; }
+# Marks the live lock (date and pid up to date)
+lock_refresh() { touch "$LOCK_DIR" 2>/dev/null || true; echo "$$" >"$LOCK_DIR/pid" 2>/dev/null || true; }
 
-# Un tour : si .devzone.modules a changé depuis le dernier tour, on applique
-tour() {
-    local maintenant ancien
+# One tick: if .devzone.modules changed since the last tick, apply
+tick() {
+    local now previous
     [ -f "$ETAT" ] || return 0
-    # État restauré ou reconstruit : le veilleur ne suit pas un état douteux,
-    # et ne désinstalle jamais tant que devzone apply ne l'a pas confirmé
+    # Restored or rebuilt state: the watcher does not follow a doubtful state,
+    # and never uninstalls until devzone apply has confirmed it
     state_recovery_wait && return 0
     state_recovery_pending && return 0
     mkdir -p "$BASE"
-    maintenant="$(stat -c %Y "$ETAT" 2>/dev/null || stat -f %m "$ETAT" 2>/dev/null || true)"
-    [ -n "$maintenant" ] || return 0
-    ancien="$(cat "$DERNIER" 2>/dev/null || true)"
-    if [ "$maintenant" != "$ancien" ]; then
-        echo "$maintenant" >"$DERNIER"
-        echo "devzone : catalogue-veilleur : .devzone.modules modifié, application" >&2
+    now="$(stat -c %Y "$ETAT" 2>/dev/null || stat -f %m "$ETAT" 2>/dev/null || true)"
+    [ -n "$now" ] || return 0
+    previous="$(cat "$LAST_FILE" 2>/dev/null || true)"
+    if [ "$now" != "$previous" ]; then
+        echo "$now" >"$LAST_FILE"
+        echo "devzone : catalog-watcher : .devzone.modules changed, applying" >&2
         bash "$ICI/../catalog.sh" apply
     fi
 }
 
-# Boucle : un tour toutes les 5 s, verrou rafraîchi à chaque tour
-boucle() {
+# Loop: one tick every 5 s, lock refreshed on each tick
+loop() {
     mkdir -p "$BASE"
-    if ! verrou_prendre; then return 0; fi
-    trap 'rm -rf "$VERROU"' EXIT INT TERM
+    if ! lock_take; then return 0; fi
+    trap 'rm -rf "$LOCK_DIR"' EXIT INT TERM
     while true; do
-        [ -f "$ETAT" ] || { rm -rf "$VERROU"; break; }
-        verrou_rafraichir
-        tour || true
+        [ -f "$ETAT" ] || { rm -rf "$LOCK_DIR"; break; }
+        lock_refresh
+        tick || true
         sleep 5
     done
 }
 
-# Lance la boucle détachée (#435) et vérifie que son verrou vit
-lancer_detache() {
+# Starts the detached loop (#435) and checks that its lock is alive
+start_detached() {
     local i pid stable=0 detache=()
     mkdir -p "$BASE"
-    # Même détachement que relay_start : setsid si présent, sinon nohup.
+    # Same detachment as relay_start: setsid when present, else nohup.
     command -v setsid >/dev/null 2>&1 && detache=(setsid)
     ${detache[@]+"${detache[@]}"} nohup env DEVZONE_CATALOGUE_REEL=oui bash "$0" boucle >"$BASE/veilleur.log" 2>&1 &
     i=0
     while [ "$i" -lt 20 ]; do
-        pid="$(cat "$VERROU/pid" 2>/dev/null || true)"
+        pid="$(cat "$LOCK_DIR/pid" 2>/dev/null || true)"
         if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
             stable=$((stable + 1))
-            [ "$stable" -ge 5 ] && { echo "lancé"; return 0; }
+            [ "$stable" -ge 5 ] && { echo "started"; return 0; }
         else
             stable=0
         fi
         sleep 0.1
         i=$((i + 1))
     done
-    echo "devzone : catalogue-veilleur : démarrage impossible, voir $BASE/veilleur.log" >&2
+    echo "devzone : catalog-watcher : cannot start, see $BASE/veilleur.log" >&2
     return 1
 }
 
-# Arrête le veilleur et retire le verrou
-arreter() {
+# Stops the watcher and removes the lock
+stop_watcher() {
     local pid
-    pid="$(cat "$VERROU/pid" 2>/dev/null || true)"
+    pid="$(cat "$LOCK_DIR/pid" 2>/dev/null || true)"
     if [ -n "$pid" ]; then kill "$pid" 2>/dev/null || true; fi
-    rm -rf "$VERROU"
+    rm -rf "$LOCK_DIR"
 }
 
 case "${1:-}" in
-    boucle | loop) if ! garde_veilleur; then exit 2; fi; boucle ;;
+    boucle | loop) if ! guard_watcher; then exit 2; fi; loop ;;
     demarrer | start | lancer)
-        if ! garde_veilleur; then exit 2; fi
-        if [ -f "$VERROU/pid" ] && kill -0 "$(cat "$VERROU/pid")" 2>/dev/null; then
-            echo "déjà lancé"
+        if ! guard_watcher; then exit 2; fi
+        if [ -f "$LOCK_DIR/pid" ] && kill -0 "$(cat "$LOCK_DIR/pid")" 2>/dev/null; then
+            echo "already running"
         else
-            lancer_detache || exit 1
+            start_detached || exit 1
         fi
         ;;
-    arreter | stop) arreter ; echo "arrêté" ;;
-    tour | un-tour) tour ;;
+    arreter | stop) stop_watcher ; echo "stopped" ;;
+    tour | un-tour) tick ;;
     *)
-        echo "devzone : catalogue-veilleur : demarrer | arreter | tour" >&2
+        echo "devzone : catalog-watcher : demarrer | arreter | tour" >&2
         exit 2
         ;;
 esac

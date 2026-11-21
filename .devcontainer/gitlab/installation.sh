@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Installation et migration de GitLab dans le cluster des services (#396).
-# Sourcé par gitlab.sh : namespace devzone-gitlab (suffixé par instance),
-# vérification de la mémoire allouable, Helm avec le contexte devzone,
-# relais port-forward, runner et migration depuis l'ancien cluster kind.
-# Le chart enveloppe charts/devzone-gitlab (#538) porte les dépendances et les
-# valeurs ; chart.sh (helm direct) et argocd.sh (Application) l'installent.
+# Installation and migration of GitLab in the services cluster (#396).
+# Sourced by gitlab.sh: devzone-gitlab namespace (suffixed per instance),
+# check of the allocatable memory, Helm with the devzone context, port-forward
+# relay, runner and migration from the old kind cluster.
+# The wrapper chart charts/devzone-gitlab (#538) holds the dependencies and the
+# values; chart.sh (direct helm) and argocd.sh (Application) install it.
 
 # Shared memory check of the services cluster (#608): quantity_ki,
 # memory_cluster_ki and check_module_memory.
@@ -12,38 +12,38 @@
 # shellcheck disable=SC1091
 . "$ICI/../memory.sh"
 
-# Namespace isolé du module : un par instance, comme postgres
+# Namespace isolated from the module: one per instance, like postgres
 GITLAB_NS="devzone-gitlab${INSTANCE_SUFFIX}"
-# Ancien cluster kind de GitLab, supprimé par « devzone gitlab migrate »
-GITLAB_ANCIEN_CLUSTER="gitlab${INSTANCE_SUFFIX}"
-GITLAB_ANCIEN_CONTEXTE="kind-gitlab${INSTANCE_SUFFIX}"
+# Old kind cluster of GitLab, deleted by "devzone gitlab migrate"
+GITLAB_OLD_CLUSTER="gitlab${INSTANCE_SUFFIX}"
+GITLAB_OLD_CONTEXT="kind-gitlab${INSTANCE_SUFFIX}"
 
-# Namespace présent dans le cluster des services : GitLab est installé.
-# Lecture des namespaces réservée à l'administrateur (#430).
-gitlab_installe() {
+# Namespace present in the services cluster: GitLab is installed.
+# Reading the namespaces is reserved to the administrator (#430).
+gitlab_installed() {
     account_admin "$(account_context)" get namespace "$GITLAB_NS" >/dev/null 2>&1
 }
 
-# Crée le namespace, étiquette et autorise le compte limité (#430), pose l'isolation.
-gitlab_namespace_preparer() {
+# Creates the namespace, labels it and allows the limited account (#430), sets the isolation.
+gitlab_namespace_prepare() {
     local ctx
     ctx="$(account_context)"
     account_namespace "$ctx" "$GITLAB_NS"
     namespace_isolate "$GITLAB_NS"
 }
 
-# Installe GitLab et son runner dans le cluster des services, puis prépare
-# l'accès (relais web/SSH, /etc/hosts) et le seed des données de test.
-gitlab_installer() {
-    echo "▶ Vérification de la mémoire allouable du cluster des services…"
+# Installs GitLab and its runner in the services cluster, then prepares the
+# access (web/SSH relay, /etc/hosts) and the seed of the test data.
+gitlab_install() {
+    echo "▶ Checking the allocatable memory of the services cluster…"
     check_module_memory gitlab 8 || return 2
 
     mkdir -p "$GITLAB_SECRETS_DIR"
-    gitlab_namespace_preparer
+    gitlab_namespace_prepare
 
-    # Secret Rails (#347) : réinstallation -> réappliquer le secret conservé avant
-    # l'installation (le chart le réutilise, sessions navigateur valides)
-    gitlab_secrets_appliquer
+    # Rails secret (#347): reinstallation -> apply the kept secret again before
+    # the installation (the chart reuses it, browser sessions stay valid)
+    gitlab_secrets_apply
     gitlab_runner_ancien_retirer
 
     # Argo CD holds the chart when the module is on (#538): the Application
@@ -55,139 +55,139 @@ gitlab_installer() {
         gitlab_release_adopter
         gitlab_application_apply || return 1
     else
-        echo "▶ Installation du chart GitLab dans ${GITLAB_NS}…"
+        echo "▶ Installing the GitLab chart in ${GITLAB_NS}…"
         gitlab_chart_depend
         gitlab_helm_pass 0 || return 1
     fi
 
-    # Relais avant l'attente : curl et git en HTTP résolvent *.localhost vers
-    # la boucle locale et n'atteignent GitLab que par ces port-forward (#320)
-    gitlab_relais_lancer || return 1
+    # Relay before the wait: curl and git in HTTP resolve *.localhost to the
+    # loopback and reach GitLab only through these port-forwards (#320)
+    gitlab_relay_start || return 1
 
-    # Nom gitlab.localhost dans /etc/hosts avant l'attente : ssh, glab et
-    # getent en ont besoin dès que le service monte (curl, lui, résout seul)
-    gitlab_hote_poser || true
+    # gitlab.localhost name in /etc/hosts before the wait: ssh, glab and
+    # getent need it as soon as the service is up (curl resolves it itself)
+    gitlab_host_set || true
 
-    gitlab_attendre_pret
+    gitlab_wait_ready
     gitlab_seed
-    if [ ! -f "$GITLAB_RAILS_FICHIER" ]; then
-        gitlab_secrets_copier
+    if [ ! -f "$GITLAB_RAILS_FILE" ]; then
+        gitlab_secrets_copy
     fi
     if [ "$par_argocd" = 0 ]; then
-        echo "▶ Exécuteur GitLab Runner…"
+        echo "▶ GitLab Runner executor…"
         gitlab_helm_pass 1 || return 1
     fi
 
-    gitlab_secrets_avertir
+    gitlab_secrets_warn
 
-    echo "▶ Installation terminée."
-    echo "  URL : http://gitlab.localhost:8929"
-    echo "  Utilisateur : root"
-    echo "  Mot de passe root : $GITLAB_SECRETS_DIR/root-password (chmod 600)"
+    echo "▶ Installation complete."
+    echo "  URL: http://gitlab.localhost:8929"
+    echo "  User: root"
+    echo "  Root password: $GITLAB_SECRETS_DIR/root-password (chmod 600)"
 }
 
-# Retire GitLab : relais, releases Helm et namespace de l'instance seulement.
-# Le secret Rails est gardé (sessions du navigateur valides à la réinstallation),
-# sauf désinstallation complète voulue (--yes) : il part alors avec les données.
-gitlab_desinstaller() {
-    local supprimer_secret="" arg
+# Removes GitLab: relays, Helm releases and the namespace of the instance only.
+# The Rails secret is kept (browser sessions valid at the reinstallation),
+# unless a complete uninstall is wanted (--yes): it then goes with the data.
+gitlab_uninstall() {
+    local delete_secret="" arg
     for arg in "$@"; do
         case "$arg" in
-            --yes) supprimer_secret=1 ;;
-            *) echo "devzone : gitlab uninstall : argument inconnu : $arg" >&2; return 2 ;;
+            --yes) delete_secret=1 ;;
+            *) echo "devzone : gitlab uninstall : unknown argument : $arg" >&2; return 2 ;;
         esac
     done
-    echo "▶ Désinstallation de GitLab…"
-    gitlab_relais_arreter
+    echo "▶ Uninstalling GitLab…"
+    gitlab_relay_stop
     rm -rf "$(relay_dir gitlab-web)" "$(relay_dir gitlab-ssh)" \
         "$(relay_dir gitlab-8929)" "$(relay_dir gitlab-2224)"
-    # Application tenue par Argo CD (#538) : ses ressources partent avec elle
+    # Application held by Argo CD (#538): its resources go with it
     gitlab_application_retirer || true
     account_helm "$(account_context)" uninstall gitlab --namespace "$GITLAB_NS" >/dev/null 2>&1 || true
     gitlab_runner_ancien_retirer
-    # RoleBinding retiré puis namespace supprimé par l'administrateur (#430)
+    # RoleBinding removed, then the namespace deleted by the administrator (#430)
     account_remove "$(account_context)" "$GITLAB_NS" >/dev/null 2>&1 || true
     account_admin "$(account_context)" delete namespace "$GITLAB_NS" --ignore-not-found >/dev/null 2>&1 || true
-    if [ -n "$supprimer_secret" ]; then
+    if [ -n "$delete_secret" ]; then
         rm -rf "$GITLAB_SECRETS_DIR"
-        echo "secret Rails supprimé avec les données de GitLab."
+        echo "Rails secret deleted with the GitLab data."
     elif [ -d "$GITLAB_SECRETS_DIR" ]; then
         find "$GITLAB_SECRETS_DIR" -mindepth 1 ! -name rails-secret.yaml -exec rm -rf {} + 2>/dev/null || true
-        if [ -f "$GITLAB_RAILS_FICHIER" ]; then
-            echo "secret Rails gardé dans workspace/.gitlab/rails-secret.yaml (sessions du navigateur valides à la réinstallation)"
+        if [ -f "$GITLAB_RAILS_FILE" ]; then
+            echo "Rails secret kept in workspace/.gitlab/rails-secret.yaml (browser sessions valid at reinstallation)"
         fi
     fi
-    gitlab_hote_retirer
-    echo "✔ GitLab désinstallé."
+    gitlab_host_remove
+    echo "✔ GitLab uninstalled."
     regenerer_identifiants
 }
 
-# Migration : installe et seed dans le cluster des services, puis supprime
-# l'ancien cluster kind-gitlab après confirmation (ou --yes).
-gitlab_migrer() {
-    local oui="" arg reponse
+# Migration: installs and seeds in the services cluster, then deletes the old
+# kind-gitlab cluster after confirmation (or --yes).
+gitlab_migrate() {
+    local yes_flag="" arg answer
     for arg in "$@"; do
         case "$arg" in
-            --yes) oui=1 ;;
-            *) echo "devzone : gitlab migrate : argument inconnu : $arg (devzone gitlab migrate [--yes])" >&2; return 2 ;;
+            --yes) yes_flag=1 ;;
+            *) echo "devzone : gitlab migrate : unknown argument : $arg (devzone gitlab migrate [--yes])" >&2; return 2 ;;
         esac
     done
 
-    echo "▶ Migration de GitLab depuis l'ancien cluster kind…"
-    echo "  C'est un GitLab de test : le projet de démo et le runner sont recréés, le reste est perdu."
-    gitlab_installer || return $?
+    echo "▶ Migrating GitLab from the old kind cluster…"
+    echo "  This is a test GitLab: the demo project and the runner are recreated, the rest is lost."
+    gitlab_install || return $?
 
-    if ! kind get clusters 2>/dev/null | grep -qx "$GITLAB_ANCIEN_CLUSTER"; then
-        echo "✔ Aucun ancien cluster $GITLAB_ANCIEN_CONTEXTE à supprimer."
+    if ! kind get clusters 2>/dev/null | grep -qx "$GITLAB_OLD_CLUSTER"; then
+        echo "✔ No old cluster $GITLAB_OLD_CONTEXT to delete."
         return 0
     fi
 
-    if [ -z "$oui" ]; then
+    if [ -z "$yes_flag" ]; then
         if ! cluster_interactive; then
-            echo "devzone : gitlab : confirmation impossible sans terminal : devzone gitlab migrate --yes (ancien cluster $GITLAB_ANCIEN_CONTEXTE conservé)" >&2
+            echo "devzone : gitlab : confirmation impossible without a terminal: devzone gitlab migrate --yes (old cluster $GITLAB_OLD_CONTEXT kept)" >&2
             return 2
         fi
-        printf "Supprimer l'ancien cluster %s et ses données ? [o/N] " "$GITLAB_ANCIEN_CONTEXTE" >&2
-        read -r reponse || reponse=""
-        case "$reponse" in
+        printf "Delete the old cluster %s and its data? [o/N] " "$GITLAB_OLD_CONTEXT" >&2
+        read -r answer || answer=""
+        case "$answer" in
             o | O | oui) ;;
-            *) echo "Abandon : ancien cluster $GITLAB_ANCIEN_CONTEXTE conservé."; return 0 ;;
+            *) echo "Aborted: old cluster $GITLAB_OLD_CONTEXT kept."; return 0 ;;
         esac
     fi
 
-    kind delete cluster --name "$GITLAB_ANCIEN_CLUSTER"
-    kubectl config delete-context "$GITLAB_ANCIEN_CONTEXTE" >/dev/null 2>&1 || true
-    kubectl config delete-cluster "$GITLAB_ANCIEN_CONTEXTE" >/dev/null 2>&1 || true
-    kubectl config delete-user "$GITLAB_ANCIEN_CONTEXTE" >/dev/null 2>&1 || true
-    echo "✔ Ancien cluster $GITLAB_ANCIEN_CONTEXTE supprimé."
+    kind delete cluster --name "$GITLAB_OLD_CLUSTER"
+    kubectl config delete-context "$GITLAB_OLD_CONTEXT" >/dev/null 2>&1 || true
+    kubectl config delete-cluster "$GITLAB_OLD_CONTEXT" >/dev/null 2>&1 || true
+    kubectl config delete-user "$GITLAB_OLD_CONTEXT" >/dev/null 2>&1 || true
+    echo "✔ Old cluster $GITLAB_OLD_CONTEXT deleted."
 }
 
-# Accès web et SSH : port-forward vers les services ClusterIP du namespace.
-gitlab_relais_lancer() {
+# Web and SSH access: port-forward to the ClusterIP services of the namespace.
+gitlab_relay_start() {
     relay_start gitlab-web devzone "$GITLAB_NS" svc/gitlab-webservice-default 8929:8181
     relay_start gitlab-ssh devzone "$GITLAB_NS" svc/gitlab-gitlab-shell 2224:22
 }
 
-# Arrête les deux relais du module.
-gitlab_relais_arreter() {
+# Stops the two relays of the module.
+gitlab_relay_stop() {
     relay_stop gitlab-web
     relay_stop gitlab-ssh
 }
 
-# État des relais : code 0 seulement si les deux tournent.
-gitlab_relais_etat() {
-    local manquants=""
-    relay_active gitlab-web || manquants="$manquants 8929"
-    relay_active gitlab-ssh || manquants="$manquants 2224"
-    if [ -n "$manquants" ]; then
-        echo "relais gitlab arrêté sur${manquants}"
+# State of the relays: code 0 only if both are running.
+gitlab_relay_status() {
+    local missing=""
+    relay_active gitlab-web || missing="$missing 8929"
+    relay_active gitlab-ssh || missing="$missing 2224"
+    if [ -n "$missing" ]; then
+        echo "gitlab relay stopped on${missing}"
         return 1
     fi
     return 0
 }
 
-# Vrai si un ancien cluster kind-gitlab existe encore (avertissement du
-# récapitulatif, tant que la migration n'a pas été faite).
-gitlab_ancien_cluster_existe() {
-    kind get clusters 2>/dev/null | grep -qx "$GITLAB_ANCIEN_CLUSTER"
+# True if an old kind-gitlab cluster still exists (warning of the summary,
+# as long as the migration has not been done).
+gitlab_old_cluster_exists() {
+    kind get clusters 2>/dev/null | grep -qx "$GITLAB_OLD_CLUSTER"
 }
