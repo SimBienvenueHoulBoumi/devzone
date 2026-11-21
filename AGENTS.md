@@ -1,7 +1,7 @@
-# Règle du dépôt : Kubernetes seulement
+# Repository rule: Kubernetes only
 
-devzone se décrit avec le cluster, le pod et les nœuds ; jamais « Docker ».
-Seuls les pods sont des conteneurs. Pour un essai jetable : `kubectl run` ou
-`kubectl create ns`, puis suppression. Le garde-fou arrête les agents qui
-lancent `docker` ; `DEVZONE_ALLOW_DOCKER=1` est réservé à une action sur
-l'hôte lui-même. Détail : `.devcontainer/skills/devzone/SKILL.md`.
+devzone is described with the cluster, the pod and the nodes; never as "Docker".
+Only pods are containers. For a disposable test: `kubectl run` or
+`kubectl create ns`, then deletion. The guard stops agents that run
+`docker`; `DEVZONE_ALLOW_DOCKER=1` is reserved for an action on the
+host itself. Details: `.devcontainer/skills/devzone/SKILL.md`.

@@ -94,7 +94,7 @@ KUBE
         [[ "$aide" == *"devzone $commande"* ]] || { echo "help: $commande missing"; false; }
     done
     for doc in README.md manage/docs/reference.md; do
-        contenu="$(awk '/^## Pour les contributeurs/{exit} {print}' "$RACINE_TEST/$doc")"
+        contenu="$(awk '/^## For contributors/{exit} {print}' "$RACINE_TEST/$doc")"
         [[ "$contenu" != *"bash .devcontainer/"* ]] || { echo "$doc: direct script"; false; }
         [[ "$contenu" != *"kubectl config use-context"* ]] || { echo "$doc: direct kubectl"; false; }
         if grep -qE 'DEVZONE_[A-Z_]+=' <<<"$contenu"; then
