@@ -12,8 +12,8 @@ DEVZONE_AGENT_POD_CPU_LIMIT="${DEVZONE_AGENT_POD_CPU_LIMIT:-2}"
 DEVZONE_AGENT_POD_MEM_LIMIT="${DEVZONE_AGENT_POD_MEM_LIMIT:-4Gi}"
 DEVZONE_AGENT_POD_TIMEOUT="${DEVZONE_AGENT_POD_TIMEOUT:-$((DEVZONE_AGENT_POD_ACTIVE_DEADLINE_SECONDS + 120))}"
 # Projects root, read by the launcher only (no trailing slash). The pod keeps
-# /workspaces/projets in its own environment (DEVZONE_RACINE in the manifest).
-AGENT_POD_ROOT="${DEVZONE_RACINE:-/workspaces/projets}"
+# /workspaces/projets in its own environment (DEVZONE_ROOT in the manifest).
+AGENT_POD_ROOT="${DEVZONE_ROOT:-/workspaces/projets}"
 # Module state file on the workspace volume (subPath .devzone.modules, read-only in the pod).
 # shellcheck disable=SC2034 # read by agent-pod.sh
 AGENT_POD_MODULES_FILE="${DEVZONE_AGENT_POD_MODULES_FILE:-${AGENT_POD_ROOT}/.devzone.modules}"
@@ -193,7 +193,7 @@ agent_pod_build_manifest() {
         printf '%s\n' "      value: \"${ws_path}\""
         printf '%s\n' "    - name: DEVZONE_WORKSPACE"
         printf '%s\n' "      value: \"kubernetes\""
-        printf '%s\n' "    - name: DEVZONE_RACINE"
+        printf '%s\n' "    - name: DEVZONE_ROOT"
         printf '%s\n' "      value: \"/workspaces/projets\""; agent_pod_egress_manifest_lines "$egress_mode"
         printf '%s\n' "    resources:"
         printf '%s\n' "      limits:"
@@ -230,7 +230,7 @@ agent_pod_build_manifest() {
         printf '%s\n' "      mountPath: /workspaces/projets/workspace"
         printf '%s\n' "    command: [\"/bin/bash\", \"-lc\"]"
         printf '%s\n' "    args:"
-        printf '%s\n' "    - 'devzone agent --local ${folder} /agent-consigne/consigne.md; code=\$?; cat \"\$DEVZONE_RACINE/workspace/.agents/${AGENT_POD_SESSION_LABEL}.log\" 2>/dev/null; exit \$code'"
+        printf '%s\n' "    - 'devzone agent --local ${folder} /agent-consigne/consigne.md; code=\$?; cat \"\$DEVZONE_ROOT/workspace/.agents/${AGENT_POD_SESSION_LABEL}.log\" 2>/dev/null; exit \$code'"
         printf '%s\n' "  volumes:"
         printf '%s\n' "  - name: workspace"
         printf '%s\n' "    persistentVolumeClaim:"

@@ -6,15 +6,15 @@
 #   ports.sh close <n>       removes the relay and the port from the state
 #   ports.sh restart         recreates the relays of the state toward the current IP
 #   ports.sh resume          one-line summary for the devzone recap
-# The state is the line "ports=8080,3000" of DEVZONE_ETAT (sorted, no duplicate).
+# The state is the line "ports=8080,3000" of DEVZONE_STATE (sorted, no duplicate).
 # ROOT: a single dirname from HERE (.devcontainer) = root of the devzone repository.
 if [ "${BASH_SOURCE[0]}" = "$0" ]; then set -euo pipefail; fi
 
 SOCAT_IMAGE=alpine/socat:1.8.0.3
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT="${DEVZONE_RACINE:-$(dirname "$HERE")}"
-ETAT="${DEVZONE_ETAT:-$ROOT/.devzone.modules}"
+ROOT="${DEVZONE_ROOT:-$(dirname "$HERE")}"
+ETAT="${DEVZONE_STATE:-$ROOT/.devzone.modules}"
 INSTANCE="${DEVZONE_INSTANCE:-devzone}"
 
 # Safe state write (#417): lock, temporary file in the state folder, backup copy

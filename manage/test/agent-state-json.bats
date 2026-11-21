@@ -26,8 +26,8 @@ setup() {
 }
 
 @test "agent-etat-json : exclusions listed" {
-    mkdir -p "$DEVZONE_AGENT_ETAT"
-    echo "$(date +%s) pays 604800" >"$DEVZONE_AGENT_ETAT/ecart-big-pickle"
+    mkdir -p "$DEVZONE_AGENT_STATE"
+    echo "$(date +%s) pays 604800" >"$DEVZONE_AGENT_STATE/ecart-big-pickle"
     run bash "$DEVZONE" agent etat --json
     [ "$status" -eq 0 ]
     [ "$(printf '%s\n' "$output" | jq -r '.ecarts[0].modele')" = "big-pickle" ]
@@ -35,8 +35,8 @@ setup() {
 }
 
 @test "agent-etat-json : rights alerts" {
-    mkdir -p "$DEVZONE_AGENT_ETAT"
-    : >"$DEVZONE_AGENT_ETAT/droits-dz-361.alerte"
+    mkdir -p "$DEVZONE_AGENT_STATE"
+    : >"$DEVZONE_AGENT_STATE/droits-dz-361.alerte"
     run bash "$DEVZONE" agent etat --json
     [ "$status" -eq 0 ]
     [ "$(printf '%s\n' "$output" | jq -r '.alertes_droits[0]')" = "dz-361" ]
@@ -67,8 +67,8 @@ agent_fake_stop() {
 }
 
 @test "agent-etat-json : agent.sh on dz-308 -> dz-308.log running" {
-    mkdir -p "$DEVZONE_RACINE/workspace/.agents" "$BATS_TEST_TMPDIR/dz-308"
-    : >"$DEVZONE_RACINE/workspace/.agents/dz-308.log"
+    mkdir -p "$DEVZONE_ROOT/workspace/.agents" "$BATS_TEST_TMPDIR/dz-308"
+    : >"$DEVZONE_ROOT/workspace/.agents/dz-308.log"
     agent_fake_process "$BATS_TEST_TMPDIR/dz-308"
     run bash "$DEVZONE" agent etat --json
     agent_fake_stop
@@ -77,9 +77,9 @@ agent_fake_stop() {
 }
 
 @test "agent-etat-json : agent.sh on dz-30 -> neither dz-308 nor d running" {
-    mkdir -p "$DEVZONE_RACINE/workspace/.agents"
-    : >"$DEVZONE_RACINE/workspace/.agents/dz-308.log"
-    : >"$DEVZONE_RACINE/workspace/.agents/d.log"
+    mkdir -p "$DEVZONE_ROOT/workspace/.agents"
+    : >"$DEVZONE_ROOT/workspace/.agents/dz-308.log"
+    : >"$DEVZONE_ROOT/workspace/.agents/d.log"
     # A real agent.sh could run on dz-308 during the test (the session of the folder
     # itself): dz-308.log would then really be running, unrelated to the fake process
     # of the test; that case is covered above.
@@ -100,23 +100,23 @@ agent_fake_stop() {
 }
 
 @test "agent-etat-json : model read on the '=== model opencode/ start' line" {
-    mkdir -p "$DEVZONE_RACINE/workspace/.agents"
+    mkdir -p "$DEVZONE_ROOT/workspace/.agents"
     printf '%s\n' \
         'model text: opencode/agent.json is read' \
         '=== model opencode/beam-free start 2026-11-06T00:00:00Z' \
         'more text: opencode/agent.json' \
-        >"$DEVZONE_RACINE/workspace/.agents/dz-328.log"
+        >"$DEVZONE_ROOT/workspace/.agents/dz-328.log"
     run bash "$DEVZONE" agent etat --json
     [ "$status" -eq 0 ]
     [ "$(printf '%s\n' "$output" | jq -r '.sessions[0].modele')" = "beam-free" ]
 }
 
 @test "agent-etat : the text reads the same model as the JSON" {
-    mkdir -p "$DEVZONE_RACINE/workspace/.agents"
+    mkdir -p "$DEVZONE_ROOT/workspace/.agents"
     printf '%s\n' \
         'model text: opencode/agent.json is read' \
         '=== model opencode/beam-free start 2026-11-06T00:00:00Z' \
-        >"$DEVZONE_RACINE/workspace/.agents/dz-328.log"
+        >"$DEVZONE_ROOT/workspace/.agents/dz-328.log"
     run bash "$DEVZONE" agent etat
     [ "$status" -eq 0 ]
     [[ "$output" == *"session dz-328.log: model opencode/beam-free, since 2026-11-06T00:00:00Z"* ]] || false

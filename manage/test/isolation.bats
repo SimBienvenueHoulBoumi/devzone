@@ -15,18 +15,18 @@ setup() {
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
     POSTGRES="$BATS_TEST_DIRNAME/../../.devcontainer/postgres/postgres.sh"
     export HOME="$BATS_TEST_TMPDIR/home"
-    export DEVZONE_RACINE="$BATS_TEST_TMPDIR/racine"
-    export DEVZONE_ETAT="$BATS_TEST_TMPDIR/modules"
-    export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
-    mkdir -p "$HOME" "$BATS_TEST_TMPDIR/bin" "$DEVZONE_RACINE/workspace"
-    : >"$DEVZONE_KUBE_HOTE"
-    : >"$DEVZONE_ETAT"
+    export DEVZONE_ROOT="$BATS_TEST_TMPDIR/racine"
+    export DEVZONE_STATE="$BATS_TEST_TMPDIR/modules"
+    export DEVZONE_KUBE_HOST="$BATS_TEST_TMPDIR/hote.config"
+    mkdir -p "$HOME" "$BATS_TEST_TMPDIR/bin" "$DEVZONE_ROOT/workspace"
+    : >"$DEVZONE_KUBE_HOST"
+    : >"$DEVZONE_STATE"
     helm_fake_install
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
     active_on() {
         local c="${1:-}"
         [ -n "$c" ] || return 2
-        printf 'postgres=on\ncluster=%s\n' "$c" >"$DEVZONE_ETAT"
+        printf 'postgres=on\ncluster=%s\n' "$c" >"$DEVZONE_STATE"
     }
 }
 
@@ -150,7 +150,7 @@ SLEEP
     run bash "$DEVZONE" cluster docker-desktop --yes </dev/null
     [ "$status" -eq 0 ]
     # The cluster choice is recorded
-    grep -qx 'cluster=docker-desktop' "$DEVZONE_ETAT"
+    grep -qx 'cluster=docker-desktop' "$DEVZONE_STATE"
     # The installation in the new cluster goes through the devzone context
     grep -q 'kubectl config set-context devzone --cluster=docker-desktop --user=docker-desktop' "$BATS_TEST_TMPDIR/kubectl.log"
     grep -q 'kubectl --context devzone -n devzone-postgres apply -f -' "$BATS_TEST_TMPDIR/kubectl.log"

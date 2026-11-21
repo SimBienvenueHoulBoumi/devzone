@@ -8,13 +8,13 @@ setup() {
     kube_isole
     PORTS_AUTO="$BATS_TEST_DIRNAME/../../.devcontainer/ports-auto.sh"
     PORTS="$BATS_TEST_DIRNAME/../../.devcontainer/ports.sh"
-    export DEVZONE_RACINE="$BATS_TEST_TMPDIR/racine"
-    export DEVZONE_ETAT="$BATS_TEST_TMPDIR/etat"
+    export DEVZONE_ROOT="$BATS_TEST_TMPDIR/racine"
+    export DEVZONE_STATE="$BATS_TEST_TMPDIR/etat"
     export DEVZONE_INSTANCE=devzone
     export DEVZONE_PORTS_AUTO_DIR="$BATS_TEST_TMPDIR/ports-auto"
-    export DEVZONE_PORTS_AUTO_DELAI=1
-    mkdir -p "$BATS_TEST_TMPDIR/bin" "$DEVZONE_RACINE/workspace"
-    : >"$DEVZONE_ETAT"
+    export DEVZONE_PORTS_AUTO_DELAY=1
+    mkdir -p "$BATS_TEST_TMPDIR/bin" "$DEVZONE_ROOT/workspace"
+    : >"$DEVZONE_STATE"
     : >"$BATS_TEST_TMPDIR/docker.log"
     : >"$BATS_TEST_TMPDIR/socat.log"
     : >"$BATS_TEST_TMPDIR/ss.listen"
@@ -137,7 +137,7 @@ CURL
 }
 
 @test "auto: ports below 1024, Docker DNS, devzone services, manual, excluded are ignored" {
-    printf 'ports=3000\nports_exclus=8080\n' >"$DEVZONE_ETAT"
+    printf 'ports=3000\nports_exclus=8080\n' >"$DEVZONE_STATE"
     cat >"$BATS_TEST_TMPDIR/ss.listen" <<'SS'
 LISTEN 0 511 127.0.0.1:80 127.0.0.1:*
 LISTEN 0 511 127.0.0.1:5432 127.0.0.1:*
@@ -170,7 +170,7 @@ SS
     grep -q 'docker run -d --restart unless-stopped --name devzone-devzone-auto-8080' "$BATS_TEST_TMPDIR/docker.log"
     run bash "$PORTS" auto off
     [ "$status" -eq 0 ]
-    grep -qx 'ports_auto=off' "$DEVZONE_ETAT"
+    grep -qx 'ports_auto=off' "$DEVZONE_STATE"
     [[ "$output" == *"automatic ports disabled"* ]] || false
     : >"$BATS_TEST_TMPDIR/docker.log"
     run bash "$PORTS_AUTO" tour
@@ -203,9 +203,9 @@ SS
 }
 
 @test "watcher: refused even with the real context set, under bats (code 2)" {
-    DEVZONE_PORTS_AUTO_REEL=oui run bash "$PORTS_AUTO" boucle
+    DEVZONE_PORTS_AUTO_REAL=yes run bash "$PORTS_AUTO" boucle
     [ "$status" -eq 2 ]
-    DEVZONE_PORTS_AUTO_REEL=oui run bash "$PORTS_AUTO" demarrer
+    DEVZONE_PORTS_AUTO_REAL=yes run bash "$PORTS_AUTO" demarrer
     [ "$status" -eq 2 ]
     [ ! -e "$DEVZONE_PORTS_AUTO_DIR/devzone/verrou" ]
     [ "$(grep -c 'docker run' "$BATS_TEST_TMPDIR/docker.log")" -eq 0 ]

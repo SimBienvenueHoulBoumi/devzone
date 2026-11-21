@@ -11,7 +11,7 @@ setup() {
     CLI="$RACINE/manage/devzone"
     T="$BATS_TEST_TMPDIR"
     R="$T/racine"
-    export DEVZONE_RACINE="$R"
+    export DEVZONE_ROOT="$R"
     mkdir -p "$T/bin" "$R/workspace"
     : >"$T/kubectl.log"; : >"$T/helm.log"
     cat >"$T/bin/kubectl" <<'KUBE'

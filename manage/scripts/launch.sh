@@ -3,9 +3,9 @@
 #   bash manage/scripts/launch.sh up [folder]        (make up)
 #   bash manage/scripts/launch.sh rebuild [folder]   (make rebuild: rebuild from scratch)
 # Full devcontainer CLI output goes to <folder>/.devzone.log; the terminal shows
-# key steps, a heartbeat at least every DEVZONE_SIGNE_DE_VIE seconds (30), and a
+# key steps, a heartbeat at least every DEVZONE_HEARTBEAT seconds (30), and a
 # question asked inside the container (last log line left unanswered for
-# DEVZONE_ATTENTE_QUESTION seconds, 20) is shown and startup is stopped: nobody
+# DEVZONE_QUESTION_WAIT seconds, 20) is shown and startup is stopped: nobody
 # can answer it (the CLI runs without input), waiting would hang forever.
 # Portable: bash 3.2 (macOS) and Linux.
 set -uo pipefail
@@ -63,8 +63,8 @@ if host_off; then
     options+=(--config "$FOLDER/.devcontainer/without-host-docker/devcontainer.json")
 fi
 LOG="$FOLDER/.devzone.log"
-HEARTBEAT="${DEVZONE_SIGNE_DE_VIE:-30}"
-QUESTION_WAIT="${DEVZONE_ATTENTE_QUESTION:-20}"
+HEARTBEAT="${DEVZONE_HEARTBEAT:-30}"
+QUESTION_WAIT="${DEVZONE_QUESTION_WAIT:-20}"
 ESC="$(printf '\033')"
 
 # Readable log line: without color codes or carriage returns
@@ -124,7 +124,7 @@ trap 'stop_launch; echo; echo "interrupted - log: .devzone.log"; exit 130' INT T
 # Docker first: without it the CLI would only show a raw JSON error
 # shellcheck source=SCRIPTDIR/docker.sh
 . "$(dirname "${BASH_SOURCE[0]}")/docker.sh"
-docker_ready "${DEVZONE_COMMANDE:-make $mode}" || exit 1
+docker_ready "${DEVZONE_COMMAND:-make $mode}" || exit 1
 
 : >"$LOG"
 start="$(date +%s)"

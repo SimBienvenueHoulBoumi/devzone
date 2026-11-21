@@ -1,18 +1,18 @@
 #!/usr/bin/env bats
 # devzone cluster (cluster.sh): cluster_is_local, cluster_candidates,
 # cluster_menu, cluster_choose. Fake kubectl and kind in $BATS_TEST_TMPDIR/bin,
-# no network call, HOME and DEVZONE_ETAT under $BATS_TEST_TMPDIR.
+# no network call, HOME and DEVZONE_STATE under $BATS_TEST_TMPDIR.
 
 setup() {
     load commun
     kube_isole
     export HOME="$BATS_TEST_TMPDIR/home"
-    export DEVZONE_ETAT="$BATS_TEST_TMPDIR/modules"
-    export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
+    export DEVZONE_STATE="$BATS_TEST_TMPDIR/modules"
+    export DEVZONE_KUBE_HOST="$BATS_TEST_TMPDIR/hote.config"
     export DEVZONE_INSTANCE=devzone
     mkdir -p "$HOME" "$BATS_TEST_TMPDIR/bin"
-    : >"$DEVZONE_KUBE_HOTE"
-    : >"$DEVZONE_ETAT"
+    : >"$DEVZONE_KUBE_HOST"
+    : >"$DEVZONE_STATE"
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
 }
 
@@ -130,7 +130,7 @@ KIND
     (
         export DEVZONE_INSTANCE=devzone
         export ETAT="$BATS_TEST_TMPDIR/etat"
-        export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
+        export DEVZONE_KUBE_HOST="$BATS_TEST_TMPDIR/hote.config"
         source "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
         run cluster_is_local kind-devzone
         [ "$status" -eq 0 ]
@@ -144,7 +144,7 @@ KIND
     (
         export DEVZONE_INSTANCE=devzone
         export ETAT="$BATS_TEST_TMPDIR/etat"
-        export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
+        export DEVZONE_KUBE_HOST="$BATS_TEST_TMPDIR/hote.config"
         source "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
         run cluster_is_local docker-desktop
         [ "$status" -eq 0 ]
@@ -158,7 +158,7 @@ KIND
     (
         export DEVZONE_INSTANCE=devzone
         export ETAT="$BATS_TEST_TMPDIR/etat"
-        export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
+        export DEVZONE_KUBE_HOST="$BATS_TEST_TMPDIR/hote.config"
         source "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
         run cluster_is_local docker-desktop
         [ "$status" -eq 0 ]
@@ -172,7 +172,7 @@ KIND
     (
         export DEVZONE_INSTANCE=devzone
         export ETAT="$BATS_TEST_TMPDIR/etat"
-        export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
+        export DEVZONE_KUBE_HOST="$BATS_TEST_TMPDIR/hote.config"
         source "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
         run cluster_is_local cluster-prod
         [ "$status" -ne 0 ]
@@ -184,7 +184,7 @@ KIND
     (
         export DEVZONE_INSTANCE=devzone
         export ETAT="$BATS_TEST_TMPDIR/etat"
-        export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
+        export DEVZONE_KUBE_HOST="$BATS_TEST_TMPDIR/hote.config"
         source "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
         run cluster_is_local unknown
         [ "$status" -ne 0 ] || false
@@ -197,7 +197,7 @@ KIND
     (
         export DEVZONE_INSTANCE=devzone
         export ETAT="$BATS_TEST_TMPDIR/etat"
-        export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
+        export DEVZONE_KUBE_HOST="$BATS_TEST_TMPDIR/hote.config"
         source "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
         run cluster_is_local no-server
         [ "$status" -ne 0 ] || false
@@ -210,7 +210,7 @@ KIND
     (
         export DEVZONE_INSTANCE=devzone
         export ETAT="$BATS_TEST_TMPDIR/etat"
-        export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
+        export DEVZONE_KUBE_HOST="$BATS_TEST_TMPDIR/hote.config"
         source "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
         run cluster_is_local kind-gitlab
         [ "$status" -eq 0 ] || false
@@ -223,7 +223,7 @@ KIND
     (
         export DEVZONE_INSTANCE=devzone
         export ETAT="$BATS_TEST_TMPDIR/etat"
-        export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
+        export DEVZONE_KUBE_HOST="$BATS_TEST_TMPDIR/hote.config"
         source "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
         run cluster_is_local docker-desktop
         [ "$status" -eq 0 ] || false
@@ -236,7 +236,7 @@ KIND
     (
         export DEVZONE_INSTANCE=devzone
         export ETAT="$BATS_TEST_TMPDIR/etat"
-        export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
+        export DEVZONE_KUBE_HOST="$BATS_TEST_TMPDIR/hote.config"
         source "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
         run cluster_is_local kind-x
         [ "$status" -eq 0 ] || false
@@ -249,7 +249,7 @@ KIND
     (
         export DEVZONE_INSTANCE=devzone
         export ETAT="$BATS_TEST_TMPDIR/etat"
-        export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
+        export DEVZONE_KUBE_HOST="$BATS_TEST_TMPDIR/hote.config"
         source "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
         run cluster_is_local cluster-ipv6
         [ "$status" -eq 0 ] || false
@@ -265,7 +265,7 @@ KIND
     (
         export DEVZONE_INSTANCE=devzone
         export ETAT="$BATS_TEST_TMPDIR/etat"
-        export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
+        export DEVZONE_KUBE_HOST="$BATS_TEST_TMPDIR/hote.config"
         source "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
         run cluster_candidates
         [ "$status" -eq 0 ] || false
@@ -282,7 +282,7 @@ KIND
     (
         export DEVZONE_INSTANCE=devzone
         export ETAT="$BATS_TEST_TMPDIR/etat"
-        export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
+        export DEVZONE_KUBE_HOST="$BATS_TEST_TMPDIR/hote.config"
         source "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
         run cluster_candidates
         [ "$status" -eq 0 ]
@@ -294,10 +294,10 @@ KIND
     set +e
     fake_kubectl
     (
-        export DEVZONE_INTERACTIF=1
+        export DEVZONE_INTERACTIVE=1
         export DEVZONE_INSTANCE=devzone
         export ETAT="$BATS_TEST_TMPDIR/etat"
-        export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
+        export DEVZONE_KUBE_HOST="$BATS_TEST_TMPDIR/hote.config"
         printf 'docker-desktop\ncluster-prod\n' >"$BATS_TEST_TMPDIR/host.contexts"
         source "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
         run cluster_menu <<<""
@@ -317,7 +317,7 @@ KIND
     (
         export DEVZONE_INSTANCE=devzone
         export ETAT="$BATS_TEST_TMPDIR/etat"
-        export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
+        export DEVZONE_KUBE_HOST="$BATS_TEST_TMPDIR/hote.config"
         source "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
         run cluster_choose
         [ "$status" -eq 0 ]
@@ -334,7 +334,7 @@ KIND
     (
         export DEVZONE_INSTANCE=devzone
         export ETAT="$BATS_TEST_TMPDIR/etat"
-        export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
+        export DEVZONE_KUBE_HOST="$BATS_TEST_TMPDIR/hote.config"
         source "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
         run cluster_choose docker-desktop
         [ "$status" -eq 0 ]
@@ -351,7 +351,7 @@ KIND
     (
         export DEVZONE_INSTANCE=devzone
         export ETAT="$BATS_TEST_TMPDIR/etat"
-        export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
+        export DEVZONE_KUBE_HOST="$BATS_TEST_TMPDIR/hote.config"
         source "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
         run cluster_choose cluster-prod </dev/null
         [ "$status" -eq 2 ]
@@ -359,7 +359,7 @@ KIND
     ) || false
 }
 
-@test "cluster_choose : remote context accepted with DEVZONE_CLUSTER_DISTANT" {
+@test "cluster_choose : remote context accepted with DEVZONE_CLUSTER_REMOTE" {
     fake_kubectl
     fake_kind
     FAKE_UNREACHABLE=none
@@ -368,8 +368,8 @@ KIND
     (
         export DEVZONE_INSTANCE=devzone
         export ETAT="$BATS_TEST_TMPDIR/etat"
-        export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
-        export DEVZONE_CLUSTER_DISTANT=cluster-prod
+        export DEVZONE_KUBE_HOST="$BATS_TEST_TMPDIR/hote.config"
+        export DEVZONE_CLUSTER_REMOTE=cluster-prod
         source "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
         run cluster_choose cluster-prod </dev/null
         [ "$status" -eq 0 ] || false
@@ -377,7 +377,7 @@ KIND
     ) || false
 }
 
-@test "cluster_choose : other DEVZONE_CLUSTER_DISTANT refused" {
+@test "cluster_choose : other DEVZONE_CLUSTER_REMOTE refused" {
     fake_kubectl
     fake_kind
     FAKE_UNREACHABLE=none
@@ -386,8 +386,8 @@ KIND
     (
         export DEVZONE_INSTANCE=devzone
         export ETAT="$BATS_TEST_TMPDIR/etat"
-        export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
-        export DEVZONE_CLUSTER_DISTANT=other
+        export DEVZONE_KUBE_HOST="$BATS_TEST_TMPDIR/hote.config"
+        export DEVZONE_CLUSTER_REMOTE=other
         source "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
         run cluster_choose cluster-prod </dev/null
         [ "$status" -eq 2 ] || false
@@ -404,7 +404,7 @@ KIND
     (
         export DEVZONE_INSTANCE=devzone
         export ETAT="$BATS_TEST_TMPDIR/etat"
-        export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
+        export DEVZONE_KUBE_HOST="$BATS_TEST_TMPDIR/hote.config"
         source "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
         run cluster_choose cluster-prod --confirm cluster-prod </dev/null
         [ "$status" -eq 0 ] || false
@@ -421,7 +421,7 @@ KIND
     (
         export DEVZONE_INSTANCE=devzone
         export ETAT="$BATS_TEST_TMPDIR/etat"
-        export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
+        export DEVZONE_KUBE_HOST="$BATS_TEST_TMPDIR/hote.config"
         source "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
         run cluster_choose cluster-prod --confirm other </dev/null
         [ "$status" -eq 2 ] || false
@@ -435,7 +435,7 @@ KIND
     (
         export DEVZONE_INSTANCE=devzone
         export ETAT="$BATS_TEST_TMPDIR/etat"
-        export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
+        export DEVZONE_KUBE_HOST="$BATS_TEST_TMPDIR/hote.config"
         source "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
         run cluster_choose cluster-prod --confirm </dev/null
         [ "$status" -eq 2 ] || false
@@ -450,10 +450,10 @@ KIND
     printf 'cluster-prod\n' >"$BATS_TEST_TMPDIR/host.contexts"
     printf 'cluster-prod\thttps://example.org:6443\n' >"$BATS_TEST_TMPDIR/host.servers"
     (
-        export DEVZONE_INTERACTIF=1
+        export DEVZONE_INTERACTIVE=1
         export DEVZONE_INSTANCE=devzone
         export ETAT="$BATS_TEST_TMPDIR/etat"
-        export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
+        export DEVZONE_KUBE_HOST="$BATS_TEST_TMPDIR/hote.config"
         source "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
         run cluster_choose cluster-prod <<<"cluster-prod"
         [ "$status" -eq 0 ] || false
@@ -467,10 +467,10 @@ KIND
     printf 'cluster-prod\n' >"$BATS_TEST_TMPDIR/host.contexts"
     printf 'cluster-prod\thttps://example.org:6443\n' >"$BATS_TEST_TMPDIR/host.servers"
     (
-        export DEVZONE_INTERACTIF=1
+        export DEVZONE_INTERACTIVE=1
         export DEVZONE_INSTANCE=devzone
         export ETAT="$BATS_TEST_TMPDIR/etat"
-        export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
+        export DEVZONE_KUBE_HOST="$BATS_TEST_TMPDIR/hote.config"
         source "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
         run cluster_choose cluster-prod <<<"y"
         [ "$status" -eq 2 ] || false
@@ -483,7 +483,7 @@ KIND
     (
         export DEVZONE_INSTANCE=devzone
         export ETAT="$BATS_TEST_TMPDIR/etat"
-        export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
+        export DEVZONE_KUBE_HOST="$BATS_TEST_TMPDIR/hote.config"
         source "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
         run cluster_choose unknown </dev/null
         [ "$status" -eq 2 ]
@@ -498,7 +498,7 @@ KIND
     (
         export DEVZONE_INSTANCE=devzone
         export ETAT="$BATS_TEST_TMPDIR/etat"
-        export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
+        export DEVZONE_KUBE_HOST="$BATS_TEST_TMPDIR/hote.config"
         source "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
         run cluster_choose
         [ "$status" -eq 0 ]
@@ -515,7 +515,7 @@ KIND
         set -e
         export DEVZONE_INSTANCE=devzone
         export ETAT="$BATS_TEST_TMPDIR/etat"
-        export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
+        export DEVZONE_KUBE_HOST="$BATS_TEST_TMPDIR/hote.config"
         source "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
         kind_create_keep_context --name devzone --wait 120s
     ) || false
@@ -533,7 +533,7 @@ KIND
         set -e
         export DEVZONE_INSTANCE=devzone
         export ETAT="$1/etat"
-        export DEVZONE_KUBE_HOTE="$1/hote.config"
+        export DEVZONE_KUBE_HOST="$1/hote.config"
         source "$2"
         kind_create_keep_context --name devzone --wait 120s
     ' _ "$BATS_TEST_TMPDIR" "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
@@ -551,7 +551,7 @@ KIND
         set -e
         export DEVZONE_INSTANCE=devzone
         export ETAT="$BATS_TEST_TMPDIR/etat"
-        export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
+        export DEVZONE_KUBE_HOST="$BATS_TEST_TMPDIR/hote.config"
         source "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
         kind_create_keep_context --name devzone --wait 120s
     ) || false
@@ -569,7 +569,7 @@ KIND
         set -e
         export DEVZONE_INSTANCE=devzone
         export ETAT="$BATS_TEST_TMPDIR/etat"
-        export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
+        export DEVZONE_KUBE_HOST="$BATS_TEST_TMPDIR/hote.config"
         source "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
         cluster_prepare kind-devzone
     ) || false

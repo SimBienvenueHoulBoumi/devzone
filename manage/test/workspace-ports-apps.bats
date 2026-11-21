@@ -41,14 +41,14 @@ exit 1
 LSOF
     chmod +x "$T/bin/kubectl" "$T/bin/lsof"
     export PATH="$T/bin:$PATH"
-    export DEVZONE_PORTS_WORKSPACE_REEL=oui
-    export DEVZONE_PORTS_WORKSPACE_PAS=0.2
-    export DEVZONE_WORKSPACE_ATTENTE=1 DEVZONE_WORKSPACE_PAS=0.1
+    export DEVZONE_PORTS_WORKSPACE_REAL=yes
+    export DEVZONE_PORTS_WORKSPACE_STEP=0.2
+    export DEVZONE_WORKSPACE_WAIT=1 DEVZONE_WORKSPACE_STEP=0.1
     : >"$T/kubectl.log"
 }
 
 teardown() {
-    ( cd "$T/workstation" && DEVZONE_PORTS_WORKSPACE_REEL=oui bash "$CLI" workspace ports stop >/dev/null 2>&1 ) || true
+    ( cd "$T/workstation" && DEVZONE_PORTS_WORKSPACE_REAL=yes bash "$CLI" workspace ports stop >/dev/null 2>&1 ) || true
 }
 
 # Cluster Services: one "namespace|name|clusterIP|type|annotation|port/TCP," line per argument.

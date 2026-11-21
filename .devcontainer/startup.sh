@@ -12,7 +12,7 @@ exec </dev/null
 ICI="$(dirname "$0")"
 # Docker socket relay first (#293): without it, the long docker exec calls
 # (kind, modules) are cut after 0.5 s under Docker Desktop
-DEVZONE_RELAIS_REEL=oui bash "$ICI/docker-relay.sh" || echo "startup : Docker relay not fixed (devzone repair)"
+DEVZONE_RELAY_REAL=yes bash "$ICI/docker-relay.sh" || echo "startup : Docker relay not fixed (devzone repair)"
 bash "$ICI/git-identity.sh" || echo "startup : git identity not handled (devzone start)"
 bash "$ICI/kube-config.sh" || echo "startup : clusters not handled (devzone start)"
 # Token of the limited Kubernetes account (#430): 24 h, renewed at each
@@ -50,13 +50,13 @@ bash "$ICI/ports.sh" restart || echo "startup : port relays not restarted (devzo
 # instance in the background, real context set for this call only.
 # Kubernetes workspace (#517): no watcher, ports go through devzone workspace ports
 if [ "${DEVZONE_WORKSPACE:-}" != kubernetes ]; then
-    DEVZONE_PORTS_AUTO_REEL=oui bash "$ICI/ports-auto.sh" demarrer >/dev/null 2>&1 || echo "startup : auto ports watcher not started (devzone repair)"
+    DEVZONE_PORTS_AUTO_REAL=yes bash "$ICI/ports-auto.sh" demarrer >/dev/null 2>&1 || echo "startup : auto ports watcher not started (devzone repair)"
 fi
 # Application catalog: one <app>=off line per absent application, written
 # once, never an existing line modified (#414)
 bash "$ICI/catalog.sh" sync || echo "startup : catalog not synchronized (devzone repair)"
 # Catalog watcher: applies again on the fly as soon as .devzone.modules changes
-DEVZONE_CATALOGUE_REEL=oui bash "$ICI/catalog/catalog-watcher.sh" demarrer >/dev/null 2>&1 || echo "startup : catalog watcher not started (devzone repair)"
+DEVZONE_CATALOG_REAL=yes bash "$ICI/catalog/catalog-watcher.sh" demarrer >/dev/null 2>&1 || echo "startup : catalog watcher not started (devzone repair)"
 
 # Grouped view of the credentials (#332), regenerated at each startup; a failure
 # prevents nothing and the content is never displayed

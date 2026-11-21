@@ -4,10 +4,10 @@
 # Sourced by .devcontainer/devzone (split of the 1 600 lines file, #722):
 # functions only, shared variables are defined in devzone.
 
-# Runs a long command, writing "still running" every DEVZONE_PROGRESSION s on
+# Runs a long command, writing "still running" every DEVZONE_PROGRESS s on
 # stderr: a silent installation looks blocked (#195)
 with_progress() {
-    local step="${DEVZONE_PROGRESSION:-30}" elapsed=0 pid code=0
+    local step="${DEVZONE_PROGRESS:-30}" elapsed=0 pid code=0
     "$@" &
     pid=$!
     while kill -0 "$pid" 2>/dev/null; do

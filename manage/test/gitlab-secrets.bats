@@ -11,14 +11,14 @@ setup() {
     kind_vide
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
     GITLAB="$BATS_TEST_DIRNAME/../../.devcontainer/gitlab/gitlab.sh"
-    export DEVZONE_RACINE="$BATS_TEST_TMPDIR/racine"
-    export DEVZONE_ETAT="$BATS_TEST_TMPDIR/modules"
+    export DEVZONE_ROOT="$BATS_TEST_TMPDIR/racine"
+    export DEVZONE_STATE="$BATS_TEST_TMPDIR/modules"
     export DEVZONE_MEMINFO="$BATS_TEST_TMPDIR/meminfo"
     export DEVZONE_HOSTS="$BATS_TEST_TMPDIR/hosts"
     export KIND_CLUSTERS="$BATS_TEST_TMPDIR/clusters"
     export DEVZONE_PORTS_AUTO_DIR="$BATS_TEST_TMPDIR/ports-auto"
-    SECRETS="$DEVZONE_RACINE/workspace/.gitlab"
-    mkdir -p "$HOME" "$DEVZONE_RACINE/workspace" "$SECRETS" "$BATS_TEST_TMPDIR/bin"
+    SECRETS="$DEVZONE_ROOT/workspace/.gitlab"
+    mkdir -p "$HOME" "$DEVZONE_ROOT/workspace" "$SECRETS" "$BATS_TEST_TMPDIR/bin"
     printf 'MemAvailable: 16000000 kB\n' >"$DEVZONE_MEMINFO"
     : >"$KIND_CLUSTERS"
     printf '127.0.0.1 localhost\n' >"$DEVZONE_HOSTS"
@@ -173,10 +173,10 @@ GETENT
     export FAKE_RUNNER_OK=1
     run bash "$GITLAB" new-password root
     [ "$status" -eq 0 ] || false
-    [ "$output" = "$DEVZONE_RACINE/.password" ]
+    [ "$output" = "$DEVZONE_ROOT/.password" ]
     grep -q "exec -i .*gitlab-rails runner -" "$BATS_TEST_TMPDIR/kubectl.log" || false
     [ -f "$SECRETS/root-password" ] || false
-    grep -q $'^gitlab\thttp://gitlab.localhost:8929\troot\t' "$DEVZONE_RACINE/.password" || false
+    grep -q $'^gitlab\thttp://gitlab.localhost:8929\troot\t' "$DEVZONE_ROOT/.password" || false
 }
 
 @test "gitlab : new-password dev regenerates the dev password" {
@@ -201,7 +201,7 @@ GETENT
     [ "$(cat "$SECRETS/root-password")" != old-password ] || false
     pass="$(cat "$SECRETS/root-password")"
     ! grep -q -- "$pass" "$BATS_TEST_TMPDIR/kubectl.log" || false
-    grep -q $'^gitlab\thttp://gitlab.localhost:8929\troot\t'"$pass"'$' "$DEVZONE_RACINE/.password" || false
+    grep -q $'^gitlab\thttp://gitlab.localhost:8929\troot\t'"$pass"'$' "$DEVZONE_ROOT/.password" || false
 }
 
 @test "gitlab : new-password: unknown user -> code 2" {
@@ -229,14 +229,14 @@ GETENT
 }
 
 @test "devzone : summary warns if the GitLab Rails secret was lost" {
-    printf 'gitlab=on\n' >"$DEVZONE_ETAT"
+    printf 'gitlab=on\n' >"$DEVZONE_STATE"
     run bash "$DEVZONE"
     [ "$status" -eq 0 ] || false
     [[ "$output" == *"GitLab reinstalled: if the browser shows 422, delete the site data of gitlab.localhost"* ]] || false
 }
 
 @test "devzone : summary without warning if the GitLab Rails secret is kept" {
-    printf 'gitlab=on\n' >"$DEVZONE_ETAT"
+    printf 'gitlab=on\n' >"$DEVZONE_STATE"
     mkdir -p "$SECRETS"
     printf '%s\n' '{"kind":"Secret","metadata":{"name":"gitlab-rails-secret"}}' >"$SECRETS/rails-secret.yaml"
     run bash "$DEVZONE"

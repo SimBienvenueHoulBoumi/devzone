@@ -57,7 +57,7 @@ RPW
     cat >"$BATS_TEST_TMPDIR/bin/devzone" <<'DEVZONE'
 #!/usr/bin/env bash
 echo "devzone $*" >>"$JOURNAL"
-[ "${DEVZONE_ECHEC:-0}" = 1 ] && exit 1
+[ "${DEVZONE_FAILED:-0}" = 1 ] && exit 1
 exit 0
 DEVZONE
 
@@ -106,7 +106,7 @@ DEVZONE
 }
 
 @test "devzone apply failing: the following steps run and done is written" {
-    export DEVZONE_ECHEC=1
+    export DEVZONE_FAILED=1
     run bash "$SCRIPT"
     [ "$status" -eq 0 ]
     [[ "$output" == *"devzone init: modules incomplete"* ]] || false

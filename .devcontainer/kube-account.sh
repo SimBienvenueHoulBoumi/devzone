@@ -18,7 +18,7 @@ ACCOUNT_CONFIG="${DEVZONE_KUBE_CONFIG:-$HOME/.kube/config}"
 # kubeconfig file that holds the admin context ctx: hote.config if it lists it
 # (host clusters), otherwise ~/.kube/config (kind clusters of the container).
 account_admin_config() {
-    local ctx="$1" host="${DEVZONE_KUBE_HOTE:-$HOME/.kube/hote.config}"
+    local ctx="$1" host="${DEVZONE_KUBE_HOST:-$HOME/.kube/hote.config}"
     if [ -n "$ctx" ] && [ -f "$host" ]; then
         if KUBECONFIG="$host" kubectl config get-contexts -o name 2>/dev/null | grep -qx -- "$ctx"; then
             echo "$host"
@@ -187,8 +187,8 @@ if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
         exit 1
     fi
     ICI="$(cd "$(dirname "$0")" && pwd)"
-    RACINE="${DEVZONE_RACINE:-$(dirname "$ICI")}"
-    ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
+    RACINE="${DEVZONE_ROOT:-$(dirname "$ICI")}"
+    ETAT="${DEVZONE_STATE:-$RACINE/.devzone.modules}"
     ctx="$(grep -E '^cluster=' "$ETAT" 2>/dev/null | tail -1 | cut -d= -f2- || true)"
     if [ -z "$ctx" ]; then
         exit 0

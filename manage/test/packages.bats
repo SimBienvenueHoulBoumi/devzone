@@ -13,11 +13,11 @@ setup() {
     kube_isole
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
     export HOME="$BATS_TEST_TMPDIR/home"
-    export DEVZONE_RACINE="$BATS_TEST_TMPDIR/racine"
-    export DEVZONE_PAQUETS_SUDO=""
-    export DEVZONE_PAQUETS_MARQUE="$BATS_TEST_TMPDIR/paquets.echec"
-    export DEVZONE_PAQUETS_MAJ="$BATS_TEST_TMPDIR/paquets.maj"
-    mkdir -p "$HOME" "$DEVZONE_RACINE/workspace" "$BATS_TEST_TMPDIR/bin"
+    export DEVZONE_ROOT="$BATS_TEST_TMPDIR/racine"
+    export DEVZONE_PACKAGES_SUDO=""
+    export DEVZONE_PACKAGES_MARKER="$BATS_TEST_TMPDIR/paquets.echec"
+    export DEVZONE_PACKAGES_UPDATE="$BATS_TEST_TMPDIR/paquets.maj"
+    mkdir -p "$HOME" "$DEVZONE_ROOT/workspace" "$BATS_TEST_TMPDIR/bin"
     : >"$BATS_TEST_TMPDIR/apt.log"
     : >"$BATS_TEST_TMPDIR/apt-cache.log"
     : >"$BATS_TEST_TMPDIR/apt-cache.list"
@@ -127,15 +127,15 @@ NPM
     run bash "$DEVZONE" packages add tree
     [ "$status" -eq 0 ]
     grep -q -- "apt-get install -y --no-install-recommends tree" "$BATS_TEST_TMPDIR/apt.log"
-    [ -f "$DEVZONE_RACINE/.devzone.paquets" ]
-    grep -qx "tree" "$DEVZONE_RACINE/.devzone.paquets"
+    [ -f "$DEVZONE_ROOT/.devzone.paquets" ]
+    grep -qx "tree" "$DEVZONE_ROOT/.devzone.paquets"
 }
 
 @test "packages: adding an unknown name is refused, list unchanged, code 1" {
     run bash "$DEVZONE" packages add nosuchpkg
     [ "$status" -eq 1 ]
     [[ "$output" == *"unknown package"* ]] || false
-    [ ! -f "$DEVZONE_RACINE/.devzone.paquets" ]
+    [ ! -f "$DEVZONE_ROOT/.devzone.paquets" ]
 }
 
 @test "packages: remove drops it from the list and uninstalls" {
@@ -156,17 +156,17 @@ NPM
 
 
 @test "packages: apply installs only the missing packages" {
-    printf '# packages added by devzone packages ; reinstalled at each container creation\ntree\nhtop\n' >"$DEVZONE_RACINE/.devzone.paquets"
+    printf '# packages added by devzone packages ; reinstalled at each container creation\ntree\nhtop\n' >"$DEVZONE_ROOT/.devzone.paquets"
     printf 'tree\n' >"$BATS_TEST_TMPDIR/installed"
     : >"$BATS_TEST_TMPDIR/apt.log"
     run bash "$DEVZONE" packages apply
     [ "$status" -eq 0 ]
     grep -q -- "apt-get install -y --no-install-recommends htop" "$BATS_TEST_TMPDIR/apt.log"
-    [ ! -e "$DEVZONE_PAQUETS_MARQUE" ]
+    [ ! -e "$DEVZONE_PACKAGES_MARKER" ]
 }
 
 @test "packages: list sorted and without duplicate" {
-    printf '# packages added by devzone packages ; reinstalled at each container creation\ntree\nhtop\ntree\n' >"$DEVZONE_RACINE/.devzone.paquets"
+    printf '# packages added by devzone packages ; reinstalled at each container creation\ntree\nhtop\ntree\n' >"$DEVZONE_ROOT/.devzone.paquets"
     run bash "$DEVZONE" packages
     [ "$status" -eq 0 ]
     [ "$(grep -c "○ htop" <<<"$output")" -eq 1 ]
@@ -174,11 +174,11 @@ NPM
 }
 
 @test "packages: package not found at apply -> mark and ⚠ in the recap" {
-    printf '# packages added by devzone packages ; reinstalled at each container creation\nghost\n' >"$DEVZONE_RACINE/.devzone.paquets"
+    printf '# packages added by devzone packages ; reinstalled at each container creation\nghost\n' >"$DEVZONE_ROOT/.devzone.paquets"
     printf 'ghost\n' >"$BATS_TEST_TMPDIR/apt-failing"
     run bash "$DEVZONE" packages apply
     [ "$status" -ne 0 ]
-    [ -f "$DEVZONE_PAQUETS_MARQUE" ]
+    [ -f "$DEVZONE_PACKAGES_MARKER" ]
     run bash "$DEVZONE"
     [ "$status" -eq 0 ]
     [[ "$output" == *"⚠ packages"* ]] || false
@@ -196,7 +196,7 @@ NPM
 }
 
 @test "packages: apply runs apt-get update before apt-get install for a missing package" {
-    printf '# packages added by devzone packages ; reinstalled at each container creation\ntree\n' >"$DEVZONE_RACINE/.devzone.paquets"
+    printf '# packages added by devzone packages ; reinstalled at each container creation\ntree\n' >"$DEVZONE_ROOT/.devzone.paquets"
     : >"$BATS_TEST_TMPDIR/installed"
     run bash "$DEVZONE" packages apply
     [ "$status" -eq 0 ]
@@ -208,24 +208,24 @@ NPM
 }
 
 @test "packages: apply installs the valid one and marks only the unknown one" {
-    printf '# packages added by devzone packages ; reinstalled at each container creation\nunknown\ntree\n' >"$DEVZONE_RACINE/.devzone.paquets"
+    printf '# packages added by devzone packages ; reinstalled at each container creation\nunknown\ntree\n' >"$DEVZONE_ROOT/.devzone.paquets"
     printf 'unknown\n' >"$BATS_TEST_TMPDIR/apt-failing"
     : >"$BATS_TEST_TMPDIR/installed"
     run bash "$DEVZONE" packages apply
     [ "$status" -ne 0 ]
     grep -q -- "apt-get update" "$BATS_TEST_TMPDIR/apt.log"
     grep -qx "tree" "$BATS_TEST_TMPDIR/installed"
-    [ -f "$DEVZONE_PAQUETS_MARQUE" ]
-    grep -qx "unknown" "$DEVZONE_PAQUETS_MARQUE"
-    [ "$(wc -l < "$DEVZONE_PAQUETS_MARQUE")" -eq 1 ] || false
-    [[ "$(cat "$DEVZONE_PAQUETS_MARQUE")" == "unknown" ]] || false
+    [ -f "$DEVZONE_PACKAGES_MARKER" ]
+    grep -qx "unknown" "$DEVZONE_PACKAGES_MARKER"
+    [ "$(wc -l < "$DEVZONE_PACKAGES_MARKER")" -eq 1 ] || false
+    [[ "$(cat "$DEVZONE_PACKAGES_MARKER")" == "unknown" ]] || false
 }
 
 @test "packages: package already installed before add is marked, remove does not uninstall it" {
     printf 'tree\n' >"$BATS_TEST_TMPDIR/installed"
     run bash "$DEVZONE" packages add tree
     [ "$status" -eq 0 ]
-    grep -qxF -e "tree $PRESENT_MARK" "$DEVZONE_RACINE/.devzone.paquets"
+    grep -qxF -e "tree $PRESENT_MARK" "$DEVZONE_ROOT/.devzone.paquets"
     : >"$BATS_TEST_TMPDIR/apt.log"
     run bash "$DEVZONE" packages remove tree
     [ "$status" -eq 0 ]
@@ -243,12 +243,12 @@ NPM
     [ "$status" -eq 0 ]
     run bash "$DEVZONE" packages remove tree
     [ "$status" -eq 0 ]
-    [ "$(grep -c '^#' "$DEVZONE_RACINE/.devzone.paquets")" -eq 1 ]
-    [ "$(grep -v '^#' "$DEVZONE_RACINE/.devzone.paquets")" = "htop" ]
+    [ "$(grep -c '^#' "$DEVZONE_ROOT/.devzone.paquets")" -eq 1 ]
+    [ "$(grep -v '^#' "$DEVZONE_ROOT/.devzone.paquets")" = "htop" ]
 }
 
 @test "packages: names_list ignores the already-present mark" {
-    printf '# packages added by devzone packages ; reinstalled at each container creation\ntree %s\nhtop\n' "$PRESENT_MARK" >"$DEVZONE_RACINE/.devzone.paquets"
+    printf '# packages added by devzone packages ; reinstalled at each container creation\ntree %s\nhtop\n' "$PRESENT_MARK" >"$DEVZONE_ROOT/.devzone.paquets"
     printf 'tree\n' >"$BATS_TEST_TMPDIR/installed"
     : >"$BATS_TEST_TMPDIR/apt.log"
     run bash "$DEVZONE" packages

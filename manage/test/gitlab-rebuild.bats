@@ -15,14 +15,14 @@ setup() {
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
     GITLAB="$BATS_TEST_DIRNAME/../../.devcontainer/gitlab/gitlab.sh"
     CLUSTER="$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
-    export DEVZONE_RACINE="$BATS_TEST_TMPDIR/racine"
-    export DEVZONE_ETAT="$BATS_TEST_TMPDIR/modules"
+    export DEVZONE_ROOT="$BATS_TEST_TMPDIR/racine"
+    export DEVZONE_STATE="$BATS_TEST_TMPDIR/modules"
     export DEVZONE_MEMINFO="$BATS_TEST_TMPDIR/meminfo"
     export DEVZONE_HOSTS="$BATS_TEST_TMPDIR/hosts"
-    export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
+    export DEVZONE_KUBE_HOST="$BATS_TEST_TMPDIR/hote.config"
     export KIND_CLUSTERS="$BATS_TEST_TMPDIR/clusters"
-    SECRETS="$DEVZONE_RACINE/workspace/.gitlab"
-    mkdir -p "$DEVZONE_RACINE/workspace" "$BATS_TEST_TMPDIR/bin"
+    SECRETS="$DEVZONE_ROOT/workspace/.gitlab"
+    mkdir -p "$DEVZONE_ROOT/workspace" "$BATS_TEST_TMPDIR/bin"
     printf 'MemAvailable: 16000000 kB\n' >"$DEVZONE_MEMINFO"
     : >"$KIND_CLUSTERS"
     printf '127.0.0.1 localhost\n' >"$DEVZONE_HOSTS"
@@ -215,13 +215,13 @@ current_context() {
 
 @test "apply: gitlab ready, runner online → failure mark cleared, summary at ✔" {
     touch "$BATS_TEST_TMPDIR/namespace"
-    printf 'gitlab=on\n' >"$DEVZONE_ETAT"
+    printf 'gitlab=on\n' >"$DEVZONE_STATE"
     mkdir -p "$SECRETS" && echo token >"$SECRETS/root-token"
-    echo gitlab >"$DEVZONE_ETAT-echec-gitlab"
+    echo gitlab >"$DEVZONE_STATE-echec-gitlab"
     FAKE_RUNNERS='[{"id":1}]' run bash "$DEVZONE" apply
     [ "$status" -eq 0 ] || false
     [[ "$output" == *"already active, nothing to do"* ]] || false
-    [ ! -e "$DEVZONE_ETAT-echec-gitlab" ] || false
+    [ ! -e "$DEVZONE_STATE-echec-gitlab" ] || false
     FAKE_RUNNERS='[{"id":1}]' run bash "$DEVZONE"
     [[ "$output" == *"✔ module gitlab"* ]] || false
     [[ "$output" != *"failed"* ]] || false

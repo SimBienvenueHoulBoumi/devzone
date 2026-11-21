@@ -13,12 +13,12 @@ setup() {
     ADMIN="$RACINE/.devcontainer/services-admin.sh"
     T="$BATS_TEST_TMPDIR"
     export HOME="$T/home"
-    export DEVZONE_RACINE="$T/racine"
-    export DEVZONE_ETAT="$T/racine/.devzone.modules"
+    export DEVZONE_ROOT="$T/racine"
+    export DEVZONE_STATE="$T/racine/.devzone.modules"
     export DEVZONE_INSTANCE=devzone
     export DEVZONE_WORKSPACE=kubernetes
     export GIT_CONFIG_NOSYSTEM=1
-    mkdir -p "$HOME" "$DEVZONE_RACINE/workspace" "$T/bin"
+    mkdir -p "$HOME" "$DEVZONE_ROOT/workspace" "$T/bin"
     : >"$T/kubectl.log"
     cd "$T" || return 1
 
@@ -44,9 +44,9 @@ GETENT
 }
 
 @test "status in the pod: gitlab on and resolved by the cluster DNS, active, never read from a failure marker" {
-    printf 'gitlab=on\n' >"$DEVZONE_ETAT"
+    printf 'gitlab=on\n' >"$DEVZONE_STATE"
     echo "gitlab-webservice-default.devzone-gitlab.svc" >"$T/dns"
-    echo gitlab >"$DEVZONE_ETAT-echec-gitlab"
+    echo gitlab >"$DEVZONE_STATE-echec-gitlab"
     run bash "$DEVZONE"
     [ "$status" -eq 0 ]
     line="$(printf '%s\n' "$output" | grep 'module gitlab' || true)"
@@ -56,7 +56,7 @@ GETENT
 }
 
 @test "status in the pod: gitlab on and absent, the workstation command, no failure" {
-    printf 'gitlab=on\n' >"$DEVZONE_ETAT"
+    printf 'gitlab=on\n' >"$DEVZONE_STATE"
     : >"$T/dns"
     run bash "$DEVZONE"
     [ "$status" -eq 0 ]
@@ -66,7 +66,7 @@ GETENT
 }
 
 @test "status in the pod: postgres and argocd off, optional with the workstation command" {
-    printf 'gitlab=off\npostgres=off\nargocd=off\n' >"$DEVZONE_ETAT"
+    printf 'gitlab=off\npostgres=off\nargocd=off\n' >"$DEVZONE_STATE"
     : >"$T/dns"
     run bash "$DEVZONE"
     [ "$status" -eq 0 ]
@@ -76,7 +76,7 @@ GETENT
 }
 
 @test "status in the pod: postgres off but present in the cluster, active" {
-    printf 'postgres=off\n' >"$DEVZONE_ETAT"
+    printf 'postgres=off\n' >"$DEVZONE_STATE"
     echo "postgres.devzone-postgres.svc" >"$T/dns"
     run bash "$DEVZONE"
     [ "$status" -eq 0 ]
@@ -84,7 +84,7 @@ GETENT
 }
 
 @test "status --json in the pod: active with the service, or the workstation command, echec null" {
-    printf 'gitlab=on\npostgres=on\n' >"$DEVZONE_ETAT"
+    printf 'gitlab=on\npostgres=on\n' >"$DEVZONE_STATE"
     echo "postgres.devzone-postgres.svc" >"$T/dns"
     run bash "$DEVZONE" status --json
     [ "$status" -eq 0 ]
@@ -95,39 +95,39 @@ GETENT
 }
 
 @test "apply in the pod: services not installed, failure markers cleared, status 0" {
-    printf 'gitlab=on\npostgres=on\nargocd=on\n' >"$DEVZONE_ETAT"
-    echo gitlab >"$DEVZONE_ETAT-echec-gitlab"
-    echo argocd >"$DEVZONE_ETAT-echec-argocd"
+    printf 'gitlab=on\npostgres=on\nargocd=on\n' >"$DEVZONE_STATE"
+    echo gitlab >"$DEVZONE_STATE-echec-gitlab"
+    echo argocd >"$DEVZONE_STATE-echec-argocd"
     run bash "$DEVZONE" apply
     [ "$status" -eq 0 ]
     [[ "$output" == *"gitlab is installed from the workstation (devzone workspace services enable gitlab)"* ]] || false
     [[ "$output" == *"postgres is installed from the workstation"* ]] || false
     [[ "$output" == *"argocd is installed from the workstation"* ]] || false
     [[ "$output" != *"activation via installer"* ]] || false
-    [ ! -f "$DEVZONE_ETAT-echec-gitlab" ]
-    [ ! -f "$DEVZONE_ETAT-echec-argocd" ]
+    [ ! -f "$DEVZONE_STATE-echec-gitlab" ]
+    [ ! -f "$DEVZONE_STATE-echec-argocd" ]
     ! grep -q 'get namespace' "$T/kubectl.log" || false
 }
 
 @test "enable gitlab in the pod: refused with the workstation command, state unchanged" {
-    printf 'gitlab=off\n' >"$DEVZONE_ETAT"
+    printf 'gitlab=off\n' >"$DEVZONE_STATE"
     run bash "$DEVZONE" enable gitlab
     [ "$status" -eq 2 ]
     [[ "$output" == *"devzone workspace services enable gitlab"* ]] || false
-    grep -qx 'gitlab=off' "$DEVZONE_ETAT"
-    [ ! -f "$DEVZONE_ETAT-echec-gitlab" ]
+    grep -qx 'gitlab=off' "$DEVZONE_STATE"
+    [ ! -f "$DEVZONE_STATE-echec-gitlab" ]
 }
 
 @test "disable postgres in the pod: refused with the workstation command" {
-    printf 'postgres=on\n' >"$DEVZONE_ETAT"
+    printf 'postgres=on\n' >"$DEVZONE_STATE"
     run bash "$DEVZONE" disable postgres --yes
     [ "$status" -eq 2 ]
     [[ "$output" == *"devzone workspace services disable postgres"* ]] || false
-    grep -qx 'postgres=on' "$DEVZONE_ETAT"
+    grep -qx 'postgres=on' "$DEVZONE_STATE"
 }
 
 @test "enable in the pod with DEVZONE_SERVICES_ADMIN=1: the installer runs" {
-    printf 'postgres=off\n' >"$DEVZONE_ETAT"
+    printf 'postgres=off\n' >"$DEVZONE_STATE"
     export DEVZONE_SERVICES_ADMIN=1
     run bash "$DEVZONE" enable postgres --context nulle-part
     [[ "$output" != *"devzone workspace services enable"* ]] || false
@@ -157,7 +157,7 @@ T="$BATS_TEST_TMPDIR"
 echo "devzone $*" >>"$T/devzone.log"
 if [ "${1:-}" != relay-stop ] && [ "${2:-}" != relay-stop ]; then
     [ -n "${KUBECONFIG:-}" ] && [ -f "$KUBECONFIG" ] && cp "$KUBECONFIG" "$T/kubeconfig.copy"
-    cp "$DEVZONE_ETAT" "$T/etat.during" 2>/dev/null || true
+    cp "$DEVZONE_STATE" "$T/etat.during" 2>/dev/null || true
     printf 'admin=%s kube=%s\n' "${DEVZONE_SERVICES_ADMIN:-}" "${DEVZONE_KUBE_CONFIG:-}" >"$T/devzone.env"
     [ "${FAKE_DEVZONE_FAIL:-0}" = 1 ] && exit 1
 fi
@@ -175,7 +175,7 @@ DZPATH
 
 @test "services-admin.sh: the devzone beside the script is called, never the one of the PATH" {
     admin_setup
-    printf 'cluster=kind-devzone\n' >"$DEVZONE_ETAT"
+    printf 'cluster=kind-devzone\n' >"$DEVZONE_STATE"
     run bash -c 'printf "tok\n" | bash "$0" seed gitlab' "$ADMIN"
     [ "$status" -eq 0 ]
     grep -q '^devzone gitlab seed$' "$T/devzone.log"
@@ -185,7 +185,7 @@ DZPATH
 
 @test "services-admin.sh enable: kubeconfig with the token, two contexts, installer run, everything cleaned" {
     admin_setup
-    printf 'cluster=docker-desktop\npostgres=off\n' >"$DEVZONE_ETAT"
+    printf 'cluster=docker-desktop\npostgres=off\n' >"$DEVZONE_STATE"
     run bash -c 'printf "SECRET-TOKEN\n" | bash "$0" enable postgres --context x' "$ADMIN"
     [ "$status" -eq 0 ]
     [[ "$output" != *"SECRET-TOKEN"* ]] || false
@@ -200,27 +200,27 @@ DZPATH
     grep -q 'admin=1 kube=' "$T/devzone.env"
     grep -qx 'cluster=devzone-admin' "$T/etat.during"
     # Afterwards: cluster line as before, kubeconfig removed
-    grep -qx 'cluster=docker-desktop' "$DEVZONE_ETAT"
+    grep -qx 'cluster=docker-desktop' "$DEVZONE_STATE"
     [ -z "$(ls "${TMPDIR:-/tmp}"/devzone-services-admin.* 2>/dev/null)" ]
 }
 
 @test "services-admin.sh: no cluster line before, none after; disable passes --yes" {
     admin_setup
-    printf 'argocd=on\n' >"$DEVZONE_ETAT"
+    printf 'argocd=on\n' >"$DEVZONE_STATE"
     run bash -c 'printf "tok\n" | bash "$0" disable argocd --yes' "$ADMIN"
     [ "$status" -eq 0 ]
     grep -q '^devzone disable argocd --yes$' "$T/devzone.log"
-    ! grep -q '^cluster=' "$DEVZONE_ETAT" || false
+    ! grep -q '^cluster=' "$DEVZONE_STATE" || false
 }
 
 @test "services-admin.sh: installer failure, code kept and cleanup done" {
     admin_setup
-    printf 'cluster=kind-devzone\n' >"$DEVZONE_ETAT"
+    printf 'cluster=kind-devzone\n' >"$DEVZONE_STATE"
     export FAKE_DEVZONE_FAIL=1
     run bash -c 'printf "tok\n" | bash "$0" enable gitlab' "$ADMIN"
     [ "$status" -eq 1 ]
     grep -q '^devzone gitlab relay-stop$' "$T/devzone.log"
-    grep -qx 'cluster=kind-devzone' "$DEVZONE_ETAT"
+    grep -qx 'cluster=kind-devzone' "$DEVZONE_STATE"
     [ -z "$(ls "${TMPDIR:-/tmp}"/devzone-services-admin.* 2>/dev/null)" ]
 }
 

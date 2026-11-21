@@ -163,7 +163,7 @@ spec:
             - name: DEVZONE_VERSION
               value: {{ .Values.image.tag | default .Chart.AppVersion | quote }}
             # Root of the devzone projects in the Kubernetes workspace (#503)
-            - name: DEVZONE_RACINE
+            - name: DEVZONE_ROOT
               value: /workspaces/projets
             # Global npm prefix, stored on the mounted state volume (#503)
             - name: NPM_CONFIG_PREFIX

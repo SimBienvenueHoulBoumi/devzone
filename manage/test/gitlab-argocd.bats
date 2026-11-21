@@ -13,20 +13,20 @@ setup() {
     REPO="$BATS_TEST_DIRNAME/../.."
     GITLAB="$REPO/.devcontainer/gitlab/gitlab.sh"
     SERVICES_ADMIN="$REPO/.devcontainer/services-admin.sh"
-    export DEVZONE_RACINE="$BATS_TEST_TMPDIR/racine"
-    export DEVZONE_ETAT="$BATS_TEST_TMPDIR/modules"
+    export DEVZONE_ROOT="$BATS_TEST_TMPDIR/racine"
+    export DEVZONE_STATE="$BATS_TEST_TMPDIR/modules"
     export DEVZONE_HOSTS="$BATS_TEST_TMPDIR/hosts"
     export KIND_CLUSTERS="$BATS_TEST_TMPDIR/clusters"
-    mkdir -p "$HOME" "$DEVZONE_RACINE/workspace" "$BATS_TEST_TMPDIR/bin"
+    mkdir -p "$HOME" "$DEVZONE_ROOT/workspace" "$BATS_TEST_TMPDIR/bin"
     : >"$KIND_CLUSTERS"
     printf '127.0.0.1 localhost\n' >"$DEVZONE_HOSTS"
-    : >"$DEVZONE_ETAT"
+    : >"$DEVZONE_STATE"
 
     # The charts and the scripts are read from the repository (symbolic links);
     # a package version gives the revision of the Applications
-    ln -s "$REPO/.devcontainer" "$DEVZONE_RACINE/.devcontainer"
-    ln -s "$REPO/charts" "$DEVZONE_RACINE/charts"
-    printf '{"version": "1.2.3"}\n' >"$DEVZONE_RACINE/package.json"
+    ln -s "$REPO/.devcontainer" "$DEVZONE_ROOT/.devcontainer"
+    ln -s "$REPO/charts" "$DEVZONE_ROOT/charts"
+    printf '{"version": "1.2.3"}\n' >"$DEVZONE_ROOT/package.json"
 
     # kubectl: memory of the nodes, namespaces (a file per namespace created),
     # secrets and API of the seed; the applied manifests are logged
@@ -77,7 +77,7 @@ CURL
 }
 
 @test "gitlab : argocd module on → Application devzone-gitlab, no helm upgrade of GitLab" {
-    printf 'argocd=on\n' >"$DEVZONE_ETAT"
+    printf 'argocd=on\n' >"$DEVZONE_STATE"
     touch "$BATS_TEST_TMPDIR/namespace"
     run bash "$GITLAB" install
     [ "$status" -eq 0 ] || false
@@ -91,9 +91,9 @@ CURL
 }
 
 @test "gitlab : argocd module on but unknown revision (clone 0.0.0) → direct helm" {
-    printf 'argocd=on\n' >"$DEVZONE_ETAT"
+    printf 'argocd=on\n' >"$DEVZONE_STATE"
     touch "$BATS_TEST_TMPDIR/namespace"
-    printf '{"version": "0.0.0"}\n' >"$DEVZONE_RACINE/package.json"
+    printf '{"version": "0.0.0"}\n' >"$DEVZONE_ROOT/package.json"
     run bash "$GITLAB" install
     [ "$status" -eq 0 ] || false
     ! grep -q "kind: Application" "$BATS_TEST_TMPDIR/apply.log" 2>/dev/null || false
@@ -106,7 +106,7 @@ CURL
     grep -q "create secret generic gitlab-runner-secret" "$BATS_TEST_TMPDIR/kubectl.log" || false
     grep -q "runner-token=" "$BATS_TEST_TMPDIR/kubectl.log" || false
     ! grep -q "token-runner" "$BATS_TEST_TMPDIR/kubectl.log" || false
-    [ -f "$DEVZONE_RACINE/workspace/.gitlab/runner-token" ] || false
+    [ -f "$DEVZONE_ROOT/workspace/.gitlab/runner-token" ] || false
 }
 
 @test "services-admin : seed refused for a service other than gitlab" {

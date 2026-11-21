@@ -44,7 +44,7 @@ KUBECTL
     agent_lance
     [ "$status" -eq 0 ]
     grep -q -- "cp .*consigne.txt devzone-workspace-0:/tmp/devzone-agent-projet.md" "$FAKE_KC_LOG" || false
-    grep -q -- "exec devzone-workspace-0 -c workspace -- env DEVZONE_RACINE=/home/vscode/.local/share/devzone" "$FAKE_KC_LOG" || false
+    grep -q -- "exec devzone-workspace-0 -c workspace -- env DEVZONE_ROOT=/home/vscode/.local/share/devzone" "$FAKE_KC_LOG" || false
     grep -q -- "/workspaces/projets/projet /tmp/devzone-agent-projet.md" "$FAKE_KC_LOG" || false
     [[ "$output" == *"Kubernetes workspace"* ]] || false
     [ ! -s "$FAKE_OP_LOG" ] || false
@@ -71,7 +71,7 @@ KUBECTL
 
 @test "agent-workspace : folder absent -> code 2, folder not found message" {
     agent_consigne
-    run bash "$DEVZONE" agent "$DEVZONE_RACINE/workspace/absent" "$DEVZONE_RACINE/workspace/consigne.txt"
+    run bash "$DEVZONE" agent "$DEVZONE_ROOT/workspace/absent" "$DEVZONE_ROOT/workspace/consigne.txt"
     [ "$status" -eq 2 ]
     [[ "$output" == *"folder not found"* ]] || false
     ! grep -q -- " cp " "$FAKE_KC_LOG" || false
@@ -89,7 +89,7 @@ KUBECTL
 
 @test "agent-workspace : --local -> local launch even if the pod runs" {
     agent_consigne
-    run bash "$DEVZONE" agent --local "$DEVZONE_RACINE/workspace/projet" "$DEVZONE_RACINE/workspace/consigne.txt"
+    run bash "$DEVZONE" agent --local "$DEVZONE_ROOT/workspace/projet" "$DEVZONE_ROOT/workspace/consigne.txt"
     [ "$status" -eq 0 ]
     [ -s "$FAKE_OP_LOG" ] || false
     ! grep -q -- "get pod devzone-workspace-0" "$FAKE_KC_LOG" || false
@@ -108,7 +108,7 @@ KUBECTL
 
 @test "agent-workspace : pod path absent from the workstation -> launched in the pod, without project copy" {
     agent_consigne
-    run bash "$DEVZONE" agent /workspaces/projets/devzone-wt/dz-4242 "$DEVZONE_RACINE/workspace/consigne.txt"
+    run bash "$DEVZONE" agent /workspaces/projets/devzone-wt/dz-4242 "$DEVZONE_ROOT/workspace/consigne.txt"
     [ "$status" -eq 0 ]
     grep -q -- "test -d /workspaces/projets/devzone-wt/dz-4242" "$FAKE_KC_LOG" || false
     grep -q -- "cp .*consigne.txt devzone-workspace-0:/tmp/devzone-agent-dz-4242.md" "$FAKE_KC_LOG" || false
@@ -119,7 +119,7 @@ KUBECTL
 @test "agent-workspace : pod path not found in the pod -> code 2, nothing launched" {
     agent_consigne
     export FAKE_KC_TEST_CODE=1
-    run bash "$DEVZONE" agent /workspaces/projets/devzone-wt/dz-999 "$DEVZONE_RACINE/workspace/consigne.txt"
+    run bash "$DEVZONE" agent /workspaces/projets/devzone-wt/dz-999 "$DEVZONE_ROOT/workspace/consigne.txt"
     [ "$status" -eq 2 ]
     [[ "$output" == *"not found in the pod"* ]] || false
     ! grep -q -- "devzone agent" "$FAKE_KC_LOG" || false

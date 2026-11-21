@@ -18,18 +18,18 @@ setup() {
 
 @test "agent : brief not found -> refused code 2, path in the message, no opencode, no state" {
     agent_consigne
-    run bash "$DEVZONE" agent "$DEVZONE_RACINE/workspace/projet" "$DEVZONE_RACINE/workspace/consigne-absente.txt"
+    run bash "$DEVZONE" agent "$DEVZONE_ROOT/workspace/projet" "$DEVZONE_ROOT/workspace/consigne-absente.txt"
     [ "$status" -eq 2 ]
-    [[ "$output" == *"brief not found: $DEVZONE_RACINE/workspace/consigne-absente.txt"* ]] || false
+    [[ "$output" == *"brief not found: $DEVZONE_ROOT/workspace/consigne-absente.txt"* ]] || false
     [ ! -s "$FAKE_OP_LOG" ]
-    [ ! -e "$DEVZONE_AGENT_ETAT" ]
+    [ ! -e "$DEVZONE_AGENT_STATE" ]
 }
 
 @test "agent : folder not found -> refused code 2, path in the message, no opencode, no state" {
     agent_consigne
-    run bash "$DEVZONE" agent "$DEVZONE_RACINE/workspace/projet-absent" "$DEVZONE_RACINE/workspace/consigne.txt"
+    run bash "$DEVZONE" agent "$DEVZONE_ROOT/workspace/projet-absent" "$DEVZONE_ROOT/workspace/consigne.txt"
     [ "$status" -eq 2 ]
-    [[ "$output" == *"folder not found: $DEVZONE_RACINE/workspace/projet-absent"* ]] || false
+    [[ "$output" == *"folder not found: $DEVZONE_ROOT/workspace/projet-absent"* ]] || false
     [ ! -s "$FAKE_OP_LOG" ]
-    [ ! -e "$DEVZONE_AGENT_ETAT" ]
+    [ ! -e "$DEVZONE_AGENT_STATE" ]
 }

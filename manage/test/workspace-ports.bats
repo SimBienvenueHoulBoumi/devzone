@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 # Applications and services of the workspace on workstation localhost (#401). Fake kubectl
 # (ss, port-forward) and fake lsof under $BATS_TEST_TMPDIR/bin: no cluster or
-# workstation port is touched. The watcher runs only under DEVZONE_PORTS_WORKSPACE_REEL=oui.
+# workstation port is touched. The watcher runs only under DEVZONE_PORTS_WORKSPACE_REAL=yes.
 
 setup() {
     load commun
@@ -40,14 +40,14 @@ exit 1
 LSOF
     chmod +x "$T/bin/kubectl" "$T/bin/lsof"
     export PATH="$T/bin:$PATH"
-    export DEVZONE_PORTS_WORKSPACE_REEL=oui
-    export DEVZONE_PORTS_WORKSPACE_PAS=0.2
-    export DEVZONE_WORKSPACE_ATTENTE=1 DEVZONE_WORKSPACE_PAS=0.1
+    export DEVZONE_PORTS_WORKSPACE_REAL=yes
+    export DEVZONE_PORTS_WORKSPACE_STEP=0.2
+    export DEVZONE_WORKSPACE_WAIT=1 DEVZONE_WORKSPACE_STEP=0.1
     : >"$T/kubectl.log"
 }
 
 teardown() {
-    ( cd "$T/workstation" && DEVZONE_PORTS_WORKSPACE_REEL=oui bash "$CLI" workspace ports stop >/dev/null 2>&1 ) || true
+    ( cd "$T/workstation" && DEVZONE_PORTS_WORKSPACE_REAL=yes bash "$CLI" workspace ports stop >/dev/null 2>&1 ) || true
 }
 
 # Simulated listening in the pod: one ss -ltnH line per given port.
@@ -217,8 +217,8 @@ wait_stopped() {
     wait_stopped "$watcher" || false
 }
 
-@test "ports start: refused under bats without DEVZONE_PORTS_WORKSPACE_REEL" {
-    unset DEVZONE_PORTS_WORKSPACE_REEL
+@test "ports start: refused under bats without DEVZONE_PORTS_WORKSPACE_REAL" {
+    unset DEVZONE_PORTS_WORKSPACE_REAL
     cd "$T/workstation"
     run bash "$CLI" workspace ports start
     [[ "$output" == *"refused under bats"* ]] || false

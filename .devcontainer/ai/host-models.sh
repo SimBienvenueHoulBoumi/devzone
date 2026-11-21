@@ -9,7 +9,7 @@
 #   host-models.sh check      update check of each model (delegates to host-check.sh)
 #   host-models.sh rapport    report (delegates to host-check.sh)
 # Default URL: http://host.docker.internal:11434, overridable with DEVZONE_OLLAMA_URL.
-# Measurements: DEVZONE_IA_MESURES, else ~/.config/devzone/ia-mesures.json
+# Measurements: DEVZONE_AI_MEASURES, else ~/.config/devzone/ia-mesures.json
 # ({"<model>": {"reussite": 0..1, "tok_s": n, "date": "..."}}).
 # Short timeout; exits 0 and writes nothing when Ollama does not answer.
 # bash 3.2 (macOS). Code and comments in English.
@@ -18,7 +18,7 @@ set -euo pipefail
 URL="${DEVZONE_OLLAMA_URL:-http://host.docker.internal:11434}"
 URL="${URL%/}"
 FILE="$HOME/.config/opencode/config.json"
-MESURES="${DEVZONE_IA_MESURES:-$HOME/.config/devzone/ia-mesures.json}"
+MESURES="${DEVZONE_AI_MEASURES:-$HOME/.config/devzone/ia-mesures.json}"
 
 # True when a model is an embedding model (Ollama details.type, or a name
 # containing "embed", case-insensitive).

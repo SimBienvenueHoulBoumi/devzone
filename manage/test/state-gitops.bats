@@ -10,12 +10,12 @@ setup() {
     kube_isole
     unset DEVZONE_WORKSPACE
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
-    export DEVZONE_RACINE="$BATS_TEST_TMPDIR/racine"
-    export DEVZONE_ETAT="$BATS_TEST_TMPDIR/racine/.devzone.modules"
+    export DEVZONE_ROOT="$BATS_TEST_TMPDIR/racine"
+    export DEVZONE_STATE="$BATS_TEST_TMPDIR/racine/.devzone.modules"
     export DEVZONE_INSTANCE=devzone
     export DEVZONE_PORTS_AUTO_DIR="$BATS_TEST_TMPDIR/ports-auto"
     export GIT_CONFIG_NOSYSTEM=1
-    mkdir -p "$BATS_TEST_TMPDIR/bin" "$BATS_TEST_TMPDIR/relais" "$DEVZONE_RACINE/workspace"
+    mkdir -p "$BATS_TEST_TMPDIR/bin" "$BATS_TEST_TMPDIR/relais" "$DEVZONE_ROOT/workspace"
     cd "$BATS_TEST_TMPDIR" || return 1
 
     # fake kubectl: the root Application answer follows FAUX_APP (#639)

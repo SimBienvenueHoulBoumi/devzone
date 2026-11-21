@@ -8,17 +8,17 @@ setup() {
     agent_consigne
     # Journal texts of agent-model.messages: the tests compare the journal exactly.
     . "$BATS_TEST_DIRNAME/../../.devcontainer/agent-model.messages"
-    mkdir -p "$DEVZONE_AGENT_ETAT"
+    mkdir -p "$DEVZONE_AGENT_STATE"
 }
 
 # Runs devzone agent with --modele $1 on the test consigne ($status, $output).
 lance_modele() {
-    run bash "$DEVZONE" agent --modele "$1" "$DEVZONE_RACINE/workspace/projet" "$DEVZONE_RACINE/workspace/consigne.txt"
+    run bash "$DEVZONE" agent --modele "$1" "$DEVZONE_ROOT/workspace/projet" "$DEVZONE_ROOT/workspace/consigne.txt"
 }
 
 # Writes an exclusion of model $1 for cause $2, lasting one hour.
 ecarte() {
-    echo "$(date +%s) $2 3600" >"$DEVZONE_AGENT_ETAT/ecart-$1"
+    echo "$(date +%s) $2 3600" >"$DEVZONE_AGENT_STATE/ecart-$1"
 }
 
 # Model of the first and of the second opencode run.
@@ -45,7 +45,7 @@ second_run() { sed -n 2p "$FAKE_OP_LOG"; }
     lance_modele hy4-flash-free
     [ "$status" -eq 0 ]
     [ "$(premier_run)" = big-pickle ]
-    [ "$(cat "$DEVZONE_AGENT_ETAT/rang")" = 1 ]
+    [ "$(cat "$DEVZONE_AGENT_STATE/rang")" = 1 ]
     ! grep -q choisi "$(agent_journal)" || false
 }
 
@@ -57,7 +57,7 @@ second_run() { sed -n 2p "$FAKE_OP_LOG"; }
 }
 
 @test "agent --modele : refused with --pod, nothing launched" {
-    run bash "$DEVZONE" agent --modele big-pickle --pod "$DEVZONE_RACINE/workspace/projet" "$DEVZONE_RACINE/workspace/consigne.txt"
+    run bash "$DEVZONE" agent --modele big-pickle --pod "$DEVZONE_ROOT/workspace/projet" "$DEVZONE_ROOT/workspace/consigne.txt"
     [ "$status" -eq 2 ]
     [ ! -s "$FAKE_OP_LOG" ]
 }
@@ -67,14 +67,14 @@ second_run() { sed -n 2p "$FAKE_OP_LOG"; }
     [ "$status" -eq 0 ]
     [ "$(premier_run)" = big-pickle ]
     grep -qxF "=== --modele : none" "$(agent_journal)" || false
-    [ "$(cat "$DEVZONE_AGENT_ETAT/rang")" = 1 ]
+    [ "$(cat "$DEVZONE_AGENT_STATE/rang")" = 1 ]
     [ "$(bash "$DEVZONE" agent etat --json | jq -r '.sessions[0].demande')" = null ]
 }
 
 @test "agent --modele : a requested model that starts does not advance the shared rank" {
     lance_modele hy4-flash-free
     [ "$status" -eq 0 ]
-    [ ! -e "$DEVZONE_AGENT_ETAT/rang" ]
+    [ ! -e "$DEVZONE_AGENT_STATE/rang" ]
 }
 
 @test "agent --modele : requested model failing -> rotation, without a second try of it" {

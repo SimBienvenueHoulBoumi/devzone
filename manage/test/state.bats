@@ -14,12 +14,12 @@ setup() {
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
     ETAT_SH="$BATS_TEST_DIRNAME/../../.devcontainer/state.sh"
     PORTS_AUTO="$BATS_TEST_DIRNAME/../../.devcontainer/ports-auto.sh"
-    export DEVZONE_RACINE="$BATS_TEST_TMPDIR/racine"
-    export DEVZONE_ETAT="$BATS_TEST_TMPDIR/racine/.devzone.modules"
+    export DEVZONE_ROOT="$BATS_TEST_TMPDIR/racine"
+    export DEVZONE_STATE="$BATS_TEST_TMPDIR/racine/.devzone.modules"
     export DEVZONE_INSTANCE=devzone
     export DEVZONE_PORTS_AUTO_DIR="$BATS_TEST_TMPDIR/ports-auto"
     export GIT_CONFIG_NOSYSTEM=1
-    mkdir -p "$BATS_TEST_TMPDIR/bin" "$BATS_TEST_TMPDIR/relais" "$DEVZONE_RACINE/workspace"
+    mkdir -p "$BATS_TEST_TMPDIR/bin" "$BATS_TEST_TMPDIR/relais" "$DEVZONE_ROOT/workspace"
     cd "$BATS_TEST_TMPDIR" || return 1
 
     # fake kubectl: namespaces labelled devzone according to FAUX_NS (#417, step 3)
@@ -91,7 +91,7 @@ NPM
 
 # Concurrent writer: $1 = key prefix, $2 = number of keys (#417)
 writer() {
-    ETAT="$DEVZONE_ETAT" bash -c '
+    ETAT="$DEVZONE_STATE" bash -c '
         . "$1"
         i=1
         while [ "$i" -le "$2" ]; do
@@ -104,7 +104,7 @@ writer() {
 # Reader: loops on the existence of the state until the writes end
 reader() {
     while [ ! -f "$BATS_TEST_TMPDIR/reader-done" ]; do
-        [ -f "$DEVZONE_ETAT" ] || { echo "state missing during a write (#417)"; return 1; }
+        [ -f "$DEVZONE_STATE" ] || { echo "state missing during a write (#417)"; return 1; }
     done
     return 0
 }
@@ -118,8 +118,8 @@ reader() {
     wait "$pid_b"
     i=1
     while [ "$i" -le 25 ]; do
-        grep -qx "a$i=on" "$DEVZONE_ETAT" || { echo "line a$i lost"; false; }
-        grep -qx "b$i=on" "$DEVZONE_ETAT" || { echo "line b$i lost"; false; }
+        grep -qx "a$i=on" "$DEVZONE_STATE" || { echo "line a$i lost"; false; }
+        grep -qx "b$i=on" "$DEVZONE_STATE" || { echo "line b$i lost"; false; }
         i=$((i + 1))
     done
 }
@@ -132,7 +132,7 @@ reader() {
         rm -f /dev/shm/devzone-state-$$
         export TMPDIR=/dev/shm
     fi
-    printf 'ia=off\n' >"$DEVZONE_ETAT"
+    printf 'ia=off\n' >"$DEVZONE_STATE"
     reader &
     pid_r=$!
     writer a 25 &
@@ -148,30 +148,30 @@ reader() {
 }
 
 @test "state removed with a backup copy: restored" {
-    printf 'ia=on\nkubernetes=off\ngitlab=on\npostgres=on\n' >"$DEVZONE_ETAT.prec"
-    rm -f "$DEVZONE_ETAT"
+    printf 'ia=on\nkubernetes=off\ngitlab=on\npostgres=on\n' >"$DEVZONE_STATE.prec"
+    rm -f "$DEVZONE_STATE"
     run bash "$DEVZONE" is-enabled postgres
     [ "$status" -eq 0 ]
     [[ "$output" == *"restored from the backup copy"* ]] || false
-    grep -qx 'postgres=on' "$DEVZONE_ETAT"
-    grep -qx 'gitlab=on' "$DEVZONE_ETAT"
-    [ -f "$DEVZONE_ETAT.recouvre" ]
+    grep -qx 'postgres=on' "$DEVZONE_STATE"
+    grep -qx 'gitlab=on' "$DEVZONE_STATE"
+    [ -f "$DEVZONE_STATE.recouvre" ]
 }
 
 @test "state removed without a backup copy, devzone namespaces: rebuilt" {
-    printf 'ia=on\n' >"$DEVZONE_ETAT"
-    rm -f "$DEVZONE_ETAT"
+    printf 'ia=on\n' >"$DEVZONE_STATE"
+    rm -f "$DEVZONE_STATE"
     FAUX_NS="devzone-postgres devzone-gitlab devzone-mysql" run bash "$DEVZONE" is-enabled postgres
     [ "$status" -eq 0 ]
     [[ "$output" == *"rebuilt from the namespaces"* ]] || false
-    grep -qx 'postgres=on' "$DEVZONE_ETAT"
-    grep -qx 'gitlab=on' "$DEVZONE_ETAT"
-    grep -qx 'mysql=on' "$DEVZONE_ETAT"
-    grep -qx 'ia=off' "$DEVZONE_ETAT"
+    grep -qx 'postgres=on' "$DEVZONE_STATE"
+    grep -qx 'gitlab=on' "$DEVZONE_STATE"
+    grep -qx 'mysql=on' "$DEVZONE_STATE"
+    grep -qx 'ia=off' "$DEVZONE_STATE"
     # cluster= expects the real host context that points to the services
     # cluster (docker-desktop here), not the "devzone" context
-    grep -qx 'cluster=docker-desktop' "$DEVZONE_ETAT"
-    [ -f "$DEVZONE_ETAT.recouvre" ]
+    grep -qx 'cluster=docker-desktop' "$DEVZONE_STATE"
+    [ -f "$DEVZONE_STATE.recouvre" ]
 }
 
 @test "rebuild: host context not found, no cluster= line but rebuilt" {
@@ -180,26 +180,26 @@ reader() {
 case "$*" in "config get-contexts -o name"|"config view") exit 1 ;; get\ namespaces*) for n in ${FAUX_NS:-}; do printf 'namespace/%s\n' "$n"; done ;; esac
 KUBE
     chmod +x "$BATS_TEST_TMPDIR/bin/kubectl"
-    printf 'ia=on\n' >"$DEVZONE_ETAT"
-    rm -f "$DEVZONE_ETAT"
+    printf 'ia=on\n' >"$DEVZONE_STATE"
+    rm -f "$DEVZONE_STATE"
     FAUX_NS="devzone-postgres devzone-gitlab" run bash "$DEVZONE" is-enabled postgres
     [ "$status" -eq 0 ]
     [[ "$output" == *"rebuilt from the namespaces"* ]] || false
     [[ "$output" == *"no host context"* ]] || false
-    grep -qx 'postgres=on' "$DEVZONE_ETAT"
-    ! grep -q '^cluster=' "$DEVZONE_ETAT" || false
-    [ -f "$DEVZONE_ETAT.recouvre" ]
+    grep -qx 'postgres=on' "$DEVZONE_STATE"
+    ! grep -q '^cluster=' "$DEVZONE_STATE" || false
+    [ -f "$DEVZONE_STATE.recouvre" ]
 }
 
 @test "first installation: default state, without backup copy" {
     run bash "$DEVZONE" is-enabled ia
     [ "$status" -eq 1 ]
-    grep -qx 'ia=off' "$DEVZONE_ETAT"
-    grep -qx 'kubernetes=off' "$DEVZONE_ETAT"
-    grep -qx 'gitlab=off' "$DEVZONE_ETAT"
-    run test -e "$DEVZONE_ETAT.prec"
+    grep -qx 'ia=off' "$DEVZONE_STATE"
+    grep -qx 'kubernetes=off' "$DEVZONE_STATE"
+    grep -qx 'gitlab=off' "$DEVZONE_STATE"
+    run test -e "$DEVZONE_STATE.prec"
     [ "$status" -ne 0 ]
-    run test -e "$DEVZONE_ETAT.recouvre"
+    run test -e "$DEVZONE_STATE.recouvre"
     [ "$status" -ne 0 ]
 }
 
@@ -211,7 +211,7 @@ KUBE
 }
 
 @test "state: argocd GitOps repository line designates the URL" {
-    printf '[argocd]\n    repo = https://github.com/tester/devzone-argocd.git\n' >"$DEVZONE_RACINE/.argocd.conf"
+    printf '[argocd]\n    repo = https://github.com/tester/devzone-argocd.git\n' >"$DEVZONE_ROOT/.argocd.conf"
     run bash "$DEVZONE" status
     [ "$status" -eq 0 ]
     [[ "$output" == *"  ○ argocd          GitOps repository: https://github.com/tester/devzone-argocd.git"* ]] || false
@@ -224,11 +224,11 @@ KUBE
 }
 
 @test "fresh restore: the port watcher does nothing for 60 s" {
-    printf 'ia=on\nports_auto=on\n' >"$DEVZONE_ETAT.prec"
-    rm -f "$DEVZONE_ETAT"
+    printf 'ia=on\nports_auto=on\n' >"$DEVZONE_STATE.prec"
+    rm -f "$DEVZONE_STATE"
     run bash "$DEVZONE" is-enabled ia
     [ "$status" -eq 0 ]
-    [ -f "$DEVZONE_ETAT.recouvre" ]
+    [ -f "$DEVZONE_STATE.recouvre" ]
     # Port that the watcher would normally relay (0.0.0.0, not the container IP)
     echo 'LISTEN 0 128 0.0.0.0:8080 0.0.0.0:*' >"$BATS_TEST_TMPDIR/ss.listen"
     run bash "$PORTS_AUTO" tour
@@ -237,9 +237,9 @@ KUBE
 }
 
 @test "restored state not confirmed: the watcher does not uninstall" {
-    printf 'ia=on\nports_auto=off\n' >"$DEVZONE_ETAT"
+    printf 'ia=on\nports_auto=off\n' >"$DEVZONE_STATE"
     # Mark older than 60 s: the delay has passed, nothing is confirmed
-    echo $(( $(date +%s) - 120 )) >"$DEVZONE_ETAT.recouvre"
+    echo $(( $(date +%s) - 120 )) >"$DEVZONE_STATE.recouvre"
     mkdir -p "$DEVZONE_PORTS_AUTO_DIR/devzone"
     printf '8080\n' >"$DEVZONE_PORTS_AUTO_DIR/devzone/actifs"
     : >"$BATS_TEST_TMPDIR/relais/devzone-devzone-auto-8080"
@@ -249,14 +249,14 @@ KUBE
 }
 
 @test "devzone apply confirms the state: uninstall resumes" {
-    printf 'ia=off\ngitlab=off\npostgres=off\nkubernetes=off\nports_auto=off\n' >"$DEVZONE_ETAT"
-    echo $(( $(date +%s) - 120 )) >"$DEVZONE_ETAT.recouvre"
+    printf 'ia=off\ngitlab=off\npostgres=off\nkubernetes=off\nports_auto=off\n' >"$DEVZONE_STATE"
+    echo $(( $(date +%s) - 120 )) >"$DEVZONE_STATE.recouvre"
     mkdir -p "$DEVZONE_PORTS_AUTO_DIR/devzone"
     printf '8080\n' >"$DEVZONE_PORTS_AUTO_DIR/devzone/actifs"
     : >"$BATS_TEST_TMPDIR/relais/devzone-devzone-auto-8080"
     run bash "$DEVZONE" apply
     [ "$status" -eq 0 ]
-    run test -e "$DEVZONE_ETAT.recouvre"
+    run test -e "$DEVZONE_STATE.recouvre"
     [ "$status" -ne 0 ]
     run bash "$PORTS_AUTO" tour
     [ "$status" -eq 0 ]
@@ -266,7 +266,7 @@ KUBE
 
 @test "state: no deprecated line on stdout nor stderr (#532)" {
     bats_require_minimum_version 1.5.0
-    printf 'ia=on\nports_auto=off\n' >"$DEVZONE_ETAT"
+    printf 'ia=on\nports_auto=off\n' >"$DEVZONE_STATE"
     run --separate-stderr bash "$DEVZONE" status
     [ "$status" -eq 0 ]
     [[ "$output" != *"deprecated"* ]] || false

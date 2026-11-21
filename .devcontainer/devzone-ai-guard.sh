@@ -36,7 +36,7 @@ install_docker_guard() {
     mkdir -p "$dst"
     for f in devzone-guard.js devzone-guard-v2.js; do
         [ -f "$src/$f" ] || continue
-        sed "s|__DEVZONE_DOCKER_GARDE__|$script|g" "$src/$f" >"$dst/$f"
+        sed "s|__DEVZONE_DOCKER_GUARD__|$script|g" "$src/$f" >"$dst/$f"
     done
     echo "devzone : docker guard active for Claude Code and opencode"
 }

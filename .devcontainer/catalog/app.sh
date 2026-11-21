@@ -4,7 +4,7 @@
 # devzone-<app> (chart charts/devzone-<app> of the devzone repository, #538) instead
 # of the manifest of the direct helm path.
 
-WAIT_SECONDS="${DEVZONE_CATALOGUE_ATTENTE:-300}"
+WAIT_SECONDS="${DEVZONE_CATALOG_WAIT:-300}"
 
 # shellcheck source=SCRIPTDIR/argocd/catalog-argocd.sh
 # shellcheck disable=SC1091

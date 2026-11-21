@@ -9,8 +9,8 @@ setup() {
     kube_isole
     SCRIPT="$BATS_TEST_DIRNAME/../../.devcontainer/gitlab/test-gitlab.sh"
     export HOME="$BATS_TEST_TMPDIR/home"
-    export DEVZONE_RACINE="$BATS_TEST_TMPDIR/racine"
-    export DEVZONE_ETAT="$BATS_TEST_TMPDIR/modules"
+    export DEVZONE_ROOT="$BATS_TEST_TMPDIR/racine"
+    export DEVZONE_STATE="$BATS_TEST_TMPDIR/modules"
     export DEVZONE_HOSTS="$BATS_TEST_TMPDIR/hosts"
     export KIND_CLUSTERS="$BATS_TEST_TMPDIR/clusters"
     export GITLAB_TEST_PIPELINE=2
@@ -19,19 +19,19 @@ setup() {
     export DEVZONE_INSTANCE=mon-devzone
     export INSTANCE_TEST=-mon-devzone
     export DEVZONE_TEST_DEVZONE="$BATS_TEST_TMPDIR/bin/devzone"
-    mkdir -p "$HOME/.local/bin" "$DEVZONE_RACINE/workspace/.gitlab" \
+    mkdir -p "$HOME/.local/bin" "$DEVZONE_ROOT/workspace/.gitlab" \
         "$BATS_TEST_TMPDIR/bin" "$TMPDIR"
-    printf 'token-root-secret' >"$DEVZONE_RACINE/workspace/.gitlab/root-token"
+    printf 'token-root-secret' >"$DEVZONE_ROOT/workspace/.gitlab/root-token"
     touch "$BATS_TEST_TMPDIR/namespace"
     # Web and SSH relays running: live PID (the test's own) in their folder
     for relay in web ssh; do
-        mkdir -p "$DEVZONE_RACINE/workspace/.gitlab-$relay"
-        echo $$ >"$DEVZONE_RACINE/workspace/.gitlab-$relay/relais.pid"
+        mkdir -p "$DEVZONE_ROOT/workspace/.gitlab-$relay"
+        echo $$ >"$DEVZONE_ROOT/workspace/.gitlab-$relay/relais.pid"
     done
     printf 'gitlab%s\n' "$INSTANCE_TEST" >"$KIND_CLUSTERS"
     printf 'kind-gitlab%s\nkind-dev\n' "$INSTANCE_TEST" >"$BATS_TEST_TMPDIR/contexts"
     printf '127.0.0.1 localhost\n127.0.0.1\tgitlab.localhost # devzone:gitlab\n' >"$DEVZONE_HOSTS"
-    : >"$DEVZONE_ETAT"
+    : >"$DEVZONE_STATE"
     touch "$BATS_TEST_TMPDIR/module_active"
 
     # devzone: double of the commands used by test-gitlab.sh
@@ -46,8 +46,8 @@ case "$1 $2" in
     "enable gitlab")
         [ -n "${FAKE_ENABLE_FAIL:-}" ] && exit 1
         touch "$BATS_TEST_TMPDIR/module_active" "$BATS_TEST_TMPDIR/namespace"
-        mkdir -p "$DEVZONE_RACINE/workspace/.gitlab"
-        printf 'token-root-secret' >"$DEVZONE_RACINE/workspace/.gitlab/root-token"
+        mkdir -p "$DEVZONE_ROOT/workspace/.gitlab"
+        printf 'token-root-secret' >"$DEVZONE_ROOT/workspace/.gitlab/root-token"
         ;;
     "disable gitlab")
         [ -n "${FAKE_DISABLE_FAIL:-}" ] && exit 1
@@ -56,7 +56,7 @@ case "$1 $2" in
             rm -f "$BATS_TEST_TMPDIR/namespace"
         fi
         if [ "${FAKE_DISABLE_LEFT:-}" != secrets ]; then
-            rm -rf "$DEVZONE_RACINE/workspace/.gitlab"
+            rm -rf "$DEVZONE_ROOT/workspace/.gitlab"
         fi
         if [ "${FAKE_DISABLE_LEFT:-}" != hosts ]; then
             grep -v 'devzone:gitlab' "$DEVZONE_HOSTS" >"$DEVZONE_HOSTS.tmp" 2>/dev/null || true
@@ -68,15 +68,15 @@ case "$1 $2" in
         mkdir -p "$HOME/.local/bin" "$HOME/.config/glab-cli"
         cp "$BATS_TEST_TMPDIR/bin/glab" "$HOME/.local/bin/glab"
         chmod +x "$HOME/.local/bin/glab"
-        grep -vE '^(plateforme|gitlab_url)=' "$DEVZONE_ETAT" >"$DEVZONE_ETAT.tmp" 2>/dev/null || true
-        mv "$DEVZONE_ETAT.tmp" "$DEVZONE_ETAT"
-        printf 'plateforme=gitlab\ngitlab_url=http://gitlab.localhost:8929\n' >>"$DEVZONE_ETAT"
+        grep -vE '^(plateforme|gitlab_url)=' "$DEVZONE_STATE" >"$DEVZONE_STATE.tmp" 2>/dev/null || true
+        mv "$DEVZONE_STATE.tmp" "$DEVZONE_STATE"
+        printf 'plateforme=gitlab\ngitlab_url=http://gitlab.localhost:8929\n' >>"$DEVZONE_STATE"
         ;;
     "platform github")
         rm -f "$HOME/.local/bin/glab"
         rm -rf "$HOME/.config/glab-cli"
-        grep -vE '^(plateforme|gitlab_url)=' "$DEVZONE_ETAT" >"$DEVZONE_ETAT.tmp" 2>/dev/null || true
-        mv "$DEVZONE_ETAT.tmp" "$DEVZONE_ETAT"
+        grep -vE '^(plateforme|gitlab_url)=' "$DEVZONE_STATE" >"$DEVZONE_STATE.tmp" 2>/dev/null || true
+        mv "$DEVZONE_STATE.tmp" "$DEVZONE_STATE"
         ;;
     "plateforme "*)
         echo "devzone : plateforme gitlab"
@@ -326,7 +326,7 @@ GETENT
     grep -q "DELETE" "$BATS_TEST_TMPDIR/curl.log" || false
     grep -q "/user/keys/7" "$BATS_TEST_TMPDIR/curl.log" || false
     [ ! -e "$HOME/.local/bin/glab" ]
-    ! grep -q '^plateforme=' "$DEVZONE_ETAT" || false
+    ! grep -q '^plateforme=' "$DEVZONE_STATE" || false
 }
 
 @test "test-gitlab : step 1 failed → ✖ with the reason, non-zero code" {
@@ -363,7 +363,7 @@ GETENT
 }
 
 @test "test-gitlab : step 3 failed (relay 2224 stopped) → ✖ with the reason" {
-    rm -f "$DEVZONE_RACINE/workspace/.gitlab-ssh/relais.pid"
+    rm -f "$DEVZONE_ROOT/workspace/.gitlab-ssh/relais.pid"
     run bash "$SCRIPT"
     [ "$status" -ne 0 ]
     [[ "$output" == *"✖ 3. host name"* ]] || false
@@ -371,8 +371,8 @@ GETENT
 }
 
 @test "test-gitlab : step 3 failed (no relay) → ✖ with both ports" {
-    rm -f "$DEVZONE_RACINE/workspace/.gitlab-web/relais.pid"
-    rm -f "$DEVZONE_RACINE/workspace/.gitlab-ssh/relais.pid"
+    rm -f "$DEVZONE_ROOT/workspace/.gitlab-web/relais.pid"
+    rm -f "$DEVZONE_ROOT/workspace/.gitlab-ssh/relais.pid"
     run bash "$SCRIPT"
     [ "$status" -ne 0 ]
     [[ "$output" == *"✖ 3. host name"* ]] || false
@@ -472,7 +472,7 @@ GETENT
     [[ "$output" == *"glab repo clone devzone/demo failed"* ]] || false
     [ ! -e "$HOME/.local/bin/glab" ]
     [ ! -e "$HOME/.config/glab-cli" ]
-    ! grep -q '^plateforme=' "$DEVZONE_ETAT" || false
+    ! grep -q '^plateforme=' "$DEVZONE_STATE" || false
 }
 
 @test "test-gitlab : step 7, repowarden clone impossible → ✖" {

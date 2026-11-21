@@ -3,12 +3,12 @@
 # $BATS_TEST_TMPDIR, jamais sur le vrai socket ni ses fichiers.
 
 relais_docker_isole() {
-    export DEVZONE_RELAIS_SOCKET="$BATS_TEST_TMPDIR/docker.sock"
-    export DEVZONE_RELAIS_SOURCE="$BATS_TEST_TMPDIR/docker-host.sock"
-    export DEVZONE_RELAIS_PID="$BATS_TEST_TMPDIR/socat.pid"
-    export DEVZONE_RELAIS_LOG="$BATS_TEST_TMPDIR/socat.log"
-    export DEVZONE_RELAIS_MARQUE="$BATS_TEST_TMPDIR/relais.echec"
-    export DEVZONE_RELAIS_SUDO=""
+    export DEVZONE_RELAY_SOCKET="$BATS_TEST_TMPDIR/docker.sock"
+    export DEVZONE_RELAY_SOURCE="$BATS_TEST_TMPDIR/docker-host.sock"
+    export DEVZONE_RELAY_PID="$BATS_TEST_TMPDIR/socat.pid"
+    export DEVZONE_RELAY_LOG="$BATS_TEST_TMPDIR/socat.log"
+    export DEVZONE_RELAY_MARKER="$BATS_TEST_TMPDIR/relais.echec"
+    export DEVZONE_RELAY_SUDO=""
 }
 
 # Aide commune de Kubernetes (#341) : le kubeconfig, le HOME et la copie du
@@ -16,7 +16,7 @@ relais_docker_isole() {
 kube_isole() {
     export HOME="$BATS_TEST_TMPDIR/home"
     export KUBECONFIG="$BATS_TEST_TMPDIR/kubeconfig"
-    export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
+    export DEVZONE_KUBE_HOST="$BATS_TEST_TMPDIR/hote.config"
     mkdir -p "$HOME" "$BATS_TEST_TMPDIR" "$HOME/.kube"
 }
 
@@ -59,14 +59,14 @@ agent_isole() {
     mkdir -p "$HOME" "$BATS_TEST_TMPDIR/bin"
     cd "$BATS_TEST_TMPDIR" || return 1
     export GIT_CONFIG_NOSYSTEM=1
-    export DEVZONE_RACINE="$BATS_TEST_TMPDIR/racine"
-    mkdir -p "$DEVZONE_RACINE/workspace"
-    export DEVZONE_AGENT_ETAT="$BATS_TEST_TMPDIR/etat"
+    export DEVZONE_ROOT="$BATS_TEST_TMPDIR/racine"
+    mkdir -p "$DEVZONE_ROOT/workspace"
+    export DEVZONE_AGENT_STATE="$BATS_TEST_TMPDIR/etat"
     export RESEAU_COUPE="$BATS_TEST_TMPDIR/reseau.coupe"
-    export DEVZONE_AGENT_RESEAU_PAS=1
+    export DEVZONE_AGENT_NETWORK_STEP=1
     export DEVZONE_AGENT_SILENCE=2
-    export DEVZONE_AGENT_PAS=0.2
-    export DEVZONE_AGENT_FIGEE=2
+    export DEVZONE_AGENT_STEP=0.2
+    export DEVZONE_AGENT_FROZEN=2
     export FAKE_OP_LOG="$BATS_TEST_TMPDIR/opencode.log"
     export FAKE_OP_CONSIGNE_LOG="$BATS_TEST_TMPDIR/consignes.log"
     export FAKE_OP_CONFIG_LOG="$BATS_TEST_TMPDIR/config.log"
@@ -182,16 +182,16 @@ OPCODEFAKE
 
 # Consigne et dossier de test, lancement de devzone agent et journal du projet.
 agent_consigne() {
-    printf 'construis la feature\n' >"$DEVZONE_RACINE/workspace/consigne.txt"
-    mkdir -p "$DEVZONE_RACINE/workspace/projet"
+    printf 'construis la feature\n' >"$DEVZONE_ROOT/workspace/consigne.txt"
+    mkdir -p "$DEVZONE_ROOT/workspace/projet"
 }
 
 # Lance devzone agent sur la consigne de test ; le résultat est dans $status et $output (run).
 agent_lance() {
-    run bash "$DEVZONE" agent "$DEVZONE_RACINE/workspace/projet" "$DEVZONE_RACINE/workspace/consigne.txt"
+    run bash "$DEVZONE" agent "$DEVZONE_ROOT/workspace/projet" "$DEVZONE_ROOT/workspace/consigne.txt"
 }
 
 # Chemin du journal du projet de test, où devzone agent écrit ses lignes.
 agent_journal() {
-    echo "$DEVZONE_RACINE/workspace/.agents/projet.log"
+    echo "$DEVZONE_ROOT/workspace/.agents/projet.log"
 }

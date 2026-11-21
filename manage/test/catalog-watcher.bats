@@ -9,12 +9,12 @@ setup() {
     VEILLEUR="$BATS_TEST_DIRNAME/../../.devcontainer/catalog/catalog-watcher.sh"
     CATALOGUE="$BATS_TEST_DIRNAME/../../.devcontainer/catalog.sh"
     export HOME="$BATS_TEST_TMPDIR/home"
-    export DEVZONE_RACINE="$BATS_TEST_TMPDIR/racine"
-    export DEVZONE_ETAT="$BATS_TEST_TMPDIR/modules"
-    export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
-    mkdir -p "$HOME" "$DEVZONE_RACINE/workspace" "$BATS_TEST_TMPDIR/bin"
-    : >"$DEVZONE_KUBE_HOTE"
-    : >"$DEVZONE_ETAT"
+    export DEVZONE_ROOT="$BATS_TEST_TMPDIR/racine"
+    export DEVZONE_STATE="$BATS_TEST_TMPDIR/modules"
+    export DEVZONE_KUBE_HOST="$BATS_TEST_TMPDIR/hote.config"
+    mkdir -p "$HOME" "$DEVZONE_ROOT/workspace" "$BATS_TEST_TMPDIR/bin"
+    : >"$DEVZONE_KUBE_HOST"
+    : >"$DEVZONE_STATE"
     : >"$BATS_TEST_TMPDIR/kubectl.log"
     cat >"$BATS_TEST_TMPDIR/bin/kubectl" <<'KUBE'
 #!/usr/bin/env bash
@@ -72,20 +72,20 @@ teardown() {
     bash "$BATS_TEST_DIRNAME/../../.devcontainer/catalog/mysql/mysql.sh" relay-stop >/dev/null 2>&1 || true
 }
 
-@test "watcher: refused without DEVZONE_CATALOGUE_REEL" {
+@test "watcher: refused without DEVZONE_CATALOG_REAL" {
     run bash "$VEILLEUR" demarrer
     [ "$status" -eq 2 ] || false
     [[ "$output" == *"refused here"* ]] || false
 }
 
-@test "watcher: refused under bats even with DEVZONE_CATALOGUE_REEL=oui" {
-    DEVZONE_CATALOGUE_REEL=oui run bash "$VEILLEUR" demarrer
+@test "watcher: refused under bats even with DEVZONE_CATALOG_REAL=yes" {
+    DEVZONE_CATALOG_REAL=yes run bash "$VEILLEUR" demarrer
     [ "$status" -eq 2 ] || false
     [[ "$output" == *"refused under bats"* ]] || false
 }
 
 @test "watcher: root deduced = repository, two levels above the script" {
-    unset DEVZONE_RACINE DEVZONE_ETAT DEVZONE_CATALOGUE_VEILLEUR_DIR
+    unset DEVZONE_ROOT DEVZONE_STATE DEVZONE_CATALOG_WATCHER_DIR
     depot="$BATS_TEST_TMPDIR/depot"
     mkdir -p "$depot/.devcontainer/catalog"
     cp "$VEILLEUR" "$depot/.devcontainer/catalog/catalog-watcher.sh"
@@ -113,8 +113,8 @@ exit 0
 NOHUP
     chmod +x "$BATS_TEST_TMPDIR/bin/nohup"
     run env -u BATS_TEST_TMPDIR \
-        DEVZONE_CATALOGUE_REEL=oui \
-        DEVZONE_CATALOGUE_VEILLEUR_DIR="$base" \
+        DEVZONE_CATALOG_REAL=yes \
+        DEVZONE_CATALOG_WATCHER_DIR="$base" \
         bash "$VEILLEUR" demarrer
     [ "$status" -ne 0 ] || false
     [[ "$output" == *"cannot start"* ]] || false
@@ -122,12 +122,12 @@ NOHUP
 
 @test "watcher: a tick applies when .devzone.modules changes" {
     touch "$BATS_TEST_TMPDIR/ns" "$BATS_TEST_TMPDIR/sts" "$BATS_TEST_TMPDIR/ready"
-    printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_ETAT"
+    printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_STATE"
     run bash "$VEILLEUR" tour
     [ "$status" -eq 0 ] || false
     premier="$(wc -l <"$BATS_TEST_TMPDIR/kubectl.log")"
     sleep 1.1
-    touch "$DEVZONE_ETAT"
+    touch "$DEVZONE_STATE"
     run bash "$VEILLEUR" tour
     [ "$status" -eq 0 ] || false
     second="$(wc -l <"$BATS_TEST_TMPDIR/kubectl.log")"

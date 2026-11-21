@@ -8,7 +8,7 @@ setup() {
     kube_isole
     agent_isole
     agent_consigne
-    P="$DEVZONE_RACINE/workspace/projet"
+    P="$DEVZONE_ROOT/workspace/projet"
     mkdir -p "$P/.devcontainer/opencode"
     printf '{"permission":{}}\n' >"$P/.devcontainer/opencode/agent.json"
     printf 'defaut\n' >"$P/.devcontainer/opencode.jsonc"
@@ -35,7 +35,7 @@ FAKE
     [ "$status" -eq 0 ]
     [ "$(cat "$P/.devcontainer/opencode/agent.json")" = '{"permission":{}}' ]
     grep -q "=== ⚠ droits modifiés : .devcontainer/opencode/agent.json : changement annulé" "$(agent_journal)" || false
-    [ -f "$DEVZONE_AGENT_ETAT/droits-projet.alerte" ]
+    [ -f "$DEVZONE_AGENT_STATE/droits-projet.alerte" ]
     run bash "$DEVZONE" agent etat
     [ "$status" -eq 0 ]
     [[ "$output" == *"⚠ droits modifiés (projet) : voir le journal"* ]] || false
@@ -65,14 +65,14 @@ FAKE
     [ "$(git -C "$P" rev-list --count HEAD)" -eq 2 ]
     sha="$(git -C "$P" log -1 --format=%h)"
     grep -q "droits modifiés : .devcontainer/opencode/agent.json : .*commité dans $sha" "$(agent_journal)" || false
-    [ -f "$DEVZONE_AGENT_ETAT/droits-projet.alerte" ]
+    [ -f "$DEVZONE_AGENT_STATE/droits-projet.alerte" ]
 }
 
 @test "droits : session qui ne touche a rien -> aucune alerte" {
     agent_lance
     [ "$status" -eq 0 ]
     ! grep -q "droits modifiés" "$(agent_journal)" || false
-    [ ! -f "$DEVZONE_AGENT_ETAT/droits-projet.alerte" ]
+    [ ! -f "$DEVZONE_AGENT_STATE/droits-projet.alerte" ]
     run bash "$DEVZONE" agent etat
     [[ "$output" != *"droits modifiés"* ]] || false
 }
@@ -90,10 +90,10 @@ FAKE
 @test "droits : alerte effacee au lancement suivant sur le projet" {
     export FAKE_OP_ACTION='echo pirate >>.devcontainer/opencode.jsonc'
     agent_lance
-    [ -f "$DEVZONE_AGENT_ETAT/droits-projet.alerte" ]
+    [ -f "$DEVZONE_AGENT_STATE/droits-projet.alerte" ]
     export FAKE_OP_ACTION=':'
     agent_lance
-    [ ! -f "$DEVZONE_AGENT_ETAT/droits-projet.alerte" ]
+    [ ! -f "$DEVZONE_AGENT_STATE/droits-projet.alerte" ]
 }
 
 @test "droits : permission.edit a les deny en dernier, meme si l'env pose edit allow" {

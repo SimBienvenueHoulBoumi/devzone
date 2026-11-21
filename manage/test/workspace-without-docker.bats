@@ -215,7 +215,7 @@ sidecar_block() {
     [ "$status" -eq 0 ]
     local main
     main="$(awk '/^        - name: workspace$/{p=1} /^          resources:/{p=0} p' <<<"$output")"
-    grep -A1 -- "- name: DEVZONE_RACINE" <<<"$main" | grep -q -- "value: /workspaces/projets" || false
+    grep -A1 -- "- name: DEVZONE_ROOT" <<<"$main" | grep -q -- "value: /workspaces/projets" || false
     grep -A1 -- "- name: NPM_CONFIG_PREFIX" <<<"$main" | grep -q -- "value: /home/vscode/.local/npm" || false
 }
 

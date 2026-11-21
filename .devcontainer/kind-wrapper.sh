@@ -6,7 +6,7 @@
 # (kube-reachable.sh). Everything else passes through unchanged.
 set -uo pipefail
 
-KIND_REEL="${DEVZONE_KIND_REEL:-/usr/local/bin/kind-reel}"
+KIND_REEL="${DEVZONE_KIND_REAL:-/usr/local/bin/kind-reel}"
 ICI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [ -f "$ICI/kube-reachable.sh" ]; then
     # shellcheck source=SCRIPTDIR/kube-reachable.sh

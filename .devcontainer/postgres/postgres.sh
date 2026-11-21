@@ -10,9 +10,9 @@
 set -euo pipefail
 
 ICI="$(cd "$(dirname "$0")" && pwd)"
-RACINE="${DEVZONE_RACINE:-$(dirname "$(dirname "$ICI")")}"
+RACINE="${DEVZONE_ROOT:-$(dirname "$(dirname "$ICI")")}"
 # shellcheck disable=SC2034 # read by cluster.sh (sourced library)
-ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
+ETAT="${DEVZONE_STATE:-$RACINE/.devzone.modules}"
 # shellcheck source=SCRIPTDIR/../cluster.sh
 . "$ICI/../cluster.sh"
 # shellcheck source=SCRIPTDIR/../password.sh

@@ -72,7 +72,7 @@ KUBE
     printf 'build the feature\n' >"$T/consigne.txt"
     FOLDER="$(faux_worktree devzone dz-637)"
     export FOLDER
-    export JOURNAL="$DEVZONE_AGENT_ETAT/dz-637.pod.log"
+    export JOURNAL="$DEVZONE_AGENT_STATE/dz-637.pod.log"
 }
 
 @test "agent-pod-init : failed init names the container on stderr and logs its message" {

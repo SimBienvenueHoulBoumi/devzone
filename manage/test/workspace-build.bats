@@ -15,8 +15,8 @@ exit 0
 BIN
     chmod +x "$T/bin/buildctl"
     export PATH="$T/bin:$PATH"
-    export DEVZONE_RACINE="$T/racine"
-    mkdir -p "$DEVZONE_RACINE"
+    export DEVZONE_ROOT="$T/racine"
+    mkdir -p "$DEVZONE_ROOT"
 }
 
 @test "devzone build in the pod: cacheonly output and expected buildctl arguments" {

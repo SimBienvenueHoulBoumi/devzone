@@ -117,7 +117,7 @@ create_workstation() {
         create_mode_start "$target" "$PAQUET/manage/workspace.sh"
         return
     fi
-    if [ -n "${DEVZONE_SANS_DEMARRER:-}" ]; then
+    if [ -n "${DEVZONE_NO_START:-}" ]; then
         echo "Pour le lancer : cd $target && make up"
         return 0
     fi

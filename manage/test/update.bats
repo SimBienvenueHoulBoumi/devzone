@@ -10,10 +10,10 @@ setup() {
     CLI="$RACINE/manage/devzone"
     T="$BATS_TEST_TMPDIR"
     cd "$T"
-    export DEVZONE_SANS_DEMARRER=1
-    export DEVZONE_RECONSTRUIRE="$T/reconstruire"
-    printf '#!/usr/bin/env bash\necho "reconstruit" >>"%s/reconstruction.log"\n' "$T" >"$DEVZONE_RECONSTRUIRE"
-    chmod +x "$DEVZONE_RECONSTRUIRE"
+    export DEVZONE_NO_START=1
+    export DEVZONE_REBUILD="$T/reconstruire"
+    printf '#!/usr/bin/env bash\necho "reconstruit" >>"%s/reconstruction.log"\n' "$T" >"$DEVZONE_REBUILD"
+    chmod +x "$DEVZONE_REBUILD"
     build_package v1 0.0.1 ancien
     build_package v2 0.0.2 nouveau
     MAJ="$T/v2/manage/devzone"

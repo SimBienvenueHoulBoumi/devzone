@@ -94,10 +94,10 @@ create_mode_write() {
 
 # Kubernetes creation: installs the workspace from the package script, run in
 # the new folder (as devzone workspace start does). DEVZONE_WORKSPACE_SH
-# replaces the script (tests); DEVZONE_SANS_DEMARRER only prints the command.
+# replaces the script (tests); DEVZONE_NO_START only prints the command.
 create_mode_start() {
     local folder="$1" script="$2"
-    if [ -n "${DEVZONE_SANS_DEMARRER:-}" ]; then
+    if [ -n "${DEVZONE_NO_START:-}" ]; then
         echo "To start the workspace: cd $folder && devzone workspace start"
         return 0
     fi

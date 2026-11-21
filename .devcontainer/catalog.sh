@@ -7,8 +7,8 @@
 set -euo pipefail
 
 ICI="$(cd "$(dirname "$0")" && pwd)"
-RACINE="${DEVZONE_RACINE:-$(dirname "$ICI")}"
-ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
+RACINE="${DEVZONE_ROOT:-$(dirname "$ICI")}"
+ETAT="${DEVZONE_STATE:-$RACINE/.devzone.modules}"
 # shellcheck source=SCRIPTDIR/cluster.sh
 # shellcheck disable=SC1091
 . "$ICI/cluster.sh"
@@ -28,7 +28,7 @@ ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
 refuse() { echo "devzone : catalog : $*" >&2; exit 2; }
 
 # Catalog folder (overridable by the tests)
-catalog_dir() { echo "${DEVZONE_CATALOGUE:-$ICI/catalog}"; }
+catalog_dir() { echo "${DEVZONE_CATALOG:-$ICI/catalog}"; }
 
 # Catalog applications: folders holding an app.conf, sorted
 catalog_apps() {

@@ -25,7 +25,7 @@ auto_relay_name() { echo "devzone-$INSTANCE-auto-$1"; }
 # Is the automatic relay of <port> already alive on the host's Docker?
 auto_relay_active() { local name; name="$(auto_relay_name "$1")"; command -v docker >/dev/null 2>&1 || return 1; [ -n "$(docker ps --filter "name=^$name$" --format '{{.Names}}' 2>/dev/null | grep -Fx "$name" || true)" ]; }
 # Delay after a port disappears before removing its bridge and relay.
-disappearance_delay() { local v; for v in DEVZONE_PORTS_AUTO_DELAI_DISPARITION DEVZONE_PORTS_AUTO_DELAI DEVZONE_PORTS_AUTO_RETARD PORTS_AUTO_DELAI PORTS_AUTO_RETARD; do [ -n "${!v:-}" ] && { echo "${!v}"; return 0; }; done; echo 10; }
+disappearance_delay() { local v; for v in DEVZONE_PORTS_AUTO_DISAPPEARANCE_DELAY DEVZONE_PORTS_AUTO_DELAY DEVZONE_PORTS_AUTO_LATE PORTS_AUTO_DELAI PORTS_AUTO_RETARD; do [ -n "${!v:-}" ] && { echo "${!v}"; return 0; }; done; echo 10; }
 
 # Guard (docker-relay.sh rule #293): the loop and demarrer never run under bats,
 # and outside the container only if the real context is set.
@@ -34,7 +34,7 @@ guard_watcher() {
         echo "devzone : port : automatic watcher refused under bats (tests)" >&2
         return 2
     fi
-    [ "${DEVZONE_PORTS_AUTO_REEL:-}" = oui ] && return 0
+    [ "${DEVZONE_PORTS_AUTO_REAL:-}" = yes ] && return 0
     echo "devzone : port : automatic watcher refused here: run devzone repair instead" >&2
     return 2
 }
@@ -160,7 +160,7 @@ auto_pass() {
 # Stops the watcher and cleans its relays.
 stop_watcher() { local pid; pid="$(cat "$LOCK/pid" 2>/dev/null || true)"; if [ -n "$pid" ]; then kill "$pid" 2>/dev/null || true; wait "$pid" 2>/dev/null || true; fi; clean_auto_all; rm -rf "$LOCK"; }
 
-# Loop: one pass every DEVZONE_PORTS_AUTO_PAS seconds.
+# Loop: one pass every DEVZONE_PORTS_AUTO_STEP seconds.
 auto_loop() {
     if ! lock_take; then return 0; fi
     clean_previous
@@ -169,7 +169,7 @@ auto_loop() {
         # State restored or rebuilt: nothing for 60 s (#417, step 4)
         if state_recovery_wait; then
             lock_refresh
-            sleep "${DEVZONE_PORTS_AUTO_PAS:-2}"
+            sleep "${DEVZONE_PORTS_AUTO_STEP:-2}"
             continue
         fi
         # State folder gone: the container has left, the watcher stops.
@@ -181,7 +181,7 @@ auto_loop() {
             break
         fi
         auto_pass || true
-        sleep "${DEVZONE_PORTS_AUTO_PAS:-2}"
+        sleep "${DEVZONE_PORTS_AUTO_STEP:-2}"
     done
 }
 
@@ -233,7 +233,7 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
 case "${1:-}" in
     ''|boucle|loop) if ! guard_watcher; then exit 2; fi; auto_loop ;;
     tour|one|un-tour) auto_pass ;;
-    demarrer|start|lancer) if [ "${DEVZONE_WORKSPACE:-}" = kubernetes ]; then echo "ports: Kubernetes workspace, ports go through devzone workspace ports"; exit 0; fi; if ! guard_watcher; then exit 2; fi; if kill -0 "$(cat "$LOCK/pid" 2>/dev/null)" 2>/dev/null; then echo "already running"; else DEVZONE_PORTS_AUTO_REEL=oui bash "$0" boucle >/dev/null 2>&1 & echo "started"; fi ;;
+    demarrer|start|lancer) if [ "${DEVZONE_WORKSPACE:-}" = kubernetes ]; then echo "ports: Kubernetes workspace, ports go through devzone workspace ports"; exit 0; fi; if ! guard_watcher; then exit 2; fi; if kill -0 "$(cat "$LOCK/pid" 2>/dev/null)" 2>/dev/null; then echo "already running"; else DEVZONE_PORTS_AUTO_REAL=yes bash "$0" boucle >/dev/null 2>&1 & echo "started"; fi ;;
     arreter|stop) stop_watcher; echo "stopped" ;;
     nettoyer|clean) clean_auto_all ;;
     auto) case "${2:-}" in on) write_key ports_auto on; echo "✔ automatic ports enabled" ;; off) write_key ports_auto off; stop_watcher; echo "✔ automatic ports disabled" ;; *) echo "devzone : port : auto on|off" >&2; exit 2 ;; esac ;;

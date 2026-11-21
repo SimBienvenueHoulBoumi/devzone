@@ -12,11 +12,11 @@ setup() {
     MYSQL="$BATS_TEST_DIRNAME/../../.devcontainer/catalog/mysql/mysql.sh"
     SECRETS="$BATS_TEST_TMPDIR/racine/workspace/.mysql"
     export HOME="$BATS_TEST_TMPDIR/home"
-    export DEVZONE_RACINE="$BATS_TEST_TMPDIR/racine"
-    export DEVZONE_ETAT="$BATS_TEST_TMPDIR/modules"
-    export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
-    mkdir -p "$HOME" "$DEVZONE_RACINE/workspace" "$BATS_TEST_TMPDIR/bin"
-    : >"$DEVZONE_KUBE_HOTE"
+    export DEVZONE_ROOT="$BATS_TEST_TMPDIR/racine"
+    export DEVZONE_STATE="$BATS_TEST_TMPDIR/modules"
+    export DEVZONE_KUBE_HOST="$BATS_TEST_TMPDIR/hote.config"
+    mkdir -p "$HOME" "$DEVZONE_ROOT/workspace" "$BATS_TEST_TMPDIR/bin"
+    : >"$DEVZONE_KUBE_HOST"
     : >"$BATS_TEST_TMPDIR/kubectl.log"
     : >"$BATS_TEST_TMPDIR/apply.log"
     : >"$BATS_TEST_TMPDIR/np.log"
@@ -122,36 +122,36 @@ attendre_nohup() {
 }
 
 @test "sync: mysql=off added once, existing line kept" {
-    printf 'autre=off\n' >"$DEVZONE_ETAT"
+    printf 'autre=off\n' >"$DEVZONE_STATE"
     run bash "$CATALOGUE" sync
     [ "$status" -eq 0 ] || false
-    grep -qx 'mysql=off' "$DEVZONE_ETAT" || false
-    grep -qF '# Catalog applications: set to on to install (devzone catalog)' "$DEVZONE_ETAT" || false
+    grep -qx 'mysql=off' "$DEVZONE_STATE" || false
+    grep -qF '# Catalog applications: set to on to install (devzone catalog)' "$DEVZONE_STATE" || false
     run bash "$CATALOGUE" sync
     [ "$status" -eq 0 ] || false
-    [ "$(grep -c '^mysql=' "$DEVZONE_ETAT")" -eq 1 ] || false
-    [ "$(grep -cF '# Catalog applications' "$DEVZONE_ETAT")" -eq 1 ] || false
+    [ "$(grep -c '^mysql=' "$DEVZONE_STATE")" -eq 1 ] || false
+    [ "$(grep -cF '# Catalog applications' "$DEVZONE_STATE")" -eq 1 ] || false
 }
 
 @test "sync keeps an existing line (mysql=on keeps its value)" {
-    printf 'mysql=on\n' >"$DEVZONE_ETAT"
+    printf 'mysql=on\n' >"$DEVZONE_STATE"
     run bash "$CATALOGUE" sync
     [ "$status" -eq 0 ] || false
-    grep -qx 'mysql=on' "$DEVZONE_ETAT" || false
+    grep -qx 'mysql=on' "$DEVZONE_STATE" || false
 }
 
 @test "sync concurrent: mysql=off added once, existing line kept" {
-    printf 'ia=on\nautre=off\n' >"$DEVZONE_ETAT"
+    printf 'ia=on\nautre=off\n' >"$DEVZONE_STATE"
     bash "$CATALOGUE" sync & pid_a=$!
     bash "$CATALOGUE" sync & pid_b=$!
     wait "$pid_a"
     wait "$pid_b"
-    grep -qx 'mysql=off' "$DEVZONE_ETAT" || false
-    grep -qx 'ia=on' "$DEVZONE_ETAT" || false
-    [ "$(grep -c '^mysql=' "$DEVZONE_ETAT")" -eq 1 ] || false
+    grep -qx 'mysql=off' "$DEVZONE_STATE" || false
+    grep -qx 'ia=on' "$DEVZONE_STATE" || false
+    [ "$(grep -c '^mysql=' "$DEVZONE_STATE")" -eq 1 ] || false
 }
 
-@test "apply: mysql=on installs (manifest, secret, relay 127.0.0.1:3306)" {    printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_ETAT"
+@test "apply: mysql=on installs (manifest, secret, relay 127.0.0.1:3306)" {    printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_STATE"
     run bash "$DEVZONE" apply
     [ "$status" -eq 0 ] || false
     grep -q 'image: mysql:8.4' "$BATS_TEST_TMPDIR/apply.log" || false
@@ -167,7 +167,7 @@ attendre_nohup() {
 }
 
 @test "apply: mysql=on reuses the PVC of the devzone-mysql namespace" {
-    printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_ETAT"
+    printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_STATE"
     printf 'data-mysql-0\n' >"$BATS_TEST_TMPDIR/pvcs"
     run bash "$DEVZONE" apply
     [ "$status" -eq 0 ] || false
@@ -176,7 +176,7 @@ attendre_nohup() {
 }
 
 @test "apply: two mysql PVCs, refusal with list and command" {
-    printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_ETAT"
+    printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_STATE"
     printf 'data-mysql-0\ndonnees-mysql-0\n' >"$BATS_TEST_TMPDIR/pvcs"
     run bash "$DEVZONE" apply
     [ "$status" -ne 0 ] || false
@@ -187,7 +187,7 @@ attendre_nohup() {
 }
 
 @test "catalog apply: mysql=on reuses the PVC of the namespace" {
-    printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_ETAT"
+    printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_STATE"
     printf 'data-mysql-0\n' >"$BATS_TEST_TMPDIR/pvcs"
     run bash "$CATALOGUE" apply
     [ "$status" -eq 0 ] || false
@@ -197,7 +197,7 @@ attendre_nohup() {
 
 @test "apply: mysql already present, no reinstallation, relay restarted" {
     touch "$BATS_TEST_TMPDIR/ns" "$BATS_TEST_TMPDIR/sts" "$BATS_TEST_TMPDIR/ready" "$BATS_TEST_TMPDIR/secret"
-    printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_ETAT"
+    printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_STATE"
     run bash "$DEVZONE" apply
     [ "$status" -eq 0 ] || false
     [ ! -s "$BATS_TEST_TMPDIR/apply.log" ] || false
@@ -206,19 +206,19 @@ attendre_nohup() {
 }
 
 @test "apply: mysql=on without a chosen cluster refused" {
-    printf 'mysql=on\n' >"$DEVZONE_ETAT"
+    printf 'mysql=on\n' >"$DEVZONE_STATE"
     run bash "$DEVZONE" apply
     [ "$status" -ne 0 ] || false
     [[ "$output" == *"no cluster chosen"* ]] || false
-    [ -f "$DEVZONE_ETAT-echec-mysql" ] || false
+    [ -f "$DEVZONE_STATE-echec-mysql" ] || false
 }
 
 @test "apply: a failure marks the failure and shows ✖ in the summary" {
     touch "$BATS_TEST_TMPDIR/APPLY_ECHEC"
-    printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_ETAT"
+    printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_STATE"
     run bash "$DEVZONE" apply
     [ "$status" -ne 0 ] || false
-    [ -f "$DEVZONE_ETAT-echec-mysql" ] || false
+    [ -f "$DEVZONE_STATE-echec-mysql" ] || false
     run bash "$DEVZONE"
     [ "$status" -eq 0 ] || false
     [[ "$output" == *"✖ module mysql"* ]] || false
@@ -228,7 +228,7 @@ attendre_nohup() {
 
 @test "resume: application installed, relay stopped, warns and proposes devzone repair" {
     touch "$BATS_TEST_TMPDIR/ns" "$BATS_TEST_TMPDIR/sts" "$BATS_TEST_TMPDIR/ready"
-    printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_ETAT"
+    printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_STATE"
     run bash "$DEVZONE"
     [ "$status" -eq 0 ] || false
     ligne="$(printf '%s\n' "$output" | grep 'application mysql' || true)"
@@ -241,7 +241,7 @@ attendre_nohup() {
 @test "resume: DEVZONE_WORKSPACE=kubernetes → installed via the cluster, access devzone workspace ports" {
     export DEVZONE_WORKSPACE=kubernetes
     touch "$BATS_TEST_TMPDIR/svc"
-    printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_ETAT"
+    printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_STATE"
     run bash "$DEVZONE"
     [ "$status" -eq 0 ]
     [[ "$output" == *"installed: local access: devzone workspace ports"* ]] || false
@@ -250,7 +250,7 @@ attendre_nohup() {
 
 @test "resume: DEVZONE_WORKSPACE=kubernetes → service absent → application expected" {
     export DEVZONE_WORKSPACE=kubernetes
-    printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_ETAT"
+    printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_STATE"
     run bash "$DEVZONE"
     [ "$status" -eq 0 ]
     [[ "$output" == *"expected: devzone apply"* ]] || false
@@ -261,23 +261,23 @@ attendre_nohup() {
     mkdir -p "$SECRETS"
     printf 'MYSQL_PASSWORD=mdproot\n' >"$SECRETS/root.env"
     touch "$BATS_TEST_TMPDIR/ns" "$BATS_TEST_TMPDIR/sts" "$BATS_TEST_TMPDIR/secret"
-    printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_ETAT"
+    printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_STATE"
     run bash "$DEVZONE" disable mysql
     [ "$status" -eq 0 ] || false
     grep -q 'delete statefulset/mysql service/mysql' "$BATS_TEST_TMPDIR/kubectl.log" || false
     ! grep -q 'delete namespace devzone-mysql' "$BATS_TEST_TMPDIR/kubectl.log" 2>/dev/null || false
-    grep -qx 'mysql=off' "$DEVZONE_ETAT" || false
+    grep -qx 'mysql=off' "$DEVZONE_STATE" || false
     [ "$(cat "$SECRETS/root.env")" = "MYSQL_PASSWORD=mdproot" ] || false
     [[ "$output" == *"✔ mysql removed from the cluster; volume donnees-mysql-0 and databases kept: devzone mysql volume"* ]] || false
 }
 
 @test "disable mysql --yes: same deletion, no warning (#557)" {
     touch "$BATS_TEST_TMPDIR/ns" "$BATS_TEST_TMPDIR/sts" "$BATS_TEST_TMPDIR/secret"
-    printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_ETAT"
+    printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_STATE"
     run --separate-stderr bash "$DEVZONE" disable mysql --yes
     [ "$status" -eq 0 ] || false
     grep -q 'delete namespace devzone-mysql' "$BATS_TEST_TMPDIR/kubectl.log" || false
-    grep -qx 'mysql=off' "$DEVZONE_ETAT" || false
+    grep -qx 'mysql=off' "$DEVZONE_STATE" || false
     [[ "$output" == *"✔ namespace devzone-mysql and volume deleted; workspace/.mysql/root.env kept"* ]] || false
     [[ "$stderr" != *"deprecated"* ]] || false
 }
@@ -286,12 +286,12 @@ attendre_nohup() {
     mkdir -p "$SECRETS"
     printf 'MYSQL_PASSWORD=mdproot\n' >"$SECRETS/root.env"
     touch "$BATS_TEST_TMPDIR/ns" "$BATS_TEST_TMPDIR/sts" "$BATS_TEST_TMPDIR/secret"
-    printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_ETAT"
-    DEVZONE_INTERACTIF=1 run bash "$DEVZONE" disable mysql <<<"n"
+    printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_STATE"
+    DEVZONE_INTERACTIVE=1 run bash "$DEVZONE" disable mysql <<<"n"
     [ "$status" -eq 0 ] || false
     grep -q 'delete statefulset/mysql service/mysql' "$BATS_TEST_TMPDIR/kubectl.log" || false
     ! grep -q 'delete namespace devzone-mysql' "$BATS_TEST_TMPDIR/kubectl.log" 2>/dev/null || false
-    grep -qx 'mysql=off' "$DEVZONE_ETAT" || false
+    grep -qx 'mysql=off' "$DEVZONE_STATE" || false
     [[ "$output" == *"Disabling mysql removes the server"* ]] || false
     [[ "$output" == *"volume donnees-mysql-0 and databases kept"* ]] || false
     [ "$(cat "$SECRETS/root.env")" = "MYSQL_PASSWORD=mdproot" ] || false
@@ -299,20 +299,20 @@ attendre_nohup() {
 
 @test "disable mysql in a terminal: o also deletes the namespace" {
     touch "$BATS_TEST_TMPDIR/ns" "$BATS_TEST_TMPDIR/sts" "$BATS_TEST_TMPDIR/secret"
-    printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_ETAT"
-    DEVZONE_INTERACTIF=1 run bash "$DEVZONE" disable mysql <<<"y"
+    printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_STATE"
+    DEVZONE_INTERACTIVE=1 run bash "$DEVZONE" disable mysql <<<"y"
     [ "$status" -eq 0 ] || false
     grep -q 'delete statefulset/mysql service/mysql' "$BATS_TEST_TMPDIR/kubectl.log" || false
     grep -q 'delete namespace devzone-mysql' "$BATS_TEST_TMPDIR/kubectl.log" || false
-    grep -qx 'mysql=off' "$DEVZONE_ETAT" || false
+    grep -qx 'mysql=off' "$DEVZONE_STATE" || false
     [[ "$output" == *"✔ namespace devzone-mysql and volume deleted; workspace/.mysql/root.env kept"* ]] || false
 }
 
 @test "enable mysql: writes the line then applies (switch to catalog application)" {
-    printf 'cluster=kind-devzone\nmysql=off\n' >"$DEVZONE_ETAT"
+    printf 'cluster=kind-devzone\nmysql=off\n' >"$DEVZONE_STATE"
     run bash "$DEVZONE" enable mysql
     [ "$status" -eq 0 ] || false
-    grep -qx 'mysql=on' "$DEVZONE_ETAT" || false
+    grep -qx 'mysql=on' "$DEVZONE_STATE" || false
     grep -q 'image: mysql:8.4' "$BATS_TEST_TMPDIR/apply.log" || false
 }
 
@@ -331,7 +331,7 @@ attendre_nohup() {
 
 @test "resume: warns about an unused mysql volume" {
     touch "$BATS_TEST_TMPDIR/ns" "$BATS_TEST_TMPDIR/sts" "$BATS_TEST_TMPDIR/ready"
-    printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_ETAT"
+    printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_STATE"
     printf 'data' >"$BATS_TEST_TMPDIR/claim"
     printf 'data-mysql-0\nancien-mysql-0\n' >"$BATS_TEST_TMPDIR/pvcs"
     run bash "$DEVZONE"
