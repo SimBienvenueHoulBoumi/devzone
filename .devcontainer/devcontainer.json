@@ -8,11 +8,11 @@
       "version": "21",
       "jdkDistro": "tem",
       "installMaven": true,
-      // Pinned so the build does not follow SDKMAN's latest Maven: a download
-      // reported as a corrupt archive failed the image build (#758). Pinning is a
-      // precaution, the retry of the image job is the remedy. Update: check the
-      // new version's archive (unzip -t on the SDKMAN download mirror, linuxx64
-      // and linuxarm64), then bump this value.
+      // Pinned for a reproducible build. It does not prevent the intermittent
+      // "archive was corrupt" failure of the SDKMAN download, which also hit this
+      // pinned version (#758): the retry of the image jobs (image-workspace.yml)
+      // is the remedy. Update: check the new version's archive (unzip -t on the
+      // SDKMAN download mirror, linuxx64 and linuxarm64), then bump this value.
       "mavenVersion": "3.9.16",
       "installGradle": true,
       "gradleVersion": "9.8.2"

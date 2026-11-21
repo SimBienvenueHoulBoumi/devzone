@@ -35,7 +35,24 @@ jobs:
       # Public DNS for the runner Docker: its DNS sometimes fails on archive.ubuntu.com (#468)
       - name: Runner Docker DNS
         run: bash manage/scripts/ci/ci-dns.sh
-      - uses: devcontainers/ci@513af61f4de4f75d37e4438f184ba4358f0fc1ca # v0.3.1900000450
+      # One retry of the build (#758), as in the publish job below: a corrupt SDKMAN
+      # download fails the first attempt now and then, even with a pinned Maven.
+      # The retry runs only after a failure, after a pause; its failure fails the job.
+      - name: Build (first attempt)
+        id: build
+        continue-on-error: true
+        uses: devcontainers/ci@513af61f4de4f75d37e4438f184ba4358f0fc1ca # v0.3.1900000450
+        with:
+          configFile: .devcontainer/devcontainer.json
+          imageName: ghcr.io/simbienvenuehoulboumi/devzone-workspace
+          imageTag: ${{ github.sha }}
+          push: never
+      - name: Pause before the retry
+        if: steps.build.outcome == 'failure'
+        run: sleep 120
+      - name: Build (retry)
+        if: steps.build.outcome == 'failure'
+        uses: devcontainers/ci@513af61f4de4f75d37e4438f184ba4358f0fc1ca # v0.3.1900000450
         with:
           configFile: .devcontainer/devcontainer.json
           imageName: ghcr.io/simbienvenuehoulboumi/devzone-workspace
