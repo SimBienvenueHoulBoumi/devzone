@@ -44,6 +44,108 @@ version() {
     node -p 'require(process.argv[1]).version' "$PAQUET/package.json" 2>/dev/null || echo inconnue
 }
 
+# Go binary of the package (#773). bin/devzone-<os>-<arch>[.exe] is built by
+# prepack (manage/scripts/ci/build-binaries.sh) and listed with its SHA-256 in
+# bin/SHA256SUMS. When one exists for this machine, it is checked, copied once
+# into ${XDG_CACHE_HOME:-~/.cache}/devzone/bin/<version>/ (npm drops the
+# executable bit of the files outside "bin"; the copy is atomic) and run in
+# place of this script. Any problem, DEVZONE_NO_GO or DEVZONE_FROM_GO (set by the
+# Go binary when it delegates to this script: no loop) keeps the bash command.
+go_platform() {
+    local os arch
+    case "$(uname -s 2>/dev/null)" in
+        Linux) os=linux ;;
+        Darwin) os=darwin ;;
+        MINGW* | MSYS* | CYGWIN*) os=windows ;;
+        *) return 1 ;;
+    esac
+    case "$(uname -m 2>/dev/null)" in
+        x86_64 | amd64) arch=amd64 ;;
+        arm64 | aarch64) arch=arm64 ;;
+        *) return 1 ;;
+    esac
+    echo "$os-$arch"
+}
+
+# SHA-256 of file $1; node when neither sha256sum nor shasum exists
+go_sha256() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "$1" | cut -d' ' -f1
+    elif command -v shasum >/dev/null 2>&1; then
+        shasum -a 256 "$1" | cut -d' ' -f1
+    else
+        node -e 'const h = require("crypto").createHash("sha256"); h.update(require("fs").readFileSync(process.argv[1])); console.log(h.digest("hex"))' "$1"
+    fi
+}
+
+# Sum of file $2 in the SHA256SUMS file $1 (lines: "<sum>  <name>")
+go_listed_sum() {
+    local sum name
+    [ -f "$1" ] || return 1
+    while read -r sum name; do
+        if [ "${name#\*}" = "$2" ]; then
+            echo "$sum"
+            return 0
+        fi
+    done <"$1"
+    return 1
+}
+
+# Copies binary $1 to $2 (mode 755), then writes its sum $3 in $2.sha256: each
+# step goes through a temporary file and mv, so a launch in parallel or a
+# crash never leaves a half-written binary
+go_install() {
+    local tmp
+    mkdir -p "$(dirname "$2")" || return 1
+    tmp="$(mktemp "$2.XXXXXX")" || return 1
+    if cp "$1" "$tmp" && chmod 755 "$tmp" && mv -f "$tmp" "$2" \
+        && printf '%s\n' "$3" >"$tmp" && mv -f "$tmp" "$2.sha256"; then
+        return 0
+    fi
+    rm -f "$tmp"
+    return 1
+}
+
+# Runs the Go binary when it applies (never returns then); otherwise returns
+go_launch() {
+    local platform ext="" name bin want have ver base target
+    if [ -n "${DEVZONE_NO_GO:-}" ] || [ -n "${DEVZONE_FROM_GO:-}" ]; then return 0; fi
+    platform="$(go_platform)" || return 0
+    case "$platform" in windows-*) ext=.exe ;; esac
+    name="devzone-$platform$ext"
+    bin="$PAQUET/bin/$name"
+    [ -f "$bin" ] || return 0
+    ver="$(version)"
+    [ "$ver" != inconnue ] || return 0
+    base="${XDG_CACHE_HOME:-}"
+    if [ -z "$base" ] && [ -n "${HOME:-}" ]; then base="$HOME/.cache"; fi
+    [ -n "$base" ] || return 0
+    target="$base/devzone/bin/$ver/devzone$ext"
+    want="$(go_listed_sum "$PAQUET/bin/SHA256SUMS" "$name")" || {
+        echo "devzone: no checksum for $name in bin/SHA256SUMS, using the bash command" >&2
+        return 0
+    }
+    if ! { [ -x "$target" ] && [ "$(cat "$target.sha256" 2>/dev/null)" = "$want" ]; }; then
+        have="$(go_sha256 "$bin")" || have=""
+        if [ "$have" != "$want" ]; then
+            echo "devzone: checksum of $name does not match bin/SHA256SUMS, using the bash command" >&2
+            return 0
+        fi
+        go_install "$bin" "$target" "$want" || {
+            echo "devzone: cannot copy $name to $target, using the bash command" >&2
+            return 0
+        }
+    fi
+    # The Go binary finds the bash command (and the package.json) from here, even
+    # copied into the cache; Git Bash gives it a Windows path
+    DEVZONE_BASH_ENTRY="$PAQUET/manage/devzone"
+    case "$platform" in
+        windows-*) DEVZONE_BASH_ENTRY="$(cygpath -m "$DEVZONE_BASH_ENTRY" 2>/dev/null || echo "$DEVZONE_BASH_ENTRY")" ;;
+    esac
+    export DEVZONE_BASH_ENTRY
+    exec "$target" "$@"
+}
+
 show_help() {
     cat <<EOT
 devzone $(version) : environnement de développement conteneurisé
@@ -81,6 +183,8 @@ container_command() {
         *) return 1 ;;
     esac
 }
+
+go_launch "$@"
 
 # Renamed names (#695): the French names of the host and container commands are
 # refused before anything is created (« devzone mettre-a-jour » must not create a

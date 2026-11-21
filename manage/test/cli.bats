@@ -153,7 +153,7 @@ GH
 
 @test "npm package: expected content, no local nor development file" {
     command -v npm >/dev/null || skip "npm absent"
-    fichiers="$(cd "$RACINE" && npm pack --dry-run --json 2>/dev/null | node -e 'for (const f of JSON.parse(require("fs").readFileSync(0))[0].files) console.log(f.path)')"
+    fichiers="$(cd "$RACINE" && npm pack --dry-run --json --ignore-scripts 2>/dev/null | node -e 'for (const f of JSON.parse(require("fs").readFileSync(0))[0].files) console.log(f.path)')"
     for f in manage/devzone .devcontainer/devcontainer.json .devcontainer/devzone Makefile manage/scripts/launch.sh manage/scripts/uninstall.sh README.md LICENSE package.json; do
         grep -qx "$f" <<<"$fichiers" || { echo "absent du paquet : $f"; return 1; }
     done
@@ -352,9 +352,12 @@ fake_docker() {
 @test "layout: paths cited by Makefile, package.json, .gitattributes and fonctionnel.yml exist" {
     cd "$RACINE"
     # Old root locations: must not come back (everything is under manage/)
-    for d in bin scripts test; do
+    for d in scripts test; do
         [ ! -e "$d" ] || { echo "ancien dossier revenu à la racine : $d/"; return 1; }
     done
+    # bin/ at the root holds the Go binaries built by prepack (#773): present only
+    # after a build, ignored by git, never tracked
+    [ -z "$(git ls-files bin)" ] || { echo "bin/ is tracked by git"; return 1; }
     chemins="$(
         grep -oE 'manage/[A-Za-z0-9_./-]+' Makefile
         grep -oE 'bash [A-Za-z0-9_./-]+' Makefile | awk '{ print $2 }'
@@ -369,6 +372,8 @@ fake_docker() {
     [ -n "$chemins" ]
     while IFS= read -r c; do
         [ -n "$c" ] || continue
+        # bin/ is built by prepack: absent from a checkout
+        [ "$c" != "bin/" ] || continue
         [ -e "${c%/}" ] || { echo "chemin cité mais absent : $c"; return 1; }
     done <<<"$chemins"
 }
