@@ -74,6 +74,8 @@ parite() {
 # release to uninstall; FAKE_ARGO=yes: Argo CD holds the workspace Application.
 # FAKE_DEVZONE=yes: the devzone context is declared; FAKE_SHELL_STATUS=n: the
 # status of "kubectl exec -it" (the shell), 0 by default, which prints its arguments.
+# FAKE_OTHER_REMOTE=url: the guard of copy-to finds a pod clone of another remote
+# ("kubectl cp" prints its arguments, with the copies).
 faux_cluster() {
     mkdir -p "$BATS_TEST_TMPDIR/bin"
     cat >"$BATS_TEST_TMPDIR/bin/helm" <<'HELM'
@@ -116,12 +118,25 @@ case "$*" in
         echo "NAME                 READY   STATUS    RESTARTS   AGE"
         echo "devzone-workspace-0  1/1     Running   0          2d"
         ;;
+    "cp "* | *" cp "*)
+        echo "kubectl $*"
+        exit 0
+        ;;
     *"exec -it"*)
         echo "kubectl $*"
         exit "${FAKE_SHELL_STATUS:-0}"
         ;;
     *"exec -i"*)
-        cat >/dev/null
+        input="$(cat)"
+        case "$input" in
+            *"git -C"*)
+                if [ -n "${FAKE_OTHER_REMOTE:-}" ]; then
+                    echo "$FAKE_OTHER_REMOTE"
+                    exit 3
+                fi
+                exit 0
+                ;;
+        esac
         if [ -n "${FAKE_NO_POD:-}" ]; then exit 1; fi
         if [ -n "${FAKE_LEGACY:-}" ]; then echo repogarde; fi
         ;;
@@ -260,4 +275,80 @@ KUBE
 @test "go-parity: workspace shell with extra words is delegated, same output" {
     faux_cluster
     parite workspace shell extra
+}
+
+# git_clone DIR URL : a git folder whose origin is URL (the guard of copy-to reads it)
+git_clone() {
+    git init -q "$1"
+    git -C "$1" remote add origin "$2"
+}
+
+@test "go-parity: workspace copy-to, folder missing: same message and status" {
+    faux_cluster
+    parite workspace copy-to folder-absent
+}
+
+@test "go-parity: workspace copy-to, empty folder: same kubectl cp arguments" {
+    faux_cluster
+    mkdir "$BATS_TEST_TMPDIR/vide"
+    parite workspace copy-to "$BATS_TEST_TMPDIR/vide"
+    run "$DZ_GO" workspace copy-to "$BATS_TEST_TMPDIR/vide"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"cp $BATS_TEST_TMPDIR/vide devzone-workspace-0:/workspaces/projets/vide --namespace devzone-workspace -c workspace"* ]] || false
+}
+
+@test "go-parity: workspace copy-to, clone of the same remote: same kubectl cp arguments" {
+    faux_cluster
+    git_clone "$BATS_TEST_TMPDIR/mine" https://github.com/acme/mine.git
+    parite workspace copy-to "$BATS_TEST_TMPDIR/mine"
+    run "$DZ_GO" workspace copy-to "$BATS_TEST_TMPDIR/mine"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"cp $BATS_TEST_TMPDIR/mine devzone-workspace-0:/workspaces/projets/mine"* ]] || false
+}
+
+@test "go-parity: workspace copy-to, other remote in the pod: same refusal and status" {
+    faux_cluster
+    git_clone "$BATS_TEST_TMPDIR/mine" https://github.com/acme/mine.git
+    export FAKE_OTHER_REMOTE=https://github.com/other/mine.git
+    parite workspace copy-to "$BATS_TEST_TMPDIR/mine"
+    run "$DZ_GO" workspace copy-to "$BATS_TEST_TMPDIR/mine"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"another remote (https://github.com/other/mine.git, here: https://github.com/acme/mine.git)"* ]] || false
+    [[ "$output" != *"kubectl"* ]] || false
+}
+
+@test "go-parity: workspace copy-to without folder is delegated, same message" {
+    faux_cluster
+    parite workspace copy-to
+}
+
+@test "go-parity: workspace copy-to with an empty folder argument: same message" {
+    faux_cluster
+    parite workspace copy-to ""
+}
+
+@test "go-parity: workspace copy-to with extra words is delegated, same output" {
+    faux_cluster
+    parite workspace copy-to "$BATS_TEST_TMPDIR" extra
+}
+
+@test "go-parity: workspace copy-from, folder missing: same kubectl cp arguments" {
+    faux_cluster
+    parite workspace copy-from folder-absent
+    run "$DZ_GO" workspace copy-from folder-absent
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"cp devzone-workspace-0:/workspaces/projets/folder-absent folder-absent --namespace devzone-workspace -c workspace"* ]] || false
+}
+
+@test "go-parity: workspace copy-from, current folder: same kubectl cp arguments" {
+    faux_cluster
+    parite workspace copy-from .
+    run "$DZ_GO" workspace copy-from .
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"cp devzone-workspace-0:/workspaces/projets/$(basename "$BATS_TEST_TMPDIR") $BATS_TEST_TMPDIR --namespace"* ]] || false
+}
+
+@test "go-parity: workspace copy-from without folder is delegated, same message" {
+    faux_cluster
+    parite workspace copy-from
 }
