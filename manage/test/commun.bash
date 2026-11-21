@@ -1,16 +1,4 @@
 #!/usr/bin/env bash
-# Aide commune des tests du relais Docker (#346) : isolation du relais sous
-# $BATS_TEST_TMPDIR, jamais sur le vrai socket ni ses fichiers.
-
-relais_docker_isole() {
-    export DEVZONE_RELAY_SOCKET="$BATS_TEST_TMPDIR/docker.sock"
-    export DEVZONE_RELAY_SOURCE="$BATS_TEST_TMPDIR/docker-host.sock"
-    export DEVZONE_RELAY_PID="$BATS_TEST_TMPDIR/socat.pid"
-    export DEVZONE_RELAY_LOG="$BATS_TEST_TMPDIR/socat.log"
-    export DEVZONE_RELAY_MARKER="$BATS_TEST_TMPDIR/relay.failed"
-    export DEVZONE_RELAY_SUDO=""
-}
-
 # Aide commune de Kubernetes (#341) : le kubeconfig, le HOME et la copie du
 # kubeconfig de l'hôte restent sous $BATS_TEST_TMPDIR, jamais ceux du poste.
 kube_isole() {
@@ -51,7 +39,6 @@ KIND
 # npm, getent, curl et opencode sous $BATS_TEST_TMPDIR/bin, état et réseau
 # isolés, délais réduits. Le faux opencode se pilote par FAKE_OP_* (voir ci-dessous).
 agent_isole() {
-    relais_docker_isole
     kube_isole
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
     export DEVZONE

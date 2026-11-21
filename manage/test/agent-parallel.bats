@@ -4,7 +4,6 @@
 
 setup() {
     load commun
-    relais_docker_isole
     kube_isole
     agent_isole
     export DEVZONE_AGENT_SILENCE=10

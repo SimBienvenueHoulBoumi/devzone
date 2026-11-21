@@ -5,7 +5,6 @@
 setup() {
     load commun
     load commun-helm
-    relais_docker_isole
     kube_isole
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
     CATALOGUE="$BATS_TEST_DIRNAME/../../.devcontainer/catalog.sh"

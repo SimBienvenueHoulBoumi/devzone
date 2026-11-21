@@ -9,7 +9,6 @@ PRESENT_MARK=$'# d\303\251j\303\240 pr\303\251sent'
 setup() {
     load commun
     kind_vide
-    relais_docker_isole
     kube_isole
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
     export HOME="$BATS_TEST_TMPDIR/home"

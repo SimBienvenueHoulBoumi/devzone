@@ -4,7 +4,6 @@
 
 setup() {
     load commun
-    relais_docker_isole
     kube_isole
     PORTS_AUTO="$BATS_TEST_DIRNAME/../../.devcontainer/ports-auto.sh"
     PORTS="$BATS_TEST_DIRNAME/../../.devcontainer/ports.sh"
@@ -211,7 +210,7 @@ SS
     [ "$(grep -c 'docker run' "$BATS_TEST_TMPDIR/docker.log")" -eq 0 ]
 }
 
-@test "kubernetes: demarrer exits 0 without watcher nor docker relay (#517)" {
+@test "kubernetes: demarrer exits 0 without watcher (#517)" {
     # Before the guard: even under bats, Kubernetes mode does not refuse, it starts nothing
     DEVZONE_WORKSPACE=kubernetes run bash "$PORTS_AUTO" demarrer
     [ "$status" -eq 0 ]

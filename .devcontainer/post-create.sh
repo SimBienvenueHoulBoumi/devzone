@@ -60,11 +60,6 @@ sudo ln -sf /workspaces/devzone/.devcontainer/devzone /usr/local/bin/devzone
 # Access to the workstation cluster (hote.config) before the modules that depend
 # on it (#370); a failure does not stop the creation, the startup runs it again
 bash /workspaces/devzone/.devcontainer/kube-config.sh || echo "devzone : kube configuration incomplete, retry: devzone start" >&2
-# Without the docker-outside-of-docker feature (docker-hote=off option, #432),
-# docker is not installed: a clear message points to the Kubernetes workspace
-if ! command -v docker >/dev/null 2>&1; then
-    sudo install -m 0755 /workspaces/devzone/.devcontainer/docker-without-host.sh /usr/local/bin/docker
-fi
 devzone apply || echo "devzone : modules incomplete (details above), retry: devzone apply" >&2
 # Guarded system packages (#351): reinstalled at each creation; a failure does not stop the creation
 devzone packages apply || echo "devzone : packages failed, retry: devzone packages" >&2

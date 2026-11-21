@@ -191,8 +191,6 @@ internal/command/run_test.go
 .devcontainer/kube-config.sh
 .devcontainer/kube-reachable.sh
 .devcontainer/isolation.sh
-.devcontainer/docker-relay.sh
-.devcontainer/docker-without-host.sh
 .devcontainer/startup.sh
 .devcontainer/post-create.sh
 .devcontainer/workspace-init.sh
@@ -202,7 +200,6 @@ internal/command/run_test.go
 manage/test/cluster.bats
 manage/test/clusters.bats
 manage/test/docker-host.bats
-manage/test/docker-relay.bats
 manage/test/gitlab-cluster.bats
 manage/test/isolation.bats
 manage/test/kube-account.bats

@@ -3,7 +3,6 @@
 
 setup() {
     load commun
-    relais_docker_isole
     kube_isole
     agent_isole
 }

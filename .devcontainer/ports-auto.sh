@@ -27,7 +27,7 @@ auto_relay_active() { local name; name="$(auto_relay_name "$1")"; command -v doc
 # Delay after a port disappears before removing its bridge and relay.
 disappearance_delay() { local v; for v in DEVZONE_PORTS_AUTO_DISAPPEARANCE_DELAY DEVZONE_PORTS_AUTO_DELAY DEVZONE_PORTS_AUTO_LATE PORTS_AUTO_DELAI PORTS_AUTO_RETARD; do [ -n "${!v:-}" ] && { echo "${!v}"; return 0; }; done; echo 10; }
 
-# Guard (docker-relay.sh rule #293): the loop and demarrer never run under bats,
+# Guard: the loop and demarrer never run under bats,
 # and outside the container only if the real context is set.
 guard_watcher() {
     if [ -n "${BATS_TEST_TMPDIR:-}" ]; then

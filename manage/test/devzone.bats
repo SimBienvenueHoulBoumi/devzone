@@ -63,7 +63,6 @@ kube_empreinte() {
 
 setup() {
     load commun
-    relais_docker_isole
     kube_isole
     kind_vide
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
@@ -155,67 +154,6 @@ GH
     [ "$status" -eq 0 ]
     [[ "$output" == *"○ module ia"*"devzone enable ia"* ]] || false
     [[ "$output" == *"○ module kubernetes"*"devzone enable kubernetes"* ]] || false
-}
-
-@test "docker-hote : partagé par défaut, avertissement dans l'état" {
-    : >"$DEVZONE_RELAY_SOURCE"
-    run bash "$DEVZONE"
-    [ "$status" -eq 0 ]
-    [[ "$output" == *"⚠ host Docker socket shared (agents included)"* ]] || false
-}
-
-@test "docker-hote : socket monté avec option off → encore partagé, make rebuild" {
-    : >"$DEVZONE_RELAY_SOURCE"
-    printf 'docker-hote=off\n' >"$DEVZONE_ROOT/.devzone.modules"
-    run bash "$DEVZONE"
-    [ "$status" -eq 0 ]
-    [[ "$output" == *"⚠ host Docker socket still shared: make rebuild on the workstation"* ]] || false
-}
-
-@test "docker-hote : option on, socket absent → absent, make rebuild" {
-    rm -f "$DEVZONE_RELAY_SOURCE"
-    run bash "$DEVZONE"
-    [ "$status" -eq 0 ]
-    [[ "$output" == *"⚠ host Docker socket absent: make rebuild on the workstation"* ]] || false
-    [[ "$output" != *"host Docker socket shared"* ]] || false
-}
-
-@test "docker-hote : desactiver écrit off, demande make rebuild, plus d'avertissement" {
-    run bash "$DEVZONE" disable docker-hote
-    [ "$status" -eq 0 ]
-    grep -qx 'docker-hote=off' "$DEVZONE_ROOT/.devzone.modules"
-    [[ "$output" == *"make rebuild"* ]] || false
-    rm -f "$DEVZONE_RELAY_SOURCE"
-    run bash "$DEVZONE"
-    [ "$status" -eq 0 ]
-    [[ "$output" != *"host Docker socket"* ]] || false
-}
-
-@test "docker-hote : desactiver concurrent avec une écriture d'état : aucune ligne perdue" {
-    printf 'docker-hote=off\nia=on\n' >"$DEVZONE_ROOT/.devzone.modules"
-    ETAT="$DEVZONE_ROOT/.devzone.modules" bash -c '. "$1"; state_write postgres on' _ "$BATS_TEST_DIRNAME/../../.devcontainer/state.sh" & pid_w=$!
-    bash "$DEVZONE" disable docker-hote & pid_d=$!
-    wait "$pid_w"
-    wait "$pid_d"
-    grep -qx 'docker-hote=off' "$DEVZONE_ROOT/.devzone.modules"
-    grep -qx 'postgres=on' "$DEVZONE_ROOT/.devzone.modules"
-}
-
-@test "docker-hote : activer écrit on, demande make rebuild" {
-    printf 'docker-hote=off\n' >"$DEVZONE_ROOT/.devzone.modules"
-    run bash "$DEVZONE" enable docker-hote
-    [ "$status" -eq 0 ]
-    grep -qx 'docker-hote=on' "$DEVZONE_ROOT/.devzone.modules"
-    [[ "$output" == *"make rebuild"* ]] || false
-}
-
-@test "état : DEVZONE_WORKSPACE=kubernetes → pas d'avertissement socket Docker, ligne workspace Kubernetes pod" {
-    : >"$DEVZONE_RELAY_SOURCE"
-    export DEVZONE_WORKSPACE=kubernetes
-    run bash "$DEVZONE"
-    [ "$status" -eq 0 ]
-    [[ "$output" == *"Kubernetes pod, service account access only (no Docker socket)"* ]] || false
-    ! grep -q '⚠ host Docker socket' <<<"$output" || false
 }
 
 @test "état : identité git absente → nécessaire, avec les deux voies" {
