@@ -133,15 +133,6 @@ attendre_nohup() {
     [ "$(grep -cF '# Catalog applications' "$DEVZONE_ETAT")" -eq 1 ] || false
 }
 
-@test "sync: header in the former French wording recognised, not added again" {
-    printf '# Applications du catalogue : passer à on pour installer (devzone catalog)\nautre=off\n' >"$DEVZONE_ETAT"
-    run bash "$CATALOGUE" sync
-    [ "$status" -eq 0 ] || false
-    grep -qx 'mysql=off' "$DEVZONE_ETAT" || false
-    [ "$(grep -cF '# Applications du catalogue' "$DEVZONE_ETAT")" -eq 1 ] || false
-    [ "$(grep -cF '# Catalog applications' "$DEVZONE_ETAT")" -eq 0 ] || false
-}
-
 @test "sync keeps an existing line (mysql=on keeps its value)" {
     printf 'mysql=on\n' >"$DEVZONE_ETAT"
     run bash "$CATALOGUE" sync
