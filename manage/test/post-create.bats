@@ -47,6 +47,16 @@ setup() {
     ! grep -Fq 'features/python' "$LOCK" || false
 }
 
+# Maven pinned by mavenVersion (#758): SDKMAN's latest archive is sometimes corrupt
+@test "devcontainer.json: Maven pinned by mavenVersion (not latest, not empty)" {
+    line="$(grep -E '^[[:space:]]*"mavenVersion"[[:space:]]*:' "$DEVCONTAINER" | head -1)"
+    [ -n "$line" ] || false
+    version="$(printf '%s\n' "$line" | sed -nE 's/.*"mavenVersion"[[:space:]]*:[[:space:]]*"([^"]*)".*/\1/p')"
+    [ -n "$version" ] || false
+    [ "$version" != latest ] || false
+    [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || false
+}
+
 @test "Dockerfile: python3-venv and python-is-python3 installed by apt" {
     grep -Fq 'python3-venv' "$DOCKERFILE" || false
     grep -Fq 'python-is-python3' "$DOCKERFILE" || false
