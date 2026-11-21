@@ -24,6 +24,6 @@ const helpTemplate = `devzone {version} : environnement de développement conten
                            services (gitlab, postgres, argocd) du workspace Kubernetes
   devzone workspace argocd status|init|apply|app add|list|remove
                            Argo CD du workspace : dépôt GitOps, .argocd.conf, projets
-  (anciens noms français : refusés avec le nouveau nom, voir README, « Noms retirés »)
+  (old French names: refused with the new name, see the README, « Removed names »)
   devzone --version
 `

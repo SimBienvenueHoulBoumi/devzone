@@ -1,7 +1,7 @@
 # internal/command
 
-- Rôle : reçoit la ligne de commande devzone ; exécute en Go les commandes de la table `ported`, délègue les autres au pont bash (#358).
-- Peut importer : la bibliothèque standard, `internal/bashbridge` et `internal/workspace`.
-- Ne doit pas importer : `cmd/...` (le binaire dépend de ce paquet, jamais l'inverse) ni un paquet métier qui dépendrait de bash.
-- La table `ported` liste les commandes portées : `--version`, `-v`, `help`, `-h`, `--help`, seules, sans autre argument ; et `workspace`, pour la seule sous-commande `status` (#712, `workspaceCommand` dans `workspace.go`). Une commande y entre quand elle est portée, et sort de la délégation dans le même changement. `devzone workspace` suivi d'autre chose que `status` (ou `status` suivi d'un mot) reste délégué au bash.
-- Tests : `go test ./internal/command/` ; les tests de délégation utilisent un faux point d'entrée bash, ceux de `workspace status` un faux `kubectl` dans le PATH.
+- Role: receives the devzone command line; runs in Go the commands of the `ported` table, delegates the others to the bash bridge (#358).
+- May import: the standard library, `internal/bashbridge` and `internal/workspace`.
+- Must not import: `cmd/...` (the binary depends on this package, never the reverse) nor a business package that would depend on bash.
+- The `ported` table lists the ported commands: `--version`, `-v`, `help`, `-h`, `--help`, only alone, with no other argument; and `workspace`, for the `status` sub-command only (#712, `workspaceCommand` in `workspace.go`). A command enters it when it is ported, and leaves the delegation in the same change. `devzone workspace` followed by anything other than `status` (or `status` followed by a word) stays delegated to bash.
+- Tests: `go test ./internal/command/`; the delegation tests use a fake bash entry point, those of `workspace status` a fake `kubectl` in the PATH.

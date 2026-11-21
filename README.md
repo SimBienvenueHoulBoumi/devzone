@@ -1,73 +1,73 @@
 # devzone
 
-[![npm](https://img.shields.io/npm/v/devzone)](https://www.npmjs.com/package/devzone) [![Licence GPL-3.0-only](https://img.shields.io/badge/licence-GPL--3.0--only-blue)](https://github.com/SimBienvenueHoulBoumi/devzone/blob/main/LICENSE)
+[![npm](https://img.shields.io/npm/v/devzone)](https://www.npmjs.com/package/devzone) [![License GPL-3.0-only](https://img.shields.io/badge/licence-GPL--3.0--only-blue)](https://github.com/SimBienvenueHoulBoumi/devzone/blob/main/LICENSE)
 
-Ton poste de développement Linux, prêt en une commande, identique sur Mac, Windows et Linux.
+Your Linux development workstation, ready in one command, identical on Mac, Windows and Linux.
 
-- Un Ubuntu identique pour toute l'équipe.
-- Les outils et services prêts : Java, Node, Python, Docker, Kubernetes, PostgreSQL, GitLab au besoin.
-- Les agents IA encadrés par repowarden.
-- Local et gratuit : rien n'est hébergé.
-- Une mise à jour avec `devzone update`, et des outils ajoutés qui survivent au rebuild (devzone packages).
+- An identical Ubuntu for the whole team.
+- Tools and services ready: Java, Node, Python, Docker, Kubernetes, PostgreSQL, GitLab when needed.
+- AI agents supervised by repowarden.
+- Local and free: nothing is hosted.
+- An update with `devzone update`, and added tools that survive the rebuild (devzone packages).
 
-## Pourquoi devzone ?
+## Why devzone?
 
-Les alternatives ont chacune leur limite :
+Each alternative has its limits:
 
-- **WSL** : Windows seulement, et propre à chaque poste.
-- **Machine virtuelle** : lourde, lente à démarrer.
-- **Environnements hébergés** (Codespaces, Gitpod…) : cloud, quotas, réseau.
+- **WSL**: Windows only, and specific to each workstation.
+- **Virtual machine**: heavy, slow to start.
+- **Hosted environments** (Codespaces, Gitpod…): cloud, quotas, network.
 
-devzone les évite : le même environnement sur chaque poste, sur ta machine.
+devzone avoids them: the same environment on every workstation, on your machine.
 
-## Limites
+## Limits
 
-- Pas de systemd : les services fournis par devzone démarrent avec devzone, pas avec `systemctl`.
-- Pas de bureau graphique : tout se passe en terminal ou dans VS Code.
-- Le socket Docker de l'hôte est partagé par défaut : c'est un compromis de sécurité assumé, qui donne un accès administrateur au Docker de l'hôte, y compris aux agents IA ([#291](https://github.com/SimBienvenueHoulBoumi/devzone/issues/291)). Pour le retirer : `devzone disable docker-hote`, puis `make rebuild` sur le poste. Sans ce socket, `docker` renvoie vers le workspace Kubernetes (`devzone workspace`, kubedock et BuildKit) ; les conteneurs et kind lancés sur le Docker du poste ne fonctionnent plus dans le conteneur, alors que la connexion au cluster Kubernetes de l'hôte et les modules restent utilisables. Pour le remettre : `devzone enable docker-hote`, puis `make rebuild`.
-- Le terminal garde l'administrateur du cluster ; les agents n'ont que le compte limité aux namespaces `devzone-*` (rôle `edit`, jeton renouvelé toutes les 24 h). Les installeurs seuls agissent en administrateur ([#430](https://github.com/SimBienvenueHoulBoumi/devzone/issues/430)).
+- No systemd: the services provided by devzone start with devzone, not with `systemctl`.
+- No graphical desktop: everything happens in a terminal or in VS Code.
+- The host Docker socket is shared by default: this is a deliberate security trade-off, which gives administrator access to the host's Docker, including to AI agents ([#291](https://github.com/SimBienvenueHoulBoumi/devzone/issues/291)). To remove it: `devzone disable docker-hote`, then `make rebuild` on the workstation. Without this socket, `docker` redirects to the Kubernetes workspace (`devzone workspace`, kubedock and BuildKit); containers and kind clusters launched on the workstation's Docker no longer work inside the container, while the connection to the host's Kubernetes cluster and the modules remain usable. To restore it: `devzone enable docker-hote`, then `make rebuild`.
+- The terminal keeps the cluster administrator; agents only have the account limited to the `devzone-*` namespaces (`edit` role, token renewed every 24 h). Only the installers act as administrator ([#430](https://github.com/SimBienvenueHoulBoumi/devzone/issues/430)).
 
-## Comment ça marche
+## How it works
 
-devzone prépare un environnement Ubuntu aux versions d'outils figées, et le lance à l'un de ces deux endroits :
+devzone prepares an Ubuntu environment with pinned tool versions, and runs it in one of these two places:
 
-- **dans le cluster Kubernetes** de ta machine, par défaut, dès qu'un cluster répond à la création : le poste est un pod `devzone-workspace-0` (namespace `devzone-workspace`) ;
-- **dans un conteneur Docker** (mode « poste Docker », déprécié, retiré dans une version à venir) : seulement avec `--docker` à la création, ou pour un poste déjà créé ainsi.
+- **inside the Kubernetes cluster** of your machine, by default, as soon as a cluster answers at creation: the workstation is a pod `devzone-workspace-0` (namespace `devzone-workspace`);
+- **inside a Docker container** (“Docker workstation” mode, deprecated, to be removed in an upcoming version): only with `--docker` at creation, or for a workstation already created that way.
 
-Dans les deux cas, rien n'est hébergé : tout tourne sur ta machine. `workspace/` est conservé entre les rebuilds, et les projets d'un poste Kubernetes restent dans le volume du pod. Le mode de chaque poste est écrit dans `.devzone.modules` (`workspace=kubernetes` ou `workspace=docker`) ; le détail est dans la [référence](manage/docs/reference.md#workspace-kubernetes).
+In both cases, nothing is hosted: everything runs on your machine. `workspace/` is kept across rebuilds, and the projects of a Kubernetes workstation stay in the pod's volume. The mode of each workstation is written in `.devzone.modules` (`workspace=kubernetes` or `workspace=docker`); the details are in the [reference](manage/docs/reference.md#kubernetes-workspace).
 
-## Démarrage rapide
+## Quick start
 
-### Prérequis
+### Prerequisites
 
-- **Kubernetes (mode par défaut)** : un cluster Kubernetes 1.30 ou plus qui répond, avec `kubectl` et `helm` sur la machine. Sur Mac et Windows, le plus simple est le cluster de Docker Desktop : *Settings → Kubernetes → Enable Kubernetes*. devzone lui-même n'a pas besoin de Docker dans ce mode, mais le cluster de Docker Desktop s'arrête avec Docker Desktop (si le cluster ne répond pas, voir [Questions fréquentes](#questions-fréquentes)). Détails dans le [workspace Kubernetes](manage/docs/reference.md#workspace-kubernetes).
-- **Docker (déprécié)** : Docker Desktop (ou Docker Engine sous Linux). Il sert au poste Docker, qui n'est plus un repli automatique : sans cluster, la création s'arrête. Il reste nécessaire pour lire les volumes à migrer (`devzone workspace migrate`, `devzone workspace revert` pour y retourner).
-- Node et npm (pour `npx` ou l'installation globale).
-- `make` (nécessaire pour `make shell` ; sous Windows sans `make`, voir le tableau « Au quotidien »).
+- **Kubernetes (default mode)**: a Kubernetes 1.30 or newer cluster that answers, with `kubectl` and `helm` on the machine. On Mac and Windows, the simplest is the Docker Desktop cluster: *Settings → Kubernetes → Enable Kubernetes*. devzone itself does not need Docker in this mode, but the Docker Desktop cluster stops with Docker Desktop (if the cluster does not answer, see [Frequently asked questions](#frequently-asked-questions)). Details in the [Kubernetes workspace](manage/docs/reference.md#kubernetes-workspace).
+- **Docker (deprecated)**: Docker Desktop (or Docker Engine on Linux). It serves the Docker workstation, which is no longer an automatic fallback: without a cluster, creation stops. It remains necessary to read the volumes to migrate (`devzone workspace migrate`, `devzone workspace revert` to go back).
+- Node and npm (for `npx` or the global installation).
+- `make` (needed for `make shell`; on Windows without `make`, see the table “Day to day”).
 
-Sous Windows : il est recommandé de cloner avec Git for Windows (les scripts restent en fins de ligne LF grâce à `.gitattributes`, et la commande npm trouve le `bash` qu'elle exige).
+On Windows: it is recommended to clone with Git for Windows (the scripts keep LF line endings thanks to `.gitattributes`, and the npm command finds the `bash` it requires).
 
-#### Mémoire minimale par module
+#### Minimum memory per module
 
-Mesures du 16/11/2026.
+Measurements from 16/11/2026.
 
-| Module | Consommation mesurée | Mémoire allouable exigée par devzone |
+| Module | Measured consumption | Allocatable memory required by devzone |
 |---|---|---|
-| Cluster de base | ~4 Go | aucune |
-| GitLab | ~3,6 Go | 8 Go |
-| MySQL | ~0,5 Go | aucune |
-| Argo CD | ~0,6 Go | 1 Go |
+| Base cluster | ~4 GB | none |
+| GitLab | ~3.6 GB | 8 GB |
+| MySQL | ~0.5 GB | none |
+| Argo CD | ~0.6 GB | 1 GB |
 
-Sur Docker Desktop (kind), le contrôle compare le minimum à la mémoire d'un seul nœud, donc à la VM ; sur un cluster de vraies machines, à la somme des nœuds.
+On Docker Desktop (kind), the check compares the minimum with the memory of a single node, so with the VM; on a cluster of real machines, with the sum of the nodes.
 
-- **Réglage de la RAM** :
-  - **Mac** (Docker Desktop) : *Settings → Resources > Memory*. Autre méthode : modifier `MemoryMiB` dans le fichier `settings-store.json` de Docker Desktop (Docker totalement quitté sinon il réécrit la valeur).
-  - **Windows** : fichier `%UserProfile%\.wslconfig` avec `[wsl2]` et `memory=<N>GB`, puis `wsl --shutdown`. WSL2 prend 50 % de la RAM par défaut.
-  - **Linux** : rien à régler : pas de VM, la RAM de l'hôte sert.
+- **Adjusting the RAM**:
+  - **Mac** (Docker Desktop): *Settings → Resources > Memory*. Other method: change `MemoryMiB` in Docker Desktop's `settings-store.json` file (Docker fully quit otherwise, it rewrites the value).
+  - **Windows**: file `%UserProfile%\.wslconfig` with `[wsl2]` and `memory=<N>GB`, then `wsl --shutdown`. WSL2 takes 50 % of the RAM by default.
+  - **Linux**: nothing to adjust: there is no VM, the host's RAM is used.
 
-### Lancer en une commande
+### Launch in one command
 
-Deux façons via npm. Sans installation, à chaque usage :
+Two ways via npm. Without installation, on each use:
 
 ```bash
 npx devzone mon-devzone
@@ -75,7 +75,7 @@ cd mon-devzone
 make shell
 ```
 
-Tu peux aussi l'installer une fois pour toutes :
+You can also install it once and for all:
 
 ```bash
 npm install -g devzone
@@ -86,13 +86,13 @@ cd mon-devzone
 make shell
 ```
 
-Avec un compte GitHub, l'option `--gitops <github|none|<url>>` renseigne le dépôt GitOps dès la création du dossier :
+With a GitHub account, the option `--gitops <github|none|<url>>` sets up the GitOps repository as soon as the folder is created:
 
 ```bash
 npx devzone mon-devzone --gitops github
 ```
 
-Ou bien récupérer le code directement :
+Or fetch the code directly:
 
 ```bash
 git clone https://github.com/SimBienvenueHoulBoumi/devzone.git
@@ -100,9 +100,9 @@ cd devzone
 make shell
 ```
 
-Tu peux aussi utiliser VS Code : ouvre le dossier `mon-devzone` (ou `devzone`), puis *Dev Containers: Reopen in Container*.
+You can also use VS Code: open the `mon-devzone` (or `devzone`) folder, then *Dev Containers: Reopen in Container*.
 
-À chaque démarrage, un récapitulatif t'indique ce qui est prêt ou ce qu'il te reste à faire. Ses libellés sont en anglais, et `devzone` le réaffiche à la demande. Extrait, sans identité git configurée :
+At each startup, a summary tells you what is ready or what remains to be done. Its labels are in English, and `devzone` shows it again on request. Extract, without a git identity configured:
 
 ```text
 devzone: state (devzone to show it again)
@@ -115,27 +115,27 @@ devzone: state (devzone to show it again)
   ○ module gitlab     optional, GitLab de test dans le cluster des services: devzone enable gitlab
 ```
 
-Une ligne `○ GitHub … optional` remplace `✔ GitHub connecté` tant que `gh` n'est pas connecté. La liste complète des commandes est dans `devzone --help`.
+A line `○ GitHub … optional` replaces `✔ GitHub connecté` as long as `gh` is not connected. The full list of commands is in `devzone --help`.
 
-Le premier lancement prend 4 à 5 min mesurées, plus le téléchargement des images de base sur une machine neuve.
+The first launch takes 4 to 5 min as measured, plus the download of the base images on a new machine.
 
-### Un cluster à la création
+### A cluster at creation
 
-À la création, devzone a besoin d'un cluster Kubernetes qui répond.
+At creation, devzone needs a Kubernetes cluster that answers.
 
 ```text
 devzone mon-devzone
   │
-  ├─ cluster qui répond ──▶ workspace dans le cluster (Kubernetes)
-  │                         make shell ouvre le pod ; pas de migration
+  ├─ cluster answers ─────▶ workspace in the cluster (Kubernetes)
+  │                         make shell opens the pod; no migration
   │
-  └─ sinon ───────────────▶ rien n'est créé : devzone liste les moyens
-                            d'avoir un cluster, puis tu relances
+  └─ otherwise ───────────▶ nothing is created: devzone lists the ways
+                            to get a cluster, then you rerun
 ```
 
-Sans cluster, dans un terminal, devzone propose de choisir un cluster distant (un contexte de ton kubeconfig, dont tu retapes le nom pour confirmer) ou de créer un minikube ; sans terminal, il s'arrête et affiche des commandes à copier (il ne les exécute jamais, et aucun identifiant cloud ne passe par lui) : un cluster distant (`aws eks update-kubeconfig`, `gcloud container clusters get-credentials`, `az aks get-credentials`, qui le déclarent dans ton kubeconfig ; fais-en le contexte courant de kubectl), ou un cluster local (Docker Desktop : *Settings → Kubernetes → Enable Kubernetes*, ou `minikube start -p devzone`). `devzone mon-devzone --docker` crée encore le poste Docker, **déprécié** : il sera retiré, et `devzone workspace migrate` le fait passer dans le cluster. Détails dans [manage/docs/reference.md](manage/docs/reference.md#création-directe-dans-le-cluster).
+Without a cluster, in a terminal, devzone offers to choose a remote cluster (a context of your kubeconfig, whose name you retype to confirm) or to create a minikube; without a terminal, it stops and shows commands to copy (it never runs them, and no cloud credential passes through it): a remote cluster (`aws eks update-kubeconfig`, `gcloud container clusters get-credentials`, `az aks get-credentials`, which declare it in your kubeconfig; make it the current kubectl context), or a local cluster (Docker Desktop: *Settings → Kubernetes → Enable Kubernetes*, or `minikube start -p devzone`). `devzone mon-devzone --docker` still creates the Docker workstation, **deprecated**: it will be removed, and `devzone workspace migrate` moves it into the cluster. Details in [manage/docs/reference.md](manage/docs/reference.md#direct-creation-in-the-cluster).
 
-### Vérifier que tout fonctionne
+### Check that everything works
 
 ```bash
 java -version
@@ -144,36 +144,36 @@ python3 --version
 repowarden --version
 ```
 
-Avec un cluster Kubernetes actif : `kubectl get nodes`.
+With an active Kubernetes cluster: `kubectl get nodes`.
 
-**Étape facultative** : `gh auth login -s workflow` pour activer GitHub (push, PR et tickets repowarden).
+**Optional step**: `gh auth login -s workflow` to enable GitHub (push, PR and repowarden tickets).
 
-## Ton premier projet
+## Your first project
 
-Tes projets vont dans `workspace/` (conservé sur ta machine, même après `make down` ou `make rebuild`).
+Your projects go into `workspace/` (kept on your machine, even after `make down` or `make rebuild`).
 
-Exemple :
+Example:
 ```bash
 cd workspace
 git clone https://github.com/ton-compte/ton-projet.git
-# ou
+# or
 mkdir mon-projet && cd mon-projet && git init -b main
 ```
 
-Pour en savoir plus : [Mettre en route un projet](https://github.com/SimBienvenueHoulBoumi/devzone/blob/main/manage/docs/reference.md#mettre-en-route-un-projet).
+To learn more: [Starting a project](https://github.com/SimBienvenueHoulBoumi/devzone/blob/main/manage/docs/reference.md#starting-a-project).
 
-## Ce que contient devzone
+## What devzone contains
 
-| Domaine | Outils |
+| Area | Tools |
 |---|---|
-| Langages | Java 21 + Maven + Gradle, Node LTS + pnpm, Python 3.12 (apt) + uv |
-| Conteneurs, Kubernetes | Docker de l'hôte (socket partagé), kubectl, helm, k9s, kind ; connexion au cluster de l'hôte (module `kubernetes`) ; Testcontainers (`TESTCONTAINERS_HOST_OVERRIDE`) ; montages (`$LOCAL_WORKSPACE_FOLDER`) |
-| GitHub (ou GitLab), qualité | gh, ou glab connecté à une instance GitLab (`devzone platform gitlab` dans le conteneur, [manage/docs/reference.md](manage/docs/reference.md#plateforme--github-ou-gitlab)) ; repowarden (hooks git globaux), shellcheck, bats, actionlint, gitleaks, ruff, vulture, pytest |
-| Assistants IA | Claude Code, opencode (module `ia`, désactivé par défaut) |
+| Languages | Java 21 + Maven + Gradle, Node LTS + pnpm, Python 3.12 (apt) + uv |
+| Containers, Kubernetes | Host Docker (shared socket), kubectl, helm, k9s, kind; connection to the host cluster (`kubernetes` module); Testcontainers (`TESTCONTAINERS_HOST_OVERRIDE`); mounts (`$LOCAL_WORKSPACE_FOLDER`) |
+| GitHub (or GitLab), quality | gh, or glab connected to a GitLab instance (`devzone platform gitlab` in the container, [manage/docs/reference.md](manage/docs/reference.md#platform-github-or-gitlab)); repowarden (global git hooks), shellcheck, bats, actionlint, gitleaks, ruff, vulture, pytest |
+| AI assistants | Claude Code, opencode (`ia` module, disabled by default) |
 
-## Installer un outil qui reste
+## Installing a tool that stays
 
-Un outil mis à la main (`sudo apt install tree`) ne survit pas à un `make rebuild` : l'image est reconstruite de zéro. Pour un outil qui doit rester, `devzone packages` garde la liste des paquets à réinstaller :
+A tool installed by hand (`sudo apt install tree`) does not survive a `make rebuild`: the image is rebuilt from scratch. For a tool that must stay, `devzone packages` keeps the list of packages to reinstall:
 
 ```sh
 devzone packages
@@ -182,28 +182,28 @@ devzone packages remove tree
 devzone packages apply
 ```
 
-- `devzone packages` affiche la liste : ✔ paquets installés, ○ paquets à installer ;
-- `devzone packages add <nom>…` valide chaque paquet (apt-cache), installe puis l'ajoute à la liste ;
-- `devzone packages remove <nom>` retire la liste et désinstalle ;
-- `devzone packages apply` installe les paquets manquants après un rebuild.
+- `devzone packages` shows the list: ✔ installed packages, ○ packages to install;
+- `devzone packages add <nom>…` validates each package (apt-cache), installs it, then adds it to the list;
+- `devzone packages remove <nom>` removes it from the list and uninstalls it;
+- `devzone packages apply` installs the missing packages after a rebuild.
 
-La liste vit dans `.devzone.packages` à la racine du dossier devzone, hors du dépôt. Un paquet en échec est signalé dans le récapitulatif (⚠ paquets : …) ; `devzone packages apply` peut alors être relancé.
+The list lives in `.devzone.packages` at the root of the devzone folder, outside the repository. A package that fails is reported in the summary (⚠ packages: …); `devzone packages apply` can then be run again.
 
-## Au quotidien
+## Day to day
 
-| Action | VS Code (`Cmd+Shift+P`) | `make` | Sans `make` (Windows) |
+| Action | VS Code (`Cmd+Shift+P`) | `make` | Without `make` (Windows) |
 |---|---|---|---|
-| Lancer | *Dev Containers: Reopen in Container* | `make up` | `npx @devcontainers/cli up --workspace-folder .` |
-| Ouvrir un shell | terminal de VS Code | `make shell` | `npx @devcontainers/cli exec --workspace-folder . bash` |
-| Arrêter | *Remote: Close Remote Connection* (le conteneur s'arrête avec la fenêtre) | `make stop` | — |
-| Supprimer le conteneur | — | `make down` | — |
-| Reconstruire (après une modification de `.devcontainer/`) | *Dev Containers: Rebuild Container* | `make rebuild` | `npx @devcontainers/cli up --workspace-folder . --remove-existing-container` |
-| État | — | `make status` | — |
-| **Désinstaller** (tout ce que devzone a créé, après confirmation) | — | `make uninstall` | `npx devzone uninstall` |
+| Launch | *Dev Containers: Reopen in Container* | `make up` | `npx @devcontainers/cli up --workspace-folder .` |
+| Open a shell | VS Code terminal | `make shell` | `npx @devcontainers/cli exec --workspace-folder . bash` |
+| Stop | *Remote: Close Remote Connection* (the container stops with the window) | `make stop` | — |
+| Remove the container | — | `make down` | — |
+| Rebuild (after a change to `.devcontainer/`) | *Dev Containers: Rebuild Container* | `make rebuild` | `npx @devcontainers/cli up --workspace-folder . --remove-existing-container` |
+| Status | — | `make status` | — |
+| **Uninstall** (everything devzone created, after confirmation) | — | `make uninstall` | `npx devzone uninstall` |
 
-Dans le mode Kubernetes (poste créé alors que le cluster répondait, ou après `devzone workspace migrate`), le même tableau s'applique au pod `devzone-workspace-0` : `make up`, `make shell` et `make stop` le pilotent, et `make rebuild` est refusé, car rien n'est à reconstruire sur la machine. `devzone workspace revert` rend le poste Docker (déprécié : un avertissement s'affiche, retrait prévu). Les services GitLab, PostgreSQL et Argo CD s'installent depuis le poste : `devzone workspace services enable postgres` (voir [la référence](manage/docs/reference.md#services-de-devzone-dans-le-workspace-kubernetes)). Tu peux aussi y développer : `devzone workspace clone <url>` fait un clone de travail dans le pod, `devzone ticket <n>` y crée le worktree d'un ticket et `devzone agent` y lance opencode sans copie ([développer dans le pod](manage/docs/reference.md#développer-devzone-et-repowarden-dans-le-pod)). Argo CD y est installé d'office et tient les déploiements : interface sur https://localhost:8443 (mot de passe `admin` dans `.password`), dépôt GitOps `<login>/devzone-argocd` créé sur ton GitHub, projets déclarés dans `.argocd.conf` (`devzone workspace argocd app add <dépôt>`) ; voir [Argo CD dans le workspace Kubernetes](manage/docs/reference.md#argo-cd-dans-le-workspace-kubernetes).
+In Kubernetes mode (workstation created while the cluster was answering, or after `devzone workspace migrate`), the same table applies to the pod `devzone-workspace-0`: `make up`, `make shell` and `make stop` control it, and `make rebuild` is refused, because nothing needs rebuilding on the machine. `devzone workspace revert` gives back the Docker workstation (deprecated: a warning is shown, removal planned). The GitLab, PostgreSQL and Argo CD services are installed from the workstation: `devzone workspace services enable postgres` (see [the reference](manage/docs/reference.md#devzone-services-in-the-kubernetes-workspace)). You can also develop there: `devzone workspace clone <url>` makes a working clone in the pod, `devzone ticket <n>` creates the worktree of a ticket there and `devzone agent` launches opencode there without a copy ([developing in the pod](manage/docs/reference.md#developing-devzone-and-repowarden-in-the-pod)). Argo CD is installed by default there and keeps the deployments: interface at https://localhost:8443 (password `admin` in `.password`), GitOps repository `<login>/devzone-argocd` created on your GitHub, projects declared in `.argocd.conf` (`devzone workspace argocd app add <repo>`); see [Argo CD in the Kubernetes workspace](manage/docs/reference.md#argo-cd-in-the-kubernetes-workspace).
 
-Dans le conteneur, `devzone --version` affiche la version de l'image du workspace, et `devzone --help` liste toutes les commandes. Extrait :
+In the container, `devzone --version` shows the version of the workspace image, and `devzone --help` lists all the commands. Extract:
 
 ```text
   devzone enable <module>                  enable and apply at once
@@ -211,59 +211,59 @@ Dans le conteneur, `devzone --version` affiche la version de l'image du workspac
   devzone port [<n>|--close <n>]           relay of a container port to the workstation
 ```
 
-### Mettre à jour devzone
+### Updating devzone
 
-À la création, le dossier garde sa version dans `.devzone.version` : la version, puis l'empreinte sha256 de chaque fichier copié depuis le paquet. Pour passer un dossier existant à la version du paquet :
+At creation, the folder keeps its version in `.devzone.version`: the version, then the sha256 fingerprint of each file copied from the package. To bring an existing folder to the package version:
 
 ```bash
 cd mon-devzone
 devzone update
 ```
 
-Pour la dernière version publiée, sans installation globale :
+For the latest published version, without a global installation:
 
 ```bash
 cd mon-devzone
 npx devzone@latest update
 ```
 
-La commande affiche la version du dossier et celle du paquet, et ne fait rien si elles sont égales. Sinon, elle sauvegarde dans `.devzone.backup/<date>/` les fichiers remplacés ou supprimés, liste les fichiers modifiés localement et demande confirmation (`--yes` pour un script ; sans terminal, `--yes` est nécessaire), remplace les fichiers du paquet, retire les anciennes arborescences (`core/`, `scripts/`), complète `.gitignore` sans l'écraser, puis propose `make rebuild`. `--sans-reconstruire` saute cette proposition ; sans terminal, la reconstruction n'est jamais lancée.
+The command shows the folder's version and the package's, and does nothing if they are equal. Otherwise, it backs up the replaced or deleted files to `.devzone.backup/<date>/`, lists the locally modified files and asks for confirmation (`--yes` for a script; without a terminal, `--yes` is required), replaces the package files, removes the old trees (`core/`, `scripts/`), completes `.gitignore` without overwriting it, then proposes `make rebuild`. `--sans-reconstruire` skips this proposal; without a terminal, the rebuild is never launched.
 
-`workspace/`, `.devzone.modules`, `.devzone.packages`, `.password`, `.app`, `.devzone.log` et les volumes Docker ne sont jamais touchés.
+`workspace/`, `.devzone.modules`, `.devzone.packages`, `.password`, `.app`, `.devzone.log` and the Docker volumes are never touched.
 
-Les anciens noms des fichiers et dossiers (`.devzone.paquets`, `.devzone.sauvegarde`, `.devzone.ports-workspace`, `.devzone.etat`, `.devzone.catalogue-veilleur`) sont renommés une seule fois, avec leur contenu, par `.devcontainer/rename-legacy-files.sh` : au démarrage du conteneur, à la mise à jour et à la migration. Un nouveau nom déjà présent n'est jamais écrasé.
+The old names of files and folders (`.devzone.paquets`, `.devzone.sauvegarde`, `.devzone.ports-workspace`, `.devzone.etat`, `.devzone.catalogue-veilleur`) are renamed once only, with their contents, by `.devcontainer/rename-legacy-files.sh`: at container startup, at update and at migration. A new name already present is never overwritten.
 
-La mise à jour ne change jamais le mode du poste ; sur un poste Docker avec Kubernetes joignable, elle propose `devzone workspace migrate`.
+The update never changes the workstation's mode; on a Docker workstation with Kubernetes reachable, it proposes `devzone workspace migrate`.
 
-Le workspace Kubernetes se met à jour à part : `devzone workspace update` le fait passer à la dernière release stable (ou `--version X.Y.Z`), image, charts et Argo CD au même tag. **Le pod `devzone-workspace-0` est recréé** : les fenêtres VS Code attachées au pod se coupent. L'image est vérifiée sur ghcr.io avant toute écriture, et rien ne change si elle n'existe pas encore. Détails dans la [référence](manage/docs/reference.md#mettre-à-jour-le-workspace).
+The Kubernetes workspace is updated separately: `devzone workspace update` moves it to the latest stable release (or `--version X.Y.Z`), image, charts and Argo CD at the same tag. **The pod `devzone-workspace-0` is recreated**: the VS Code windows attached to the pod are disconnected. The image is checked on ghcr.io before any write, and nothing changes if it does not exist yet. Details in the [reference](manage/docs/reference.md#updating-the-workspace).
 
-Dans le conteneur, le récapitulatif `devzone` signale une version publiée plus récente (vérification npm au plus une fois par jour, sans bloquer hors ligne) : `○ devzone X.Y.Z disponible : sur le poste, devzone update`.
+In the container, the `devzone` summary reports a more recent published version (npm check at most once a day, without blocking offline): `○ devzone X.Y.Z disponible : sur le poste, devzone update`.
 
 ## Options
 
-**Mode à la création** : `--kubernetes` (workspace dans le cluster, refusé sans cluster) ou `--docker` (poste Docker déprécié, sans contrôle du cluster). Sans option, le cluster doit répondre, sinon rien n'est créé (voir [Un cluster à la création](#un-cluster-à-la-création)).
+**Mode at creation**: `--kubernetes` (workspace in the cluster, refused without a cluster) or `--docker` (deprecated Docker workstation, without cluster check). Without an option, the cluster must answer, otherwise nothing is created (see [A cluster at creation](#a-cluster-at-creation)).
 
-**Module `ia`** : active Claude Code et opencode (versions figées), avec le garde-fou repowarden qui les arrête avant de modifier `main` ou `develop` ou de commiter sans `repowarden cc` (voir [manage/docs/reference.md](manage/docs/reference.md#garde-fou-des-assistants-ia)). Pour l'activer : `devzone enable ia`. Ils sont désinstallés quand le module est désactivé, mais tes connexions restent dans leurs volumes. Le module pose aussi un garde-fou qui arrête les commandes `docker` des agents : devzone est Kubernetes d'abord, seuls les pods sont des conteneurs (`kubectl`, ou un pod jetable, à la place).
+**`ia` module**: enables Claude Code and opencode (pinned versions), with the repowarden guard that stops them before they modify `main` or `develop` or commit without `repowarden cc` (see [manage/docs/reference.md](manage/docs/reference.md#ai-assistants-guard)). To enable it: `devzone enable ia`. They are uninstalled when the module is disabled, but your logins stay in their volumes. The module also sets up a guard that stops the `docker` commands of agents: devzone is Kubernetes first, only pods are containers (`kubectl`, or a disposable pod, instead).
 
-**Modèles de ton ordinateur** : devzone n'héberge aucun modèle. Si Ollama tourne sur ta machine, `devzone enable ia` détecte ses modèles et les branche à opencode (rien n'est installé ni téléchargé). `devzone ai` les liste avec le modèle par défaut, `devzone ai check` dit si chacun est à jour sans rien télécharger, et `devzone ai rapport` détaille le modèle retenu et pourquoi (la variable `DEVZONE_HOST_MODEL`, une mesure, ou la règle « un modèle de code d'abord, puis le plus petit »). Détails dans [manage/docs/reference.md](manage/docs/reference.md#configuration-dopencode). Le module `llm` (modèle hébergé dans le cluster) a été retiré : devzone n'héberge aucun modèle.
+**Models on your computer**: devzone hosts no model. If Ollama runs on your machine, `devzone enable ia` detects its models and connects them to opencode (nothing is installed or downloaded). `devzone ai` lists them with the default model, `devzone ai check` says whether each one is up to date without downloading anything, and `devzone ai rapport` details the selected model and why (the `DEVZONE_HOST_MODEL` variable, a measurement, or the rule “a code model first, then the smallest”). Details in [manage/docs/reference.md](manage/docs/reference.md#opencode-configuration). The `llm` module (model hosted in the cluster) has been removed: devzone hosts no model.
 
-**Module `kubernetes`** : active à chaque démarrage la connexion au cluster de l'hôte et l'installation de metrics-server sur les clusters locaux (pour voir le CPU et la RAM dans k9s). Pour l'activer : `devzone enable kubernetes`. Sans ce module, kubectl, helm, k9s et kind restent installés.
+**`kubernetes` module**: enables, at each startup, the connection to the host cluster and the installation of metrics-server on local clusters (to see CPU and RAM in k9s). To enable it: `devzone enable kubernetes`. Without this module, kubectl, helm, k9s and kind remain installed.
 
-**Plateforme GitHub ou GitLab** : GitHub par défaut (nouvelle architecture). Pour servir une équipe sur GitLab : `devzone platform gitlab --url URL` (ou sans `--url` quand le module `gitlab` est activé, pour l'instance de test) : glab est installé (version figée, somme vérifiée) et connecté à l'instance, et `devzone` l'affiche à la place des contrôles `gh`. `devzone platform github` revient en arrière (glab retiré). GitLab est accessible directement depuis le poste sans relais temporaire. Détails dans [manage/docs/reference.md](manage/docs/reference.md#plateforme--github-ou-gitlab).
+**GitHub or GitLab platform**: GitHub by default (new architecture). To serve a team on GitLab: `devzone platform gitlab --url URL` (or without `--url` when the `gitlab` module is enabled, for the test instance): glab is installed (pinned version, checksum verified) and connected to the instance, and `devzone` shows it instead of the `gh` checks. `devzone platform github` goes back (glab removed). GitLab is reachable directly from the workstation without a temporary relay. Details in [manage/docs/reference.md](manage/docs/reference.md#platform-github-or-gitlab).
 
-**Module `postgres`** : un PostgreSQL partagé, une base par projet (voir [Accéder à PostgreSQL](#accéder-à-postgresql)). Pour l'activer : `devzone enable postgres`.
+**`postgres` module**: a shared PostgreSQL, one database per project (see [Connecting to PostgreSQL](#connecting-to-postgresql)). To enable it: `devzone enable postgres`.
 
-**Module `argocd`** : Argo CD sur le cluster de devzone, interface sur https://127.0.0.1:8443 dans le conteneur (voir [Argo CD](manage/docs/reference.md#argo-cd)). Pour l'activer : `devzone enable argocd`.
+**`argocd` module**: Argo CD on the devzone cluster, interface at https://127.0.0.1:8443 in the container (see [Argo CD](manage/docs/reference.md#argo-cd)). To enable it: `devzone enable argocd`.
 
-**Option `devzone agent --pod`** : lance une session agent dans un pod éphémère isolé (ticket #222). Le pod est créé avec des ressources limitées (2 CPU, 4 Gi mémoire), des montages restreints du workspace et de l'état, et une affinité obligatoire vers le pod workspace. Isole : worktree du ticket au même chemin que dans le workspace, .git du dépôt, et sous-dossiers d'état (.config/opencode, .local/share/opencode, .local/state/oc-lancer, .local/npm en lecture seule). N'isole pas : le réseau (non filtré, c'est #220), le kubeconfig de l'hôte, `~/.config/gh`, `~/.claude`, les autres worktrees, et, comme le `.git` du dépôt est monté, les références git des autres branches y restent lisibles et modifiables. Sans `--pod`, le comportement `devzone agent` actuel est strictement inchangé.
+**`devzone agent --pod` option**: launches an agent session in an isolated disposable pod (ticket #222). The pod is created with limited resources (2 CPU, 4 Gi memory), restricted mounts of the workspace and the state, and a mandatory affinity to the workspace pod. It isolates: the ticket's worktree at the same path as in the workspace, the repository's `.git`, and state subfolders (.config/opencode, .local/share/opencode, .local/state/oc-lancer, .local/npm read-only). It does NOT isolate: the network (unfiltered, that is #220), the host kubeconfig, `~/.config/gh`, `~/.claude`, the other worktrees, and, since the repository's `.git` is mounted, the git references of the other branches remain readable and writable there. Without `--pod`, the current `devzone agent` behavior is strictly unchanged.
 
-Ces modules sont désactivés par défaut, activables à la demande depuis le conteneur (sans rebuild), et leur choix est conservé d'un démarrage à l'autre.
+These modules are disabled by default, can be enabled on demand from the container (without a rebuild), and their choice is kept from one startup to the next.
 
-La commande `devzone` s'écrit en anglais, sous-commandes et options comprises (`enable`, `disable`, `platform`, `packages`, `update`, `uninstall`, `status`, `use` ; `postgres create`, `packages add`, `gitlab new-password`, `port --close`, `cluster --yes`). Les anciens noms français restent acceptés et écrivent un avertissement ; la table complète est dans [Anciens noms des commandes](manage/docs/reference.md#anciens-noms-des-commandes).
+The `devzone` command is written in English, subcommands and options included (`enable`, `disable`, `platform`, `packages`, `update`, `uninstall`, `status`, `use`; `postgres create`, `packages add`, `gitlab new-password`, `port --close`, `cluster --yes`). The old French names are refused with the new name; the full table is in [Removed names](manage/docs/reference.md#removed-names).
 
-## Où sont mes identifiants ?
+## Where are my credentials?
 
-Les comptes créés par devzone sont regroupés dans `.password`, à la racine de devzone (à côté de `.devzone.modules`). Une ligne par compte, colonnes séparées par des tabulations :
+The accounts created by devzone are grouped in `.password`, at the root of devzone (next to `.devzone.modules`). One line per account, columns separated by tabs:
 
 ```text
 # service	address	user	password
@@ -273,29 +273,29 @@ postgres:monprojet	127.0.0.1:5432/monprojet	monprojet	…
 argocd	https://127.0.0.1:8443	admin	…
 ```
 
-Le fichier est lisible par toi seul (600) et ignoré par git : ne le copie ni ne le commit jamais. Il est régénéré à chaque création, suppression ou changement de compte (modules `gitlab`, `postgres` et `argocd`, seed GitLab, démarrage) :
+The file is readable by you only (600) and ignored by git: never copy it or commit it. It is regenerated at each creation, deletion or change of account (`gitlab`, `postgres` and `argocd` modules, GitLab seed, startup):
 
 ```sh
-devzone passwords                  # régénère le fichier et affiche seulement son chemin
-devzone postgres create <projet>         # création, ou nouveau mot de passe avec --new-password
-devzone postgres delete <projet>     # suppression du compte et de sa ligne
-devzone gitlab new-password [root|dev]  # mot de passe aléatoire (root ou dev) régénéré
+devzone passwords                  # regenerates the file and only shows its path
+devzone postgres create <projet>         # creation, or new password with --new-password
+devzone postgres delete <projet>     # deletion of the account and its line
+devzone gitlab new-password [root|dev]  # random password (root or dev) regenerated
 ```
 
-Les fichiers des modules restent la source : `workspace/.postgres/<projet>.env`, `workspace/.postgres/admin-password`, `workspace/.gitlab/root-password`, `workspace/.gitlab/dev-password` et `workspace/.argocd/admin.env`.
+The module files remain the source: `workspace/.postgres/<projet>.env`, `workspace/.postgres/admin-password`, `workspace/.gitlab/root-password`, `workspace/.gitlab/dev-password` and `workspace/.argocd/admin.env`.
 
-Le secret Rails de GitLab est conservé dans `workspace/.gitlab/rails-secret.yaml` (600) et réappliqué à une réinstallation ; à défaut, si le secret a été perdu, le récapitulatif avertit : « GitLab réinstallé : si le navigateur affiche 422, supprimez les données de site de gitlab.localhost ».
+The GitLab Rails secret is kept in `workspace/.gitlab/rails-secret.yaml` (600) and reapplied on a reinstallation; failing that, if the secret was lost, the summary warns: “GitLab reinstalled: if the browser shows 422, delete the site data of gitlab.localhost”.
 
-## Accéder à PostgreSQL
+## Connecting to PostgreSQL
 
-Le module `postgres` installe un PostgreSQL 16 partagé sur le cluster de devzone : une base et un utilisateur par projet. Toutes les commandes se lancent dans le conteneur (`make shell`).
+The `postgres` module installs a shared PostgreSQL 16 on the devzone cluster: one database and one user per project. All commands are run in the container (`make shell`).
 
 ```sh
-devzone enable postgres          # la première fois : choix du cluster (kind dédié ou cluster de l'hôte)
-devzone postgres create monprojet  # base et utilisateur « monprojet »
+devzone enable postgres          # the first time: choice of the cluster (dedicated kind or host cluster)
+devzone postgres create monprojet  # database and user "monprojet"
 ```
 
-Les identifiants sont écrits dans `workspace/.postgres/monprojet.env` (lisible par toi seul, jamais commité) :
+The credentials are written to `workspace/.postgres/monprojet.env` (readable by you only, never committed):
 
 ```text
 DB_HOST=127.0.0.1
@@ -306,7 +306,7 @@ DB_PASSWORD=…
 DB_URL=jdbc:postgresql://127.0.0.1:5432/monprojet
 ```
 
-PostgreSQL est joignable sur `127.0.0.1:5432` depuis le conteneur. Exemple Spring Boot (`application.yaml` d'un projet rangé dans `workspace/<dossier>/<projet>/`) :
+PostgreSQL is reachable on `127.0.0.1:5432` from the container. Spring Boot example (`application.yaml` of a project stored in `workspace/<dossier>/<projet>/`):
 
 ```yaml
 spring:
@@ -318,150 +318,150 @@ spring:
     password: ${DB_PASSWORD}
 ```
 
-Autres commandes : `devzone postgres list`, `devzone postgres psql monprojet` (console), `devzone postgres delete monprojet`, `devzone cluster [CTX]` (voir ou changer de cluster). Détails dans [manage/docs/reference.md](manage/docs/reference.md#postgresql).
+Other commands: `devzone postgres list`, `devzone postgres psql monprojet` (console), `devzone postgres delete monprojet`, `devzone cluster [CTX]` (to see or change the cluster). Details in [manage/docs/reference.md](manage/docs/reference.md#postgresql).
 
-### Voir le contenu de la base
+### Viewing the database contents
 
-Dans le conteneur :
+In the container:
 
 ```sh
-devzone postgres list              # les bases et leur propriétaire
-devzone postgres psql monprojet     # console SQL connectée à la base « monprojet », avec son utilisateur
+devzone postgres list              # the databases and their owner
+devzone postgres psql monprojet     # SQL console connected to the database "monprojet", with its user
 ```
 
-Dans la console (`\q` pour sortir) :
+In the console (`\q` to exit):
 
-| Commande | Affiche |
+| Command | Shows |
 |---|---|
-| `\conninfo` | la base et l'utilisateur de la connexion |
-| `\dt` | les tables de la base |
-| `\d task` | la structure d'une table : colonnes, types, index, clés |
-| `\dn` | les schémas |
-| `SELECT * FROM task LIMIT 10;` | les premières lignes d'une table |
-| `SELECT * FROM flyway_schema_history;` | les migrations Flyway appliquées (si le projet utilise Flyway) |
+| `\conninfo` | the database and user of the connection |
+| `\dt` | the tables of the database |
+| `\d task` | the structure of a table: columns, types, indexes, keys |
+| `\dn` | the schemas |
+| `SELECT * FROM task LIMIT 10;` | the first rows of a table |
+| `SELECT * FROM flyway_schema_history;` | the Flyway migrations applied (if the project uses Flyway) |
 
-`devzone postgres psql`, sans nom de projet, ouvre la console en superutilisateur `postgres` : toutes les bases (`\l`), tous les utilisateurs (`\du`). Réserve-la à l'administration, une erreur y touche les bases de tous les projets.
+`devzone postgres psql`, without a project name, opens the console as the `postgres` superuser: all databases (`\l`), all users (`\du`). Reserve it for administration: a mistake there touches the databases of all projects.
 
-### Se connecter depuis le poste (IntelliJ, DBeaver, psql)
+### Connecting from the workstation (IntelliJ, DBeaver, psql)
 
-Le relais de devzone rend PostgreSQL joignable **dans le conteneur** seulement (en attendant [#292](https://github.com/SimBienvenueHoulBoumi/devzone/issues/292)). Pour un client installé sur le poste, ouvre un tunnel dans un terminal **du poste** (Terminal du Mac, pas celui du conteneur), et laisse-le ouvert :
+devzone's relay makes PostgreSQL reachable **inside the container** only (pending [#292](https://github.com/SimBienvenueHoulBoumi/devzone/issues/292)). For a client installed on the workstation, open a tunnel in a **workstation** terminal (the Mac Terminal, not the container's one), and leave it open:
 
 ```sh
 kubectl --context docker-desktop -n devzone-postgres port-forward svc/postgres 5432:5432
 ```
 
-(`docker-desktop` : le Kubernetes de l'hôte, celui de devzone par défaut ; `15432:5432` si un PostgreSQL local occupe déjà le port 5432 du poste.)
+(`docker-desktop`: the host's Kubernetes, devzone's by default; `15432:5432` if a local PostgreSQL already occupies port 5432 of the workstation.)
 
-Puis, dans le client, une connexion PostgreSQL : hôte `localhost`, port `5432`, base, utilisateur et mot de passe lus dans `workspace/.postgres/monprojet.env` (`DB_NAME`, `DB_USER`, `DB_PASSWORD`). Dans IntelliJ : *View → Tool Windows → Database → + → Data Source → PostgreSQL*, puis *Test Connection* (fenêtre Database : IntelliJ Ultimate ; plugin *Database Navigator* sinon).
+Then, in the client, a PostgreSQL connection: host `localhost`, port `5432`, database, user and password read in `workspace/.postgres/monprojet.env` (`DB_NAME`, `DB_USER`, `DB_PASSWORD`). In IntelliJ: *View → Tool Windows → Database → + → Data Source → PostgreSQL*, then *Test Connection* (Database window: IntelliJ Ultimate; *Database Navigator* plugin otherwise).
 
-« Connection refused » : le tunnel ne tourne pas, ou il a été lancé dans le conteneur. Une base recréée (`devzone postgres delete` puis `create`, ou `create --new-password`) a un nouveau mot de passe : à reporter dans le client.
+“Connection refused”: the tunnel is not running, or it was started in the container. A database recreated (`devzone postgres delete` then `create`, or `create --new-password`) has a new password: update it in the client.
 
-### Droits : un utilisateur par base
+### Rights: one user per database
 
-L'utilisateur d'un projet possède **sa** base (il y crée tables, index, données) et rien d'autre : il ne peut ni créer une base, ni se connecter à celle d'un autre projet. D'où, dans un client, `[42501] ERROR: permission denied to create database`. C'est voulu (les projets ne se voient pas). Pour une nouvelle base : `devzone postgres create <projet>`, qui donne son propre utilisateur et son fichier `.env`.
+A project's user owns **its** database (it creates tables, indexes, data in it) and nothing else: it cannot create a database, nor connect to another project's. Hence, in a client, `[42501] ERROR: permission denied to create database`. This is intended (projects do not see each other). For a new database: `devzone postgres create <projet>`, which gives it its own user and its `.env` file.
 
-> Le module `gitlab` a aussi son propre PostgreSQL (`gitlab-postgresql`) : il appartient à GitLab, n'y mets pas tes bases.
+> The `gitlab` module also has its own PostgreSQL (`gitlab-postgresql`): it belongs to GitLab, do not put your databases in it.
 
-## Voir mon application dans le navigateur
+## See my application in the browser
 
-Sur le poste Kubernetes, `devzone workspace start` lance un veilleur de ports : chaque port TCP ≥ 1024 qui écoute dans le pod est relayé sur `127.0.0.1` du poste, au même numéro, par `kubectl port-forward`. Un serveur lancé dans le pod (`npm run dev`, port 5173) répond donc sur `http://localhost:5173`, sans commande. Les services activés (PostgreSQL, MySQL, Argo CD) sont relayés aussi, sur leur port habituel. Les Services des applications déployées dans le cluster sont relayés de la même façon, chacun sur un port local (80 → 8080 ; un port déjà pris ailleurs devient un autre port) : `devzone workspace ports status` affiche leur URL `http://127.0.0.1:<port>`. Un Service peut être exclu avec l'annotation `devzone.io/relay: "false"`. Le veilleur se pilote avec `devzone workspace ports start|stop|status` ; détails dans la [référence](manage/docs/reference.md#applications-et-services-sur-localhost-du-poste).
+On the Kubernetes workstation, `devzone workspace start` starts a port watcher: each TCP port ≥ 1024 that listens in the pod is relayed to `127.0.0.1` of the workstation, at the same number, by `kubectl port-forward`. A server started in the pod (`npm run dev`, port 5173) therefore answers at `http://localhost:5173`, without a command. The enabled services (PostgreSQL, MySQL, Argo CD) are relayed too, on their usual port. The Services of applications deployed in the cluster are relayed the same way, each on a local port (80 → 8080; a port already taken elsewhere becomes another port): `devzone workspace ports status` shows their URL `http://127.0.0.1:<port>`. A Service can be excluded with the annotation `devzone.io/relay: "false"`. The watcher is driven with `devzone workspace ports start|stop|status`; details in the [reference](manage/docs/reference.md#applications-and-services-on-the-workstations-localhost).
 
-Sur le poste Docker, une application lancée **dans** le conteneur (par exemple un Spring Boot avec `./gradlew bootRun` sur le port 8080) n'est pas joignable depuis le poste : le conteneur devzone ne publie aucun port. Dès qu'elle écoute dans le conteneur, le **veilleur de ports automatiques** (`.devcontainer/ports-auto.sh`) pose un relais `alpine/socat` (version figée) sur le Docker de l'hôte, de `127.0.0.1:<port>` du poste vers le port du conteneur : `http://localhost:<port>` **sans commande**. Le relais disparaît quand l'application s'arrête.
+On the Docker workstation, an application launched **inside** the container (for example a Spring Boot with `./gradlew bootRun` on port 8080) is not reachable from the workstation: the devzone container publishes no port. As soon as it listens in the container, the **automatic port watcher** (`.devcontainer/ports-auto.sh`) sets up an `alpine/socat` relay (pinned version) on the host's Docker, from `127.0.0.1:<port>` of the workstation to the container's port: `http://localhost:<port>` **without a command**. The relay disappears when the application stops.
 
 ```sh
-devzone port             # liste : relais manuels et automatiques, ● actif ou ○ arrêté
-devzone port auto off    # coupe le veilleur : plus de relais automatique
-devzone port --close <n> # retire un relais manuel et son port de l'état
+devzone port             # list: manual and automatic relays, ● active or ○ stopped
+devzone port auto off    # stops the watcher: no more automatic relay
+devzone port --close <n> # removes a manual relay and its port from the state
 ```
 
-`devzone port <n>` ouvre aussi un relais manuel : même mécanisme côté poste, conteneur `alpine/socat`, nom `devzone-<instance>-port-<n>`.
+`devzone port <n>` also opens a manual relay: same mechanism on the workstation side, `alpine/socat` container, name `devzone-<instance>-port-<n>`.
 
-Depuis le poste : `http://localhost:8080`. Le relais manuel est recréé automatiquement au démarrage du conteneur, vers l'adresse actuelle du conteneur ; il est retiré par `make uninstall` (étiquette `devzone.instance`). Le relais automatique disparaît avec l'application.
+From the workstation: `http://localhost:8080`. The manual relay is recreated automatically at container startup, toward the container's current address; it is removed by `make uninstall` (label `devzone.instance`). The automatic relay disappears with the application.
 
-Spring Boot écoute sur `0.0.0.0` par défaut : ne fixe pas `server.address` à `127.0.0.1`, sinon le relais ne peut pas joindre l'application. Un port déjà pris sur le poste, un port invalide ou un Docker de l'hôte injoignable sont refusés avec un code non nul. Détails dans [manage/docs/reference.md](manage/docs/reference.md#ports-vers-le-poste).
+Spring Boot listens on `0.0.0.0` by default: do not set `server.address` to `127.0.0.1`, otherwise the relay cannot reach the application. A port already taken on the workstation, an invalid port or an unreachable host Docker are refused with a non-zero exit code. Details in [manage/docs/reference.md](manage/docs/reference.md#ports-to-the-workstation).
 
-## Questions fréquentes
+## Frequently asked questions
 
-- **Docker absent ou arrêté** : `npx devzone`, `make up`, `make rebuild` et `make uninstall` vérifient Docker avant tout et disent quoi faire : l'installer (Docker Desktop, ou Docker Engine sous Linux), démarrer Docker Desktop, ou, sous Linux, ajouter ton compte au groupe `docker` (`sudo usermod -aG docker $USER`, puis une nouvelle session). Avec `npx devzone mon-devzone`, le dossier est créé quand même : une fois Docker démarré, `cd mon-devzone && make shell`.
-- **Accès au socket Docker de l'hôte** : le socket Docker de la machine hôte est monté dans le conteneur. Cela offre un accès administrateur au Docker de l'hôte, y compris pour les agents IA. C'est un compromis de sécurité assumé documenté dans la section Limites. Pour restreindre l'accès, utilisez les mécanismes propres à Docker Desktop/Linux.
-- **Le premier lancement est long** : c'est normal (construction de l'image, téléchargement des images de base). Il prend 4 à 5 min mesurées, plus le téléchargement des images de base sur une machine neuve.
-- **`make` est absent sous Windows** : tu peux utiliser `npx @devcontainers/cli` (voir le tableau « Au quotidien ») ou Git Bash. Les scripts sont compatibles (fins de ligne LF).
-- **Le cluster Kubernetes ne répond pas** : devzone ne crée jamais de cluster. À la création, sans cluster qui répond (en 5 s), rien n'est créé : la commande échoue (code 1), dit pourquoi et liste les moyens d'avoir un cluster (voir [Un cluster à la création](#un-cluster-à-la-création)) :
+- **Docker absent or stopped**: `npx devzone`, `make up`, `make rebuild` and `make uninstall` check Docker first and tell you what to do: install it (Docker Desktop, or Docker Engine on Linux), start Docker Desktop, or, on Linux, add your account to the `docker` group (`sudo usermod -aG docker $USER`, then a new session). With `npx devzone mon-devzone`, the folder is created anyway: once Docker is started, `cd mon-devzone && make shell`.
+- **Access to the host's Docker socket**: the host machine's Docker socket is mounted in the container. This grants administrator access to the host's Docker, including for AI agents. It is a deliberate security trade-off documented in the Limits section. To restrict access, use the mechanisms specific to Docker Desktop/Linux.
+- **The first launch is long**: this is normal (building the image, downloading the base images). It takes 4 to 5 min as measured, plus the download of the base images on a new machine.
+- **`make` is missing on Windows**: you can use `npx @devcontainers/cli` (see the table “Day to day”) or Git Bash. The scripts are compatible (LF line endings).
+- **The Kubernetes cluster does not answer**: devzone never creates a cluster. At creation, without a cluster that answers (within 5 s), nothing is created: the command fails (code 1), says why and lists the ways to get a cluster (see [A cluster at creation](#a-cluster-at-creation)):
 
   ```text
   ✖ Kubernetes not reachable: cluster <contexte> unreachable (<serveur>). Nothing created.
   ```
 
-  Seul `--docker` crée encore un poste Docker, déprécié. Ensuite, `devzone workspace start` (donc `make up` et `make shell`) vérifie le cluster en premier et s'arrête sans rien modifier. Le message dit la cause :
+  Only `--docker` still creates a Docker workstation, deprecated. Then, `devzone workspace start` (so `make up` and `make shell`) checks the cluster first and stops without changing anything. The message gives the cause:
 
-  - **Docker Desktop arrêté** : `✖ Docker Desktop is stopped: the Kubernetes cluster of this machine runs inside it. Start Docker Desktop, then: make shell`. Lance Docker Desktop, puis `make shell`. Pour qu'il démarre à chaque connexion : *Settings → General → Start Docker Desktop when you sign in*.
-  - **Docker répond, pas le cluster** : `✖ Kubernetes cluster <contexte> unreachable (<serveur>): enable Kubernetes in Docker Desktop (Settings → Kubernetes) or check kubectl config get-contexts`. Active Kubernetes dans Docker Desktop (*Settings → Kubernetes → Enable Kubernetes*).
-  - **Autre cluster** : `✖ Kubernetes cluster <contexte> unreachable (<serveur>)`, suivi de `Check the contexts: kubectl config get-contexts`. Vérifie le contexte choisi, ou change-le avec `devzone use CTX`.
+  - **Docker Desktop stopped**: `✖ Docker Desktop is stopped: the Kubernetes cluster of this machine runs inside it. Start Docker Desktop, then: make shell`. Start Docker Desktop, then `make shell`. To have it start at each login: *Settings → General → Start Docker Desktop when you sign in*.
+  - **Docker answers, not the cluster**: `✖ Kubernetes cluster <contexte> unreachable (<serveur>): enable Kubernetes in Docker Desktop (Settings → Kubernetes) or check kubectl config get-contexts`. Enable Kubernetes in Docker Desktop (*Settings → Kubernetes → Enable Kubernetes*).
+  - **Other cluster**: `✖ Kubernetes cluster <contexte> unreachable (<serveur>)`, followed by `Check the contexts: kubectl config get-contexts`. Check the chosen context, or change it with `devzone use CTX`.
 
-  Détails dans la [référence](manage/docs/reference.md#le-cluster-ne-répond-pas).
-- **Problème d'identité git pour commiter** : règle-la une seule fois. Avec GitHub : `gh auth login -s workflow` (l'identité est déduite automatiquement). Sans GitHub : `git config --file ~/.config/git/config user.name "<nom>"` et `git config --file ~/.config/git/config user.email "<email>"`.
-- **`make up` semble bloqué** : il affiche ses étapes et un signe de vie au moins toutes les 30 s ; le journal complet est dans `.devzone.log`.
+  Details in the [reference](manage/docs/reference.md#the-cluster-does-not-answer).
+- **Git identity problem when committing**: set it once. With GitHub: `gh auth login -s workflow` (the identity is deduced automatically). Without GitHub: `git config --file ~/.config/git/config user.name "<nom>"` and `git config --file ~/.config/git/config user.email "<email>"`.
+- **`make up` seems stuck**: it shows its steps and a sign of life at least every 30 s; the full log is in `.devzone.log`.
 
-## Changer de cluster
+## Changing cluster
 
 ```sh
-devzone clusters                    # vue : contextes, type, état, namespace
-devzone use CTX [-n NS]        # bascule le cluster de travail de kubectl
-devzone use -n NS              # change seulement le namespace du cluster courant
+devzone clusters                    # view: contexts, type, state, namespace
+devzone use CTX [-n NS]        # switches the kubectl working cluster
+devzone use -n NS              # changes only the namespace of the current cluster
 ```
 
-L'invite du shell affiche `⎈ ctx/ns` (cyan si local, rouge gras avec distant sinon). Un rebuild repart sur le cluster de l'hôte : le choix de kubectl est écrit dans `~/.kube/config`, qui n'est pas dans un volume.
+The shell prompt shows `⎈ ctx/ns` (cyan if local, bold red if remote otherwise). A rebuild restarts on the host's cluster: the kubectl choice is written to `~/.kube/config`, which is not in a volume.
 
-## Désinstaller
+## Uninstalling
 
 ```bash
 make uninstall
 ```
 
-Cette commande supprime le conteneur, l'image `vsc-devzone-…`, les volumes `devzone-*`, les events du Docker de l'hôte et les clusters kind créés sur l'hôte, les namespaces `devzone-postgres` et les étiquettes `app.kubernetes.io/managed-by=devzone` sur les clusters de l'hôte, ainsi que les éventuels metrics-server installés par devzone. Les ressources sont filtrées par l'étiquette `devzone.instance` pour ne cibler que l'instance courante. Elle **ne touche jamais** à `workspace/` (tes projets). Pour garder tes connexions (GitHub, git, Claude Code, opencode et modules) : `make uninstall KEEP=logins` (ancien `GARDER=connexions` accepté).
+This command removes the container, the image `vsc-devzone-…`, the `devzone-*` volumes, the events of the host's Docker and the kind clusters created on the host, the `devzone-postgres` namespaces and the `app.kubernetes.io/managed-by=devzone` labels on the host's clusters, as well as any metrics-server installed by devzone. Resources are filtered by the `devzone.instance` label to target only the current instance. It **never touches** `workspace/` (your projects). To keep your logins (GitHub, git, Claude Code, opencode and modules): `make uninstall KEEP=logins` (old `GARDER=connexions` still accepted).
 
-Avec la commande installée globalement (`npm install -g devzone`), tu peux aussi lancer, dans le dossier du devzone :
+With the command installed globally (`npm install -g devzone`), you can also run, in the devzone folder:
 
 ```bash
 devzone uninstall
 ```
 
-Même effet que `make uninstall`. Ensuite seulement, pour retirer la commande de ta machine :
+Same effect as `make uninstall`. Then only, to remove the command from your machine:
 
 ```bash
 npm uninstall -g devzone
 ```
 
-Cette commande retire seulement la commande `devzone` de ta machine ; elle ne supprime ni conteneur, ni volume, ni dossier.
+This command only removes the `devzone` command from your machine; it deletes neither the container, nor the volumes, nor the folder.
 
-## Noms retirés
+## Removed names
 
-Les commandes, sous-commandes et options s'écrivent en anglais. Les anciens noms français sont retirés : devzone les refuse, affiche le nouveau nom et ne fait rien.
+Commands, subcommands and options are written in English. The old French names are removed: devzone refuses them, shows the new name and does nothing.
 
 ```
 ✖ « activer » a été renommé : devzone enable
 ```
 
-La table complète (commandes, sous-commandes, options) est dans [la référence](manage/docs/reference.md#noms-retirés).
+The full table (commands, subcommands, options) is in [the reference](manage/docs/reference.md#removed-names).
 
-## Pour aller plus loin
+## Going further
 
-- [Référence détaillée](https://github.com/SimBienvenueHoulBoumi/devzone/blob/main/manage/docs/reference.md)
-- [Contribuer](https://github.com/SimBienvenueHoulBoumi/devzone/blob/main/manage/docs/contribuer.md) : tests, processus de livraison et organisation
+- [Detailed reference](https://github.com/SimBienvenueHoulBoumi/devzone/blob/main/manage/docs/reference.md)
+- [Contributing](https://github.com/SimBienvenueHoulBoumi/devzone/blob/main/manage/docs/contributing.md): tests, delivery process and organization
 
-## Licence
+## License
 
-devzone est un logiciel libre, distribué sous la [GNU General Public License version 3](https://github.com/SimBienvenueHoulBoumi/devzone/blob/main/LICENSE).
+devzone is free software, distributed under the [GNU General Public License version 3](https://github.com/SimBienvenueHoulBoumi/devzone/blob/main/LICENSE).
 
 
-### Mandataire de sortie des sessions d’agent (désactivé par défaut)
+### Egress proxy for agent sessions (disabled by default)
 
-Limite le réseau sortant des sessions lancées avec `devzone agent --pod` via un mandataire HTTP(S) (Squid) dans le namespace du workspace. Tout est désactivé par défaut : sans activation, le rendu du chart et le manifeste des pods de session restent identiques.
+Limits the outbound network of sessions launched with `devzone agent --pod` through an HTTP(S) proxy (Squid) in the workspace namespace. Everything is disabled by default: without activation, the chart rendering and the manifest of the session pods remain identical.
 
-- **Modes** : `observation` (le mandataire accepte tout et journalise, aucune coupure, pour construire la liste) ; `strict` (seule la liste de domaines est autorisée, et une NetworkPolicy limite la sortie des pods de session au mandataire et au DNS).
-- **Activer** (Helm) : `egressProxy.enabled=true` et `egressProxy.mode=observation` ou `strict` (liste : `egressProxy.allowedDomains`, par défaut `.opencode.ai`, `.npmjs.org`, `.github.com`).
-- **Lire les contacts** : `kubectl logs deploy/devzone-workspace-egress-proxy -c access-log -n <namespace>`.
-- **Garde (strict)** : une fenêtre de 1 à 2 s existe au démarrage avant que la restriction soit programmée ; un conteneur d’initialisation attend que l’accès direct soit fermé (20 essais, 1 s) et refuse la session si la restriction ne devient jamais effective.
-- **Limites** : le workspace lui-même reste ouvert ; seules les sessions `devzone agent --pod` sont filtrées ; les outils qui ignorent `HTTPS_PROXY` sont bloqués en mode strict.
-- **Commandes** (#633) : `devzone workspace egress observation|strict|off`, `egress status` (domaines contactés et leur état), `egress allow|deny <domaine>`. Le réglage est gardé dans `.devzone.modules` et rejoué à chaque `workspace start` et `workspace update` ; le pod n'est pas recréé.
-- **Parcours** : `devzone workspace egress observation`, puis `egress status` pour voir les domaines contactés, `egress allow <domaine>` pour ceux qui manquent, et enfin `devzone workspace egress strict`.
+- **Modes**: `observation` (the proxy accepts everything and logs, no cut-off, to build the list); `strict` (only the domain list is allowed, and a NetworkPolicy limits the output of the session pods to the proxy and DNS).
+- **Enable** (Helm): `egressProxy.enabled=true` and `egressProxy.mode=observation` or `strict` (list: `egressProxy.allowedDomains`, default `.opencode.ai`, `.npmjs.org`, `.github.com`).
+- **Reading the contacts**: `kubectl logs deploy/devzone-workspace-egress-proxy -c access-log -n <namespace>`.
+- **Guard (strict)**: a window of 1 to 2 s exists at startup before the restriction is scheduled; an init container waits for direct access to be closed (20 tries, 1 s) and refuses the session if the restriction never becomes effective.
+- **Limits**: the workspace itself remains open; only `devzone agent --pod` sessions are filtered; tools that ignore `HTTPS_PROXY` are blocked in strict mode.
+- **Commands** (#633): `devzone workspace egress observation|strict|off`, `egress status` (domains contacted and their state), `egress allow|deny <domaine>`. The setting is kept in `.devzone.modules` and replayed at each `workspace start` and `workspace update`; the pod is not recreated.
+- **Path**: `devzone workspace egress observation`, then `egress status` to see the domains contacted, `egress allow <domaine>` for those missing, and finally `devzone workspace egress strict`.

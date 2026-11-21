@@ -1,27 +1,20 @@
-# Contribuer à devzone
+# Contributing to devzone
 
-## Langues
+## Languages
 
-- Le **code** est en anglais : identifiants, noms de fichiers, commentaires,
-  tests, messages et commandes de la CLI.
-- La **documentation** est en français : README, `manage/docs/` et ce fichier.
-- Les noms français de la CLI sont retirés (#695) : devzone les refuse et
-  affiche le nouveau nom (table dans `manage/docs/reference.md`, « Noms retirés »).
+- The **code** is in English: identifiers, file names, comments, tests, messages and CLI commands.
+- The **documentation** is in English too: README, `manage/docs/` and this file.
+- The French names of the CLI are removed (#695): devzone refuses them and shows the new name (table in `manage/docs/reference.md`, "Removed names").
 
-## Bascule progressive par lots (#502)
+## Progressive switch by batch (#502)
 
-Le passage du code en anglais se fait par lots. Le fichier `.english` à la
-racine recense les fichiers déjà écrits en anglais ; la CI les vérifie à
-chaque exécution (`bash manage/scripts/check-english.sh`). Tout nouveau
-fichier de code doit y être ajouté.
+The switch of the code to English is done by batches. The `.english` file at the root lists the files already written in English; CI checks them on every run (`bash manage/scripts/check-english.sh`). Every new code file must be added to it.
 
-## Charts des services
+## devzone charts
 
-Chaque service de devzone a un chart `charts/devzone-<service>` : nom du
-dossier, `Chart.yaml`, valeurs communes et étiquettes sont fixés par la
-convention de [manage/docs/reference.md](manage/docs/reference.md#convention-des-charts-devzone).
-Le contrôle `bash manage/scripts/check-charts.sh` la vérifie.
+Each devzone service has a chart `charts/devzone-<service>`: folder name, `Chart.yaml`, common values and labels are fixed by the convention in [manage/docs/reference.md](manage/docs/reference.md#devzone-chart-convention).
+The check `bash manage/scripts/check-charts.sh` verifies it.
 
-## Variables des scripts shell
+## Shell script variables
 
-Dans les scripts shell, une variable suivie d'un caractère non ASCII s'écrit `${NOM}` (sous macOS, `$NOM…` lit le caractère comme partie du nom). Le contrôle `bash manage/scripts/check-utf8-vars.sh` le vérifie (#591).
+In shell scripts, a variable followed by a non-ASCII character is written `${NAME}` (on macOS, `$NAME…` reads the character as part of the name). The check `bash manage/scripts/check-utf8-vars.sh` verifies it (#591).
