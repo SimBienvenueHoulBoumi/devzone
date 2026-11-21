@@ -257,8 +257,8 @@ EOF
 }
 
 @test "agent: host model is the local model, after every online model" {
-    # Module ia on: the local slot is the host model detected via /api/tags.
-    printf 'ia=on\n' >"$DEVZONE_ROOT/.devzone.modules"
+    # Module ai on: the local slot is the host model detected via /api/tags.
+    printf 'ai=on\n' >"$DEVZONE_ROOT/.devzone.modules"
     export DEVZONE_AGENT_STATE="$BATS_TEST_TMPDIR/etat"
     export FAKE_ARGS="$BATS_TEST_TMPDIR/refs.log"
     : >"$FAKE_ARGS"
@@ -324,7 +324,7 @@ FAKE
 
 @test "agent: the host model is tried last, whatever .devzone.modules says" {
     unset DEVZONE_WORKSPACE
-    printf 'ia=on\n' >"$DEVZONE_ROOT/.devzone.modules"
+    printf 'ai=on\n' >"$DEVZONE_ROOT/.devzone.modules"
     fake_opencode_rotation
     run bash "$DEVZONE" agent "$DEVZONE_ROOT/workspace/projet" "$DEVZONE_ROOT/workspace/consigne.txt"
     [ "$status" -eq 3 ]
@@ -335,7 +335,7 @@ FAKE
 
 @test "agent: a host model name with slashes sets no stray file and keeps its exact reference" {
     unset DEVZONE_WORKSPACE
-    printf 'ia=on\n' >"$DEVZONE_ROOT/.devzone.modules"
+    printf 'ai=on\n' >"$DEVZONE_ROOT/.devzone.modules"
     # Fake Ollama: one model whose name has slashes and a colon (as pulled from Hugging Face).
     export FAKE_TAGS='{"models":[{"name":"hf.co/ggml-org/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-GGUF:Q4_0","size":1,"digest":"sha256:aaaaaaaa","details":{"type":"llm"}}]}'
     fake_opencode_rotation

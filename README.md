@@ -108,7 +108,7 @@ devzone: state (devzone to show it again)
                     ou git config --file ~/.config/git/config user.name "<nom>" et user.email "<email>"
   ✔ plateforme     github
   ✔ GitHub          connecté
-  ○ module ia         optional, assistants IA : Claude Code, opencode: devzone enable ia
+  ○ module ai         optional, assistants IA : Claude Code, opencode: devzone enable ai
   ○ module kubernetes optional, connexion au cluster de l'hôte et metrics-server au démarrage: devzone enable kubernetes
   ○ module gitlab     optional, GitLab de test dans le cluster des services: devzone enable gitlab
 ```
@@ -167,7 +167,7 @@ To learn more: [Starting a project](https://github.com/SimBienvenueHoulBoumi/dev
 | Languages | Java 21 + Maven + Gradle, Node LTS + pnpm, Go 1.27.4, Python 3.12 (apt) + uv |
 | Containers, Kubernetes | Host Docker (shared socket), kubectl, helm, k9s, kind; connection to the host cluster (`kubernetes` module); Testcontainers (`TESTCONTAINERS_HOST_OVERRIDE`); mounts (`$LOCAL_WORKSPACE_FOLDER`) |
 | GitHub (or GitLab), quality | gh, or glab connected to a GitLab instance (`devzone platform gitlab` in the container, [manage/docs/reference.md](manage/docs/reference.md#platform-github-or-gitlab)); repowarden (global git hooks), shellcheck, bats, actionlint, gitleaks, ruff, vulture, pytest |
-| AI assistants | Claude Code, opencode (`ia` module, disabled by default) |
+| AI assistants | Claude Code, opencode (`ai` module, disabled by default) |
 
 ## Installing a tool that stays
 
@@ -239,9 +239,9 @@ In the container, the `devzone` summary reports a more recent published version 
 
 **Mode at creation**: `--kubernetes` (workspace in the cluster, refused without a cluster). Without an option, the cluster must answer, otherwise nothing is created (see [A cluster at creation](#a-cluster-at-creation)).
 
-**`ia` module**: enables Claude Code and opencode (pinned versions), with the repowarden guard that stops them before they modify `main` or `develop` or commit without `repowarden cc` (see [manage/docs/reference.md](manage/docs/reference.md#ai-assistants-guard)). To enable it: `devzone enable ia`. They are uninstalled when the module is disabled, but your logins stay in their volumes. The module also sets up a guard that stops the `docker` commands of agents: devzone is Kubernetes first, only pods are containers (`kubectl`, or a disposable pod, instead).
+**`ai` module**: enables Claude Code and opencode (pinned versions), with the repowarden guard that stops them before they modify `main` or `develop` or commit without `repowarden cc` (see [manage/docs/reference.md](manage/docs/reference.md#ai-assistants-guard)). To enable it: `devzone enable ai`. They are uninstalled when the module is disabled, but your logins stay in their volumes. The module also sets up a guard that stops the `docker` commands of agents: devzone is Kubernetes first, only pods are containers (`kubectl`, or a disposable pod, instead).
 
-**Models on your computer**: devzone hosts no model. If Ollama runs on your machine, `devzone enable ia` detects its models and connects them to opencode (nothing is installed or downloaded). `devzone ai` lists them with the default model, `devzone ai check` says whether each one is up to date without downloading anything, and `devzone ai rapport` details the selected model and why (the `DEVZONE_HOST_MODEL` variable, a measurement, or the rule “a code model first, then the smallest”). Details in [manage/docs/reference.md](manage/docs/reference.md#opencode-configuration). The `llm` module (model hosted in the cluster) has been removed: devzone hosts no model.
+**Models on your computer**: devzone hosts no model. If Ollama runs on your machine, `devzone enable ai` detects its models and connects them to opencode (nothing is installed or downloaded). `devzone ai` lists them with the default model, `devzone ai check` says whether each one is up to date without downloading anything, and `devzone ai rapport` details the selected model and why (the `DEVZONE_HOST_MODEL` variable, a measurement, or the rule “a code model first, then the smallest”). Details in [manage/docs/reference.md](manage/docs/reference.md#opencode-configuration). The `llm` module (model hosted in the cluster) has been removed: devzone hosts no model.
 
 **`kubernetes` module**: enables, at each startup, the connection to the host cluster and the installation of metrics-server on local clusters (to see CPU and RAM in k9s). To enable it: `devzone enable kubernetes`. Without this module, kubectl, helm, k9s and kind remain installed.
 

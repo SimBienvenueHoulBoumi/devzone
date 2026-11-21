@@ -8,7 +8,7 @@
 # Skill marker: the file is installed if missing, updated while it carries the
 # marker and is unchanged, kept if customised (#161, opencode rule). The marker
 # text is the one written in SKILL.md: it is kept as is.
-SKILL_MARKER='<!-- devzone : skill set by devzone enable ia -->'
+SKILL_MARKER='<!-- devzone : skill set by devzone enable ai -->'
 # Fingerprint of the installed version, next to SKILL.md: it tells an unchanged
 # skill from a customised one that still carries the marker.
 SKILL_FINGERPRINT='.devzone-fingerprint'

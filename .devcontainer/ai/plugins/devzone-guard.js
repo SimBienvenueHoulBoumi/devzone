@@ -1,7 +1,7 @@
 // Guard for opencode 1.x: blocks Docker commands in devzone (Kubernetes-first).
 // Each shell tool call is checked by docker-guard.sh. Exit code 2: error shown
 // to the agent with stderr message. Script absent or failing: nothing blocked.
-// The installed copy (devzone enable ia) replaces the placeholder below with
+// The installed copy (devzone enable ai) replaces the placeholder below with
 // the script path; DEVZONE_DOCKER_GUARD overrides it. The script is resolved
 // from the plugin location itself (.devcontainer/ai/plugins -> ../docker-guard.sh).
 import { spawnSync } from "node:child_process"

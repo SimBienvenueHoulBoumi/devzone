@@ -150,10 +150,10 @@ CURL
 }
 
 @test "open: the state keeps the other lines and sorts the ports" {
-    printf 'ia=on\nports=3000\n' >"$DEVZONE_STATE"
+    printf 'ai=on\nports=3000\n' >"$DEVZONE_STATE"
     run bash "$PORTS" 8080
     [ "$status" -eq 0 ]
-    grep -qx 'ia=on' "$DEVZONE_STATE"
+    grep -qx 'ai=on' "$DEVZONE_STATE"
     grep -qx 'ports=3000,8080' "$DEVZONE_STATE"
 }
 

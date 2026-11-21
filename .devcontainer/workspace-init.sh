@@ -93,7 +93,7 @@ PROMPT
 
 init_safe_directory
 init_repowarden
-init_modules
 init_legacy_names
+init_modules
 init_prompt
 log "done"

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
 # Renames the files and folders that devzone wrote under their former French
-# names to their English names (#733, lot 3), and the state key plateforme= to
-# platform= (lot 4). Called by the pod startup, by the workspace init, and on the
+# names to their English names (#733, lot 3), and the state keys plateforme= to
+# platform= (lot 4) and ia= to ai= (#774, lot 3). Called by the pod startup, by the workspace init, and on the
 # workstation by devzone update and workspace update.
 # Idempotent: a name is renamed only when the old one exists and the new one
 # does not, so a second run does nothing. Two folders with both names are
@@ -91,6 +91,8 @@ migrate_root() {
     rename_legacy "$ROOT/.devzone.etat" "$ROOT/.devzone.state"
     rename_legacy "$ROOT/.devzone.catalogue-veilleur" "$ROOT/.devzone.catalog-watcher"
     migrate_markers
+    # Failure marker of the AI module, renamed with it (#774)
+    rename_legacy "$ROOT/.devzone.modules-failed-ia" "$ROOT/.devzone.modules-failed-ai"
 }
 
 # Fingerprint of the devzone skill, next to its SKILL.md in each assistant folder
@@ -107,30 +109,37 @@ migrate_tmp() {
     rename_legacy "$TMP_DIR/devzone-paquets.echec" "$TMP_DIR/devzone-packages.failed"
 }
 
-# Key of the state file (#733, lot 4): the line plateforme=<v> becomes
-# platform=<v>. When a platform= line is already there, only the old line goes.
-# The file is rewritten in a temporary file, then moved over it; the other
-# lines are copied as they are. A file without the old key is left alone.
-migrate_state_keys() {
+# Key of the state file: the line <old>=<v> becomes <new>=<v>. When a <new>=
+# line is already there, only the old line goes. The file is rewritten in a
+# temporary file, then moved over it; the other lines are copied as they are.
+# A file without the old key is left alone.
+migrate_state_key() {
+    local old="$1" new="$2"
     local f="$ROOT/.devzone.modules" tmp="$ROOT/.devzone.modules.tmp.$$"
     [ -f "$f" ] || return 0
-    grep -q '^plateforme=' "$f" || return 0
-    if grep -q '^platform=' "$f"; then
-        sed '/^plateforme=/d' "$f" >"$tmp"
+    grep -q "^$old=" "$f" || return 0
+    if grep -q "^$new=" "$f"; then
+        sed "/^$old=/d" "$f" >"$tmp"
     else
-        sed 's/^plateforme=/platform=/' "$f" >"$tmp"
+        sed "s/^$old=/$new=/" "$f" >"$tmp"
     fi || {
         rm -f "$tmp"
-        echo "devzone : plateforme= not renamed to platform=" >&2
+        echo "devzone : $old= not renamed to $new=" >&2
         return 0
     }
     if mv -- "$tmp" "$f"; then
-        echo "devzone : plateforme= renamed to platform="
+        echo "devzone : $old= renamed to $new="
     else
         rm -f "$tmp"
-        echo "devzone : plateforme= not renamed to platform=" >&2
+        echo "devzone : $old= not renamed to $new=" >&2
     fi
     return 0
+}
+
+# Keys of the state file: plateforme= (#733, lot 4), ia= (#774, lot 3)
+migrate_state_keys() {
+    migrate_state_key plateforme platform
+    migrate_state_key ia ai
 }
 
 migrate_root

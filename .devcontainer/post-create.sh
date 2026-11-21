@@ -60,6 +60,8 @@ sudo ln -sf /workspaces/devzone/.devcontainer/devzone /usr/local/bin/devzone
 # Access to the workstation cluster (hote.config) before the modules that depend
 # on it (#370); a failure does not stop the creation, the startup runs it again
 bash /workspaces/devzone/.devcontainer/kube-config.sh || echo "devzone : kube configuration incomplete, retry: devzone start" >&2
+# Former names (state key ia=) renamed before the first read of the state (#774)
+bash /workspaces/devzone/.devcontainer/rename-legacy-files.sh || echo "devzone : legacy names not renamed, retry: devzone repair" >&2
 devzone apply || echo "devzone : modules incomplete (details above), retry: devzone apply" >&2
 # Guarded system packages (#351): reinstalled at each creation; a failure does not stop the creation
 devzone packages apply || echo "devzone : packages failed, retry: devzone packages" >&2

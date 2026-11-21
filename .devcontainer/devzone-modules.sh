@@ -6,7 +6,7 @@
 
 description() {
     case "$1" in
-        ia) echo "AI assistants: Claude Code, opencode" ;;
+        ai) echo "AI assistants: Claude Code, opencode" ;;
         kubernetes) echo "connection to the host cluster and metrics-server at startup" ;;
         gitlab) echo "test GitLab in the services cluster" ;;
         postgres) echo "shared PostgreSQL, one database per project" ;;

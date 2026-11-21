@@ -140,13 +140,13 @@ attendre_nohup() {
 }
 
 @test "sync concurrent: mysql=off added once, existing line kept" {
-    printf 'ia=on\nautre=off\n' >"$DEVZONE_STATE"
+    printf 'ai=on\nautre=off\n' >"$DEVZONE_STATE"
     bash "$CATALOGUE" sync & pid_a=$!
     bash "$CATALOGUE" sync & pid_b=$!
     wait "$pid_a"
     wait "$pid_b"
     grep -qx 'mysql=off' "$DEVZONE_STATE" || false
-    grep -qx 'ia=on' "$DEVZONE_STATE" || false
+    grep -qx 'ai=on' "$DEVZONE_STATE" || false
     [ "$(grep -c '^mysql=' "$DEVZONE_STATE")" -eq 1 ] || false
 }
 

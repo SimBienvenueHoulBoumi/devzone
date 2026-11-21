@@ -191,7 +191,7 @@ agent_pod_launch() {
     fi
     # The pod mounts this file read-only: refuse before any object is created.
     if [ ! -f "$AGENT_POD_MODULES_FILE" ]; then
-        echo "devzone agent --pod : modules file missing : $AGENT_POD_MODULES_FILE (run devzone enable ia on the workspace)" >&2
+        echo "devzone agent --pod : modules file missing : $AGENT_POD_MODULES_FILE (run devzone enable ai on the workspace)" >&2
         exit 1
     fi
 

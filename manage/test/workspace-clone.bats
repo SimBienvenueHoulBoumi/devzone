@@ -133,7 +133,7 @@ echo "kubectl $*" >>"$BATS_TEST_TMPDIR/kubectl.log"
 KUBE
     guard
     [ "$status" -eq 0 ]
-    grep -q "exec devzone-workspace-0 .*devzone is-enabled ia && repowarden agents init --global" "$T/kubectl.log" || false
+    grep -q "exec devzone-workspace-0 .*devzone is-enabled ai && repowarden agents init --global" "$T/kubectl.log" || false
     [[ "$output" == *"guard active"* ]] || false
 }
 

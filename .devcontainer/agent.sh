@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Drives opencode on a brief: rotation, silence at start, resume.
-# ia module (#221). devzone agent <folder> <brief> | state | release.
+# ai module (#221). devzone agent <folder> <brief> | state | release.
 # shellcheck disable=SC2034 # RACINE, FREE_MODELS, PAUSE_RANK: read by the sourced agent-*.sh
 set -euo pipefail
 # Folder of the script, symbolic links followed by hand: readlink -f does not exist
@@ -54,9 +54,9 @@ agent_launch() {
     [ -r "$brief" ] || refuse "brief not found: $brief (searched from $(pwd))"
     folder="$(cd "$folder" && pwd -P)"
     brief="$(cd "$(dirname "$brief")" && pwd -P)/$(basename "$brief")"
-    # ia module required: without assistants, nothing to drive.
-    if ! bash "$ICI/devzone" is-enabled ia >/dev/null 2>&1; then
-        refuse "ia module disabled: devzone enable ia"
+    # ai module required: without assistants, nothing to drive.
+    if ! bash "$ICI/devzone" is-enabled ai >/dev/null 2>&1; then
+        refuse "ai module disabled: devzone enable ai"
     fi
     configure
     journal="$(journal_of "$folder")"
