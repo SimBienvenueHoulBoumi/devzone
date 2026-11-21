@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Opérations d'installation du catalogue (#414) : sourcé par catalog.sh.
-# Le module argocd actif : l'application installée est une Application Argo CD
-# devzone-<app> (chart charts/devzone-<app> du dépôt devzone, #538) au lieu du
-# manifeste de la voie helm direct.
+# Install operations of the catalog (#414): sourced by catalog.sh.
+# With the argocd module on, the installed application is an Argo CD Application
+# devzone-<app> (chart charts/devzone-<app> of the devzone repository, #538) instead
+# of the manifest of the direct helm path.
 
-ATTENTE="${DEVZONE_CATALOGUE_ATTENTE:-300}"
+WAIT_SECONDS="${DEVZONE_CATALOGUE_ATTENTE:-300}"
 
 # shellcheck source=SCRIPTDIR/argocd/catalog-argocd.sh
 # shellcheck disable=SC1091
@@ -13,75 +13,74 @@ ATTENTE="${DEVZONE_CATALOGUE_ATTENTE:-300}"
 # shellcheck disable=SC1091
 . "$ICI/chart-direct.sh"
 
-# Attente du StatefulSet prêt : une seule commande rollout sur la voie
-# manifeste, sondée sur la voie Argo CD (la synchronisation est en tâche de
-# fond)
-app_attendre() {
-    local app="$1" ns="$2" argo="$3" fin=$((SECONDS + ATTENTE))
+# Waits for the StatefulSet to be ready: a single rollout command on the manifest
+# path, polled on the Argo CD path (the sync runs in the background)
+app_wait() {
+    local app="$1" ns="$2" argo="$3" end=$((SECONDS + WAIT_SECONDS))
     if [ "$argo" = 1 ]; then
-        while [ "$SECONDS" -lt "$fin" ]; do
+        while [ "$SECONDS" -lt "$end" ]; do
             kubectl --context devzone -n "$ns" rollout status "statefulset/$app" --timeout=10s >/dev/null 2>&1 && return 0
             sleep 5
         done
-        echo "devzone : catalogue : $app pas prêt après ${ATTENTE}s" >&2
+        echo "devzone : catalog : $app not ready after ${WAIT_SECONDS}s" >&2
         return 1
     fi
     if ! kubectl --context devzone -n "$ns" rollout status "statefulset/$app" \
-        --timeout="${ATTENTE}s" >/dev/null; then
-        echo "devzone : catalogue : $app pas prêt après ${ATTENTE}s" >&2
+        --timeout="${WAIT_SECONDS}s" >/dev/null; then
+        echo "devzone : catalog : $app not ready after ${WAIT_SECONDS}s" >&2
         return 1
     fi
 }
 
-# Secret de l'application : mot de passe généré une fois, miroir local
-# (workspace/.$app/admin-password, 600, jamais affiché). Reprise : le mot de
-# passe déjà là (secret cluster ou root.env) est conservé, jamais régénéré.
+# Application secret: password generated once, local mirror
+# (workspace/.$app/admin-password, 600, never shown). Re-run: a password already
+# there (cluster secret or root.env) is kept, never regenerated.
 app_secret() {
-    local app="$1" ns="$2" mdp fichier
-    fichier="$RACINE/workspace/.$app/admin-password"
-    mkdir -p "$(dirname "$fichier")"
-    chmod 700 "$(dirname "$fichier")"
+    local app="$1" ns="$2" password file
+    file="$RACINE/workspace/.$app/admin-password"
+    mkdir -p "$(dirname "$file")"
+    chmod 700 "$(dirname "$file")"
     if kubectl --context devzone -n "$ns" get secret "$app-admin" >/dev/null 2>&1; then
-        mdp="$(kubectl --context devzone -n "$ns" get secret "$app-admin" \
+        password="$(kubectl --context devzone -n "$ns" get secret "$app-admin" \
             -o jsonpath='{.data.password}' | tr -d '\n')"
-        (umask 077 && printf '%s' "$mdp" >"$fichier")
+        (umask 077 && printf '%s' "$password" >"$file")
         return 0
     fi
-    mdp="$(sed -n 's/^\(MYSQL_\|\)PASSWORD=//p' "$RACINE/workspace/.$app/root.env" 2>/dev/null | tail -1 || true)"
-    if [ -z "$mdp" ] && [ -s "$fichier" ]; then mdp="$(cat "$fichier")"; fi
-    if [ -z "$mdp" ]; then
-        (umask 077 && openssl rand -hex 24 | tr -d '\n' >"$fichier")
-    elif [ ! -s "$fichier" ]; then
-        (umask 077 && printf '%s' "$mdp" >"$fichier")
+    password="$(sed -n 's/^\(MYSQL_\|\)PASSWORD=//p' "$RACINE/workspace/.$app/root.env" 2>/dev/null | tail -1 || true)"
+    if [ -z "$password" ] && [ -s "$file" ]; then password="$(cat "$file")"; fi
+    if [ -z "$password" ]; then
+        (umask 077 && openssl rand -hex 24 | tr -d '\n' >"$file")
+    elif [ ! -s "$file" ]; then
+        (umask 077 && printf '%s' "$password" >"$file")
     fi
     kubectl --context devzone -n "$ns" create secret generic "$app-admin" \
-        --from-file=password="$fichier" >/dev/null
+        --from-file=password="$file" >/dev/null
 }
 
-# Vue regroupée des identifiants : un échec n'empêche jamais l'opération
+# Grouped view of the credentials: a failure never blocks the operation
 regenerer_identifiants() {
     password_regenerate ||
-        echo "devzone : catalogue : identifiants regroupés non mis à jour (devzone passwords)" >&2
+        echo "devzone : catalog : grouped credentials not updated (devzone passwords)" >&2
 }
 
-# Installe une application : contexte devzone posé (#396), namespace créé et
-# isolé (#396), secret généré, puis Application Argo CD (module argocd actif,
-# #538) ou manifeste, attente prête, relais lancé vers 127.0.0.1:<port> du
-# conteneur ; rend non nul en échec
-app_installer() {
+# Installs an application: devzone context set (#396), namespace created and
+# isolated (#396), secret generated, then the Argo CD Application (argocd module
+# on, #538) or the manifest, wait until ready, relay started to 127.0.0.1:<port>
+# of the container; returns non-zero on failure
+app_install() {
     local app="$1" ns port image CTX extra="" argo=0
-    ns="$(app_ns "$app")"
-    port="$(app_lire "$app" port)"
-    image="$(app_lire "$app" image)"
+    ns="$(app_namespace "$app")"
+    port="$(app_read "$app" port)"
+    image="$(app_read "$app" image)"
     CTX="$(cluster_saved)"
-    [ -n "$CTX" ] || refuse "aucun cluster choisi : devzone enable $app"
+    [ -n "$CTX" ] || refuse "no cluster chosen: devzone enable $app"
     if ! devzone_context_set "$CTX"; then
-        echo "devzone : catalogue : impossible de poser le contexte devzone sur $CTX" >&2
+        echo "devzone : catalog : cannot set the devzone context on $CTX" >&2
         return 1
     fi
-    echo "▶ Application $app sur le cluster $CTX (namespace $ns)…"
-    # Namespace créé et étiqueté par l'administrateur (#430), puis compte
-    # limité autorisé dans le namespace
+    echo "▶ Application $app on cluster $CTX (namespace $ns)…"
+    # Namespace created and labelled by the administrator (#430), then the limited
+    # account allowed in the namespace
     account_admin "$CTX" create namespace "$ns" --dry-run=client -o yaml |
         account_admin "$CTX" apply -f - >/dev/null
     account_admin "$CTX" label namespace "$ns" "$CLUSTER_LABEL" --overwrite >/dev/null
@@ -92,37 +91,36 @@ app_installer() {
     if [ "$app" = mysql ]; then
         # shellcheck source=SCRIPTDIR/mysql/volume.sh
         # shellcheck disable=SC1091
-        . "$(dossier_catalogue)/mysql/volume.sh"
-        claim="$(mysql_claim_choisir "$ns")" || return 2
+        . "$(catalog_dir)/mysql/volume.sh"
+        claim="$(mysql_claim_choose "$ns")" || return 2
         [ "$claim" = donnees ] || extra="claim=$claim"
     fi
     if catalogue_argocd_active "$app"; then
         argo=1
-        echo "▶ Application $app par Argo CD (chart charts/devzone-$app)…"
+        echo "▶ Application $app through Argo CD (chart charts/devzone-$app)…"
         catalogue_argocd_apply "$app" "$ns" "$image" "$port" \
-            "$(app_lire "$app" memoire)" "$(app_lire "$app" taille)" "$extra" || return 1
+            "$(app_read "$app" memoire)" "$(app_read "$app" taille)" "$extra" || return 1
     else
-        # Helm direct: the chart charts/devzone-<app>, the one definition (#559)
+        # Direct helm: the chart charts/devzone-<app>, the one definition (#559)
         chart_install "$app" "$ns" "image=$image" "port=$port" \
-            "memory=$(app_lire "$app" memoire)" "size=$(app_lire "$app" taille)" "claim=$claim" || return 1
+            "memory=$(app_read "$app" memoire)" "size=$(app_read "$app" taille)" "claim=$claim" || return 1
     fi
-    app_attendre "$app" "$ns" "$argo" || return 1
+    app_wait "$app" "$ns" "$argo" || return 1
     relay_start "$app" "$CTX" "$ns" "svc/$app" "$port:$port"
-    echo "✔ $app prêt : 127.0.0.1:$port dans le conteneur"
+    echo "✔ $app ready: 127.0.0.1:$port in the container"
     regenerer_identifiants
 }
 
-# Désinstalle une application : relais coupé, Application Argo CD retirée
-# (module argocd actif, #538) ou manifeste, marque oubliée ; le volume (PVC)
-# et les données restent (#441) : la suppression des données est confirmée à
-# part (devzone mysql delete-data)
-app_desinstaller() {
+# Uninstalls an application: relay stopped, Argo CD Application removed (argocd
+# module on, #538) or the manifest, failure marker forgotten. The volume (PVC) and
+# the data stay (#441): deleting the data is confirmed apart (devzone mysql delete-data)
+app_remove() {
     local app="$1" ns claim pvc CTX
-    ns="$(app_ns "$app")"
+    ns="$(app_namespace "$app")"
     relay_stop "$app"
-    rm -f "$(fichier_echec "$app")"
-    # RoleBinding retiré par l'administrateur (#430) : le namespace et le
-    # volume restent, l'autorisation du compte ne doit pas traîner
+    rm -f "$(failure_file "$app")"
+    # RoleBinding removed by the administrator (#430): the namespace and the volume
+    # stay, the account authorization must not linger
     CTX="$(cluster_saved)" || true
     if [ -n "$CTX" ]; then
         account_remove "$CTX" "$ns" >/dev/null 2>&1 || true
@@ -133,79 +131,79 @@ app_desinstaller() {
         catalogue_argocd_delete "$app" >/dev/null 2>&1 || true
         kubectl --context devzone -n "$ns" delete "secret/$app-admin" >/dev/null 2>&1 || true
         pvc="${claim:-donnees}-$app-0"
-        echo "✔ $app retiré : Application supprimée ; volume $pvc et bases gardés : devzone $app volume"
+        echo "✔ $app removed: Application deleted; volume $pvc and databases kept: devzone $app volume"
         regenerer_identifiants
         return 0
     fi
     kubectl --context devzone -n "$ns" delete "statefulset/$app" "service/$app" \
         "secret/$app-admin" >/dev/null 2>&1 || true
     pvc="${claim:-donnees}-$app-0"
-    echo "✔ $app retiré du cluster ; volume $pvc et bases gardés : devzone $app volume"
+    echo "✔ $app removed from the cluster; volume $pvc and databases kept: devzone $app volume"
     regenerer_identifiants
 }
 
-# Marque d'échec d'une tentative : dernière ligne du message gardée et montrée
-app_echec() {
-    printf '%s\n' "$2" | tail -1 >"$(fichier_echec "$1")"
+# Failure marker of an attempt: last line of the message kept and shown
+app_failure() {
+    printf '%s\n' "$2" | tail -1 >"$(failure_file "$1")"
     printf '%s\n' "$2" >&2
 }
 
-# Avertit des PVC mysql non montés par le StatefulSet (#440). Lecture des
-# namespaces réservée à l'administrateur (#430).
-app_mysql_volumes_inutilises() {
-    local ctx ns monte pvc liste
+# Warns about the mysql PVCs not mounted by the StatefulSet (#440). Reading the
+# namespaces is reserved to the administrator (#430).
+app_unused_mysql_volumes() {
+    local ctx ns mounted pvc list
     ctx="$(cluster_saved)"
     [ -n "$ctx" ] || return 0
-    ns="$(app_ns mysql)"
+    ns="$(app_namespace mysql)"
     account_admin "$ctx" get namespace "$ns" >/dev/null 2>&1 || return 0
-    monte="$(kubectl --context devzone -n "$ns" get statefulset mysql -o jsonpath='{.spec.volumeClaimTemplates[0].metadata.name}' 2>/dev/null || true)"
-    [ -n "$monte" ] || return 0
-    liste="$(kubectl --context devzone -n "$ns" get pvc -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null | grep -E '\-mysql-0$' || true)"
+    mounted="$(kubectl --context devzone -n "$ns" get statefulset mysql -o jsonpath='{.spec.volumeClaimTemplates[0].metadata.name}' 2>/dev/null || true)"
+    [ -n "$mounted" ] || return 0
+    list="$(kubectl --context devzone -n "$ns" get pvc -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null | grep -E '\-mysql-0$' || true)"
     while IFS= read -r pvc; do
         [ -n "$pvc" ] || continue
-        [ "$pvc" != "${monte}-mysql-0" ] || continue
-        printf '  ⚠ volume %s non utilisé : devzone mysql volume\n' "$pvc"
-    done <<<"$liste"
+        [ "$pvc" != "${mounted}-mysql-0" ] || continue
+        printf '  ⚠ volume %s not used : devzone mysql volume\n' "$pvc"
+    done <<<"$list"
 }
 
-# Comble l'écart entre le voulu et le réel : installe, retire, relance le
-# relais permanent ; marque l'échec au premier problème puis passe à la suite
-catalogue_appliquer() {
-    local app sortie code=0 port CTX ns
+# Closes the gap between wanted and actual: installs, removes, restarts the
+# permanent relay; marks the first failure then moves on
+catalog_apply() {
+    local app output code=0 port CTX ns
     while IFS= read -r app; do
         [ -n "$app" ] || continue
-        port="$(app_lire "$app" port)"
-        if [ "$(voulu "$app")" != on ] && presente "$app"; then
-            if ! sortie="$(app_desinstaller "$app" 2>&1)"; then
-                code=1; app_echec "$app" "$sortie"
+        port="$(app_read "$app" port)"
+        if [ "$(wanted "$app")" != on ] && present "$app"; then
+            if ! output="$(app_remove "$app" 2>&1)"; then
+                code=1; app_failure "$app" "$output"
             else
-                printf '%s\n' "$sortie"
+                printf '%s\n' "$output"
             fi
-        elif [ "$(voulu "$app")" = on ] && presente "$app"; then
-            if ! app_prete "$app"; then
+        elif [ "$(wanted "$app")" = on ] && present "$app"; then
+            if ! app_ready "$app"; then
                 code=1
-                echo "devzone : catalogue : $app installé mais pas prêt : devzone apply" >&2
-                echo "pas prêt" >"$(fichier_echec "$app")"
+                echo "devzone : catalog : $app installed but not ready: devzone apply" >&2
+                echo "not ready" >"$(failure_file "$app")"
             else
-                rm -f "$(fichier_echec "$app")"
+                rm -f "$(failure_file "$app")"
             fi
-            # Relais permanent : relancé s'il est arrêté
+            # Permanent relay: restarted if stopped
             CTX="$(cluster_saved)" || true
-            ns="$(app_ns "$app")"
+            ns="$(app_namespace "$app")"
             if [ -n "$CTX" ]; then
-                if ! sortie="$(relay_start "$app" "$CTX" "$ns" "svc/$app" "$port:$port" 2>&1)"; then
-                    code=1; app_echec "$app" "$sortie"
+                if ! output="$(relay_start "$app" "$CTX" "$ns" "svc/$app" "$port:$port" 2>&1)"; then
+                    code=1; app_failure "$app" "$output"
                 else
-                    [ -n "$sortie" ] && printf '%s\n' "$sortie"
+                    [ -n "$output" ] && printf '%s\n' "$output"
                 fi
             fi
-        elif [ "$(voulu "$app")" = on ]; then
-            if ! sortie="$(app_installer "$app" 2>&1)"; then
-                code=1; app_echec "$app" "$sortie"
+        elif [ "$(wanted "$app")" = on ]; then
+            if ! output="$(app_install "$app" 2>&1)"; then
+                code=1; app_failure "$app" "$output"
             else
-                printf '%s\n' "$sortie"
+                printf '%s\n' "$output"
             fi
         fi
-    done <<<"$(catalogue_apps)"
+    done <<<"$(catalog_apps)"
     return "$code"
 }

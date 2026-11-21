@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
-# Module postgres (#280) : PostgreSQL partagé dans le cluster de devzone
-# (cluster.sh), une base et un utilisateur par projet.
+# Module postgres (#280): shared PostgreSQL in the devzone cluster (cluster.sh),
+# one database and one user per project.
 #   postgres.sh install | uninstall | status | relay-start | relay-stop
-#   postgres.sh create <projet> [--new-password]   base, rôle, workspace/.postgres/<projet>.env
-#   postgres.sh list                                bases et propriétaires
-#   postgres.sh psql [<projet>]                     console dans le pod
-#   postgres.sh delete <projet> [--yes]             base, rôle et fichier .env
-# Secrets dans workspace/.postgres/ (600, ignorés par git), jamais affichés.
+#   postgres.sh create <project> [--new-password]   database, role, workspace/.postgres/<project>.env
+#   postgres.sh list                                databases and owners
+#   postgres.sh psql [<project>]                    console in the pod
+#   postgres.sh delete <project> [--yes]            database, role and .env file
+# Secrets in workspace/.postgres/ (600, ignored by git), never displayed.
 set -euo pipefail
 
 ICI="$(cd "$(dirname "$0")" && pwd)"
 RACINE="${DEVZONE_RACINE:-$(dirname "$(dirname "$ICI")")}"
-# shellcheck disable=SC2034 # lu par cluster.sh (bibliothèque sourcée)
+# shellcheck disable=SC2034 # read by cluster.sh (sourced library)
 ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
 # shellcheck source=SCRIPTDIR/../cluster.sh
 . "$ICI/../cluster.sh"
@@ -21,32 +21,32 @@ ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
 # shellcheck source=SCRIPTDIR/../chart-direct.sh
 # shellcheck disable=SC1091
 . "$ICI/../chart-direct.sh"
-# Isolation réseau : namespace_isolate, d'où viennent les NetworkPolicies
+# Network isolation: namespace_isolate, which provides the NetworkPolicies
 # shellcheck source=SCRIPTDIR/../isolation.sh
 # shellcheck disable=SC1091
 . "$ICI/../isolation.sh"
 
 NS=devzone-postgres
 SECRETS="$RACINE/workspace/.postgres"
-# Port du conteneur où le relais rend PostgreSQL joignable
+# Container port where the relay makes PostgreSQL reachable
 POSTGRES_PORT="${POSTGRES_PORT:-5432}"
 POSTGRES_ATTENTE="${POSTGRES_ATTENTE:-300}"
 POSTGRES_TAILLE="${POSTGRES_TAILLE:-5Gi}"
 
 refuse() { echo "devzone : postgres : $*" >&2; exit 2; }
 
-# Vue regroupée des identifiants : un échec n'empêche jamais l'opération
-regenerer_identifiants() {
+# Grouped credentials view: a failure never blocks the operation
+regenerate_credentials() {
     password_regenerate ||
-        echo "devzone : postgres : identifiants regroupés non mis à jour (devzone passwords)" >&2
+        echo "devzone : postgres : grouped credentials not updated (devzone passwords)" >&2
 }
 
-# Contexte du module : celui du cluster de devzone ; sans choix, rien n'est
-# installé (devzone enable postgres le fixe)
-contexte() {
+# Module context: the devzone cluster; without a choice nothing is
+# installed (devzone enable postgres sets it)
+module_context() {
     local c
     c="$(cluster_saved)"
-    [ -n "$c" ] || refuse "aucun cluster choisi : devzone enable postgres"
+    [ -n "$c" ] || refuse "no cluster chosen: devzone enable postgres"
     echo "$c"
 }
 
@@ -54,111 +54,111 @@ k() {
     kubectl --context devzone -n "$NS" "$@"
 }
 
-# Namespace présent dans le cluster des services : lecture des namespaces
-# réservée à l'administrateur (#430)
-installe() {
+# Namespace present in the services cluster: reading namespaces is
+# reserved to the administrator (#430)
+is_installed() {
     account_admin "$(account_context)" get namespace "$NS" >/dev/null 2>&1
 }
 
-# psql en superutilisateur dans le pod : connexion locale (socket), sans mot
-# de passe ; le script SQL passe par stdin, jamais en argument visible
+# psql as superuser in the pod: local connection (socket), no password;
+# the SQL script goes through stdin, never as a visible argument
 psql_admin() {
     k exec -i postgres-0 -c postgres -- psql -v ON_ERROR_STOP=1 -X -q -U postgres "$@"
 }
 
-# Nom de projet = nom du rôle et de la base : identifiant SQL simple, jamais
-# à échapper, et pas un nom réservé
-valider_projet() {
+# Project name = role name and database name: simple SQL identifier, never
+# to escape, and not a reserved name
+validate_project() {
     local p="${1:-}"
-    [ -n "$p" ] || refuse "nom de projet manquant"
-    [[ "$p" =~ ^[a-z][a-z0-9_]{0,62}$ ]] || refuse "nom de projet invalide : $p (minuscules, chiffres, _ ; commence par une lettre)"
+    [ -n "$p" ] || refuse "project name missing"
+    [[ "$p" =~ ^[a-z][a-z0-9_]{0,62}$ ]] || refuse "invalid project name: $p (lowercase, digits, _; starts with a letter)"
     case "$p" in
-        postgres | template0 | template1) refuse "nom réservé : $p" ;;
+        postgres | template0 | template1) refuse "reserved name: $p" ;;
     esac
 }
 
-mot_de_passe() {
+new_password() {
     openssl rand -hex 24
 }
 
-# Mot de passe du superutilisateur : celui du secret s'il existe déjà dans le
-# cluster (jamais régénéré : la base garde le sien), sinon le fichier local,
-# sinon un nouveau
-secret_admin() {
-    local fichier="$SECRETS/admin-password" mdp
+# Superuser password: the one in the secret if it already exists in the
+# cluster (never regenerated: the database keeps its own), otherwise the local
+# file, otherwise a new one
+admin_secret() {
+    local file="$SECRETS/admin-password" pw
     mkdir -p "$SECRETS"
     chmod 700 "$SECRETS"
     if k get secret postgres-admin >/dev/null 2>&1; then
-        mdp="$(k get secret postgres-admin -o jsonpath='{.data.password}' | base64 -d)"
-        (umask 077 && printf '%s' "$mdp" >"$fichier")
+        pw="$(k get secret postgres-admin -o jsonpath='{.data.password}' | base64 -d)"
+        (umask 077 && printf '%s' "$pw" >"$file")
         return 0
     fi
-    if [ ! -s "$fichier" ]; then
-        (umask 077 && mot_de_passe | tr -d '\n' >"$fichier")
+    if [ ! -s "$file" ]; then
+        (umask 077 && new_password | tr -d '\n' >"$file")
     fi
-    k create secret generic postgres-admin --from-file=password="$fichier" >/dev/null
+    k create secret generic postgres-admin --from-file=password="$file" >/dev/null
 }
 
-installer() {
-    CTX="$(contexte)"
+do_install() {
+    CTX="$(module_context)"
     cluster_prepare "$CTX"
-    # Sur une machine neuve, le contexte devzone doit viser le cluster choisi
-    # avant toute pose de ressource (#396) ; sinon, tout s'arrête : message et code
+    # On a new machine, the devzone context must point to the chosen cluster
+    # before any resource is created (#396); otherwise, everything stops: message and code
     if ! devzone_context_set "$CTX"; then
-        echo "devzone : postgres : impossible de poser le contexte devzone sur $CTX" >&2
+        echo "devzone : postgres : cannot set the devzone context on $CTX" >&2
         return 1
     fi
-    echo "▶ PostgreSQL sur le cluster $CTX (namespace $NS)…"
-    # Namespace créé et étiqueté par l'administrateur (#430) : le compte limité
-    # n'a pas le droit de créer d'objets hors des namespaces devzone-*
+    echo "▶ PostgreSQL on cluster $CTX (namespace $NS)…"
+    # Namespace created and labeled by the administrator (#430): the limited
+    # account may not create objects outside the devzone-* namespaces
     account_admin "$CTX" create namespace "$NS" --dry-run=client -o yaml |
         account_admin "$CTX" apply -f - >/dev/null
     account_admin "$CTX" label namespace "$NS" "$CLUSTER_LABEL" --overwrite >/dev/null
-    # Compte limité autorisé dans le namespace : RoleBinding vers edit
+    # Limited account allowed in the namespace: RoleBinding to edit
     account_allow "$CTX" "$NS"
-    secret_admin
+    admin_secret
     chart_install postgres "$NS" "size=$POSTGRES_TAILLE" || return 1
-    echo "▶ Attente de PostgreSQL (timeout ${POSTGRES_ATTENTE}s)…"
+    echo "▶ Waiting for PostgreSQL (timeout ${POSTGRES_ATTENTE}s)…"
     if ! k rollout status statefulset/postgres --timeout="${POSTGRES_ATTENTE}s" >/dev/null; then
-        echo "devzone : postgres : pas prêt après ${POSTGRES_ATTENTE}s : kubectl --context $CTX -n $NS describe pod postgres-0" >&2
+        echo "devzone : postgres : not ready after ${POSTGRES_ATTENTE}s: kubectl --context $CTX -n $NS describe pod postgres-0" >&2
         return 1
     fi
     relay_stop postgres
     relay_start postgres "$CTX" "$NS" svc/postgres "$POSTGRES_PORT:5432"
-    echo "✔ PostgreSQL prêt : 127.0.0.1:$POSTGRES_PORT dans le conteneur"
-    echo "  Base d'un projet : devzone postgres create <projet>"
-    regenerer_identifiants
+    echo "✔ PostgreSQL ready: 127.0.0.1:$POSTGRES_PORT in the container"
+    echo "  Database for a project: devzone postgres create <project>"
+    regenerate_credentials
 }
 
-desinstaller() {
+do_uninstall() {
     CTX="$(cluster_saved)"
     relay_stop postgres
-    # Désinstallation sur une machine neuve : le contexte devzone est reposé sur
-    # le cluster choisi (sinon il vise l'ancien) ; sans lui, seulement le
-    # nettoyage local a lieu
+    # Uninstall on a new machine: the devzone context is reset to the chosen
+    # cluster (otherwise it points to the old one); without it, only the
+    # local cleanup takes place
     if [ -n "$CTX" ]; then
         devzone_context_set "$CTX" ||
-            echo "devzone : postgres : contexte devzone non posé sur $CTX ; nettoyage local seulement" >&2
+            echo "devzone : postgres : devzone context not set on $CTX; local cleanup only" >&2
     fi
-    if [ -n "$CTX" ] && installe; then
-        echo "▶ Suppression de PostgreSQL et de toutes ses bases sur ${CTX}…"
-        # RoleBinding retiré puis namespace supprimé par l'administrateur (#430)
+    if [ -n "$CTX" ] && is_installed; then
+        echo "▶ Deleting PostgreSQL and all its databases on ${CTX}…"
+        # RoleBinding removed, then namespace deleted by the administrator (#430)
         account_remove "$CTX" "$NS" >/dev/null 2>&1 || true
         account_admin "$CTX" delete namespace "$NS" --wait=true >/dev/null
         cluster_release "$CTX"
     fi
     rm -rf "$SECRETS"
-    echo "✔ PostgreSQL désinstallé."
-    regenerer_identifiants
+    echo "✔ PostgreSQL uninstalled."
+    regenerate_credentials
 }
 
-nombre_bases() {
+count_databases() {
     psql_admin -At -c "SELECT count(*) FROM pg_database WHERE datname NOT IN ('postgres','template0','template1')" 2>/dev/null || echo "?"
 }
 
-etat() {
+do_status() {
     CTX="$(cluster_saved)"
-    if [ -z "$CTX" ] || ! installe; then
+    if [ -z "$CTX" ] || ! is_installed; then
         echo "désactivé"
         return 0
     fi
@@ -167,143 +167,143 @@ etat() {
     elif ! relay_active postgres; then
         echo "prêt sur $CTX, relais arrêté : devzone apply"
     else
-        echo "prêt sur $CTX : 127.0.0.1:$POSTGRES_PORT, $(nombre_bases) base(s)"
+        echo "prêt sur $CTX : 127.0.0.1:$POSTGRES_PORT, $(count_databases) base(s)"
     fi
 }
 
-creer() {
-    local projet="${1:-}" nouveau="" fichier mdp arg
-    valider_projet "$projet"
+do_create() {
+    local project="${1:-}" renew="" file pw arg
+    validate_project "$project"
     for arg in "${@:2}"; do
         case "$arg" in
-            --new-password) nouveau=1 ;;
-            *) refuse "argument inconnu : $arg" ;;
+            --new-password) renew=1 ;;
+            *) refuse "unknown argument: $arg" ;;
         esac
     done
-    CTX="$(contexte)"
-    installe || refuse "module inactif : devzone enable postgres"
-    fichier="$SECRETS/$projet.env"
-    # Mot de passe gardé : une application déjà configurée continue de marcher
-    mdp="$(sed -n 's/^DB_PASSWORD=//p' "$fichier" 2>/dev/null || true)"
-    if [ -z "$mdp" ] || [ -n "$nouveau" ]; then
-        mdp="$(mot_de_passe)"
+    CTX="$(module_context)"
+    is_installed || refuse "module disabled: devzone enable postgres"
+    file="$SECRETS/$project.env"
+    # Kept password: an application already configured keeps working
+    pw="$(sed -n 's/^DB_PASSWORD=//p' "$file" 2>/dev/null || true)"
+    if [ -z "$pw" ] || [ -n "$renew" ]; then
+        pw="$(new_password)"
     fi
-    # REVOKE … FROM PUBLIC : un projet ne se connecte pas à la base d'un autre
+    # REVOKE ... FROM PUBLIC: a project does not connect to another project's database
     psql_admin <<SQL
-SELECT 'CREATE ROLE $projet LOGIN' WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '$projet')\gexec
-ALTER ROLE $projet PASSWORD '$mdp';
-SELECT 'CREATE DATABASE $projet OWNER $projet' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '$projet')\gexec
-REVOKE CONNECT ON DATABASE $projet FROM PUBLIC;
-GRANT CONNECT ON DATABASE $projet TO $projet;
+SELECT 'CREATE ROLE $project LOGIN' WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '$project')\gexec
+ALTER ROLE $project PASSWORD '$pw';
+SELECT 'CREATE DATABASE $project OWNER $project' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '$project')\gexec
+REVOKE CONNECT ON DATABASE $project FROM PUBLIC;
+GRANT CONNECT ON DATABASE $project TO $project;
 SQL
     mkdir -p "$SECRETS"
     chmod 700 "$SECRETS"
     (
         umask 077
-        cat >"$fichier" <<ENV
+        cat >"$file" <<ENV
 DB_HOST=127.0.0.1
 DB_PORT=$POSTGRES_PORT
-DB_NAME=$projet
-DB_USER=$projet
-DB_PASSWORD=$mdp
-DB_URL=jdbc:postgresql://127.0.0.1:$POSTGRES_PORT/$projet
+DB_NAME=$project
+DB_USER=$project
+DB_PASSWORD=$pw
+DB_URL=jdbc:postgresql://127.0.0.1:$POSTGRES_PORT/$project
 ENV
     )
-    echo "✔ base $projet prête ; identifiants : $fichier"
-    regenerer_identifiants
+    echo "✔ database $project ready; credentials: $file"
+    regenerate_credentials
 }
 
-liste() {
-    CTX="$(contexte)"
-    installe || refuse "module inactif : devzone enable postgres"
+do_list() {
+    CTX="$(module_context)"
+    is_installed || refuse "module disabled: devzone enable postgres"
     psql_admin -At -F ' ' -c "SELECT datname, pg_get_userbyid(datdba) FROM pg_database WHERE datname NOT IN ('postgres','template0','template1') ORDER BY 1" |
-        awk 'BEGIN { n = 0 } { printf "  %-30s propriétaire %s\n", $1, $2; n++ } END { if (n == 0) print "  (aucune base : devzone postgres create <projet>)" }'
+        awk 'BEGIN { n = 0 } { printf "  %-30s owner %s\n", $1, $2; n++ } END { if (n == 0) print "  (no database: devzone postgres create <project>)" }'
 }
 
-console() {
-    local projet="${1:-}" tty=()
-    CTX="$(contexte)"
-    installe || refuse "module inactif : devzone enable postgres"
+do_psql() {
+    local project="${1:-}" tty=()
+    CTX="$(module_context)"
+    is_installed || refuse "module disabled: devzone enable postgres"
     [ -t 0 ] && tty=(-t)
-    if [ -n "$projet" ]; then
-        valider_projet "$projet"
-        k exec -i ${tty[@]+"${tty[@]}"} postgres-0 -c postgres -- psql -U "$projet" -d "$projet"
+    if [ -n "$project" ]; then
+        validate_project "$project"
+        k exec -i ${tty[@]+"${tty[@]}"} postgres-0 -c postgres -- psql -U "$project" -d "$project"
     else
         k exec -i ${tty[@]+"${tty[@]}"} postgres-0 -c postgres -- psql -U postgres
     fi
 }
 
-supprimer() {
-    local projet="${1:-}" oui="" arg reponse
-    valider_projet "$projet"
+do_delete() {
+    local project="${1:-}" yes="" arg answer
+    validate_project "$project"
     for arg in "${@:2}"; do
         case "$arg" in
-            --yes) oui=1 ;;
-            *) refuse "argument inconnu : $arg" ;;
+            --yes) yes=1 ;;
+            *) refuse "unknown argument: $arg" ;;
         esac
     done
-    CTX="$(contexte)"
-    installe || refuse "module inactif : devzone enable postgres"
-    if [ -z "$oui" ]; then
-        cluster_interactive || refuse "confirmation impossible sans terminal : devzone postgres delete $projet --yes"
-        printf 'Supprimer la base %s et toutes ses données ? [o/N] ' "$projet" >&2
-        read -r reponse || reponse=""
-        case "$reponse" in
+    CTX="$(module_context)"
+    is_installed || refuse "module disabled: devzone enable postgres"
+    if [ -z "$yes" ]; then
+        cluster_interactive || refuse "cannot confirm without a terminal: devzone postgres delete $project --yes"
+        printf 'Delete database %s and all its data? [o/N] ' "$project" >&2
+        read -r answer || answer=""
+        case "$answer" in
             o | O | oui) ;;
-            *) echo "Abandon : rien n'a été supprimé."; return 0 ;;
+            *) echo "Abandon: nothing was deleted."; return 0 ;;
         esac
     fi
     psql_admin <<SQL
-DROP DATABASE IF EXISTS $projet WITH (FORCE);
-DROP ROLE IF EXISTS $projet;
+DROP DATABASE IF EXISTS $project WITH (FORCE);
+DROP ROLE IF EXISTS $project;
 SQL
-    rm -f "$SECRETS/$projet.env"
-    echo "✔ base $projet supprimée"
-    regenerer_identifiants
+    rm -f "$SECRETS/$project.env"
+    echo "✔ database $project deleted"
+    regenerate_credentials
 }
 
-relais() {
+do_relay_start() {
     CTX="$(cluster_saved)"
-    if [ -n "$CTX" ] && installe; then
+    if [ -n "$CTX" ] && is_installed; then
         relay_start postgres "$CTX" "$NS" svc/postgres "$POSTGRES_PORT:5432"
     fi
 }
 
-autoriser() {
+do_authorize() {
     local ns="${1:-}"
-    [ -n "$ns" ] || { echo "devzone postgres : namespace manquant" >&2; return 2; }
+    [ -n "$ns" ] || { echo "devzone postgres: namespace missing" >&2; return 2; }
     namespace_isolate "$ns"
-    echo "devzone postgres : accès autorisé depuis $ns vers le service PostgreSQL"
+    echo "devzone postgres: access allowed from $ns to the PostgreSQL service"
 }
 
-interdire() {
-    local ns="${1:-}" patch sortie
-    [ -n "$ns" ] || { echo "devzone postgres : namespace manquant" >&2; return 2; }
-    # JSON construit par jq, jamais assemblé à la main (le JSON invalide était
-    # rejeté en silence) ; l'échec du patch est affiché et rend un code (#396)
+do_forbid() {
+    local ns="${1:-}" patch out
+    [ -n "$ns" ] || { echo "devzone postgres: namespace missing" >&2; return 2; }
+    # JSON built by jq, never assembled by hand (invalid JSON was silently
+    # rejected); a failed patch is displayed and returns a code (#396)
     patch="$(jq -nc '{"spec":{"ingress":[{"from":[{"podSelector":{}}]}]}}')"
-    if ! sortie="$(kubectl --context devzone -n "$NS" patch networkpolicy devzone-meme-namespace \
+    if ! out="$(kubectl --context devzone -n "$NS" patch networkpolicy devzone-meme-namespace \
         -p "$patch" 2>&1)"; then
-        echo "devzone : postgres : impossible de retirer la règle d'accès de $ns : $sortie" >&2
+        echo "devzone : postgres : cannot remove the access rule of $ns: $out" >&2
         return 1
     fi
-    echo "devzone postgres : accès interdit depuis $ns vers le service PostgreSQL"
+    echo "devzone postgres: access forbidden from $ns to the PostgreSQL service"
 }
 
 case "${1:-}" in
-    install) installer ;;
-    uninstall) desinstaller ;;
-    status) etat ;;
-    create) creer "${@:2}" ;;
-    list) liste ;;
-    psql) console "${@:2}" ;;
-    delete) supprimer "${@:2}" ;;
-    relay-start) relais ;;
+    install) do_install ;;
+    uninstall) do_uninstall ;;
+    status) do_status ;;
+    create) do_create "${@:2}" ;;
+    list) do_list ;;
+    psql) do_psql "${@:2}" ;;
+    delete) do_delete "${@:2}" ;;
+    relay-start) do_relay_start ;;
     relay-stop) relay_stop postgres ;;
-    authorize) autoriser "${@:2}" ;;
-    forbid) interdire "${@:2}" ;;
+    authorize) do_authorize "${@:2}" ;;
+    forbid) do_forbid "${@:2}" ;;
     *)
-        echo "devzone postgres : create <projet> [--new-password] | list | psql [<projet>] | delete <projet> [--yes]" >&2
+        echo "devzone postgres: create <project> [--new-password] | list | psql [<project>] | delete <project> [--yes]" >&2
         exit 1
         ;;
 esac

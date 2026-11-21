@@ -20,7 +20,7 @@ setup() {
 @test "enable llm: refused with the migration message, not an unknown module" {
     run bash "$DEVZONE" enable llm
     [ "$status" -eq 1 ]
-    [[ "$output" == *"module llm retiré"* ]] || false
+    [[ "$output" == *"llm module removed"* ]] || false
     [[ "$output" == *"devzone ai"* ]] || false
     [[ "$output" == *"kubectl delete namespace devzone-llm"* ]] || false
     [[ "$output" != *"module inconnu"* ]] || false
@@ -30,7 +30,7 @@ setup() {
     printf 'ia=on\nllm=on\npostgres=off\n' >"$DEVZONE_ETAT"
     run bash "$DEVZONE" disable llm
     [ "$status" -eq 1 ]
-    [[ "$output" == *"module llm retiré"* ]] || false
+    [[ "$output" == *"llm module removed"* ]] || false
     ! grep -q '^llm=' "$DEVZONE_ETAT" || false
     grep -qx 'ia=on' "$DEVZONE_ETAT"
     grep -qx 'postgres=off' "$DEVZONE_ETAT"

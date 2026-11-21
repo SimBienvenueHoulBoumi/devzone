@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Catalogue d'applications (#414) : une application préconfigurée par dossier
-# .devcontainer/catalog/<app>/ (app.conf ; le chart charts/devzone-<app>, #559), installée dans le
-# cluster des services de devzone sous son namespace de app.conf ; l'état
-# voulu est la ligne <app>=on|off de .devzone.modules.
+# Application catalog (#414): one preconfigured application per folder
+# .devcontainer/catalog/<app>/ (app.conf; the chart charts/devzone-<app>, #559),
+# installed in the devzone services cluster under the namespace of its app.conf;
+# the wanted state is the line <app>=on|off of .devzone.modules.
 #   catalog.sh sync | apply | list | resume | json | remove <app>
 set -euo pipefail
 
@@ -25,38 +25,38 @@ ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
 # shellcheck disable=SC1091
 . "$ICI/catalog/app.sh"
 
-refuse() { echo "devzone : catalogue : $*" >&2; exit 2; }
+refuse() { echo "devzone : catalog : $*" >&2; exit 2; }
 
-# Dossier du catalogue (surchargeable par les tests)
-dossier_catalogue() { echo "${DEVZONE_CATALOGUE:-$ICI/catalog}"; }
+# Catalog folder (overridable by the tests)
+catalog_dir() { echo "${DEVZONE_CATALOGUE:-$ICI/catalog}"; }
 
-# Applications du catalogue : dossiers pourvus d'un app.conf, triés
-catalogue_apps() {
+# Catalog applications: folders holding an app.conf, sorted
+catalog_apps() {
     local d
-    for d in "$(dossier_catalogue)"/*; do
+    for d in "$(catalog_dir)"/*; do
         [ -f "$d/app.conf" ] || continue
         echo "${d##*/}"
     done | LC_ALL=C sort
 }
 
-# Clé de app.conf (nom, description, image, port, mémoire, taille, namespace)
-app_lire() {
-    grep -E "^$2=" "$(dossier_catalogue)/$1/app.conf" 2>/dev/null | tail -1 | cut -d= -f2- || true
+# app.conf key (nom, description, image, port, memoire, taille, namespace)
+app_read() {
+    grep -E "^$2=" "$(catalog_dir)/$1/app.conf" 2>/dev/null | tail -1 | cut -d= -f2- || true
 }
 
-# Namespace de l'application : celui de app.conf (requis)
-app_ns() {
+# Application namespace: the one of app.conf (required)
+app_namespace() {
     local ns
-    ns="$(app_lire "$1" namespace)"
-    [ -n "$ns" ] || refuse "namespace manquant dans app.conf de $1"
+    ns="$(app_read "$1" namespace)"
+    [ -n "$ns" ] || refuse "missing namespace in app.conf of $1"
     echo "$ns"
 }
 
-# Marque d'échec d'une application : même schéma que fichier_echec des modules
-fichier_echec() { echo "$ETAT-echec-$1"; }
+# Failure marker of an application: same scheme as the failure file of the modules
+failure_file() { echo "$ETAT-echec-$1"; }
 
-# État voulu : on si la ligne <app>=on existe, off par défaut
-voulu() {
+# Wanted state: on if the line <app>=on exists, off by default
+wanted() {
     local v
     v="$(grep -E "^$1=" "$ETAT" 2>/dev/null | tail -1 | cut -d= -f2- || true)"
     [ "$v" = on ] && echo on || echo off
@@ -66,15 +66,15 @@ voulu() {
 # service resolves in the cluster DNS (no RBAC needed, #515). Elsewhere: labelled
 # namespace and StatefulSet of the app name; reading the namespaces is reserved
 # to the administrator (#430). Nothing without a chosen cluster or when absent.
-presente() {
+present() {
     local ctx ns
-    ns="$(app_ns "$1")"
+    ns="$(app_namespace "$1")"
     if [ "${DEVZONE_WORKSPACE:-}" = kubernetes ]; then
         # In the pod there is no kubeconfig and the limited service account
         # cannot list StatefulSets (#430): presence is the cluster DNS
         # resolving the service, no RBAC needed, the pod service account
         # stays limited
-        getent hosts "$(app_lire "$1" nom).${ns}.svc" >/dev/null 2>&1
+        getent hosts "$(app_read "$1" nom).${ns}.svc" >/dev/null 2>&1
         return
     fi
     ctx="$(cluster_saved)"
@@ -83,149 +83,149 @@ presente() {
         kubectl --context devzone -n "$ns" get statefulset "$1" >/dev/null 2>&1
 }
 
-# Application prête : le StatefulSet compte une réplique prête
-app_prete() {
+# Application ready: the StatefulSet has one ready replica
+app_ready() {
     local ns
-    ns="$(app_ns "$1")"
+    ns="$(app_namespace "$1")"
     [ "$(kubectl --context devzone -n "$ns" get statefulset "$1" \
         -o jsonpath='{.status.readyReplicas}' 2>/dev/null || true)" = 1 ]
 }
 
-# Ajoute à l'état les lignes <app>=off des applications absentes (une fois
-# chacune, jamais une ligne existante modifiée), précédées une fois du
-# commentaire ; la lecture et l'écriture tiennent le même verrou (#417) :
-# une écriture concurrente ne peut pas être perdue entre les deux
-catalogue_synchroniser() (
-    local app entete manque="" tmp
+# Adds to the state the <app>=off lines of the absent applications (once each,
+# an existing line is never changed), preceded once by the comment; reading and
+# writing hold the same lock (#417): a concurrent write cannot be lost between the two
+catalog_sync() (
+    local app header missing="" tmp
     [ -f "$ETAT" ] || return 0
-    entete="# Applications du catalogue : passer à on pour installer (devzone catalog)"
+    header="# Applications du catalogue : passer à on pour installer (devzone catalog)"
     state_lock_take || return 1
-    # Le verrou est rendu à la sortie, y compris sur une erreur sous set -e
+    # The lock is released on exit, including on an error under set -e
     trap 'state_lock_release' EXIT
     while IFS= read -r app; do
         [ -n "$app" ] || continue
         grep -qE "^${app}=" "$ETAT" 2>/dev/null && continue
-        manque="${manque}${manque:+$'\n'}${app}=off"
-    done <<<"$(catalogue_apps)"
-    [ -n "$manque" ] || return 0
+        missing="${missing}${missing:+$'\n'}${app}=off"
+    done <<<"$(catalog_apps)"
+    [ -n "$missing" ] || return 0
     tmp="$(mktemp)"
     {
         cat "$ETAT"
-        grep -qF "$entete" "$ETAT" || echo "$entete"
-        echo "$manque"
+        grep -qF "$header" "$ETAT" || echo "$header"
+        echo "$missing"
     } >"$tmp"
     state_replace "$tmp"
     rm -f "$tmp"
 )
 
-# État réel d'une application : disponible, attendue, installée, echec
-app_etat() {
+# Real state of an application: available, expected, installed, failed. These
+# values are the etat field of devzone status --json: keep them
+app_state() {
     local app="$1"
-    if [ "$(voulu "$app")" != on ]; then
+    if [ "$(wanted "$app")" != on ]; then
         echo disponible
-    elif [ -f "$(fichier_echec "$app")" ]; then
+    elif [ -f "$(failure_file "$app")" ]; then
         echo echec
-    elif presente "$app"; then
+    elif present "$app"; then
         echo installée
     else
         echo attendue
     fi
 }
 
-# devzone catalog : nom, état (off, on installée, on en échec), description
-catalogue_lister() {
-    local app etat etiquette
+# devzone catalog: name, state (off, on installed, on failed), description
+catalog_list() {
+    local app state label
     while IFS= read -r app; do
         [ -n "$app" ] || continue
-        etat="$(app_etat "$app")"
-        case "$etat" in
-            disponible) etiquette='off disponible' ;;
-            installée) etiquette="on installée" ;;
-            echec) etiquette="on en échec" ;;
-            *) etiquette="on attendue" ;;
+        state="$(app_state "$app")"
+        case "$state" in
+            disponible) label='off available' ;;
+            installée) label='on installed' ;;
+            echec) label='on failed' ;;
+            *) label='on expected' ;;
         esac
-        printf '  %-12s %-14s %s\n' "$app" "$etiquette" "$(app_lire "$app" description)"
-    done <<<"$(catalogue_apps)"
+        printf '  %-12s %-14s %s\n' "$app" "$label" "$(app_read "$app" description)"
+    done <<<"$(catalog_apps)"
 }
 
-# Relais de l application installee : etat de son script, sinon pid du relais
-app_relais_arrete() {
-    local app="$1" script etat
+# Relay of the installed application: state of its script, else the relay pid
+app_relay_stopped() {
+    local app="$1" script state
     if [ "${DEVZONE_WORKSPACE:-}" = kubernetes ]; then
         # In the pod, no relay: the access goes through the workspace ports
         return 1
     fi
     script="$ICI/catalog/$app/$app.sh"
     if [ -f "$script" ]; then
-        etat="$(bash "$script" status 2>/dev/null || true)"
-        case "$etat" in *"relais arrêté"*) return 0 ;; esac
+        state="$(bash "$script" status 2>/dev/null || true)"
+        case "$state" in *"relais arrêté"*) return 0 ;; esac
     fi
     ! relay_active "$app"
 }
 
-# Lignes Applications du récapitulatif de devzone : ○ disponible, ✔ installée
-# (adresse du relais), ✖ en échec, ⚠ attendue
-catalogue_resume() {
+# Application lines of devzone's summary: ○ available, ✔ installed (relay
+# address), ✖ failed, ⚠ expected
+catalog_summary() {
     local app
     while IFS= read -r app; do
         [ -n "$app" ] || continue
-        case "$(app_etat "$app")" in
-            disponible) printf '  ○ application %-12s disponible, %s : devzone enable %s\n' \
-                "$app" "$(app_lire "$app" description)" "$app" ;;
+        case "$(app_state "$app")" in
+            disponible) printf '  ○ application %-12s available, %s: devzone enable %s\n' \
+                "$app" "$(app_read "$app" description)" "$app" ;;
             installée)
-                if app_relais_arrete "$app"; then
-                    printf '  ⚠ application %-12s installée, relais arrêté : devzone repair\n' "$app"
+                if app_relay_stopped "$app"; then
+                    printf '  ⚠ application %-12s installed, relay stopped: devzone repair\n' "$app"
                 else
                     if [ "${DEVZONE_WORKSPACE:-}" = kubernetes ]; then
-                        printf '  ✔ application %-12s installée : local access: devzone workspace ports\n' "$app"
+                        printf '  ✔ application %-12s installed: local access: devzone workspace ports\n' "$app"
                     else
-                        printf '  ✔ application %-12s installée : 127.0.0.1:%s\n' \
-                            "$app" "$(app_lire "$app" port)"
+                        printf '  ✔ application %-12s installed: 127.0.0.1:%s\n' \
+                            "$app" "$(app_read "$app" port)"
                     fi
                 fi ;;
-            attendue) printf '  ⚠ application %-12s attendue : devzone apply\n' "$app" ;;
-            *) printf '  ✖ application %s en échec : %s : devzone apply\n' \
-                "$app" "$(head -1 "$(fichier_echec "$app")")" ;;
+            attendue) printf '  ⚠ application %-12s expected: devzone apply\n' "$app" ;;
+            *) printf '  ✖ application %s failed: %s: devzone apply\n' \
+                "$app" "$(head -1 "$(failure_file "$app")")" ;;
         esac
-    done <<<"$(catalogue_apps)"
-    app_mysql_volumes_inutilises 2>/dev/null || true
+    done <<<"$(catalog_apps)"
+    app_unused_mysql_volumes 2>/dev/null || true
 }
 
-# Rubrique applications de devzone status --json : mêmes champs que modules
-catalogue_json() {
-    local app actif etat echec cmd json='[]'
+# Applications section of devzone status --json: same fields as the modules
+catalog_json() {
+    local app active state failure cmd json='[]'
     while IFS= read -r app; do
         [ -n "$app" ] || continue
-        actif=false
-        [ "$(voulu "$app")" = on ] && actif=true
-        etat="$(app_etat "$app")"
-        echec=""
+        active=false
+        [ "$(wanted "$app")" = on ] && active=true
+        state="$(app_state "$app")"
+        failure=""
         cmd="devzone apply"
-        case "$etat" in
+        case "$state" in
             disponible) cmd="devzone enable $app" ;;
             installée) cmd="devzone disable $app" ;;
-            echec) echec="$(head -1 "$(fichier_echec "$app")")" ;;
+            echec) failure="$(head -1 "$(failure_file "$app")")" ;;
         esac
-        json="$(jq -cn --argjson avant "$json" --arg nom "$app" --argjson actif "$actif" \
-            --arg description "$(app_lire "$app" description)" \
-            --arg etat "$etat" --arg port "$(app_lire "$app" port)" \
-            --arg echec "$echec" --arg commande "$cmd" \
-            '$avant + [{nom:$nom,actif:$actif,description:$description,port:$port,etat:$etat,echec:(if $echec=="" then null else $echec end),commande:(if $commande=="" then null else $commande end)}]')"
-    done <<<"$(catalogue_apps)"
+        json="$(jq -cn --argjson before "$json" --arg nom "$app" --argjson actif "$active" \
+            --arg description "$(app_read "$app" description)" \
+            --arg etat "$state" --arg port "$(app_read "$app" port)" \
+            --arg failure "$failure" --arg command "$cmd" \
+            '$before + [{nom:$nom,actif:$actif,description:$description,port:$port,etat:$etat,echec:(if $failure=="" then null else $failure end),commande:(if $command=="" then null else $command end)}]')"
+    done <<<"$(catalog_apps)"
     printf '%s\n' "$json"
 }
 
 case "${1:-}" in
-    sync) catalogue_synchroniser ;;
-    apply) catalogue_appliquer ;;
-    list) catalogue_lister ;;
-    resume) catalogue_resume ;;
-    json) catalogue_json ;;
-    # Retrait d'une application : StatefulSet et service, volume gardé (#441)
-    remove) app_desinstaller "$2" ;;
+    sync) catalog_sync ;;
+    apply) catalog_apply ;;
+    list) catalog_list ;;
+    resume) catalog_summary ;;
+    json) catalog_json ;;
+    # Removal of an application: StatefulSet and service, volume kept (#441)
+    remove) app_remove "$2" ;;
     -h | --help | aide) sed -n '2,6p' "$0" | sed 's/^# \{0,1\}//' ;;
     *)
-        echo "devzone : catalogue : sync | apply | list | resume | json | remove <app>" >&2
+        echo "devzone : catalog : sync | apply | list | resume | json | remove <app>" >&2
         exit 1
         ;;
 esac

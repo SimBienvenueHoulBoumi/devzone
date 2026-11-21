@@ -96,7 +96,7 @@ reussit "Docker du conteneur = Docker de l'hôte" "docker info --format '{{.ID}}
 
 echo "▶ Premier démarrage (récapitulatif affiché au démarrage)"
 reussit "modules désactivés par défaut" "devzone" "○ module ia"
-reussit "kubernetes désactivé par défaut" "devzone" "○ module kubernetes"
+reussit "kubernetes disabled par défaut" "devzone" "○ module kubernetes"
 echoue "assistants IA absents" "command -v claude"
 for message in "✖ git identity" "○ GitHub          optional" "○ module ia"; do
     if grep -q "$message" "$JOURNAL"; then ok "message : $message"; else ko "message : $message" "$(tail -5 "$JOURNAL")"; fi
@@ -131,7 +131,7 @@ fi
 # shellcheck disable=SC2016 # commande développée dans le conteneur
 echoue "ia : garde-fou : modification sur main refusée" 'd="$(mktemp -d)" && cd "$d" && git init -q -b main && printf "{\"tool_name\":\"Write\",\"tool_input\":{\"file_path\":\"%s/a.txt\"},\"cwd\":\"%s\"}" "$d" "$d" | repowarden guard --format claude' "branche protégée"
 reussit "disable ia" "devzone disable ia && ! command -v claude"
-echoue "module inconnu refusé" "devzone enable nexistepas" "module inconnu"
+echoue "unknown module refusé" "devzone enable nexistepas" "unknown module"
 
 echo "▶ Module kubernetes (cluster kind du test, jamais un cluster de l'hôte)"
 # #230 : avant de tenter le cluster kind, le daemon docker du conteneur doit répondre
@@ -163,7 +163,7 @@ reussit "metrics-server marqué comme installé par devzone" "kubectl --context 
 reussit "désinstaller : retire le metrics-server de devzone" "CONFIRMER=oui bash manage/scripts/uninstall.sh" "metrics-server removed: kind-$KIND_TEST"
 echoue "metrics-server absent après désinstallation" "kubectl --context kind-$KIND_TEST -n kube-system get deployment metrics-server"
 echoue "metrics-server.sh : unknown context" "bash .devcontainer/metrics-server.sh nexistepas" "unknown context"
-reussit "disable kubernetes" "devzone disable kubernetes" "kubernetes désactivé"
+reussit "disable kubernetes" "devzone disable kubernetes" "kubernetes disabled"
 reussit "cluster kind toujours utilisable" "kubectl --context kind-$KIND_TEST get nodes" "Ready"
 
 echo "▶ Git et hooks repowarden"

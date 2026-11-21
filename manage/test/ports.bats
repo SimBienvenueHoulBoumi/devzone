@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
-# Relais de ports (#290) : un conteneur alpine/socat par port, sur le Docker
-# de l'hôte, de 127.0.0.1 du poste vers l'IP du conteneur devzone. Faux docker
-# et curl dans le PATH : aucun conteneur lancé, arguments journalisés.
+# Port relays (#290): one alpine/socat container per port, on the host's Docker,
+# from 127.0.0.1 of the workstation to the IP of the devzone container. Fake docker
+# and curl in the PATH: no container started, arguments logged.
 
 setup() {
     load commun
@@ -13,8 +13,8 @@ setup() {
     export DEVZONE_RACINE="$BATS_TEST_TMPDIR/racine"
     export DEVZONE_ETAT="$BATS_TEST_TMPDIR/etat"
     export DEVZONE_INSTANCE=devzone
-    mkdir -p "$HOME" "$DEVZONE_RACINE/workspace" "$BATS_TEST_TMPDIR/bin" "$BATS_TEST_TMPDIR/relais"
-    # le veilleur de ports automatiques reste sous le dossier du test (#394)
+    mkdir -p "$HOME" "$DEVZONE_RACINE/workspace" "$BATS_TEST_TMPDIR/bin" "$BATS_TEST_TMPDIR/relays"
+    # the automatic port watcher stays under the test folder (#394)
     export DEVZONE_PORTS_AUTO_DIR="$BATS_TEST_TMPDIR/ports-auto"
     : >"$DEVZONE_ETAT"
     : >"$BATS_TEST_TMPDIR/docker.log"
@@ -28,27 +28,27 @@ case "${1:-}" in
     inspect)
         case "$*" in
             *NetworkSettings.Networks*)
-                [ "${FAUX_SANS_CONTENEUR:-0}" = 1 ] && exit 1
+                [ "${FAKE_SANS_CONTENEUR:-0}" = 1 ] && exit 1
                 echo "devzone_default 172.18.0.5"
                 ;;
             *)
-                nom="${2:-}"
-                [ -f "$T/relais/$nom" ] || exit 1
+                name="${2:-}"
+                [ -f "$T/relays/$name" ] || exit 1
                 case "$*" in *State.Running*) echo true ;; esac
                 ;;
         esac
         ;;
     run)
-        nom=""; prec=""
+        name=""; prec=""
         for a in "$@"; do
-            [ "$prec" = --name ] && nom="$a"
+            [ "$prec" = --name ] && name="$a"
             prec="$a"
         done
-        if [ "${FAUX_ECHEC_PORT:-}" = "${nom##*-}" ]; then
-            echo "docker: Error response from daemon: Bind for 127.0.0.1:${nom##*-} failed: port is already allocated." >&2
+        if [ "${FAKE_ECHEC_PORT:-}" = "${name##*-}" ]; then
+            echo "docker: Error response from daemon: Bind for 127.0.0.1:${name##*-} failed: port is already allocated." >&2
             exit 1
         fi
-        case "${FAUX_RUN_ECHEC:-}" in
+        case "${FAKE_RUN_ECHEC:-}" in
             allocation)
                 echo "docker: Error response from daemon: Bind for 127.0.0.1:8080 failed: port is already allocated." >&2
                 exit 1
@@ -62,37 +62,37 @@ case "${1:-}" in
                 exit 1
                 ;;
         esac
-        mkdir -p "$T/relais"
-        : >"$T/relais/$nom"
-        echo "id-$nom"
+        mkdir -p "$T/relays"
+        : >"$T/relays/$name"
+        echo "id-$name"
         ;;
     ps)
-        motif=""; prec=""; show_all=0
+        pattern=""; prec=""; show_all=0
         for a in "$@"; do
             [ "$a" = "-a" ] && show_all=1
-            [ "$prec" = --filter ] && motif="$a"
+            [ "$prec" = --filter ] && pattern="$a"
             prec="$a"
         done
-        for f in "$T"/relais/*; do
+        for f in "$T"/relays/*; do
             [ -e "$f" ] || continue
-            nom="$(basename "$f")"
-            m="${motif#name=}"
+            name="$(basename "$f")"
+            m="${pattern#name=}"
             m="${m#^}"
             m="${m%$}"
-            if [ "$nom" = "$m" ]; then
+            if [ "$name" = "$m" ]; then
                 if [ "$show_all" = 1 ] || [ ! -s "$f" ]; then
-                    echo "$nom"
+                    echo "$name"
                 fi
             fi
         done
         ;;
     stop)
-        nom="${2:-}"
-        [ -f "$T/relais/$nom" ] && echo stopped >"$T/relais/$nom"
+        name="${2:-}"
+        [ -f "$T/relays/$name" ] && echo stopped >"$T/relays/$name"
         ;;
     rm)
-        nom="${3:-${2:-}}"
-        rm -f "$T/relais/$nom"
+        name="${3:-${2:-}}"
+        rm -f "$T/relays/$name"
         ;;
 esac
 exit 0
@@ -101,7 +101,7 @@ DOCKER
     cat >"$BATS_TEST_TMPDIR/bin/curl" <<'CURL'
 #!/usr/bin/env bash
 echo "curl $*" >>"$BATS_TEST_TMPDIR/curl.log"
-for p in ${FAUX_REPOND:-}; do
+for p in ${FAKE_REPOND:-}; do
     case "$*" in *":$p"*) exit 0 ;; esac
 done
 exit 7
@@ -111,7 +111,7 @@ CURL
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
 }
 
-@test "ouvrir : relais socat vers l'IP du conteneur, étiqueté, état trié" {
+@test "open: socat relay to the container IP, labelled, sorted state" {
     run bash "$PORTS" 8080
     [ "$status" -eq 0 ]
     grep -q 'docker run -d --restart unless-stopped --name devzone-devzone-port-8080' "$BATS_TEST_TMPDIR/docker.log"
@@ -121,19 +121,19 @@ CURL
     grep -q -- '-p 127.0.0.1:8080:8080' "$BATS_TEST_TMPDIR/docker.log"
     grep -q 'alpine/socat:1.8.0.3 tcp-listen:8080,fork,reuseaddr tcp-connect:172.18.0.5:8080' "$BATS_TEST_TMPDIR/docker.log"
     grep -qx 'ports=8080' "$DEVZONE_ETAT"
-    [[ "$output" == *"127.0.0.1:8080 du poste"*"8080 du conteneur"* ]] || false
+    [[ "$output" == *"127.0.0.1:8080 on the workstation"*"8080 in the container"* ]] || false
 }
 
-@test "ouvrir : relais déjà ouvert idempotent, état complété sans second docker run" {
+@test "open: relay already open is idempotent, state completed without a second docker run" {
     bash "$PORTS" 8080
     run bash "$PORTS" 8080
     [ "$status" -eq 0 ]
     [ "$(grep -c 'docker run' "$BATS_TEST_TMPDIR/docker.log")" -eq 1 ]
-    [[ "$output" == *"déjà ouvert"* ]] || false
+    [[ "$output" == *"already open"* ]] || false
     grep -qx 'ports=8080' "$DEVZONE_ETAT"
 }
 
-@test "ouvrir : relais arrêté → rm -f puis run vers l'IP actuelle" {
+@test "open: stopped relay -> rm -f then run toward the current IP" {
     printf 'ports=8080\n' >"$DEVZONE_ETAT"
     bash "$PORTS" 8080 >/dev/null
     run "$BATS_TEST_TMPDIR/bin/docker" stop devzone-devzone-port-8080
@@ -146,10 +146,10 @@ CURL
     grep -q 'tcp-connect:172.18.0.5:8080' "$BATS_TEST_TMPDIR/docker.log"
     [ "$(grep -c 'docker run' "$BATS_TEST_TMPDIR/docker.log")" -eq 1 ]
     grep -qx 'ports=8080' "$DEVZONE_ETAT"
-    [[ "$output" == *"127.0.0.1:8080 du poste"*"8080 du conteneur"* ]] || false
+    [[ "$output" == *"127.0.0.1:8080 on the workstation"*"8080 in the container"* ]] || false
 }
 
-@test "ouvrir : l'état garde les autres lignes et trie les ports" {
+@test "open: the state keeps the other lines and sorts the ports" {
     printf 'ia=on\nports=3000\n' >"$DEVZONE_ETAT"
     run bash "$PORTS" 8080
     [ "$status" -eq 0 ]
@@ -157,82 +157,82 @@ CURL
     grep -qx 'ports=3000,8080' "$DEVZONE_ETAT"
 }
 
-@test "ouvrir : port invalide refusé (code 1), aucun relais, état intact" {
+@test "open: invalid port refused (code 1), no relay, state intact" {
     printf 'ports=3000\n' >"$DEVZONE_ETAT"
     for p in "" 0 65536 abc 80a -1 999999999999999999999; do
         run bash "$PORTS" open "$p"
         [ "$status" -eq 1 ]
-        [[ "$output" == *"port invalide"* ]] || false
+        [[ "$output" == *"invalid port"* ]] || false
     done
     ! grep -q 'docker run' "$BATS_TEST_TMPDIR/docker.log" || false
     grep -qx 'ports=3000' "$DEVZONE_ETAT"
 }
 
-@test "ouvrir : conteneur devzone introuvable (Docker de l'hôte absent) → refus code 1" {
-    FAUX_SANS_CONTENEUR=1 run bash "$PORTS" 8080
+@test "open: devzone container not found (host Docker absent) -> refused, code 1" {
+    FAKE_SANS_CONTENEUR=1 run bash "$PORTS" 8080
     [ "$status" -eq 1 ]
-    [[ "$output" == *"conteneur devzone introuvable"* ]] || false
+    [[ "$output" == *"devzone container not found"* ]] || false
     [ ! -s "$DEVZONE_ETAT" ]
 }
 
-@test "ouvrir : port déjà pris sur le poste → refus clair, état inchangé" {
-    for cas in allocation adresse; do
+@test "open: port already taken on the workstation -> clear refusal, state unchanged" {
+    for case_name in allocation adresse; do
         : >"$DEVZONE_ETAT"
-        FAUX_RUN_ECHEC="$cas" run bash "$PORTS" 8080
+        FAKE_RUN_ECHEC="$case_name" run bash "$PORTS" 8080
         [ "$status" -eq 1 ]
-        [[ "$output" == *"port déjà utilisé sur le poste : 8080"* ]] || false
+        [[ "$output" == *"port already in use on the workstation : 8080"* ]] || false
         [ ! -s "$DEVZONE_ETAT" ]
     done
 }
 
-@test "ouvrir : autre échec de docker run → message du relais, code 1" {
-    FAUX_RUN_ECHEC=autre run bash "$PORTS" 8080
+@test "open: other docker run failure -> relay message, code 1" {
+    FAKE_RUN_ECHEC=autre run bash "$PORTS" 8080
     [ "$status" -eq 1 ]
-    [[ "$output" == *"échec du relais 8080"*"daemon error"* ]] || false
+    [[ "$output" == *"relay on port 8080 failed"*"daemon error"* ]] || false
     [ ! -s "$DEVZONE_ETAT" ]
 }
 
-@test "liste : triée sans doublon, ● actif, ○ arrêté, application derrière" {
+@test "list: sorted without duplicate, ● active, ○ stopped, application behind" {
     printf 'ports=3000,8080,8080\n' >"$DEVZONE_ETAT"
-    : >"$BATS_TEST_TMPDIR/relais/devzone-devzone-port-8080"
-    FAUX_REPOND=8080 run bash "$PORTS" list
+    : >"$BATS_TEST_TMPDIR/relays/devzone-devzone-port-8080"
+    FAKE_REPOND=8080 run bash "$PORTS" list
     [ "$status" -eq 0 ]
     [ "$(printf '%s\n' "$output" | grep -c '^')" -eq 2 ]
-    printf '%s\n' "$output" | sed -n '1p' | grep -q '3000 *○ arrêté *aucune application'
-    printf '%s\n' "$output" | sed -n '2p' | grep -q '8080 *● actif *application répond'
+    printf '%s\n' "$output" | sed -n '1p' | grep -q '3000 *○ stopped *no application'
+    printf '%s\n' "$output" | sed -n '2p' | grep -q '8080 *● active *application responds'
     grep -q -- '--max-time 2 http://127.0.0.1:3000' "$BATS_TEST_TMPDIR/curl.log"
     grep -q -- '--max-time 2 http://127.0.0.1:8080' "$BATS_TEST_TMPDIR/curl.log"
 }
 
-@test "liste : aucun relais" {
+@test "list: no relay" {
     run bash "$PORTS"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"aucun relais"* ]] || false
+    [[ "$output" == *"no relay"* ]] || false
 }
 
-@test "fermer : relais supprimé, port retiré de l'état, autres ports gardés" {
+@test "close: relay removed, port removed from the state, other ports kept" {
     bash "$PORTS" 8080
     bash "$PORTS" 3000
     run bash "$PORTS" --close 8080
     [ "$status" -eq 0 ]
     grep -q 'docker rm -f devzone-devzone-port-8080' "$BATS_TEST_TMPDIR/docker.log"
-    [ ! -e "$BATS_TEST_TMPDIR/relais/devzone-devzone-port-8080" ]
+    [ ! -e "$BATS_TEST_TMPDIR/relays/devzone-devzone-port-8080" ]
     grep -qx 'ports=3000' "$DEVZONE_ETAT"
     run bash "$PORTS" close 3000
     [ "$status" -eq 0 ]
     grep -qx 'ports=' "$DEVZONE_ETAT"
 }
 
-@test "fermer : port invalide refusé (code 1)" {
+@test "close: invalid port refused (code 1)" {
     run bash "$PORTS" --close 70000
     [ "$status" -eq 1 ]
-    [[ "$output" == *"port invalide"* ]] || false
+    [[ "$output" == *"invalid port"* ]] || false
 }
 
-@test "relancer : chaque relais recréé vers l'IP actuelle, état inchangé" {
+@test "restart: each relay recreated toward the current IP, state unchanged" {
     printf 'ports=3000,8080\n' >"$DEVZONE_ETAT"
-    : >"$BATS_TEST_TMPDIR/relais/devzone-devzone-port-3000"
-    : >"$BATS_TEST_TMPDIR/relais/devzone-devzone-port-8080"
+    : >"$BATS_TEST_TMPDIR/relays/devzone-devzone-port-3000"
+    : >"$BATS_TEST_TMPDIR/relays/devzone-devzone-port-8080"
     run bash "$PORTS" restart
     [ "$status" -eq 0 ]
     grep -q 'docker rm -f devzone-devzone-port-3000' "$BATS_TEST_TMPDIR/docker.log"
@@ -243,25 +243,25 @@ CURL
     grep -qx 'ports=3000,8080' "$DEVZONE_ETAT"
 }
 
-@test "relancer : un échec avertit sans bloquer les autres, code 1" {
+@test "restart: a failure warns without blocking the others, code 1" {
     printf 'ports=3000,8080\n' >"$DEVZONE_ETAT"
-    FAUX_ECHEC_PORT=3000 run bash "$PORTS" restart
+    FAKE_ECHEC_PORT=3000 run bash "$PORTS" restart
     [ "$status" -eq 1 ]
-    [[ "$output" == *"port déjà utilisé sur le poste : 3000"* ]] || false
+    [[ "$output" == *"port already in use on the workstation : 3000"* ]] || false
     [ "$(grep -c 'docker run' "$BATS_TEST_TMPDIR/docker.log")" -eq 2 ]
     grep -q 'tcp-connect:172.18.0.5:8080' "$BATS_TEST_TMPDIR/docker.log"
     grep -qx 'ports=3000,8080' "$DEVZONE_ETAT"
 }
 
-@test "relancer : conteneur introuvable → avertissement, code 1, état intact" {
+@test "restart: container not found -> warning, code 1, state intact" {
     printf 'ports=8080\n' >"$DEVZONE_ETAT"
-    FAUX_SANS_CONTENEUR=1 run bash "$PORTS" restart
+    FAKE_SANS_CONTENEUR=1 run bash "$PORTS" restart
     [ "$status" -eq 1 ]
-    [[ "$output" == *"relais non relancés"* ]] || false
+    [[ "$output" == *"relays not restarted"* ]] || false
     grep -qx 'ports=8080' "$DEVZONE_ETAT"
 }
 
-@test "instance : nom et étiquette propres à DEVZONE_INSTANCE" {
+@test "instance: name and label specific to DEVZONE_INSTANCE" {
     export DEVZONE_INSTANCE=mon-devzone
     run bash "$PORTS" 8080
     [ "$status" -eq 0 ]
@@ -269,24 +269,24 @@ CURL
     grep -q -- '--label devzone.instance=mon-devzone' "$BATS_TEST_TMPDIR/docker.log"
 }
 
-@test "devzone port : ouvre, liste et ferme par le routage de la commande" {
+@test "devzone port: open, list and close through the command routing" {
     run bash "$DEVZONE" port 8080
     [ "$status" -eq 0 ]
     grep -qx 'ports=8080' "$DEVZONE_ETAT"
-    : >"$BATS_TEST_TMPDIR/relais/devzone-devzone-port-8080"
+    : >"$BATS_TEST_TMPDIR/relays/devzone-devzone-port-8080"
 
     run bash "$DEVZONE" port
     [ "$status" -eq 0 ]
-    [[ "$output" == *"8080"*"● actif"* ]] || false
+    [[ "$output" == *"8080"*"● active"* ]] || false
 
     run bash "$DEVZONE" port --close 8080
     [ "$status" -eq 0 ]
     grep -qx 'ports=' "$DEVZONE_ETAT"
 }
 
-@test "devzone : récapitulatif ports vers le poste, actif puis none" {
+@test "devzone: ports recap for the workstation, active then none" {
     printf 'ports=8080\n' >"$DEVZONE_ETAT"
-    : >"$BATS_TEST_TMPDIR/relais/devzone-devzone-port-8080"
+    : >"$BATS_TEST_TMPDIR/relays/devzone-devzone-port-8080"
     run bash "$DEVZONE"
     [ "$status" -eq 0 ]
     [[ "$output" == *"✔ ports to the workstation 8080 ●"* ]] || false
@@ -297,33 +297,33 @@ CURL
     [[ "$output" == *"○ ports to the workstation none (devzone port <n>)"* ]] || false
 }
 
-@test "devzone --help cite devzone port" {
+@test "devzone --help cites devzone port" {
     run bash "$DEVZONE" --help
     [[ "$output" == *"devzone port [<n>|--close <n>]"* ]] || false
 }
 
-@test "ouvrir sans DEVZONE_ETAT ni DEVZONE_RACINE" {
+@test "open without DEVZONE_ETAT nor DEVZONE_RACINE" {
     unset DEVZONE_ETAT DEVZONE_RACINE
-    mkdir -p "$BATS_TEST_TMPDIR/depot"
-    cp -r "$BATS_TEST_DIRNAME/../../.devcontainer" "$BATS_TEST_TMPDIR/depot/.devcontainer"
+    mkdir -p "$BATS_TEST_TMPDIR/repo"
+    cp -r "$BATS_TEST_DIRNAME/../../.devcontainer" "$BATS_TEST_TMPDIR/repo/.devcontainer"
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
-    run bash "$BATS_TEST_TMPDIR/depot/.devcontainer/ports.sh" 8080
+    run bash "$BATS_TEST_TMPDIR/repo/.devcontainer/ports.sh" 8080
     [ "$status" -eq 0 ]
-    grep -qx 'ports=8080' "$BATS_TEST_TMPDIR/depot/.devzone.modules"
-    [[ "$output" == *"127.0.0.1:8080 du poste"*"8080 du conteneur"* ]] || false
+    grep -qx 'ports=8080' "$BATS_TEST_TMPDIR/repo/.devzone.modules"
+    [[ "$output" == *"127.0.0.1:8080 on the workstation"*"8080 in the container"* ]] || false
 }
 
-@test "ecrire_ports : échec écriture sur stderr, code 1" {
+@test "write_ports: write failure on stderr, code 1" {
     unset DEVZONE_ETAT DEVZONE_RACINE
-    mkdir -p "$BATS_TEST_TMPDIR/depot"
-    cp -r "$BATS_TEST_DIRNAME/../../.devcontainer" "$BATS_TEST_TMPDIR/depot/.devcontainer"
+    mkdir -p "$BATS_TEST_TMPDIR/repo"
+    cp -r "$BATS_TEST_DIRNAME/../../.devcontainer" "$BATS_TEST_TMPDIR/repo/.devcontainer"
     export TMPDIR="/nonexistent"
-    # Depuis #417 le temporaire est créé dans le dossier de l'état (jamais dans
-    # TMPDIR) : c'est ce dossier qui devient inutilisable, l'écriture échoue
-    printf 'bloc\n' >"$BATS_TEST_TMPDIR/depot/bloc"
-    export DEVZONE_ETAT="$BATS_TEST_TMPDIR/depot/bloc/.devzone.modules"
+    # Since #417 the temporary file is created in the state folder (never in
+    # TMPDIR): that folder is the one that becomes unusable, the write fails
+    printf 'block\n' >"$BATS_TEST_TMPDIR/repo/block"
+    export DEVZONE_ETAT="$BATS_TEST_TMPDIR/repo/block/.devzone.modules"
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
-    run bash "$BATS_TEST_TMPDIR/depot/.devcontainer/ports.sh" open 8080
-    [[ "$output" == *"devzone : port : état non enregistré"* ]] || false
+    run bash "$BATS_TEST_TMPDIR/repo/.devcontainer/ports.sh" open 8080
+    [[ "$output" == *"devzone : port : state not saved"* ]] || false
     [ "$status" -eq 1 ]
 }

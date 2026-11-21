@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# Module argocd (#411) : Argo CD dans le cluster des services de devzone.
+# Module argocd (#411): Argo CD in the devzone services cluster.
 #   argocd.sh install | uninstall | status | relay-start | relay-stop
 #   argocd.sh app add <repo url> [path] [--name N] [--revision R] | app list | app remove <N>
-# Namespace devzone-argocd isolé, relais 127.0.0.1:8443 dans le conteneur.
-# Mot de passe admin dans workspace/.argocd/admin.env (600), repris dans
-# .password ; jamais affiché.
+# Isolated devzone-argocd namespace, relay 127.0.0.1:8443 in the container.
+# Admin password in workspace/.argocd/admin.env (600), copied to .password;
+# never displayed.
 set -euo pipefail
 
 ICI="$(cd "$(dirname "$0")" && pwd)"
 RACINE="${DEVZONE_RACINE:-$(dirname "$(dirname "$ICI")")}"
-# shellcheck disable=SC2034 # lu par cluster.sh (bibliothèque sourcée)
+# shellcheck disable=SC2034 # read by cluster.sh (sourced library)
 ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
 # shellcheck source=SCRIPTDIR/../cluster.sh
 # shellcheck disable=SC1091
@@ -17,7 +17,7 @@ ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
 # shellcheck source=SCRIPTDIR/../password.sh
 # shellcheck disable=SC1091
 . "$ICI/../password.sh"
-# Isolation réseau : namespace_isolate, posée avec le namespace devzone-argocd
+# Network isolation: namespace_isolate, applied with the devzone-argocd namespace
 # shellcheck source=SCRIPTDIR/../isolation.sh
 # shellcheck disable=SC1091
 . "$ICI/../isolation.sh"
@@ -29,43 +29,43 @@ ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
 
 NS=devzone-argocd
 SECRETS="$RACINE/workspace/.argocd"
-# Version figée du chart argo-cd, port du relais et attente d'installation
+# Pinned argo-cd chart version, relay port and install wait
 ARGOCD_VERSION="${ARGOCD_VERSION:-10.14.0}"
 ARGOCD_PORT="${ARGOCD_PORT:-8443}"
 ARGOCD_ATTENTE="${ARGOCD_ATTENTE:-600}"
 
-# Refus du module : message préfixé et code 2 (même convention que postgres)
+# Module refusal: prefixed message and code 2 (same convention as postgres)
 refuse() { echo "devzone : argocd : $*" >&2; exit 2; }
 
-# Vue regroupée des identifiants : un échec n'empêche jamais l'opération
-regenerer_identifiants() {
+# Grouped credentials view: a failure never blocks the operation
+regenerate_credentials() {
     password_regenerate ||
-        echo "devzone : argocd : identifiants regroupés non mis à jour (devzone passwords)" >&2
+        echo "devzone : argocd : grouped credentials not updated (devzone passwords)" >&2
 }
 
-# Refuse l'installation sous 1 Go de mémoire allouable dans le cluster ; le
-# message indique où agrandir le cluster et la commande à relancer.
-verifier_memoire() {
-    local memoire
-    if ! memoire="$(memory_cluster_ki)"; then
-        echo "devzone : argocd : cluster des services injoignable : devzone cluster" >&2
+# Refuses the install below 1 GB of allocatable memory in the cluster; the
+# message says where to enlarge the cluster and the command to run again.
+check_memory() {
+    local mem
+    if ! mem="$(memory_cluster_ki)"; then
+        echo "devzone : argocd : services cluster unreachable: devzone cluster" >&2
         return 2
     fi
-    if [ "$memoire" -lt 1048576 ]; then
-        echo "devzone : argocd : il faut au moins 1 Go de mémoire allouable dans le cluster (disponible : $((memoire / 1024)) Mo) ; agrandir le cluster (Docker Desktop → Settings → Resources) puis relancer : devzone enable argocd" >&2
+    if [ "$mem" -lt 1048576 ]; then
+        echo "devzone : argocd : at least 1 GB of allocatable memory is needed in the cluster (available: $((mem / 1024)) MB); enlarge the cluster (Docker Desktop → Settings → Resources) then run again: devzone enable argocd" >&2
         return 2
     fi
 }
 
-# Namespace présent dans le cluster des services : Argo CD est installé.
-# Lecture des namespaces réservée à l'administrateur (#430).
-installe() {
+# Namespace present in the services cluster: Argo CD is installed.
+# Reading namespaces is reserved to the administrator (#430).
+is_installed() {
     account_admin "$(account_context)" get namespace "$NS" >/dev/null 2>&1
 }
 
-# Crée le namespace et l'étiquette par l'administrateur, autorise le compte
-# limité puis pose la NetworkPolicy isolante du module (#430).
-preparer_namespace() {
+# Creates the namespace and labels it through the administrator, allows the
+# limited account, then applies the module's isolating NetworkPolicy (#430).
+prepare_namespace() {
     local ctx
     ctx="$(account_context)"
     account_admin "$ctx" create namespace "$NS" --dry-run=client -o yaml |
@@ -75,18 +75,18 @@ preparer_namespace() {
     namespace_isolate "$NS"
 }
 
-# Lit le mot de passe initial dans le Secret du chart et l'écrit dans
-# workspace/.argocd/admin.env (600) ; le contenu n'est jamais affiché.
-enregistrer_admin() {
-    local brut mdp
-    if ! brut="$(kubectl --context devzone -n "$NS" get secret argocd-initial-admin-secret \
+# Reads the initial password from the chart's Secret and writes it to
+# workspace/.argocd/admin.env (600); the content is never displayed.
+save_admin() {
+    local raw pw
+    if ! raw="$(kubectl --context devzone -n "$NS" get secret argocd-initial-admin-secret \
         -o jsonpath='{.data.password}' 2>/dev/null)"; then
-        echo "devzone : argocd : secret argocd-initial-admin-secret introuvable" >&2
+        echo "devzone : argocd : secret argocd-initial-admin-secret not found" >&2
         return 1
     fi
-    mdp="$(printf '%s' "$brut" | base64 -d 2>/dev/null || true)"
-    if [ -z "$mdp" ]; then
-        echo "devzone : argocd : mot de passe admin illisible dans le secret" >&2
+    pw="$(printf '%s' "$raw" | base64 -d 2>/dev/null || true)"
+    if [ -z "$pw" ]; then
+        echo "devzone : argocd : admin password unreadable in the secret" >&2
         return 1
     fi
     mkdir -p "$SECRETS"
@@ -96,19 +96,19 @@ enregistrer_admin() {
         cat >"$SECRETS/admin.env" <<ENV
 ARGOCD_URL=https://127.0.0.1:$ARGOCD_PORT
 ARGOCD_USER=admin
-ARGOCD_PASSWORD=$mdp
+ARGOCD_PASSWORD=$pw
 ENV
     )
     chmod 600 "$SECRETS/admin.env"
 }
 
-# Installe Argo CD avec le chart figé, prépare le namespace, range le mot de
-# passe admin et lance le relais d'accès ; idempotent (upgrade --install).
-installer() {
-    echo "▶ Vérification de la mémoire allouable du cluster des services…"
-    verifier_memoire || return 2
-    preparer_namespace
-    echo "▶ Installation d'Argo CD $ARGOCD_VERSION dans $NS (chart charts/devzone-argocd)…"
+# Installs Argo CD with the pinned chart, prepares the namespace, stores the
+# admin password and starts the access relay; idempotent (upgrade --install).
+do_install() {
+    echo "▶ Checking the allocatable memory of the services cluster…"
+    check_memory || return 2
+    prepare_namespace
+    echo "▶ Installing Argo CD $ARGOCD_VERSION in $NS (chart charts/devzone-argocd)…"
     # Wrapper chart: the dependency argo-cd (pinned in Chart.yaml) is built
     # first, then installed from the local chart (#538)
     helm dependency build "$RACINE/charts/devzone-argocd" >/dev/null
@@ -118,35 +118,36 @@ installer() {
         --create-namespace \
         --timeout "${ARGOCD_ATTENTE}s" \
         --wait
-    enregistrer_admin
+    save_admin
     relay_start argocd devzone "$NS" svc/argocd-server "$ARGOCD_PORT:443"
-    regenerer_identifiants
-    echo "✔ module argocd prêt : https://127.0.0.1:$ARGOCD_PORT"
+    regenerate_credentials
+    echo "✔ argocd module ready: https://127.0.0.1:$ARGOCD_PORT"
 }
 
-# Désinstalle la release Helm et supprime le namespace ; les autres services
-# du cluster restent, sous helm direct. Le RoleBinding et le namespace partent
-# par l'administrateur (#430).
-desinstaller() {
+# Uninstalls the Helm release and deletes the namespace; the other services
+# of the cluster stay, under direct helm. The RoleBinding and the namespace
+# are removed by the administrator (#430).
+do_uninstall() {
     local ctx
     relay_stop argocd
-    if installe; then
-        echo "▶ Suppression d'Argo CD sur le cluster des services…"
+    if is_installed; then
+        echo "▶ Deleting Argo CD on the services cluster…"
         if ! account_helm "$(account_context)" uninstall argocd -n "$NS" >/dev/null 2>&1; then
-            echo "devzone : argocd : helm uninstall a échoué (release déjà absente ?)" >&2
+            echo "devzone : argocd : helm uninstall failed (release already absent?)" >&2
         fi
         ctx="$(account_context)"
         account_remove "$ctx" "$NS" >/dev/null 2>&1 || true
         account_admin "$ctx" delete namespace "$NS" --wait=true >/dev/null
     fi
     rm -rf "$SECRETS"
-    echo "✔ module argocd désactivé ; les services restent, sous helm direct."
-    regenerer_identifiants
+    echo "✔ argocd module disabled; the services stay, under direct helm."
+    regenerate_credentials
 }
 
-# État du module : désactivé sans namespace, prêt avec relais actif.
-etat() {
-    if ! installe; then
+# Module status: disabled without namespace, ready with the relay active.
+# The status texts are read by devzone: keep them unchanged.
+do_status() {
+    if ! is_installed; then
         echo "désactivé"
         return 0
     fi
@@ -157,9 +158,9 @@ etat() {
     fi
 }
 
-# Relance le relais d'accès seulement si le namespace Argo CD existe.
-relais() {
-    if installe; then
+# Starts the access relay again only if the Argo CD namespace exists.
+do_relay_start() {
+    if is_installed; then
         relay_start argocd devzone "$NS" svc/argocd-server "$ARGOCD_PORT:443"
     fi
 }
@@ -192,26 +193,26 @@ ARGOCD_CONF="${DEVZONE_ARGOCD_CONF:-$RACINE/.argocd.conf}"
 argocd_kubectl() { kubectl --context devzone "$@"; }
 
 case "${1:-}" in
-    install) installer ;;
-    uninstall) desinstaller ;;
-    status) etat ;;
-    relay-start) relais ;;
+    install) do_install ;;
+    uninstall) do_uninstall ;;
+    status) do_status ;;
+    relay-start) do_relay_start ;;
     relay-stop) relay_stop argocd ;;
     init)
         # GitOps repository of the user (#516): created or designated, then
         # the root Application when the module is installed
         gitops_init "${@:2}" || exit $?
-        if installe; then gitops_root; fi
+        if is_installed; then gitops_root; fi
         ;;
     apply)
-        installe || refuse "module off: devzone enable argocd"
+        is_installed || refuse "module off: devzone enable argocd"
         gitops_init && gitops_root && apps_reconcile
         ;;
     app)
         if [ "${DEVZONE_WORKSPACE:-}" = kubernetes ]; then
             refuse "in the workspace pod, on the workstation: devzone workspace argocd app ${*:2}"
         fi
-        installe || refuse "module off: devzone enable argocd"
+        is_installed || refuse "module off: devzone enable argocd"
         argocd_app "${@:2}"
         ;;
     *)
