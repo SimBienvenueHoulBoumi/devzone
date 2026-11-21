@@ -11,7 +11,7 @@ setup() {
     # (as in check-charts), the runner does not need to have it locally
     export HELM_REPOSITORY_CONFIG="$BATS_TEST_TMPDIR/helm/repositories.yaml" \
         HELM_REPOSITORY_CACHE="$BATS_TEST_TMPDIR/helm/cache"
-    source "$RACINE/manage/scripts/check-charts.sh"
+    source "$RACINE/manage/scripts/ci/check-charts.sh"
     charts_helm_repos "$RACINE/charts/devzone-gitlab/Chart.yaml" "$BATS_TEST_TMPDIR/helm" || return 1
     CHART="$BATS_TEST_TMPDIR/devzone-gitlab"
     cp -R "$RACINE/charts/devzone-gitlab" "$CHART"

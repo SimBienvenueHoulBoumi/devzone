@@ -11,7 +11,7 @@
 set -u
 
 ICI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT="$(cd "$ICI/../.." && pwd)"
+ROOT="$(cd "$ICI/../../.." && pwd)"
 
 # Byte matching only. The class is every byte outside printable ASCII, minus
 # the tab (a tab after a name is not a fault). Built from a printf so this

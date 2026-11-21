@@ -2,18 +2,18 @@
 # Pinned container versions: compares repowarden (versions.env) and AI
 # assistants (IA_… lines, devzone) to the latest npm version, or applies an
 # upgrade.
-#   bash manage/scripts/versions.sh
+#   bash manage/scripts/ci/versions.sh
 #       one "package old new" line per outdated package, nothing otherwise
-#   bash manage/scripts/versions.sh --installed
+#   bash manage/scripts/ci/versions.sh --installed
 #       one "package pinned installed" line per installed tool behind its pin
-#   bash manage/scripts/versions.sh --apply <package> <version>
+#   bash manage/scripts/ci/versions.sh --apply <package> <version>
 #       replaces that pinned version in its file, nothing else
-#   bash manage/scripts/versions.sh --existing-ticket <package> <author>
+#   bash manage/scripts/ci/versions.sh --existing-ticket <package> <author>
 #       "number<TAB>title" of the open ticket by <author>, nothing otherwise
 # Compatible with bash 3.2 (macOS).
 set -euo pipefail
 
-HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 VERSIONS_ENV="$HERE/.devcontainer/versions.env"
 DEVZONE="$HERE/.devcontainer/devzone"
 
@@ -153,17 +153,17 @@ case "${1:-}" in
     --installed | --installees) compare_installed ;;
     --apply | --appliquer)
         [ "$#" -eq 3 ] ||
-            { echo "usage: bash manage/scripts/versions.sh [--installed | --apply <package> <version> | --existing-ticket <package> <author>]" >&2; exit 2; }
+            { echo "usage: bash manage/scripts/ci/versions.sh [--installed | --apply <package> <version> | --existing-ticket <package> <author>]" >&2; exit 2; }
         apply "$2" "$3"
         ;;
     --existing-ticket | --ticket-existant)
         [ "$#" -eq 3 ] ||
-            { echo "usage: bash manage/scripts/versions.sh [--installed | --apply <package> <version> | --existing-ticket <package> <author>]" >&2; exit 2; }
+            { echo "usage: bash manage/scripts/ci/versions.sh [--installed | --apply <package> <version> | --existing-ticket <package> <author>]" >&2; exit 2; }
         existing_ticket "$2" "$3"
         ;;
     -h | --help) sed -n '2,17p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' ;;
     *)
-        echo "usage: bash manage/scripts/versions.sh [--installed | --apply <package> <version> | --existing-ticket <package> <author>]" >&2
+        echo "usage: bash manage/scripts/ci/versions.sh [--installed | --apply <package> <version> | --existing-ticket <package> <author>]" >&2
         exit 2
         ;;
 esac

@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# manage/scripts/ci-dns.sh (#468): public DNS for runner Docker.
+# manage/scripts/ci/ci-dns.sh (#468): public DNS for runner Docker.
 # Everything isolated under $BATS_TEST_TMPDIR: fake sudo, systemctl and docker,
 # test daemon.json; never real Docker or /etc/docker.
 
@@ -7,7 +7,7 @@ load commun
 
 setup() {
     kube_isole
-    SCRIPT="$BATS_TEST_DIRNAME/../scripts/ci-dns.sh"
+    SCRIPT="$BATS_TEST_DIRNAME/../scripts/ci/ci-dns.sh"
     mkdir -p "$BATS_TEST_TMPDIR/bin"
     for tool in sudo systemctl docker; do
         cat >"$BATS_TEST_TMPDIR/bin/$tool" <<'FAKE'

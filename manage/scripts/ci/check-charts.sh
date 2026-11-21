@@ -16,7 +16,7 @@
 set -u
 
 ICI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT="$(cd "$ICI/../.." && pwd)"
+ROOT="$(cd "$ICI/../../.." && pwd)"
 CHARTS_DIR="${CHARTS_DIR:-$ROOT/charts}"
 CHARTS_CODE_DIRS="${CHARTS_CODE_DIRS:-$ROOT/.devcontainer $ROOT/manage/scripts}"
 # The workstation keeps its own values (per volume, not a shared service)
