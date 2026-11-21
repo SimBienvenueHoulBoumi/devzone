@@ -9,15 +9,12 @@
 # marker and is unchanged, kept if customised (#161, opencode rule). The marker
 # text is the one written in SKILL.md: it is kept as is.
 SKILL_MARKER='<!-- devzone : skill set by devzone enable ia -->'
-# Former wording (French, before #722): still recognised. Byte escapes keep the
-# accent out of the source (check-english).
-SKILL_MARKER_OLD="$(printf '<!-- devzone : skill pos\303\251e par devzone enable ia -->')"
 # Fingerprint of the installed version, next to SKILL.md: it tells an unchanged
 # skill from a customised one that still carries the marker.
 SKILL_FINGERPRINT='.devzone-empreinte'
 
-# True if the file carries the devzone marker, in its current or former wording
-has_skill_marker() { grep -qF -e "$SKILL_MARKER" -e "$SKILL_MARKER_OLD" "$1"; }
+# True if the file carries the devzone marker
+has_skill_marker() { grep -qF -e "$SKILL_MARKER" "$1"; }
 
 # Folders of the devzone skill, in the volumes of Claude Code and opencode.
 skill_dirs() {
