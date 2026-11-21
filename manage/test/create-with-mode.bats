@@ -38,8 +38,8 @@ DOCKER
 #!/usr/bin/env bash
 echo "workspace $* in $(basename "$PWD")" >>"$FAKE_LOG"
 WS
-    printf '#!/usr/bin/env bash\necho "workspace failed" >>"$FAKE_LOG"\nexit 1\n' >"$T/ws-echec.sh"
-    chmod +x "$T/bin/kubectl" "$T/bin/helm" "$T/bin/docker" "$T/ws.sh" "$T/ws-echec.sh"
+    printf '#!/usr/bin/env bash\necho "workspace failed" >>"$FAKE_LOG"\nexit 1\n' >"$T/ws-failed.sh"
+    chmod +x "$T/bin/kubectl" "$T/bin/helm" "$T/bin/docker" "$T/ws.sh" "$T/ws-failed.sh"
     export PATH="$T/bin:$PATH"
     export DEVZONE_WORKSPACE_SH="$T/ws.sh"
     export DEVZONE_NO_START=1
@@ -112,7 +112,7 @@ WS
 
 @test "--kubernetes, start fails: status 1, folder kept, the start to redo named" {
     unset DEVZONE_NO_START
-    export DEVZONE_WORKSPACE_SH="$T/ws-echec.sh"
+    export DEVZONE_WORKSPACE_SH="$T/ws-failed.sh"
     run bash "$CLI" mon --kubernetes --gitops none
     [ "$status" -eq 1 ]
     [ -f mon/Makefile ]

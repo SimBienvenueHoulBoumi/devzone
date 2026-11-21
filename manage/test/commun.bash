@@ -7,7 +7,7 @@ relais_docker_isole() {
     export DEVZONE_RELAY_SOURCE="$BATS_TEST_TMPDIR/docker-host.sock"
     export DEVZONE_RELAY_PID="$BATS_TEST_TMPDIR/socat.pid"
     export DEVZONE_RELAY_LOG="$BATS_TEST_TMPDIR/socat.log"
-    export DEVZONE_RELAY_MARKER="$BATS_TEST_TMPDIR/relais.echec"
+    export DEVZONE_RELAY_MARKER="$BATS_TEST_TMPDIR/relay.failed"
     export DEVZONE_RELAY_SUDO=""
 }
 

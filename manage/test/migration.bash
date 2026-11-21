@@ -17,7 +17,7 @@ migration_isolate() {
     echo "a" >"$T/workstation/workspace/alpha/a.txt"
     echo "b" >"$T/workstation/workspace/beta/b.txt"
     echo "ia=on" >"$T/workstation/.devzone.modules"
-    echo "jq" >"$T/workstation/.devzone.paquets"
+    echo "jq" >"$T/workstation/.devzone.packages"
     cat >"$T/bin/kubectl" <<'KUBE'
 #!/usr/bin/env bash
 # Fake kubectl: pod is $FAKE_POD (/workspaces/projets and /home/vscode rerouted).

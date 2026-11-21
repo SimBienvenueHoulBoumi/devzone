@@ -11,7 +11,7 @@
 SKILL_MARKER='<!-- devzone : skill set by devzone enable ia -->'
 # Fingerprint of the installed version, next to SKILL.md: it tells an unchanged
 # skill from a customised one that still carries the marker.
-SKILL_FINGERPRINT='.devzone-empreinte'
+SKILL_FINGERPRINT='.devzone-fingerprint'
 
 # True if the file carries the devzone marker
 has_skill_marker() { grep -qF -e "$SKILL_MARKER" "$1"; }

@@ -18,7 +18,7 @@ setup() {
     [ -f "$T/pod/home/vscode/.config/gh/hosts.yml" ]
     [ -f "$T/pod/home/vscode/.m2/a.jar" ]
     [ -f "$T/pod/workspaces/projets/.devzone.modules" ]
-    [ -f "$T/pod/workspaces/projets/.devzone.paquets" ]
+    [ -f "$T/pod/workspaces/projets/.devzone.packages" ]
     grep -qx "workspace=kubernetes" "$T/workstation/.devzone.modules" || false
     grep -qx "ia=on" "$T/workstation/.devzone.modules" || false
 }

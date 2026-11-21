@@ -24,7 +24,7 @@ with_progress() {
 # File that marks an active module in failure (content: where to look); next to
 # the state, in its volume: the state shows it at each startup
 failure_marker_file() {
-    echo "$ETAT-echec-$1"
+    echo "$ETAT-failed-$1"
 }
 
 # Services in the Kubernetes workspace pod (#528): gitlab, postgres and argocd

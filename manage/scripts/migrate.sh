@@ -163,11 +163,13 @@ step_identities() {
     done
 }
 
-# Step 4: workstation .devzone.modules and .devzone.paquets copied to the pod.
+# Step 4: workstation .devzone.modules and .devzone.packages copied to the pod.
 step_state() {
     local f
-    echo "▶ [4/5] state: .devzone.modules and .devzone.paquets to $PROJECTS_DIR"
-    for f in .devzone.modules .devzone.paquets; do
+    # Former French names renamed first (#733): the workstation folder may be old
+    DEVZONE_ROOT="$PWD" bash "$ROOT/.devcontainer/rename-legacy-files.sh" || true
+    echo "▶ [4/5] state: .devzone.modules and .devzone.packages to $PROJECTS_DIR"
+    for f in .devzone.modules .devzone.packages; do
         if [ ! -f "$f" ]; then
             echo "  – $f: missing on workstation, skipped"
             continue
@@ -240,4 +242,4 @@ confirmer() { confirm "$@"; }
 noter_workspace() { record_workspace "$@"; }
 migrer() { migrate_workspace "$@"; }
 nettoyer_docker() { clean_docker "$@"; }
-echec() { fail "$@"; }
+failed() { fail "$@"; }

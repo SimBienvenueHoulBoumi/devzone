@@ -1,6 +1,7 @@
 #!/usr/bin/env bats
 # check-names.sh (#716): a tracked path with a French word in its name fails,
-# the user data files and .github/ are not checked.
+# .github/ is not checked. The former user data names fail too (#733: they are
+# renamed by rename-legacy-files.sh, the allowlist no longer holds them).
 
 setup() {
     SCRIPT="$BATS_TEST_DIRNAME/../scripts/check-names.sh"
@@ -33,9 +34,11 @@ setup() {
     [[ "$output" == *"catalogue/app.sh: catalogue"* ]] || false
 }
 
-@test "check-names: the user data files and .github/ are not checked" {
+@test "check-names: a former user data name fails, .github/ is not checked" {
     : >"$REPO/.devzone.paquets"
     : >"$REPO/.github/workflows/fonctionnel.yml"
     run bash "$REPO/manage/scripts/check-names.sh"
-    [ "$status" -eq 0 ]
+    [ "$status" -eq 1 ]
+    [[ "$output" == *".devzone.paquets: paquets"* ]] || false
+    [[ "$output" != *"fonctionnel"* ]] || false
 }

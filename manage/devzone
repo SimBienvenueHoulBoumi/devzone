@@ -31,9 +31,9 @@ GITIGNORE_LINES=(
     '!workspace/.gitkeep'
     '.DS_Store'
     '.devzone.log'
-    '.devzone.etat'
+    '.devzone.state'
     '.password'
-    '.devzone.sauvegarde/'
+    '.devzone.backup/'
     '.devcontainer/sans-docker-hote/'
     '.devcontainer/without-host-docker/'
 )

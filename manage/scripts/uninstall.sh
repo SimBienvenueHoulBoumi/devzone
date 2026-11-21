@@ -15,7 +15,7 @@ set -euo pipefail
 # devzone folder: two levels above the script (manage/scripts/), so the command
 # works when run from any folder
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-STATE="$HERE/.devzone.etat"
+STATE="$HERE/.devzone.state"
 KEEP="${KEEP:-${GARDER:-}}"
 LOGINS=(gh git claude opencode-config opencode-data config)
 LOCAL_CTX='^(kind-.*|docker-desktop|rancher-desktop|orbstack|minikube)$'

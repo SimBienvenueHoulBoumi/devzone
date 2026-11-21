@@ -53,7 +53,7 @@ app_namespace() {
 }
 
 # Failure marker of an application: same scheme as the failure file of the modules
-failure_file() { echo "$ETAT-echec-$1"; }
+failure_file() { echo "$ETAT-failed-$1"; }
 
 # Wanted state: on if the line <app>=on exists, off by default
 wanted() {

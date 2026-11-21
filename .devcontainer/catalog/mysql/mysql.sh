@@ -51,7 +51,7 @@ module_context() {
     echo "$c"
 }
 # Failure marker of the module (same scheme as devzone's failure_file)
-failure_file() { echo "$ETAT-echec-mysql"; }
+failure_file() { echo "$ETAT-failed-mysql"; }
 # Project name: a simple SQL identifier, never escaped, not a reserved name
 check_project_name() {
     local p="${1:-}"

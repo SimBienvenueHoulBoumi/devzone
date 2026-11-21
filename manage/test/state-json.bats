@@ -97,10 +97,10 @@ CURL
 
 @test "state-json: module failed → echec and command" {
     printf 'ia=on\n' >"$DEVZONE_STATE"
-    echo "echec npm" >"$DEVZONE_STATE-echec-ia"
+    echo "failed npm" >"$DEVZONE_STATE-failed-ia"
     run bash "$DEVZONE" status --json
     [ "$status" -eq 0 ]
-    [ "$(printf '%s\n' "$output" | jq -r '.modules[] | select(.nom=="ia") | .echec')" = "echec npm" ]
+    [ "$(printf '%s\n' "$output" | jq -r '.modules[] | select(.nom=="ia") | .echec')" = "failed npm" ]
     [ "$(printf '%s\n' "$output" | jq -r '.modules[] | select(.nom=="ia") | .commande')" = "devzone apply" ]
 }
 
@@ -112,8 +112,8 @@ CURL
 }
 
 @test "state-json: relay failed → alert relais_docker" {
-    echo "relay broken" >"$BATS_TEST_TMPDIR/relais.echec"
-    export DEVZONE_RELAY_MARKER="$BATS_TEST_TMPDIR/relais.echec"
+    echo "relay broken" >"$BATS_TEST_TMPDIR/relay.failed"
+    export DEVZONE_RELAY_MARKER="$BATS_TEST_TMPDIR/relay.failed"
     run bash "$DEVZONE" status --json
     [ "$status" -eq 0 ]
     [ "$(printf '%s\n' "$output" | jq -r '.alertes[] | select(.code=="relais_docker") | .code')" = "relais_docker" ]

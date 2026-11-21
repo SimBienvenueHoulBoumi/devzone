@@ -98,7 +98,7 @@ CATALOGUE
     : >"$depot/.devzone.modules"
     run bash "$depot/.devcontainer/catalog/catalog-watcher.sh" tour
     [ "$status" -eq 0 ] || false
-    [ -f "$depot/.devzone.catalogue-veilleur/dernier" ] || false
+    [ -f "$depot/.devzone.catalog-watcher/dernier" ] || false
     [ "$(cat "$BATS_TEST_TMPDIR/catalogue.log")" = "apply" ] || false
 }
 

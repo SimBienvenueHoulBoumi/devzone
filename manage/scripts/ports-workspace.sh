@@ -2,7 +2,7 @@
 # Applications and services of the Kubernetes workspace on workstation localhost (#401).
 # Sourced by manage/workspace.sh (ports_* functions); run directly with "loop" or
 # "round", it is the workstation watcher: only one, mkdir lock and pid in
-# .devzone.ports-workspace/. It relays with kubectl port-forward, on 127.0.0.1
+# .devzone.workspace-ports/. It relays with kubectl port-forward, on 127.0.0.1
 # only, TCP ports >= 1024 listening in the pod, and devzone services of active
 # modules in .devzone.modules. Guard: never under bats without
 # DEVZONE_PORTS_WORKSPACE_REAL=yes.
@@ -18,7 +18,7 @@ PW_JSONPATH='jsonpath={.spec.ports[0].port}'
 . "$(dirname "${BASH_SOURCE[0]}")/ports-apps.sh"
 
 # Watcher state folder: lock, pid, relays, reported ports, log.
-pw_dir() { printf '%s' "${DEVZONE_PORTS_WORKSPACE_DIR:-$PWD/.devzone.ports-workspace}"; }
+pw_dir() { printf '%s' "${DEVZONE_PORTS_WORKSPACE_DIR:-$PWD/.devzone.workspace-ports}"; }
 
 # kubectl context flag: devzone if it exists, otherwise current context.
 pw_ctx() {

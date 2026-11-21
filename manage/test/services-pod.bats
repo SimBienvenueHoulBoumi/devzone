@@ -46,7 +46,7 @@ GETENT
 @test "status in the pod: gitlab on and resolved by the cluster DNS, active, never read from a failure marker" {
     printf 'gitlab=on\n' >"$DEVZONE_STATE"
     echo "gitlab-webservice-default.devzone-gitlab.svc" >"$T/dns"
-    echo gitlab >"$DEVZONE_STATE-echec-gitlab"
+    echo gitlab >"$DEVZONE_STATE-failed-gitlab"
     run bash "$DEVZONE"
     [ "$status" -eq 0 ]
     line="$(printf '%s\n' "$output" | grep 'module gitlab' || true)"
@@ -96,16 +96,16 @@ GETENT
 
 @test "apply in the pod: services not installed, failure markers cleared, status 0" {
     printf 'gitlab=on\npostgres=on\nargocd=on\n' >"$DEVZONE_STATE"
-    echo gitlab >"$DEVZONE_STATE-echec-gitlab"
-    echo argocd >"$DEVZONE_STATE-echec-argocd"
+    echo gitlab >"$DEVZONE_STATE-failed-gitlab"
+    echo argocd >"$DEVZONE_STATE-failed-argocd"
     run bash "$DEVZONE" apply
     [ "$status" -eq 0 ]
     [[ "$output" == *"gitlab is installed from the workstation (devzone workspace services enable gitlab)"* ]] || false
     [[ "$output" == *"postgres is installed from the workstation"* ]] || false
     [[ "$output" == *"argocd is installed from the workstation"* ]] || false
     [[ "$output" != *"activation via installer"* ]] || false
-    [ ! -f "$DEVZONE_STATE-echec-gitlab" ]
-    [ ! -f "$DEVZONE_STATE-echec-argocd" ]
+    [ ! -f "$DEVZONE_STATE-failed-gitlab" ]
+    [ ! -f "$DEVZONE_STATE-failed-argocd" ]
     ! grep -q 'get namespace' "$T/kubectl.log" || false
 }
 
@@ -115,7 +115,7 @@ GETENT
     [ "$status" -eq 2 ]
     [[ "$output" == *"devzone workspace services enable gitlab"* ]] || false
     grep -qx 'gitlab=off' "$DEVZONE_STATE"
-    [ ! -f "$DEVZONE_STATE-echec-gitlab" ]
+    [ ! -f "$DEVZONE_STATE-failed-gitlab" ]
 }
 
 @test "disable postgres in the pod: refused with the workstation command" {

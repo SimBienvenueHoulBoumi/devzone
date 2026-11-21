@@ -29,7 +29,7 @@ COPIE="$TMP/mon-devzone-cli"
 TERMINAL=(python3 -I "$RACINE/manage/test/terminal.py")
 DC=(npx -y @devcontainers/cli)
 reussis=0
-echecs=0
+failures=0
 
 nettoyer() {
     local ids id image dind volume
@@ -41,10 +41,10 @@ nettoyer() {
         [ -z "$dind" ] || docker volume rm "$dind" >/dev/null 2>&1 || true
         [ -z "$image" ] || docker rmi "$image" >/dev/null 2>&1 || true
     done
-    # Après make down : image et Docker interne notés dans .devzone.etat
-    if [ -f "$COPIE/.devzone.etat" ]; then
-        image="$(sed -n 's/^IMAGE=//p' "$COPIE/.devzone.etat")"
-        dind="$(sed -n 's/^DIND=//p' "$COPIE/.devzone.etat")"
+    # Après make down : image et Docker interne notés dans .devzone.state
+    if [ -f "$COPIE/.devzone.state" ]; then
+        image="$(sed -n 's/^IMAGE=//p' "$COPIE/.devzone.state")"
+        dind="$(sed -n 's/^DIND=//p' "$COPIE/.devzone.state")"
         [ -z "$dind" ] || docker volume rm "$dind" >/dev/null 2>&1 || true
         [ -z "$image" ] || docker rmi "$image" >/dev/null 2>&1 || true
     fi
@@ -57,7 +57,7 @@ trap nettoyer EXIT
 
 ok() { reussis=$((reussis + 1)); echo "  ✔ $1"; }
 ko() {
-    echecs=$((echecs + 1))
+    failures=$((failures + 1))
     echo "  ✖ $1"
     printf '%s\n' "$2" | tail -8 | sed 's/^/      /'
     # make up failure names its full log: show its error lines and tail too
@@ -184,5 +184,5 @@ SORTIE="volumes restants : $(volumes)"
 verifier "réponse oui : volumes supprimés" test "$(volumes)" = 0
 
 echo
-echo "Résultat : $reussis réussi(s), $echecs échec(s)"
-[ "$echecs" -eq 0 ]
+echo "Résultat : $reussis réussi(s), $failures échec(s)"
+[ "$failures" -eq 0 ]

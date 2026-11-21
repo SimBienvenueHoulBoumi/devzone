@@ -115,12 +115,12 @@ KUBE
 }
 
 @test "agent-pod-init : init containers that succeeded are not named failed" {
-    export FAKE_INIT_STATUSES=$'premier-ok 0\ngarde-en-echec 1'
+    export FAKE_INIT_STATUSES=$'premier-ok 0\nguard-failed 1'
     export FAKE_PHASE=Failed
     export FAKE_AGENT_STARTED=0
     run bash "$DEVZONE" agent --pod "$FOLDER" "$T/consigne.txt"
     [ "$status" -ne 0 ]
-    [[ "$output" == *"init container garde-en-echec failed (exit 1)"* ]] || false
+    [[ "$output" == *"init container guard-failed failed (exit 1)"* ]] || false
     [[ "$output" != *"init container premier-ok failed"* ]] || false
 }
 
