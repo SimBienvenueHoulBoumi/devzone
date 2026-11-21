@@ -64,7 +64,7 @@ reussit "npm install -g de l'archive" "npm install -g --no-audit --no-fund '$ARC
 
 echo "▶ devzone --version, --help, option inconnue"
 reussit "devzone --version : la version de package.json" "devzone --version" "^$VERSION$"
-reussit "devzone --help : l'aide" "devzone --help" "devzone <dossier>"
+reussit "devzone --help : l'aide" "devzone --help" "devzone <folder>"
 echoue "devzone --option-inconnue : sortie en erreur" "devzone --option-inconnue" "option inconnue"
 
 echo "▶ devzone lancé comme le raccourci .cmd de npm (chemin Windows du script)"
@@ -74,7 +74,7 @@ echo "▶ devzone lancé comme le raccourci .cmd de npm (chemin Windows du scrip
 if command -v cygpath >/dev/null 2>&1; then
     WINSCRIPT="$(cygpath -w "$TMP/npm/node_modules/devzone/manage/devzone")"
     reussit "chemin Windows : --version donne la version" "bash '$WINSCRIPT' --version" "^$VERSION$"
-    reussit "chemin Windows : --help donne l'aide" "bash '$WINSCRIPT' --help" "devzone <dossier>"
+    reussit "chemin Windows : --help donne l'aide" "bash '$WINSCRIPT' --help" "devzone <folder>"
 else
     echo "  ○ ignoré (hors Windows : pas de cygpath)"
 fi

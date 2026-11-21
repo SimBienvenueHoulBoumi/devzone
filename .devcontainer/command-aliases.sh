@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Renamed names of the devzone CLI (#695): the French names of the commands,
 # subcommands and options are no longer accepted, they are refused. Each old
-# name prints « ✖ « old » a été renommé : devzone new » on stderr, exits with
+# name prints « ✖ « old » was renamed: devzone new » on stderr, exits with
 # code 1 and does nothing (no folder is created: « devzone stop » creates ./stop,
 # « devzone mettre-a-jour » must not create ./mettre-a-jour).
 #
@@ -171,7 +171,7 @@ reject_renamed() {
         case "$command" in
             copier-vers | copier-depuis) new="workspace $new" ;;
         esac
-        printf '✖ « %s » a été renommé : devzone %s\n' "$command" "$new" >&2
+        printf '✖ « %s » was renamed: devzone %s\n' "$command" "$new" >&2
         return 1
     fi
     for word in "$@"; do
@@ -184,7 +184,7 @@ reject_renamed() {
             esac
         fi
         if new="$(renamed_subcommand "$command" "$word")"; then
-            printf '✖ « %s » a été renommé : devzone %s %s\n' "$word" "$command" "$new" >&2
+            printf '✖ « %s » was renamed: devzone %s %s\n' "$word" "$command" "$new" >&2
             return 1
         fi
         break
@@ -194,7 +194,7 @@ reject_renamed() {
             --rapatrier) removed_notice; return 1 ;;
             -*)
                 if new="$(renamed_option "$word")"; then
-                    printf '✖ « %s » a été renommé : %s\n' "$word" "$new" >&2
+                    printf '✖ « %s » was renamed: %s\n' "$word" "$new" >&2
                     return 1
                 fi
                 ;;

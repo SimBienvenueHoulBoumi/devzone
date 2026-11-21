@@ -435,7 +435,7 @@ This command only removes the `devzone` command from your machine; it deletes ne
 Commands, subcommands and options are written in English. The old French names are removed: devzone refuses them, shows the new name and does nothing.
 
 ```
-✖ « activer » a été renommé : devzone enable
+✖ « activer » was renamed: devzone enable
 ```
 
 The full table (commands, subcommands, options) is in [the reference](manage/docs/reference.md#removed-names).

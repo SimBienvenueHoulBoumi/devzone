@@ -107,6 +107,8 @@ The `status` output of the modules (gitlab, postgres, argocd, mysql) and the sta
 | `runner en ligne`, `runner hors ligne` | `runner online`, `runner offline` |
 | catalog: `disponible`, `installée`, `attendue`, `echec` | `available`, `installed`, `expected`, `failed` |
 
+The refusal of an old name is in English: `✖ « <old> » was renamed: devzone <new>` (it was `a été renommé :`). The help of the CLI (`devzone --help`, with `<folder>` where it said `<dossier>`) and the description of the `mysql` catalog entry are in English too.
+
 ## Removed
 
 - The relay of the host Docker socket and the option that controlled it: `docker-hote` (a `docker-hote=…` line in `.devzone.modules` is ignored, `devzone enable docker-hote` answers "unknown module"), `DEVZONE_RELAIS_*`, the relay line of `devzone status` and `devzone repair`, the alert `relais_docker`, and the JSON fields `docker_hote` and `docker_hote_actif`. devzone no longer talks to the host Docker socket.
