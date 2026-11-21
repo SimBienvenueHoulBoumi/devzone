@@ -8,10 +8,9 @@
 # wording (French, before #722) is still recognised. Byte escapes keep the accent
 # out of the source (check-english).
 OPENCODE_MARKER='// devzone : default opencode configuration'
-OPENCODE_MARKER_OLD="$(printf '// devzone : configuration opencode par d\303\251faut')"
 
-# True if the file carries the default-configuration marker, in either wording
-opencode_marked() { grep -qF -e "$OPENCODE_MARKER" -e "$OPENCODE_MARKER_OLD" "$1"; }
+# True if the file carries the default-configuration marker
+opencode_marked() { grep -qF -e "$OPENCODE_MARKER" "$1"; }
 
 # Default opencode configuration (versioned model): written at first use,
 # updated while it keeps the devzone marker, customised otherwise. The marker
