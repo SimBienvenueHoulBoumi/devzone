@@ -39,7 +39,7 @@ catalog_apps() {
     done | LC_ALL=C sort
 }
 
-# app.conf key (nom, description, image, port, memoire, taille, namespace)
+# app.conf key (name, description, image, port, memoire, taille, namespace)
 app_read() {
     grep -E "^$2=" "$(catalog_dir)/$1/app.conf" 2>/dev/null | tail -1 | cut -d= -f2- || true
 }
@@ -74,7 +74,7 @@ present() {
         # cannot list StatefulSets (#430): presence is the cluster DNS
         # resolving the service, no RBAC needed, the pod service account
         # stays limited
-        getent hosts "$(app_read "$1" nom).${ns}.svc" >/dev/null 2>&1
+        getent hosts "$(app_read "$1" name).${ns}.svc" >/dev/null 2>&1
         return
     fi
     ctx="$(cluster_saved)"
@@ -206,11 +206,11 @@ catalog_json() {
             installed) cmd="devzone disable $app" ;;
             failed) failure="$(head -1 "$(failure_file "$app")")" ;;
         esac
-        json="$(jq -cn --argjson before "$json" --arg nom "$app" --argjson actif "$active" \
+        json="$(jq -cn --argjson before "$json" --arg name "$app" --argjson active "$active" \
             --arg description "$(app_read "$app" description)" \
-            --arg etat "$state" --arg port "$(app_read "$app" port)" \
+            --arg state "$state" --arg port "$(app_read "$app" port)" \
             --arg failure "$failure" --arg command "$cmd" \
-            '$before + [{nom:$nom,actif:$actif,description:$description,port:$port,etat:$etat,echec:(if $failure=="" then null else $failure end),commande:(if $command=="" then null else $command end)}]')"
+            '$before + [{name:$name,active:$active,description:$description,port:$port,state:$state,failed:(if $failure=="" then null else $failure end),command:(if $command=="" then null else $command end)}]')"
     done <<<"$(catalog_apps)"
     printf '%s\n' "$json"
 }

@@ -67,7 +67,7 @@ SUFFIXES=()
 
 # Previous platform, read from the same state file as devzone: the trap
 # must be able to restore it even if step 6 fails midway.
-PLATFORM_BEFORE="$(grep -E '^plateforme=' "$STATE_FILE" 2>/dev/null | tail -1 | cut -d= -f2 || true)"
+PLATFORM_BEFORE="$(grep -E '^platform=' "$STATE_FILE" 2>/dev/null | tail -1 | cut -d= -f2 || true)"
 [ "$PLATFORM_BEFORE" = gitlab ] || PLATFORM_BEFORE=github
 URL_BEFORE="$(grep -E '^gitlab_url=' "$STATE_FILE" 2>/dev/null | tail -1 | cut -d= -f2- || true)"
 

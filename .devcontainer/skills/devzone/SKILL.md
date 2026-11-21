@@ -34,7 +34,7 @@ Les modules sont désactivés par défaut, activés à la demande, sans rebuild 
 - `devzone disable <module>` : désactive et applique tout de suite.
 - `devzone apply` : installe ce qui est actif.
 - `devzone repair` : relance relais Docker, gitlab, postgres, mysql, argocd, ports étiquetés et le veilleur du catalogue.
-- `devzone status --json` : récapitulatif complet en JSON, pour les outils (aucun secret, commande à lancer par point à traiter).
+- `devzone status --json` : récapitulatif complet en JSON, pour les outils (aucun secret ; le champ `command` de chaque point donne la commande à lancer).
 
 Le catalogue d'applications se consulte avec `devzone catalog` ; un veilleur applique à chaud les changements de `.devzone.modules`, et `devzone repair` le relance. MySQL se pilote avec `devzone mysql create <projet>`, `devzone mysql list`, `devzone mysql delete <projet>`, `devzone mysql volume [<nom>|--delete <nom>]` et `devzone mysql delete-data` (données gardées par défaut).
 

@@ -68,14 +68,14 @@ case "$1 $2" in
         mkdir -p "$HOME/.local/bin" "$HOME/.config/glab-cli"
         cp "$BATS_TEST_TMPDIR/bin/glab" "$HOME/.local/bin/glab"
         chmod +x "$HOME/.local/bin/glab"
-        grep -vE '^(plateforme|gitlab_url)=' "$DEVZONE_STATE" >"$DEVZONE_STATE.tmp" 2>/dev/null || true
+        grep -vE '^(platform|gitlab_url)=' "$DEVZONE_STATE" >"$DEVZONE_STATE.tmp" 2>/dev/null || true
         mv "$DEVZONE_STATE.tmp" "$DEVZONE_STATE"
-        printf 'plateforme=gitlab\ngitlab_url=http://gitlab.localhost:8929\n' >>"$DEVZONE_STATE"
+        printf 'platform=gitlab\ngitlab_url=http://gitlab.localhost:8929\n' >>"$DEVZONE_STATE"
         ;;
     "platform github")
         rm -f "$HOME/.local/bin/glab"
         rm -rf "$HOME/.config/glab-cli"
-        grep -vE '^(plateforme|gitlab_url)=' "$DEVZONE_STATE" >"$DEVZONE_STATE.tmp" 2>/dev/null || true
+        grep -vE '^(platform|gitlab_url)=' "$DEVZONE_STATE" >"$DEVZONE_STATE.tmp" 2>/dev/null || true
         mv "$DEVZONE_STATE.tmp" "$DEVZONE_STATE"
         ;;
     "plateforme "*)
@@ -326,7 +326,7 @@ GETENT
     grep -q "DELETE" "$BATS_TEST_TMPDIR/curl.log" || false
     grep -q "/user/keys/7" "$BATS_TEST_TMPDIR/curl.log" || false
     [ ! -e "$HOME/.local/bin/glab" ]
-    ! grep -q '^plateforme=' "$DEVZONE_STATE" || false
+    ! grep -q '^platform=' "$DEVZONE_STATE" || false
 }
 
 @test "test-gitlab : step 1 failed → ✖ with the reason, non-zero code" {
@@ -472,7 +472,7 @@ GETENT
     [[ "$output" == *"glab repo clone devzone/demo failed"* ]] || false
     [ ! -e "$HOME/.local/bin/glab" ]
     [ ! -e "$HOME/.config/glab-cli" ]
-    ! grep -q '^plateforme=' "$DEVZONE_STATE" || false
+    ! grep -q '^platform=' "$DEVZONE_STATE" || false
 }
 
 @test "test-gitlab : step 7, repowarden clone impossible → ✖" {

@@ -235,11 +235,3 @@ clean_docker() {
         echo "  ✔ $v removed"
     done
 }
-
-# compatibility aliases, removed with lot 4 (#509)
-lire_option() { read_flag "$@"; }
-confirmer() { confirm "$@"; }
-noter_workspace() { record_workspace "$@"; }
-migrer() { migrate_workspace "$@"; }
-nettoyer_docker() { clean_docker "$@"; }
-failed() { fail "$@"; }
