@@ -72,6 +72,8 @@ parite() {
 # FAKE_NO_POD=yes: no pod; FAKE_LEGACY=yes: a legacy copy in the pod;
 # FAKE_KUBE_DOWN=yes: the cluster does not answer; FAKE_NO_RELEASE=yes: no helm
 # release to uninstall; FAKE_ARGO=yes: Argo CD holds the workspace Application.
+# FAKE_DEVZONE=yes: the devzone context is declared; FAKE_SHELL_STATUS=n: the
+# status of "kubectl exec -it" (the shell), 0 by default, which prints its arguments.
 faux_cluster() {
     mkdir -p "$BATS_TEST_TMPDIR/bin"
     cat >"$BATS_TEST_TMPDIR/bin/helm" <<'HELM'
@@ -92,7 +94,10 @@ HELM
     cat >"$BATS_TEST_TMPDIR/bin/kubectl" <<'KUBE'
 #!/usr/bin/env bash
 case "$*" in
-    "config get-contexts -o name") echo lab ;;
+    "config get-contexts -o name")
+        echo lab
+        [ -z "${FAKE_DEVZONE:-}" ] || echo devzone
+        ;;
     *"get namespace"*)
         [ -n "${FAKE_ARGO:-}" ] || exit 1
         ;;
@@ -110,6 +115,10 @@ case "$*" in
         fi
         echo "NAME                 READY   STATUS    RESTARTS   AGE"
         echo "devzone-workspace-0  1/1     Running   0          2d"
+        ;;
+    *"exec -it"*)
+        echo "kubectl $*"
+        exit "${FAKE_SHELL_STATUS:-0}"
         ;;
     *"exec -i"*)
         cat >/dev/null
@@ -208,4 +217,47 @@ KUBE
     run "$DZ_GO" workspace stop
     [ "$status" -eq 0 ]
     [ ! -e "$state/pid" ] && [ ! -e "$state/verrou" ] && [ ! -e "$state/relais/5432" ]
+}
+
+@test "go-parity: workspace vscode: same guide, same status" {
+    faux_cluster
+    parite workspace vscode
+    run "$DZ_GO" workspace vscode
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"namespace devzone-workspace, pod devzone-workspace-0, container workspace"* ]] || false
+}
+
+@test "go-parity: workspace vscode with extra words is delegated, same output" {
+    faux_cluster
+    parite workspace vscode extra
+}
+
+@test "go-parity: workspace shell, current context: same kubectl arguments and status" {
+    faux_cluster
+    parite workspace shell
+    run "$DZ_GO" workspace shell
+    [ "$status" -eq 0 ]
+    [ "$output" = "kubectl exec -it devzone-workspace-0 --namespace devzone-workspace -c workspace -- bash" ] || false
+}
+
+@test "go-parity: workspace shell, devzone context declared: same kubectl arguments" {
+    faux_cluster
+    export FAKE_DEVZONE=yes
+    parite workspace shell
+    run "$DZ_GO" workspace shell
+    [ "$status" -eq 0 ]
+    [ "$output" = "kubectl --context devzone exec -it devzone-workspace-0 --namespace devzone-workspace -c workspace -- bash" ] || false
+}
+
+@test "go-parity: workspace shell, kubectl exits 130: same status" {
+    faux_cluster
+    export FAKE_SHELL_STATUS=130
+    parite workspace shell
+    run "$DZ_GO" workspace shell
+    [ "$status" -eq 130 ]
+}
+
+@test "go-parity: workspace shell with extra words is delegated, same output" {
+    faux_cluster
+    parite workspace shell extra
 }
