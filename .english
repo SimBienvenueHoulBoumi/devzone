@@ -53,6 +53,11 @@ internal/workspace/stop_ports.go
 internal/workspace/stop_test.go
 internal/workspace/stop_ports_test.go
 internal/command/workspace_stop_test.go
+internal/workspace/vscode.go
+internal/workspace/vscode_test.go
+internal/workspace/shell.go
+internal/workspace/shell_test.go
+internal/command/workspace_terminal_test.go
 manage/test/workspace-build.bats
 .devcontainer/services-admin.sh
 manage/scripts/services-workspace.sh
