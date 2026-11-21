@@ -261,3 +261,7 @@ internal/workspace/copy_test.go
 internal/workspace/git_helpers_test.go
 internal/workspace/pod_script_test.go
 internal/command/workspace_copy_test.go
+internal/workspace/clone.go
+internal/workspace/clone_script.go
+internal/workspace/clone_test.go
+internal/command/workspace_clone_test.go
