@@ -1,13 +1,20 @@
 #!/usr/bin/env bash
-# Pinned container versions: compares repowarden (versions.env) and AI
-# assistants (IA_… lines, devzone) to the latest npm version, or applies an
-# upgrade.
+# Pinned versions: compares repowarden (versions.env) and AI assistants
+# (IA_… lines, devzone) to the latest npm version, or applies an upgrade; and
+# the tools of the workspace image (Dockerfile, see tools-image.sh).
 #   bash manage/scripts/ci/versions.sh
 #       one "package old new" line per outdated package, nothing otherwise
 #   bash manage/scripts/ci/versions.sh --installed
 #       one "package pinned installed" line per installed tool behind its pin
 #   bash manage/scripts/ci/versions.sh --apply <package> <version>
 #       replaces that pinned version in its file, nothing else
+#   bash manage/scripts/ci/versions.sh --tools
+#       one "tool pinned upstream" line per image tool (Go, k9s, actionlint,
+#       gitleaks, kind) behind its upstream release, " majeure" added when the
+#       major differs; nothing otherwise
+#   bash manage/scripts/ci/versions.sh --apply <tool> <version> [--major]
+#       replaces the version and both sha256 fingerprints of that tool in the
+#       Dockerfile, nothing else; another major version needs --major
 #   bash manage/scripts/ci/versions.sh --existing-ticket <package> <author>
 #       "number<TAB>title" of the open ticket by <author>, nothing otherwise
 # Compatible with bash 3.2 (macOS).
@@ -16,6 +23,8 @@ set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 VERSIONS_ENV="$HERE/.devcontainer/versions.env"
 DEVZONE="$HERE/.devcontainer/devzone"
+# shellcheck disable=SC2034 # read by tools-image.sh (sourced)
+DOCKERFILE="$HERE/.devcontainer/Dockerfile"
 
 # List "package version" of pinned versions in both files; in devzone, one
 # IA_<NAME>=<package>@<version> line per AI assistant
@@ -148,22 +157,32 @@ apply() {
     rm -f "$tmp"
 }
 
+usage() {
+    echo "usage: bash manage/scripts/ci/versions.sh [--installed | --tools | --apply <package|tool> <version> [--major] | --existing-ticket <package> <author>]" >&2
+    exit 2
+}
+
+# Tools of the image (--tools, --apply <tool>)
+# shellcheck source=SCRIPTDIR/tools-image.sh
+. "$(dirname "${BASH_SOURCE[0]}")/tools-image.sh"
+
 case "${1:-}" in
     "") list_outdated ;;
     --installed | --installees) compare_installed ;;
+    --tools) tools_outdated ;;
     --apply | --appliquer)
-        [ "$#" -eq 3 ] ||
-            { echo "usage: bash manage/scripts/ci/versions.sh [--installed | --apply <package> <version> | --existing-ticket <package> <author>]" >&2; exit 2; }
-        apply "$2" "$3"
+        if tool_known "${2:-}"; then
+            [ "$#" -le 4 ] || usage
+            apply_tool "$2" "${3:-}" "${4:-}"
+        else
+            [ "$#" -eq 3 ] || usage
+            apply "$2" "$3"
+        fi
         ;;
     --existing-ticket | --ticket-existant)
-        [ "$#" -eq 3 ] ||
-            { echo "usage: bash manage/scripts/ci/versions.sh [--installed | --apply <package> <version> | --existing-ticket <package> <author>]" >&2; exit 2; }
+        [ "$#" -eq 3 ] || usage
         existing_ticket "$2" "$3"
         ;;
-    -h | --help) sed -n '2,17p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' ;;
-    *)
-        echo "usage: bash manage/scripts/ci/versions.sh [--installed | --apply <package> <version> | --existing-ticket <package> <author>]" >&2
-        exit 2
-        ;;
+    -h | --help) sed -n '2,/^# Compatible/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' ;;
+    *) usage ;;
 esac

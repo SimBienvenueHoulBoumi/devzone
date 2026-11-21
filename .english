@@ -15,6 +15,7 @@ manage/scripts/workspace-wait.sh
 manage/scripts/poste.sh
 manage/scripts/launch.sh
 manage/scripts/ci/versions.sh
+manage/scripts/ci/tools-image.sh
 manage/scripts/uninstall.sh
 manage/scripts/ports-apps.sh
 manage/scripts/ports-workspace.sh
