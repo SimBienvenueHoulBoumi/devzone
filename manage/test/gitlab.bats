@@ -453,15 +453,15 @@ wait_log() {
 
 @test "gitlab : status disabled, ready (runner online or not), failed" {
     run bash "$GITLAB" status
-    [ "$output" = "désactivé" ]
+    [ "$output" = "disabled" ]
     touch "$BATS_TEST_TMPDIR/namespace"
     mkdir -p "$SECRETS" && echo token >"$SECRETS/root-token"
     run bash "$GITLAB" status
-    [ "$output" = "prêt : http://gitlab.localhost:8929, runner hors ligne" ]
+    [ "$output" = "ready: http://gitlab.localhost:8929, runner offline" ]
     FAKE_RUNNERS='[{"id":1}]' run bash "$GITLAB" status
-    [ "$output" = "prêt : http://gitlab.localhost:8929, runner en ligne" ]
+    [ "$output" = "ready: http://gitlab.localhost:8929, runner online" ]
     FAKE_GITLAB_FAIL=1 run bash "$GITLAB" status
-    [ "$output" = "en échec : devzone apply" ]
+    [ "$output" = "failed: devzone apply" ]
 }
 
 @test "gitlab : status no longer reports a node published on 0.0.0.0" {

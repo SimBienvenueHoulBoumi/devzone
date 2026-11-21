@@ -73,7 +73,7 @@ confirm() {
         return 1
     fi
     read -r -p "$1 [y/N] " reply || true
-    case "$reply" in y | Y | yes | YES | Yes | o | O | oui | OUI | Oui) return 0 ;; esac
+    case "$reply" in y | Y | yes | YES | Yes) return 0 ;; esac
     echo "✖ canceled, nothing changed" >&2
     return 1
 }

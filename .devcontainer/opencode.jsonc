@@ -1,8 +1,8 @@
-// devzone : configuration opencode par défaut (devzone enable ia la tient à jour ; retirer cette ligne pour la personnaliser)
+// devzone : default opencode configuration (devzone enable ia keeps it up to date; remove this line to customise it)
 {
   "$schema": "https://opencode.ai/config.json",
   // Modèles gratuits de la version d'opencode fixée par devzone.
-  // Partage et mises à jour désactivés : les versions sont fixées par devzone.
+  // Sharing and updates disabled: versions are pinned by devzone.
   "model": "opencode/big-pickle",
   "small_model": "opencode/mimo-v2.6-flash-free",
   "share": "disabled",

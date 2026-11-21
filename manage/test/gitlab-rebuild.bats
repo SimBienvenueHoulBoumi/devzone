@@ -224,5 +224,5 @@ current_context() {
     [ ! -e "$DEVZONE_ETAT-echec-gitlab" ] || false
     FAKE_RUNNERS='[{"id":1}]' run bash "$DEVZONE"
     [[ "$output" == *"✔ module gitlab"* ]] || false
-    [[ "$output" != *"en échec"* ]] || false
+    [[ "$output" != *"failed"* ]] || false
 }

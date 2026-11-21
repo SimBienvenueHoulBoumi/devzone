@@ -47,10 +47,10 @@ mysql_volume() {
         [ "${pvc%-mysql-0}" != "$mounted" ] || refuse "mounted volume, deletion refused: $name"
         if [ -z "$yes" ]; then
             cluster_interactive || refuse "confirmation needs a terminal: devzone mysql volume --delete $name --yes"
-            printf 'Delete volume %s? [o/N] ' "$pvc" >&2
+            printf 'Delete volume %s? [y/N] ' "$pvc" >&2
             read -r answer || answer=""
             case "$answer" in
-                o | O | oui) ;;
+                y | Y | yes) ;;
                 *) echo "Aborted: nothing was deleted."; return 0 ;;
             esac
         fi

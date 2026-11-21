@@ -159,15 +159,15 @@ count_databases() {
 do_status() {
     CTX="$(cluster_saved)"
     if [ -z "$CTX" ] || ! is_installed; then
-        echo "désactivé"
+        echo "disabled"
         return 0
     fi
     if [ "$(k get statefulset postgres -o jsonpath='{.status.readyReplicas}' 2>/dev/null || true)" != 1 ]; then
-        echo "en échec sur $CTX : devzone apply"
+        echo "failed on $CTX: devzone apply"
     elif ! relay_active postgres; then
-        echo "prêt sur $CTX, relais arrêté : devzone apply"
+        echo "ready on $CTX, relay stopped: devzone apply"
     else
-        echo "prêt sur $CTX : 127.0.0.1:$POSTGRES_PORT, $(count_databases) base(s)"
+        echo "ready on $CTX: 127.0.0.1:$POSTGRES_PORT, $(count_databases) database(s)"
     fi
 }
 
@@ -246,10 +246,10 @@ do_delete() {
     is_installed || refuse "module disabled: devzone enable postgres"
     if [ -z "$yes" ]; then
         cluster_interactive || refuse "cannot confirm without a terminal: devzone postgres delete $project --yes"
-        printf 'Delete database %s and all its data? [o/N] ' "$project" >&2
+        printf 'Delete database %s and all its data? [y/N] ' "$project" >&2
         read -r answer || answer=""
         case "$answer" in
-            o | O | oui) ;;
+            y | Y | yes) ;;
             *) echo "Abandon: nothing was deleted."; return 0 ;;
         esac
     fi

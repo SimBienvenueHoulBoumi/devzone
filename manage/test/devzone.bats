@@ -370,7 +370,7 @@ GH
     [ "$status" -eq 0 ]
     run bash "$DEVZONE"
     [[ "$output" == *"✔ module ia"*"active"* ]] || false
-    [[ "$output" != *"en échec"* ]] || false
+    [[ "$output" != *"failed"* ]] || false
 }
 
 @test "désactiver ia après un échec : plus marqué en échec" {
@@ -381,7 +381,7 @@ GH
     [ "$status" -eq 0 ]
     run bash "$DEVZONE"
     [[ "$output" == *"○ module ia"* ]] || false
-    [[ "$output" != *"en échec"* ]] || false
+    [[ "$output" != *"failed"* ]] || false
 }
 
 @test "désactiver ia : désinstalle, état gardé" {
@@ -792,7 +792,7 @@ HOOK
     run bash "$DEVZONE" enable ia
     [ "$status" -eq 0 ]
     [ -f "$HOME/.config/opencode/opencode.jsonc" ]
-    grep -q '^// devzone : configuration opencode par défaut' "$HOME/.config/opencode/opencode.jsonc"
+    grep -q '^// devzone : default opencode configuration' "$HOME/.config/opencode/opencode.jsonc"
     grep -q '"model": "opencode/big-pickle"' "$HOME/.config/opencode/opencode.jsonc"
     grep -q '"compaction": {' "$HOME/.config/opencode/opencode.jsonc"
     [[ "$output" == *"opencode : default configuration written"* ]] || false
@@ -807,12 +807,37 @@ HOOK
     [[ "$output" == *"opencode : default configuration updated"* ]] || false
 }
 
+@test "activer ia : configuration opencode avec le repère anglais et différente -> mise à jour" {
+    mkdir -p "$HOME/.config/opencode"
+    printf '// devzone : default opencode configuration (ancienne)\n{"model":"ancien"}\n' >"$HOME/.config/opencode/opencode.jsonc"
+    run bash "$DEVZONE" enable ia
+    [ "$status" -eq 0 ]
+    grep -q '"model": "opencode/big-pickle"' "$HOME/.config/opencode/opencode.jsonc"
+    [[ "$output" == *"opencode : default configuration updated"* ]] || false
+}
+
+@test "activer ia : skill avec l'ancien repère français, non modifiée -> mise à jour" {
+    run bash "$DEVZONE" enable ia
+    [ "$status" -eq 0 ]
+    local d f
+    for d in "$HOME/.claude/skills/devzone" "$HOME/.config/opencode/skills/devzone"; do
+        f="$d/SKILL.md"
+        sed 's/skill set by devzone enable ia/skill posée par devzone enable ia/' "$f" >"$f.tmp"
+        mv "$f.tmp" "$f"
+        sha256sum "$f" | cut -d' ' -f1 >"$d/.devzone-empreinte"
+    done
+    run bash "$DEVZONE" enable ia
+    [ "$status" -eq 0 ]
+    grep -qF '<!-- devzone : skill set by devzone enable ia -->' "$HOME/.claude/skills/devzone/SKILL.md"
+    [[ "$output" == *"devzone skill updated"* ]] || false
+}
+
 @test "activer ia : configuration opencode avec seulement \$schema -> remplacée" {
     mkdir -p "$HOME/.config/opencode"
     printf '{\n  "$schema": "https://opencode.ai/config.json"\n}\n' >"$HOME/.config/opencode/opencode.jsonc"
     run bash "$DEVZONE" enable ia
     [ "$status" -eq 0 ]
-    grep -q '^// devzone : configuration opencode par défaut' "$HOME/.config/opencode/opencode.jsonc"
+    grep -q '^// devzone : default opencode configuration' "$HOME/.config/opencode/opencode.jsonc"
     grep -q '"model": "opencode/big-pickle"' "$HOME/.config/opencode/opencode.jsonc"
     [[ "$output" == *"opencode : default configuration updated"* ]] || false
 }
@@ -835,8 +860,8 @@ HOOK
     [ "$(head -n 1 "$HOME/.config/opencode/skills/devzone/SKILL.md")" = '---' ]
     grep -q '^name: devzone$' "$HOME/.claude/skills/devzone/SKILL.md"
     grep -q '^name: devzone$' "$HOME/.config/opencode/skills/devzone/SKILL.md"
-    grep -qF '<!-- devzone : skill posée par devzone enable ia -->' "$HOME/.claude/skills/devzone/SKILL.md"
-    grep -qF '<!-- devzone : skill posée par devzone enable ia -->' "$HOME/.config/opencode/skills/devzone/SKILL.md"
+    grep -qF '<!-- devzone : skill set by devzone enable ia -->' "$HOME/.claude/skills/devzone/SKILL.md"
+    grep -qF '<!-- devzone : skill set by devzone enable ia -->' "$HOME/.config/opencode/skills/devzone/SKILL.md"
     [[ "$output" == *"devzone skill installed"* ]] || false
 }
 

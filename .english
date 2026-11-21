@@ -228,6 +228,14 @@ manage/test/test-gitlab.bats
 .devcontainer/devzone-cluster.sh
 .devcontainer/devzone-platform.sh
 .devcontainer/devzone-status.sh
+.devcontainer/devzone-ai.sh
+.devcontainer/devzone-skill.sh
+.devcontainer/devzone-services.sh
+.devcontainer/gitlab/gitlab.sh
+.devcontainer/gitlab/test-gitlab.sh
+.devcontainer/postgres/postgres.sh
+.devcontainer/argocd/argocd.sh
+.devcontainer/catalog/mysql/mysql.sh
 manage/test/go-parity.bats
 internal/command/version.go
 internal/command/version_test.go

@@ -99,7 +99,7 @@ wait_nohup() {
     [ "$status" -ne 0 ]
     run bash "$ARGOCD" status
     [ "$status" -eq 0 ]
-    [ "$output" = "désactivé" ]
+    [ "$output" = "disabled" ]
 }
 
 @test "enable argocd: isolated namespace, pinned chart, password stored, relay started" {
@@ -139,7 +139,7 @@ wait_nohup() {
     argocd_installed
     run bash "$ARGOCD" status
     [ "$status" -eq 0 ]
-    [[ "$output" == *"relais arrêté"* ]] || false
+    [[ "$output" == *"relay stopped"* ]] || false
 }
 
 @test "enable argocd already installed: relay restarted, no new installation" {

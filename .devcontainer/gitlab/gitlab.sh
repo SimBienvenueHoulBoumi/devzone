@@ -125,25 +125,25 @@ gitlab_host_remove() {
 gitlab_status() {
     # Disabled if the devzone-gitlab namespace does not exist
     if ! gitlab_installed; then
-        echo "désactivé"
+        echo "disabled"
         return 0
     fi
 
     # Check that GitLab answers the readiness probe
     if curl -sf http://gitlab.localhost:8929/-/readiness >/dev/null 2>&1 || curl -sf http://gitlab.localhost:8929/users/sign_in >/dev/null 2>&1; then
         # Check whether the runner is online or offline
-        local runner_status="hors ligne"
+        local runner_status="offline"
         if [ -f "$GITLAB_SECRETS_DIR/root-token" ]; then
             local token count
             token="$(cat "$GITLAB_SECRETS_DIR/root-token")"
             count="$(curl -s --header "PRIVATE-TOKEN: $token" "http://gitlab.localhost:8929/api/v4/runners/all?status=online" 2>/dev/null | jq -r 'length' 2>/dev/null || true)"
             if [ "${count:-0}" -gt 0 ] 2>/dev/null; then
-                runner_status="en ligne"
+                runner_status="online"
             fi
         fi
-        echo "prêt : http://gitlab.localhost:8929, runner ${runner_status}"
+        echo "ready: http://gitlab.localhost:8929, runner ${runner_status}"
     else
-        echo "en échec : devzone apply"
+        echo "failed: devzone apply"
     fi
     return 0
 }

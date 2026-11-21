@@ -3,7 +3,7 @@ name: devzone
 description: Utiliser pour travailler dans un conteneur devzone — modules et catalogue, devzone agent, worktrees, garde-fou.
 ---
 
-<!-- devzone : skill posée par devzone enable ia -->
+<!-- devzone : skill set by devzone enable ia -->
 
 # Skill devzone (assistants IA)
 

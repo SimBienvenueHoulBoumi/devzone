@@ -151,11 +151,11 @@ step_module() {
 step_state() {
     local state
     state="$(bash "$GITLAB" status 2>&1 || true)"
-    if [[ "$state" != *"prêt"* ]]; then
+    if [[ "$state" != *"ready"* ]]; then
         REASON="state: ${state:-unreadable}"
         return 1
     fi
-    if [[ "$state" != *"runner en ligne"* ]]; then
+    if [[ "$state" != *"runner online"* ]]; then
         REASON="runner offline ($state)"
         return 1
     fi
