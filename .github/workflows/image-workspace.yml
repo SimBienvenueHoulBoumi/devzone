@@ -69,7 +69,26 @@ jobs:
       # Multi-architecture image: Apple Silicon Mac (arm64) and amd64 workstations (#494)
       - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
-      - uses: devcontainers/ci@513af61f4de4f75d37e4438f184ba4358f0fc1ca # v0.3.1900000450
+      # One retry of the build and push (#758): a corrupt SDKMAN download can fail
+      # the first attempt. The retry runs only after a failure, after a pause (a
+      # retry started at once fell in the same bad window, #685); its failure
+      # fails the job. Both steps use the same action and inputs.
+      - name: Build and push (first attempt)
+        id: publish
+        continue-on-error: true
+        uses: devcontainers/ci@513af61f4de4f75d37e4438f184ba4358f0fc1ca # v0.3.1900000450
+        with:
+          configFile: .devcontainer/devcontainer.json
+          imageName: ghcr.io/simbienvenuehoulboumi/devzone-workspace
+          imageTag: ${{ steps.version.outputs.version }},latest
+          platform: linux/amd64,linux/arm64
+          push: always
+      - name: Pause before the retry
+        if: steps.publish.outcome == 'failure'
+        run: sleep 120
+      - name: Build and push (retry)
+        if: steps.publish.outcome == 'failure'
+        uses: devcontainers/ci@513af61f4de4f75d37e4438f184ba4358f0fc1ca # v0.3.1900000450
         with:
           configFile: .devcontainer/devcontainer.json
           imageName: ghcr.io/simbienvenuehoulboumi/devzone-workspace
