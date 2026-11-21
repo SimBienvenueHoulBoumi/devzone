@@ -117,29 +117,12 @@ Le choix est **propre à chaque devzone** (instance) et gardé dans le dossier `
 
 Dans le [workspace Kubernetes](#services-de-devzone-dans-le-workspace-kubernetes), `gitlab`, `postgres` et `argocd` s'installent depuis le poste (`devzone workspace services enable <service>`) ; le pod n'affiche que leur présence dans le cluster.
 
-### Socket Docker de l'hôte
-
-Par défaut, la feature `docker-outside-of-docker` monte le socket Docker du poste dans le conteneur : le récapitulatif affiche `⚠ socket Docker de l hôte partagé (agents compris)`. C'est ce qui permet à `docker`, Testcontainers et kind de parler au Docker de l'hôte, mais cela donne aussi au conteneur et à ses agents l'administration du Docker du poste.
-
-Le récapitulatif suit le **socket réellement monté**, pas l'option : tant que `make rebuild` n'a pas été lancé, le conteneur courant garde son ancien montage, signalé par `⚠ socket Docker de l hôte encore partagé : make rebuild sur le poste` (option `off`) ou `⚠ socket Docker de l hôte absent : make rebuild sur le poste` (option `on`, socket absent). Sans socket et avec l'option `off`, tout est cohérent : rien n'est affiché.
-
-Pour retirer ce partage :
-
-```bash
-devzone disable docker-hote     # écrit docker-hote=off, puis demande une reconstruction
-make rebuild                       # sur le poste, pas dans le conteneur
-```
-
-Au lancement sur le poste, `manage/scripts/launch.sh` lit la ligne `docker-hote` (absente = `on`). À `off`, il génère `.devcontainer/without-host-docker/devcontainer.json` (copie sans la feature, chemins de build adaptés au sous-dossier, dossier ignoré par git) et passe ce fichier au CLI devcontainers avec `--config`. Pour remettre le socket : `devzone enable docker-hote`, puis `make rebuild`.
-
-Sans socket, `docker` n'existe plus dans le conteneur : la commande affiche un message qui renvoie au workspace Kubernetes (`devzone workspace`, kubedock et BuildKit). Le relais du socket ne bloque pas le démarrage, et la connexion au cluster Kubernetes de l'hôte reste disponible ; en revanche, kind et les conteneurs lancés sur le Docker du poste ne le sont plus. `devzone status --json` porte l'option dans le champ `docker_host` et l'état réel du montage dans `docker_hote_actif`.
-
 ### Commandes de l'application
 
 Les scripts internes de `.devcontainer/` ne sont pas des commandes utilisateur : `devzone` les enveloppe.
 
 ```bash
-devzone repair                 # relance relais Docker, gitlab, postgres, ports et identifiants
+devzone repair                 # relance gitlab, postgres, ports et identifiants
 devzone start                # démarrage complet (identité git, clusters, relais, récapitulatif)
 devzone metrics [contexte…]     # installe metrics-server sur un cluster local
 devzone use CTX [--confirm CTX]  # bascule le cluster de travail de kubectl
@@ -261,7 +244,6 @@ devzone use <nom>       # bascule le cluster de travail de kubectl
 
 - **Cluster actif** : celui de l'hôte par défaut s'il répond (en pratique `docker-desktop`), sinon kind dédié `kind-devzone`. Un choix fait avec `devzone use` est gardé aux redémarrages.
 - **Clusters kind** : tournent sur le Docker de l'hôte (socket partagé, #291). Leur API écoute sur 127.0.0.1 **du poste**, jamais sur le réseau local ; `kind` (enveloppe de devzone) réécrit l'adresse en `host.docker.internal` dans le kubeconfig du conteneur, en gardant la vérification TLS : un cluster créé à la main par `kind create cluster` est joignable tout de suite. Nom suffixé par instance quand ce n'est pas l'instance par défaut. Ils redémarrent avec Docker Desktop, sont conservés par `make rebuild` et `make down`, et supprimés par `kind delete cluster` (ou `make uninstall`).
-- **Relais du socket Docker** ([#293](https://github.com/SimBienvenueHoulBoumi/devzone/issues/293)) : sous Docker Desktop, la feature `docker-outside-of-docker` relaie le socket de l'hôte par `socat` sans option `-t`. Un `docker exec` sans entrée standard (kind lance ainsi `kubeadm init`) y est coupé au bout de 0,5 s, avec une sortie tronquée et un code 0 : kind croit l'init réussi (« failed to remove control plane taint … connection refused »). Au démarrage, devzone remplace ce relais par le même avec `-t 86400`, puis vérifie qu'un `docker exec` long va au bout. En cas d'échec, une ligne `⚠ relais Docker` apparaît dans le récapitulatif `devzone`, avec la commande à relancer : `devzone repair`. Sous Linux (socket par groupe, sans socat), seul le contrôle est fait.
 - **CPU et RAM dans k9s** (`kubectl top`) : module `kubernetes` actif, metrics-server est installé au démarrage sur les clusters **locaux** qui ne l'ont pas (Docker Desktop, kind…), jamais sur un cluster distant. Après un `kind create cluster` : `devzone metrics` (ou `devzone metrics <contexte>` pour un cluster précis).
 - **Cluster de l'hôte** : `~/.kube` est monté en lecture seule, jamais modifié ; sa copie adaptée est `~/.kube/hote.config` (`127.0.0.1` remplacé par `host.docker.internal`). Après un changement de cluster sur l'hôte : `make stop && make up`.
 - **Messages de démarrage** (`kube-config : …`, `metrics-server : …`, récapitulatif) : dans le terminal de création, ou en relançant `devzone start`.
@@ -371,7 +353,7 @@ Apres `devzone workspace migrate`, `make up`, `make shell` et `make stop` pilote
 
 **Poste Docker en veille (#517)** : à la bascule (étape 5), `migrate` arrête le conteneur du dossier poste (étiquette `devcontainer.local_folder`) et les relais de ports automatiques `devzone-<instance>-auto-*` avec `docker stop` ; il ne les supprime jamais. `revert` les relance avec `docker start`. Docker absent ou arrêté : un avertissement, la migration n'échoue pas pour autant. Dans le pod Kubernetes (`DEVZONE_WORKSPACE` valant `kubernetes`), le veilleur de ports automatiques ne démarre pas (`devzone repair` le saute) et le réseau kind n'est pas rejoint : les ports passent par `devzone workspace ports`.
 
-Restent légitimes sur Docker : le mode poste Docker (`make`, `lancer`, relais du socket), la lecture des volumes par `migrate` et `revert`, `uninstall`, la CI, et kubedock (API Docker émulée par Kubernetes dans le pod).
+Restent légitimes sur Docker : le mode poste Docker (`make`, `lancer`), la lecture des volumes par `migrate` et `revert`, `uninstall`, la CI, et kubedock (API Docker émulée par Kubernetes dans le pod).
 
 ### Le cluster ne répond pas
 
@@ -1045,13 +1027,10 @@ internes restent appelables pendant le développement et par les tests :
 
 ```bash
 bash .devcontainer/startup.sh
-bash .devcontainer/docker-relay.sh
 bash .devcontainer/metrics-server.sh
 ```
 
-Les tests isolent le relais Docker (`DEVZONE_RELAY_SOCKET=…`,
-`DEVZONE_RELAY_SOURCE=…`, `DEVZONE_RELAY_PID=…`, `DEVZONE_RELAY_LOG=…`,
-`DEVZONE_RELAY_MARKER=…`, `DEVZONE_RELAY_SUDO=`) et Kubernetes
+Les tests isolent Kubernetes
 (`kube_isole` de `manage/test/commun.bash` : `HOME`, `KUBECONFIG` et
 `DEVZONE_KUBE_HOST` sous le dossier temporaire du test). `cluster.sh` accepte
 `--confirm CTX` et conserve `DEVZONE_CLUSTER_REMOTE=<contexte>` pour les

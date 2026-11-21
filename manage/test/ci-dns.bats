@@ -6,7 +6,6 @@
 load commun
 
 setup() {
-    relais_docker_isole
     kube_isole
     SCRIPT="$BATS_TEST_DIRNAME/../scripts/ci-dns.sh"
     mkdir -p "$BATS_TEST_TMPDIR/bin"

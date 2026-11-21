@@ -12,7 +12,6 @@ setup() {
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
     GITLAB="$BATS_TEST_DIRNAME/../../.devcontainer/gitlab/gitlab.sh"
     DEMARRAGE="$BATS_TEST_DIRNAME/../../.devcontainer/startup.sh"
-    relais_docker_isole
     kube_isole
     export HOME="$BATS_TEST_TMPDIR/home"
     export DEVZONE_ROOT="$BATS_TEST_TMPDIR/racine"
@@ -645,19 +644,7 @@ SUDO
     grep -q 'devzone:gitlab' "$DEVZONE_HOSTS"
 }
 
-real_mark() {
-    stat -c %Y /tmp/devzone-relay.failed 2>/dev/null ||
-        stat -f %m /tmp/devzone-relay.failed 2>/dev/null ||
-        echo absent
-}
-
 @test "startup: gitlab active → line set, inactive → nothing" {
-    # Isolation (#346): the Docker relay runs under $BATS_TEST_TMPDIR, the
-    # real mark of the workstation is never touched (unchanged, not absent:
-    # it may exist if the workstation relay really failed)
-    [[ "$DEVZONE_RELAY_MARKER" == "$BATS_TEST_TMPDIR"/* ]] || false
-    local before
-    before="$(real_mark)"
     # Module inactive: nothing is set
     printf 'gitlab=off\n' >"$DEVZONE_STATE"
     run bash "$DEMARRAGE"
@@ -673,10 +660,6 @@ real_mark() {
     grep -q 'devzone devzone-gitlab svc/gitlab-webservice-default 8929:8181' "$BATS_TEST_TMPDIR/setsid.log"
     wait_log "$BATS_TEST_TMPDIR/setsid.log" 'devzone devzone-gitlab svc/gitlab-gitlab-shell 2224:22'
     grep -q 'devzone devzone-gitlab svc/gitlab-gitlab-shell 2224:22' "$BATS_TEST_TMPDIR/setsid.log"
-    # Isolation (#346): the real mark of the workstation is unchanged after the
-    # startup (read before the first launch of startup.sh)
-    [[ "$DEVZONE_RELAY_MARKER" == "$BATS_TEST_TMPDIR"/* ]] || false
-    [ "$(real_mark)" = "$before" ]
 }
 
 @test "gitlab : values — host without port, external port via GITLAB_PORT" {

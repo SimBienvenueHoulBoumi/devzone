@@ -4,7 +4,6 @@
 
 setup() {
     load commun
-    relais_docker_isole
     kube_isole
     ICI="$(cd "$BATS_TEST_DIRNAME/../../.devcontainer" && pwd)"
     DEMARRAGE="$ICI/startup.sh"

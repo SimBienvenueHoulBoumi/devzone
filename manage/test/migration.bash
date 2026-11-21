@@ -4,10 +4,9 @@
 # The "pod" is $T/pod, "Docker volumes" are folders under $T/volumes, the
 # workstation is $T/workstation. No real volume or cluster is touched.
 
-# Isolate HOME, relay and kubeconfig, create workstation, pod and fake tools.
+# Isolate HOME and kubeconfig, create workstation, pod and fake tools.
 migration_isolate() {
     load commun
-    relais_docker_isole
     kube_isole
     RACINE="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
     CLI="$RACINE/manage/devzone"

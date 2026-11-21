@@ -30,10 +30,9 @@ Les modules sont désactivés par défaut, activés à la demande, sans rebuild 
 - `devzone enable postgres` : PostgreSQL partagé, une base par projet (`devzone postgres create <projet>`).
 - `devzone enable mysql` : MySQL partagé du catalogue, une base par projet.
 - `devzone enable argocd` : Argo CD du cluster des services, interface dans le conteneur sur https://127.0.0.1:8443.
-- `devzone disable docker-hote` : retire le socket Docker de l'hôte (puis `make rebuild` sur le poste) ; `devzone enable docker-hote` le remet.
 - `devzone disable <module>` : désactive et applique tout de suite.
 - `devzone apply` : installe ce qui est actif.
-- `devzone repair` : relance relais Docker, gitlab, postgres, mysql, argocd, ports étiquetés et le veilleur du catalogue.
+- `devzone repair` : relance gitlab, postgres, mysql, argocd, ports étiquetés et le veilleur du catalogue.
 - `devzone status --json` : récapitulatif complet en JSON, pour les outils (aucun secret ; le champ `command` de chaque point donne la commande à lancer).
 
 Le catalogue d'applications se consulte avec `devzone catalog` ; un veilleur applique à chaud les changements de `.devzone.modules`, et `devzone repair` le relance. MySQL se pilote avec `devzone mysql create <projet>`, `devzone mysql list`, `devzone mysql delete <projet>`, `devzone mysql volume [<nom>|--delete <nom>]` et `devzone mysql delete-data` (données gardées par défaut).

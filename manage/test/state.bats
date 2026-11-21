@@ -6,7 +6,6 @@
 
 setup() {
     load commun
-    relais_docker_isole
     kube_isole
     # Outside the pod by default: the ambient DEVZONE_WORKSPACE (a workspace
     # pod) must not change the messages of these tests

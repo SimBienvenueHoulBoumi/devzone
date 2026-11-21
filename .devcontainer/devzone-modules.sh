@@ -32,12 +32,6 @@ value_of() {
     init_state
     local v
     v="$(grep -E "^$1=" "$ETAT" | tail -1 | cut -d= -f2 || true)"
-    # docker-hote option (#432): missing line = on (host socket shared, the
-    # historical behaviour); the modules stay off by default
-    if [ "$1" = docker-hote ] && [ -z "$v" ]; then
-        echo on
-        return 0
-    fi
     [ "$v" = on ] && echo on || echo off
 }
 
@@ -101,19 +95,6 @@ change_module() {
         return 1
     fi
     migrate_llm
-    # docker-hote option (#432): the host socket, shared by default.
-    # The choice only applies when the container is created; without a
-    # rebuild, the current container keeps its mount.
-    if [ "$m" = docker-hote ]; then
-        write_value docker-hote "$1"
-        if [ "$1" = on ]; then
-            echo "devzone : host Docker socket shared after rebuild"
-        else
-            echo "devzone : host Docker socket not shared after rebuild"
-        fi
-        echo "devzone : rebuild needed: on the workstation, make rebuild"
-        return 0
-    fi
     if ! is_known "$m"; then
         # An application of the catalog: the line is written, then applied
         if [ -f "$ICI/catalog/$m/app.conf" ]; then

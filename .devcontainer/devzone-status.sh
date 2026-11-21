@@ -7,7 +7,7 @@
 # Full state: ✔ ready, ✖ required, ○ optional, ⚠ to fix; each point to do with
 # its command (shown at each startup)
 show_state() {
-    local name email status m late path ports_state relay_mark ctx_work ctx_host packages_mark packages_names argocd_repo
+    local name email status m late path ports_state ctx_work ctx_host packages_mark packages_names argocd_repo
     echo "devzone: state (devzone to show it again)"
     version_available_line
     name="$(git config --get user.name || true)"
@@ -85,23 +85,6 @@ show_state() {
     else
         printf '  ○ argocd          no GitOps repository: devzone argocd init\n'
     fi
-    # Host Docker socket (#432): the warning shows the real state, the mounted
-    # socket (same variable as docker-relay.sh), not the option: the mount only
-    # changes at make rebuild (a reassuring false answer until then)
-    # In the Kubernetes workspace (DEVZONE_WORKSPACE=kubernetes), the pod has
-    # no Docker host socket: no alert, the service account is the cluster access
-    if [ "${DEVZONE_WORKSPACE:-}" = kubernetes ]; then
-        printf '  ✔ workspace       Kubernetes pod, service account access only (no Docker socket)\n'
-    else
-        relay_source="${DEVZONE_RELAY_SOURCE:-/var/run/docker-host.sock}"
-        if [ -e "$relay_source" ] && [ "$(value_of docker-hote)" = on ]; then
-            printf '  ⚠ host Docker socket shared (agents included)\n'
-        elif [ -e "$relay_source" ]; then
-            printf '  ⚠ host Docker socket still shared: make rebuild on the workstation\n'
-        elif [ "$(value_of docker-hote)" = on ]; then
-            printf '  ⚠ host Docker socket absent: make rebuild on the workstation\n'
-        fi
-    fi
     # Catalog applications (#414)
     if [ -d "$ICI/catalog" ]; then
         bash "$ICI/catalog.sh" resume
@@ -142,12 +125,6 @@ show_state() {
     # Grouped credentials (#332): the path only, never the content
     if [ -f "$RACINE/.password" ]; then
         printf '  ○ credentials: %s\n' "$RACINE/.password"
-    fi
-    # Mark set by docker-relay.sh at startup (#293): long docker exec cut,
-    # kind and modules in failure
-    relay_mark="${DEVZONE_RELAY_MARKER:-/tmp/devzone-relay.failed}"
-    if [ -f "$relay_mark" ]; then
-        printf '  ⚠ Docker relay     %s: devzone repair\n' "$(head -1 "$relay_mark")"
     fi
     # Mark set by packages.sh at the failed reapplication (351): names of the packages not installed
     packages_mark="${DEVZONE_PACKAGES_MARKER:-/tmp/devzone-packages.failed}"

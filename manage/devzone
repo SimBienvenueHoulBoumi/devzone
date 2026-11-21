@@ -34,8 +34,6 @@ GITIGNORE_LINES=(
     '.devzone.state'
     '.password'
     '.devzone.backup/'
-    '.devcontainer/sans-docker-hote/'
-    '.devcontainer/without-host-docker/'
 )
 
 # Version of the package (package.json next to manage/)

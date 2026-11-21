@@ -4,7 +4,6 @@
 
 setup() {
     load commun
-    relais_docker_isole
     kube_isole
     PORTS_AUTO="$BATS_TEST_DIRNAME/../../.devcontainer/ports-auto.sh"
     PORTS="$BATS_TEST_DIRNAME/../../.devcontainer/ports.sh"

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# At each startup, in order: Docker socket relay (#293), git identity (deduced
-# from the gh account), Kubernetes clusters, gitlab.localhost name and 8929/2224
+# At each startup, in order: git identity (deduced from the gh account),
+# Kubernetes clusters, gitlab.localhost name and 8929/2224
 # relay of the gitlab module if enabled, relays of the postgres and argocd
 # modules if enabled, port relays to the workstation, grouped credentials
 # (.password), then the summary of what remains to be done (devzone).
@@ -10,12 +10,9 @@
 # behind make, a wait would block (see post-create.sh)
 exec </dev/null
 ICI="$(dirname "$0")"
-# Former French names renamed first (#733): the relay and the packages check
-# below read the English names
+# Former French names renamed first (#733): the packages check below reads the
+# English names
 bash "$ICI/rename-legacy-files.sh" || echo "startup : legacy names not renamed (devzone repair)"
-# Docker socket relay first (#293): without it, the long docker exec calls
-# (kind, modules) are cut after 0.5 s under Docker Desktop
-DEVZONE_RELAY_REAL=yes bash "$ICI/docker-relay.sh" || echo "startup : Docker relay not fixed (devzone repair)"
 bash "$ICI/git-identity.sh" || echo "startup : git identity not handled (devzone start)"
 bash "$ICI/kube-config.sh" || echo "startup : clusters not handled (devzone start)"
 # Token of the limited Kubernetes account (#430): 24 h, renewed at each

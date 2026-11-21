@@ -28,11 +28,6 @@ setup() {
     chmod +x "$APP"
     export PATH="$T/bin:$PATH"
 
-    cat >"$T/app/docker-relay.sh" <<'RELAIS'
-#!/usr/bin/env bash
-printf 'relais %s %s\n' "${DEVZONE_RELAY_REAL:-}" "$*" >>"$BATS_TEST_TMPDIR/actions.log"
-[ ! -f "$BATS_TEST_TMPDIR/failed-relay" ] || { echo "socket unavailable"; exit 1; }
-RELAIS
     cat >"$T/app/ports.sh" <<'PORTS'
 #!/usr/bin/env bash
 printf 'ports %s\n' "$*" >>"$BATS_TEST_TMPDIR/actions.log"
@@ -112,11 +107,9 @@ KUBE
 @test "repair: each repaired element and code 0" {
     run bash "$APP" repair
     [ "$status" -eq 0 ]
-    [[ "$output" == *"✔ Docker relay"* ]] || false
     [[ "$output" == *"✔ ports relay"* ]] || false
     [[ "$output" == *"✔ ports auto watcher"* ]] || false
     [[ "$output" == *"✔ credentials"* ]] || false
-    [[ "$(cat "$T/actions.log")" == *"relais yes"* ]] || false
     [[ "$(cat "$T/actions.log")" == *"ports restart"* ]] || false
     [[ "$(cat "$T/actions.log")" == *"ports-auto demarrer"* ]] || false
     [[ "$(cat "$T/actions.log")" == *"password regenerer"* ]] || false

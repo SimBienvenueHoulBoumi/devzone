@@ -7,8 +7,6 @@ workspace/*
 .devzone.state
 .devzone.modules*
 .password
-.devcontainer/sans-docker-hote/
-.devcontainer/without-host-docker/
 .devzone.catalog-watcher/
 
 # Dependencies of the wrapper charts devzone-argocd and devzone-gitlab, built

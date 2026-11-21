@@ -2,7 +2,7 @@
 # Network isolation and access authorization between devzone namespaces.
 # File <= 250 lines: functions namespace_isolate, allow, forbid.
 # These functions modify NetworkPolicies in the Kubernetes cluster.
-# Helpers of manage/test/commun.bash: relais_docker_isole, kube_isole.
+# Helpers of manage/test/commun.bash: kube_isole.
 
 # Sets an isolating NetworkPolicy in a namespace.
 # Only the pods of the same namespace can reach the services.
