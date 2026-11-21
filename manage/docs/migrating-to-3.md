@@ -49,7 +49,7 @@ The prompts read `[y/N]` and accept `y`, `Y` or `yes`. The old `o` and `oui` are
 
 ## Files and folders
 
-These are renamed once, automatically, when the pod starts and by `devzone update` and `devzone workspace update`. A name is moved only when the old one exists and the new one does not: an existing new name is never overwritten, and a second run does nothing.
+These are renamed once, automatically, when the pod starts and by `devzone update` and `devzone workspace update`. A name is moved only when the old one exists and the new one does not: an existing new name is never overwritten, and a second run does nothing. When both names are folders, the entries of the old folder that the new one lacks are moved into it, and the old folder is removed only when it is left empty; a file present on both sides stays in the old folder, and a message on stderr names it.
 
 | Before | Now |
 |---|---|

@@ -1,7 +1,8 @@
 #!/usr/bin/env bats
 # rename-legacy-files.sh (#733, lot 3): each file and folder written under its
 # former French name is renamed once, with its content. A new name that already
-# exists is never overwritten, a second run changes nothing. The state key
+# exists is never overwritten, two folders with both names are merged, a second
+# run changes nothing. The state key
 # plateforme= of .devzone.modules becomes platform= (lot 4), same rules.
 
 setup() {
@@ -125,4 +126,95 @@ legacy_tree() {
     [ "$status" -eq 0 ]
     [ -z "$output" ]
     [ ! -e "$DEVZONE_ROOT/.devzone.modules" ]
+}
+
+@test "rename-legacy-files: folders with both names are merged and the old one is removed" {
+    mkdir -p "$DEVZONE_ROOT/.devzone.sauvegarde/20260101-120000" "$DEVZONE_ROOT/.devzone.backup/20260102-120000"
+    echo "old" >"$DEVZONE_ROOT/.devzone.sauvegarde/20260101-120000/file"
+    echo "new" >"$DEVZONE_ROOT/.devzone.backup/20260102-120000/file"
+    run bash "$SCRIPT"
+    [ "$status" -eq 0 ]
+    [ "$(cat "$DEVZONE_ROOT/.devzone.backup/20260101-120000/file")" = "old" ]
+    [ "$(cat "$DEVZONE_ROOT/.devzone.backup/20260102-120000/file")" = "new" ]
+    [ ! -e "$DEVZONE_ROOT/.devzone.sauvegarde" ]
+    [ "$output" = "devzone : $DEVZONE_ROOT/.devzone.sauvegarde merged into $DEVZONE_ROOT/.devzone.backup" ]
+}
+
+@test "rename-legacy-files: a file present on both sides is kept in the old folder" {
+    mkdir -p "$DEVZONE_ROOT/.devzone.ports-workspace" "$DEVZONE_ROOT/.devzone.workspace-ports"
+    echo "old" >"$DEVZONE_ROOT/.devzone.ports-workspace/3000"
+    echo "new" >"$DEVZONE_ROOT/.devzone.workspace-ports/3000"
+    echo "moved" >"$DEVZONE_ROOT/.devzone.ports-workspace/5000"
+    run bash "$SCRIPT"
+    [ "$status" -eq 0 ]
+    [ "$(cat "$DEVZONE_ROOT/.devzone.ports-workspace/3000")" = "old" ]
+    [ "$(cat "$DEVZONE_ROOT/.devzone.workspace-ports/3000")" = "new" ]
+    [ "$(cat "$DEVZONE_ROOT/.devzone.workspace-ports/5000")" = "moved" ]
+    [ ! -e "$DEVZONE_ROOT/.devzone.ports-workspace/5000" ]
+    [ -d "$DEVZONE_ROOT/.devzone.ports-workspace" ]
+    [[ "$output" == *"$DEVZONE_ROOT/.devzone.ports-workspace/3000 kept: $DEVZONE_ROOT/.devzone.workspace-ports/3000 already exists"* ]] || false
+    [[ "$output" != *"merged into"* ]] || false
+}
+
+@test "rename-legacy-files: an empty old folder is removed when the new one exists" {
+    mkdir -p "$DEVZONE_ROOT/.devzone.sauvegarde" "$DEVZONE_ROOT/.devzone.backup"
+    run bash "$SCRIPT"
+    [ "$status" -eq 0 ]
+    [ ! -e "$DEVZONE_ROOT/.devzone.sauvegarde" ]
+    [ -d "$DEVZONE_ROOT/.devzone.backup" ]
+    [ "$output" = "devzone : $DEVZONE_ROOT/.devzone.sauvegarde merged into $DEVZONE_ROOT/.devzone.backup" ]
+}
+
+@test "rename-legacy-files: a folder without its new name is renamed as before" {
+    mkdir -p "$DEVZONE_ROOT/.devzone.catalogue-veilleur"
+    echo "watcher" >"$DEVZONE_ROOT/.devzone.catalogue-veilleur/log"
+    run bash "$SCRIPT"
+    [ "$status" -eq 0 ]
+    [ "$output" = "devzone : $DEVZONE_ROOT/.devzone.catalogue-veilleur renamed to $DEVZONE_ROOT/.devzone.catalog-watcher" ]
+    [ "$(cat "$DEVZONE_ROOT/.devzone.catalog-watcher/log")" = "watcher" ]
+}
+
+@test "rename-legacy-files: a second run after a merge changes nothing" {
+    mkdir -p "$DEVZONE_ROOT/.devzone.sauvegarde/a" "$DEVZONE_ROOT/.devzone.backup"
+    echo "x" >"$DEVZONE_ROOT/.devzone.sauvegarde/a/file"
+    bash "$SCRIPT" >/dev/null
+    run bash "$SCRIPT"
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+    [ "$(cat "$DEVZONE_ROOT/.devzone.backup/a/file")" = "x" ]
+}
+
+@test "rename-legacy-files: hidden entries of the old folder are merged" {
+    mkdir -p "$DEVZONE_ROOT/.devzone.paquets" "$DEVZONE_ROOT/.devzone.packages"
+    echo "hidden" >"$DEVZONE_ROOT/.devzone.paquets/.lock"
+    run bash "$SCRIPT"
+    [ "$status" -eq 0 ]
+    [ "$(cat "$DEVZONE_ROOT/.devzone.packages/.lock")" = "hidden" ]
+    [ ! -e "$DEVZONE_ROOT/.devzone.paquets" ]
+}
+
+@test "rename-legacy-files: a file and a folder with the two names are left alone" {
+    echo "old" >"$DEVZONE_ROOT/.devzone.etat"
+    mkdir -p "$DEVZONE_ROOT/.devzone.state"
+    echo "state" >"$DEVZONE_ROOT/.devzone.state/x"
+    run bash "$SCRIPT"
+    [ "$status" -eq 0 ]
+    [ "$output" = "devzone : $DEVZONE_ROOT/.devzone.etat kept, $DEVZONE_ROOT/.devzone.state already exists" ]
+    [ "$(cat "$DEVZONE_ROOT/.devzone.etat")" = "old" ]
+    [ "$(cat "$DEVZONE_ROOT/.devzone.state/x")" = "state" ]
+}
+
+@test "rename-legacy-files: no file is lost in a merge with a conflict" {
+    mkdir -p "$DEVZONE_ROOT/.devzone.sauvegarde/20260101-120000" "$DEVZONE_ROOT/.devzone.backup/20260101-120000"
+    echo "a" >"$DEVZONE_ROOT/.devzone.sauvegarde/20260101-120000/file"
+    echo "b" >"$DEVZONE_ROOT/.devzone.backup/20260101-120000/file"
+    echo "c" >"$DEVZONE_ROOT/.devzone.sauvegarde/.hidden"
+    echo "d" >"$DEVZONE_ROOT/.devzone.sauvegarde/other"
+    run bash "$SCRIPT"
+    [ "$status" -eq 0 ]
+    [ "$(cat "$DEVZONE_ROOT/.devzone.sauvegarde/20260101-120000/file")" = "a" ]
+    [ "$(cat "$DEVZONE_ROOT/.devzone.backup/20260101-120000/file")" = "b" ]
+    [ "$(cat "$DEVZONE_ROOT/.devzone.backup/.hidden")" = "c" ]
+    [ "$(cat "$DEVZONE_ROOT/.devzone.backup/other")" = "d" ]
+    [ ! -e "$DEVZONE_ROOT/.devzone.sauvegarde/other" ]
 }
