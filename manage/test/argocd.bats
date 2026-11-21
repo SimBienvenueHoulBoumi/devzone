@@ -5,7 +5,6 @@
 setup() {
     bats_require_minimum_version 1.5.0
     load commun
-    relais_docker_isole
     kube_isole
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
     ARGOCD="$BATS_TEST_DIRNAME/../../.devcontainer/argocd/argocd.sh"

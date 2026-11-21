@@ -4,7 +4,6 @@
 
 setup() {
     load commun
-    relais_docker_isole
     kube_isole
     VEILLEUR="$BATS_TEST_DIRNAME/../../.devcontainer/catalog/catalog-watcher.sh"
     CATALOGUE="$BATS_TEST_DIRNAME/../../.devcontainer/catalog.sh"

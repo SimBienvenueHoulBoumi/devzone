@@ -7,7 +7,6 @@
 
 setup() {
     load commun
-    relais_docker_isole
     kube_isole
     ROOT="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
     CHART="$ROOT/charts/devzone-workspace"

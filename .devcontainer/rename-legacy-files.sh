@@ -65,9 +65,8 @@ migrate_skills() {
     done
 }
 
-# Markers written in the temporary folder by the relay and the packages check
+# Markers written in the temporary folder by the packages check
 migrate_tmp() {
-    rename_legacy "$TMP_DIR/devzone-relais-docker.echec" "$TMP_DIR/devzone-relay.failed"
     rename_legacy "$TMP_DIR/devzone-paquets.echec" "$TMP_DIR/devzone-packages.failed"
 }
 

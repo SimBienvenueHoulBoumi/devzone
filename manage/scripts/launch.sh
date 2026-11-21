@@ -21,47 +21,6 @@ case "$mode" in
         ;;
 esac
 
-# Host Docker socket (#432): docker-hote line in instance state, written by devzone
-# inside the container. Missing or on: historical behavior.
-host_off() {
-    local v
-    v="$(grep -E '^docker-hote=' "$FOLDER/.devzone.modules" 2>/dev/null | tail -1 | cut -d= -f2 || true)"
-    [ "$v" = off ]
-}
-
-# Copy of devcontainer.json without the docker-outside-of-docker feature, for a
-# container without the host socket. The file lives one level deeper: build
-# paths go up one level (../). Written at each start, in a git-ignored folder;
-# comments from the original JSON are kept.
-# shellcheck disable=SC2034
-generate_config_without_host_docker() {
-    local folder="$FOLDER/.devcontainer/without-host-docker" context=no
-    grep -q '"context"' "$FOLDER/.devcontainer/devcontainer.json" && context=yes
-    mkdir -p "$folder"
-    awk -v context="$context" '
-        /ghcr\.io\/devcontainers\/features\/docker-outside-of-docker/ { next }
-        /"build"[[:space:]]*:[[:space:]]*\{[[:space:]]*"dockerfile"[[:space:]]*:[[:space:]]*"Dockerfile"[[:space:]]*\}/ {
-            sub(/\{[[:space:]]*"dockerfile"[[:space:]]*:[[:space:]]*"Dockerfile"[[:space:]]*\}/,
-                "{ \"dockerfile\": \"../Dockerfile\", \"context\": \"..\" }")
-            print
-            next
-        }
-        context == "no" && /"build"[[:space:]]*:[[:space:]]*\{[[:space:]]*$/ {
-            print
-            print "    \"context\": \"..\","
-            next
-        }
-        /"dockerfile"[[:space:]]*:/ {
-            sub(/"dockerfile"[[:space:]]*:[[:space:]]*"[^"]*"/, "\"dockerfile\": \"../Dockerfile\"")
-        }
-        { print }
-    ' "$FOLDER/.devcontainer/devcontainer.json" >"$folder/devcontainer.json"
-}
-
-if host_off; then
-    generate_config_without_host_docker
-    options+=(--config "$FOLDER/.devcontainer/without-host-docker/devcontainer.json")
-fi
 LOG="$FOLDER/.devzone.log"
 HEARTBEAT="${DEVZONE_HEARTBEAT:-30}"
 QUESTION_WAIT="${DEVZONE_QUESTION_WAIT:-20}"

@@ -24,7 +24,6 @@ devzone avoids them: the same environment on every workstation, on your machine.
 
 - No systemd: the services provided by devzone start with devzone, not with `systemctl`.
 - No graphical desktop: everything happens in a terminal or in VS Code.
-- The host Docker socket is shared by default: this is a deliberate security trade-off, which gives administrator access to the host's Docker, including to AI agents ([#291](https://github.com/SimBienvenueHoulBoumi/devzone/issues/291)). To remove it: `devzone disable docker-hote`, then `make rebuild` on the workstation. Without this socket, `docker` redirects to the Kubernetes workspace (`devzone workspace`, kubedock and BuildKit); containers and kind clusters launched on the workstation's Docker no longer work inside the container, while the connection to the host's Kubernetes cluster and the modules remain usable. To restore it: `devzone enable docker-hote`, then `make rebuild`.
 - The terminal keeps the cluster administrator; agents only have the account limited to the `devzone-*` namespaces (`edit` role, token renewed every 24 h). Only the installers act as administrator ([#430](https://github.com/SimBienvenueHoulBoumi/devzone/issues/430)).
 
 ## How it works

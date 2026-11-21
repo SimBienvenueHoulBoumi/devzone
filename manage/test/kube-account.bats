@@ -7,7 +7,6 @@
 
 setup() {
     load commun
-    relais_docker_isole
     kube_isole
     KUBE_ACCOUNT="$BATS_TEST_DIRNAME/../../.devcontainer/kube-account.sh"
     export DEVZONE_STATE="$BATS_TEST_TMPDIR/modules"

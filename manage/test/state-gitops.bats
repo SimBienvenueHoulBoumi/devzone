@@ -6,7 +6,6 @@
 
 setup() {
     load commun
-    relais_docker_isole
     kube_isole
     unset DEVZONE_WORKSPACE
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"

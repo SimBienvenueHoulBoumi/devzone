@@ -61,11 +61,10 @@ repair_item() {
     fi
 }
 
-# Application repairs (#341): Docker relay, active services, ports and
-# credentials; a failure does not stop the following ones.
+# Application repairs (#341): active services, ports and credentials; a failure
+# does not stop the following ones.
 repair_workstation() {
     repair_failed=0
-    repair_item "Docker relay" env DEVZONE_RELAY_REAL=yes bash "$ICI/docker-relay.sh"
     # Limited Kubernetes account token (#430): 24 h, renewed here; without the
     # kubernetes module and without a services cluster, nothing to do
     if [ "$(value_of kubernetes)" = on ] || [ -n "$(cluster_saved)" ]; then
