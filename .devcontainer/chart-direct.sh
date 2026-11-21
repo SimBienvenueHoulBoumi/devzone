@@ -33,7 +33,7 @@ chart_install() {
     shift 2
     chart="$CHART_CODE/charts/devzone-$svc"
     if [ ! -f "$chart/Chart.yaml" ]; then
-        echo "✖ $svc : chart charts/devzone-$svc missing (manage/docs/reference.md#charts-de-devzone)" >&2
+        echo "✖ $svc : chart charts/devzone-$svc missing (manage/docs/reference.md#devzone-charts)" >&2
         return 2
     fi
     sets=()
