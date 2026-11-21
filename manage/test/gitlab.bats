@@ -646,8 +646,8 @@ SUDO
 }
 
 real_mark() {
-    stat -c %Y /tmp/devzone-relais-docker.echec 2>/dev/null ||
-        stat -f %m /tmp/devzone-relais-docker.echec 2>/dev/null ||
+    stat -c %Y /tmp/devzone-relay.failed 2>/dev/null ||
+        stat -f %m /tmp/devzone-relay.failed 2>/dev/null ||
         echo absent
 }
 

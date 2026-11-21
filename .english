@@ -241,3 +241,5 @@ internal/command/version.go
 internal/command/version_test.go
 internal/command/help.go
 internal/command/help_test.go
+.devcontainer/rename-legacy-files.sh
+manage/test/rename-legacy-files.bats

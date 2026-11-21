@@ -31,7 +31,7 @@ setup() {
     cat >"$T/app/docker-relay.sh" <<'RELAIS'
 #!/usr/bin/env bash
 printf 'relais %s %s\n' "${DEVZONE_RELAY_REAL:-}" "$*" >>"$BATS_TEST_TMPDIR/actions.log"
-[ ! -f "$BATS_TEST_TMPDIR/echec-relais" ] || { echo "socket unavailable"; exit 1; }
+[ ! -f "$BATS_TEST_TMPDIR/failed-relay" ] || { echo "socket unavailable"; exit 1; }
 RELAIS
     cat >"$T/app/ports.sh" <<'PORTS'
 #!/usr/bin/env bash
@@ -44,7 +44,7 @@ PORTS_AUTO
     cat >"$T/app/password.sh" <<'PASSWORD'
 #!/usr/bin/env bash
 printf 'password %s\n' "$*" >>"$BATS_TEST_TMPDIR/actions.log"
-[ ! -f "$BATS_TEST_TMPDIR/echec-password" ] || { echo "credentials unavailable"; exit 1; }
+[ ! -f "$BATS_TEST_TMPDIR/failed-password" ] || { echo "credentials unavailable"; exit 1; }
 PASSWORD
     cat >"$T/app/gitlab/gitlab.sh" <<'GITLAB'
 #!/usr/bin/env bash
@@ -155,7 +155,7 @@ KUBE
 }
 
 @test "repair: a failed element shows its reason and code 1" {
-    : >"$T/echec-password"
+    : >"$T/failed-password"
     run bash "$APP" repair
     [ "$status" -eq 1 ]
     [[ "$output" == *"✖ credentials : credentials unavailable"* ]] || false

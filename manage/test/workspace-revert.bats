@@ -37,8 +37,8 @@ setup() {
     echo "changed on pod" >"$T/pod/workspaces/projets/alpha/a.txt"
     ws revert --bring-back
     [ "$status" -eq 0 ]
-    [[ "$output" == *"project alpha: workstation version saved in .devzone.sauvegarde/"* ]] || false
-    backup="$(find "$T/workstation/.devzone.sauvegarde" -mindepth 1 -maxdepth 1 -type d | head -1)"
+    [[ "$output" == *"project alpha: workstation version saved in .devzone.backup/"* ]] || false
+    backup="$(find "$T/workstation/.devzone.backup" -mindepth 1 -maxdepth 1 -type d | head -1)"
     [[ "$(basename "$backup")" =~ ^[0-9]{8}-[0-9]{6}$ ]] || false
     [ "$(cat "$backup/workspace/alpha/local.txt")" = "local work" ]
     [ "$(cat "$backup/workspace/alpha/a.txt")" = "a" ]

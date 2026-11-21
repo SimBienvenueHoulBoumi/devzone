@@ -10,7 +10,7 @@ ETAT="${DEVZONE_STATE:-$RACINE/.devzone.modules}"
 # shellcheck source=SCRIPTDIR/state.sh
 # shellcheck disable=SC1091
 . "$(dirname "$ICI")/state.sh"
-BASE="${DEVZONE_CATALOG_WATCHER_DIR:-$RACINE/.devzone.catalogue-veilleur}"
+BASE="${DEVZONE_CATALOG_WATCHER_DIR:-$RACINE/.devzone.catalog-watcher}"
 LOCK_DIR="$BASE/verrou"
 LAST_FILE="$BASE/dernier"
 

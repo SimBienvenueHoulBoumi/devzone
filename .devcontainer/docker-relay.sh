@@ -32,7 +32,7 @@ RELAY_USER="${DEVZONE_RELAY_USER:-vscode}"
 DOCKER="${DEVZONE_RELAY_DOCKER:-docker}"
 # Failure mark read by the devzone summary (.devcontainer/devzone): specific to
 # the container, erased at each restart with /tmp
-MARK="${DEVZONE_RELAY_MARKER:-/tmp/devzone-relais-docker.echec}"
+MARK="${DEVZONE_RELAY_MARKER:-/tmp/devzone-relay.failed}"
 WAIT="${DEVZONE_RELAY_WAIT:-10}"
 # The feature's relay runs as root: sudo unless already root
 if [ -n "${DEVZONE_RELAY_SUDO+x}" ]; then

@@ -24,7 +24,7 @@ setup() {
     [ ! -e mon-devzone/manage/devzone ]
     [ ! -e mon-devzone/manage/test ]
     grep -q '^workspace/\*$' mon-devzone/.gitignore
-    grep -qx '.devzone.sauvegarde/' mon-devzone/.gitignore
+    grep -qx '.devzone.backup/' mon-devzone/.gitignore
 }
 
 @test "devzone <folder>: .devzone.version holds the version and one checksum per copied file" {

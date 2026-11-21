@@ -12,7 +12,7 @@ setup() {
     CLI="$ROOT/manage/devzone"
     SCRIPT="$ROOT/manage/scripts/ports-workspace.sh"
     T="$BATS_TEST_TMPDIR"
-    D="$T/workstation/.devzone.ports-workspace"
+    D="$T/workstation/.devzone.workspace-ports"
     mkdir -p "$T/bin" "$T/workstation"
     : >"$T/ss"
     : >"$T/svc"

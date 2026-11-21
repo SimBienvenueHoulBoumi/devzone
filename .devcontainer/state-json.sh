@@ -229,12 +229,12 @@ state_json() {
         credentials_raw="$RACINE/.password"
     fi
 
-    relay_marker="${DEVZONE_RELAY_MARKER:-/tmp/devzone-relais-docker.echec}"
+    relay_marker="${DEVZONE_RELAY_MARKER:-/tmp/devzone-relay.failed}"
     if [ -f "$relay_marker" ]; then
         msg="$(head -1 "$relay_marker" 2>/dev/null || true)"
         append_alert relais_docker "$msg" "devzone repair"
     fi
-    packages_marker="${DEVZONE_PACKAGES_MARKER:-/tmp/devzone-paquets.echec}"
+    packages_marker="${DEVZONE_PACKAGES_MARKER:-/tmp/devzone-packages.failed}"
     if [ -f "$packages_marker" ]; then
         packages_names=""
         while IFS= read -r n; do

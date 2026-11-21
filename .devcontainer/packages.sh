@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # System packages kept after a rebuild (#351): a list in the devzone folder
-# (<root>/.devzone.paquets, a comment header + one package name per line, sorted,
+# (<root>/.devzone.packages, a comment header + one package name per line, sorted,
 # without duplicates), reinstalled at each container creation (post-create.sh).
 # A package installed by hand is lost by a rebuild, unless it is in this list.
 #   packages.sh or packages.sh list        list with the state of each package
@@ -14,8 +14,8 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="${DEVZONE_ROOT:-$(dirname "$HERE")}"
-LIST="${ROOT}/.devzone.paquets"
-MARK="${DEVZONE_PACKAGES_MARKER:-/tmp/devzone-paquets.echec}"
+LIST="${ROOT}/.devzone.packages"
+MARK="${DEVZONE_PACKAGES_MARKER:-/tmp/devzone-packages.failed}"
 UPDATED="${DEVZONE_PACKAGES_UPDATE:-/tmp/devzone-paquets.maj}"
 SUDO="${DEVZONE_PACKAGES_SUDO-sudo}"
 APT="${DEVZONE_PACKAGES_APT:-apt-get}"

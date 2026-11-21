@@ -145,12 +145,12 @@ show_state() {
     fi
     # Mark set by docker-relay.sh at startup (#293): long docker exec cut,
     # kind and modules in failure
-    relay_mark="${DEVZONE_RELAY_MARKER:-/tmp/devzone-relais-docker.echec}"
+    relay_mark="${DEVZONE_RELAY_MARKER:-/tmp/devzone-relay.failed}"
     if [ -f "$relay_mark" ]; then
         printf '  ⚠ Docker relay     %s: devzone repair\n' "$(head -1 "$relay_mark")"
     fi
     # Mark set by packages.sh at the failed reapplication (351): names of the packages not installed
-    packages_mark="${DEVZONE_PACKAGES_MARKER:-/tmp/devzone-paquets.echec}"
+    packages_mark="${DEVZONE_PACKAGES_MARKER:-/tmp/devzone-packages.failed}"
     if [ -f "$packages_mark" ]; then
         packages_names=""
         while IFS= read -r n; do

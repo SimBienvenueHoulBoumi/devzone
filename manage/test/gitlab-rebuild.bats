@@ -217,11 +217,11 @@ current_context() {
     touch "$BATS_TEST_TMPDIR/namespace"
     printf 'gitlab=on\n' >"$DEVZONE_STATE"
     mkdir -p "$SECRETS" && echo token >"$SECRETS/root-token"
-    echo gitlab >"$DEVZONE_STATE-echec-gitlab"
+    echo gitlab >"$DEVZONE_STATE-failed-gitlab"
     FAKE_RUNNERS='[{"id":1}]' run bash "$DEVZONE" apply
     [ "$status" -eq 0 ] || false
     [[ "$output" == *"already active, nothing to do"* ]] || false
-    [ ! -e "$DEVZONE_STATE-echec-gitlab" ] || false
+    [ ! -e "$DEVZONE_STATE-failed-gitlab" ] || false
     FAKE_RUNNERS='[{"id":1}]' run bash "$DEVZONE"
     [[ "$output" == *"✔ module gitlab"* ]] || false
     [[ "$output" != *"failed"* ]] || false

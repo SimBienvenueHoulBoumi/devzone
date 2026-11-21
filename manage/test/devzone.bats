@@ -944,7 +944,7 @@ mon réglage' ]
     git init -q
     cp "$BATS_TEST_DIRNAME/../../.gitignore" ./.gitignore
     printf "ia=on\nkubernetes=on\n" >.devzone.modules
-    printf "gitlab\n" >.devzone.modules-echec-gitlab
+    printf "gitlab\n" >.devzone.modules-failed-gitlab
     run git status --porcelain
     [ "$status" -eq 0 ]
     [ -z "$(grep "\.devzone\.modules" <<<"$output")" ]

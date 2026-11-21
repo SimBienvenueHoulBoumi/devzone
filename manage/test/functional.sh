@@ -26,7 +26,7 @@ DC=(npx -y @devcontainers/cli)
 WS=(--workspace-folder "$COPIE")
 JOURNAL="$TMP/journal.log"
 reussis=0
-echecs=0
+failures=0
 
 nettoyer() {
     local ids image dind
@@ -56,7 +56,7 @@ dz() {
 }
 
 ok() { reussis=$((reussis + 1)); echo "  ✔ $1"; }
-ko() { echecs=$((echecs + 1)); echo "  ✖ $1"; printf '%s\n' "$2" | tail -5 | sed 's/^/      /'; }
+ko() { failures=$((failures + 1)); echo "  ✖ $1"; printf '%s\n' "$2" | tail -5 | sed 's/^/      /'; }
 
 # reussit <nom> <commande> [motif attendu dans la sortie]
 reussit() {
@@ -198,7 +198,7 @@ restants() { docker volume ls -q | grep -c "^${DEVZONE_VOLUMES}-" || true; }
 id="$(docker ps -q --filter "label=devcontainer.local_folder=$COPIE")"
 IMAGE_TEST="$(docker inspect "$id" --format '{{.Config.Image}}')"
 (cd "$COPIE" && make down >/dev/null)
-if [ -f "$COPIE/.devzone.etat" ]; then ok "make down : image notée"; else ko "make down : image notée" "pas de .devzone.etat"; fi
+if [ -f "$COPIE/.devzone.state" ]; then ok "make down : image notée"; else ko "make down : image notée" "pas de .devzone.state"; fi
 avant="$(restants)"
 if ! sortie="$(hote bash manage/scripts/uninstall.sh </dev/null)" && [ "$(restants)" = "$avant" ]; then ok "sans confirmation : rien n'est supprimé"; else ko "sans confirmation : rien n'est supprimé" "$sortie"; fi
 sortie="$(hote env CONFIRMER=yes GARDER=connexions bash manage/scripts/uninstall.sh)"
@@ -214,5 +214,5 @@ else
 fi
 
 echo
-echo "Résultat : $reussis réussi(s), $echecs échec(s)"
-[ "$echecs" -eq 0 ]
+echo "Résultat : $reussis réussi(s), $failures échec(s)"
+[ "$failures" -eq 0 ]

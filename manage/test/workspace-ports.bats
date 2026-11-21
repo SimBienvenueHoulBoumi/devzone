@@ -72,7 +72,7 @@ alive() {
 wait_watcher_pid() {
     local i
     for i in $(seq 50); do
-        [ -s "$T/workstation/.devzone.ports-workspace/pid" ] && return 0
+        [ -s "$T/workstation/.devzone.workspace-ports/pid" ] && return 0
         sleep 0.1
     done
     return 1
@@ -82,7 +82,7 @@ wait_watcher_pid() {
 wait_stopped() {
     local i
     for i in $(seq 50); do
-        if ! alive "$1" && [ ! -e "$T/workstation/.devzone.ports-workspace/pid" ]; then return 0; fi
+        if ! alive "$1" && [ ! -e "$T/workstation/.devzone.workspace-ports/pid" ]; then return 0; fi
         sleep 0.1
     done
     return 1
@@ -116,13 +116,13 @@ wait_stopped() {
 @test "ports: disappeared port, port-forward stopped" {
     listening 5173
     round
-    pid="$(cat "$T/workstation/.devzone.ports-workspace/relais/5173")"
+    pid="$(cat "$T/workstation/.devzone.workspace-ports/relais/5173")"
     kill -0 "$pid"
     listening
     round
     sleep 0.3
     ! kill -0 "$pid" 2>/dev/null || false
-    [ ! -e "$T/workstation/.devzone.ports-workspace/relais/5173" ]
+    [ ! -e "$T/workstation/.devzone.workspace-ports/relais/5173" ]
 }
 
 @test "ports: port taken on workstation, reported once, not relayed" {
@@ -189,12 +189,12 @@ wait_stopped() {
     run bash "$CLI" workspace ports start
     [ "$status" -eq 0 ]
     wait_watcher_pid || false
-    watcher="$(cat .devzone.ports-workspace/pid)"
+    watcher="$(cat .devzone.workspace-ports/pid)"
     kill -0 "$watcher" || false
     run bash "$CLI" workspace ports start
     [[ "$output" == *"already running (pid $watcher)"* ]] || false
     sleep 1
-    pid="$(cat .devzone.ports-workspace/relais/5173)"
+    pid="$(cat .devzone.workspace-ports/relais/5173)"
     run bash "$CLI" workspace ports status
     [[ "$output" == *"running"*"127.0.0.1:5173 relayed"* ]] || false
     run bash "$CLI" workspace ports stop
@@ -211,7 +211,7 @@ wait_stopped() {
     run bash "$CLI" workspace ports start
     [ "$status" -eq 0 ]
     wait_watcher_pid || false
-    watcher="$(cat .devzone.ports-workspace/pid)"
+    watcher="$(cat .devzone.workspace-ports/pid)"
     run bash "$CLI" workspace ports stop
     [ "$status" -eq 0 ]
     wait_stopped "$watcher" || false
@@ -222,7 +222,7 @@ wait_stopped() {
     cd "$T/workstation"
     run bash "$CLI" workspace ports start
     [[ "$output" == *"refused under bats"* ]] || false
-    [ ! -e .devzone.ports-workspace/pid ]
+    [ ! -e .devzone.workspace-ports/pid ]
     [ -z "$(ps -eo args | grep "[p]orts-workspace.sh loop" || true)" ]
 }
 
@@ -235,7 +235,7 @@ wait_stopped() {
     run bash "$CLI" workspace start
     [ "$status" -eq 0 ]
     wait_watcher_pid || false
-    watcher="$(cat .devzone.ports-workspace/pid)"
+    watcher="$(cat .devzone.workspace-ports/pid)"
     kill -0 "$watcher" || false
     run bash "$CLI" workspace stop
     [ "$status" -eq 0 ]

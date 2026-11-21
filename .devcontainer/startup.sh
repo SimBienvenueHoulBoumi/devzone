@@ -10,6 +10,9 @@
 # behind make, a wait would block (see post-create.sh)
 exec </dev/null
 ICI="$(dirname "$0")"
+# Former French names renamed first (#733): the relay and the packages check
+# below read the English names
+bash "$ICI/rename-legacy-files.sh" || echo "startup : legacy names not renamed (devzone repair)"
 # Docker socket relay first (#293): without it, the long docker exec calls
 # (kind, modules) are cut after 0.5 s under Docker Desktop
 DEVZONE_RELAY_REAL=yes bash "$ICI/docker-relay.sh" || echo "startup : Docker relay not fixed (devzone repair)"

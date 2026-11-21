@@ -210,7 +210,7 @@ attendre_nohup() {
     run bash "$DEVZONE" apply
     [ "$status" -ne 0 ] || false
     [[ "$output" == *"no cluster chosen"* ]] || false
-    [ -f "$DEVZONE_STATE-echec-mysql" ] || false
+    [ -f "$DEVZONE_STATE-failed-mysql" ] || false
 }
 
 @test "apply: a failure marks the failure and shows ✖ in the summary" {
@@ -218,7 +218,7 @@ attendre_nohup() {
     printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_STATE"
     run bash "$DEVZONE" apply
     [ "$status" -ne 0 ] || false
-    [ -f "$DEVZONE_STATE-echec-mysql" ] || false
+    [ -f "$DEVZONE_STATE-failed-mysql" ] || false
     run bash "$DEVZONE"
     [ "$status" -eq 0 ] || false
     [[ "$output" == *"✖ module mysql"* ]] || false
