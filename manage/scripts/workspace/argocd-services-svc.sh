@@ -3,7 +3,7 @@
 # apart (postgres-admin, mysql-admin, mirrored and never printed), Helm
 # parameters of the mysql chart (existing volume claim), and the
 # devzone workspace services enable|disable switch when Argo CD holds the
-# charts. Sourced by manage/scripts/argocd-services.sh. bash 3.2 (macOS).
+# charts. Sourced by manage/scripts/workspace/argocd-services.sh. bash 3.2 (macOS).
 
 # Namespace of the service: labelled, isolated like the other devzone-*
 # (services.sh: services_namespace_prepare)

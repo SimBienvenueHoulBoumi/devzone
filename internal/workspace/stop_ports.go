@@ -9,7 +9,7 @@ import (
 )
 
 // portsStateName is the state folder of the port watcher, in the folder of the
-// workstation shell (pw_dir in manage/scripts/ports-workspace.sh).
+// workstation shell (pw_dir in manage/scripts/workspace/ports-workspace.sh).
 const portsStateName = ".devzone.workspace-ports"
 
 // The watcher is waited for during stopPoll steps, stopPolls at most (ports_stop).

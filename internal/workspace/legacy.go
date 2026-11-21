@@ -10,7 +10,7 @@ import (
 // podScript runs in the pod (bash -s with the projects folder as $1). It prints
 // the legacy copies, one folder name per line: a copy is legacy when its .git
 // file points to a git folder missing from the pod. Same script as
-// workspace_legacy_pod_script in manage/scripts/workspace-copies.sh.
+// workspace_legacy_pod_script in manage/scripts/workspace/workspace-copies.sh.
 const podScript = `broken() {
     local g
     [ -f "$1/.git" ] || return 1

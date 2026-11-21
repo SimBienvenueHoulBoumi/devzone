@@ -14,7 +14,7 @@ PW_INTERNAL=" 2475 1234 "
 # pgAdmin service port: read from the service, without it nothing is relayed.
 PW_JSONPATH='jsonpath={.spec.ports[0].port}'
 # Cluster Services relayed as applications (#611).
-# shellcheck source=manage/scripts/ports-apps.sh
+# shellcheck source=manage/scripts/workspace/ports-apps.sh
 . "$(dirname "${BASH_SOURCE[0]}")/ports-apps.sh"
 
 # Watcher state folder: lock, pid, relays, reported ports, log.

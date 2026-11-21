@@ -165,28 +165,28 @@ copy_from() {
 }
 
 # French names of the command and compatibility aliases (lot 3, #508)
-# shellcheck source=manage/scripts/workspace-aliases.sh
-. "$HERE/scripts/workspace-aliases.sh"
+# shellcheck source=manage/scripts/workspace/workspace-aliases.sh
+. "$HERE/scripts/workspace/workspace-aliases.sh"
 # shellcheck source=manage/scripts/kube-ready.sh
 . "$HERE/scripts/kube-ready.sh"
-# shellcheck source=manage/scripts/workspace-wait.sh
-. "$HERE/scripts/workspace-wait.sh"
-# shellcheck source=manage/scripts/workspace-clone.sh
-. "$HERE/scripts/workspace-clone.sh"
-# shellcheck source=manage/scripts/workspace-copies.sh
-. "$HERE/scripts/workspace-copies.sh"
-# shellcheck source=manage/scripts/ports-workspace.sh
-. "$HERE/scripts/ports-workspace.sh"
-# shellcheck source=manage/scripts/services-workspace.sh
-. "$HERE/scripts/services-workspace.sh"
-# shellcheck source=manage/scripts/argocd-workspace.sh
-. "$HERE/scripts/argocd-workspace.sh"
-# shellcheck source=manage/scripts/argocd-services.sh
-. "$HERE/scripts/argocd-services.sh"
-# shellcheck source=manage/scripts/workspace-update.sh
-. "$HERE/scripts/workspace-update.sh"
-# shellcheck source=manage/scripts/workspace-egress.sh
-. "$HERE/scripts/workspace-egress.sh"
+# shellcheck source=manage/scripts/workspace/workspace-wait.sh
+. "$HERE/scripts/workspace/workspace-wait.sh"
+# shellcheck source=manage/scripts/workspace/workspace-clone.sh
+. "$HERE/scripts/workspace/workspace-clone.sh"
+# shellcheck source=manage/scripts/workspace/workspace-copies.sh
+. "$HERE/scripts/workspace/workspace-copies.sh"
+# shellcheck source=manage/scripts/workspace/ports-workspace.sh
+. "$HERE/scripts/workspace/ports-workspace.sh"
+# shellcheck source=manage/scripts/workspace/services-workspace.sh
+. "$HERE/scripts/workspace/services-workspace.sh"
+# shellcheck source=manage/scripts/workspace/argocd-workspace.sh
+. "$HERE/scripts/workspace/argocd-workspace.sh"
+# shellcheck source=manage/scripts/workspace/argocd-services.sh
+. "$HERE/scripts/workspace/argocd-services.sh"
+# shellcheck source=manage/scripts/workspace/workspace-update.sh
+. "$HERE/scripts/workspace/workspace-update.sh"
+# shellcheck source=manage/scripts/workspace/workspace-egress.sh
+. "$HERE/scripts/workspace/workspace-egress.sh"
 
 # Renamed names (#695): an old French name is refused before anything runs, with
 # its English name (« devzone workspace start »). A copied devzone may miss the
