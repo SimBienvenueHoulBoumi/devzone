@@ -153,7 +153,7 @@ GH
 
 @test "npm package: expected content, no local nor development file" {
     command -v npm >/dev/null || skip "npm absent"
-    fichiers="$(cd "$RACINE" && npm pack --dry-run --json 2>/dev/null | node -e 'for (const f of JSON.parse(require("fs").readFileSync(0))[0].files) console.log(f.path)')"
+    fichiers="$(cd "$RACINE" && npm pack --dry-run --json --ignore-scripts 2>/dev/null | node -e 'for (const f of JSON.parse(require("fs").readFileSync(0))[0].files) console.log(f.path)')"
     for f in manage/devzone .devcontainer/devcontainer.json .devcontainer/devzone Makefile manage/scripts/launch.sh manage/scripts/uninstall.sh README.md LICENSE package.json; do
         grep -qx "$f" <<<"$fichiers" || { echo "absent du paquet : $f"; return 1; }
     done
