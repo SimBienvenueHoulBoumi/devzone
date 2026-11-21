@@ -10,7 +10,7 @@
 set -u
 
 ICI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT="$(cd "$ICI/../.." && pwd)"
+ROOT="$(cd "$ICI/../../.." && pwd)"
 
 # French words that must not appear in a name. Split fragments, so this file
 # does not match its own rules (the check-english convention).

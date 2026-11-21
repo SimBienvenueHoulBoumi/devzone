@@ -34,7 +34,7 @@ jobs:
           persist-credentials: false
       # Public DNS for the runner Docker: its DNS sometimes fails on archive.ubuntu.com (#468)
       - name: Runner Docker DNS
-        run: bash manage/scripts/ci-dns.sh
+        run: bash manage/scripts/ci/ci-dns.sh
       - uses: devcontainers/ci@513af61f4de4f75d37e4438f184ba4358f0fc1ca # v0.3.1900000450
         with:
           configFile: .devcontainer/devcontainer.json

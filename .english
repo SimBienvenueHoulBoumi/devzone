@@ -1,11 +1,11 @@
 # Files already written in English (#502), checked on every CI run by
-# manage/scripts/check-english.sh. Add any new code file here.
-manage/scripts/check-english.sh
-manage/scripts/check-names.sh
-manage/scripts/check-go-layout.sh
-manage/scripts/check-utf8-vars.sh
+# manage/scripts/ci/check-english.sh. Add any new code file here.
+manage/scripts/ci/check-english.sh
+manage/scripts/ci/check-names.sh
+manage/scripts/ci/check-go-layout.sh
+manage/scripts/ci/check-utf8-vars.sh
 manage/test/check-utf8-vars.bats
-manage/scripts/ci-dns.sh
+manage/scripts/ci/ci-dns.sh
 manage/scripts/docker.sh
 manage/scripts/kube-ready.sh
 manage/scripts/create-mode.sh
@@ -14,7 +14,7 @@ manage/test/create-cluster.bats
 manage/scripts/workspace-wait.sh
 manage/scripts/poste.sh
 manage/scripts/launch.sh
-manage/scripts/versions.sh
+manage/scripts/ci/versions.sh
 manage/scripts/uninstall.sh
 manage/scripts/ports-apps.sh
 manage/scripts/ports-workspace.sh
@@ -103,7 +103,7 @@ charts/devzone-workspace/templates/statefulset.yaml
 .devcontainer/chart-direct.sh
 .devcontainer/ports-json.sh
 .devcontainer/help.sh
-manage/scripts/check-charts.sh
+manage/scripts/ci/check-charts.sh
 manage/test/charts-convention.bats
 manage/test/chart-require.bats
 manage/scripts/workspace-clone.sh

@@ -6,7 +6,7 @@
 
 setup() {
     RACINE="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
-    SCRIPT="$RACINE/manage/scripts/check-charts.sh"
+    SCRIPT="$RACINE/manage/scripts/ci/check-charts.sh"
     export CHARTS_DIR="$BATS_TEST_TMPDIR/charts"
     export CHARTS_CODE_DIRS="$BATS_TEST_TMPDIR/code"
     export HELM_LOG="$BATS_TEST_TMPDIR/helm.log"

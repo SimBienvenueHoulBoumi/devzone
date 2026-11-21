@@ -73,7 +73,7 @@ jobs:
       - uses: actions/checkout@v7
       # Public DNS for the runner Docker: its DNS sometimes fails on archive.ubuntu.com (#468)
       - name: Runner Docker DNS
-        run: bash manage/scripts/ci-dns.sh
+        run: bash manage/scripts/ci/ci-dns.sh
       - run: bash manage/test/functional.sh
 
   cli:
@@ -85,7 +85,7 @@ jobs:
       - uses: actions/checkout@v7
       # Public DNS for the runner Docker: its DNS sometimes fails on archive.ubuntu.com (#468)
       - name: Runner Docker DNS
-        run: bash manage/scripts/ci-dns.sh
+        run: bash manage/scripts/ci/ci-dns.sh
       - run: bash manage/test/cli-terminal.sh
 
   windows:
@@ -227,7 +227,7 @@ jobs:
           npx --yes bats@1.10.0 manage/test/cli.bats manage/test/versions.bats manage/test/ci-container.bats manage/test/agent.bats manage/test/agent-gaps.bats manage/test/agent-rights.bats manage/test/agent-rights-gh.bats manage/test/agent-quota.bats manage/test/agent-parallel.bats manage/test/agent-paths.bats manage/test/agent-state-json.bats
 
   # Code in English: files listed in .english are checked on every run (#502).
-  # The charts convention (#554) is checked here too: manage/scripts/check-charts.sh
+  # The charts convention (#554) is checked here too: manage/scripts/ci/check-charts.sh
   # and $NAME before a non-ASCII byte in the shell scripts (#591): check-utf8-vars.sh
   english:
     runs-on: ubuntu-latest
@@ -237,15 +237,15 @@ jobs:
         with:
           persist-credentials: false
       - name: english check
-        run: bash manage/scripts/check-english.sh
+        run: bash manage/scripts/ci/check-english.sh
       - name: names check (files and folders in English, #716)
-        run: bash manage/scripts/check-names.sh
+        run: bash manage/scripts/ci/check-names.sh
       # helm is installed on the runner: lint and render of each chart, wrapper
       # dependency pulled anonymously (OCI)
-      - name: charts convention (manage/scripts/check-charts.sh)
-        run: bash manage/scripts/check-charts.sh
-      - name: utf8 variables (manage/scripts/check-utf8-vars.sh)
-        run: bash manage/scripts/check-utf8-vars.sh
+      - name: charts convention (manage/scripts/ci/check-charts.sh)
+        run: bash manage/scripts/ci/check-charts.sh
+      - name: utf8 variables (manage/scripts/ci/check-utf8-vars.sh)
+        run: bash manage/scripts/ci/check-utf8-vars.sh
 
   # Summary required to merge (requiredChecks): always run, never "skipped"
   # (GitHub would count a skipped job as passed)

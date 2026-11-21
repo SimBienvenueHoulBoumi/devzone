@@ -51,7 +51,7 @@ jobs:
       - name: Compare the pinned versions with npm
         id: retards
         run: |
-          bash manage/scripts/versions.sh > retards.txt
+          bash manage/scripts/ci/versions.sh > retards.txt
           cat retards.txt
           if [ -s retards.txt ]; then
             echo "present=true" >>"$GITHUB_OUTPUT"
@@ -103,7 +103,7 @@ jobs:
             titre="$paquet $nouvelle dans le conteneur"
             # A ticket opened by the App already exists for this package (title "package ...");
             # same title opened by someone else: ignored, it does not block the bump.
-            existant="$(bash manage/scripts/versions.sh --ticket-existant "$paquet" "app/${APP_SLUG}")"
+            existant="$(bash manage/scripts/ci/versions.sh --ticket-existant "$paquet" "app/${APP_SLUG}")"
             if [ -n "$existant" ]; then
               n="${existant%%$'\t'*}"
               titre_existant="${existant#*$'\t'}"
@@ -133,7 +133,7 @@ jobs:
           À confirmer par le mainteneur (« ## Conception retenue ») : la vérification \`ticket\` de la PR l'attend.
 
           - Monter \`$paquet\` de \`$ancienne\` à \`$nouvelle\` (dernière version npm).
-          - \`manage/scripts/versions.sh --appliquer $paquet $nouvelle\` remplace la seule version figée, dans son fichier.
+          - \`manage/scripts/ci/versions.sh --appliquer $paquet $nouvelle\` remplace la seule version figée, dans son fichier.
           - Commit \`chore(devcontainer): $paquet $nouvelle\`, puis push : la PR brouillon s'ouvre, la CI teste le conteneur.
           EOF
             )"
@@ -141,7 +141,7 @@ jobs:
             # Validated automatically so that the ticket branch can be created
             repowarden ticket label "$n" validé
             repowarden ticket "$n"
-            bash manage/scripts/versions.sh --appliquer "$paquet" "$nouvelle"
+            bash manage/scripts/ci/versions.sh --appliquer "$paquet" "$nouvelle"
             # versions.env holds the repowarden version since #503
             git add -- .devcontainer/versions.env .devcontainer/devzone
             repowarden cc -m "$paquet $nouvelle" \
