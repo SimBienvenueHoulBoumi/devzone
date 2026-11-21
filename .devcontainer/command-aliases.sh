@@ -132,6 +132,14 @@ renamed_subcommand() {
                 *) return 1 ;;
             esac
             ;;
+        agent)
+            case "$word" in
+                etat) echo state ;;
+                liberer) echo release ;;
+                aide) echo help ;;
+                *) return 1 ;;
+            esac
+            ;;
         *) return 1 ;;
     esac
 }
@@ -145,6 +153,8 @@ renamed_option() {
         --oui) echo --yes ;;
         --confirmer) echo --confirm ;;
         --contexte) echo --context ;;
+        --modele) echo --model ;;
+        --tous) echo --all ;;
         *) return 1 ;;
     esac
 }

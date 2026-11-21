@@ -10,7 +10,7 @@ ERROR_LINE='(^|[[:space:]])(Error|ERROR|Erreur):'
 
 # Cause of a failure: pays (country, lasting), quota, filtre (filter), reseau
 # (network, no exclusion) or autre (other). The stored names stay as they are:
-# they are written to the state files and to devzone agent etat --json.
+# they are written to the state files and to devzone agent state --json.
 error_cause() {
     local t="$1"
     case "$t" in
@@ -56,18 +56,18 @@ exclusion_label() {
     fi
 }
 
-# Writes the exclusion of the model: "<start> <cause> <duration>" in $AGENT_ETAT/ecart-<model>
+# Writes the exclusion of the model: "<start> <cause> <duration>" in $AGENT_STATE/ecart-<model>
 # (the state file keeps its name on disk).
 model_exclude() {
-    printf '%s %s %s\n' "$(date +%s)" "$2" "$(exclusion_duration "$2")" >"$AGENT_ETAT/ecart-$1"
+    printf '%s %s %s\n' "$(date +%s)" "$2" "$(exclusion_duration "$2")" >"$AGENT_STATE/ecart-$1"
 }
 
 # True (0) when the model is excluded right now. Also reads the old muet-<model>
 # format (timestamp only, 1 h).
 model_excluded() {
     local f e cause d
-    f="$AGENT_ETAT/ecart-$1"
-    if [ ! -f "$f" ]; then f="$AGENT_ETAT/muet-$1"; fi
+    f="$AGENT_STATE/ecart-$1"
+    if [ ! -f "$f" ]; then f="$AGENT_STATE/muet-$1"; fi
     if [ ! -f "$f" ]; then return 1; fi
     read -r e cause d <<<"$(cat "$f")"
     [ "$(date +%s)" -lt $(( e + ${d:-3600} )) ]
@@ -94,11 +94,11 @@ network_wait() {
     return 1
 }
 
-# Lists the current exclusions for devzone agent etat (muet- too, without cause).
+# Lists the current exclusions for devzone agent state (muet- too, without cause).
 agent_exclusions() {
     local f m e cause d end now
     now="$(date +%s)"
-    for f in "$AGENT_ETAT"/ecart-*; do
+    for f in "$AGENT_STATE"/ecart-*; do
         [ -e "$f" ] || continue
         m="${f##*/ecart-}"
         read -r e cause d <<<"$(cat "$f")"
@@ -106,7 +106,7 @@ agent_exclusions() {
         [ "$now" -lt "$end" ] || continue
         echo "  model $m excluded ($(cause_label "$cause")) until $(utc_time "$end")"
     done
-    for f in "$AGENT_ETAT"/muet-*; do
+    for f in "$AGENT_STATE"/muet-*; do
         [ -e "$f" ] || continue
         m="${f##*/muet-}"
         e="$(cat "$f" 2>/dev/null || true)"
@@ -117,11 +117,11 @@ agent_exclusions() {
     done
 }
 
-# Lifts the exclusion of a model, or of all (--tous): devzone agent liberer.
+# Lifts the exclusion of a model, or of all (--all): devzone agent release.
 exclusion_clear() {
     case "$1" in
-        --tous) rm -f "$AGENT_ETAT"/ecart-* "$AGENT_ETAT"/muet-* ;;
-        *) rm -f "$AGENT_ETAT/ecart-$1" "$AGENT_ETAT/muet-$1" ;;
+        --all) rm -f "$AGENT_STATE"/ecart-* "$AGENT_STATE"/muet-* ;;
+        *) rm -f "$AGENT_STATE/ecart-$1" "$AGENT_STATE/muet-$1" ;;
     esac
 }
 
@@ -146,9 +146,9 @@ session_fatal_error() {
     pkill -P "$pid" 2>/dev/null || true
     kill "$pid" 2>/dev/null || true
     wait "$pid" 2>/dev/null || true
-    droits_verifier "$folder"
+    rights_verify "$folder"
     model_exclude "$m" "$cause"
-    modele_demande_ecart "$m" "$cause" "$journal"
+    model_requested_excluded "$m" "$cause" "$journal"
     printf '%s\n' "=== opencode/$m excluded ($(cause_label "$cause")): next model" >>"$journal"
     return 0
 }

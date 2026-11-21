@@ -107,6 +107,34 @@ The `status` output of the modules (gitlab, postgres, argocd, mysql) and the sta
 | `runner en ligne`, `runner hors ligne` | `runner online`, `runner offline` |
 | catalog: `disponible`, `installée`, `attendue`, `echec` | `available`, `installed`, `expected`, `failed` |
 
+## Agent command
+
+`devzone agent` uses English names for its subcommands, options and JSON keys. The old names are refused with the new one, exit code 1, like the other renamed names.
+
+| Before | Now |
+|---|---|
+| `devzone agent etat` | `devzone agent state` |
+| `devzone agent liberer` | `devzone agent release` |
+| `devzone agent --modele` | `devzone agent --model` |
+| `devzone agent liberer --tous` | `devzone agent release --all` |
+
+The journal header of a requested model changes from `=== --modele : …` to `=== --model : …`, and the model messages are in English. There is no read compatibility: a journal written before 3.0 shows no requested model (`requested` is empty).
+
+`devzone agent state --json` uses the keys below, with `schema` 2. The value `inconnu` (unknown model) becomes `unknown`.
+
+| Before | Now |
+|---|---|
+| `schema`: `1` | `schema`: `2` |
+| `sessions[].modele` | `sessions[].model` |
+| `sessions[].debut` | `sessions[].start` |
+| `sessions[].dernier_ecrit` | `sessions[].last_written` |
+| `sessions[].demande` | `sessions[].requested` |
+| `sessions[].en_cours` | `sessions[].running` |
+| `ecarts` | `exclusions` |
+| `ecarts[].modele` | `exclusions[].model` |
+| `ecarts[].fin` | `exclusions[].end` |
+| `alertes_droits` | `rights_alerts` |
+
 ## Removed
 
 - The relay of the host Docker socket and the option that controlled it: `docker-hote` (a `docker-hote=…` line in `.devzone.modules` is ignored, `devzone enable docker-hote` answers "unknown module"), `DEVZONE_RELAIS_*`, the relay line of `devzone status` and `devzone repair`, the alert `relais_docker`, and the JSON fields `docker_hote` and `docker_hote_actif`. devzone no longer talks to the host Docker socket.

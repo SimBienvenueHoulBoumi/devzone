@@ -310,3 +310,31 @@ removed_refus() {
     [ "$status" -eq 1 ]
     [ ! -e "$T/kubectl.log" ]
 }
+
+@test "agent: old subcommand etat is refused, code 1, with the new name state" {
+    run --separate-stderr refus agent etat
+    [ "$status" -eq 1 ] || { echo "code $status"; false; }
+    [[ "$stderr" == *"devzone agent state"* ]] || { echo "message : $stderr"; false; }
+    [ -z "$output" ] || false
+}
+
+@test "agent: old subcommand liberer is refused, code 1, with the new name release" {
+    run --separate-stderr refus agent liberer
+    [ "$status" -eq 1 ] || { echo "code $status"; false; }
+    [[ "$stderr" == *"devzone agent release"* ]] || { echo "message : $stderr"; false; }
+    [ -z "$output" ] || false
+}
+
+@test "agent: old option --modele is refused, code 1, with the new name --model" {
+    run --separate-stderr refus agent --modele big-pickle
+    [ "$status" -eq 1 ] || { echo "code $status"; false; }
+    [[ "$stderr" == *"--model"* ]] || { echo "message : $stderr"; false; }
+    [ -z "$output" ] || false
+}
+
+@test "agent: old option --tous is refused, code 1, with the new name --all" {
+    run --separate-stderr refus agent release --tous
+    [ "$status" -eq 1 ] || { echo "code $status"; false; }
+    [[ "$stderr" == *"--all"* ]] || { echo "message : $stderr"; false; }
+    [ -z "$output" ] || false
+}

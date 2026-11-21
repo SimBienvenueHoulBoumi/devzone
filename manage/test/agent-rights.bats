@@ -33,11 +33,11 @@ FAKE
     agent_lance
     [ "$status" -eq 0 ]
     [ "$(cat "$P/.devcontainer/opencode/agent.json")" = '{"permission":{}}' ]
-    grep -q "=== ⚠ droits modifiés : .devcontainer/opencode/agent.json : changement annulé" "$(agent_journal)" || false
+    grep -q "=== ⚠ rights changed: .devcontainer/opencode/agent.json : change reverted" "$(agent_journal)" || false
     [ -f "$DEVZONE_AGENT_STATE/droits-projet.alerte" ]
-    run bash "$DEVZONE" agent etat
+    run bash "$DEVZONE" agent state
     [ "$status" -eq 0 ]
-    [[ "$output" == *"⚠ droits modifiés (projet) : voir le journal"* ]] || false
+    [[ "$output" == *"⚠ rights changed (projet): see the journal"* ]] || false
 }
 
 @test "droits : .repowarden.conf cree par l'agent alors qu'il n'existait pas -> supprime" {
@@ -45,7 +45,7 @@ FAKE
     agent_lance
     [ "$status" -eq 0 ]
     [ ! -e "$P/.repowarden.conf" ]
-    grep -q "droits modifiés : .repowarden.conf : changement annulé" "$(agent_journal)" || false
+    grep -q "rights changed: .repowarden.conf : change reverted" "$(agent_journal)" || false
 }
 
 @test "droits : fichier de droits supprime par l'agent -> restaure" {
@@ -53,7 +53,7 @@ FAKE
     agent_lance
     [ "$status" -eq 0 ]
     [ "$(cat "$P/.devcontainer/opencode.jsonc")" = "defaut" ]
-    grep -q "droits modifiés : .devcontainer/opencode.jsonc" "$(agent_journal)" || false
+    grep -q "rights changed: .devcontainer/opencode.jsonc" "$(agent_journal)" || false
 }
 
 @test "droits : modification commitee -> contenu remis dans l'arbre, historique intact, commit nomme" {
@@ -63,17 +63,17 @@ FAKE
     [ "$(cat "$P/.devcontainer/opencode/agent.json")" = '{"permission":{}}' ]
     [ "$(git -C "$P" rev-list --count HEAD)" -eq 2 ]
     sha="$(git -C "$P" log -1 --format=%h)"
-    grep -q "droits modifiés : .devcontainer/opencode/agent.json : .*commité dans $sha" "$(agent_journal)" || false
+    grep -q "rights changed: .devcontainer/opencode/agent.json : .*committed in $sha" "$(agent_journal)" || false
     [ -f "$DEVZONE_AGENT_STATE/droits-projet.alerte" ]
 }
 
 @test "droits : session qui ne touche a rien -> aucune alerte" {
     agent_lance
     [ "$status" -eq 0 ]
-    ! grep -q "droits modifiés" "$(agent_journal)" || false
+    ! grep -q "rights changed" "$(agent_journal)" || false
     [ ! -f "$DEVZONE_AGENT_STATE/droits-projet.alerte" ]
-    run bash "$DEVZONE" agent etat
-    [[ "$output" != *"droits modifiés"* ]] || false
+    run bash "$DEVZONE" agent state
+    [[ "$output" != *"rights changed"* ]] || false
 }
 
 @test "droits : verification aussi apres une session figee" {
@@ -83,7 +83,7 @@ FAKE
     [ "$status" -eq 0 ]
     [ "$(cat "$P/.devcontainer/opencode.jsonc")" = "defaut" ]
     grep -q "frozen" "$(agent_journal)" || false
-    grep -q "droits modifiés : .devcontainer/opencode.jsonc" "$(agent_journal)" || false
+    grep -q "rights changed: .devcontainer/opencode.jsonc" "$(agent_journal)" || false
 }
 
 @test "droits : alerte effacee au lancement suivant sur le projet" {

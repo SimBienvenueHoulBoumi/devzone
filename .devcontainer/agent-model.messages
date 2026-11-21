@@ -1,7 +1,7 @@
-# Messages of devzone agent --modele (#420), in French like the journal they go to.
-# Sourced by agent-model.sh. Kept out of .english on purpose: the accents are
-# the point. Each %s is replaced by a model name or a cause (printf formats).
-MSG_AUCUN_MODELE='aucun modèle gratuit disponible'
-MSG_CHOISI='=== modèle choisi : %s (demandé)'
-MSG_ECARTE='=== modèle demandé %s écarté (%s), suivant'
-MSG_INCONNU='devzone agent : modèle inconnu : %s ; modèles gratuits :'
+# Messages of devzone agent --model (#420), in English like the journal they go to.
+# Sourced by agent-model.sh. Each %s is replaced by a model name or a cause
+# (printf formats).
+MSG_NO_MODEL='no free model available'
+MSG_CHOSEN='=== requested model chosen: %s'
+MSG_EXCLUDED='=== requested model %s excluded (%s), next'
+MSG_UNKNOWN='devzone agent: unknown model: %s ; free models:'

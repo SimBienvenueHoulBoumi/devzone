@@ -158,9 +158,9 @@ agent_pod_set_trap() {
 
 # --- Launch a session agent in an ephemeral pod (devzone agent --pod) ---
 
-agent_pod_lancer() {
+agent_pod_launch() {
     local folder_raw="${1:-}" consigne_raw="${2:-}"
-    local folder consigne pod_name journal_file phase manifest_file etat
+    local folder consigne pod_name journal_file phase manifest_file state
     local rc=0
 
     if [ "${DEVZONE_WORKSPACE:-}" != "kubernetes" ]; then
@@ -181,7 +181,7 @@ agent_pod_lancer() {
         exit 1
     }
     if [ ! -r "${consigne_raw:-}" ]; then
-        echo "devzone agent --pod : consigne not found : ${consigne_raw:-}" >&2
+        echo "devzone agent --pod : brief not found : ${consigne_raw:-}" >&2
         exit 1
     fi
     consigne="$(cd "$(dirname "$consigne_raw")" && pwd -P)/$(basename "$consigne_raw")"
@@ -196,9 +196,9 @@ agent_pod_lancer() {
     fi
 
     # The log of the session stays in the agent state directory (shared with the pod).
-    etat="${AGENT_ETAT:-$HOME/.local/state/oc-lancer}"
-    mkdir -p "$etat"
-    journal_file="$etat/${AGENT_POD_SESSION_LABEL}.pod.log"
+    state="${AGENT_STATE:-$HOME/.local/state/oc-lancer}"
+    mkdir -p "$state"
+    journal_file="$state/${AGENT_POD_SESSION_LABEL}.pod.log"
     : >"$journal_file"
 
     pod_name="$(agent_pod_name "$folder")"

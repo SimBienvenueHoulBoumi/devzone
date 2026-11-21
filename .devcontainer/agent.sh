@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Drives opencode on a brief: rotation, silence at start, resume.
-# ia module (#221). devzone agent <folder> <brief> | etat | liberer.
+# ia module (#221). devzone agent <folder> <brief> | state | release.
 # shellcheck disable=SC2034 # RACINE, FREE_MODELS, PAUSE_RANK: read by the sourced agent-*.sh
 set -euo pipefail
 # Folder of the script, symbolic links followed by hand: readlink -f does not exist
@@ -30,12 +30,12 @@ RACINE="${DEVZONE_ROOT:-$(dirname "$ICI")}"
 . "$ICI/agent-model.sh"
 FREE_MODELS=(big-pickle deepseek-v4.1-flash-free hy4-flash-free nemotron-3.5-super-vl-free
     nemotron-3.5-lightning-free mimo-v2.6-flash-free beam-free flint-40b-free longcat-2.5-free)
-# Session pod ephemere (#222)
+# Ephemeral session pod (#222)
 # shellcheck source=agent-pod.sh disable=SC1091
 . "$ICI/agent-pod.sh"
 SILENCE="${DEVZONE_AGENT_SILENCE:-45}"
 FROZEN="${DEVZONE_AGENT_FROZEN:-600}"
-AGENT_ETAT="${DEVZONE_AGENT_STATE:-$HOME/.local/state/oc-lancer}"
+AGENT_STATE="${DEVZONE_AGENT_STATE:-$HOME/.local/state/oc-lancer}"
 # Pause between read and write of the rank (tests only): active only when
 # DEVZONE_AGENT_PAUSE_RANK is set under bats; never a pause by default.
 PAUSE_RANK=0
@@ -58,13 +58,13 @@ agent_launch() {
     if ! bash "$ICI/devzone" is-enabled ia >/dev/null 2>&1; then
         refuse "ia module disabled: devzone enable ia"
     fi
-    configurer
+    configure
     journal="$(journal_of "$folder")"
     export AGENT_JOURNAL="$journal"
-    state="$AGENT_ETAT"
+    state="$AGENT_STATE"
     mkdir -p "$(dirname "$journal")" "$state"
-    droits_photo "$folder"
-    modeles_charger "$journal"
+    rights_snapshot "$folder"
+    models_load "$journal"
     local_charge
     start="$(rank_take "$state" "$journal")" || refuse "model rank locked: retry later"
     brief_current="$brief"
@@ -79,17 +79,17 @@ agent_launch() {
         printf '\n\nRESUME: a previous session was interrupted. Read git status, git diff and git log in the folder, check this work against the brief above, fix what deviates from it and finish what is missing.\n' >>"$c"
         brief_current="$c"
     }
-    modele_ordre "$start"
+    model_order "$start"
     i=0
-    while [ "$i" -lt "${#ORDRE[@]}" ]; do
-        m="${ORDRE[$i]}"
+    while [ "$i" -lt "${#ORDER[@]}" ]; do
+        m="${ORDER[$i]}"
         if [ "$m" != "$network_for" ]; then network_for="$m"; network_n=0; fi
         if model_excluded "$m"; then
-            modele_demande_ecart "$m" "$(modele_ecart_cause "$m")" "$journal"
+            model_requested_excluded "$m" "$(model_exclusion_cause "$m")" "$journal"
             i=$(( i + 1 ))
             continue
         fi
-        modele_demande_choisi "$m" "$journal"
+        model_requested_chosen "$m" "$journal"
         echo "=== model opencode/$m start $(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$journal"
         offset="$(wc -c <"$journal")"
         opencode_launch "$folder" "$m" "$brief_current" "$journal" "$state"
@@ -111,10 +111,10 @@ agent_launch() {
             pkill -P "$pid" 2>/dev/null || true
             kill "$pid" 2>/dev/null || true
             wait "$pid" 2>/dev/null || true
-            droits_verifier "$folder"
+            rights_verify "$folder"
             echo "=== opencode/$m silent at start: excluded 1 h, next model" >>"$journal"
             model_exclude "$m" mute
-            modele_demande_ecart "$m" mute "$journal"
+            model_requested_excluded "$m" mute "$journal"
             resume
             i=$(( i + 1 ))
             continue
@@ -137,7 +137,7 @@ agent_launch() {
                     pkill -P "$pid" 2>/dev/null || true
                     kill "$pid" 2>/dev/null || true
                     wait "$pid" 2>/dev/null || true
-                    droits_verifier "$folder"
+                    rights_verify "$folder"
                     freeze=1
                     break
                 fi
@@ -152,7 +152,7 @@ agent_launch() {
         fi
         code=0
         wait "$pid" || code=$?
-        droits_verifier "$folder"
+        rights_verify "$folder"
         # Only the output of this attempt counts: an error of a previous model must not
         # condemn the next one. Only its last 30 lines are read, and only when the exit
         # code is non-zero or opencode wrote its own error line: a printed "Free usage
@@ -185,7 +185,7 @@ agent_launch() {
                     echo "=== opencode/$m error, no exclusion: next model" >>"$journal"
                 else
                     model_exclude "$m" "$cause"
-                    modele_demande_ecart "$m" "$cause" "$journal"
+                    model_requested_excluded "$m" "$cause" "$journal"
                     echo "=== opencode/$m excluded ($(cause_label "$cause"), $(exclusion_label "$cause")): next model" >>"$journal"
                 fi
                 resume
@@ -207,26 +207,26 @@ agent_launch() {
 }
 case "${1:-}" in
     status) agent_pod_status ;;
-    etat) if [ "${2:-}" = "--json" ]; then exec bash "$ICI/agent-state-json.sh"; else agent_state; fi ;;
-    liberer)
-        [ -n "${2:-}" ] || { agent_aide >&2; exit 2; }
+    state) if [ "${2:-}" = "--json" ]; then exec bash "$ICI/agent-state-json.sh"; else agent_state; fi ;;
+    release)
+        [ -n "${2:-}" ] || { agent_help >&2; exit 2; }
         exclusion_clear "$2"
         ;;
-    -h | --help | aide) agent_aide ;;
+    -h | --help | help) agent_help ;;
     "")
-        agent_aide
+        agent_help
         exit 2
         ;;
     *)
-        if [ "${1:-}" = "--modele" ]; then [ -n "${2:-}" ] || { agent_aide >&2; exit 2; }; MODELE_LISTE="$2"; shift 2; fi
+        if [ "${1:-}" = "--model" ]; then [ -n "${2:-}" ] || { agent_help >&2; exit 2; }; MODEL_LIST="$2"; shift 2; fi
         if [ "${1:-}" = "--pod" ]; then
-            [ -z "$MODELE_LISTE" ] || refuse "--modele is not supported with --pod"
+            [ -z "$MODEL_LIST" ] || refuse "--model is not supported with --pod"
             shift
             if [ -z "${1:-}" ] || [ -z "${2:-}" ]; then
-                agent_aide >&2
+                agent_help >&2
                 exit 2
             fi
-            agent_pod_lancer "$1" "$2"
+            agent_pod_launch "$1" "$2"
         fi
         local_mode=0
         if [ "${1:-}" = "--local" ]; then
@@ -234,7 +234,7 @@ case "${1:-}" in
             shift
         fi
         if [ "$#" -lt 2 ]; then
-            agent_aide >&2
+            agent_help >&2
             exit 2
         fi
         if [ "$local_mode" = 0 ] && workspace_available; then

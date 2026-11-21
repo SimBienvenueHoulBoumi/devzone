@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# devzone agent : configuration effective (opencode.jsonc + configurer) pour gh (#367).
+# devzone agent : configuration effective (opencode.jsonc + configure) pour gh (#367).
 
 perm_pour() {
     local f="$1" cmd="$2" val="" key
@@ -34,7 +34,7 @@ setup() {
         . "$ICI/agent-session.sh"
         refuse() { echo "devzone agent : $*" >&2; exit 2; }
         unset OPENCODE_CONFIG_CONTENT
-        configurer
+        configure
         printf "%s\n" "$OPENCODE_CONFIG_CONTENT"
     ' >"$BATS_TEST_TMPDIR/cfg.json"
     jq -s '.[0] * .[1]' "$BATS_TEST_TMPDIR/oc.json" "$BATS_TEST_TMPDIR/cfg.json" >"$BATS_TEST_TMPDIR/eff.json"
@@ -56,7 +56,7 @@ setup() {
         . "$ICI/agent-session.sh"
         refuse() { echo "devzone agent : $*" >&2; exit 2; }
         unset OPENCODE_CONFIG_CONTENT
-        configurer
+        configure
         printf "%s\n" "$OPENCODE_CONFIG_CONTENT"
     ' >"$BATS_TEST_TMPDIR/cfg.json"
     jq -s '.[0] * .[1]' "$BATS_TEST_TMPDIR/oc.json" "$BATS_TEST_TMPDIR/cfg.json" >"$BATS_TEST_TMPDIR/eff.json"

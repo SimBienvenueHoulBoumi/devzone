@@ -5,9 +5,9 @@
 # model; its internal name has no slash (an ecart-<name> file is written for it);
 # opencode gets the reference.
 # Real host model name (Ollama) chosen for this attempt, empty otherwise.
-LOCAL_HOTE_REEL=""
+LOCAL_HOST_REAL=""
 # Internal (slash-free) name of the host model chosen for this attempt.
-LOCAL_HOTE_INTERNE=""
+LOCAL_HOST_INTERNAL=""
 
 # shellcheck source=SCRIPTDIR/ai/host-models.sh
 # shellcheck disable=SC1091
@@ -17,29 +17,29 @@ LOCAL_HOTE_INTERNE=""
 # [A-Za-z0-9._-] becomes '_'. Used for ecart-<name> files, the journal and
 # the rotation, so a host model such as hf.co/org/model:tag never creates a
 # nested or invalid path.
-nom_interne() {
+internal_name() {
     printf '%s' "$1" | sed 's/[^A-Za-z0-9._-]/_/g'
 }
 
-# Sets LOCAL_MODELE for this attempt, read by modele_au_rang and
-# modeles_total. Also records the real host model name when the host is chosen.
+# Sets LOCAL_MODEL for this attempt, read by model_at_rank and
+# models_total. Also records the real host model name when the host is chosen.
 local_charge() {
     local nom
-    LOCAL_MODELE=""
-    LOCAL_HOTE_REEL=""
-    LOCAL_HOTE_INTERNE=""
+    LOCAL_MODEL=""
+    LOCAL_HOST_REAL=""
+    LOCAL_HOST_INTERNAL=""
     nom="$(premier 2>/dev/null || true)"
     [ -n "$nom" ] || return 0
-    LOCAL_HOTE_REEL="$nom"
-    LOCAL_HOTE_INTERNE="$(nom_interne "$nom")"
-    LOCAL_MODELE="$LOCAL_HOTE_INTERNE"
+    LOCAL_HOST_REAL="$nom"
+    LOCAL_HOST_INTERNAL="$(internal_name "$nom")"
+    LOCAL_MODEL="$LOCAL_HOST_INTERNAL"
     return 0
 }
 
 # Model reference given to opencode -m
-modele_ref() {
-    if [ -n "$LOCAL_HOTE_INTERNE" ] && [ "$1" = "$LOCAL_HOTE_INTERNE" ]; then
-        echo "devzone-host/$LOCAL_HOTE_REEL"
+model_ref() {
+    if [ -n "$LOCAL_HOST_INTERNAL" ] && [ "$1" = "$LOCAL_HOST_INTERNAL" ]; then
+        echo "devzone-host/$LOCAL_HOST_REAL"
     else
         echo "opencode/$1"
     fi
@@ -47,17 +47,17 @@ modele_ref() {
 
 # Model of rank $1 in the attempt that starts at $2: online ones in rotation,
 # then the local host model
-modele_au_rang() {
+model_at_rank() {
     if [ "$1" -lt "${#FREE_MODELS[@]}" ]; then
         echo "${FREE_MODELS[$(( ($2 + $1) % ${#FREE_MODELS[@]} ))]}"
     else
-        echo "$LOCAL_MODELE"
+        echo "$LOCAL_MODEL"
     fi
 }
 
 # Number of models to try: the online ones, plus the local host model if ready
-modeles_total() {
+models_total() {
     local total="${#FREE_MODELS[@]}"
-    [ -n "$LOCAL_MODELE" ] && total=$((total + 1))
+    [ -n "$LOCAL_MODEL" ] && total=$((total + 1))
     echo "$total"
 }

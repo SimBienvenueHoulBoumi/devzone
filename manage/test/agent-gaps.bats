@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# devzone agent command: exclusions by cause, network wait, state and liberer (#328).
+# devzone agent command: exclusions by cause, network wait, state and release (#328).
 # Launches, rotation and resume are in agent.bats.
 
 setup() {
@@ -129,7 +129,7 @@ setup() {
     [ "$status" -eq 0 ]
     echo "$(date +%s) pays 604800" >"$DEVZONE_AGENT_STATE/ecart-big-pickle"
     echo "$(date +%s) quota 3600" >"$DEVZONE_AGENT_STATE/ecart-glm-5.3-flash-free"
-    run bash "$DEVZONE" agent etat
+    run bash "$DEVZONE" agent state
     [ "$status" -eq 0 ]
     [[ "$output" == *"projet.log"* ]] || false
     [[ "$output" == *"opencode/big-pickle"* ]] || false
@@ -142,7 +142,7 @@ setup() {
     now="$(date +%s)"
     echo $(( now - 600 )) >"$DEVZONE_AGENT_STATE/muet-big-pickle"
     echo $(( now - 7200 )) >"$DEVZONE_AGENT_STATE/muet-deepseek-v4.1-flash-free"
-    run bash "$DEVZONE" agent etat
+    run bash "$DEVZONE" agent state
     [ "$status" -eq 0 ]
     [[ "$output" == *"model big-pickle excluded (silent) until"* ]] || false
     [[ "$output" != *"deepseek-v4.1-flash-free"* ]] || false
@@ -152,13 +152,13 @@ setup() {
     mkdir -p "$DEVZONE_AGENT_STATE"
     echo "$(date +%s) pays 604800" >"$DEVZONE_AGENT_STATE/ecart-big-pickle"
     echo "$(date +%s) quota 3600" >"$DEVZONE_AGENT_STATE/ecart-glm-5.3-flash-free"
-    run bash "$DEVZONE" agent liberer
+    run bash "$DEVZONE" agent release
     [ "$status" -eq 2 ]
-    run bash "$DEVZONE" agent liberer big-pickle
+    run bash "$DEVZONE" agent release big-pickle
     [ "$status" -eq 0 ]
     [ ! -f "$DEVZONE_AGENT_STATE/ecart-big-pickle" ]
     [ -f "$DEVZONE_AGENT_STATE/ecart-glm-5.3-flash-free" ]
-    run bash "$DEVZONE" agent liberer --tous
+    run bash "$DEVZONE" agent release --all
     [ "$status" -eq 0 ]
     [ ! -f "$DEVZONE_AGENT_STATE/ecart-glm-5.3-flash-free" ]
 }
