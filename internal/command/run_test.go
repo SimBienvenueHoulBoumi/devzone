@@ -50,15 +50,16 @@ func TestRunDelegatesUnknownCommand(t *testing.T) {
 	}
 }
 
-func TestRunDelegatesWithoutArguments(t *testing.T) {
-	requireBash(t)
-	entry(t, echoArgs+"\n")
-	var out bytes.Buffer
-	if got := Run(nil, &out, &bytes.Buffer{}); got != 0 {
+func TestRunWithoutArgumentsShowsHelp(t *testing.T) {
+	// The entry point of the fake package would print nothing: the help must
+	// come from Go, not from a delegation
+	setupPackage(t, "1.4.2")
+	var out, errOut bytes.Buffer
+	if got := Run(nil, &out, &errOut); got != 0 {
 		t.Fatalf("exit status = %d, want 0", got)
 	}
-	if out.String() != "args:\n" {
-		t.Fatalf("stdout = %q", out.String())
+	if out.String() != helpText("1.4.2") {
+		t.Fatalf("stdout = %q, want the help text", out.String())
 	}
 }
 

@@ -9,9 +9,27 @@ import (
 // the exit status.
 type Handler func(args []string, out, errOut io.Writer) int
 
-// ported lists the commands implemented in Go, by name. It is empty until the
-// first command is ported (#358): until then every command is delegated to bash.
-var ported = map[string]Handler{}
+// ported lists the commands implemented in Go, by name (#358). A name runs in Go
+// only when it stands alone: with an argument, see bare.
+var ported = map[string]Handler{
+	"--version": bare("--version", printVersion),
+	"-v":        bare("-v", printVersion),
+	"help":      bare("help", printHelp),
+	"-h":        bare("-h", printHelp),
+	"--help":    bare("--help", printHelp),
+}
+
+// bare builds the handler of a command that takes no argument. With an argument,
+// the whole command line goes to bash: bash checks the renamed names first
+// (reject_renamed) and stays the reference for the extra words.
+func bare(name string, run func(out io.Writer) int) Handler {
+	return func(args []string, out, errOut io.Writer) int {
+		if len(args) > 0 {
+			return delegate(append([]string{name}, args...), out, errOut)
+		}
+		return run(out)
+	}
+}
 
 // Ported returns the names of the commands implemented in Go, sorted.
 func Ported() []string {

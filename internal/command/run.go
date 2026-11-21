@@ -12,12 +12,14 @@ import (
 )
 
 // Run executes the command line args (without the program name) and returns
-// the exit status. Standard input is passed on to the delegated bash command.
+// the exit status. Without argument, the help is shown, as manage/devzone does.
+// Standard input is passed on to the delegated bash command.
 func Run(args []string, out, errOut io.Writer) int {
-	if len(args) > 0 {
-		if handler, ok := ported[args[0]]; ok {
-			return handler(args[1:], out, errOut)
-		}
+	if len(args) == 0 {
+		args = []string{"help"}
+	}
+	if handler, ok := ported[args[0]]; ok {
+		return handler(args[1:], out, errOut)
 	}
 	return delegate(args, out, errOut)
 }
