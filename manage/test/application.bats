@@ -13,6 +13,7 @@ setup() {
     export DEVZONE_ETAT="$T/modules"
     mkdir -p "$T/app/gitlab" "$T/app/postgres" "$T/app/catalog/mysql" "$T/bin" "$DEVZONE_RACINE"
     cp "$RACINE_TEST/.devcontainer/devzone" "$APP"
+    cp "$RACINE_TEST"/.devcontainer/devzone-*.sh "$T/app/"
     cp "$RACINE_TEST/.devcontainer/help.sh" "$T/app/help.sh"
     cp "$RACINE_TEST/.devcontainer/cluster.sh" "$T/app/cluster.sh"
     cp "$RACINE_TEST/.devcontainer/state.sh" "$T/app/state.sh"

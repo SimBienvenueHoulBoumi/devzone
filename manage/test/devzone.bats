@@ -715,6 +715,7 @@ KUBE
     APP="$BATS_TEST_TMPDIR/app/devzone"
     mkdir -p "$BATS_TEST_TMPDIR/app/ai/plugins" "$BATS_TEST_TMPDIR/app/skills/devzone" "$BATS_TEST_TMPDIR/app/argocd"
     cp "$BATS_TEST_DIRNAME/../../.devcontainer/devzone" "$APP"
+    cp "$BATS_TEST_DIRNAME"/../../.devcontainer/devzone-*.sh "$BATS_TEST_TMPDIR/app/"
     cp "$BATS_TEST_DIRNAME/../../.devcontainer/help.sh" "$BATS_TEST_TMPDIR/app/help.sh"
     cp "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh" "$BATS_TEST_TMPDIR/app/cluster.sh"
     cp "$BATS_TEST_DIRNAME/../../.devcontainer/state.sh" "$BATS_TEST_TMPDIR/app/state.sh"
