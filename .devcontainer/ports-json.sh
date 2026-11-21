@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # JSON output of the port relays (#557): the array
-# [{port,actif,application,auto}] read by the tools (devzone status --json).
-# The keys and the application values are a contract, kept unchanged.
+# [{port,active,application,auto}] read by the tools (devzone status --json).
+# The keys and the application values are a contract.
 # Sourced by ports.sh, which holds the functions used here.
 
 # JSON list of the relays of the state: jq only
@@ -24,8 +24,8 @@ list_json() {
         else
             app="$JSON_APP_NONE"
         fi
-        json="$(jq -c --argjson port "$port" --argjson actif "$active" --arg app "$app" \
-            '. + [{port:$port,actif:$actif,application:$app,auto:false}]' <<<"$json")"
+        json="$(jq -c --argjson port "$port" --argjson active "$active" --arg app "$app" \
+            '. + [{port:$port,active:$active,application:$app,auto:false}]' <<<"$json")"
     done
     auto_json="$(bash "$HERE/ports-auto.sh" list_json_auto 2>/dev/null || echo '[]')"
     if [ -n "$auto_json" ] && [ "$auto_json" != "[]" ]; then

@@ -209,7 +209,7 @@ restart_relays() {
     return "$rc"
 }
 
-# Machine-readable output of list: a JSON array [{port,actif,application,auto}], jq only.
+# Machine-readable output of list: a JSON array [{port,active,application,auto}], jq only.
 # shellcheck source=SCRIPTDIR/ports-json.sh
 # shellcheck disable=SC1091
 . "$HERE/ports-json.sh"

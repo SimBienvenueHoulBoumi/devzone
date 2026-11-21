@@ -136,5 +136,5 @@ nombre_reglages_credential() {
     run bash "$DEVZONE" platform gitlab --url "$INSTANCE"
     [ "$status" -ne 0 ]
     [[ "$output" == *"cannot set the git credential"* ]] || false
-    ! grep -q '^plateforme=' "$DEVZONE_STATE" 2>/dev/null || false
+    ! grep -q '^platform=' "$DEVZONE_STATE" 2>/dev/null || false
 }

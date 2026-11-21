@@ -70,18 +70,18 @@ CURL
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
 }
 
-@test "state-json: schema 1 and valid JSON" {
+@test "state-json: schema 2 and valid JSON" {
     run bash "$DEVZONE" status --json
     [ "$status" -eq 0 ]
     printf '%s\n' "$output" | jq -e . >/dev/null
-    [ "$(printf '%s\n' "$output" | jq -r '.schema')" = "1" ]
+    [ "$(printf '%s\n' "$output" | jq -r '.schema')" = "2" ]
 }
 
 @test "state-json: git identity absent → ok false with command" {
     run bash "$DEVZONE" status --json
     [ "$status" -eq 0 ]
-    [ "$(printf '%s\n' "$output" | jq -r '.identite_git.ok')" = "false" ]
-    [ "$(printf '%s\n' "$output" | jq -r '.identite_git.commande')" != "null" ]
+    [ "$(printf '%s\n' "$output" | jq -r '.git_identity.ok')" = "false" ]
+    [ "$(printf '%s\n' "$output" | jq -r '.git_identity.command')" != "null" ]
 }
 
 @test "state-json: git identity present" {
@@ -92,7 +92,7 @@ CURL
     run bash "$DEVZONE" status --json
     [ "$status" -eq 0 ]
     printf '%s\n' "$output" | jq -e . >/dev/null
-    [ "$(printf '%s\n' "$output" | jq -r '.identite_git.nom')" = "$nom" ]
+    [ "$(printf '%s\n' "$output" | jq -r '.git_identity.name')" = "$nom" ]
 }
 
 @test "state-json: module failed → echec and command" {
@@ -100,15 +100,15 @@ CURL
     echo "failed npm" >"$DEVZONE_STATE-failed-ia"
     run bash "$DEVZONE" status --json
     [ "$status" -eq 0 ]
-    [ "$(printf '%s\n' "$output" | jq -r '.modules[] | select(.nom=="ia") | .echec')" = "failed npm" ]
-    [ "$(printf '%s\n' "$output" | jq -r '.modules[] | select(.nom=="ia") | .commande')" = "devzone apply" ]
+    [ "$(printf '%s\n' "$output" | jq -r '.modules[] | select(.name=="ia") | .failed')" = "failed npm" ]
+    [ "$(printf '%s\n' "$output" | jq -r '.modules[] | select(.name=="ia") | .command')" = "devzone apply" ]
 }
 
 @test "state-json: gh failing → github null and errors.github" {
     GH_ETAT=absent run bash "$DEVZONE" status --json
     [ "$status" -eq 0 ]
-    [ "$(printf '%s\n' "$output" | jq -r '.plateforme.github')" = "null" ]
-    [ "$(printf '%s\n' "$output" | jq -r '.erreurs.github')" != "null" ]
+    [ "$(printf '%s\n' "$output" | jq -r '.platform.github')" = "null" ]
+    [ "$(printf '%s\n' "$output" | jq -r '.errors.github')" != "null" ]
 }
 
 @test "state-json: relay failed → alert relais_docker" {
@@ -116,7 +116,7 @@ CURL
     export DEVZONE_RELAY_MARKER="$BATS_TEST_TMPDIR/relay.failed"
     run bash "$DEVZONE" status --json
     [ "$status" -eq 0 ]
-    [ "$(printf '%s\n' "$output" | jq -r '.alertes[] | select(.code=="relais_docker") | .code')" = "relais_docker" ]
+    [ "$(printf '%s\n' "$output" | jq -r '.alerts[] | select(.code=="relais_docker") | .code')" = "relais_docker" ]
 }
 
 @test "state-json: open port → in ports" {
@@ -146,7 +146,7 @@ GH
     run bash "$DEVZONE" status --json
     [ "$status" -eq 0 ]
     printf '%s\n' "$output" | jq -e . >/dev/null
-    [ "$(printf '%s\n' "$output" | jq -r '.docker_hote')" = "true" ]
+    [ "$(printf '%s\n' "$output" | jq -r '.docker_host')" = "true" ]
     [ "$(printf '%s\n' "$output" | jq -r '.docker_hote_actif')" = "true" ]
 }
 
@@ -154,7 +154,7 @@ GH
     rm -f "$DEVZONE_RELAY_SOURCE"
     run bash "$DEVZONE" status --json
     [ "$status" -eq 0 ]
-    [ "$(printf '%s\n' "$output" | jq -r '.docker_hote')" = "true" ]
+    [ "$(printf '%s\n' "$output" | jq -r '.docker_host')" = "true" ]
     [ "$(printf '%s\n' "$output" | jq -r '.docker_hote_actif')" = "false" ]
 }
 
@@ -163,7 +163,7 @@ GH
     printf 'docker-hote=off\n' >"$DEVZONE_STATE"
     run bash "$DEVZONE" status --json
     [ "$status" -eq 0 ]
-    [ "$(printf '%s\n' "$output" | jq -r '.docker_hote')" = "false" ]
+    [ "$(printf '%s\n' "$output" | jq -r '.docker_host')" = "false" ]
     [ "$(printf '%s\n' "$output" | jq -r '.docker_hote_actif')" = "true" ]
 }
 
@@ -172,7 +172,7 @@ GH
     rm -f "$DEVZONE_RELAY_SOURCE"
     run bash "$DEVZONE" status --json
     [ "$status" -eq 0 ]
-    [ "$(printf '%s\n' "$output" | jq -r '.docker_hote')" = "false" ]
+    [ "$(printf '%s\n' "$output" | jq -r '.docker_host')" = "false" ]
     [ "$(printf '%s\n' "$output" | jq -r '.docker_hote_actif')" = "false" ]
 }
 
@@ -182,7 +182,7 @@ GH
     run bash "$DEVZONE" status --json
     [ "$status" -eq 0 ]
     printf '%s\n' "$output" | jq -e . >/dev/null
-    [ "$(printf '%s\n' "$output" | jq -r '.docker_hote')" = "false" ]
+    [ "$(printf '%s\n' "$output" | jq -r '.docker_host')" = "false" ]
     [ "$(printf '%s\n' "$output" | jq -r '.docker_hote_actif')" = "false" ]
 }
 

@@ -29,7 +29,7 @@ devzone platform gitlab --url https://gitlab.example.com:3443
 devzone platform gitlab           # sans --url : l'instance du module gitlab (http://gitlab.localhost:8929)
 ```
 
-- **Choix par instance** : gardé aux rebuilds dans le fichier d'état (`$RACINE/.devzone.modules`, lignes `plateforme=` et `gitlab_url=`), comme les [modules](#modules).
+- **Choix par instance** : gardé aux rebuilds dans le fichier d'état (`$RACINE/.devzone.modules`, lignes `platform=` et `gitlab_url=`), comme les [modules](#modules).
 - **glab** (CLI GitLab), installé **seulement** quand GitLab est choisi : binaire de la release officielle de gitlab.org (chart de gitlab-org/cli), version figée et somme SHA-256 vérifiées, dans `~/.local/bin` ; au retour à `github`, le binaire et sa configuration (`~/.config/glab-cli/`) sont retirés — la configuration d'un service n'existe que pendant qu'il est choisi.
 - **Connexion** : instance du module `gitlab` → automatique, avec le jeton root du module (`workspace/.gitlab/`, protocole http, jamais affiché) ; autre instance (gitlab.com ou auto-hébergée) → `glab auth login --hostname <hôte>`, interactif (code de connexion à saisir).
 - **État** : la ligne `plateforme` affiche l'instance et « glab connecté », ou « non connecté » avec la commande à lancer. Avec `gitlab`, les lignes propres à GitHub signalent qu'elles ne s'appliquent pas : repowarden (bots, tickets, workflows du dépôt devzone) reste uniquement sur GitHub en attendant son support GitLab ([simdevWarden/repowarden#531](https://github.com/simdevWarden/repowarden/issues/531)). `gh` connecté reste utile pour ces tickets.
@@ -132,7 +132,7 @@ make rebuild                       # sur le poste, pas dans le conteneur
 
 Au lancement sur le poste, `manage/scripts/launch.sh` lit la ligne `docker-hote` (absente = `on`). À `off`, il génère `.devcontainer/without-host-docker/devcontainer.json` (copie sans la feature, chemins de build adaptés au sous-dossier, dossier ignoré par git) et passe ce fichier au CLI devcontainers avec `--config`. Pour remettre le socket : `devzone enable docker-hote`, puis `make rebuild`.
 
-Sans socket, `docker` n'existe plus dans le conteneur : la commande affiche un message qui renvoie au workspace Kubernetes (`devzone workspace`, kubedock et BuildKit). Le relais du socket ne bloque pas le démarrage, et la connexion au cluster Kubernetes de l'hôte reste disponible ; en revanche, kind et les conteneurs lancés sur le Docker du poste ne le sont plus. `devzone status --json` porte l'option dans le champ `docker_hote` et l'état réel du montage dans `docker_hote_actif`.
+Sans socket, `docker` n'existe plus dans le conteneur : la commande affiche un message qui renvoie au workspace Kubernetes (`devzone workspace`, kubedock et BuildKit). Le relais du socket ne bloque pas le démarrage, et la connexion au cluster Kubernetes de l'hôte reste disponible ; en revanche, kind et les conteneurs lancés sur le Docker du poste ne le sont plus. `devzone status --json` porte l'option dans le champ `docker_host` et l'état réel du montage dans `docker_hote_actif`.
 
 ### Commandes de l'application
 
@@ -398,7 +398,7 @@ Pour que Docker Desktop démarre à chaque connexion : Settings → General → 
 
 Les modules `gitlab`, `postgres` et `argocd` vivent dans le cluster, mais le pod du workspace n'a pas de kubeconfig et son compte de service est limité à son namespace (#430) : il ne peut ni installer un service ni lire ses namespaces. Depuis #528 :
 
-- **État dans le pod** : `devzone status` juge la présence d'un service par le DNS du cluster (`gitlab-webservice-default.devzone-gitlab.svc`, `postgres.devzone-postgres.svc`, `argocd-server.devzone-argocd.svc`), comme le catalogue. Présent → `✔ module postgres active: … (postgres.devzone-postgres.svc)` ; absent → `⚠ module gitlab not in the cluster: on the workstation, devzone workspace services enable gitlab` (module actif dans `.devzone.modules`) ou `○ module … optional` (inactif). Aucun « en échec » venu d'un installeur : la marque d'échec n'est pas lue dans le pod. `devzone status --json` porte les mêmes valeurs (`etat`, `commande`, `echec` à `null`).
+- **État dans le pod** : `devzone status` juge la présence d'un service par le DNS du cluster (`gitlab-webservice-default.devzone-gitlab.svc`, `postgres.devzone-postgres.svc`, `argocd-server.devzone-argocd.svc`), comme le catalogue. Présent → `✔ module postgres active: … (postgres.devzone-postgres.svc)` ; absent → `⚠ module gitlab not in the cluster: on the workstation, devzone workspace services enable gitlab` (module actif dans `.devzone.modules`) ou `○ module … optional` (inactif). Aucun « en échec » venu d'un installeur : la marque d'échec n'est pas lue dans le pod. `devzone status --json` porte les mêmes valeurs (`state`, `command`, `failed` à `null`).
 - **Démarrage du pod** : `devzone apply` (lancé par `workspace-init.sh`) n'installe plus ces services ; il l'écrit (« installed from the workstation ») et efface les marques d'échec des anciens démarrages. Dans le pod, `devzone enable gitlab` ou `devzone disable postgres` refusent (code 2) et renvoient à la commande du poste, sans toucher l'état.
 - **Installation depuis le poste** : `devzone workspace services enable <service> [options]` (les options de `devzone enable`, par exemple `--context CTX` pour postgres) et `devzone workspace services disable <service> [--yes]` (`--yes` indispensable : pas de terminal dans le pod pour confirmer ). Le poste crée un ServiceAccount `devzone-services-admin` dans `devzone-workspace`, lié à `cluster-admin` le temps de l'opération, lui demande un jeton d'une heure (`kubectl create token`, kubectl 1.24 ou plus) puis lance l'installeur habituel **dans le pod du workspace** (`kubectl exec`, script `.devcontainer/services-admin.sh`) : le jeton passe sur l'entrée standard, jamais en argument ni affiché, et ne vit que dans un kubeconfig temporaire du pod (droits 600, contextes `devzone-admin` et `devzone`), supprimé à la fin. L'état et les secrets (`workspace/.postgres/`, `workspace/.gitlab/`, `workspace/.argocd/` sous `/workspaces/projets`) restent dans le pod, comme sur le poste Docker. À la fin, même en échec : relais du pod arrêtés (l'accès passe par le DNS du cluster et `devzone workspace ports`), ligne `cluster=` de l'état remise comme avant, ServiceAccount et ClusterRoleBinding supprimés. `devzone workspace services status` dit, par namespace, ce qui est installé. Depuis #516, `argocd` est installé ou retiré par le poste lui-même (helm), et `postgres` passe par une Application Argo CD quand Argo CD est actif (voir [Argo CD dans le workspace Kubernetes](#argo-cd-dans-le-workspace-kubernetes)).
 - **Hors périmètre** : Argo CD comme source des services (#516) ; `mysql` et le catalogue (déjà par DNS, #515) ; les commandes `devzone postgres create …` dans le pod, qui demandent encore un kubeconfig.
@@ -820,6 +820,7 @@ npx devzone@latest update   # dernière version publiée
 - **Remplacement** : les fichiers du paquet sont recopiés, les fichiers de l'ancien manifeste qui n'existent plus sont supprimés, ainsi que les anciennes arborescences `core/` et `scripts/` à la racine. `.gitignore` est complété des lignes manquantes, jamais écrasé.
 - **Jamais touchés** : `workspace/`, `.devzone.modules`, `.devzone.packages`, `.password`, `.app`, `.devzone.log`, les volumes Docker.
 - **Reconstruction** : le nouveau `.devzone.version` est écrit, puis `make rebuild` est proposé avec confirmation dans un terminal. `--sans-reconstruire` saute cette étape ; sans terminal, la reconstruction est indiquée mais jamais lancée.
+- **Clé d'état (#733, lot 4)** : `plateforme=` de `.devzone.modules` devient `platform=`. `.devcontainer/rename-legacy-files.sh` la réécrit une fois, avec sa valeur (si `platform=` existe déjà, seule l'ancienne ligne est retirée), à chaque passage qui lance le script ; les autres lignes ne bougent pas.
 - **Anciens noms (#733)** : `.devzone.paquets`, `.devzone.sauvegarde`, `.devzone.ports-workspace`, `.devzone.etat`, `.devzone.catalogue-veilleur`, `.devzone-empreinte` (skills) et les marqueurs `-echec-` deviennent `.devzone.packages`, `.devzone.backup`, `.devzone.workspace-ports`, `.devzone.state`, `.devzone.catalog-watcher`, `.devzone-fingerprint` et `-failed-`. `.devcontainer/rename-legacy-files.sh` les renomme une fois, avec leur contenu, au démarrage du conteneur, à `devzone update`, à `devzone workspace update` et à `devzone workspace migrate`. Un nouveau nom déjà présent n'est jamais écrasé ; une seconde exécution ne fait rien.
 
 Un dossier créé avant ce manifeste a une version « inconnue » : tous les fichiers différents du paquet sont traités comme modifiés (sauvegarde, puis confirmation).
@@ -866,40 +867,50 @@ VS Code et les autres outils. La sortie texte n'est pas changée : ajoute
 `--json` à la commande de ton choix.
 
 - **Rien à faire, aucun secret** : chaque point à traiter a sa commande
-  `devzone` prête à lancer (champ `commande`, `null` si rien à faire) ; aucun
+  `devzone` prête à lancer (champ `command`, `null` si rien à faire) ; aucun
   jeton, aucun mot de passe, jamais le contenu des identifiants (chemin seul,
-  via le champ `identifiants`).
+  via le champ `credentials`).
 - **Robuste** : chaque rubrique est calculée à part. Si l'une échoue, sa valeur
-  est `null`, le champ `erreurs` explique pourquoi, le JSON reste valide et le
+  est `null`, le champ `errors` explique pourquoi, le JSON reste valide et le
   code de sortie vaut 0.
-- **Stable et versionné** : les noms de champs sont en français, sans accent ni
-  espace. Ajouter un champ reste dans `schema: 1` ; retirer ou renommer un champ
-  fait passer `schema` à 2 : fonde ta lecture dessus.
+- **Stable et versionné** : les noms de champs sont en anglais, sans accent ni
+  espace. Depuis #733, sans alias : `nom`→`name`, `actif`→`active`,
+  `etat`→`state`, `echec`→`failed`, `commande`→`command`, `outils`→`tools`,
+  `plateforme`→`platform`, `disponible`→`available`, `docker_hote`→`docker_host`,
+  `identite_git`→`git_identity`, `identifiants`→`credentials`,
+  `alertes`→`alerts`, `erreurs`→`errors`, `retards`→`outdated`,
+  `paquet`/`figee`/`installee`→`package`/`frozen`/`installed`,
+  `travail`→`work`, `travail_interne`→`internal_work`,
+  `services_distant`→`services_remote`, `connecte`→`connected`. Seule exception,
+  `docker_hote_actif`, garde son nom jusqu'à sa suppression (#735). Ce renommage
+  fait passer `schema` de 1 à 2 : un lecteur écrit pour `schema: 1` doit être
+  mis à jour. Ajouter un champ reste dans `schema: 2` ; retirer ou renommer un
+  champ fait passer `schema` à 3 : fonde ta lecture dessus.
 
 `devzone status --json` (le récapitulatif complet, rubrique par rubrique) :
 
 ```json
 {
-  "schema": 1,
-  "devzone": { "version": "0.22.0", "disponible": "0.23.0" },
-  "identite_git": { "ok": true, "nom": "…", "email": "…", "commande": null },
-  "plateforme": { "nom": "github", "url": null,
-                  "github": { "connecte": true, "workflow": true, "commande": null } },
-  "outils": { "retards": [ { "paquet": "…", "figee": "…", "installee": "…" } ], "commande": "devzone apply" },
-  "modules": [ { "nom": "postgres", "actif": true, "description": "…", "etat": "ready on docker-desktop…",
-                 "echec": null, "commande": null } ],
-  "docker_hote": true,
+  "schema": 2,
+  "devzone": { "version": "0.22.0", "available": "0.23.0" },
+  "git_identity": { "ok": true, "name": "…", "email": "…", "command": null },
+  "platform": { "name": "github", "url": null,
+                "github": { "connected": true, "workflow": true, "command": null } },
+  "tools": { "outdated": [ { "package": "…", "frozen": "…", "installed": "…" } ], "command": "devzone apply" },
+  "modules": [ { "name": "postgres", "active": true, "description": "…", "state": "ready on docker-desktop…",
+                 "failed": null, "command": null } ],
+  "docker_host": true,
   "docker_hote_actif": true,
-  "clusters": { "services": "docker-desktop", "services_distant": false,
-                "travail": "docker-desktop", "travail_interne": false, "commande": null },
-  "ports": [ { "port": 8080, "actif": true, "application": "…" } ],
-  "identifiants": "/workspaces/devzone/.password",
-  "alertes": [ { "code": "relais_docker", "message": "…", "commande": "devzone repair" } ],
-  "erreurs": {}
+  "clusters": { "services": "docker-desktop", "services_remote": false,
+                "work": "docker-desktop", "internal_work": false, "command": null },
+  "ports": [ { "port": 8080, "active": true, "application": "…" } ],
+  "credentials": "/workspaces/devzone/.password",
+  "alerts": [ { "code": "relais_docker", "message": "…", "command": "devzone repair" } ],
+  "errors": {}
 }
 ```
 
-Les alertes possibles : `relais_docker`, `paquets`, `worktree`,
+Les alertes possibles : `relais_docker`, `packages`, `worktree`,
 `cluster_distant` (services sur un cluster distant), `cluster_interne`
 (cluster de travail de devzone, revenir avec `devzone use <ton cluster>`).
 

@@ -94,7 +94,7 @@ GH
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
 }
 
-# Empreinte de l'état modules : les clés plateforme/gitlab_url n'existent
+# Empreinte de l'état modules : les clés platform/gitlab_url n'existent
 # que pendant que la plateforme gitlab est choisie
 empreinte_etat() {
     cat "$DEVZONE_STATE"
@@ -164,7 +164,7 @@ empreinte_etat() {
     [[ "$output" == *"missing URL"* ]] || false
     [ ! -e "$HOME/.local/bin/glab" ]
     ! grep -q '^gitlab_url=' "$DEVZONE_STATE" || false
-    ! grep -q '^plateforme=' "$DEVZONE_STATE" || false
+    ! grep -q '^platform=' "$DEVZONE_STATE" || false
 }
 
 @test "--url sans valeur → refus" {
@@ -187,7 +187,7 @@ empreinte_etat() {
     [ "$status" -ne 0 ]
     [[ "$output" == *"root token"*"devzone enable gitlab"* ]] || false
     [ -x "$HOME/.local/bin/glab" ]
-    ! grep -q '^plateforme=' "$DEVZONE_STATE" || false
+    ! grep -q '^platform=' "$DEVZONE_STATE" || false
     ! grep -q '^gitlab_url=' "$DEVZONE_STATE" || false
 }
 
@@ -199,7 +199,7 @@ empreinte_etat() {
     [ "$status" -ne 0 ]
     [[ "$output" == *"SHA-256 sum"* ]] || false
     [ ! -e "$HOME/.local/bin/glab" ]
-    ! grep -q '^plateforme=' "$DEVZONE_STATE" || false
+    ! grep -q '^platform=' "$DEVZONE_STATE" || false
     [ -f "$DEVZONE_STATE" ]
 }
 
@@ -209,7 +209,7 @@ empreinte_etat() {
     [ "$status" -ne 0 ]
     [[ "$output" == *"glab download failed"* ]] || false
     [ ! -e "$HOME/.local/bin/glab" ]
-    ! grep -q '^plateforme=' "$DEVZONE_STATE" || false
+    ! grep -q '^platform=' "$DEVZONE_STATE" || false
 }
 
 @test "connexion refusée par glab → échec, plateforme non retenue, rien à corriger" {
@@ -217,18 +217,18 @@ empreinte_etat() {
     [ "$status" -ne 0 ]
     [[ "$output" != *"glab connected"* ]] || false
     [[ "$output" == *"glab auth login --hostname example.gitlab:8443"* ]] || false
-    ! grep -q '^plateforme=' "$DEVZONE_STATE" || false
+    ! grep -q '^platform=' "$DEVZONE_STATE" || false
     [ -x "$HOME/.local/bin/glab" ]
 }
 
 @test "module gitlab : connexion impossible → plateforme gardée, état glab not connected" {
-    printf 'gitlab=on\nplateforme=gitlab\ngitlab_url=http://gitlab.localhost:8929\n' >"$DEVZONE_STATE"
+    printf 'gitlab=on\nplatform=gitlab\ngitlab_url=http://gitlab.localhost:8929\n' >"$DEVZONE_STATE"
     mkdir -p "$DEVZONE_ROOT/workspace/.gitlab"
     printf 'jeton-root-secret' >"$DEVZONE_ROOT/workspace/.gitlab/root-token"
     FAUX_GLAB_KO=1 run bash "$DEVZONE" platform gitlab
     [ "$status" -ne 0 ]
     [[ "$output" != *"glab connected"* ]] || false
-    grep -qx 'plateforme=gitlab' "$DEVZONE_STATE" || false
+    grep -qx 'platform=gitlab' "$DEVZONE_STATE" || false
     run bash "$DEVZONE" platform
     [ "$status" -eq 0 ]
     [[ "$output" == *"devzone : gitlab platform: http://gitlab.localhost:8929, glab not connected: glab auth login --hostname gitlab.localhost:8929"* ]] || false

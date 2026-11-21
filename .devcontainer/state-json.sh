@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Machine output of devzone status (--json): stable, versioned JSON object.
 # Sourced by devzone: reuses its functions (value_of, description, …), does not
-# rewrite etat(). Built only with jq. JSON keys are a contract: French names kept.
+# rewrite etat(). Built only with jq. JSON keys are a contract: English names
+# (#733), listed in manage/docs/reference.md.
 
 # Adds an entry to $errors: the section that failed and why.
 add_error() {
@@ -15,7 +16,7 @@ append_alert() {
         --arg code "$code" \
         --arg message "$message" \
         --arg command "$command" \
-        '. + [{code:$code,message:$message,commande:(if $command=="" then null else $command end)}]' \
+        '. + [{code:$code,message:$message,command:(if $command=="" then null else $command end)}]' \
         <<<"$alerts_json")"
 }
 
@@ -68,9 +69,9 @@ state_json() {
             add_error github "gh auth status failed"
         else
             if printf '%s\n' "$gh_status" | grep -q "Token scopes:" && ! printf '%s\n' "$gh_status" | grep -q "'workflow'"; then
-                github_json="$(jq -cn '{connecte:true,workflow:false,commande:"gh auth refresh -h github.com -s workflow"}')"
+                github_json="$(jq -cn '{connected:true,workflow:false,command:"gh auth refresh -h github.com -s workflow"}')"
             else
-                github_json="$(jq -cn '{connecte:true,workflow:true,commande:null}')"
+                github_json="$(jq -cn '{connected:true,workflow:true,command:null}')"
             fi
         fi
     else
@@ -87,7 +88,7 @@ state_json() {
             [ -n "$package" ] || continue
             tools_late_json="$(jq -c \
                 --arg p "$package" --arg f "$frozen" --arg i "$installed" \
-                '. + [{paquet:$p,figee:$f,installee:$i}]' <<<"$tools_late_json")"
+                '. + [{package:$p,frozen:$f,installed:$i}]' <<<"$tools_late_json")"
         done <<<"$late_out"
         count="$(jq 'length' <<<"$tools_late_json" 2>/dev/null || echo 0)"
         if [ "$count" -gt 0 ]; then
@@ -95,7 +96,7 @@ state_json() {
         fi
     else
         tools_late_json="null"
-        add_error outils "outdated_tools unavailable"
+        add_error tools "outdated_tools unavailable"
     fi
 
     modules_json='[]'
@@ -167,7 +168,7 @@ state_json() {
             --arg state "$state_value" \
             --arg failure "$failure_value" \
             --arg command "$command_value" \
-            '. + [{nom:$name,actif:$active,description:$description,etat:(if $state=="" then null else $state end),echec:(if $failure=="" then null else $failure end),commande:(if $command=="" then null else $command end)}]' \
+            '. + [{name:$name,active:$active,description:$description,state:(if $state=="" then null else $state end),failed:(if $failure=="" then null else $failure end),command:(if $command=="" then null else $command end)}]' \
             <<<"$modules_json")"
     done
 
@@ -241,7 +242,7 @@ state_json() {
             [ -n "$n" ] || continue
             packages_names="${packages_names:+$packages_names, }$n"
         done < "$packages_marker"
-        append_alert paquets "$packages_names" "devzone packages"
+        append_alert packages "$packages_names" "devzone packages"
     fi
     wt_out="$(missing_worktrees 2>/dev/null || true)"
     while IFS= read -r path; do
@@ -258,7 +259,7 @@ state_json() {
     argocd_repo="$(conf_get argocd repo)"
 
     jq -n \
-        --argjson schema 1 \
+        --argjson schema 2 \
         --arg dv "$dv_raw" \
         --arg dvp "$dvp_raw" \
         --argjson id_ok "$id_ok" \
@@ -286,20 +287,20 @@ state_json() {
         --argjson errors "$errors" \
         '{
             schema: $schema,
-            devzone: { version: (if $dv=="" then null else $dv end), disponible: (if $dvp=="" then null else $dvp end) },
-            identite_git: { ok: $id_ok, nom: (if $id_name=="" then null else $id_name end), email: (if $id_email=="" then null else $id_email end), commande: (if $id_command=="" then null else $id_command end) },
-            plateforme: { nom: $platform_name, url: (if $platform_url=="" then null else $platform_url end), github: $github },
+            devzone: { version: (if $dv=="" then null else $dv end), available: (if $dvp=="" then null else $dvp end) },
+            git_identity: { ok: $id_ok, name: (if $id_name=="" then null else $id_name end), email: (if $id_email=="" then null else $id_email end), command: (if $id_command=="" then null else $id_command end) },
+            platform: { name: $platform_name, url: (if $platform_url=="" then null else $platform_url end), github: $github },
             argocd_repo: (if $argocd_repo == "" then null else $argocd_repo end),
-            outils: { retards: $tools_late, commande: (if $tools_command=="" then null else $tools_command end) },
+            tools: { outdated: $tools_late, command: (if $tools_command=="" then null else $tools_command end) },
             modules: $modules,
-            docker_hote: $docker_host,
+            docker_host: $docker_host,
             docker_hote_actif: $docker_host_active,
-            clusters: { services: (if $clusters_services=="" then null else $clusters_services end), services_distant: $services_remote, travail: (if $clusters_work=="" then null else $clusters_work end), travail_interne: $work_internal, commande: (if $clusters_command=="" then null else $clusters_command end) },
+            clusters: { services: (if $clusters_services=="" then null else $clusters_services end), services_remote: $services_remote, work: (if $clusters_work=="" then null else $clusters_work end), internal_work: $work_internal, command: (if $clusters_command=="" then null else $clusters_command end) },
             ports: $ports,
             applications: (if $applications=="" then null else $applications end),
-            identifiants: (if $credentials=="" then null else $credentials end),
-            alertes: $alerts,
-            erreurs: $errors
+            credentials: (if $credentials=="" then null else $credentials end),
+            alerts: $alerts,
+            errors: $errors
         }'
 }
 

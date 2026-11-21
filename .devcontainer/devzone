@@ -4,7 +4,7 @@
 #
 # Per-instance state: $RACINE/.devzone.modules (a folder mounted from the host,
 # survives rebuilds), one line "module=on|off"; the chosen platform is kept
-# there too (plateforme=, gitlab_url=), and the services cluster (cluster=, see
+# there too (platform=, gitlab_url=), and the services cluster (cluster=, see
 # cluster.sh); the old global state (~/.config/devzone/modules) is read once
 set -euo pipefail
 
