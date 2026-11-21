@@ -65,7 +65,7 @@ repair_item() {
 # credentials; a failure does not stop the following ones.
 repair_workstation() {
     repair_failed=0
-    repair_item "Docker relay" env DEVZONE_RELAIS_REEL=oui bash "$ICI/docker-relay.sh"
+    repair_item "Docker relay" env DEVZONE_RELAY_REAL=yes bash "$ICI/docker-relay.sh"
     # Limited Kubernetes account token (#430): 24 h, renewed here; without the
     # kubernetes module and without a services cluster, nothing to do
     if [ "$(value_of kubernetes)" = on ] || [ -n "$(cluster_saved)" ]; then
@@ -87,9 +87,9 @@ repair_workstation() {
     repair_item "ports relay" bash "$ICI/ports.sh" restart
     # Kubernetes workspace (#517): no automatic port watcher
     if ! in_pod; then
-        repair_item "ports auto watcher" env DEVZONE_PORTS_AUTO_REEL=oui bash "$ICI/ports-auto.sh" demarrer
+        repair_item "ports auto watcher" env DEVZONE_PORTS_AUTO_REAL=yes bash "$ICI/ports-auto.sh" demarrer
     fi
-    repair_item "catalog watcher" env DEVZONE_CATALOGUE_REEL=oui bash "$ICI/catalog/catalog-watcher.sh" demarrer
+    repair_item "catalog watcher" env DEVZONE_CATALOG_REAL=yes bash "$ICI/catalog/catalog-watcher.sh" demarrer
     repair_item "credentials" bash "$ICI/password.sh" regenerer
     return "$repair_failed"
 }

@@ -13,14 +13,14 @@
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
-ROOT="${DEVZONE_RACINE:-$(dirname "$HERE")}"
+ROOT="${DEVZONE_ROOT:-$(dirname "$HERE")}"
 LIST="${ROOT}/.devzone.paquets"
-MARK="${DEVZONE_PAQUETS_MARQUE:-/tmp/devzone-paquets.echec}"
-UPDATED="${DEVZONE_PAQUETS_MAJ:-/tmp/devzone-paquets.maj}"
-SUDO="${DEVZONE_PAQUETS_SUDO-sudo}"
-APT="${DEVZONE_PAQUETS_APT:-apt-get}"
-APTCACHE="${DEVZONE_PAQUETS_APTCACHE:-apt-cache}"
-DPKGQUERY="${DEVZONE_PAQUETS_DPKG_QUERY:-dpkg-query}"
+MARK="${DEVZONE_PACKAGES_MARKER:-/tmp/devzone-paquets.echec}"
+UPDATED="${DEVZONE_PACKAGES_UPDATE:-/tmp/devzone-paquets.maj}"
+SUDO="${DEVZONE_PACKAGES_SUDO-sudo}"
+APT="${DEVZONE_PACKAGES_APT:-apt-get}"
+APTCACHE="${DEVZONE_PACKAGES_APTCACHE:-apt-cache}"
+DPKGQUERY="${DEVZONE_PACKAGES_DPKG_QUERY:-dpkg-query}"
 FORMAT="-f=\${Status}"
 # Stored values, kept byte for byte (the users' list file): the header and the
 # « already present » mark are written in UTF-8 as byte escapes (contract).

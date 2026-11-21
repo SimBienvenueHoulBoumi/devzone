@@ -13,15 +13,15 @@ setup() {
     MYSQL="$BATS_TEST_DIRNAME/../../.devcontainer/catalog/mysql/mysql.sh"
     SECRETS="$BATS_TEST_TMPDIR/racine/workspace/.mysql"
     export HOME="$BATS_TEST_TMPDIR/home"
-    export DEVZONE_RACINE="$BATS_TEST_TMPDIR/racine"
-    export DEVZONE_ETAT="$BATS_TEST_TMPDIR/modules"
-    export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
+    export DEVZONE_ROOT="$BATS_TEST_TMPDIR/racine"
+    export DEVZONE_STATE="$BATS_TEST_TMPDIR/modules"
+    export DEVZONE_KUBE_HOST="$BATS_TEST_TMPDIR/hote.config"
     mkdir -p "$HOME" "$SECRETS" "$BATS_TEST_TMPDIR/bin"
-    : >"$DEVZONE_KUBE_HOTE"
+    : >"$DEVZONE_KUBE_HOST"
     : >"$BATS_TEST_TMPDIR/kubectl.log"
     : >"$BATS_TEST_TMPDIR/apply.log"
     : >"$BATS_TEST_TMPDIR/sql.log"
-    printf 'cluster=kind-devzone\n' >"$DEVZONE_ETAT"
+    printf 'cluster=kind-devzone\n' >"$DEVZONE_STATE"
     cat >"$BATS_TEST_TMPDIR/bin/kubectl" <<'KUBE'
 #!/usr/bin/env bash
 T="$BATS_TEST_TMPDIR"
@@ -120,7 +120,7 @@ teardown() {
     [ "$(stat -c %a "$SECRETS/datayer.env" 2>/dev/null || stat -f %Lp "$SECRETS/datayer.env")" = 600 ] || false
     [[ "$output" != *mdpmysql* ]] || false
     [[ "$output" == *"$SECRETS/datayer.env"* ]] || false
-    grep -q $'^mysql:datayer\t127.0.0.1:3306\tdatayer\tmdpmysql1$' "$DEVZONE_RACINE/.password" || false
+    grep -q $'^mysql:datayer\t127.0.0.1:3306\tdatayer\tmdpmysql1$' "$DEVZONE_ROOT/.password" || false
 }
 
 @test "create again: password kept, --new-password changes it" {
@@ -191,7 +191,7 @@ teardown() {
 
 @test "delete-data in a terminal: Enter = abort, no delete" {
     touch "$BATS_TEST_TMPDIR/ns"
-    DEVZONE_INTERACTIF=1 run bash "$MYSQL" delete-data <<<""
+    DEVZONE_INTERACTIVE=1 run bash "$MYSQL" delete-data <<<""
     [ "$status" -eq 0 ] || false
     [[ "$output" == *"Aborted"* ]] || false
     ! grep -q 'delete' "$BATS_TEST_TMPDIR/kubectl.log" 2>/dev/null || false

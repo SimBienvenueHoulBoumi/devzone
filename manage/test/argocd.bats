@@ -9,13 +9,13 @@ setup() {
     kube_isole
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
     ARGOCD="$BATS_TEST_DIRNAME/../../.devcontainer/argocd/argocd.sh"
-    export DEVZONE_RACINE="$BATS_TEST_TMPDIR/racine"
-    export DEVZONE_ETAT="$BATS_TEST_TMPDIR/modules"
-    SECRETS="$DEVZONE_RACINE/workspace/.argocd"
-    mkdir -p "$HOME" "$DEVZONE_RACINE/workspace" "$BATS_TEST_TMPDIR/bin"
-    printf 'argocd=off\ncluster=docker-desktop\n' >"$DEVZONE_ETAT"
+    export DEVZONE_ROOT="$BATS_TEST_TMPDIR/racine"
+    export DEVZONE_STATE="$BATS_TEST_TMPDIR/modules"
+    SECRETS="$DEVZONE_ROOT/workspace/.argocd"
+    mkdir -p "$HOME" "$DEVZONE_ROOT/workspace" "$BATS_TEST_TMPDIR/bin"
+    printf 'argocd=off\ncluster=docker-desktop\n' >"$DEVZONE_STATE"
     # Host cluster: docker-desktop, with its empty kubeconfig (isolated)
-    : >"$DEVZONE_KUBE_HOTE"
+    : >"$DEVZONE_KUBE_HOST"
 
     cat >"$BATS_TEST_TMPDIR/bin/kubectl" <<'KUBE'
 #!/usr/bin/env bash
@@ -80,7 +80,7 @@ argocd_installed() {
     mkdir -p "$SECRETS"
     printf 'ARGOCD_URL=https://127.0.0.1:8443\nARGOCD_USER=admin\nARGOCD_PASSWORD=secret-admin\n' \
         >"$SECRETS/admin.env"
-    printf 'argocd=on\ncluster=docker-desktop\n' >"$DEVZONE_ETAT"
+    printf 'argocd=on\ncluster=docker-desktop\n' >"$DEVZONE_STATE"
 }
 
 wait_nohup() {
@@ -105,7 +105,7 @@ wait_nohup() {
 @test "enable argocd: isolated namespace, pinned chart, password stored, relay started" {
     run bash "$DEVZONE" enable argocd </dev/null
     [ "$status" -eq 0 ]
-    grep -qx 'argocd=on' "$DEVZONE_ETAT"
+    grep -qx 'argocd=on' "$DEVZONE_STATE"
     grep -q 'kind: NetworkPolicy' "$BATS_TEST_TMPDIR/apply.log"
     grep -q 'name: devzone-meme-namespace' "$BATS_TEST_TMPDIR/apply.log"
     # Namespace label set by the administrator, not by the limited account (#430)
@@ -119,9 +119,9 @@ wait_nohup() {
     [ "$(stat -c '%a' "$SECRETS/admin.env")" = 600 ]
     grep -qx 'ARGOCD_PASSWORD=secret-admin' "$SECRETS/admin.env"
     grep -qx 'ARGOCD_URL=https://127.0.0.1:8443' "$SECRETS/admin.env"
-    [ -f "$DEVZONE_RACINE/.password" ]
-    [ "$(stat -c '%a' "$DEVZONE_RACINE/.password")" = 600 ]
-    grep -q "$(printf 'argocd\thttps://127.0.0.1:8443\tadmin\tsecret-admin')" "$DEVZONE_RACINE/.password"
+    [ -f "$DEVZONE_ROOT/.password" ]
+    [ "$(stat -c '%a' "$DEVZONE_ROOT/.password")" = 600 ]
+    grep -q "$(printf 'argocd\thttps://127.0.0.1:8443\tadmin\tsecret-admin')" "$DEVZONE_ROOT/.password"
     wait_nohup '8443:443'
     [[ "$output" == *"✔ argocd module ready: https://127.0.0.1:8443"* ]] || false
     [[ "$output" != *"secret-admin"* ]] || false
@@ -167,8 +167,8 @@ wait_nohup() {
 
 @test "argocd app add: devzone GitLab, internal URL and module root token in a repository Secret" {
     argocd_installed
-    mkdir -p "$DEVZONE_RACINE/workspace/.gitlab"
-    printf 'glpat-SECRET' >"$DEVZONE_RACINE/workspace/.gitlab/root-token"
+    mkdir -p "$DEVZONE_ROOT/workspace/.gitlab"
+    printf 'glpat-SECRET' >"$DEVZONE_ROOT/workspace/.gitlab/root-token"
     run bash "$DEVZONE" argocd app add http://gitlab.localhost:8929/devzone/demo.git k8s
     [ "$status" -eq 0 ]
     [[ "$output" != *"glpat-SECRET"* ]] || false
@@ -192,7 +192,7 @@ wait_nohup() {
     argocd_installed
     run bash "$DEVZONE" disable argocd
     [ "$status" -eq 0 ]
-    grep -qx 'argocd=off' "$DEVZONE_ETAT"
+    grep -qx 'argocd=off' "$DEVZONE_STATE"
     grep -Eq 'helm --kubeconfig [^ ]+ --kube-context docker-desktop uninstall argocd -n devzone-argocd' "$BATS_TEST_TMPDIR/helm.log"
     # Namespace deleted by the administrator, not by the limited account (#430)
     grep -q -- '--context docker-desktop delete namespace devzone-argocd' "$BATS_TEST_TMPDIR/kubectl.log"

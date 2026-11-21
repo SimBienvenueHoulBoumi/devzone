@@ -79,7 +79,7 @@ echo "docker $*" >>"$BATS_TEST_TMPDIR/docker.log"
 DOCKER
     chmod +x "$T/bin/kubectl" "$T/bin/helm" "$T/bin/docker"
     export PATH="$T/bin:$PATH"
-    export DEVZONE_WORKSPACE_ATTENTE=1 DEVZONE_WORKSPACE_PAS=0.1
+    export DEVZONE_WORKSPACE_WAIT=1 DEVZONE_WORKSPACE_STEP=0.1
     # Devzone folder of the workstation: its state, never the real one; Argo CD
     # off here (its own tests: workspace-argocd.bats, #516)
     cd "$T" || return 1
@@ -280,7 +280,7 @@ DOCKER
     export FAKE_REVISION="rev-new"
     export FAKE_POD_REVISIONS="rev-old rev-new"
     # Two polling rounds at least: 1 s is too short on a loaded CI runner (#522)
-    export DEVZONE_WORKSPACE_ATTENTE=10
+    export DEVZONE_WORKSPACE_WAIT=10
     export FAKE_POD_STATES="Running ImagePullBackOff"
     : >"$T/helm.log"
     run bash "$CLI" workspace start
@@ -294,7 +294,7 @@ DOCKER
     export FAKE_REVISION="rev-new"
     export FAKE_POD_REVISIONS="rev-old rev-new"
     # Two polling rounds at least: 1 s is too short on a loaded CI runner (#522)
-    export DEVZONE_WORKSPACE_ATTENTE=10
+    export DEVZONE_WORKSPACE_WAIT=10
     export FAKE_POD_STATES="ErrImagePull Running"
     : >"$T/helm.log"
     run bash "$CLI" workspace start

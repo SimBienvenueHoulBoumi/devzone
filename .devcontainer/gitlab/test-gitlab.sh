@@ -15,12 +15,12 @@
 set -uo pipefail
 
 ICI="$(cd "$(dirname "$0")" && pwd)"
-# Same root as gitlab.sh: DEVZONE_RACINE for the tests
-RACINE="${DEVZONE_RACINE:-$(dirname "$(dirname "$ICI")")}"
+# Same root as gitlab.sh: DEVZONE_ROOT for the tests
+RACINE="${DEVZONE_ROOT:-$(dirname "$(dirname "$ICI")")}"
 GITLAB="$ICI/gitlab.sh"
 SECRETS="$RACINE/workspace/.gitlab"
 TOKEN_FILE="$SECRETS/root-token"
-STATE_FILE="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
+STATE_FILE="${DEVZONE_STATE:-$RACINE/.devzone.modules}"
 HOSTS="${DEVZONE_HOSTS:-/etc/hosts}"
 # Instance name: DEVZONE_INSTANCE suffix computed by cluster.sh, as in
 # gitlab.sh (suffixed devzone-gitlab namespace).
@@ -92,7 +92,7 @@ api() {
 
 read_token() {
     if [ ! -f "$TOKEN_FILE" ]; then
-        REASON="root token missing ($TOKEN_FILE): run with the devzone test-gitlab command of the PATH, or set DEVZONE_RACINE to the root of the enabled repository"
+        REASON="root token missing ($TOKEN_FILE): run with the devzone test-gitlab command of the PATH, or set DEVZONE_ROOT to the root of the enabled repository"
         return 1
     fi
     TOKEN="$(cat "$TOKEN_FILE")"

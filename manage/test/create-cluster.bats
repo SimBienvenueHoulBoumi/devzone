@@ -160,7 +160,7 @@ choisir() {
 @test "creation through the command: a cluster chosen in the menu creates the devzone in kubernetes mode" {
     FAKE_CONTEXTS="docker-desktop prod-eks"
     export FAKE_CONTEXTS
-    export DEVZONE_SANS_DEMARRER=1
+    export DEVZONE_NO_START=1
     # the whole creation copies files: the system tools after the fakes (the fake kubectl and helm stay first)
     export PATH="$T/bin:$T/outils:$PATH_SYSTEME"
     mkdir -p "$T/work"

@@ -113,7 +113,7 @@ setup() {
     agent_lance
     [ "$status" -eq 0 ]
     [ -f "$FAKE_OP_KUBECONFIG_LOG" ] || false
-    grep -qx "$DEVZONE_AGENT_ETAT/kubeconfig" "$FAKE_OP_KUBECONFIG_LOG" || false
+    grep -qx "$DEVZONE_AGENT_STATE/kubeconfig" "$FAKE_OP_KUBECONFIG_LOG" || false
     ! grep -q 'hote.config' "$FAKE_OP_KUBECONFIG_LOG" || false
 }
 
@@ -135,9 +135,9 @@ KUBECTL
     agent_consigne
     agent_lance
     [ "$status" -eq 0 ]
-    grep -q 'name: devzone' "$DEVZONE_AGENT_ETAT/kubeconfig" || false
-    ! grep -q 'kind-x' "$DEVZONE_AGENT_ETAT/kubeconfig" || false
-    [ "$(stat -c %a "$DEVZONE_AGENT_ETAT/kubeconfig" 2>/dev/null || stat -f %Lp "$DEVZONE_AGENT_ETAT/kubeconfig")" = 600 ]
+    grep -q 'name: devzone' "$DEVZONE_AGENT_STATE/kubeconfig" || false
+    ! grep -q 'kind-x' "$DEVZONE_AGENT_STATE/kubeconfig" || false
+    [ "$(stat -c %a "$DEVZONE_AGENT_STATE/kubeconfig" 2>/dev/null || stat -f %Lp "$DEVZONE_AGENT_STATE/kubeconfig")" = 600 ]
 }
 
 @test "agent : no devzone context -> empty kubeconfig and journal line (#470)" {
@@ -146,16 +146,16 @@ KUBECTL
     agent_consigne
     agent_lance
     [ "$status" -eq 0 ]
-    [ ! -s "$DEVZONE_AGENT_ETAT/kubeconfig" ]
-    [ "$(stat -c %a "$DEVZONE_AGENT_ETAT/kubeconfig" 2>/dev/null || stat -f %Lp "$DEVZONE_AGENT_ETAT/kubeconfig")" = 600 ]
+    [ ! -s "$DEVZONE_AGENT_STATE/kubeconfig" ]
+    [ "$(stat -c %a "$DEVZONE_AGENT_STATE/kubeconfig" 2>/dev/null || stat -f %Lp "$DEVZONE_AGENT_STATE/kubeconfig")" = 600 ]
     grep -q "=== kubernetes: no devzone context, session without access" "$(agent_journal)" || false
 }
 
 @test "agent : recent lock without pid -> not taken over, wait then refusal" {
     # A lock without pid is only taken over when its age exceeds 30 s (#377)
     source "$BATS_TEST_DIRNAME/../../.devcontainer/agent-session.sh"
-    AGENT_ETAT="$DEVZONE_AGENT_ETAT"
-    export DEVZONE_AGENT_VERROU_MAX=2
+    AGENT_ETAT="$DEVZONE_AGENT_STATE"
+    export DEVZONE_AGENT_LOCK_MAX=2
     mkdir -p "$AGENT_ETAT/verrou"
     start="$(date +%s)"
     run lock_take
@@ -169,8 +169,8 @@ KUBECTL
 @test "agent : recent lock with unknown pid (other container) -> not taken over" {
     # Pid absent from this pid space: only the age of the lock decides (#377)
     source "$BATS_TEST_DIRNAME/../../.devcontainer/agent-session.sh"
-    AGENT_ETAT="$DEVZONE_AGENT_ETAT"
-    export DEVZONE_AGENT_VERROU_MAX=2
+    AGENT_ETAT="$DEVZONE_AGENT_STATE"
+    export DEVZONE_AGENT_LOCK_MAX=2
     mkdir -p "$AGENT_ETAT/verrou"
     echo 999999 >"$AGENT_ETAT/verrou/pid"
     start="$(date +%s)"
@@ -184,7 +184,7 @@ KUBECTL
     # Lock left by a stop: age over 30 s, taken over without waiting even if its pid
     # is still alive, the age alone decides (#377)
     source "$BATS_TEST_DIRNAME/../../.devcontainer/agent-session.sh"
-    AGENT_ETAT="$DEVZONE_AGENT_ETAT"
+    AGENT_ETAT="$DEVZONE_AGENT_STATE"
     mkdir -p "$AGENT_ETAT/verrou"
     echo "$$" >"$AGENT_ETAT/verrou/pid"
     touch -d '-60 seconds' "$AGENT_ETAT/verrou" 2>/dev/null || touch -t 200001010000 "$AGENT_ETAT/verrou" || false

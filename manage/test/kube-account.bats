@@ -10,11 +10,11 @@ setup() {
     relais_docker_isole
     kube_isole
     KUBE_ACCOUNT="$BATS_TEST_DIRNAME/../../.devcontainer/kube-account.sh"
-    export DEVZONE_ETAT="$BATS_TEST_TMPDIR/modules"
+    export DEVZONE_STATE="$BATS_TEST_TMPDIR/modules"
     mkdir -p "$BATS_TEST_TMPDIR/bin"
-    : >"$DEVZONE_ETAT"
+    : >"$DEVZONE_STATE"
     # hote.config exists and lists docker-desktop (host kubeconfig)
-    : >"$DEVZONE_KUBE_HOTE"
+    : >"$DEVZONE_KUBE_HOST"
     printf 'docker-desktop\n' >"$BATS_TEST_TMPDIR/hote.contexts"
     cat >"$BATS_TEST_TMPDIR/bin/kubectl" <<'KUBE'
 #!/usr/bin/env bash
@@ -142,7 +142,7 @@ KUBE
 }
 
 @test "kube-account.sh jeton : account set up and token renewed" {
-    printf 'cluster=docker-desktop\n' >"$DEVZONE_ETAT"
+    printf 'cluster=docker-desktop\n' >"$DEVZONE_STATE"
     run bash "$KUBE_ACCOUNT" jeton
     [ "$status" -eq 0 ] || false
     grep -q 'create namespace devzone-system' "$BATS_TEST_TMPDIR/kubectl.log" || false
@@ -159,7 +159,7 @@ KUBE
 }
 
 @test "kube-account.sh jeton : catches up the existing devzone namespaces (idempotent)" {
-    printf 'cluster=docker-desktop\n' >"$DEVZONE_ETAT"
+    printf 'cluster=docker-desktop\n' >"$DEVZONE_STATE"
     printf 'namespace/devzone-mysql\nnamespace/devzone-gitlab\n' >"$BATS_TEST_TMPDIR/namespaces"
     run bash "$KUBE_ACCOUNT" jeton
     [ "$status" -eq 0 ] || false

@@ -263,7 +263,7 @@ DOCKER
 }
 
 @test "manage/devzone stop creates ./stop" {
-    DEVZONE_SANS_DEMARRER=1 run bash "$CLI" stop
+    DEVZONE_NO_START=1 run bash "$CLI" stop
     [ "$status" -eq 0 ]
     [ -d stop ]
 }

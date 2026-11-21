@@ -131,7 +131,7 @@ argocd_save_admin_password() {
 
 # .password of the workstation regenerated from workspace/.*/ (password.sh of the package)
 argocd_passwords_refresh() {
-    DEVZONE_RACINE="$PWD" bash "$RACINE/.devcontainer/password.sh" regenerer 2>/dev/null ||
+    DEVZONE_ROOT="$PWD" bash "$RACINE/.devcontainer/password.sh" regenerer 2>/dev/null ||
         echo "⚠ .password not updated (bash .devcontainer/password.sh regenerer)" >&2
 }
 

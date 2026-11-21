@@ -2,8 +2,8 @@
 # MySQL of the catalog (#414): create, list, delete, status, relay-start, relay-stop, install, delete-data.
 set -euo pipefail
 ICI="$(cd "$(dirname "$0")" && pwd)"
-RACINE="${DEVZONE_RACINE:-$(dirname "$(dirname "$(dirname "$ICI")")")}"
-ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
+RACINE="${DEVZONE_ROOT:-$(dirname "$(dirname "$(dirname "$ICI")")")}"
+ETAT="${DEVZONE_STATE:-$RACINE/.devzone.modules}"
 # shellcheck source=SCRIPTDIR/../../cluster.sh
 # shellcheck disable=SC1091
 . "$ICI/../../cluster.sh"

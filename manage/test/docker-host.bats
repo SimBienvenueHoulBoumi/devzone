@@ -111,8 +111,8 @@ exit 0
 KUBE
     chmod +x "$BATS_TEST_TMPDIR/bin/kubectl"
     : >"$BATS_TEST_TMPDIR/kubectl.log"
-    export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
-    : >"$DEVZONE_KUBE_HOTE"
+    export DEVZONE_KUBE_HOST="$BATS_TEST_TMPDIR/hote.config"
+    : >"$DEVZONE_KUBE_HOST"
 }
 
 @test "cluster_choose : host answers -> contexte host" {
@@ -121,7 +121,7 @@ KUBE
     (
         export DEVZONE_INSTANCE=devzone
         export ETAT="$BATS_TEST_TMPDIR/state"
-        export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
+        export DEVZONE_KUBE_HOST="$BATS_TEST_TMPDIR/hote.config"
         source "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
         run cluster_choose
         [ "$status" -eq 0 ]
@@ -135,7 +135,7 @@ KUBE
     (
         export DEVZONE_INSTANCE=devzone
         export ETAT="$BATS_TEST_TMPDIR/state"
-        export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
+        export DEVZONE_KUBE_HOST="$BATS_TEST_TMPDIR/hote.config"
         source "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
         run cluster_choose
         [ "$status" -eq 0 ]
@@ -150,7 +150,7 @@ KUBE
     (
         export DEVZONE_INSTANCE=devzone
         export ETAT="$BATS_TEST_TMPDIR/state"
-        export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
+        export DEVZONE_KUBE_HOST="$BATS_TEST_TMPDIR/hote.config"
         source "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
         run cluster_choose
         [ "$status" -eq 0 ]
@@ -162,7 +162,7 @@ KUBE
 @test "uninstall : filter by instance, no kind" {
     export DEVZONE_VOLUMES="mon-devzone"
     export CONFIRMER=yes
-    export DEVZONE_DANS_CONTENEUR=non
+    export DEVZONE_IN_CONTAINER=no
     cat >"$BATS_TEST_TMPDIR/bin/docker" <<'DOCKER'
 #!/usr/bin/env bash
 echo "docker $*" >>"$BATS_TEST_TMPDIR/docker.log"
@@ -200,7 +200,7 @@ exit "${FAKE_KIND_CODE:-0}"
 KIND
     chmod +x "$BATS_TEST_TMPDIR/bin/kind-reel"
     : >"$BATS_TEST_TMPDIR/kind-reel.log"
-    export DEVZONE_KIND_REEL="$BATS_TEST_TMPDIR/bin/kind-reel"
+    export DEVZONE_KIND_REAL="$BATS_TEST_TMPDIR/bin/kind-reel"
     WRAPPER="$BATS_TEST_DIRNAME/../../.devcontainer/kind-wrapper.sh"
 }
 
@@ -238,7 +238,7 @@ KIND
 @test "uninstall in the container: no Docker action on the workstation" {
     # docker talks to the host Docker there: the volumes seen would be the workstation's
     export CONFIRMER=yes
-    export DEVZONE_DANS_CONTENEUR=oui
+    export DEVZONE_IN_CONTAINER=yes
     cat >"$BATS_TEST_TMPDIR/bin/docker" <<'DOCKER'
 #!/usr/bin/env bash
 echo "docker $*" >>"$BATS_TEST_TMPDIR/docker.log"

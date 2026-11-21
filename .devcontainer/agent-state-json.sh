@@ -14,7 +14,7 @@ while [ -L "$SOURCE" ]; do
     esac
 done
 ICI="$(cd -P "$(dirname "$SOURCE")" && pwd)"
-RACINE="${DEVZONE_RACINE:-$(dirname "$ICI")}"
+RACINE="${DEVZONE_ROOT:-$(dirname "$ICI")}"
 
 # shellcheck source=agent-errors.sh
 # shellcheck disable=SC1091
@@ -26,7 +26,7 @@ RACINE="${DEVZONE_RACINE:-$(dirname "$ICI")}"
 # shellcheck disable=SC1091
 . "$ICI/agent-session.sh"
 
-AGENT_ETAT="${DEVZONE_AGENT_ETAT:-$HOME/.local/state/oc-lancer}"
+AGENT_ETAT="${DEVZONE_AGENT_STATE:-$HOME/.local/state/oc-lancer}"
 
 # UTC ISO-8601 date of an epoch, GNU then BSD date: the fin field of the exclusions.
 iso() {

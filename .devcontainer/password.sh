@@ -8,7 +8,7 @@
 set -euo pipefail
 
 PASSWORD_HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PASSWORD_ROOT="${DEVZONE_RACINE:-$(dirname "$PASSWORD_HERE")}"
+PASSWORD_ROOT="${DEVZONE_ROOT:-$(dirname "$PASSWORD_HERE")}"
 PASSWORD_TARGET="$PASSWORD_ROOT/.password"
 
 # Regenerates $ROOT/.password from workspace/.gitlab, workspace/.postgres,

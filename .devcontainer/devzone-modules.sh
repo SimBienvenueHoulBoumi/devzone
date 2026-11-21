@@ -140,6 +140,6 @@ change_module() {
     fi
     write_value "$m" "$1"
     # Services held by Argo CD (#559): 0 done, 3 helm direct as before, else failed
-    if DEVZONE_ETAT="$ETAT" bash "$ICI/argocd/services-hook.sh" "$m" "$1" "${@:3}"; then return 0; elif [ $? -ne 3 ]; then return 1; fi
+    if DEVZONE_STATE="$ETAT" bash "$ICI/argocd/services-hook.sh" "$m" "$1" "${@:3}"; then return 0; elif [ $? -ne 3 ]; then return 1; fi
     "apply_$m" "$1" "${@:3}"
 }

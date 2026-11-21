@@ -9,9 +9,9 @@ setup() {
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
     export HOME="$BATS_TEST_TMPDIR/home"
     mkdir -p "$HOME" "$BATS_TEST_TMPDIR/bin" "$BATS_TEST_TMPDIR/racine/workspace"
-    export DEVZONE_RACINE="$BATS_TEST_TMPDIR/racine"
-    export DEVZONE_ETAT="$BATS_TEST_TMPDIR/modules"
-    : >"$DEVZONE_ETAT"
+    export DEVZONE_ROOT="$BATS_TEST_TMPDIR/racine"
+    export DEVZONE_STATE="$BATS_TEST_TMPDIR/modules"
+    : >"$DEVZONE_STATE"
     export GIT_CONFIG_NOSYSTEM=1
     cd "$BATS_TEST_TMPDIR" || return 1
 
@@ -96,8 +96,8 @@ CURL
 }
 
 @test "state-json: module failed → echec and command" {
-    printf 'ia=on\n' >"$DEVZONE_ETAT"
-    echo "echec npm" >"$DEVZONE_ETAT-echec-ia"
+    printf 'ia=on\n' >"$DEVZONE_STATE"
+    echo "echec npm" >"$DEVZONE_STATE-echec-ia"
     run bash "$DEVZONE" status --json
     [ "$status" -eq 0 ]
     [ "$(printf '%s\n' "$output" | jq -r '.modules[] | select(.nom=="ia") | .echec')" = "echec npm" ]
@@ -113,14 +113,14 @@ CURL
 
 @test "state-json: relay failed → alert relais_docker" {
     echo "relay broken" >"$BATS_TEST_TMPDIR/relais.echec"
-    export DEVZONE_RELAIS_MARQUE="$BATS_TEST_TMPDIR/relais.echec"
+    export DEVZONE_RELAY_MARKER="$BATS_TEST_TMPDIR/relais.echec"
     run bash "$DEVZONE" status --json
     [ "$status" -eq 0 ]
     [ "$(printf '%s\n' "$output" | jq -r '.alertes[] | select(.code=="relais_docker") | .code')" = "relais_docker" ]
 }
 
 @test "state-json: open port → in ports" {
-    printf 'ports=8080\n' >"$DEVZONE_ETAT"
+    printf 'ports=8080\n' >"$DEVZONE_STATE"
     : >"$BATS_TEST_TMPDIR/relais/devzone-devzone-port-8080"
     FAUX_REPOND=8080 run bash "$DEVZONE" status --json
     [ "$status" -eq 0 ]
@@ -128,7 +128,7 @@ CURL
 }
 
 @test "state-json: no secret in the output" {
-    printf 'secret-sentinel-123\n' >"$DEVZONE_RACINE/.password"
+    printf 'secret-sentinel-123\n' >"$DEVZONE_ROOT/.password"
     cat >"$BATS_TEST_TMPDIR/bin/gh" <<'GH'
 #!/usr/bin/env bash
 echo "token secret-gh-456" >&2
@@ -142,7 +142,7 @@ GH
 }
 
 @test "state-json: docker-hote on by default, socket present → active" {
-    : >"$DEVZONE_RELAIS_SOURCE"
+    : >"$DEVZONE_RELAY_SOURCE"
     run bash "$DEVZONE" status --json
     [ "$status" -eq 0 ]
     printf '%s\n' "$output" | jq -e . >/dev/null
@@ -151,7 +151,7 @@ GH
 }
 
 @test "state-json: docker-hote on, socket absent → active false" {
-    rm -f "$DEVZONE_RELAIS_SOURCE"
+    rm -f "$DEVZONE_RELAY_SOURCE"
     run bash "$DEVZONE" status --json
     [ "$status" -eq 0 ]
     [ "$(printf '%s\n' "$output" | jq -r '.docker_hote')" = "true" ]
@@ -159,8 +159,8 @@ GH
 }
 
 @test "state-json: docker-hote=off, socket still mounted → active true" {
-    : >"$DEVZONE_RELAIS_SOURCE"
-    printf 'docker-hote=off\n' >"$DEVZONE_ETAT"
+    : >"$DEVZONE_RELAY_SOURCE"
+    printf 'docker-hote=off\n' >"$DEVZONE_STATE"
     run bash "$DEVZONE" status --json
     [ "$status" -eq 0 ]
     [ "$(printf '%s\n' "$output" | jq -r '.docker_hote')" = "false" ]
@@ -168,8 +168,8 @@ GH
 }
 
 @test "state-json: docker-hote=off without socket → false" {
-    printf 'docker-hote=off\n' >"$DEVZONE_ETAT"
-    rm -f "$DEVZONE_RELAIS_SOURCE"
+    printf 'docker-hote=off\n' >"$DEVZONE_STATE"
+    rm -f "$DEVZONE_RELAY_SOURCE"
     run bash "$DEVZONE" status --json
     [ "$status" -eq 0 ]
     [ "$(printf '%s\n' "$output" | jq -r '.docker_hote')" = "false" ]
@@ -177,7 +177,7 @@ GH
 }
 
 @test "state-json: DEVZONE_WORKSPACE=kubernetes → socket absent, no alert" {
-    : >"$DEVZONE_RELAIS_SOURCE"
+    : >"$DEVZONE_RELAY_SOURCE"
     export DEVZONE_WORKSPACE=kubernetes
     run bash "$DEVZONE" status --json
     [ "$status" -eq 0 ]
@@ -187,7 +187,7 @@ GH
 }
 
 @test "state-json: argocd_repo field: the designated GitOps repository" {
-    printf '[argocd]\n    repo = https://github.com/tester/devzone-argocd.git\n' >"$DEVZONE_RACINE/.argocd.conf"
+    printf '[argocd]\n    repo = https://github.com/tester/devzone-argocd.git\n' >"$DEVZONE_ROOT/.argocd.conf"
     run bash "$DEVZONE" status --json
     [ "$status" -eq 0 ]
     printf '%s\n' "$output" | jq -e . >/dev/null

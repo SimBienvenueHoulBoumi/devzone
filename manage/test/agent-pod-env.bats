@@ -53,7 +53,7 @@ KUBE
     printf 'build the feature\n' >"$T/consigne.txt"
     FOLDER="$(faux_worktree devzone dz-222)"
     export FOLDER
-    export SEMI_FOLDER="$DEVZONE_RACINE/devzone-wt/dz;222"
+    export SEMI_FOLDER="$DEVZONE_ROOT/devzone-wt/dz;222"
     export PATH="$T/bin:$PATH"
 }
 
@@ -61,12 +61,12 @@ source_agent_pod() {
     source "$BATS_TEST_DIRNAME/../../.devcontainer/agent-pod.sh"
 }
 
-@test "agent-pod-env : manifest sets DEVZONE_WORKSPACE and DEVZONE_RACINE" {
+@test "agent-pod-env : manifest sets DEVZONE_WORKSPACE and DEVZONE_ROOT" {
     source_agent_pod
     agent_pod_validate_folder "$FOLDER" >/dev/null
     manifest="$(agent_pod_build_manifest "$FOLDER" "$T/consigne.txt" "agent-dz-222-test")"
     grep -A1 "name: DEVZONE_WORKSPACE" "$manifest" | grep -q 'value: "kubernetes"' || false
-    grep -A1 "name: DEVZONE_RACINE" "$manifest" | grep -q 'value: "/workspaces/projets"' || false
+    grep -A1 "name: DEVZONE_ROOT" "$manifest" | grep -q 'value: "/workspaces/projets"' || false
     rm -f "$manifest"
 }
 
@@ -119,10 +119,10 @@ source_agent_pod() {
 @test "agent-pod-env : two folders give two pod names, pod name is lowercase" {
     source_agent_pod
     first="$(agent_pod_name "$FOLDER")"
-    second="$(agent_pod_name "$DEVZONE_RACINE/devzone-wt/dz-223")"
+    second="$(agent_pod_name "$DEVZONE_ROOT/devzone-wt/dz-223")"
     [[ "$first" == agent-dz-222-* ]] || false
     [[ "$second" == agent-dz-223-* ]] || false
-    name="$(agent_pod_name "$DEVZONE_RACINE/Dz-Foo")"
+    name="$(agent_pod_name "$DEVZONE_ROOT/Dz-Foo")"
     [[ "$name" == agent-dz-foo-* ]] || false
 }
 
@@ -131,7 +131,7 @@ source_agent_pod() {
     [ "$status" -eq 0 ]
     [[ "$output" == *"last log line"* ]] || false
     [[ "$output" != *"log line 1"$'\n'* ]] || false
-    grep -q "last log line" "$DEVZONE_AGENT_ETAT/dz-222.pod.log" || false
+    grep -q "last log line" "$DEVZONE_AGENT_STATE/dz-222.pod.log" || false
 }
 
 @test "agent-pod-env : failure shows the cause on stderr and keeps the log" {
@@ -139,7 +139,7 @@ source_agent_pod() {
     run bash "$DEVZONE" agent --pod "$FOLDER" "$T/consigne.txt"
     [ "$status" -ne 0 ]
     [[ "$output" == *"last log line"* ]] || false
-    grep -q "last log line" "$DEVZONE_AGENT_ETAT/dz-222.pod.log" || false
+    grep -q "last log line" "$DEVZONE_AGENT_STATE/dz-222.pod.log" || false
     grep -q "delete pod" "$T/kubectl.log" || false
 }
 

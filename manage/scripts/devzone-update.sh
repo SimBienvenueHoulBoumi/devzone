@@ -214,8 +214,8 @@ update_workstation() {
             return 0
             ;;
     esac
-    if [ -n "${DEVZONE_RECONSTRUIRE:-}" ]; then
-        sh -c "$DEVZONE_RECONSTRUIRE"
+    if [ -n "${DEVZONE_REBUILD:-}" ]; then
+        sh -c "$DEVZONE_REBUILD"
     else
         make -C "$folder" rebuild
     fi

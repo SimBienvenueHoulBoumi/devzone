@@ -107,7 +107,7 @@ GH
 DOCKER
     chmod +x "$T/bin/kubectl" "$T/bin/helm" "$T/bin/gh" "$T/bin/docker"
     export PATH="$T/bin:$PATH"
-    export DEVZONE_WORKSPACE_ATTENTE=1 DEVZONE_WORKSPACE_PAS=0.1
+    export DEVZONE_WORKSPACE_WAIT=1 DEVZONE_WORKSPACE_STEP=0.1
     export DEVZONE_ARGOCD_REVISION="feat/essai"
     export GIT_CONFIG_NOSYSTEM=1
     cd "$T" || return 1

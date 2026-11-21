@@ -121,7 +121,7 @@ state_default() {
 # cluster= line of the state expects this context, not "devzone" (services cluster)
 host_context_of_cluster() {
     local cluster="$1" host ctx
-    host="${DEVZONE_KUBE_HOTE:-$HOME/.kube/hote.config}"
+    host="${DEVZONE_KUBE_HOST:-$HOME/.kube/hote.config}"
     while IFS= read -r ctx; do
         [ -n "$ctx" ] || continue
         # The "devzone" context is set on the services cluster: we look for the

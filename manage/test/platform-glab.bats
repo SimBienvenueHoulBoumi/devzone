@@ -18,9 +18,9 @@ setup() {
     mkdir -p "$HOME" "$HOME/.local/bin"
     # garde-fou : jamais le vrai HOME
     [[ "$HOME" == "$BATS_TEST_TMPDIR"/* ]] || false
-    export DEVZONE_RACINE="$BATS_TEST_TMPDIR/racine"
-    export DEVZONE_ETAT="$BATS_TEST_TMPDIR/modules"
-    mkdir -p "$DEVZONE_RACINE/workspace"
+    export DEVZONE_ROOT="$BATS_TEST_TMPDIR/racine"
+    export DEVZONE_STATE="$BATS_TEST_TMPDIR/modules"
+    mkdir -p "$DEVZONE_ROOT/workspace"
     export GLAB_LOG="$BATS_TEST_TMPDIR/glab.log"
     INSTANCE="http://example.gitlab:8443"
     AUTRE="https://git.autre.exemple"
@@ -136,5 +136,5 @@ nombre_reglages_credential() {
     run bash "$DEVZONE" platform gitlab --url "$INSTANCE"
     [ "$status" -ne 0 ]
     [[ "$output" == *"cannot set the git credential"* ]] || false
-    ! grep -q '^plateforme=' "$DEVZONE_ETAT" 2>/dev/null || false
+    ! grep -q '^plateforme=' "$DEVZONE_STATE" 2>/dev/null || false
 }

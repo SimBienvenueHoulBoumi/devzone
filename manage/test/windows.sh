@@ -79,8 +79,8 @@ else
     echo "  ○ ignoré (hors Windows : pas de cygpath)"
 fi
 
-echo "▶ devzone <dossier> avec DEVZONE_SANS_DEMARRER=1"
-reussit "crée un devzone complet" "DEVZONE_SANS_DEMARRER=1 devzone '$TESTDIR' --docker" "créé dans"
+echo "▶ devzone <dossier> avec DEVZONE_NO_START=1"
+reussit "crée un devzone complet" "DEVZONE_NO_START=1 devzone '$TESTDIR' --docker" "créé dans"
 for f in .devcontainer/devcontainer.json .devcontainer/devzone Makefile .gitattributes manage/scripts/launch.sh manage/scripts/uninstall.sh README.md LICENSE workspace/.gitkeep .gitignore; do
     reussit "existe : $f" "[ -e '$TESTDIR/$f' ]"
 done
@@ -89,7 +89,7 @@ reussit ".gitignore : workspace ignoré sauf .gitkeep" "grep -q '^workspace/\\*\
 echo "▶ Dossier non vide refusé, rien n'est écrasé"
 mkdir -p "$TMP/plein"
 echo important >"$TMP/plein/fichier"
-echoue "dossier non vide refusé" "DEVZONE_SANS_DEMARRER=1 devzone '$TMP/plein'" "pas vide"
+echoue "dossier non vide refusé" "DEVZONE_NO_START=1 devzone '$TMP/plein'" "pas vide"
 reussit "fichier existant préservé" "[ \"\$(cat '$TMP/plein/fichier')\" = important ]"
 reussit "Makefile non créé" "[ ! -e '$TMP/plein/Makefile' ]"
 

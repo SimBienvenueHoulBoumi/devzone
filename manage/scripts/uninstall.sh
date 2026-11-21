@@ -29,7 +29,7 @@ esac
 # Docker first: without it every docker call would show its raw error
 # shellcheck source=SCRIPTDIR/docker.sh
 . "$(dirname "${BASH_SOURCE[0]}")/docker.sh"
-docker_ready "${DEVZONE_COMMANDE:-make desinstaller}" || exit 1
+docker_ready "${DEVZONE_COMMAND:-make desinstaller}" || exit 1
 
 # .argocd.conf of the devzone folder: the GitOps repository is never removed
 # with the devzone, only its designation can be changed later
@@ -52,10 +52,10 @@ fi
 # (DEVZONE_VOLUMES) is unknown here. Touching Docker from the container could
 # remove another instance's resources (or the default instance): only the
 # Kubernetes part is handled.
-# DEVZONE_DANS_CONTENEUR=yes|no forces the mode (tests, which run inside a container)
-case "${DEVZONE_DANS_CONTENEUR:-}" in
-    oui | yes) INSIDE_CONTAINER=true ;;
-    non | no) INSIDE_CONTAINER=false ;;
+# DEVZONE_IN_CONTAINER=yes|no forces the mode (tests, which run inside a container)
+case "${DEVZONE_IN_CONTAINER:-}" in
+    yes) INSIDE_CONTAINER=true ;;
+    no) INSIDE_CONTAINER=false ;;
     *) INSIDE_CONTAINER=false; [ ! -f /.dockerenv ] || INSIDE_CONTAINER=true ;;
 esac
 

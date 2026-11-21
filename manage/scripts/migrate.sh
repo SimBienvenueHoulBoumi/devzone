@@ -10,7 +10,7 @@
 
 # vscode home in the pod and image used to copy Docker volumes.
 POD_HOME="/home/vscode"
-COPY_IMAGE="${DEVZONE_IMAGE_COPIE:-busybox:1.36}"
+COPY_IMAGE="${DEVZONE_IMAGE_COPY:-busybox:1.36}"
 # Docker workstation volumes: devzone-<x>, or $DEVZONE_VOLUMES-<x> (functional tests).
 DOCKER_VOLUMES=(gh git claude opencode-config opencode-data agent config m2 gradle pnpm)
 # Folder size measurement ($1): "file count bytes".

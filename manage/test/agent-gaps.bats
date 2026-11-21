@@ -15,7 +15,7 @@ setup() {
     [ "$(grep -c . "$FAKE_OP_LOG")" -eq 2 ]
     [ "$(sed -n '1p' "$FAKE_OP_LOG")" = "big-pickle" ]
     [ "$(sed -n '2p' "$FAKE_OP_LOG")" = "deepseek-v4.1-flash-free" ]
-    grep -q "^[0-9]* quota 3600$" "$DEVZONE_AGENT_ETAT/ecart-big-pickle" || false
+    grep -q "^[0-9]* quota 3600$" "$DEVZONE_AGENT_STATE/ecart-big-pickle" || false
     grep -q "Free usage limit" "$(agent_journal)" || false
 }
 
@@ -27,7 +27,7 @@ setup() {
     [ "$status" -eq 0 ]
     [ "$(grep -c . "$FAKE_OP_LOG")" -eq 2 ]
     [ "$(sed -n '2p' "$FAKE_OP_LOG")" = "deepseek-v4.1-flash-free" ]
-    grep -q "^[0-9]* pays 604800$" "$DEVZONE_AGENT_ETAT/ecart-big-pickle" || false
+    grep -q "^[0-9]* pays 604800$" "$DEVZONE_AGENT_STATE/ecart-big-pickle" || false
     grep -q "excluded (country, 7 d)" "$(agent_journal)" || false
 }
 
@@ -38,7 +38,7 @@ setup() {
     agent_lance
     [ "$status" -eq 0 ]
     [ "$(sed -n '2p' "$FAKE_OP_LOG")" = "deepseek-v4.1-flash-free" ]
-    grep -q "^[0-9]* filtre 3600$" "$DEVZONE_AGENT_ETAT/ecart-big-pickle" || false
+    grep -q "^[0-9]* filtre 3600$" "$DEVZONE_AGENT_STATE/ecart-big-pickle" || false
 }
 
 @test "agent : error without known cause -> next model, no exclusion" {
@@ -48,7 +48,7 @@ setup() {
     agent_lance
     [ "$status" -eq 0 ]
     [ "$(sed -n '2p' "$FAKE_OP_LOG")" = "deepseek-v4.1-flash-free" ]
-    [ ! -f "$DEVZONE_AGENT_ETAT/ecart-big-pickle" ]
+    [ ! -f "$DEVZONE_AGENT_STATE/ecart-big-pickle" ]
     grep -q "no exclusion" "$(agent_journal)" || false
 }
 
@@ -61,7 +61,7 @@ setup() {
     [ "$(grep -c . "$FAKE_OP_LOG")" -eq 2 ]
     [ "$(sed -n '2p' "$FAKE_OP_LOG")" = "deepseek-v4.1-flash-free" ]
     grep -q "network reachable: treated as other" "$(agent_journal)" || false
-    [ ! -f "$DEVZONE_AGENT_ETAT/ecart-big-pickle" ]
+    [ ! -f "$DEVZONE_AGENT_STATE/ecart-big-pickle" ]
 }
 
 @test "agent : ENOTFOUND then network back -> same model relaunched, no exclusion" {
@@ -77,7 +77,7 @@ setup() {
     grep -q "network back" "$(agent_journal)" || false
     grep -q "end with opencode/big-pickle" "$(agent_journal)" || false
     grep -q "RESUME" "$FAKE_OP_CONSIGNE_LOG" || false
-    [ ! -f "$DEVZONE_AGENT_ETAT/ecart-big-pickle" ]
+    [ ! -f "$DEVZONE_AGENT_STATE/ecart-big-pickle" ]
 }
 
 @test "agent : ENOTFOUND repeated 4 times, network back each time -> 3 retries then next model" {
@@ -88,20 +88,20 @@ setup() {
     [ "$(grep -c '^big-pickle$' "$FAKE_OP_LOG")" -eq 4 ]
     [ "$(sed -n '5p' "$FAKE_OP_LOG")" = "deepseek-v4.1-flash-free" ]
     grep -q "network down 3 times: next model, no exclusion" "$(agent_journal)" || false
-    [ ! -f "$DEVZONE_AGENT_ETAT/ecart-big-pickle" ]
+    [ ! -f "$DEVZONE_AGENT_STATE/ecart-big-pickle" ]
 }
 
 @test "agent : network never back -> code 4 network unavailable, no exclusion" {
     agent_consigne
     export FAKE_OP_RESEAU_MODELS="big-pickle"
     echo 1000000 >"$RESEAU_COUPE"
-    export DEVZONE_AGENT_RESEAU_MAX=2
+    export DEVZONE_AGENT_NETWORK_MAX=2
     agent_lance
     [ "$status" -eq 4 ]
     grep -q "network unavailable" "$(agent_journal)" || false
     ! grep -q "no free model available" "$(agent_journal)" || false
     [ "$(grep -c . "$FAKE_OP_LOG")" -eq 1 ]
-    [ ! -f "$DEVZONE_AGENT_ETAT/ecart-big-pickle" ]
+    [ ! -f "$DEVZONE_AGENT_STATE/ecart-big-pickle" ]
 }
 
 @test "agent : silence at start -> model excluded one hour (silent), next model" {
@@ -110,14 +110,14 @@ setup() {
     agent_lance
     [ "$status" -eq 0 ]
     [ "$(grep -c . "$FAKE_OP_LOG")" -eq 2 ]
-    grep -q "^[0-9]* mute 3600$" "$DEVZONE_AGENT_ETAT/ecart-big-pickle" || false
+    grep -q "^[0-9]* mute 3600$" "$DEVZONE_AGENT_STATE/ecart-big-pickle" || false
     grep -q "silent at start" "$(agent_journal)" || false
 }
 
 @test "agent : old muet- file still counted for 1 h" {
     agent_consigne
-    mkdir -p "$DEVZONE_AGENT_ETAT"
-    date +%s >"$DEVZONE_AGENT_ETAT/muet-big-pickle"
+    mkdir -p "$DEVZONE_AGENT_STATE"
+    date +%s >"$DEVZONE_AGENT_STATE/muet-big-pickle"
     agent_lance
     [ "$status" -eq 0 ]
     [ "$(sed -n '1p' "$FAKE_OP_LOG")" = "deepseek-v4.1-flash-free" ]
@@ -127,8 +127,8 @@ setup() {
     agent_consigne
     agent_lance
     [ "$status" -eq 0 ]
-    echo "$(date +%s) pays 604800" >"$DEVZONE_AGENT_ETAT/ecart-big-pickle"
-    echo "$(date +%s) quota 3600" >"$DEVZONE_AGENT_ETAT/ecart-glm-5.3-flash-free"
+    echo "$(date +%s) pays 604800" >"$DEVZONE_AGENT_STATE/ecart-big-pickle"
+    echo "$(date +%s) quota 3600" >"$DEVZONE_AGENT_STATE/ecart-glm-5.3-flash-free"
     run bash "$DEVZONE" agent etat
     [ "$status" -eq 0 ]
     [[ "$output" == *"projet.log"* ]] || false
@@ -138,10 +138,10 @@ setup() {
 }
 
 @test "agent : state only lists current exclusions, with their end time" {
-    mkdir -p "$DEVZONE_AGENT_ETAT"
+    mkdir -p "$DEVZONE_AGENT_STATE"
     now="$(date +%s)"
-    echo $(( now - 600 )) >"$DEVZONE_AGENT_ETAT/muet-big-pickle"
-    echo $(( now - 7200 )) >"$DEVZONE_AGENT_ETAT/muet-deepseek-v4.1-flash-free"
+    echo $(( now - 600 )) >"$DEVZONE_AGENT_STATE/muet-big-pickle"
+    echo $(( now - 7200 )) >"$DEVZONE_AGENT_STATE/muet-deepseek-v4.1-flash-free"
     run bash "$DEVZONE" agent etat
     [ "$status" -eq 0 ]
     [[ "$output" == *"model big-pickle excluded (silent) until"* ]] || false
@@ -149,18 +149,18 @@ setup() {
 }
 
 @test "agent : liberer lifts one model's exclusion, --tous lifts all, without argument refused" {
-    mkdir -p "$DEVZONE_AGENT_ETAT"
-    echo "$(date +%s) pays 604800" >"$DEVZONE_AGENT_ETAT/ecart-big-pickle"
-    echo "$(date +%s) quota 3600" >"$DEVZONE_AGENT_ETAT/ecart-glm-5.3-flash-free"
+    mkdir -p "$DEVZONE_AGENT_STATE"
+    echo "$(date +%s) pays 604800" >"$DEVZONE_AGENT_STATE/ecart-big-pickle"
+    echo "$(date +%s) quota 3600" >"$DEVZONE_AGENT_STATE/ecart-glm-5.3-flash-free"
     run bash "$DEVZONE" agent liberer
     [ "$status" -eq 2 ]
     run bash "$DEVZONE" agent liberer big-pickle
     [ "$status" -eq 0 ]
-    [ ! -f "$DEVZONE_AGENT_ETAT/ecart-big-pickle" ]
-    [ -f "$DEVZONE_AGENT_ETAT/ecart-glm-5.3-flash-free" ]
+    [ ! -f "$DEVZONE_AGENT_STATE/ecart-big-pickle" ]
+    [ -f "$DEVZONE_AGENT_STATE/ecart-glm-5.3-flash-free" ]
     run bash "$DEVZONE" agent liberer --tous
     [ "$status" -eq 0 ]
-    [ ! -f "$DEVZONE_AGENT_ETAT/ecart-glm-5.3-flash-free" ]
+    [ ! -f "$DEVZONE_AGENT_STATE/ecart-glm-5.3-flash-free" ]
 }
 
 @test "agent : error_cause classifies country, quota, filter, network and other" {

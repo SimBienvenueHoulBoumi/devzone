@@ -10,10 +10,10 @@ setup() {
     relais_docker_isole
     kube_isole
     export HOME="$BATS_TEST_TMPDIR/home"
-    export DEVZONE_RACINE="$BATS_TEST_TMPDIR/racine"
+    export DEVZONE_ROOT="$BATS_TEST_TMPDIR/racine"
     # startup.sh starts the automatic port watcher: its folder stays under the test (#394)
     export DEVZONE_PORTS_AUTO_DIR="$BATS_TEST_TMPDIR/ports-auto"
-    ROOT="$DEVZONE_RACINE"
+    ROOT="$DEVZONE_ROOT"
     GL="$ROOT/workspace/.gitlab"
     PG="$ROOT/workspace/.postgres"
     mkdir -p "$HOME" "$GL" "$PG"

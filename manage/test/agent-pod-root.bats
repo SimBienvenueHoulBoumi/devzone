@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# devzone agent --pod: projects root (DEVZONE_RACINE) and path checks (#222).
+# devzone agent --pod: projects root (DEVZONE_ROOT) and path checks (#222).
 # Third file, so agent-pod.bats stays under 250 lines. The root is a folder under
 # BATS_TEST_TMPDIR: no test needs /workspaces, and no real cluster is used.
 
@@ -31,8 +31,8 @@ source_agent_pod() {
     source "$BATS_TEST_DIRNAME/../../.devcontainer/agent-pod.sh"
 }
 
-@test "agent-pod-root : without DEVZONE_RACINE the launcher root is /workspaces/projets" {
-    run env -u DEVZONE_RACINE bash -c '. "$1"; printf "%s" "$AGENT_POD_ROOT"' _ "$BATS_TEST_DIRNAME/../../.devcontainer/agent-pod.sh"
+@test "agent-pod-root : without DEVZONE_ROOT the launcher root is /workspaces/projets" {
+    run env -u DEVZONE_ROOT bash -c '. "$1"; printf "%s" "$AGENT_POD_ROOT"' _ "$BATS_TEST_DIRNAME/../../.devcontainer/agent-pod.sh"
     [ "$status" -eq 0 ]
     [ "$output" = "/workspaces/projets" ]
 }
@@ -41,7 +41,7 @@ source_agent_pod() {
     source_agent_pod
     run agent_pod_validate_folder "$OUTSIDE"
     [ "$status" -ne 0 ]
-    [[ "$output" == *"outside the projects root $DEVZONE_RACINE"* ]] || false
+    [[ "$output" == *"outside the projects root $DEVZONE_ROOT"* ]] || false
 }
 
 @test "agent-pod-root : launcher refuses a folder outside the root before any object" {
@@ -52,7 +52,7 @@ source_agent_pod() {
 }
 
 @test "agent-pod-root : folder without .git is refused without a pod" {
-    NO_GIT="$DEVZONE_RACINE/dz-222-no-git"
+    NO_GIT="$DEVZONE_ROOT/dz-222-no-git"
     mkdir -p "$NO_GIT"
     source_agent_pod
     run agent_pod_validate_folder "$NO_GIT"
@@ -62,26 +62,26 @@ source_agent_pod() {
 
 @test "agent-pod-root : path with space is refused" {
     source_agent_pod
-    run agent_pod_validate_folder "$DEVZONE_RACINE/devzone-wt/dz 222"
+    run agent_pod_validate_folder "$DEVZONE_ROOT/devzone-wt/dz 222"
     [ "$status" -ne 0 ]
 }
 
 @test "agent-pod-root : path with semicolon is refused" {
     source_agent_pod
-    run agent_pod_validate_folder "$DEVZONE_RACINE/devzone-wt/dz;222"
+    run agent_pod_validate_folder "$DEVZONE_ROOT/devzone-wt/dz;222"
     [ "$status" -ne 0 ]
 }
 
 @test "agent-pod-root : path with a .. part is refused" {
     FOLDER="$(faux_worktree devzone dz-222)"
     source_agent_pod
-    run agent_pod_validate_folder "$DEVZONE_RACINE/devzone-wt/../devzone-wt/dz-222"
+    run agent_pod_validate_folder "$DEVZONE_ROOT/devzone-wt/../devzone-wt/dz-222"
     [ "$status" -ne 0 ]
     [[ "$output" == *"invalid folder path"* ]] || false
 }
 
 @test "agent-pod-root : worktree depot outside the root is refused" {
-    folder="$DEVZONE_RACINE/devzone-wt/dz-222"
+    folder="$DEVZONE_ROOT/devzone-wt/dz-222"
     mkdir -p "$folder" "$T/hors/depot/.git/worktrees/dz-222"
     printf 'gitdir: %s/hors/depot/.git/worktrees/dz-222\n' "$T" >"$folder/.git"
     source_agent_pod

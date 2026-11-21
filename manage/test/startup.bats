@@ -44,8 +44,8 @@ setup() {
         chmod +x "$BATS_TEST_TMPDIR/bin/$outil"
     done
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
-    export DEVZONE_RACINE="$BATS_TEST_TMPDIR/racine"
-    export DEVZONE_ETAT="$BATS_TEST_TMPDIR/racine/.devzone.modules"
+    export DEVZONE_ROOT="$BATS_TEST_TMPDIR/racine"
+    export DEVZONE_STATE="$BATS_TEST_TMPDIR/racine/.devzone.modules"
     export DEVZONE_PORTS_AUTO_DIR="$BATS_TEST_TMPDIR/ports-auto"
     export HOME="$BATS_TEST_TMPDIR/home"
     export GIT_CONFIG_NOSYSTEM=1
@@ -65,8 +65,8 @@ setup() {
         chmod +x "$BATS_TEST_TMPDIR/bin/$outil"
     done
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
-    export DEVZONE_RACINE="$BATS_TEST_TMPDIR/racine"
-    export DEVZONE_ETAT="$BATS_TEST_TMPDIR/racine/.devzone.modules"
+    export DEVZONE_ROOT="$BATS_TEST_TMPDIR/racine"
+    export DEVZONE_STATE="$BATS_TEST_TMPDIR/racine/.devzone.modules"
     export DEVZONE_PORTS_AUTO_DIR="$BATS_TEST_TMPDIR/ports-auto"
     export HOME="$BATS_TEST_TMPDIR/home"
     export GIT_CONFIG_NOSYSTEM=1

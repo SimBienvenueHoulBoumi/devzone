@@ -24,10 +24,10 @@ ICI="$(cd -P "$(dirname "$SOURCE")" && pwd)"
 # shellcheck disable=SC1091
 . "$ICI/help.sh"
 VERSIONS="$ICI/../manage/scripts/versions.sh"
-# devzone folder (/workspaces/devzone); DEVZONE_RACINE for the tests
-RACINE="${DEVZONE_RACINE:-$(dirname "$ICI")}"
-# Default state of the instance; DEVZONE_ETAT takes precedence (tests, CI)
-ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
+# devzone folder (/workspaces/devzone); DEVZONE_ROOT for the tests
+RACINE="${DEVZONE_ROOT:-$(dirname "$ICI")}"
+# Default state of the instance; DEVZONE_STATE takes precedence (tests, CI)
+ETAT="${DEVZONE_STATE:-$RACINE/.devzone.modules}"
 MODULES=(ia kubernetes gitlab postgres argocd mysql)
 # shellcheck source=SCRIPTDIR/cluster.sh
 # shellcheck disable=SC1091
@@ -187,14 +187,14 @@ case "${1:-}" in
     start) bash "$ICI/startup.sh" ;;
     metrics) bash "$ICI/metrics-server.sh" "${@:2}" ;;
     use) use_cluster "${@:2}" ;;
-    clusters) DEVZONE_ETAT="$ETAT" bash "$ICI/clusters.sh" "${@:2}" ;;
+    clusters) DEVZONE_STATE="$ETAT" bash "$ICI/clusters.sh" "${@:2}" ;;
     cluster) change_cluster "${@:2}" ;;
-    postgres) DEVZONE_ETAT="$ETAT" bash "$ICI/postgres/postgres.sh" "${@:2}" ;;
-    mysql) DEVZONE_ETAT="$ETAT" bash "$ICI/catalog/mysql/mysql.sh" "${@:2}" ;;
-    gitlab) DEVZONE_ETAT="$ETAT" bash "$ICI/gitlab/gitlab.sh" "${@:2}" ;;
-    catalog) DEVZONE_ETAT="$ETAT" bash "$ICI/catalog.sh" list ;;
-    argocd) DEVZONE_ETAT="$ETAT" bash "$ICI/argocd/argocd.sh" "${@:2}" ;;
-    port) DEVZONE_ETAT="$ETAT" bash "$ICI/ports.sh" "${@:2}" ;;
+    postgres) DEVZONE_STATE="$ETAT" bash "$ICI/postgres/postgres.sh" "${@:2}" ;;
+    mysql) DEVZONE_STATE="$ETAT" bash "$ICI/catalog/mysql/mysql.sh" "${@:2}" ;;
+    gitlab) DEVZONE_STATE="$ETAT" bash "$ICI/gitlab/gitlab.sh" "${@:2}" ;;
+    catalog) DEVZONE_STATE="$ETAT" bash "$ICI/catalog.sh" list ;;
+    argocd) DEVZONE_STATE="$ETAT" bash "$ICI/argocd/argocd.sh" "${@:2}" ;;
+    port) DEVZONE_STATE="$ETAT" bash "$ICI/ports.sh" "${@:2}" ;;
     packages) bash "$ICI/packages.sh" "${@:2}" ;;
     passwords)
         bash "$ICI/password.sh" regenerer ||
@@ -204,7 +204,7 @@ case "${1:-}" in
     -h | --help | help) devzone_aide ;;
     -v | --version) echo "devzone ${DEVZONE_VERSION:-unknown}" ;;
     test-bash32) bash "$RACINE/manage/test/bash32.sh" ;;
-    test-gitlab) DEVZONE_ETAT="$ETAT" bash "$ICI/gitlab/test-gitlab.sh" "${@:2}" ;;
+    test-gitlab) DEVZONE_STATE="$ETAT" bash "$ICI/gitlab/test-gitlab.sh" "${@:2}" ;;
     platform)
         if [ -n "${2:-}" ]; then
             change_platform "${@:2}"

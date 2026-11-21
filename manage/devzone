@@ -6,7 +6,7 @@
 #   devzone --version | --help
 # In the container, « devzone » is another command: the modules
 # (.devcontainer/devzone).
-# DEVZONE_SANS_DEMARRER=1: copy only, without starting the container (tests).
+# DEVZONE_NO_START=1: copy only, without starting the container (tests).
 # The helpers live in manage/scripts/devzone-*.sh, sourced by the command that
 # needs them (so --version and --help work with this file alone).
 # shellcheck disable=SC2034 # PACKAGE_ITEMS, GITIGNORE_LINES: read by the sourced devzone-*.sh
@@ -121,7 +121,7 @@ case "${1:-}" in
             echo "✖ À lancer dans un dossier devzone (uninstall.sh introuvable ici)." >&2
             exit 1
         fi
-        DEVZONE_COMMANDE="devzone uninstall" bash "$uninstaller"
+        DEVZONE_COMMAND="devzone uninstall" bash "$uninstaller"
         ;;
     workspace)
         bash "$PAQUET/manage/workspace.sh" "${@:2}"

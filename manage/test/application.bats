@@ -9,9 +9,9 @@ setup() {
     RACINE_TEST="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
     T="$BATS_TEST_TMPDIR"
     APP="$T/app/devzone"
-    export DEVZONE_RACINE="$T/racine"
-    export DEVZONE_ETAT="$T/modules"
-    mkdir -p "$T/app/gitlab" "$T/app/postgres" "$T/app/catalog/mysql" "$T/bin" "$DEVZONE_RACINE"
+    export DEVZONE_ROOT="$T/racine"
+    export DEVZONE_STATE="$T/modules"
+    mkdir -p "$T/app/gitlab" "$T/app/postgres" "$T/app/catalog/mysql" "$T/bin" "$DEVZONE_ROOT"
     cp "$RACINE_TEST/.devcontainer/devzone" "$APP"
     cp "$RACINE_TEST"/.devcontainer/devzone-*.sh "$T/app/"
     cp "$RACINE_TEST/.devcontainer/help.sh" "$T/app/help.sh"
@@ -30,7 +30,7 @@ setup() {
 
     cat >"$T/app/docker-relay.sh" <<'RELAIS'
 #!/usr/bin/env bash
-printf 'relais %s %s\n' "${DEVZONE_RELAIS_REEL:-}" "$*" >>"$BATS_TEST_TMPDIR/actions.log"
+printf 'relais %s %s\n' "${DEVZONE_RELAY_REAL:-}" "$*" >>"$BATS_TEST_TMPDIR/actions.log"
 [ ! -f "$BATS_TEST_TMPDIR/echec-relais" ] || { echo "socket unavailable"; exit 1; }
 RELAIS
     cat >"$T/app/ports.sh" <<'PORTS'
@@ -116,14 +116,14 @@ KUBE
     [[ "$output" == *"✔ ports relay"* ]] || false
     [[ "$output" == *"✔ ports auto watcher"* ]] || false
     [[ "$output" == *"✔ credentials"* ]] || false
-    [[ "$(cat "$T/actions.log")" == *"relais oui"* ]] || false
+    [[ "$(cat "$T/actions.log")" == *"relais yes"* ]] || false
     [[ "$(cat "$T/actions.log")" == *"ports restart"* ]] || false
     [[ "$(cat "$T/actions.log")" == *"ports-auto demarrer"* ]] || false
     [[ "$(cat "$T/actions.log")" == *"password regenerer"* ]] || false
 }
 
 @test "repair: active gitlab and postgres are repaired too" {
-    printf 'gitlab=on\npostgres=on\n' >"$DEVZONE_ETAT"
+    printf 'gitlab=on\npostgres=on\n' >"$DEVZONE_STATE"
     run bash "$APP" repair
     [ "$status" -eq 0 ]
     [[ "$(cat "$T/actions.log")" == *"gitlab hote-poser"* ]] || false
@@ -133,7 +133,7 @@ KUBE
 
 @test "repair: the kubernetes account token is renewed" {
     faux_kubectl
-    printf 'cluster=docker-desktop\n' >"$DEVZONE_ETAT"
+    printf 'cluster=docker-desktop\n' >"$DEVZONE_STATE"
     run bash "$APP" repair
     [ "$status" -eq 0 ]
     [[ "$output" == *"✔ kubernetes account"* ]] || false
@@ -176,12 +176,12 @@ KUBE
 
 @test "use: switches the context without touching the services cluster" {
     faux_kubectl
-    printf 'cluster=kind-devzone\n' >"$DEVZONE_ETAT"
+    printf 'cluster=kind-devzone\n' >"$DEVZONE_STATE"
     run bash "$APP" use docker-desktop
     [ "$status" -eq 0 ]
     [[ "$output" == *"working cluster: docker-desktop"* ]] || false
     [[ "$(cat "$T/kubectl.log")" == *"config use-context docker-desktop"* ]] || false
-    [ "$(cat "$DEVZONE_ETAT")" = "cluster=kind-devzone" ]
+    [ "$(cat "$DEVZONE_STATE")" = "cluster=kind-devzone" ]
 }
 
 @test "use: unknown context refused without switching" {

@@ -7,11 +7,11 @@ setup() {
     HM="$BATS_TEST_DIRNAME/../../.devcontainer/ai/host-models.sh"
     HC="$BATS_TEST_DIRNAME/../../.devcontainer/ai/host-check.sh"
     export HOME="$BATS_TEST_TMPDIR/home"
-    export DEVZONE_RACINE="$BATS_TEST_TMPDIR/racine"
+    export DEVZONE_ROOT="$BATS_TEST_TMPDIR/racine"
     export DEVZONE_OLLAMA_URL="http://host.docker.internal:11434"
     export DEVZONE_OLLAMA_REGISTRY="http://registre.faux"
-    unset DEVZONE_HOST_MODEL DEVZONE_IA_MESURES
-    mkdir -p "$HOME" "$BATS_TEST_TMPDIR/bin" "$DEVZONE_RACINE/workspace" "$BATS_TEST_TMPDIR/manifests"
+    unset DEVZONE_HOST_MODEL DEVZONE_AI_MEASURES
+    mkdir -p "$HOME" "$BATS_TEST_TMPDIR/bin" "$DEVZONE_ROOT/workspace" "$BATS_TEST_TMPDIR/manifests"
     : >"$BATS_TEST_TMPDIR/curl.log"
     export FAKE_CURL="$BATS_TEST_TMPDIR/curl.log"
     export FAKE_OLLAMA=ok
@@ -258,12 +258,12 @@ EOF
 
 @test "agent: host model is the local model, after every online model" {
     # Module ia on: the local slot is the host model detected via /api/tags.
-    printf 'ia=on\n' >"$DEVZONE_RACINE/.devzone.modules"
-    export DEVZONE_AGENT_ETAT="$BATS_TEST_TMPDIR/etat"
+    printf 'ia=on\n' >"$DEVZONE_ROOT/.devzone.modules"
+    export DEVZONE_AGENT_STATE="$BATS_TEST_TMPDIR/etat"
     export FAKE_ARGS="$BATS_TEST_TMPDIR/refs.log"
     : >"$FAKE_ARGS"
-    mkdir -p "$DEVZONE_AGENT_ETAT" "$DEVZONE_RACINE/workspace/projet"
-    printf 'construis la feature\n' >"$DEVZONE_RACINE/workspace/consigne.txt"
+    mkdir -p "$DEVZONE_AGENT_STATE" "$DEVZONE_ROOT/workspace/projet"
+    printf 'construis la feature\n' >"$DEVZONE_ROOT/workspace/consigne.txt"
     # Fake opencode: two online models, every attempt fails so the whole rotation runs.
     cat >"$BATS_TEST_TMPDIR/bin/opencode" <<'FAKE'
 #!/usr/bin/env bash
@@ -282,7 +282,7 @@ case "${1:-}" in
 esac
 FAKE
     chmod +x "$BATS_TEST_TMPDIR/bin/opencode"
-    run bash "$DEVZONE" agent "$DEVZONE_RACINE/workspace/projet" "$DEVZONE_RACINE/workspace/consigne.txt"
+    run bash "$DEVZONE" agent "$DEVZONE_ROOT/workspace/projet" "$DEVZONE_ROOT/workspace/consigne.txt"
     [ "$status" -eq 3 ]
     [ "$(tail -1 "$FAKE_ARGS")" = "devzone-host/qwen3-coder:32k" ]
     [ "$(grep -c '^opencode/' "$FAKE_ARGS")" -eq 2 ]
@@ -293,11 +293,11 @@ FAKE
 # known cause); the host model (devzone-host/...) hits the quota. Every
 # reference passed to -m is recorded in $FAKE_ARGS.
 fake_opencode_rotation() {
-    export DEVZONE_AGENT_ETAT="$BATS_TEST_TMPDIR/etat"
+    export DEVZONE_AGENT_STATE="$BATS_TEST_TMPDIR/etat"
     export FAKE_ARGS="$BATS_TEST_TMPDIR/refs.log"
     : >"$FAKE_ARGS"
-    mkdir -p "$DEVZONE_AGENT_ETAT" "$DEVZONE_RACINE/workspace/projet"
-    printf 'construis la feature\n' >"$DEVZONE_RACINE/workspace/consigne.txt"
+    mkdir -p "$DEVZONE_AGENT_STATE" "$DEVZONE_ROOT/workspace/projet"
+    printf 'construis la feature\n' >"$DEVZONE_ROOT/workspace/consigne.txt"
     cat >"$BATS_TEST_TMPDIR/bin/opencode" <<'FAKE'
 #!/usr/bin/env bash
 case "${1:-}" in
@@ -324,9 +324,9 @@ FAKE
 
 @test "agent: the host model is tried last, whatever .devzone.modules says" {
     unset DEVZONE_WORKSPACE
-    printf 'ia=on\n' >"$DEVZONE_RACINE/.devzone.modules"
+    printf 'ia=on\n' >"$DEVZONE_ROOT/.devzone.modules"
     fake_opencode_rotation
-    run bash "$DEVZONE" agent "$DEVZONE_RACINE/workspace/projet" "$DEVZONE_RACINE/workspace/consigne.txt"
+    run bash "$DEVZONE" agent "$DEVZONE_ROOT/workspace/projet" "$DEVZONE_ROOT/workspace/consigne.txt"
     [ "$status" -eq 3 ]
     [ "$(tail -1 "$FAKE_ARGS")" = "devzone-host/qwen3-coder:32k" ]
     [ "$(grep -c '^opencode/' "$FAKE_ARGS")" -eq 2 ]
@@ -335,16 +335,16 @@ FAKE
 
 @test "agent: a host model name with slashes sets no stray file and keeps its exact reference" {
     unset DEVZONE_WORKSPACE
-    printf 'ia=on\n' >"$DEVZONE_RACINE/.devzone.modules"
+    printf 'ia=on\n' >"$DEVZONE_ROOT/.devzone.modules"
     # Fake Ollama: one model whose name has slashes and a colon (as pulled from Hugging Face).
     export FAKE_TAGS='{"models":[{"name":"hf.co/ggml-org/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-GGUF:Q4_0","size":1,"digest":"sha256:aaaaaaaa","details":{"type":"llm"}}]}'
     fake_opencode_rotation
-    run bash "$DEVZONE" agent "$DEVZONE_RACINE/workspace/projet" "$DEVZONE_RACINE/workspace/consigne.txt"
+    run bash "$DEVZONE" agent "$DEVZONE_ROOT/workspace/projet" "$DEVZONE_ROOT/workspace/consigne.txt"
     [ "$status" -eq 3 ]
     # The reference given to opencode keeps the exact model name
     [ "$(tail -1 "$FAKE_ARGS")" = "devzone-host/hf.co/ggml-org/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-GGUF:Q4_0" ]
     # The set-aside file has a slash-free internal name, nothing is created in a sub-folder
-    [ -f "$DEVZONE_AGENT_ETAT/ecart-hf.co_ggml-org_NVIDIA-Nemotron-3.5-Lightning-30B-A3B-GGUF_Q4_0" ]
-    [ ! -e "$DEVZONE_AGENT_ETAT/ecart-hf.co" ]
-    [ -z "$(find "$DEVZONE_AGENT_ETAT" -mindepth 1 -type d -name 'ecart-*')" ]
+    [ -f "$DEVZONE_AGENT_STATE/ecart-hf.co_ggml-org_NVIDIA-Nemotron-3.5-Lightning-30B-A3B-GGUF_Q4_0" ]
+    [ ! -e "$DEVZONE_AGENT_STATE/ecart-hf.co" ]
+    [ -z "$(find "$DEVZONE_AGENT_STATE" -mindepth 1 -type d -name 'ecart-*')" ]
 }

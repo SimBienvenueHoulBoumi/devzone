@@ -15,7 +15,7 @@ while [ -L "$SOURCE" ]; do
     esac
 done
 ICI="$(cd -P "$(dirname "$SOURCE")" && pwd)"
-RACINE="${DEVZONE_RACINE:-$(dirname "$ICI")}"
+RACINE="${DEVZONE_ROOT:-$(dirname "$ICI")}"
 # shellcheck source=agent-errors.sh disable=SC1091
 . "$ICI/agent-errors.sh"
 # shellcheck source=agent-rights.sh disable=SC1091
@@ -34,12 +34,12 @@ FREE_MODELS=(big-pickle deepseek-v4.1-flash-free hy4-flash-free nemotron-3.5-sup
 # shellcheck source=agent-pod.sh disable=SC1091
 . "$ICI/agent-pod.sh"
 SILENCE="${DEVZONE_AGENT_SILENCE:-45}"
-FROZEN="${DEVZONE_AGENT_FIGEE:-600}"
-AGENT_ETAT="${DEVZONE_AGENT_ETAT:-$HOME/.local/state/oc-lancer}"
+FROZEN="${DEVZONE_AGENT_FROZEN:-600}"
+AGENT_ETAT="${DEVZONE_AGENT_STATE:-$HOME/.local/state/oc-lancer}"
 # Pause between read and write of the rank (tests only): active only when
-# DEVZONE_AGENT_PAUSE_RANG is set under bats; never a pause by default.
+# DEVZONE_AGENT_PAUSE_RANK is set under bats; never a pause by default.
 PAUSE_RANK=0
-if [ -n "${DEVZONE_AGENT_PAUSE_RANG:-}" ] && [ -n "${BATS_TEST_TMPDIR:-}" ]; then PAUSE_RANK="$DEVZONE_AGENT_PAUSE_RANG"; fi
+if [ -n "${DEVZONE_AGENT_PAUSE_RANK:-}" ] && [ -n "${BATS_TEST_TMPDIR:-}" ]; then PAUSE_RANK="$DEVZONE_AGENT_PAUSE_RANK"; fi
 # Retries of the same session for a network cause, per model, before the next model
 NETWORK_RETRIES=3
 refuse() { echo "devzone agent: $*" >&2; exit 2; }
@@ -104,7 +104,7 @@ agent_launch() {
                 if [ "$(error_cause "$(error_lines "$new")")" != "quota" ]; then started=1; break; fi
             fi
             if [ $(( $(date +%s) - start_t )) -ge "$SILENCE" ]; then break; fi
-            sleep "${DEVZONE_AGENT_PAS:-1}"
+            sleep "${DEVZONE_AGENT_STEP:-1}"
         done
         if [ "$discard" = 1 ]; then resume; i=$(( i + 1 )); continue; fi
         if kill -0 "$pid" 2>/dev/null && [ "$started" = 0 ]; then
@@ -127,7 +127,7 @@ agent_launch() {
             size="$(wc -c <"$journal")"
             while kill -0 "$pid" 2>/dev/null; do
                 if session_fatal_error "$pid" "$journal" "$offset" "$m" "$folder"; then discard=1; break; fi
-                sleep "${DEVZONE_AGENT_PAS:-1}"
+                sleep "${DEVZONE_AGENT_STEP:-1}"
                 now="$(date +%s)"
                 if [ "$(wc -c <"$journal")" -gt "$size" ]; then
                     size="$(wc -c <"$journal")"

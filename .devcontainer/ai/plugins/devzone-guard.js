@@ -2,17 +2,17 @@
 // Each shell tool call is checked by docker-guard.sh. Exit code 2: error shown
 // to the agent with stderr message. Script absent or failing: nothing blocked.
 // The installed copy (devzone enable ia) replaces the placeholder below with
-// the script path; DEVZONE_DOCKER_GARDE overrides it. The script is resolved
+// the script path; DEVZONE_DOCKER_GUARD overrides it. The script is resolved
 // from the plugin location itself (.devcontainer/ai/plugins -> ../docker-guard.sh).
 import { spawnSync } from "node:child_process"
 import { existsSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import { dirname, join } from "node:path"
 
-const INSTALLED = process.env.DEVZONE_DOCKER_GARDE || "__DEVZONE_DOCKER_GARDE__"
+const INSTALLED = process.env.DEVZONE_DOCKER_GUARD || "__DEVZONE_DOCKER_GUARD__"
 
 function guardScript() {
-  if (INSTALLED && INSTALLED.indexOf("__DEVZONE_DOCKER_GARDE__") !== 0 && existsSync(INSTALLED)) {
+  if (INSTALLED && INSTALLED.indexOf("__DEVZONE_DOCKER_GUARD__") !== 0 && existsSync(INSTALLED)) {
     return INSTALLED
   }
   const script = join(dirname(fileURLToPath(import.meta.url)), "..", "docker-guard.sh")
