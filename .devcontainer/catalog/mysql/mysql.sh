@@ -111,7 +111,7 @@ install_module() {
     regenerer_identifiants
 }
 # Deletes the namespace (so the PVCs), keeps workspace/.mysql (#441):
-# terminal confirmation [o/N], --yes required otherwise (refusal, code 2)
+# terminal confirmation [y/N], --yes required otherwise (refusal, code 2)
 delete_data() {
     local CTX yes="" arg answer
     for arg in "$@"; do
@@ -122,10 +122,10 @@ delete_data() {
     done
     if [ -z "$yes" ]; then
         cluster_interactive || refuse "confirmation needs a terminal: devzone mysql delete-data --yes"
-        printf 'Delete namespace %s and all its volumes? [o/N] ' "$NS" >&2
+        printf 'Delete namespace %s and all its volumes? [y/N] ' "$NS" >&2
         read -r answer || answer=""
         case "$answer" in
-            o | O | oui) ;;
+            y | Y | yes) ;;
             *) echo "Aborted: nothing was deleted."; return 0 ;;
         esac
     fi
@@ -148,18 +148,18 @@ module_status() {
     local CTX
     CTX="$(cluster_saved)"
     if [ -z "$CTX" ] || ! installed; then
-        echo "désactivé"
+        echo "disabled"
         return 0
     fi
     if [ "$(k get statefulset mysql -o jsonpath='{.status.readyReplicas}' 2>/dev/null || true)" != 1 ]; then
-        echo "en échec sur $CTX : devzone apply"
+        echo "failed on $CTX: devzone apply"
         return 0
     fi
     if ! relay_active mysql; then
-        echo "prêt sur $CTX, relais arrêté : devzone apply"
+        echo "ready on $CTX, relay stopped: devzone apply"
         return 0
     fi
-    echo "prêt sur $CTX : 127.0.0.1:$MYSQL_PORT, $(database_count) base(s)"
+    echo "ready on $CTX: 127.0.0.1:$MYSQL_PORT, $(database_count) database(s)"
 }
 # Creates the user and the database of a project; .env in 600, password kept
 create_project() {
@@ -224,10 +224,10 @@ delete_project() {
     installed || refuse "module disabled: devzone enable mysql"
     if [ -z "$yes" ]; then
         cluster_interactive || refuse "confirmation needs a terminal: devzone mysql delete $project --yes"
-        printf 'Delete database %s and its user? [o/N] ' "$project" >&2
+        printf 'Delete database %s and its user? [y/N] ' "$project" >&2
         read -r answer || answer=""
         case "$answer" in
-            o | O | oui) ;;
+            y | Y | yes) ;;
             *) echo "Aborted: nothing was deleted."; return 0 ;;
         esac
     fi

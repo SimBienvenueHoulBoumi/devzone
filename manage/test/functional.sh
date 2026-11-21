@@ -105,7 +105,7 @@ done
 echo "▶ Module ia"
 reussit "enable ia" "devzone enable ia && claude --version && opencode --version" "Claude Code"
 reussit "ia : garde-fou repowarden branché (Claude Code, opencode)" "grep -qE 'repowarden (garde|guard)' ~/.claude/settings.json && test -f ~/.config/opencode/plugins/repowarden-garde.js"
-reussit "ia : configuration opencode par défaut en place" "grep -q '^// devzone : configuration opencode par défaut' ~/.config/opencode/opencode.jsonc && grep -q '\"model\": \"opencode/big-pickle\"' ~/.config/opencode/opencode.jsonc"
+reussit "ia : configuration opencode par défaut en place" "grep -q '^// devzone : default opencode configuration' ~/.config/opencode/opencode.jsonc && grep -q '\"model\": \"opencode/big-pickle\"' ~/.config/opencode/opencode.jsonc"
 # Chaque modèle de la configuration doit être proposé par la version installée
 modeles="$(dz "grep -oE '\"opencode/[^\"]+\"' ~/.config/opencode/opencode.jsonc | tr -d '\"' | sort -u")"
 modeles_dispo="$(dz "timeout 60 opencode models opencode")"
@@ -160,7 +160,7 @@ reussit "enable kubernetes : metrics-server sur kind" "devzone enable kubernetes
 reussit "métriques disponibles" "for i in \$(seq 1 36); do kubectl --context kind-$KIND_TEST top nodes >/dev/null 2>&1 && exit 0; sleep 5; done; exit 1"
 reussit "metrics-server marqué comme installé par devzone" "kubectl --context kind-$KIND_TEST -n kube-system get deployment metrics-server -o jsonpath='{.metadata.labels.devzone}'" "^installe$"
 # Désinstallation lancée dans le conteneur : seul le cluster kind-$KIND_TEST est vu
-reussit "désinstaller : retire le metrics-server de devzone" "CONFIRMER=oui bash manage/scripts/uninstall.sh" "metrics-server removed: kind-$KIND_TEST"
+reussit "désinstaller : retire le metrics-server de devzone" "CONFIRMER=yes bash manage/scripts/uninstall.sh" "metrics-server removed: kind-$KIND_TEST"
 echoue "metrics-server absent après désinstallation" "kubectl --context kind-$KIND_TEST -n kube-system get deployment metrics-server"
 echoue "metrics-server.sh : unknown context" "bash .devcontainer/metrics-server.sh nexistepas" "unknown context"
 reussit "disable kubernetes" "devzone disable kubernetes" "kubernetes disabled"
@@ -201,12 +201,12 @@ IMAGE_TEST="$(docker inspect "$id" --format '{{.Config.Image}}')"
 if [ -f "$COPIE/.devzone.etat" ]; then ok "make down : image notée"; else ko "make down : image notée" "pas de .devzone.etat"; fi
 avant="$(restants)"
 if ! sortie="$(hote bash manage/scripts/uninstall.sh </dev/null)" && [ "$(restants)" = "$avant" ]; then ok "sans confirmation : rien n'est supprimé"; else ko "sans confirmation : rien n'est supprimé" "$sortie"; fi
-sortie="$(hote env CONFIRMER=oui GARDER=connexions bash manage/scripts/uninstall.sh)"
+sortie="$(hote env CONFIRMER=yes GARDER=connexions bash manage/scripts/uninstall.sh)"
 gardes="$(docker volume ls -q | grep "^${DEVZONE_VOLUMES}-" | sed "s/^${DEVZONE_VOLUMES}-//" | sort | tr '\n' ' ')"
 if [ "$gardes" = "claude config gh git opencode-config opencode-data " ]; then ok "GARDER=connexions : seules les connexions restent"; else ko "GARDER=connexions : seules les connexions restent" "restants : $gardes"$'\n'"$sortie"; fi
 if ! docker image inspect "$IMAGE_TEST" >/dev/null 2>&1; then ok "après make down : image supprimée"; else ko "après make down : image supprimée" "$IMAGE_TEST"; fi
 demarrer
-sortie="$(hote env CONFIRMER=oui bash manage/scripts/uninstall.sh)"
+sortie="$(hote env CONFIRMER=yes bash manage/scripts/uninstall.sh)"
 if [ -z "$(docker ps -aq --filter "label=devcontainer.local_folder=$COPIE")" ] && [ "$(restants)" = 0 ] && ! docker image inspect "$IMAGE_TEST" >/dev/null 2>&1; then
     ok "désinstallation complète : aucun conteneur, volume ni image"
 else

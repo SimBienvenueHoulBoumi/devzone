@@ -147,10 +147,10 @@ gitlab_migrate() {
             echo "devzone : gitlab : confirmation impossible without a terminal: devzone gitlab migrate --yes (old cluster $GITLAB_OLD_CONTEXT kept)" >&2
             return 2
         fi
-        printf "Delete the old cluster %s and its data? [o/N] " "$GITLAB_OLD_CONTEXT" >&2
+        printf "Delete the old cluster %s and its data? [y/N] " "$GITLAB_OLD_CONTEXT" >&2
         read -r answer || answer=""
         case "$answer" in
-            o | O | oui) ;;
+            y | Y | yes) ;;
             *) echo "Aborted: old cluster $GITLAB_OLD_CONTEXT kept."; return 0 ;;
         esac
     fi

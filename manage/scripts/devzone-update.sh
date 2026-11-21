@@ -119,10 +119,10 @@ update_workstation() {
                 echo "✖ Fichiers modifiés localement : relance avec --yes pour les remplacer (sauvegarde dans .devzone.sauvegarde/)." >&2
                 exit 1
             fi
-            printf 'Remplacer ces fichiers (sauvegarde dans .devzone.sauvegarde/) ? [o/N] ' >&2
+            printf 'Replace these files (backup in .devzone.sauvegarde/)? [y/N] ' >&2
             read -r answer || answer=""
             case "$answer" in
-                o | O | oui | Oui | OUI) ;;
+                y | Y | yes) ;;
                 *)
                     echo "Abandon : rien n'a été modifié."
                     return 1
@@ -205,10 +205,10 @@ update_workstation() {
         echo "Reconstruction : make -C $folder rebuild (à lancer dans un terminal)"
         return 0
     fi
-    printf 'Reconstruire le conteneur maintenant (make rebuild) ? [o/N] ' >&2
+    printf 'Rebuild the container now (make rebuild)? [y/N] ' >&2
     read -r answer || answer=""
     case "$answer" in
-        o | O | oui | Oui | OUI) ;;
+        y | Y | yes) ;;
         *)
             echo "Reconstruction non lancée : make -C $folder rebuild"
             return 0

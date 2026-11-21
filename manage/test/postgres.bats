@@ -322,15 +322,15 @@ wait_nohup() {
 
 @test "status: disabled, ready on the cluster with the number of databases, relay stopped" {
     run bash "$POSTGRES" status
-    [ "$output" = "désactivé" ]
+    [ "$output" = "disabled" ]
     active_on docker-desktop
     run bash "$POSTGRES" status
-    [ "$output" = "prêt sur docker-desktop, relais arrêté : devzone apply" ]
+    [ "$output" = "ready on docker-desktop, relay stopped: devzone apply" ]
     bash "$POSTGRES" relay-start
     run bash "$POSTGRES" status
-    [ "$output" = "prêt sur docker-desktop : 127.0.0.1:5432, 2 base(s)" ]
+    [ "$output" = "ready on docker-desktop: 127.0.0.1:5432, 2 database(s)" ]
     run bash "$DEVZONE"
-    [[ "$output" == *"✔ module postgres"*"prêt sur docker-desktop"* ]] || false
+    [[ "$output" == *"✔ module postgres"*"ready on docker-desktop"* ]] || false
 }
 
 @test "relay: started only once, stopped by relay-stop" {

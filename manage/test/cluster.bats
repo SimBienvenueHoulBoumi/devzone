@@ -472,7 +472,7 @@ KIND
         export ETAT="$BATS_TEST_TMPDIR/etat"
         export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
         source "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
-        run cluster_choose cluster-prod <<<"o"
+        run cluster_choose cluster-prod <<<"y"
         [ "$status" -eq 2 ] || false
     ) || false
 }

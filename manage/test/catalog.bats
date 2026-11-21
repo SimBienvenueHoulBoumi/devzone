@@ -126,11 +126,20 @@ attendre_nohup() {
     run bash "$CATALOGUE" sync
     [ "$status" -eq 0 ] || false
     grep -qx 'mysql=off' "$DEVZONE_ETAT" || false
-    grep -qF '# Applications du catalogue : passer à on pour installer (devzone catalog)' "$DEVZONE_ETAT" || false
+    grep -qF '# Catalog applications: set to on to install (devzone catalog)' "$DEVZONE_ETAT" || false
     run bash "$CATALOGUE" sync
     [ "$status" -eq 0 ] || false
     [ "$(grep -c '^mysql=' "$DEVZONE_ETAT")" -eq 1 ] || false
+    [ "$(grep -cF '# Catalog applications' "$DEVZONE_ETAT")" -eq 1 ] || false
+}
+
+@test "sync: header in the former French wording recognised, not added again" {
+    printf '# Applications du catalogue : passer à on pour installer (devzone catalog)\nautre=off\n' >"$DEVZONE_ETAT"
+    run bash "$CATALOGUE" sync
+    [ "$status" -eq 0 ] || false
+    grep -qx 'mysql=off' "$DEVZONE_ETAT" || false
     [ "$(grep -cF '# Applications du catalogue' "$DEVZONE_ETAT")" -eq 1 ] || false
+    [ "$(grep -cF '# Catalog applications' "$DEVZONE_ETAT")" -eq 0 ] || false
 }
 
 @test "sync keeps an existing line (mysql=on keeps its value)" {
@@ -300,7 +309,7 @@ attendre_nohup() {
 @test "disable mysql in a terminal: o also deletes the namespace" {
     touch "$BATS_TEST_TMPDIR/ns" "$BATS_TEST_TMPDIR/sts" "$BATS_TEST_TMPDIR/secret"
     printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_ETAT"
-    DEVZONE_INTERACTIF=1 run bash "$DEVZONE" disable mysql <<<"o"
+    DEVZONE_INTERACTIF=1 run bash "$DEVZONE" disable mysql <<<"y"
     [ "$status" -eq 0 ] || false
     grep -q 'delete statefulset/mysql service/mysql' "$BATS_TEST_TMPDIR/kubectl.log" || false
     grep -q 'delete namespace devzone-mysql' "$BATS_TEST_TMPDIR/kubectl.log" || false

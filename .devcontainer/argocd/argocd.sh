@@ -148,13 +148,13 @@ do_uninstall() {
 # The status texts are read by devzone: keep them unchanged.
 do_status() {
     if ! is_installed; then
-        echo "désactivé"
+        echo "disabled"
         return 0
     fi
     if ! relay_active argocd; then
-        echo "prêt, relais arrêté : devzone apply"
+        echo "ready, relay stopped: devzone apply"
     else
-        echo "prêt : https://127.0.0.1:$ARGOCD_PORT"
+        echo "ready: https://127.0.0.1:$ARGOCD_PORT"
     fi
 }
 
