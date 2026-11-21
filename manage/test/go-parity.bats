@@ -67,3 +67,74 @@ parite() {
 @test "go-parity: renamed option refused by bash, same message and status" {
     parite --version --oui
 }
+
+# faux_cluster : fake kubectl first in PATH, no real cluster touched (#712).
+# FAKE_NO_POD=yes: no pod; FAKE_LEGACY=yes: a legacy copy in the pod;
+# FAKE_KUBE_DOWN=yes: the cluster does not answer.
+faux_cluster() {
+    mkdir -p "$BATS_TEST_TMPDIR/bin"
+    cat >"$BATS_TEST_TMPDIR/bin/kubectl" <<'KUBE'
+#!/usr/bin/env bash
+case "$*" in
+    "config get-contexts -o name") echo lab ;;
+    *"get pods"*)
+        if [ -n "${FAKE_KUBE_DOWN:-}" ]; then
+            echo "Unable to connect to the server" >&2
+            exit 1
+        fi
+        if [ -n "${FAKE_NO_POD:-}" ]; then
+            echo "No resources found in devzone-workspace namespace." >&2
+            exit 0
+        fi
+        echo "NAME                 READY   STATUS    RESTARTS   AGE"
+        echo "devzone-workspace-0  1/1     Running   0          2d"
+        ;;
+    *"exec -i"*)
+        cat >/dev/null
+        if [ -n "${FAKE_NO_POD:-}" ]; then exit 1; fi
+        if [ -n "${FAKE_LEGACY:-}" ]; then echo repogarde; fi
+        ;;
+esac
+exit 0
+KUBE
+    chmod +x "$BATS_TEST_TMPDIR/bin/kubectl"
+    export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
+}
+
+@test "go-parity: workspace status, pod listed: same output and status" {
+    faux_cluster
+    parite workspace status
+    run "$DZ_GO" workspace status
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"devzone-workspace-0"* ]] || false
+}
+
+@test "go-parity: workspace status, no pod: same message and status" {
+    faux_cluster
+    export FAKE_NO_POD=yes
+    parite workspace status
+}
+
+@test "go-parity: workspace status, legacy copy in the pod: same warning" {
+    faux_cluster
+    export FAKE_LEGACY=yes
+    parite workspace status
+    run "$DZ_GO" workspace status
+    [[ "$output" == *"rm -rf /workspaces/projets/repogarde"* ]] || false
+}
+
+@test "go-parity: workspace status, cluster down: same error and status" {
+    faux_cluster
+    export FAKE_KUBE_DOWN=yes
+    parite workspace status
+}
+
+@test "go-parity: workspace status with extra words is delegated, same output" {
+    faux_cluster
+    parite workspace status extra
+}
+
+@test "go-parity: workspace alone is delegated, same help" {
+    faux_cluster
+    parite workspace
+}

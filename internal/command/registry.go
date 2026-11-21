@@ -10,13 +10,15 @@ import (
 type Handler func(args []string, out, errOut io.Writer) int
 
 // ported lists the commands implemented in Go, by name (#358). A name runs in Go
-// only when it stands alone: with an argument, see bare.
+// only when it stands alone: with an argument, see bare. The workspace name runs
+// in Go for its status subcommand alone (#712), see workspaceCommand.
 var ported = map[string]Handler{
 	"--version": bare("--version", printVersion),
 	"-v":        bare("-v", printVersion),
 	"help":      bare("help", printHelp),
 	"-h":        bare("-h", printHelp),
 	"--help":    bare("--help", printHelp),
+	"workspace": workspaceCommand,
 }
 
 // bare builds the handler of a command that takes no argument. With an argument,
