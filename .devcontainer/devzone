@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2034 # shared variables, read by the sourced devzone-*.sh
 # Aide de devzone (devzone --help) : .devcontainer/help.sh, sourcé ci-dessous.
 #
 # État propre à chaque instance : $RACINE/.devzone.modules (dossier monté
