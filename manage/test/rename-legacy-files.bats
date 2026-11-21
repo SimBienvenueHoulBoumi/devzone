@@ -1,7 +1,8 @@
 #!/usr/bin/env bats
 # rename-legacy-files.sh (#733, lot 3): each file and folder written under its
 # former French name is renamed once, with its content. A new name that already
-# exists is never overwritten, a second run changes nothing.
+# exists is never overwritten, a second run changes nothing. The state key
+# plateforme= of .devzone.modules becomes platform= (lot 4), same rules.
 
 setup() {
     SCRIPT="$BATS_TEST_DIRNAME/../../.devcontainer/rename-legacy-files.sh"
@@ -86,4 +87,45 @@ legacy_tree() {
     [ "$status" -eq 0 ]
     [ -z "$output" ]
     [ -z "$(ls -A "$DEVZONE_ROOT")" ]
+}
+
+@test "rename-legacy-files: plateforme= of the state file becomes platform= with its value" {
+    printf 'gitlab=on\nplateforme=gitlab\ngitlab_url=http://gitlab.localhost:8929\n' >"$DEVZONE_ROOT/.devzone.modules"
+    run bash "$SCRIPT"
+    [ "$status" -eq 0 ]
+    [ "$output" = "devzone : plateforme= renamed to platform=" ]
+    grep -qx 'platform=gitlab' "$DEVZONE_ROOT/.devzone.modules"
+    ! grep -q '^plateforme=' "$DEVZONE_ROOT/.devzone.modules" || false
+    [ "$(ls -A "$DEVZONE_ROOT")" = ".devzone.modules" ]
+}
+
+@test "rename-legacy-files: the old plateforme= line is dropped when platform= exists" {
+    printf 'platform=github\nplateforme=gitlab\n' >"$DEVZONE_ROOT/.devzone.modules"
+    run bash "$SCRIPT"
+    [ "$status" -eq 0 ]
+    [ "$(cat "$DEVZONE_ROOT/.devzone.modules")" = "platform=github" ]
+}
+
+@test "rename-legacy-files: the other lines of the state file are unchanged" {
+    printf 'gitlab=on\ncluster=my-choice\nplateforme=gitlab\ngitlab_url=http://gitlab.localhost:8929\n' >"$DEVZONE_ROOT/.devzone.modules"
+    printf 'gitlab=on\ncluster=my-choice\nplatform=gitlab\ngitlab_url=http://gitlab.localhost:8929\n' >"$T/expected"
+    run bash "$SCRIPT"
+    [ "$status" -eq 0 ]
+    cmp -s "$T/expected" "$DEVZONE_ROOT/.devzone.modules"
+}
+
+@test "rename-legacy-files: a second run changes the state file no more" {
+    printf 'plateforme=gitlab\n' >"$DEVZONE_ROOT/.devzone.modules"
+    bash "$SCRIPT" >/dev/null
+    run bash "$SCRIPT"
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+    [ "$(cat "$DEVZONE_ROOT/.devzone.modules")" = "platform=gitlab" ]
+}
+
+@test "rename-legacy-files: a missing state file is no error and creates nothing" {
+    run bash "$SCRIPT"
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+    [ ! -e "$DEVZONE_ROOT/.devzone.modules" ]
 }

@@ -6,14 +6,14 @@
 
 
 # ---- Platform: GitHub (default) or GitLab (#240) ----
-# Choice kept in the state file (plateforme=, gitlab_url=), per instance; the
+# Choice kept in the state file (platform=, gitlab_url=), per instance; the
 # configuration of a service only exists while it is chosen (#242): glab and the
 # URL disappear when going back to github.
 
 # Current platform: github when there is no line (default)
 platform_read() {
     local v
-    v="$(grep -E '^plateforme=' "$ETAT" 2>/dev/null | tail -1 | cut -d= -f2 || true)"
+    v="$(grep -E '^platform=' "$ETAT" 2>/dev/null | tail -1 | cut -d= -f2 || true)"
     [ "$v" = gitlab ] && echo gitlab || echo github
 }
 
@@ -141,7 +141,7 @@ change_platform() {
                 git config --global --unset-all "credential.$(gitlab_url_read).helper" 2>/dev/null || true
             fi
             remove_glab
-            remove_key plateforme
+            remove_key platform
             remove_key gitlab_url
             echo "devzone : github platform (default): gh checks; glab and its configuration removed if they were installed"
             ;;
@@ -177,7 +177,7 @@ change_platform() {
                 echo "devzone : cannot set the git credential" >&2
                 return 1
             fi
-            write_value plateforme gitlab
+            write_value platform gitlab
             write_value gitlab_url "$url"
             echo "devzone : gitlab platform: $url, glab connected"
             ;;

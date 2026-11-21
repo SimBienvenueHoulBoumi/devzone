@@ -88,10 +88,10 @@ GETENT
     echo "postgres.devzone-postgres.svc" >"$T/dns"
     run bash "$DEVZONE" status --json
     [ "$status" -eq 0 ]
-    [ "$(printf '%s\n' "$output" | jq -r '.modules[] | select(.nom=="postgres") | .etat')" = "active: postgres.devzone-postgres.svc" ]
-    [ "$(printf '%s\n' "$output" | jq -r '.modules[] | select(.nom=="gitlab") | .etat')" = "not in the cluster" ]
-    [ "$(printf '%s\n' "$output" | jq -r '.modules[] | select(.nom=="gitlab") | .commande')" = "devzone workspace services enable gitlab" ]
-    [ "$(printf '%s\n' "$output" | jq -r '.modules[] | select(.nom=="gitlab") | .echec')" = "null" ]
+    [ "$(printf '%s\n' "$output" | jq -r '.modules[] | select(.name=="postgres") | .state')" = "active: postgres.devzone-postgres.svc" ]
+    [ "$(printf '%s\n' "$output" | jq -r '.modules[] | select(.name=="gitlab") | .state')" = "not in the cluster" ]
+    [ "$(printf '%s\n' "$output" | jq -r '.modules[] | select(.name=="gitlab") | .command')" = "devzone workspace services enable gitlab" ]
+    [ "$(printf '%s\n' "$output" | jq -r '.modules[] | select(.name=="gitlab") | .failed')" = "null" ]
 }
 
 @test "apply in the pod: services not installed, failure markers cleared, status 0" {

@@ -220,11 +220,11 @@ auto_list_json() {
     while IFS= read -r port; do
         [ -n "$port" ] || continue
         if grep -qxF "$port" "$BUSY" 2>/dev/null; then
-            json="$(jq -c --argjson port "$port" --arg busy "$JSON_APP_BUSY" '. + [{port:$port,actif:false,application:$busy,auto:true}]' <<<"$json")"; continue
+            json="$(jq -c --argjson port "$port" --arg busy "$JSON_APP_BUSY" '. + [{port:$port,active:false,application:$busy,auto:true}]' <<<"$json")"; continue
         fi
         if auto_relay_active "$port"; then active=true; else active=false; fi
         if app_responds "$port"; then app="$JSON_APP_RESPONDS"; else app="$JSON_APP_NONE"; fi
-        json="$(jq -c --argjson port "$port" --argjson actif "$active" --arg app "$app" '. + [{port:$port,actif:$actif,application:$app,auto:true}]' <<<"$json")"
+        json="$(jq -c --argjson port "$port" --argjson active "$active" --arg app "$app" '. + [{port:$port,active:$active,application:$app,auto:true}]' <<<"$json")"
     done <<<"$ports"
     printf '%s\n' "$json"
 }
