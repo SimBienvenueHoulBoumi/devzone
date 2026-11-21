@@ -43,6 +43,14 @@ Prerequisite of the automatic delivery: the repository's GitHub App (`repowarden
 
 
 
+## Package contents
+
+The npm package (what `npm pack` produces and `devzone <folder>` copies) is checked by `manage/test/package-contents.bats`. The test reads `npm pack --dry-run --json --ignore-scripts`: nothing is published, no lifecycle script runs, and there is no network access. It is skipped when npm is absent.
+
+- **Shipped**: `manage/devzone` (the command), `manage/scripts/`, `manage/workspace.sh`, `.devcontainer/` (including `isolation.sh` and `ticket.sh`, which are used at run time, not only by the tests), `charts/`, `Makefile`, `.gitattributes`, `README.md`, `LICENSE`, `package.json`.
+- **Excluded**: `manage/test/`, `manage/docs/`, `cmd/`, `internal/`, `.github/`, `.claude/`, `.opencode/`, `go.mod`, `go.sum`, `.english`, `.repowarden.conf`, `CLAUDE.md`, `AGENTS.md`, `CONTRIBUTING.md`. The exclusion comes from the `files` list of `package.json`: a path added there is shipped.
+- **Ceilings**: 175 files and 872000 bytes unpacked, measured at #772 (159 files, 792412 bytes) plus 10 %. The test fails when a ceiling is passed; raise one only with the reason in the commit.
+
 ## Organization
 
 ```text

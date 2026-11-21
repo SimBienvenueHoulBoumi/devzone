@@ -1,9 +1,22 @@
 # Automatic version bumps of the pinned tools of the container: repowarden
-# (versions.env) and AI assistants (one IA_ line per package, devzone).
-# Compared every hour and by hand; for each package behind, opens the ticket
-# (or updates the one already open), proposes a design, creates the ticket
-# branch, applies the bump, commits and pushes: the draft PR opens through the
-# usual flow, the CI tests the container.
+# (versions.env), AI assistants (one IA_ line per package, devzone) and the
+# tools of the workspace image (Go, k9s, actionlint, gitleaks, kind: Dockerfile).
+# Compared every hour and by hand; for each package or image tool behind, opens
+# the ticket (or updates the one already open), proposes a design, creates the
+# ticket branch, applies the bump, commits and pushes: the draft PR opens through
+# the usual flow, the CI tests the container.
+#
+# Image tools: versions.sh --tools lists them and versions-tools-plan.sh plans
+# the bumps: at most 3 per run. A next major version is never applied by this
+# workflow: it is only listed in the job summary (applied by hand, with --major).
+#
+# dry_run (Actions -> versions -> Run workflow, box ticked): writes nothing (no
+# ticket, no branch, no push); the job summary shows what would be done.
+#
+# The image tools are written (ticket, branch, push) by a manual run only, until
+# that path has been run for real once; the hourly run only reports them in the job
+# summary. To make them automatic, remove the event_name condition of the step
+# "Ticket and PR for each image tool behind".
 #
 # The GitHub App (REPOWARDEN_APP_CLIENT_ID, REPOWARDEN_APP_KEY) signs the
 # actions: the push triggers the CI and the ticket tracking, like the other
@@ -13,12 +26,13 @@
 # check only accepts a design from the maintainer, who takes it over
 # ("## Conception retenue") on the ticket, then marks the PR ready.
 #
-# Accepted exception (version bumps only): the workflow validates the ticket it
-# creates, so that the ticket branch can be created; the human control stays the
-# retained design and marking the PR ready.
+# Accepted exception (version bumps only, packages and image tools): the workflow
+# validates the ticket it creates, so that the ticket branch can be created; the
+# human control stays the retained design and marking the PR ready.
 #
 # A ticket with the same title opened by someone else is ignored: it cannot
-# block the bumps.
+# block the bumps. The same goes for an image tool: a ticket of the App with the
+# same title is not created again.
 # No cross trigger from repowarden: it would need a token of another owner;
 # without a new version, the job stops after the comparison.
 name: versions
@@ -27,6 +41,11 @@ on:
   schedule:
     - cron: "17 * * * *" # every hour at minute 17
   workflow_dispatch: # by hand (Actions -> versions -> Run workflow)
+    inputs:
+      dry_run:
+        description: "Plan only: writes nothing (no ticket, no branch, no push)"
+        type: boolean
+        default: false
 
 permissions: {}
 
@@ -39,9 +58,11 @@ jobs:
   versions:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      DRY_RUN: ${{ inputs.dry_run }}
     steps:
-      # The App token only exists when the comparison finds a package behind:
-      # so the checkout uses the default token, without keeping its
+      # The App token only exists when the comparison finds a package or an image
+      # tool behind: so the checkout uses the default token, without keeping its
       # credentials, then the remote is rewritten with the App token before
       # the pushes (see below).
       - uses: actions/checkout@v7
@@ -58,8 +79,24 @@ jobs:
           else
             echo "present=false" >>"$GITHUB_OUTPUT"
           fi
+      - name: Compare the image tools with their upstream releases
+        id: outils
+        run: |
+          # An unreadable upstream must not block the packages: no tool is planned then
+          if bash manage/scripts/ci/versions.sh --tools >outils.txt; then
+            :
+          else
+            echo "::warning::versions: upstream of the image tools unreadable, no tool planned"
+            : >outils.txt
+          fi
+          cat outils.txt
+          if [ -s outils.txt ]; then
+            echo "present=true" >>"$GITHUB_OUTPUT"
+          else
+            echo "present=false" >>"$GITHUB_OUTPUT"
+          fi
       - name: GitHub App token
-        if: steps.retards.outputs.present == 'true'
+        if: steps.retards.outputs.present == 'true' || steps.outils.outputs.present == 'true'
         id: app
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
@@ -69,7 +106,7 @@ jobs:
           permission-issues: write
           permission-pull-requests: write
       - name: Git identity of the App
-        if: steps.retards.outputs.present == 'true'
+        if: steps.retards.outputs.present == 'true' || steps.outils.outputs.present == 'true'
         env:
           GH_TOKEN: ${{ steps.app.outputs.token }}
         run: |
@@ -78,20 +115,20 @@ jobs:
           git config user.name "${slug}[bot]"
           git config user.email "${id}+${slug}[bot]@users.noreply.github.com"
       - name: Repowarden at the same pinned version as the container
-        if: steps.retards.outputs.present == 'true'
+        if: steps.retards.outputs.present == 'true' || steps.outils.outputs.present == 'true'
         run: |
           version="$(sed -nE 's/^REPOWARDEN_VERSION=([^[:space:]]+)$/\1/p' .devcontainer/versions.env | head -1)"
           npm install -g "repowarden@$version"
-      # The remote carries the App token: the pushes of the loop below are signed
+      # The remote carries the App token: the pushes of the loops below are signed
       # by the App, which triggers the CI and the ticket tracking.
       - name: Remote with the App token for the pushes
-        if: steps.retards.outputs.present == 'true'
+        if: steps.retards.outputs.present == 'true' || steps.outils.outputs.present == 'true'
         env:
           GH_TOKEN: ${{ steps.app.outputs.token }}
         run: |
           git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
       - name: Ticket and PR for each package behind
-        if: steps.retards.outputs.present == 'true'
+        if: steps.retards.outputs.present == 'true' && inputs.dry_run != true
         env:
           GH_TOKEN: ${{ steps.app.outputs.token }}
           GH_REPO: ${{ github.repository }}
@@ -150,3 +187,104 @@ jobs:
               --refs "Ticket : #$n"
             git push -u origin "$(git branch --show-current)"
           done <retards.txt
+      # Majeures are listed in the job summary only; see versions-tools-plan.sh
+      - name: Plan of the image tools
+        if: steps.outils.outputs.present == 'true'
+        id: plan
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          APP_SLUG: ${{ steps.app.outputs.app-slug }}
+        run: |
+          bash manage/scripts/ci/versions-tools-plan.sh "app/${APP_SLUG}" <outils.txt >plan.txt
+          cat plan.txt
+          if awk -F'\t' '$1 != "majeure" { found = 1 } END { exit found ? 0 : 1 }' plan.txt; then
+            echo "present=true" >>"$GITHUB_OUTPUT"
+          else
+            echo "present=false" >>"$GITHUB_OUTPUT"
+          fi
+      # The write path for the image tools has never run for real: until a manual run
+      # has checked it, only a manual run (Actions -> versions -> Run workflow) may
+      # write; the hourly run lists the tools in the job summary and writes nothing.
+      - name: Ticket and PR for each image tool behind
+        if: steps.plan.outputs.present == 'true' && inputs.dry_run != true && github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          APP_SLUG: ${{ steps.app.outputs.app-slug }}
+        run: |
+          set -euo pipefail
+          while IFS=$'\t' read -r kind outil ancienne nouvelle titre notes numero; do
+            case "$kind" in
+              majeure) continue ;;
+              existant)
+                # Open ticket of the App for this tool, with the title of an older version
+                gh issue edit "$numero" --title "$titre"
+                gh issue comment "$numero" --body "Nouvelle version amont : $nouvelle (la version figée était $ancienne)."
+                continue
+                ;;
+            esac
+            corps="$(cat <<EOF
+          ## Besoin
+          La version figée de $outil dans l'image ($ancienne, Dockerfile) est dépassée : la dernière version amont est $nouvelle.
+
+          ## Notes de version
+          $notes
+
+          ## Terminé quand…
+          - [ ] $outil $nouvelle est figé dans le Dockerfile de l'image (version et empreintes sha256)
+          - [ ] les tests fonctionnels et la CLI passent sur la PR
+          EOF
+            )"
+            n="$(repowarden ticket nouveau "$titre" --type chore --description "$corps" --porcelain)"
+            conception="$(cat <<EOF
+          ## Conception proposée
+
+          À confirmer par le mainteneur (« ## Conception retenue ») : la vérification \`ticket\` de la PR l'attend.
+
+          - Monter \`$outil\` de \`$ancienne\` à \`$nouvelle\` (dernière version amont).
+          - \`manage/scripts/ci/versions.sh --apply $outil $nouvelle\` remplace la version et recalcule les deux empreintes sha256 de l'outil dans le Dockerfile, rien d'autre.
+          - Commit \`chore(devcontainer): $outil $nouvelle dans l'image\`, puis push : la PR brouillon s'ouvre, la CI teste le conteneur.
+          EOF
+            )"
+            repowarden ticket comment "$n" "$conception"
+            # Validated automatically so that the ticket branch can be created
+            repowarden ticket label "$n" validé
+            repowarden ticket "$n"
+            bash manage/scripts/ci/versions.sh --apply "$outil" "$nouvelle"
+            git add -- .devcontainer/Dockerfile
+            repowarden cc -m "$outil $nouvelle dans l'image" \
+              --type chore --scope devcontainer \
+              --body "Monte $outil de $ancienne à $nouvelle, dernière version amont." \
+              --refs "Ticket : #$n"
+            git push -u origin "$(git branch --show-current)"
+          done <plan.txt
+      - name: Job summary
+        if: always()
+        run: |
+          {
+            echo "## versions"
+            echo
+            if [ "$DRY_RUN" = true ]; then
+              echo "Dry run: nothing written (no ticket, no branch, no push)."
+              echo
+            fi
+            if [ -s retards.txt ]; then
+              echo "### Packages behind"
+              while read -r paquet ancienne nouvelle; do
+                echo "- $paquet $ancienne → $nouvelle"
+              done <retards.txt
+              echo
+            fi
+            if [ -s plan.txt ]; then
+              echo "### Image tools"
+              while IFS=$'\t' read -r kind outil ancienne nouvelle titre notes numero; do
+                case "$kind" in
+                  plan) echo "- planned: $titre ([release notes]($notes))" ;;
+                  existant) echo "- open ticket #$numero to update: $titre" ;;
+                  majeure) echo "- major version, not applied (apply by hand with --major): $outil $ancienne → $nouvelle ([release notes]($notes))" ;;
+                esac
+              done <plan.txt
+              echo
+            fi
+          } >>"$GITHUB_STEP_SUMMARY"

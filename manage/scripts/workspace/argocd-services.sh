@@ -46,16 +46,16 @@ GITOPS_CMD="devzone workspace argocd init"
 ARGOCD_CONF_DIR="$PWD"
 # shellcheck disable=SC2034
 ARGOCD_CONF="$PWD/.argocd.conf"
-# shellcheck source=../../.devcontainer/argocd/conf.sh
+# shellcheck source=../../../.devcontainer/argocd/conf.sh
 # shellcheck disable=SC1091
 . "$RACINE/.devcontainer/argocd/conf.sh"
-# shellcheck source=../../.devcontainer/argocd/gitops.sh
+# shellcheck source=../../../.devcontainer/argocd/gitops.sh
 # shellcheck disable=SC1091
 . "$RACINE/.devcontainer/argocd/gitops.sh"
-# shellcheck source=../../.devcontainer/argocd/apps.sh
+# shellcheck source=../../../.devcontainer/argocd/apps.sh
 # shellcheck disable=SC1091
 . "$RACINE/.devcontainer/argocd/apps.sh"
-# shellcheck source=../../.devcontainer/argocd/services.sh
+# shellcheck source=../../../.devcontainer/argocd/services.sh
 # shellcheck disable=SC1091
 . "$RACINE/.devcontainer/argocd/services.sh"
 argocd_kubectl() { ak "$@"; }

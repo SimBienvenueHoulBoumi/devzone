@@ -6,7 +6,7 @@
 #   argocd_app remove <N>
 #   apps_reconcile      every [app N] of .argocd.conf applied, the others removed
 # Sourced by the container (argocd.sh: kubectl --context devzone) and by the
-# workstation (manage/scripts/argocd-services.sh), after conf.sh and
+# workstation (manage/scripts/workspace/argocd-services.sh), after conf.sh and
 # gitops.sh. The includer defines argocd_kubectl, APPS_GENERATOR, APPS_CMD,
 # ARGOCD_CONF and ARGOCD_CONF_DIR (the devzone folder: token-file paths are
 # relative to it), and may define apps_gitlab_token (root token of the

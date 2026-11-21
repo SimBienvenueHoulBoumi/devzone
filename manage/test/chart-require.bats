@@ -79,7 +79,7 @@ setup() {
 
 @test "argocd_install: a chart absent is refused before any kubectl or helm call" {
     # shellcheck disable=SC1091
-    . "$BATS_TEST_DIRNAME/../../manage/scripts/argocd-workspace.sh"
+    . "$BATS_TEST_DIRNAME/../../manage/scripts/workspace/argocd-workspace.sh"
     # Stubs defined after the source: argocd-workspace.sh defines ak itself
     ak() { echo "ak $*" >>"$LOG"; }
     helm() { echo "helm $*" >>"$LOG"; }

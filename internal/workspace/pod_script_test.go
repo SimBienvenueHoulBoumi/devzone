@@ -10,8 +10,8 @@ import (
 // bashScriptsFiles are the bash files that hold the scripts run in the pod, as
 // seen from this package
 var bashScriptsFiles = []string{
-	"../../manage/scripts/workspace-copies.sh",
-	"../../manage/scripts/workspace-clone.sh",
+	"../../manage/scripts/workspace/workspace-copies.sh",
+	"../../manage/scripts/workspace/workspace-clone.sh",
 }
 
 // bashPodScript returns the script that the bash function function sends to the
@@ -65,7 +65,7 @@ func heredocOf(t *testing.T, file, function string) (string, bool) {
 }
 
 // TestLegacyScriptMatchesBash checks that podScript (legacy.go) is the script of
-// workspace_legacy_pod_script in manage/scripts/workspace-copies.sh
+// workspace_legacy_pod_script in manage/scripts/workspace/workspace-copies.sh
 func TestLegacyScriptMatchesBash(t *testing.T) {
 	if want := bashPodScript(t, "workspace_legacy_pod_script"); podScript != want {
 		t.Fatalf("podScript differs from the bash script:\n%s\nwant:\n%s", podScript, want)
@@ -73,7 +73,7 @@ func TestLegacyScriptMatchesBash(t *testing.T) {
 }
 
 // TestCopyGuardScriptMatchesBash checks that copyGuardScript (copy_guard.go) is
-// the script of workspace_copy_pod_script in manage/scripts/workspace-copies.sh
+// the script of workspace_copy_pod_script in manage/scripts/workspace/workspace-copies.sh
 func TestCopyGuardScriptMatchesBash(t *testing.T) {
 	if want := bashPodScript(t, "workspace_copy_pod_script"); copyGuardScript != want {
 		t.Fatalf("copyGuardScript differs from the bash script:\n%s\nwant:\n%s", copyGuardScript, want)
@@ -81,7 +81,7 @@ func TestCopyGuardScriptMatchesBash(t *testing.T) {
 }
 
 // TestCloneScriptMatchesBash checks that cloneScript (clone_script.go) is the
-// script of workspace_clone_pod_script in manage/scripts/workspace-clone.sh
+// script of workspace_clone_pod_script in manage/scripts/workspace/workspace-clone.sh
 func TestCloneScriptMatchesBash(t *testing.T) {
 	if want := bashPodScript(t, "workspace_clone_pod_script"); cloneScript != want {
 		t.Fatalf("cloneScript differs from the bash script:\n%s\nwant:\n%s", cloneScript, want)
