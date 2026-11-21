@@ -4,12 +4,20 @@
 # Sourced by .devcontainer/devzone (split of the 1 600 lines file, #722):
 # functions only, shared variables are defined in devzone.
 
+# Marker of the default configuration: first line of opencode.jsonc. The former
+# wording (French, before #722) is still recognised. Byte escapes keep the accent
+# out of the source (check-english).
+OPENCODE_MARKER='// devzone : default opencode configuration'
+OPENCODE_MARKER_OLD="$(printf '// devzone : configuration opencode par d\303\251faut')"
+
+# True if the file carries the default-configuration marker, in either wording
+opencode_marked() { grep -qF -e "$OPENCODE_MARKER" -e "$OPENCODE_MARKER_OLD" "$1"; }
+
 # Default opencode configuration (versioned model): written at first use,
 # updated while it keeps the devzone marker, customised otherwise. The marker
 # text is written in opencode.jsonc: it is kept as is.
 opencode_config() {
-    local model="$ICI/opencode.jsonc" marker target
-    marker='// devzone : configuration opencode par défaut'
+    local model="$ICI/opencode.jsonc" target
     if [ -f "$HOME/.config/opencode/opencode.jsonc" ]; then
         target="$HOME/.config/opencode/opencode.jsonc"
     elif [ -f "$HOME/.config/opencode/opencode.json" ]; then
@@ -21,7 +29,7 @@ opencode_config() {
     if [ ! -f "$target" ]; then
         cp "$model" "$target"
         echo "opencode : default configuration written"
-    elif grep -qF "$marker" "$target"; then
+    elif opencode_marked "$target"; then
         if ! cmp -s "$model" "$target"; then
             cp "$model" "$target"
             echo "opencode : default configuration updated"
@@ -38,8 +46,7 @@ opencode_config() {
 # marker and was not changed; a custom configuration (no marker, or changed) is
 # kept. Symmetrical with opencode_config.
 remove_opencode_config() {
-    local marker model target
-    marker='// devzone : configuration opencode par défaut'
+    local model target
     model="$ICI/opencode.jsonc"
     if [ -f "$HOME/.config/opencode/opencode.jsonc" ]; then
         target="$HOME/.config/opencode/opencode.jsonc"
@@ -48,7 +55,7 @@ remove_opencode_config() {
     else
         return 0
     fi
-    if grep -qF "$marker" "$target" && cmp -s "$model" "$target"; then
+    if opencode_marked "$target" && cmp -s "$model" "$target"; then
         rm -f "$target"
         echo "opencode : default configuration removed"
     else

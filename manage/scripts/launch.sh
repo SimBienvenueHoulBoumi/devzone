@@ -73,7 +73,7 @@ clean_line() { sed "s/${ESC}\[[0-9;?]*[A-Za-z]//g" | tr -d '\r'; }
 last_line() { tail -c 2000 "$LOG" | clean_line | grep -v '^[[:space:]]*$' | tail -1 | cut -c1-110; }
 
 # Pending question: last unfinished line (no newline, like a prompt) ending with
-# [o/N], [y/N], ? or a password prompt
+# [y/N], ? or a password prompt
 pattern='(\[[^]]*/[^]]*\]|\?|[Pp]assword[^:]*:|[Mm]ot de passe[^:]*:)[[:space:]]*$'
 pending_question() {
     local line

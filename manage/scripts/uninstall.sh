@@ -168,14 +168,14 @@ if [ "$total" -eq 0 ]; then
     echo "✔ Nothing to remove."
 else
     CONFIRM_VALUE="${CONFIRM:-${CONFIRMER:-}}"
-    if [ "$CONFIRM_VALUE" != yes ] && [ "$CONFIRM_VALUE" != oui ]; then
+    if [ "$CONFIRM_VALUE" != yes ]; then
         if [ ! -t 0 ]; then
             echo "✖ Cannot confirm without a terminal: CONFIRM=yes make desinstaller" >&2
             exit 1
         fi
         read -r -p "Permanently remove? Type yes: " answer
         case "$answer" in
-            yes | oui) ;;
+            yes) ;;
             *) echo "Canceled: nothing was removed."; exit 0 ;;
         esac
     fi

@@ -149,14 +149,14 @@ teardown() {
 
 @test "status: disabled, relay stopped, then ready" {
     run bash "$MYSQL" status
-    [ "$output" = "désactivé" ] || false
+    [ "$output" = "disabled" ] || false
     touch "$BATS_TEST_TMPDIR/ns" "$BATS_TEST_TMPDIR/sts" "$BATS_TEST_TMPDIR/ready"
     run bash "$MYSQL" status
-    [ "$output" = "prêt sur kind-devzone, relais arrêté : devzone apply" ] || false
+    [ "$output" = "ready on kind-devzone, relay stopped: devzone apply" ] || false
     bash "$MYSQL" relay-start
     attendre_nohup 'svc/mysql 3306:3306$'
     run bash "$MYSQL" status
-    [ "$output" = "prêt sur kind-devzone : 127.0.0.1:3306, 0 base(s)" ] || false
+    [ "$output" = "ready on kind-devzone: 127.0.0.1:3306, 0 database(s)" ] || false
 }
 
 @test "install adopts an existing installation, root.env intact, no reinstallation" {

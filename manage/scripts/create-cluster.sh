@@ -81,7 +81,7 @@ create_cluster_minikube() {
     printf 'Create it now? [y/N] '
     read -r answer || answer=""
     case "$answer" in
-        y | Y | yes | o | O | oui) ;;
+        y | Y | yes) ;;
         *) echo "✖ cancelled" >&2; return 1 ;;
     esac
     minikube start -p devzone || { echo "✖ minikube start failed: nothing else done" >&2; return 1; }

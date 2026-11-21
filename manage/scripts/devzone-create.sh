@@ -18,8 +18,8 @@ ask_gitops() {
     read -r answer || answer=""
     answer="${answer:-$default}"
     case "$answer" in
-        G | g | GitHub | github | Oui | oui | OUI) echo "github" ;;
-        n | N | none | None | Non | non | NON | aucun | Aucun) echo "none" ;;
+        G | g | GitHub | github | y | Y | yes) echo "github" ;;
+        n | N | none | None) echo "none" ;;
         *) echo "$answer" ;;
     esac
 }

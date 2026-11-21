@@ -95,9 +95,11 @@ app_ready() {
 # an existing line is never changed), preceded once by the comment; reading and
 # writing hold the same lock (#417): a concurrent write cannot be lost between the two
 catalog_sync() (
-    local app header missing="" tmp
+    local app header header_old missing="" tmp
     [ -f "$ETAT" ] || return 0
-    header="# Applications du catalogue : passer à on pour installer (devzone catalog)"
+    header="# Catalog applications: set to on to install (devzone catalog)"
+    # Header written before #722 (French wording): still recognised, not added twice
+    header_old="$(printf '# Applications du catalogue : passer \303\240 on pour installer (devzone catalog)')"
     state_lock_take || return 1
     # The lock is released on exit, including on an error under set -e
     trap 'state_lock_release' EXIT
@@ -110,7 +112,7 @@ catalog_sync() (
     tmp="$(mktemp)"
     {
         cat "$ETAT"
-        grep -qF "$header" "$ETAT" || echo "$header"
+        grep -qF -e "$header" -e "$header_old" "$ETAT" || echo "$header"
         echo "$missing"
     } >"$tmp"
     state_replace "$tmp"
@@ -122,13 +124,13 @@ catalog_sync() (
 app_state() {
     local app="$1"
     if [ "$(wanted "$app")" != on ]; then
-        echo disponible
+        echo available
     elif [ -f "$(failure_file "$app")" ]; then
-        echo echec
+        echo failed
     elif present "$app"; then
-        echo installée
+        echo installed
     else
-        echo attendue
+        echo expected
     fi
 }
 
@@ -139,9 +141,9 @@ catalog_list() {
         [ -n "$app" ] || continue
         state="$(app_state "$app")"
         case "$state" in
-            disponible) label='off available' ;;
-            installée) label='on installed' ;;
-            echec) label='on failed' ;;
+            available) label='off available' ;;
+            installed) label='on installed' ;;
+            failed) label='on failed' ;;
             *) label='on expected' ;;
         esac
         printf '  %-12s %-14s %s\n' "$app" "$label" "$(app_read "$app" description)"
@@ -158,7 +160,7 @@ app_relay_stopped() {
     script="$ICI/catalog/$app/$app.sh"
     if [ -f "$script" ]; then
         state="$(bash "$script" status 2>/dev/null || true)"
-        case "$state" in *"relais arrêté"*) return 0 ;; esac
+        case "$state" in *"relay stopped"*) return 0 ;; esac
     fi
     ! relay_active "$app"
 }
@@ -170,9 +172,9 @@ catalog_summary() {
     while IFS= read -r app; do
         [ -n "$app" ] || continue
         case "$(app_state "$app")" in
-            disponible) printf '  ○ application %-12s available, %s: devzone enable %s\n' \
+            available) printf '  ○ application %-12s available, %s: devzone enable %s\n' \
                 "$app" "$(app_read "$app" description)" "$app" ;;
-            installée)
+            installed)
                 if app_relay_stopped "$app"; then
                     printf '  ⚠ application %-12s installed, relay stopped: devzone repair\n' "$app"
                 else
@@ -183,7 +185,7 @@ catalog_summary() {
                             "$app" "$(app_read "$app" port)"
                     fi
                 fi ;;
-            attendue) printf '  ⚠ application %-12s expected: devzone apply\n' "$app" ;;
+            expected) printf '  ⚠ application %-12s expected: devzone apply\n' "$app" ;;
             *) printf '  ✖ application %s failed: %s: devzone apply\n' \
                 "$app" "$(head -1 "$(failure_file "$app")")" ;;
         esac
@@ -202,9 +204,9 @@ catalog_json() {
         failure=""
         cmd="devzone apply"
         case "$state" in
-            disponible) cmd="devzone enable $app" ;;
-            installée) cmd="devzone disable $app" ;;
-            echec) failure="$(head -1 "$(failure_file "$app")")" ;;
+            available) cmd="devzone enable $app" ;;
+            installed) cmd="devzone disable $app" ;;
+            failed) failure="$(head -1 "$(failure_file "$app")")" ;;
         esac
         json="$(jq -cn --argjson before "$json" --arg nom "$app" --argjson actif "$active" \
             --arg description "$(app_read "$app" description)" \

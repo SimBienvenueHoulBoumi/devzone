@@ -161,7 +161,7 @@ KUBE
 # --- uninstall ---------------------------------------------------------
 @test "uninstall : filter by instance, no kind" {
     export DEVZONE_VOLUMES="mon-devzone"
-    export CONFIRMER=oui
+    export CONFIRMER=yes
     export DEVZONE_DANS_CONTENEUR=non
     cat >"$BATS_TEST_TMPDIR/bin/docker" <<'DOCKER'
 #!/usr/bin/env bash
@@ -237,7 +237,7 @@ KIND
 
 @test "uninstall in the container: no Docker action on the workstation" {
     # docker talks to the host Docker there: the volumes seen would be the workstation's
-    export CONFIRMER=oui
+    export CONFIRMER=yes
     export DEVZONE_DANS_CONTENEUR=oui
     cat >"$BATS_TEST_TMPDIR/bin/docker" <<'DOCKER'
 #!/usr/bin/env bash

@@ -21,15 +21,15 @@ confirm_removal() {
     # postgres: everything goes, the refusal cancels; gitlab: the Rails secret
     # stays, its deletion only happens on a full uninstall on purpose
     if [ "$app" = mysql ]; then
-        printf 'Disabling mysql removes the server; the volume and databases stay. Also delete the devzone-mysql namespace and its volumes? [o/N] ' >&2
+        printf 'Disabling mysql removes the server; the volume and databases stay. Also delete the devzone-mysql namespace and its volumes? [y/N] ' >&2
     elif [ "$app" = gitlab ]; then
-        printf 'Disabling gitlab keeps the Rails secret (browser sessions stay valid at reinstall). Also delete the Rails secret? [o/N] ' >&2
+        printf 'Disabling gitlab keeps the Rails secret (browser sessions stay valid at reinstall). Also delete the Rails secret? [y/N] ' >&2
     else
-        printf 'Disabling %s deletes all its databases. Continue? [o/N] ' "$app" >&2
+        printf 'Disabling %s deletes all its databases. Continue? [y/N] ' "$app" >&2
     fi
     read -r answer || answer=""
     case "$answer" in
-        o | O | oui) DELETE_DATA=1; return 0 ;;
+        y | Y | yes) DELETE_DATA=1; return 0 ;;
     esac
     # refusal: mysql and gitlab still disable (data kept), postgres cancels
     case "$app" in
@@ -90,10 +90,10 @@ change_cluster() {
                 echo "devzone : the postgres databases will be deleted from $ctx_old (not migrated): devzone cluster $ctx_new --yes" >&2
                 return 1
             fi
-            printf 'postgres will be reinstalled on %s, its databases deleted from %s (not migrated). Continue? [o/N] ' "$ctx_new" "$ctx_old" >&2
+            printf 'postgres will be reinstalled on %s, its databases deleted from %s (not migrated). Continue? [y/N] ' "$ctx_new" "$ctx_old" >&2
             read -r answer || answer=""
             case "$answer" in
-                o | O | oui) ;;
+                y | Y | yes) ;;
                 *) echo "Aborted: nothing changed."; return 0 ;;
             esac
         fi

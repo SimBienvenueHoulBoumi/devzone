@@ -43,7 +43,7 @@ state_json() {
     if v="$(folder_version 2>/dev/null)"; then
         dv_raw="$v"
     else
-        add_error devzone "version_du_dossier unavailable"
+        add_error devzone "folder_version unavailable"
     fi
     dvp_raw="$(published_version 2>/dev/null || true)"
 
@@ -95,7 +95,7 @@ state_json() {
         fi
     else
         tools_late_json="null"
-        add_error outils "outils_retard unavailable"
+        add_error outils "outdated_tools unavailable"
     fi
 
     modules_json='[]'

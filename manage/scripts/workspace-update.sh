@@ -87,9 +87,9 @@ update_workspace() {
             echo "✖ no terminal to confirm: run again with --yes (devzone workspace update --yes)" >&2
             return 1
         fi
-        read -r -p "Update the workspace to v$version? [o/N] " answer || answer=""
+        read -r -p "Update the workspace to v$version? [y/N] " answer || answer=""
         case "$answer" in
-            o | O | oui | y | Y | yes) ;;
+            y | Y | yes) ;;
             *)
                 echo "✖ canceled, nothing changed" >&2
                 return 1
