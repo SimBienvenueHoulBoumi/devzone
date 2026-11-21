@@ -2,13 +2,13 @@
 # Rollback from Kubernetes workspace to Docker workstation (#403): devzone workspace
 # revert [--bring-back]. Sourced by manage/workspace.sh after migrate.sh (uses
 # copy_from, record_workspace, fail and kc). With --bring-back, the workstation
-# version of a project is moved to .devzone.sauvegarde/<date>/ before being replaced.
+# version of a project is moved to .devzone.backup/<date>/ before being replaced.
 
 # Backup folder for this run (relative to devzone), same convention as
-# devzone update: .devzone.sauvegarde/<YYYYMMDD-HHMMSS>, -n suffix if taken.
+# devzone update: .devzone.backup/<YYYYMMDD-HHMMSS>, -n suffix if taken.
 backup_folder() {
     local base folder n=1
-    base=".devzone.sauvegarde/$(date +%Y%m%d-%H%M%S)"
+    base=".devzone.backup/$(date +%Y%m%d-%H%M%S)"
     folder="$base"
     while [ -e "$folder" ]; do
         n=$((n + 1))

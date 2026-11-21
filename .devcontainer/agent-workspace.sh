@@ -73,7 +73,7 @@ agent_workspace() {
     echo "devzone agent: Kubernetes workspace (pod devzone-workspace-0, $in_pod); --local for the container"
     agent_kc cp "$brief" "devzone-workspace-0:/tmp/devzone-agent-$name.md" -c workspace
     # shellcheck disable=SC2016 # the pod shell expands MODEL_OPT, not this one
-    agent_kc exec devzone-workspace-0 -c workspace -- env DEVZONE_RACINE="$pod_root" MODEL_OPT="$MODELE_LISTE" bash -lc 'devzone agent ${MODEL_OPT:+--modele "$MODEL_OPT"} "$1" "$2"' _ "$in_pod" "/tmp/devzone-agent-$name.md" || code=$?
+    agent_kc exec devzone-workspace-0 -c workspace -- env DEVZONE_ROOT="$pod_root" MODEL_OPT="$MODELE_LISTE" bash -lc 'devzone agent ${MODEL_OPT:+--modele "$MODEL_OPT"} "$1" "$2"' _ "$in_pod" "/tmp/devzone-agent-$name.md" || code=$?
     journal="$(journal_of "$name")"
     mkdir -p "$(dirname "$journal")"
     if ! agent_kc exec devzone-workspace-0 -c workspace -- cat "$pod_root/workspace/.agents/$name.log" >>"$journal"; then

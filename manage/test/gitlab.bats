@@ -15,15 +15,15 @@ setup() {
     relais_docker_isole
     kube_isole
     export HOME="$BATS_TEST_TMPDIR/home"
-    export DEVZONE_RACINE="$BATS_TEST_TMPDIR/racine"
-    export DEVZONE_ETAT="$BATS_TEST_TMPDIR/modules"
+    export DEVZONE_ROOT="$BATS_TEST_TMPDIR/racine"
+    export DEVZONE_STATE="$BATS_TEST_TMPDIR/modules"
     export DEVZONE_MEMINFO="$BATS_TEST_TMPDIR/meminfo"
     export DEVZONE_HOSTS="$BATS_TEST_TMPDIR/hosts"
     export KIND_CLUSTERS="$BATS_TEST_TMPDIR/clusters"
     # startup.sh starts the auto port watcher: its folder stays under the test (#394)
     export DEVZONE_PORTS_AUTO_DIR="$BATS_TEST_TMPDIR/ports-auto"
-    SECRETS="$DEVZONE_RACINE/workspace/.gitlab"
-    mkdir -p "$HOME" "$DEVZONE_RACINE/workspace" "$BATS_TEST_TMPDIR/bin"
+    SECRETS="$DEVZONE_ROOT/workspace/.gitlab"
+    mkdir -p "$HOME" "$DEVZONE_ROOT/workspace" "$BATS_TEST_TMPDIR/bin"
     printf 'MemAvailable: 16000000 kB\n' >"$DEVZONE_MEMINFO"
     : >"$KIND_CLUSTERS"
     printf '127.0.0.1 localhost\n' >"$DEVZONE_HOSTS"
@@ -354,11 +354,11 @@ wait_log() {
 @test "gitlab : seed and uninstall regenerate .password" {
     run bash "$GITLAB" install
     [ "$status" -eq 0 ]
-    grep -q $'^gitlab\thttp://gitlab.localhost:8929\tdev\t' "$DEVZONE_RACINE/.password"
-    grep -q $'^gitlab\thttp://gitlab.localhost:8929\troot\tpassword123$' "$DEVZONE_RACINE/.password"
+    grep -q $'^gitlab\thttp://gitlab.localhost:8929\tdev\t' "$DEVZONE_ROOT/.password"
+    grep -q $'^gitlab\thttp://gitlab.localhost:8929\troot\tpassword123$' "$DEVZONE_ROOT/.password"
     run bash "$GITLAB" uninstall
     [ "$status" -eq 0 ]
-    [ ! -e "$DEVZONE_RACINE/.password" ]
+    [ ! -e "$DEVZONE_ROOT/.password" ]
 }
 
 @test "gitlab : project created with the numeric group ID, push with the root token" {
@@ -497,7 +497,7 @@ wait_log() {
 }
 
 @test "devzone apply: gitlab active, ready without runner online → install" {
-    printf 'gitlab=on\n' >"$DEVZONE_ETAT"
+    printf 'gitlab=on\n' >"$DEVZONE_STATE"
     touch "$BATS_TEST_TMPDIR/namespace"
     mkdir -p "$SECRETS" && echo token >"$SECRETS/root-token"
     run bash "$DEVZONE" apply
@@ -506,7 +506,7 @@ wait_log() {
 }
 
 @test "devzone apply: gitlab active, ready with runner online → no install" {
-    printf 'gitlab=on\n' >"$DEVZONE_ETAT"
+    printf 'gitlab=on\n' >"$DEVZONE_STATE"
     touch "$BATS_TEST_TMPDIR/namespace"
     mkdir -p "$SECRETS" && echo token >"$SECRETS/root-token"
     FAKE_RUNNERS='[{"id":1}]' run bash "$DEVZONE" apply
@@ -516,7 +516,7 @@ wait_log() {
 }
 
 @test "devzone apply: gitlab disabled → nothing" {
-    printf 'gitlab=off\n' >"$DEVZONE_ETAT"
+    printf 'gitlab=off\n' >"$DEVZONE_STATE"
     run bash "$DEVZONE" apply
     [ "$status" -eq 0 ]
     [ ! -e "$BATS_TEST_TMPDIR/helm.log" ]
@@ -566,15 +566,15 @@ wait_log() {
 }
 
 @test "gitlab : relay-stop stops both relays" {
-    mkdir -p "$DEVZONE_RACINE/workspace/.gitlab-web" "$DEVZONE_RACINE/workspace/.gitlab-ssh"
-    echo "999999" >"$DEVZONE_RACINE/workspace/.gitlab-web/relais.pid"
-    echo "999998" >"$DEVZONE_RACINE/workspace/.gitlab-ssh/relais.pid"
+    mkdir -p "$DEVZONE_ROOT/workspace/.gitlab-web" "$DEVZONE_ROOT/workspace/.gitlab-ssh"
+    echo "999999" >"$DEVZONE_ROOT/workspace/.gitlab-web/relais.pid"
+    echo "999998" >"$DEVZONE_ROOT/workspace/.gitlab-ssh/relais.pid"
     run bash "$GITLAB" relay-stop
     [ "$status" -eq 0 ] || false
     grep -q "pgrep -P 999999" "$BATS_TEST_TMPDIR/pgrep.log" || false
     grep -q "pgrep -P 999998" "$BATS_TEST_TMPDIR/pgrep.log" || false
-    [ ! -e "$DEVZONE_RACINE/workspace/.gitlab-web/relais.pid" ] || false
-    [ ! -e "$DEVZONE_RACINE/workspace/.gitlab-ssh/relais.pid" ] || false
+    [ ! -e "$DEVZONE_ROOT/workspace/.gitlab-web/relais.pid" ] || false
+    [ ! -e "$DEVZONE_ROOT/workspace/.gitlab-ssh/relais.pid" ] || false
 }
 
 @test "gitlab : uninstall stops the web and SSH relays" {
@@ -582,14 +582,14 @@ wait_log() {
     { true; } &
     pid=$!
     wait "$pid" || true
-    mkdir -p "$DEVZONE_RACINE/workspace/.gitlab-web" "$DEVZONE_RACINE/workspace/.gitlab-ssh"
-    echo "$pid" >"$DEVZONE_RACINE/workspace/.gitlab-web/relais.pid"
-    echo "$pid" >"$DEVZONE_RACINE/workspace/.gitlab-ssh/relais.pid"
+    mkdir -p "$DEVZONE_ROOT/workspace/.gitlab-web" "$DEVZONE_ROOT/workspace/.gitlab-ssh"
+    echo "$pid" >"$DEVZONE_ROOT/workspace/.gitlab-web/relais.pid"
+    echo "$pid" >"$DEVZONE_ROOT/workspace/.gitlab-ssh/relais.pid"
     run bash "$GITLAB" uninstall
     [ "$status" -eq 0 ]
     grep -q "pgrep -P $pid" "$BATS_TEST_TMPDIR/pgrep.log"
-    [ ! -e "$DEVZONE_RACINE/workspace/.gitlab-web" ]
-    [ ! -e "$DEVZONE_RACINE/workspace/.gitlab-ssh" ]
+    [ ! -e "$DEVZONE_ROOT/workspace/.gitlab-web" ]
+    [ ! -e "$DEVZONE_ROOT/workspace/.gitlab-ssh" ]
 }
 
 @test "gitlab : hote-retirer removes the line, keeps localhost; without line → nothing, code 0" {
@@ -636,7 +636,7 @@ SUDO
 }
 
 @test "devzone apply: gitlab active, ready → gitlab.localhost line set" {
-    printf 'gitlab=on\n' >"$DEVZONE_ETAT"
+    printf 'gitlab=on\n' >"$DEVZONE_STATE"
     touch "$BATS_TEST_TMPDIR/namespace"
     mkdir -p "$SECRETS" && echo token >"$SECRETS/root-token"
     FAKE_RUNNERS='[{"id":1}]' run bash "$DEVZONE" apply
@@ -646,8 +646,8 @@ SUDO
 }
 
 real_mark() {
-    stat -c %Y /tmp/devzone-relais-docker.echec 2>/dev/null ||
-        stat -f %m /tmp/devzone-relais-docker.echec 2>/dev/null ||
+    stat -c %Y /tmp/devzone-relay.failed 2>/dev/null ||
+        stat -f %m /tmp/devzone-relay.failed 2>/dev/null ||
         echo absent
 }
 
@@ -655,16 +655,16 @@ real_mark() {
     # Isolation (#346): the Docker relay runs under $BATS_TEST_TMPDIR, the
     # real mark of the workstation is never touched (unchanged, not absent:
     # it may exist if the workstation relay really failed)
-    [[ "$DEVZONE_RELAIS_MARQUE" == "$BATS_TEST_TMPDIR"/* ]] || false
+    [[ "$DEVZONE_RELAY_MARKER" == "$BATS_TEST_TMPDIR"/* ]] || false
     local before
     before="$(real_mark)"
     # Module inactive: nothing is set
-    printf 'gitlab=off\n' >"$DEVZONE_ETAT"
+    printf 'gitlab=off\n' >"$DEVZONE_STATE"
     run bash "$DEMARRAGE"
     [ "$status" -eq 0 ]
     ! grep -q 'devzone:gitlab' "$DEVZONE_HOSTS" || false
     # Module active: the name is set at startup
-    printf 'gitlab=on\n' >"$DEVZONE_ETAT"
+    printf 'gitlab=on\n' >"$DEVZONE_STATE"
     run bash "$DEMARRAGE"
     [ "$status" -eq 0 ]
     grep -q 'devzone:gitlab' "$DEVZONE_HOSTS"
@@ -675,7 +675,7 @@ real_mark() {
     grep -q 'devzone devzone-gitlab svc/gitlab-gitlab-shell 2224:22' "$BATS_TEST_TMPDIR/setsid.log"
     # Isolation (#346): the real mark of the workstation is unchanged after the
     # startup (read before the first launch of startup.sh)
-    [[ "$DEVZONE_RELAIS_MARQUE" == "$BATS_TEST_TMPDIR"/* ]] || false
+    [[ "$DEVZONE_RELAY_MARKER" == "$BATS_TEST_TMPDIR"/* ]] || false
     [ "$(real_mark)" = "$before" ]
 }
 

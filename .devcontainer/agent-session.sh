@@ -47,7 +47,7 @@ lock_trace() {
 # which of the two launches succeeded in mkdir.
 lock_take() {
     local end age lock_pid
-    end=$(( $(date +%s) + ${DEVZONE_AGENT_VERROU_MAX:-10} ))
+    end=$(( $(date +%s) + ${DEVZONE_AGENT_LOCK_MAX:-10} ))
     while ! mkdir "$AGENT_ETAT/verrou" 2>/dev/null; do
         # A lock is orphaned only by its age: the rank is held for a few milliseconds,
         # 30 s can only be a stop to take over; otherwise wait, then give up (code 1).
@@ -73,7 +73,7 @@ lock_take() {
     if command -v flock >/dev/null 2>&1; then
         # exec in an if makes a failure a condition instead of killing the shell
         # (bash 3.2 and GNU alike); without flock, mkdir remains the only guard (macOS).
-        if { exec 9>"$AGENT_ETAT/rang.lock"; } && flock -w "${DEVZONE_AGENT_VERROU_MAX:-10}" 9; then
+        if { exec 9>"$AGENT_ETAT/rang.lock"; } && flock -w "${DEVZONE_AGENT_LOCK_MAX:-10}" 9; then
             AGENT_LOCK_FLOCK=1
         else
             lock_release

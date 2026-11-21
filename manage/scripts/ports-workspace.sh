@@ -2,10 +2,10 @@
 # Applications and services of the Kubernetes workspace on workstation localhost (#401).
 # Sourced by manage/workspace.sh (ports_* functions); run directly with "loop" or
 # "round", it is the workstation watcher: only one, mkdir lock and pid in
-# .devzone.ports-workspace/. It relays with kubectl port-forward, on 127.0.0.1
+# .devzone.workspace-ports/. It relays with kubectl port-forward, on 127.0.0.1
 # only, TCP ports >= 1024 listening in the pod, and devzone services of active
 # modules in .devzone.modules. Guard: never under bats without
-# DEVZONE_PORTS_WORKSPACE_REEL=oui.
+# DEVZONE_PORTS_WORKSPACE_REAL=yes.
 
 PW_POD="devzone-workspace-0"
 PW_NS="devzone-workspace"
@@ -18,7 +18,7 @@ PW_JSONPATH='jsonpath={.spec.ports[0].port}'
 . "$(dirname "${BASH_SOURCE[0]}")/ports-apps.sh"
 
 # Watcher state folder: lock, pid, relays, reported ports, log.
-pw_dir() { printf '%s' "${DEVZONE_PORTS_WORKSPACE_DIR:-$PWD/.devzone.ports-workspace}"; }
+pw_dir() { printf '%s' "${DEVZONE_PORTS_WORKSPACE_DIR:-$PWD/.devzone.workspace-ports}"; }
 
 # kubectl context flag: devzone if it exists, otherwise current context.
 pw_ctx() {
@@ -33,10 +33,10 @@ pw_kubectl() {
     kubectl $(pw_ctx) "$@"
 }
 
-# Guard: refuse under bats without DEVZONE_PORTS_WORKSPACE_REEL=oui (message if $1 empty).
+# Guard: refuse under bats without DEVZONE_PORTS_WORKSPACE_REAL=yes (message if $1 empty).
 pw_guard() {
-    if [ -n "${BATS_TEST_TMPDIR:-}" ] && [ "${DEVZONE_PORTS_WORKSPACE_REEL:-}" != oui ]; then
-        [ -n "${1:-}" ] || echo "✖ port watcher refused under bats (DEVZONE_PORTS_WORKSPACE_REEL=oui required)" >&2
+    if [ -n "${BATS_TEST_TMPDIR:-}" ] && [ "${DEVZONE_PORTS_WORKSPACE_REAL:-}" != yes ]; then
+        [ -n "${1:-}" ] || echo "✖ port watcher refused under bats (DEVZONE_PORTS_WORKSPACE_REAL=yes required)" >&2
         return 2
     fi
 }
@@ -155,7 +155,7 @@ pw_loop() {
     trap 'pw_remove_all; rm -rf "$d/verrou" "$d/pid"; exit 0' TERM INT
     while :; do
         pw_round || true
-        sleep "${DEVZONE_PORTS_WORKSPACE_PAS:-3}" &
+        sleep "${DEVZONE_PORTS_WORKSPACE_STEP:-3}" &
         wait $!
     done
 }

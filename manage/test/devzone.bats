@@ -78,8 +78,8 @@ setup() {
     cd "$BATS_TEST_TMPDIR" || return 1
     export GIT_CONFIG_NOSYSTEM=1
     # Racine de devzone simulée : les worktrees du vrai dépôt n'interfèrent pas
-    export DEVZONE_RACINE="$BATS_TEST_TMPDIR/racine"
-    mkdir -p "$DEVZONE_RACINE/workspace"
+    export DEVZONE_ROOT="$BATS_TEST_TMPDIR/racine"
+    mkdir -p "$DEVZONE_ROOT/workspace"
     # npm simulé : journalise ses arguments ; « npm ls -g --depth=0 --json »
     # renvoie les outils installés (NPM_INSTALLEES). Installation des
     # assistants IA : dure NPM_DUREE secondes, crée claude et opencode
@@ -158,22 +158,22 @@ GH
 }
 
 @test "docker-hote : partagé par défaut, avertissement dans l'état" {
-    : >"$DEVZONE_RELAIS_SOURCE"
+    : >"$DEVZONE_RELAY_SOURCE"
     run bash "$DEVZONE"
     [ "$status" -eq 0 ]
     [[ "$output" == *"⚠ host Docker socket shared (agents included)"* ]] || false
 }
 
 @test "docker-hote : socket monté avec option off → encore partagé, make rebuild" {
-    : >"$DEVZONE_RELAIS_SOURCE"
-    printf 'docker-hote=off\n' >"$DEVZONE_RACINE/.devzone.modules"
+    : >"$DEVZONE_RELAY_SOURCE"
+    printf 'docker-hote=off\n' >"$DEVZONE_ROOT/.devzone.modules"
     run bash "$DEVZONE"
     [ "$status" -eq 0 ]
     [[ "$output" == *"⚠ host Docker socket still shared: make rebuild on the workstation"* ]] || false
 }
 
 @test "docker-hote : option on, socket absent → absent, make rebuild" {
-    rm -f "$DEVZONE_RELAIS_SOURCE"
+    rm -f "$DEVZONE_RELAY_SOURCE"
     run bash "$DEVZONE"
     [ "$status" -eq 0 ]
     [[ "$output" == *"⚠ host Docker socket absent: make rebuild on the workstation"* ]] || false
@@ -183,34 +183,34 @@ GH
 @test "docker-hote : desactiver écrit off, demande make rebuild, plus d'avertissement" {
     run bash "$DEVZONE" disable docker-hote
     [ "$status" -eq 0 ]
-    grep -qx 'docker-hote=off' "$DEVZONE_RACINE/.devzone.modules"
+    grep -qx 'docker-hote=off' "$DEVZONE_ROOT/.devzone.modules"
     [[ "$output" == *"make rebuild"* ]] || false
-    rm -f "$DEVZONE_RELAIS_SOURCE"
+    rm -f "$DEVZONE_RELAY_SOURCE"
     run bash "$DEVZONE"
     [ "$status" -eq 0 ]
     [[ "$output" != *"host Docker socket"* ]] || false
 }
 
 @test "docker-hote : desactiver concurrent avec une écriture d'état : aucune ligne perdue" {
-    printf 'docker-hote=off\nia=on\n' >"$DEVZONE_RACINE/.devzone.modules"
-    ETAT="$DEVZONE_RACINE/.devzone.modules" bash -c '. "$1"; state_write postgres on' _ "$BATS_TEST_DIRNAME/../../.devcontainer/state.sh" & pid_w=$!
+    printf 'docker-hote=off\nia=on\n' >"$DEVZONE_ROOT/.devzone.modules"
+    ETAT="$DEVZONE_ROOT/.devzone.modules" bash -c '. "$1"; state_write postgres on' _ "$BATS_TEST_DIRNAME/../../.devcontainer/state.sh" & pid_w=$!
     bash "$DEVZONE" disable docker-hote & pid_d=$!
     wait "$pid_w"
     wait "$pid_d"
-    grep -qx 'docker-hote=off' "$DEVZONE_RACINE/.devzone.modules"
-    grep -qx 'postgres=on' "$DEVZONE_RACINE/.devzone.modules"
+    grep -qx 'docker-hote=off' "$DEVZONE_ROOT/.devzone.modules"
+    grep -qx 'postgres=on' "$DEVZONE_ROOT/.devzone.modules"
 }
 
 @test "docker-hote : activer écrit on, demande make rebuild" {
-    printf 'docker-hote=off\n' >"$DEVZONE_RACINE/.devzone.modules"
+    printf 'docker-hote=off\n' >"$DEVZONE_ROOT/.devzone.modules"
     run bash "$DEVZONE" enable docker-hote
     [ "$status" -eq 0 ]
-    grep -qx 'docker-hote=on' "$DEVZONE_RACINE/.devzone.modules"
+    grep -qx 'docker-hote=on' "$DEVZONE_ROOT/.devzone.modules"
     [[ "$output" == *"make rebuild"* ]] || false
 }
 
 @test "état : DEVZONE_WORKSPACE=kubernetes → pas d'avertissement socket Docker, ligne workspace Kubernetes pod" {
-    : >"$DEVZONE_RELAIS_SOURCE"
+    : >"$DEVZONE_RELAY_SOURCE"
     export DEVZONE_WORKSPACE=kubernetes
     run bash "$DEVZONE"
     [ "$status" -eq 0 ]
@@ -261,13 +261,13 @@ GH
 }
 
 @test "état : worktree au chemin absent (créé de l'autre côté) → ⚠, rien supprimé" {
-    depot="$DEVZONE_RACINE/workspace/projet"
+    depot="$DEVZONE_ROOT/workspace/projet"
     mkdir -p "$depot"
     git -C "$depot" init -q
     git -C "$depot" -c user.name=t -c user.email=t@example.invalid commit -q --allow-empty -m base
     git -C "$depot" worktree add -q --detach "$BATS_TEST_TMPDIR/wt-hote"
     # Dépôt rangé un niveau plus bas (workspace/<groupe>/<dépôt>)
-    imbrique="$DEVZONE_RACINE/workspace/groupe/autre"
+    imbrique="$DEVZONE_ROOT/workspace/groupe/autre"
     mkdir -p "$imbrique"
     git -C "$imbrique" init -q
     git -C "$imbrique" -c user.name=t -c user.email=t@example.invalid commit -q --allow-empty -m base
@@ -282,7 +282,7 @@ GH
 }
 
 @test "état : worktree présent → aucun avertissement worktree" {
-    depot="$DEVZONE_RACINE/workspace/groupe/projet"
+    depot="$DEVZONE_ROOT/workspace/groupe/projet"
     mkdir -p "$depot"
     git -C "$depot" init -q
     git -C "$depot" -c user.name=t -c user.email=t@example.invalid commit -q --allow-empty -m base
@@ -333,7 +333,7 @@ GH
 }
 
 @test "activer ia : installation lente → annoncée, progression pendant, résultat après" {
-    NPM_DUREE=3 DEVZONE_PROGRESSION=1 run bash "$DEVZONE" enable ia
+    NPM_DUREE=3 DEVZONE_PROGRESS=1 run bash "$DEVZONE" enable ia
     [ "$status" -eq 0 ]
     [[ "$output" == *"installing Claude Code and opencode (a few minutes)"*"still running"*"Claude Code and opencode installed"* ]] || false
 }
@@ -386,13 +386,13 @@ GH
 
 @test "désactiver ia : désinstalle, état gardé" {
     bash "$DEVZONE" enable ia
-    mkdir -p "${DEVZONE_AGENT_ETAT:-$HOME/.local/state/oc-lancer}"
+    mkdir -p "${DEVZONE_AGENT_STATE:-$HOME/.local/state/oc-lancer}"
     run bash "$DEVZONE" disable ia
     [ "$status" -eq 0 ]
     grep -qx "npm uninstall -g @anthropic-ai/claude-code opencode-ai" "$BATS_TEST_TMPDIR/npm.log"
     run bash "$DEVZONE" is-enabled ia
     [ "$status" -ne 0 ]
-    [ -d "${DEVZONE_AGENT_ETAT:-$HOME/.local/state/oc-lancer}" ]
+    [ -d "${DEVZONE_AGENT_STATE:-$HOME/.local/state/oc-lancer}" ]
 }
 
 @test "désactiver kubernetes : retire hote.config, sans rien lancer" {
@@ -630,22 +630,22 @@ KUBE
     printf 'ia=on\nkubernetes=on\n' >"$HOME/.config/devzone/modules"
     run bash "$DEVZONE" is-enabled ia
     [ "$status" -eq 0 ]
-    [ -f "$DEVZONE_RACINE/.devzone.modules" ]
+    [ -f "$DEVZONE_ROOT/.devzone.modules" ]
     [ ! -e "$HOME/.config/devzone/modules" ]
-    grep -qx 'ia=on' "$DEVZONE_RACINE/.devzone.modules"
+    grep -qx 'ia=on' "$DEVZONE_ROOT/.devzone.modules"
 }
 
 @test "migration : second devzone (source déjà déplacée) → valeurs par défaut" {
     mkdir -p "$HOME/.config/devzone"
     printf 'ia=on\nkubernetes=on\n' >"$HOME/.config/devzone/modules"
     bash "$DEVZONE" is-enabled ia
-    export DEVZONE_RACINE="$BATS_TEST_TMPDIR/racine2"
-    mkdir -p "$DEVZONE_RACINE/workspace"
+    export DEVZONE_ROOT="$BATS_TEST_TMPDIR/racine2"
+    mkdir -p "$DEVZONE_ROOT/workspace"
     run bash "$DEVZONE" is-enabled ia
     [ "$status" -ne 0 ]
-    [ -f "$DEVZONE_RACINE/.devzone.modules" ]
-    grep -qx 'ia=off' "$DEVZONE_RACINE/.devzone.modules"
-    grep -qx 'kubernetes=off' "$DEVZONE_RACINE/.devzone.modules"
+    [ -f "$DEVZONE_ROOT/.devzone.modules" ]
+    grep -qx 'ia=off' "$DEVZONE_ROOT/.devzone.modules"
+    grep -qx 'kubernetes=off' "$DEVZONE_ROOT/.devzone.modules"
 }
 
 @test "appliquer : installe ia seulement s'il est actif" {
@@ -747,7 +747,7 @@ HOOK
     [ -f "$HOME/.config/opencode/plugins/devzone-guard.js" ]
     [ -f "$HOME/.config/opencode/plugins/devzone-guard-v2.js" ]
     grep -qF "$BATS_TEST_TMPDIR/app/ai/docker-guard.sh" "$HOME/.config/opencode/plugins/devzone-guard.js"
-    ! grep -q "__DEVZONE_DOCKER_GARDE__" "$HOME/.config/opencode/plugins/devzone-guard.js" || false
+    ! grep -q "__DEVZONE_DOCKER_GUARD__" "$HOME/.config/opencode/plugins/devzone-guard.js" || false
     [ "$(jq '[.hooks.PreToolUse[] | .hooks[] | select((.command // "") | contains("docker-guard.sh"))] | length' "$HOME/.claude/settings.json")" -eq 1 ]
     run bash "$APP" disable ia
     [ "$status" -eq 0 ]
@@ -798,15 +798,6 @@ HOOK
     [[ "$output" == *"opencode : default configuration written"* ]] || false
 }
 
-@test "activer ia : configuration opencode avec le repère et différente -> mise à jour" {
-    mkdir -p "$HOME/.config/opencode"
-    printf '// devzone : configuration opencode par défaut (ancienne)\n{"model":"ancien"}\n' >"$HOME/.config/opencode/opencode.jsonc"
-    run bash "$DEVZONE" enable ia
-    [ "$status" -eq 0 ]
-    grep -q '"model": "opencode/big-pickle"' "$HOME/.config/opencode/opencode.jsonc"
-    [[ "$output" == *"opencode : default configuration updated"* ]] || false
-}
-
 @test "activer ia : configuration opencode avec le repère anglais et différente -> mise à jour" {
     mkdir -p "$HOME/.config/opencode"
     printf '// devzone : default opencode configuration (ancienne)\n{"model":"ancien"}\n' >"$HOME/.config/opencode/opencode.jsonc"
@@ -814,22 +805,6 @@ HOOK
     [ "$status" -eq 0 ]
     grep -q '"model": "opencode/big-pickle"' "$HOME/.config/opencode/opencode.jsonc"
     [[ "$output" == *"opencode : default configuration updated"* ]] || false
-}
-
-@test "activer ia : skill avec l'ancien repère français, non modifiée -> mise à jour" {
-    run bash "$DEVZONE" enable ia
-    [ "$status" -eq 0 ]
-    local d f
-    for d in "$HOME/.claude/skills/devzone" "$HOME/.config/opencode/skills/devzone"; do
-        f="$d/SKILL.md"
-        sed 's/skill set by devzone enable ia/skill posée par devzone enable ia/' "$f" >"$f.tmp"
-        mv "$f.tmp" "$f"
-        sha256sum "$f" | cut -d' ' -f1 >"$d/.devzone-empreinte"
-    done
-    run bash "$DEVZONE" enable ia
-    [ "$status" -eq 0 ]
-    grep -qF '<!-- devzone : skill set by devzone enable ia -->' "$HOME/.claude/skills/devzone/SKILL.md"
-    [[ "$output" == *"devzone skill updated"* ]] || false
 }
 
 @test "activer ia : configuration opencode avec seulement \$schema -> remplacée" {
@@ -969,21 +944,21 @@ mon réglage' ]
     git init -q
     cp "$BATS_TEST_DIRNAME/../../.gitignore" ./.gitignore
     printf "ia=on\nkubernetes=on\n" >.devzone.modules
-    printf "gitlab\n" >.devzone.modules-echec-gitlab
+    printf "gitlab\n" >.devzone.modules-failed-gitlab
     run git status --porcelain
     [ "$status" -eq 0 ]
     [ -z "$(grep "\.devzone\.modules" <<<"$output")" ]
 }
 
 @test "état : version publiée plus récente → ligne devzone update" {
-    printf 'version 0.19.0\n' >"$DEVZONE_RACINE/.devzone.version"
+    printf 'version 0.19.0\n' >"$DEVZONE_ROOT/.devzone.version"
     NPM_PUBLIEE=0.20.0 run bash "$DEVZONE"
     [ "$status" -eq 0 ]
     [[ "$output" == *"○ devzone 0.20.0 available: on the workstation, devzone update"* ]] || false
 }
 
 @test "état : version publiée identique ou plus ancienne → aucune ligne" {
-    printf 'version 0.19.0\n' >"$DEVZONE_RACINE/.devzone.version"
+    printf 'version 0.19.0\n' >"$DEVZONE_ROOT/.devzone.version"
     NPM_PUBLIEE=0.19.0 run bash "$DEVZONE"
     [ "$status" -eq 0 ]
     [[ "$output" != *"○ devzone "*"disponible"* ]] || false
@@ -993,7 +968,7 @@ mon réglage' ]
 }
 
 @test "état : version publiée vérifiée une seule fois par jour (cache)" {
-    printf 'version 0.19.0\n' >"$DEVZONE_RACINE/.devzone.version"
+    printf 'version 0.19.0\n' >"$DEVZONE_ROOT/.devzone.version"
     NPM_PUBLIEE=0.20.0 run bash "$DEVZONE"
     [ "$(grep -c '^npm view devzone version' "$NPM_LOG")" -eq 1 ]
     NPM_PUBLIEE=0.21.0 run bash "$DEVZONE"
@@ -1003,7 +978,7 @@ mon réglage' ]
 }
 
 @test "état : hors ligne → silence, vérification mise en cache" {
-    printf 'version 0.19.0\n' >"$DEVZONE_RACINE/.devzone.version"
+    printf 'version 0.19.0\n' >"$DEVZONE_ROOT/.devzone.version"
     NPM_VIEW_CODE=1 run bash "$DEVZONE"
     [ "$status" -eq 0 ]
     [[ "$output" != *"○ devzone "*"disponible"* ]] || false
@@ -1011,7 +986,7 @@ mon réglage' ]
 }
 
 @test "état : npm lent → abandon après 5 s, sans bloquer le récapitulatif" {
-    printf 'version 0.19.0\n' >"$DEVZONE_RACINE/.devzone.version"
+    printf 'version 0.19.0\n' >"$DEVZONE_ROOT/.devzone.version"
     debut="$(date +%s)"
     NPM_PUBLIEE=0.20.0 NPM_VIEW_DUREE=30 run bash "$DEVZONE"
     [ "$status" -eq 0 ]

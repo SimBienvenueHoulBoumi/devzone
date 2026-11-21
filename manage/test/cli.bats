@@ -7,7 +7,7 @@ setup() {
     kube_isole
     RACINE="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
     CLI="$RACINE/manage/devzone"
-    export DEVZONE_SANS_DEMARRER=1
+    export DEVZONE_NO_START=1
     cd "$BATS_TEST_TMPDIR" || return 1
 }
 
@@ -24,7 +24,7 @@ setup() {
     [ ! -e mon-devzone/manage/devzone ]
     [ ! -e mon-devzone/manage/test ]
     grep -q '^workspace/\*$' mon-devzone/.gitignore
-    grep -qx '.devzone.sauvegarde/' mon-devzone/.gitignore
+    grep -qx '.devzone.backup/' mon-devzone/.gitignore
 }
 
 @test "devzone <folder>: .devzone.version holds the version and one checksum per copied file" {
@@ -271,7 +271,7 @@ fake_docker() {
 }
 
 @test "devzone <folder> without Docker: folder created, how to start later, without a raw error" {
-    unset DEVZONE_SANS_DEMARRER
+    unset DEVZONE_NO_START
     fake_cli 'echo "{\"outcome\":\"error\"}"; exit 1'
     fake_docker arrete
     # Cluster unreachable: the mode is Docker, whatever kubectl the host has (#497)
@@ -315,7 +315,7 @@ fake_docker() {
 
 @test "launch.sh: question asked in the container reported, start stopped instead of waiting" {
     fake_cli 'printf "Running the postCreateCommand from devcontainer.json...\r\nConfigurer les bots de ce dépôt ? [o/N] "; sleep 60'
-    export DEVZONE_ATTENTE_QUESTION=2
+    export DEVZONE_QUESTION_WAIT=2
     debut="$(date +%s)"
     run bash "$RACINE/manage/scripts/launch.sh" up "$PWD/dz"
     [ "$status" -eq 1 ]
@@ -325,7 +325,7 @@ fake_docker() {
 
 @test "launch.sh: silence reported (sign of life), not taken for a question" {
     fake_cli 'printf "npm install en cours\r\n"; sleep 4'
-    export DEVZONE_SIGNE_DE_VIE=1 DEVZONE_ATTENTE_QUESTION=1
+    export DEVZONE_HEARTBEAT=1 DEVZONE_QUESTION_WAIT=1
     run bash "$RACINE/manage/scripts/launch.sh" up "$PWD/dz"
     [ "$status" -eq 0 ]
     [[ "$output" == *"no new line for"*"npm install en cours"* ]] || false

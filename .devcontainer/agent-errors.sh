@@ -35,10 +35,10 @@ cause_label() {
     esac
 }
 
-# Duration of an exclusion in seconds: country 7 days (DEVZONE_AGENT_ECART_PAYS), the others 1 h.
+# Duration of an exclusion in seconds: country 7 days (DEVZONE_AGENT_COUNTRY_EXCLUSION), the others 1 h.
 exclusion_duration() {
     case "$1" in
-        pays) echo "${DEVZONE_AGENT_ECART_PAYS:-604800}" ;;
+        pays) echo "${DEVZONE_AGENT_COUNTRY_EXCLUSION:-604800}" ;;
         *) echo 3600 ;;
     esac
 }
@@ -78,18 +78,18 @@ network_reachable() {
     getent hosts opencode.ai >/dev/null 2>&1 && curl -sI --max-time 5 https://opencode.ai >/dev/null 2>&1
 }
 
-# Waits for the network to come back: a try every DEVZONE_AGENT_RESEAU_PAS s, for
-# DEVZONE_AGENT_RESEAU_MAX s at most. Returns 0 when it is back.
+# Waits for the network to come back: a try every DEVZONE_AGENT_NETWORK_STEP s, for
+# DEVZONE_AGENT_NETWORK_MAX s at most. Returns 0 when it is back.
 network_wait() {
     local end
-    end=$(( $(date +%s) + ${DEVZONE_AGENT_RESEAU_MAX:-1800} ))
+    end=$(( $(date +%s) + ${DEVZONE_AGENT_NETWORK_MAX:-1800} ))
     echo "=== network down, waiting" >>"$AGENT_JOURNAL"
     while [ "$(date +%s)" -lt "$end" ]; do
         if network_reachable; then
             echo "=== network back" >>"$AGENT_JOURNAL"
             return 0
         fi
-        sleep "${DEVZONE_AGENT_RESEAU_PAS:-30}"
+        sleep "${DEVZONE_AGENT_NETWORK_STEP:-30}"
     done
     return 1
 }

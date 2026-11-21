@@ -2,7 +2,7 @@
 # devzone workspace egress (#633): the wait for the proxy after a redeploy. Argo
 # CD creates the proxy Deployment late: the wait looks it up first, then its
 # rollout. Fake kubectl in $BATS_TEST_TMPDIR/bin: no cluster, no network. Waits
-# are shortened (DEVZONE_EGRESS_WAIT 2, DEVZONE_EGRESS_PAS 1, rollout 1 s).
+# are shortened (DEVZONE_EGRESS_WAIT 2, DEVZONE_EGRESS_STEP 1, rollout 1 s).
 
 setup() {
     load commun
@@ -12,8 +12,8 @@ setup() {
     CLI="$RACINE/manage/devzone"
     T="$BATS_TEST_TMPDIR"
     R="$T/racine"
-    export DEVZONE_RACINE="$R"
-    export DEVZONE_EGRESS_WAIT=2 DEVZONE_EGRESS_PAS=1 DEVZONE_EGRESS_ROLLOUT=1
+    export DEVZONE_ROOT="$R"
+    export DEVZONE_EGRESS_WAIT=2 DEVZONE_EGRESS_STEP=1 DEVZONE_EGRESS_ROLLOUT=1
     mkdir -p "$T/bin" "$R/workspace"
     : >"$T/kubectl.log"; : >"$T/helm.log"
     # FAKE_DEPLOY_ABSENT : number of « not found » answers to get deployment

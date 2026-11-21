@@ -93,7 +93,7 @@ show_state() {
     if [ "${DEVZONE_WORKSPACE:-}" = kubernetes ]; then
         printf '  ✔ workspace       Kubernetes pod, service account access only (no Docker socket)\n'
     else
-        relay_source="${DEVZONE_RELAIS_SOURCE:-/var/run/docker-host.sock}"
+        relay_source="${DEVZONE_RELAY_SOURCE:-/var/run/docker-host.sock}"
         if [ -e "$relay_source" ] && [ "$(value_of docker-hote)" = on ]; then
             printf '  ⚠ host Docker socket shared (agents included)\n'
         elif [ -e "$relay_source" ]; then
@@ -123,7 +123,7 @@ show_state() {
     ctx_work="$(kubectl config current-context 2>/dev/null || true)"
     case "$ctx_work" in
         kind-gitlab* | kind-devzone*)
-            ctx_host="$(KUBECONFIG="${DEVZONE_KUBE_HOTE:-$HOME/.kube/hote.config}" kubectl config current-context 2>/dev/null || true)"
+            ctx_host="$(KUBECONFIG="${DEVZONE_KUBE_HOST:-$HOME/.kube/hote.config}" kubectl config current-context 2>/dev/null || true)"
             if [ -n "$ctx_host" ] && cluster_reachable "$ctx_host"; then
                 printf '  ⚠ working cluster: %s (devzone internal cluster); go back: devzone use %s\n' "$ctx_work" "$ctx_host"
             fi
@@ -145,12 +145,12 @@ show_state() {
     fi
     # Mark set by docker-relay.sh at startup (#293): long docker exec cut,
     # kind and modules in failure
-    relay_mark="${DEVZONE_RELAIS_MARQUE:-/tmp/devzone-relais-docker.echec}"
+    relay_mark="${DEVZONE_RELAY_MARKER:-/tmp/devzone-relay.failed}"
     if [ -f "$relay_mark" ]; then
         printf '  ⚠ Docker relay     %s: devzone repair\n' "$(head -1 "$relay_mark")"
     fi
     # Mark set by packages.sh at the failed reapplication (351): names of the packages not installed
-    packages_mark="${DEVZONE_PAQUETS_MARQUE:-/tmp/devzone-paquets.echec}"
+    packages_mark="${DEVZONE_PACKAGES_MARKER:-/tmp/devzone-packages.failed}"
     if [ -f "$packages_mark" ]; then
         packages_names=""
         while IFS= read -r n; do

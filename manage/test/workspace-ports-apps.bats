@@ -41,14 +41,14 @@ exit 1
 LSOF
     chmod +x "$T/bin/kubectl" "$T/bin/lsof"
     export PATH="$T/bin:$PATH"
-    export DEVZONE_PORTS_WORKSPACE_REEL=oui
-    export DEVZONE_PORTS_WORKSPACE_PAS=0.2
-    export DEVZONE_WORKSPACE_ATTENTE=1 DEVZONE_WORKSPACE_PAS=0.1
+    export DEVZONE_PORTS_WORKSPACE_REAL=yes
+    export DEVZONE_PORTS_WORKSPACE_STEP=0.2
+    export DEVZONE_WORKSPACE_WAIT=1 DEVZONE_WORKSPACE_STEP=0.1
     : >"$T/kubectl.log"
 }
 
 teardown() {
-    ( cd "$T/workstation" && DEVZONE_PORTS_WORKSPACE_REEL=oui bash "$CLI" workspace ports stop >/dev/null 2>&1 ) || true
+    ( cd "$T/workstation" && DEVZONE_PORTS_WORKSPACE_REAL=yes bash "$CLI" workspace ports stop >/dev/null 2>&1 ) || true
 }
 
 # Cluster Services: one "namespace|name|clusterIP|type|annotation|port/TCP," line per argument.
@@ -152,15 +152,15 @@ alive() {
 @test "apps: Service gone, its relay and its attribution removed" {
     services "default|web|10.96.0.11|ClusterIP||3000/TCP,"
     round
-    pid="$(cat "$T/workstation/.devzone.ports-workspace/relais/3000")"
+    pid="$(cat "$T/workstation/.devzone.workspace-ports/relais/3000")"
     alive "$pid" || false
-    [ -e "$T/workstation/.devzone.ports-workspace/apps/default.web.3000" ]
+    [ -e "$T/workstation/.devzone.workspace-ports/apps/default.web.3000" ]
     services
     round
     sleep 0.3
     ! alive "$pid" || false
-    [ ! -e "$T/workstation/.devzone.ports-workspace/relais/3000" ]
-    [ ! -e "$T/workstation/.devzone.ports-workspace/apps/default.web.3000" ]
+    [ ! -e "$T/workstation/.devzone.workspace-ports/relais/3000" ]
+    [ ! -e "$T/workstation/.devzone.workspace-ports/apps/default.web.3000" ]
 }
 
 @test "apps: Service back with the same name and port gets the same local port" {

@@ -4,12 +4,12 @@ workspace/*
 
 .DS_Store
 .devzone.log
-.devzone.etat
+.devzone.state
 .devzone.modules*
 .password
 .devcontainer/sans-docker-hote/
 .devcontainer/without-host-docker/
-.devzone.catalogue-veilleur/
+.devzone.catalog-watcher/
 
 # Dependencies of the wrapper charts devzone-argocd and devzone-gitlab, built
 # by helm dependency build before the installation; their locks (Chart.lock)

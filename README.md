@@ -187,7 +187,7 @@ devzone packages apply
 - `devzone packages remove <nom>` retire la liste et désinstalle ;
 - `devzone packages apply` installe les paquets manquants après un rebuild.
 
-La liste vit dans `.devzone.paquets` à la racine du dossier devzone, hors du dépôt. Un paquet en échec est signalé dans le récapitulatif (⚠ paquets : …) ; `devzone packages apply` peut alors être relancé.
+La liste vit dans `.devzone.packages` à la racine du dossier devzone, hors du dépôt. Un paquet en échec est signalé dans le récapitulatif (⚠ paquets : …) ; `devzone packages apply` peut alors être relancé.
 
 ## Au quotidien
 
@@ -227,9 +227,11 @@ cd mon-devzone
 npx devzone@latest update
 ```
 
-La commande affiche la version du dossier et celle du paquet, et ne fait rien si elles sont égales. Sinon, elle sauvegarde dans `.devzone.sauvegarde/<date>/` les fichiers remplacés ou supprimés, liste les fichiers modifiés localement et demande confirmation (`--yes` pour un script ; sans terminal, `--yes` est nécessaire), remplace les fichiers du paquet, retire les anciennes arborescences (`core/`, `scripts/`), complète `.gitignore` sans l'écraser, puis propose `make rebuild`. `--sans-reconstruire` saute cette proposition ; sans terminal, la reconstruction n'est jamais lancée.
+La commande affiche la version du dossier et celle du paquet, et ne fait rien si elles sont égales. Sinon, elle sauvegarde dans `.devzone.backup/<date>/` les fichiers remplacés ou supprimés, liste les fichiers modifiés localement et demande confirmation (`--yes` pour un script ; sans terminal, `--yes` est nécessaire), remplace les fichiers du paquet, retire les anciennes arborescences (`core/`, `scripts/`), complète `.gitignore` sans l'écraser, puis propose `make rebuild`. `--sans-reconstruire` saute cette proposition ; sans terminal, la reconstruction n'est jamais lancée.
 
-`workspace/`, `.devzone.modules`, `.devzone.paquets`, `.password`, `.app`, `.devzone.log` et les volumes Docker ne sont jamais touchés.
+`workspace/`, `.devzone.modules`, `.devzone.packages`, `.password`, `.app`, `.devzone.log` et les volumes Docker ne sont jamais touchés.
+
+Les anciens noms des fichiers et dossiers (`.devzone.paquets`, `.devzone.sauvegarde`, `.devzone.ports-workspace`, `.devzone.etat`, `.devzone.catalogue-veilleur`) sont renommés une seule fois, avec leur contenu, par `.devcontainer/rename-legacy-files.sh` : au démarrage du conteneur, à la mise à jour et à la migration. Un nouveau nom déjà présent n'est jamais écrasé.
 
 La mise à jour ne change jamais le mode du poste ; sur un poste Docker avec Kubernetes joignable, elle propose `devzone workspace migrate`.
 

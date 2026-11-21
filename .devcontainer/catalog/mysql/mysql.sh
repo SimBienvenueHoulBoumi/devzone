@@ -2,8 +2,8 @@
 # MySQL of the catalog (#414): create, list, delete, status, relay-start, relay-stop, install, delete-data.
 set -euo pipefail
 ICI="$(cd "$(dirname "$0")" && pwd)"
-RACINE="${DEVZONE_RACINE:-$(dirname "$(dirname "$(dirname "$ICI")")")}"
-ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
+RACINE="${DEVZONE_ROOT:-$(dirname "$(dirname "$(dirname "$ICI")")")}"
+ETAT="${DEVZONE_STATE:-$RACINE/.devzone.modules}"
 # shellcheck source=SCRIPTDIR/../../cluster.sh
 # shellcheck disable=SC1091
 . "$ICI/../../cluster.sh"
@@ -51,7 +51,7 @@ module_context() {
     echo "$c"
 }
 # Failure marker of the module (same scheme as devzone's failure_file)
-failure_file() { echo "$ETAT-echec-mysql"; }
+failure_file() { echo "$ETAT-failed-mysql"; }
 # Project name: a simple SQL identifier, never escaped, not a reserved name
 check_project_name() {
     local p="${1:-}"

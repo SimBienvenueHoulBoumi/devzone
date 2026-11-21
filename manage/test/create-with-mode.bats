@@ -38,11 +38,11 @@ DOCKER
 #!/usr/bin/env bash
 echo "workspace $* in $(basename "$PWD")" >>"$FAKE_LOG"
 WS
-    printf '#!/usr/bin/env bash\necho "workspace failed" >>"$FAKE_LOG"\nexit 1\n' >"$T/ws-echec.sh"
-    chmod +x "$T/bin/kubectl" "$T/bin/helm" "$T/bin/docker" "$T/ws.sh" "$T/ws-echec.sh"
+    printf '#!/usr/bin/env bash\necho "workspace failed" >>"$FAKE_LOG"\nexit 1\n' >"$T/ws-failed.sh"
+    chmod +x "$T/bin/kubectl" "$T/bin/helm" "$T/bin/docker" "$T/ws.sh" "$T/ws-failed.sh"
     export PATH="$T/bin:$PATH"
     export DEVZONE_WORKSPACE_SH="$T/ws.sh"
-    export DEVZONE_SANS_DEMARRER=1
+    export DEVZONE_NO_START=1
     : >"$FAKE_LOG"
     unset FAKE_KUBE_CLUSTER_INFO
     cd "$T/work" || return 1
@@ -57,8 +57,8 @@ WS
     [[ "$(cat "$FAKE_LOG")" != *"workspace start"* ]] || false
 }
 
-@test "cluster ready, no option, no DEVZONE_SANS_DEMARRER: workspace started in the folder, no Docker" {
-    unset DEVZONE_SANS_DEMARRER
+@test "cluster ready, no option, no DEVZONE_NO_START: workspace started in the folder, no Docker" {
+    unset DEVZONE_NO_START
     run bash "$CLI" mon --gitops none
     [ "$status" -eq 0 ]
     [[ "$(cat "$FAKE_LOG")" == *"workspace start in mon"* ]] || false
@@ -111,8 +111,8 @@ WS
 }
 
 @test "--kubernetes, start fails: status 1, folder kept, the start to redo named" {
-    unset DEVZONE_SANS_DEMARRER
-    export DEVZONE_WORKSPACE_SH="$T/ws-echec.sh"
+    unset DEVZONE_NO_START
+    export DEVZONE_WORKSPACE_SH="$T/ws-failed.sh"
     run bash "$CLI" mon --kubernetes --gitops none
     [ "$status" -eq 1 ]
     [ -f mon/Makefile ]

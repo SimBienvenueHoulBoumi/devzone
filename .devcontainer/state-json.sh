@@ -182,7 +182,7 @@ state_json() {
         if [ "$(value_of docker-hote)" = on ]; then
             docker_host=true
         fi
-        relay_source="${DEVZONE_RELAIS_SOURCE:-/var/run/docker-host.sock}"
+        relay_source="${DEVZONE_RELAY_SOURCE:-/var/run/docker-host.sock}"
         if [ -e "$relay_source" ]; then
             docker_host_active=true
         fi
@@ -196,7 +196,7 @@ state_json() {
     work_ctx="$(kubectl config current-context 2>/dev/null || true)"
     case "$work_ctx" in
         kind-gitlab* | kind-devzone*)
-            host_ctx="$(KUBECONFIG="${DEVZONE_KUBE_HOTE:-$HOME/.kube/hote.config}" kubectl config current-context 2>/dev/null || true)"
+            host_ctx="$(KUBECONFIG="${DEVZONE_KUBE_HOST:-$HOME/.kube/hote.config}" kubectl config current-context 2>/dev/null || true)"
             if [ -n "$host_ctx" ] && cluster_reachable "$host_ctx" 2>/dev/null; then
                 work_internal=true
             fi
@@ -229,12 +229,12 @@ state_json() {
         credentials_raw="$RACINE/.password"
     fi
 
-    relay_marker="${DEVZONE_RELAIS_MARQUE:-/tmp/devzone-relais-docker.echec}"
+    relay_marker="${DEVZONE_RELAY_MARKER:-/tmp/devzone-relay.failed}"
     if [ -f "$relay_marker" ]; then
         msg="$(head -1 "$relay_marker" 2>/dev/null || true)"
         append_alert relais_docker "$msg" "devzone repair"
     fi
-    packages_marker="${DEVZONE_PAQUETS_MARQUE:-/tmp/devzone-paquets.echec}"
+    packages_marker="${DEVZONE_PACKAGES_MARKER:-/tmp/devzone-packages.failed}"
     if [ -f "$packages_marker" ]; then
         packages_names=""
         while IFS= read -r n; do

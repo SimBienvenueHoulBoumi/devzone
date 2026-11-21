@@ -19,7 +19,7 @@ VERSION="$(node -p 'require(process.argv[1]).version' "$RACINE/package.json")"
 export npm_config_prefix="$TMP/npm"
 export PATH="$TMP/npm/bin:$TMP/npm:$PATH"
 reussis=0
-echecs=0
+failures=0
 
 nettoyer() {
     rm -rf "$TMP"
@@ -27,7 +27,7 @@ nettoyer() {
 trap nettoyer EXIT
 
 ok() { reussis=$((reussis + 1)); echo "  ✔ $1"; }
-ko() { echecs=$((echecs + 1)); echo "  ✖ $1"; printf '%s\n' "$2" | tail -5 | sed 's/^/      /'; }
+ko() { failures=$((failures + 1)); echo "  ✖ $1"; printf '%s\n' "$2" | tail -5 | sed 's/^/      /'; }
 
 # Commande tapée par un utilisateur (bash de Git Bash, PATH réelle) ; les \r
 # sont retirés pour que les motifs tiennent sous Windows
@@ -79,8 +79,8 @@ else
     echo "  ○ ignoré (hors Windows : pas de cygpath)"
 fi
 
-echo "▶ devzone <dossier> avec DEVZONE_SANS_DEMARRER=1"
-reussit "crée un devzone complet" "DEVZONE_SANS_DEMARRER=1 devzone '$TESTDIR' --docker" "créé dans"
+echo "▶ devzone <dossier> avec DEVZONE_NO_START=1"
+reussit "crée un devzone complet" "DEVZONE_NO_START=1 devzone '$TESTDIR' --docker" "créé dans"
 for f in .devcontainer/devcontainer.json .devcontainer/devzone Makefile .gitattributes manage/scripts/launch.sh manage/scripts/uninstall.sh README.md LICENSE workspace/.gitkeep .gitignore; do
     reussit "existe : $f" "[ -e '$TESTDIR/$f' ]"
 done
@@ -89,7 +89,7 @@ reussit ".gitignore : workspace ignoré sauf .gitkeep" "grep -q '^workspace/\\*\
 echo "▶ Dossier non vide refusé, rien n'est écrasé"
 mkdir -p "$TMP/plein"
 echo important >"$TMP/plein/fichier"
-echoue "dossier non vide refusé" "DEVZONE_SANS_DEMARRER=1 devzone '$TMP/plein'" "pas vide"
+echoue "dossier non vide refusé" "DEVZONE_NO_START=1 devzone '$TMP/plein'" "pas vide"
 reussit "fichier existant préservé" "[ \"\$(cat '$TMP/plein/fichier')\" = important ]"
 reussit "Makefile non créé" "[ ! -e '$TMP/plein/Makefile' ]"
 
@@ -97,5 +97,5 @@ echo "▶ devzone uninstall hors d'un dossier devzone"
 echoue "uninstall refusé hors devzone" "cd '$TMP' && devzone uninstall" "dossier devzone"
 
 echo
-echo "Résultat : $reussis réussi(s), $echecs échec(s)"
-[ "$echecs" -eq 0 ]
+echo "Résultat : $reussis réussi(s), $failures échec(s)"
+[ "$failures" -eq 0 ]

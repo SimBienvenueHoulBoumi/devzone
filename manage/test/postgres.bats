@@ -13,15 +13,15 @@ setup() {
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
     POSTGRES="$BATS_TEST_DIRNAME/../../.devcontainer/postgres/postgres.sh"
     export HOME="$BATS_TEST_TMPDIR/home"
-    export DEVZONE_RACINE="$BATS_TEST_TMPDIR/racine"
-    export DEVZONE_ETAT="$BATS_TEST_TMPDIR/modules"
-    export DEVZONE_KUBE_HOTE="$BATS_TEST_TMPDIR/hote.config"
+    export DEVZONE_ROOT="$BATS_TEST_TMPDIR/racine"
+    export DEVZONE_STATE="$BATS_TEST_TMPDIR/modules"
+    export DEVZONE_KUBE_HOST="$BATS_TEST_TMPDIR/hote.config"
     export KIND_CLUSTERS="$BATS_TEST_TMPDIR/clusters"
-    SECRETS="$DEVZONE_RACINE/workspace/.postgres"
-    mkdir -p "$HOME" "$DEVZONE_RACINE/workspace" "$BATS_TEST_TMPDIR/bin"
+    SECRETS="$DEVZONE_ROOT/workspace/.postgres"
+    mkdir -p "$HOME" "$DEVZONE_ROOT/workspace" "$BATS_TEST_TMPDIR/bin"
     : >"$KIND_CLUSTERS"
     # Visible host cluster (kubernetes module active): docker-desktop
-    : >"$DEVZONE_KUBE_HOTE"
+    : >"$DEVZONE_KUBE_HOST"
 
     cat >"$BATS_TEST_TMPDIR/bin/kind" <<'KIND'
 #!/usr/bin/env bash
@@ -89,7 +89,7 @@ teardown() {
 }
 
 active_on() {
-    printf 'postgres=on\ncluster=%s\n' "$1" >"$DEVZONE_ETAT"
+    printf 'postgres=on\ncluster=%s\n' "$1" >"$DEVZONE_STATE"
     touch "$BATS_TEST_TMPDIR/ns" "$BATS_TEST_TMPDIR/secret"
 }
 
@@ -114,7 +114,7 @@ wait_nohup() {
 @test "enable without a terminal: dedicated kind created, PostgreSQL applied, relay started" {
     run bash "$DEVZONE" enable postgres </dev/null
     [ "$status" -eq 0 ]
-    grep -qx 'cluster=kind-devzone' "$DEVZONE_ETAT"
+    grep -qx 'cluster=kind-devzone' "$DEVZONE_STATE"
     grep -q 'kind create cluster --name devzone' "$BATS_TEST_TMPDIR/kind.log"
     grep -q 'kubectl config set-context devzone --cluster=kind-devzone --user=kind-devzone' "$BATS_TEST_TMPDIR/kubectl.log"
     grep -q 'kubectl --context devzone -n devzone-postgres create secret generic postgres-admin' "$BATS_TEST_TMPDIR/kubectl.log"
@@ -130,7 +130,7 @@ wait_nohup() {
 @test "enable --context docker-desktop: no kind, everything on this context" {
     run bash "$DEVZONE" enable postgres --context docker-desktop </dev/null
     [ "$status" -eq 0 ]
-    grep -qx 'cluster=docker-desktop' "$DEVZONE_ETAT"
+    grep -qx 'cluster=docker-desktop' "$DEVZONE_STATE"
     ! grep -q 'create cluster' "$BATS_TEST_TMPDIR/kind.log" 2>/dev/null || false
     grep -q 'kubectl config set-context devzone --cluster=docker-desktop --user=docker-desktop' "$BATS_TEST_TMPDIR/kubectl.log"
     grep -q 'kubectl --context devzone -n devzone-postgres apply -f -' "$BATS_TEST_TMPDIR/kubectl.log"
@@ -141,8 +141,8 @@ wait_nohup() {
     run bash "$DEVZONE" enable postgres --context inconnu </dev/null
     [ "$status" -eq 2 ]
     [[ "$output" == *"unknown or unreachable cluster: inconnu"* ]] || false
-    grep -qx 'postgres=off' "$DEVZONE_ETAT"
-    ! grep -q '^cluster=' "$DEVZONE_ETAT" || false
+    grep -qx 'postgres=off' "$DEVZONE_STATE"
+    ! grep -q '^cluster=' "$DEVZONE_STATE" || false
     [ ! -f "$BATS_TEST_TMPDIR/apply.log" ]
 
     FAUX_INJOIGNABLE=docker-desktop run bash "$DEVZONE" enable postgres --context docker-desktop </dev/null
@@ -150,31 +150,31 @@ wait_nohup() {
 }
 
 @test "enable without kubernetes module: only the dedicated kind is possible" {
-    rm -f "$DEVZONE_KUBE_HOTE"
+    rm -f "$DEVZONE_KUBE_HOST"
     run bash "$DEVZONE" enable postgres --context docker-desktop </dev/null
     [ "$status" -eq 2 ]
 }
 
 @test "enable in a terminal: menu, choice 1 = host cluster" {
-    DEVZONE_INTERACTIF=1 run bash "$DEVZONE" enable postgres <<<"1"
+    DEVZONE_INTERACTIVE=1 run bash "$DEVZONE" enable postgres <<<"1"
     [ "$status" -eq 0 ]
     [[ "$output" == *"1) docker-desktop"*"2) kind-devzone"* ]] || false
-    grep -qx 'cluster=docker-desktop' "$DEVZONE_ETAT"
+    grep -qx 'cluster=docker-desktop' "$DEVZONE_STATE"
 }
 
 @test "enable in a terminal: Enter = host cluster; choice out of the list refused" {
-    DEVZONE_INTERACTIF=1 run bash "$DEVZONE" enable postgres <<<""
+    DEVZONE_INTERACTIVE=1 run bash "$DEVZONE" enable postgres <<<""
     [ "$status" -eq 0 ]
-    grep -qx 'cluster=docker-desktop' "$DEVZONE_ETAT"
+    grep -qx 'cluster=docker-desktop' "$DEVZONE_STATE"
 
-    rm -f "$DEVZONE_ETAT"
-    DEVZONE_INTERACTIF=1 run bash "$DEVZONE" enable postgres <<<"9"
+    rm -f "$DEVZONE_STATE"
+    DEVZONE_INTERACTIVE=1 run bash "$DEVZONE" enable postgres <<<"9"
     [ "$status" -eq 2 ]
-    grep -qx 'postgres=off' "$DEVZONE_ETAT"
+    grep -qx 'postgres=off' "$DEVZONE_STATE"
 }
 
 @test "enable --context other than the chosen cluster: refused, devzone cluster shown" {
-    printf 'cluster=kind-devzone\n' >"$DEVZONE_ETAT"
+    printf 'cluster=kind-devzone\n' >"$DEVZONE_STATE"
     run bash "$DEVZONE" enable postgres --context docker-desktop </dev/null
     [ "$status" -eq 2 ]
     [[ "$output" == *"devzone cluster docker-desktop"* ]] || false
@@ -182,7 +182,7 @@ wait_nohup() {
 
 @test "existing admin secret: never regenerated, copied as 600 without being displayed" {
     touch "$BATS_TEST_TMPDIR/secret"
-    printf 'cluster=kind-devzone\n' >"$DEVZONE_ETAT"
+    printf 'cluster=kind-devzone\n' >"$DEVZONE_STATE"
     run bash "$POSTGRES" install
     [ "$status" -eq 0 ]
     ! grep -q 'create secret' "$BATS_TEST_TMPDIR/kubectl.log" || false
@@ -229,28 +229,28 @@ wait_nohup() {
 @test "create, --new-password, delete: .password follows the accounts" {
     active_on docker-desktop
     bash "$POSTGRES" create taskmanager
-    grep -q $'^postgres:taskmanager\t127.0.0.1:5432/taskmanager\ttaskmanager\tpwsecret1$' "$DEVZONE_RACINE/.password"
+    grep -q $'^postgres:taskmanager\t127.0.0.1:5432/taskmanager\ttaskmanager\tpwsecret1$' "$DEVZONE_ROOT/.password"
     bash "$POSTGRES" create taskmanager --new-password
-    grep -q $'^postgres:taskmanager\t127.0.0.1:5432/taskmanager\ttaskmanager\tpwsecret2$' "$DEVZONE_RACINE/.password"
+    grep -q $'^postgres:taskmanager\t127.0.0.1:5432/taskmanager\ttaskmanager\tpwsecret2$' "$DEVZONE_ROOT/.password"
     bash "$POSTGRES" delete taskmanager --yes
-    [ ! -e "$DEVZONE_RACINE/.password" ]
+    [ ! -e "$DEVZONE_ROOT/.password" ]
 }
 
 @test "install, uninstall: .password follows the admin account" {
     run bash "$DEVZONE" enable postgres --context docker-desktop </dev/null
     [ "$status" -eq 0 ]
-    grep -q $'^postgres\t127.0.0.1:5432\tpostgres\t' "$DEVZONE_RACINE/.password"
+    grep -q $'^postgres\t127.0.0.1:5432\tpostgres\t' "$DEVZONE_ROOT/.password"
     run bash "$DEVZONE" disable postgres </dev/null
     [ "$status" -eq 0 ]
-    [ ! -e "$DEVZONE_RACINE/.password" ]
+    [ ! -e "$DEVZONE_ROOT/.password" ]
 }
 
 @test "create, list, psql: module disabled → clear refusal" {
-    printf 'cluster=kind-devzone\n' >"$DEVZONE_ETAT"
+    printf 'cluster=kind-devzone\n' >"$DEVZONE_STATE"
     run bash "$POSTGRES" create taskmanager
     [ "$status" -eq 2 ]
     [[ "$output" == *"devzone enable postgres"* ]] || false
-    rm -f "$DEVZONE_ETAT"
+    rm -f "$DEVZONE_STATE"
     run bash "$POSTGRES" list
     [ "$status" -eq 2 ]
 }
@@ -278,7 +278,7 @@ wait_nohup() {
 
 @test "delete in a terminal: Enter = abort" {
     active_on kind-devzone
-    DEVZONE_INTERACTIF=1 run bash "$POSTGRES" delete taskmanager <<<""
+    DEVZONE_INTERACTIVE=1 run bash "$POSTGRES" delete taskmanager <<<""
     [ "$status" -eq 0 ]
     [[ "$output" == *"Abandon"* ]] || false
     [ ! -f "$BATS_TEST_TMPDIR/sql.log" ]
@@ -295,7 +295,7 @@ wait_nohup() {
     grep -q -- '--context kind-devzone delete namespace devzone-postgres' "$BATS_TEST_TMPDIR/kubectl.log"
     grep -q 'kind delete cluster --name devzone' "$BATS_TEST_TMPDIR/kind.log"
     [ ! -d "$SECRETS" ]
-    grep -qx 'postgres=off' "$DEVZONE_ETAT"
+    grep -qx 'postgres=off' "$DEVZONE_STATE"
 }
 
 @test "disable: dedicated kind kept if it carries another service; host cluster never deleted" {
@@ -314,9 +314,9 @@ wait_nohup() {
 
 @test "disable in a terminal: confirmation, Enter = nothing deleted" {
     active_on kind-devzone
-    DEVZONE_INTERACTIF=1 run bash "$DEVZONE" disable postgres <<<""
+    DEVZONE_INTERACTIVE=1 run bash "$DEVZONE" disable postgres <<<""
     [[ "$output" == *"Aborted"* ]] || false
-    grep -qx 'postgres=on' "$DEVZONE_ETAT"
+    grep -qx 'postgres=on' "$DEVZONE_STATE"
     ! grep -q 'delete namespace' "$BATS_TEST_TMPDIR/kubectl.log" 2>/dev/null || false
 }
 
@@ -357,11 +357,11 @@ wait_nohup() {
 
     run bash "$DEVZONE" cluster docker-desktop </dev/null
     [ "$status" -eq 1 ]
-    grep -qx 'cluster=kind-devzone' "$DEVZONE_ETAT"
+    grep -qx 'cluster=kind-devzone' "$DEVZONE_STATE"
 
     run bash "$DEVZONE" cluster docker-desktop --yes </dev/null
     [ "$status" -eq 0 ]
-    grep -qx 'cluster=docker-desktop' "$DEVZONE_ETAT"
+    grep -qx 'cluster=docker-desktop' "$DEVZONE_STATE"
     # Namespace of the old cluster deleted by the administrator (#430)
     grep -q -- '--context kind-devzone delete namespace devzone-postgres' "$BATS_TEST_TMPDIR/kubectl.log"
     # Installation on the new cluster goes through the devzone context, linked to docker-desktop
@@ -372,7 +372,7 @@ wait_nohup() {
 @test "cluster: module disabled → choice only saved; same cluster → nothing" {
     run bash "$DEVZONE" cluster docker-desktop </dev/null
     [ "$status" -eq 0 ]
-    grep -qx 'cluster=docker-desktop' "$DEVZONE_ETAT"
+    grep -qx 'cluster=docker-desktop' "$DEVZONE_STATE"
     [ ! -f "$BATS_TEST_TMPDIR/apply.log" ]
     run bash "$DEVZONE" cluster docker-desktop </dev/null
     [[ "$output" == *"already on docker-desktop"* ]] || false

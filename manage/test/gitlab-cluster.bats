@@ -12,13 +12,13 @@ setup() {
     kube_isole
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
     GITLAB="$BATS_TEST_DIRNAME/../../.devcontainer/gitlab/gitlab.sh"
-    export DEVZONE_RACINE="$BATS_TEST_TMPDIR/racine"
-    export DEVZONE_ETAT="$BATS_TEST_TMPDIR/modules"
+    export DEVZONE_ROOT="$BATS_TEST_TMPDIR/racine"
+    export DEVZONE_STATE="$BATS_TEST_TMPDIR/modules"
     export DEVZONE_HOSTS="$BATS_TEST_TMPDIR/hosts"
     export KIND_CLUSTERS="$BATS_TEST_TMPDIR/clusters"
-    SECRETS="$DEVZONE_RACINE/workspace/.gitlab"
-    mkdir -p "$HOME" "$DEVZONE_RACINE/workspace" "$BATS_TEST_TMPDIR/bin"
-    : >"$DEVZONE_ETAT"
+    SECRETS="$DEVZONE_ROOT/workspace/.gitlab"
+    mkdir -p "$HOME" "$DEVZONE_ROOT/workspace" "$BATS_TEST_TMPDIR/bin"
+    : >"$DEVZONE_STATE"
     : >"$KIND_CLUSTERS"
     printf '127.0.0.1 localhost\n' >"$DEVZONE_HOSTS"
 

@@ -5,21 +5,21 @@
 set -euo pipefail
 
 ICI="$(cd "$(dirname "$0")" && pwd)"
-RACINE="${DEVZONE_RACINE:-$(cd "$ICI/../.." && pwd)}"
-ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
+RACINE="${DEVZONE_ROOT:-$(cd "$ICI/../.." && pwd)}"
+ETAT="${DEVZONE_STATE:-$RACINE/.devzone.modules}"
 # shellcheck source=SCRIPTDIR/state.sh
 # shellcheck disable=SC1091
 . "$(dirname "$ICI")/state.sh"
-BASE="${DEVZONE_CATALOGUE_VEILLEUR_DIR:-$RACINE/.devzone.catalogue-veilleur}"
+BASE="${DEVZONE_CATALOG_WATCHER_DIR:-$RACINE/.devzone.catalog-watcher}"
 LOCK_DIR="$BASE/verrou"
 LAST_FILE="$BASE/dernier"
 
 refuse() { echo "devzone : catalog-watcher : $*" >&2; exit 2; }
 
-# Guard (#293): never under bats, only with DEVZONE_CATALOGUE_REEL=oui
+# Guard (#293): never under bats, only with DEVZONE_CATALOG_REAL=yes
 guard_watcher() {
-    if [ "${DEVZONE_CATALOGUE_REEL:-}" != oui ]; then
-        echo "devzone : catalog-watcher : refused here (DEVZONE_CATALOGUE_REEL=oui)" >&2
+    if [ "${DEVZONE_CATALOG_REAL:-}" != yes ]; then
+        echo "devzone : catalog-watcher : refused here (DEVZONE_CATALOG_REAL=yes)" >&2
         return 2
     fi
     if [ -n "${BATS_TEST_TMPDIR:-}" ]; then
@@ -86,7 +86,7 @@ start_detached() {
     mkdir -p "$BASE"
     # Same detachment as relay_start: setsid when present, else nohup.
     command -v setsid >/dev/null 2>&1 && detache=(setsid)
-    ${detache[@]+"${detache[@]}"} nohup env DEVZONE_CATALOGUE_REEL=oui bash "$0" boucle >"$BASE/veilleur.log" 2>&1 &
+    ${detache[@]+"${detache[@]}"} nohup env DEVZONE_CATALOG_REAL=yes bash "$0" boucle >"$BASE/veilleur.log" 2>&1 &
     i=0
     while [ "$i" -lt 20 ]; do
         pid="$(cat "$LOCK_DIR/pid" 2>/dev/null || true)"

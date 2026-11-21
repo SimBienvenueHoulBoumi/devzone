@@ -44,7 +44,7 @@ FAKE
     [ "$(grep -c . "$FAKE_OP_LOG")" -eq 2 ]
     [ "$(sed -n '1p' "$FAKE_OP_LOG")" = "big-pickle" ]
     [ "$(sed -n '2p' "$FAKE_OP_LOG")" = "deepseek-v4.1-flash-free" ]
-    grep -q "^[0-9]* quota 3600$" "$DEVZONE_AGENT_ETAT/ecart-big-pickle" || false
+    grep -q "^[0-9]* quota 3600$" "$DEVZONE_AGENT_STATE/ecart-big-pickle" || false
     grep -q "excluded (quota): next model" "$(agent_journal)" || false
 }
 
@@ -55,7 +55,7 @@ FAKE
     [ "$status" -eq 0 ]
     [ "$(grep -c . "$FAKE_OP_LOG")" -eq 2 ]
     [ "$(sed -n '2p' "$FAKE_OP_LOG")" = "deepseek-v4.1-flash-free" ]
-    grep -q "^[0-9]* pays 604800$" "$DEVZONE_AGENT_ETAT/ecart-big-pickle" || false
+    grep -q "^[0-9]* pays 604800$" "$DEVZONE_AGENT_STATE/ecart-big-pickle" || false
     grep -q "excluded (country): next model" "$(agent_journal)" || false
 }
 
@@ -74,5 +74,5 @@ FAKE
     [ "$(grep -c . "$FAKE_OP_LOG")" -eq 1 ]
     grep -q "end with opencode/big-pickle" "$(agent_journal)" || false
     ! grep -q "excluded" "$(agent_journal)" || false
-    [ ! -f "$DEVZONE_AGENT_ETAT/ecart-big-pickle" ]
+    [ ! -f "$DEVZONE_AGENT_STATE/ecart-big-pickle" ]
 }

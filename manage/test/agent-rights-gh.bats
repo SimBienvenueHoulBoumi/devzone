@@ -16,10 +16,10 @@ setup() {
     relais_docker_isole
     kube_isole
     unset OPENCODE_CONFIG_CONTENT
-    export DEVZONE_RACINE="$BATS_TEST_TMPDIR/racine"
-    mkdir -p "$DEVZONE_RACINE/workspace"
-    export DEVZONE_AGENT_ETAT="$BATS_TEST_TMPDIR/etat"
-    mkdir -p "$DEVZONE_AGENT_ETAT"
+    export DEVZONE_ROOT="$BATS_TEST_TMPDIR/racine"
+    mkdir -p "$DEVZONE_ROOT/workspace"
+    export DEVZONE_AGENT_STATE="$BATS_TEST_TMPDIR/etat"
+    mkdir -p "$DEVZONE_AGENT_STATE"
 }
 
 @test "agent : config effective permet la lecture gh" {
@@ -27,8 +27,8 @@ setup() {
     sed '/^[[:space:]]*\/\//d' "$ICI/opencode.jsonc" >"$BATS_TEST_TMPDIR/oc.json"
     bash -c '
         set -uo pipefail
-        export DEVZONE_RACINE="'"$DEVZONE_RACINE"'"
-        export DEVZONE_AGENT_ETAT="'"$DEVZONE_AGENT_ETAT"'"
+        export DEVZONE_ROOT="'"$DEVZONE_ROOT"'"
+        export DEVZONE_AGENT_STATE="'"$DEVZONE_AGENT_STATE"'"
         ICI="'"$ICI"'"
         . "$ICI/agent-errors.sh"
         . "$ICI/agent-rights.sh"
@@ -49,8 +49,8 @@ setup() {
     sed '/^[[:space:]]*\/\//d' "$ICI/opencode.jsonc" >"$BATS_TEST_TMPDIR/oc.json"
     bash -c '
         set -uo pipefail
-        export DEVZONE_RACINE="'"$DEVZONE_RACINE"'"
-        export DEVZONE_AGENT_ETAT="'"$DEVZONE_AGENT_ETAT"'"
+        export DEVZONE_ROOT="'"$DEVZONE_ROOT"'"
+        export DEVZONE_AGENT_STATE="'"$DEVZONE_AGENT_STATE"'"
         ICI="'"$ICI"'"
         . "$ICI/agent-errors.sh"
         . "$ICI/agent-rights.sh"

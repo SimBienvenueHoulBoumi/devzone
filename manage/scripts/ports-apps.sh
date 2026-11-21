@@ -2,7 +2,7 @@
 # Applications of the Kubernetes workspace relayed on workstation localhost (#611).
 # Sourced by ports-workspace.sh, never run alone. One kubectl get svc -A per
 # round: each TCP port of each Service gets a local port, kept stable in
-# .devzone.ports-workspace/apps/<namespace>.<service>.<port> while the Service
+# .devzone.workspace-ports/apps/<namespace>.<service>.<port> while the Service
 # exists. Only Services with a ready endpoint are relayed (#638): the others keep
 # their local port and show as "no ready pod" in status. Output lines:
 # "portlocal|namespace|svc/name|remoteport", as pw_services.

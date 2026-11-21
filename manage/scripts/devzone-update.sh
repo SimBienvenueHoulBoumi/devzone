@@ -116,10 +116,10 @@ update_workstation() {
         done <"$work/modified"
         if [ -z "$assume_yes" ]; then
             if [ ! -t 0 ]; then
-                echo "✖ Fichiers modifiés localement : relance avec --yes pour les remplacer (sauvegarde dans .devzone.sauvegarde/)." >&2
+                echo "✖ Fichiers modifiés localement : relance avec --yes pour les remplacer (sauvegarde dans .devzone.backup/)." >&2
                 exit 1
             fi
-            printf 'Replace these files (backup in .devzone.sauvegarde/)? [y/N] ' >&2
+            printf 'Replace these files (backup in .devzone.backup/)? [y/N] ' >&2
             read -r answer || answer=""
             case "$answer" in
                 y | Y | yes) ;;
@@ -131,9 +131,13 @@ update_workstation() {
         fi
     fi
 
+    # Former French names renamed before the backup (#733): the backup folder is
+    # .devzone.backup. The script comes from the package, the folder may be old
+    DEVZONE_ROOT="$folder" bash "$PAQUET/.devcontainer/rename-legacy-files.sh" || true
+
     # 3. Backup of every file replaced or removed
     if [ -s "$work/to_save" ]; then
-        base="$folder/.devzone.sauvegarde/$(date +%Y%m%d-%H%M%S)"
+        base="$folder/.devzone.backup/$(date +%Y%m%d-%H%M%S)"
         backup="$base"
         n=1
         while [ -e "$backup" ]; do
@@ -214,8 +218,8 @@ update_workstation() {
             return 0
             ;;
     esac
-    if [ -n "${DEVZONE_RECONSTRUIRE:-}" ]; then
-        sh -c "$DEVZONE_RECONSTRUIRE"
+    if [ -n "${DEVZONE_REBUILD:-}" ]; then
+        sh -c "$DEVZONE_REBUILD"
     else
         make -C "$folder" rebuild
     fi

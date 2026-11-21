@@ -26,7 +26,7 @@
 export KUBECONFIG
 
 # Module state: defined by the caller; default value for the tests
-: "${ETAT:=${DEVZONE_ETAT:-$HOME/.devzone.modules}}"
+: "${ETAT:=${DEVZONE_STATE:-$HOME/.devzone.modules}}"
 
 # Safe state write (#417): lock, temporary file in the state folder, backup copy
 # .prec — shared by devzone, ports and ports-auto
@@ -124,7 +124,7 @@ cluster_reachable() {
 
 # Host contexts: local ones first, then the dedicated kind, finally the remote ones
 cluster_candidates() {
-    local host="${DEVZONE_KUBE_HOTE:-$HOME/.kube/hote.config}" c
+    local host="${DEVZONE_KUBE_HOST:-$HOME/.kube/hote.config}" c
     if [ -f "$host" ]; then
         # 1. Local clusters of the host (server on a loopback address)
         for c in $(KUBECONFIG="$host" kubectl config get-contexts -o name 2>/dev/null); do
@@ -164,7 +164,7 @@ cluster_menu() {
             fi
             i=$((i + 1))
         done
-        [ -f "${DEVZONE_KUBE_HOTE:-$HOME/.kube/hote.config}" ] ||
+        [ -f "${DEVZONE_KUBE_HOST:-$HOME/.kube/hote.config}" ] ||
             echo "  (host clusters not visible: devzone enable kubernetes)"
     } >&2
     printf 'Number [1]: ' >&2
@@ -180,9 +180,9 @@ cluster_menu() {
     echo "${candidates[$((answer - 1))]}"
 }
 
-# Interactive terminal; DEVZONE_INTERACTIF=1 for the tests (stdin redirected)
+# Interactive terminal; DEVZONE_INTERACTIVE=1 for the tests (stdin redirected)
 cluster_interactive() {
-    [ "${DEVZONE_INTERACTIF:-}" = 1 ] || [ -t 0 ]
+    [ "${DEVZONE_INTERACTIVE:-}" = 1 ] || [ -t 0 ]
 }
 
 cluster_choose() {
@@ -222,7 +222,7 @@ cluster_choose() {
             return 2
         fi
         # Remote: confirmation required. --confirm counts only if it is exactly
-        # the requested context; DEVZONE_CLUSTER_DISTANT is still accepted for
+        # the requested context; DEVZONE_CLUSTER_REMOTE is still accepted for
         # the tests and CI
         if ! cluster_is_local "$wanted"; then
             if [ -n "$confirm" ]; then
@@ -230,9 +230,9 @@ cluster_choose() {
                     echo "devzone : remote cluster refused: $wanted (--confirm $wanted)" >&2
                     return 2
                 fi
-            elif [ -n "${DEVZONE_CLUSTER_DISTANT:-}" ]; then
-                if [ "${DEVZONE_CLUSTER_DISTANT}" != "$wanted" ]; then
-                    echo "devzone : remote cluster refused: $wanted (DEVZONE_CLUSTER_DISTANT must be exactly $wanted)" >&2
+            elif [ -n "${DEVZONE_CLUSTER_REMOTE:-}" ]; then
+                if [ "${DEVZONE_CLUSTER_REMOTE}" != "$wanted" ]; then
+                    echo "devzone : remote cluster refused: $wanted (DEVZONE_CLUSTER_REMOTE must be exactly $wanted)" >&2
                     return 2
                 fi
             elif cluster_interactive; then
@@ -258,8 +258,8 @@ cluster_choose() {
     else
         # Default: local only (never remote by default)
         local host_choice=""
-        if [ -f "${DEVZONE_KUBE_HOTE:-$HOME/.kube/hote.config}" ]; then
-            host_choice="$(KUBECONFIG="${DEVZONE_KUBE_HOTE:-$HOME/.kube/hote.config}" kubectl config current-context 2>/dev/null || true)"
+        if [ -f "${DEVZONE_KUBE_HOST:-$HOME/.kube/hote.config}" ]; then
+            host_choice="$(KUBECONFIG="${DEVZONE_KUBE_HOST:-$HOME/.kube/hote.config}" kubectl config current-context 2>/dev/null || true)"
         fi
         if [ -n "$host_choice" ] && cluster_is_local "$host_choice" && cluster_reachable "$host_choice"; then
             echo "$host_choice"

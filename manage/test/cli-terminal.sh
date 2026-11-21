@@ -29,7 +29,7 @@ COPIE="$TMP/mon-devzone-cli"
 TERMINAL=(python3 -I "$RACINE/manage/test/terminal.py")
 DC=(npx -y @devcontainers/cli)
 reussis=0
-echecs=0
+failures=0
 
 nettoyer() {
     local ids id image dind volume
@@ -41,10 +41,10 @@ nettoyer() {
         [ -z "$dind" ] || docker volume rm "$dind" >/dev/null 2>&1 || true
         [ -z "$image" ] || docker rmi "$image" >/dev/null 2>&1 || true
     done
-    # Après make down : image et Docker interne notés dans .devzone.etat
-    if [ -f "$COPIE/.devzone.etat" ]; then
-        image="$(sed -n 's/^IMAGE=//p' "$COPIE/.devzone.etat")"
-        dind="$(sed -n 's/^DIND=//p' "$COPIE/.devzone.etat")"
+    # Après make down : image et Docker interne notés dans .devzone.state
+    if [ -f "$COPIE/.devzone.state" ]; then
+        image="$(sed -n 's/^IMAGE=//p' "$COPIE/.devzone.state")"
+        dind="$(sed -n 's/^DIND=//p' "$COPIE/.devzone.state")"
         [ -z "$dind" ] || docker volume rm "$dind" >/dev/null 2>&1 || true
         [ -z "$image" ] || docker rmi "$image" >/dev/null 2>&1 || true
     fi
@@ -57,7 +57,7 @@ trap nettoyer EXIT
 
 ok() { reussis=$((reussis + 1)); echo "  ✔ $1"; }
 ko() {
-    echecs=$((echecs + 1))
+    failures=$((failures + 1))
     echo "  ✖ $1"
     printf '%s\n' "$2" | tail -8 | sed 's/^/      /'
     # make up failure names its full log: show its error lines and tail too
@@ -119,13 +119,13 @@ humain "devzone uninstall hors d'un dossier devzone : refusé" 30 1 "dossier dev
 # Question posée pendant le lancement (CLI devcontainer simulé) : make up
 # doit la montrer et s'arrêter, pas attendre en silence
 FAUX="$TMP/faux-devzone"
-DEVZONE_SANS_DEMARRER=1 bash "$RACINE/manage/devzone" "$FAUX" --docker >/dev/null
+DEVZONE_NO_START=1 bash "$RACINE/manage/devzone" "$FAUX" --docker >/dev/null
 mkdir -p "$TMP/faux-bin"
 printf '#!/usr/bin/env bash\nprintf "Running the postCreateCommand from devcontainer.json...\\r\\nConfigurer les bots de ce dépôt ? [o/N] "\nsleep 600\n' >"$TMP/faux-bin/npx"
 chmod +x "$TMP/faux-bin/npx"
 # (code 2 : celui de make quand la recette échoue)
 humain "make up : question dans le conteneur signalée au lieu d'attendre" 90 2 "asks a question" \
-    -- env PATH="$TMP/faux-bin:$PATH" DEVZONE_ATTENTE_QUESTION=5 make -C "$FAUX" up
+    -- env PATH="$TMP/faux-bin:$PATH" DEVZONE_QUESTION_WAIT=5 make -C "$FAUX" up
 
 echo "▶ Création et lancement : devzone <dossier> (npm)"
 humain "devzone <dossier> : créé et lancé, avancement affiché" 1800 0 "▶ Installing in container" --envoyer 'GitOps repository for Argo CD\?' $'n\n' -- bash "$RACINE/manage/devzone" "$COPIE" --docker
@@ -184,5 +184,5 @@ SORTIE="volumes restants : $(volumes)"
 verifier "réponse oui : volumes supprimés" test "$(volumes)" = 0
 
 echo
-echo "Résultat : $reussis réussi(s), $echecs échec(s)"
-[ "$echecs" -eq 0 ]
+echo "Résultat : $reussis réussi(s), $failures échec(s)"
+[ "$failures" -eq 0 ]

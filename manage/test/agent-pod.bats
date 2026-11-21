@@ -1,6 +1,6 @@
 #!/usr/bin/env bats
 # devzone agent --pod: one ephemeral pod per agent session (#222).
-# Tests use a fake kubectl and a test projects root (DEVZONE_RACINE under
+# Tests use a fake kubectl and a test projects root (DEVZONE_ROOT under
 # BATS_TEST_TMPDIR): no real cluster is touched, /workspaces is never used.
 
 load commun
@@ -71,7 +71,7 @@ source_agent_pod() {
     [ "$AGENT_POD_WORKTREE_SUBPATH" = "devzone-wt/dz-222" ]
     [ "$AGENT_POD_WORKTREE_MOUNTPATH" = "$FOLDER" ]
     [ "$AGENT_POD_GIT_SUBPATH" = "devzone/.git" ]
-    [ "$AGENT_POD_GIT_MOUNTPATH" = "$DEVZONE_RACINE/devzone/.git" ]
+    [ "$AGENT_POD_GIT_MOUNTPATH" = "$DEVZONE_ROOT/devzone/.git" ]
     [ "$AGENT_POD_SESSION_LABEL" = "dz-222" ]
     [ "$AGENT_POD_TICKET" = "222" ]
 }
@@ -98,7 +98,7 @@ source_agent_pod() {
     agent_pod_validate_folder "$FOLDER" >/dev/null
     manifest="$(agent_pod_build_manifest "$FOLDER" "$T/consigne.txt" "agent-dz-222-test")"
     grep -q "subPath: devzone/.git" "$manifest" || false
-    grep -qF "mountPath: $DEVZONE_RACINE/devzone/.git" "$manifest" || false
+    grep -qF "mountPath: $DEVZONE_ROOT/devzone/.git" "$manifest" || false
     rm -f "$manifest"
 }
 
@@ -193,7 +193,7 @@ source_agent_pod() {
 
 @test "agent-pod : without --pod, behavior unchanged (local)" {
     unset DEVZONE_WORKSPACE
-    printf 'ia=on\n' >"$DEVZONE_RACINE/.devzone.modules"
+    printf 'ia=on\n' >"$DEVZONE_ROOT/.devzone.modules"
     run bash "$DEVZONE" agent --local "$FOLDER" "$T/consigne.txt"
     [ "$status" -eq 0 ]
     ! grep -q "create -f" "$T/kubectl.log" || false

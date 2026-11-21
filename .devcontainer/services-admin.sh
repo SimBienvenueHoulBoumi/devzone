@@ -21,8 +21,8 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # The devzone command beside this script, not the one of the PATH: the copy
 # that runs the installers is the one of this folder (#591)
 DEVZONE_CMD="$HERE/devzone"
-RACINE="${DEVZONE_RACINE:-$(dirname "$HERE")}"
-ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
+RACINE="${DEVZONE_ROOT:-$(dirname "$HERE")}"
+ETAT="${DEVZONE_STATE:-$RACINE/.devzone.modules}"
 SA_DIR="${DEVZONE_SA_DIR:-/var/run/secrets/kubernetes.io/serviceaccount}"
 API_SERVER="${DEVZONE_API_SERVER:-https://kubernetes.default.svc}"
 ADMIN_CONTEXT=devzone-admin

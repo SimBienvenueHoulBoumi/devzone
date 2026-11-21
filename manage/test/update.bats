@@ -10,10 +10,10 @@ setup() {
     CLI="$RACINE/manage/devzone"
     T="$BATS_TEST_TMPDIR"
     cd "$T"
-    export DEVZONE_SANS_DEMARRER=1
-    export DEVZONE_RECONSTRUIRE="$T/reconstruire"
-    printf '#!/usr/bin/env bash\necho "reconstruit" >>"%s/reconstruction.log"\n' "$T" >"$DEVZONE_RECONSTRUIRE"
-    chmod +x "$DEVZONE_RECONSTRUIRE"
+    export DEVZONE_NO_START=1
+    export DEVZONE_REBUILD="$T/reconstruire"
+    printf '#!/usr/bin/env bash\necho "reconstruit" >>"%s/reconstruction.log"\n' "$T" >"$DEVZONE_REBUILD"
+    chmod +x "$DEVZONE_REBUILD"
     build_package v1 0.0.1 ancien
     build_package v2 0.0.2 nouveau
     MAJ="$T/v2/manage/devzone"
@@ -48,7 +48,7 @@ create_v1() {
 }
 
 backup_of() {
-    find "$DZ/.devzone.sauvegarde" -mindepth 1 -maxdepth 1 -type d | head -1
+    find "$DZ/.devzone.backup" -mindepth 1 -maxdepth 1 -type d | head -1
 }
 
 # Poisoned manifest: the path must be ignored with a warning, and the
@@ -85,7 +85,7 @@ poisoned_manifest() {
     [[ "$output" == *"déjà à jour"* ]] || false
     [[ "$output" == *"npx devzone@latest update"* ]] || false
     [ "$(cat "$DZ/.devzone.version")" = "$avant" ]
-    [ ! -e "$DZ/.devzone.sauvegarde" ]
+    [ ! -e "$DZ/.devzone.backup" ]
     [ ! -e "$T/reconstruction.log" ]
 }
 
@@ -139,7 +139,7 @@ poisoned_manifest() {
     [[ "$output" == *"--yes"* ]] || false
     [ "$(cat "$DZ/Makefile")" = 'modifie a la main' ]
     [ "$(sed -n '1p' "$DZ/.devzone.version")" = "version 0.0.1" ]
-    [ ! -e "$DZ/.devzone.sauvegarde" ]
+    [ ! -e "$DZ/.devzone.backup" ]
     [ ! -e "$T/reconstruction.log" ]
 }
 
@@ -164,7 +164,7 @@ poisoned_manifest() {
     run bash "$MAJ" update --yes --sans-reconstruire
     [ "$status" -eq 0 ]
     grep -q '^    repo = https://github.com/tester/devzone-argocd.git$' "$DZ/.argocd.conf"
-    [ ! -e "$DZ/.devzone.sauvegarde/.argocd.conf" ]
+    [ ! -e "$DZ/.devzone.backup/.argocd.conf" ]
 }
 
 @test "scripts/ created by the user with a manifest: kept intact" {
@@ -268,7 +268,7 @@ echo moi' ]
     [ "$(cat "$DZ/core/devzone")" = 'vieux devzone' ]
     [ "$(cat "$DZ/core/scripts/uninstall.sh")" = 'vieux core' ]
     [ "$(sed -n '1p' "$DZ/.devzone.version")" = "version 0.0.1" ]
-    [ ! -e "$DZ/.devzone.sauvegarde" ]
+    [ ! -e "$DZ/.devzone.backup" ]
 }
 
 @test "old folder without a manifest: all differing files are modified → --yes required" {
@@ -278,21 +278,21 @@ echo moi' ]
     run bash "$MAJ" update
     [ "$status" -eq 1 ]
     [[ "$output" == *"Makefile"* ]] || false
-    [ ! -e "$DZ/.devzone.sauvegarde" ]
+    [ ! -e "$DZ/.devzone.backup" ]
 }
 
 @test ".gitignore completed without overwriting the custom lines" {
     create_v1
     printf 'mon-regle-a-moi\n' >>"$DZ/.gitignore"
-    grep -v '^\.devzone\.sauvegarde/$' "$DZ/.gitignore" >"$T/gitignore.tmp"
+    grep -v '^\.devzone\.backup/$' "$DZ/.gitignore" >"$T/gitignore.tmp"
     mv "$T/gitignore.tmp" "$DZ/.gitignore"
     cd "$DZ"
     run bash "$MAJ" update --sans-reconstruire
     [ "$status" -eq 0 ]
     grep -qx 'mon-regle-a-moi' "$DZ/.gitignore"
-    grep -qx '.devzone.sauvegarde/' "$DZ/.gitignore"
+    grep -qx '.devzone.backup/' "$DZ/.gitignore"
     grep -qx 'workspace/\*' "$DZ/.gitignore"
-    [ "$(grep -c '^\.devzone\.sauvegarde/$' "$DZ/.gitignore")" -eq 1 ]
+    [ "$(grep -c '^\.devzone\.backup/$' "$DZ/.gitignore")" -eq 1 ]
 }
 
 @test "without a terminal: rebuild suggested, never started" {

@@ -122,7 +122,7 @@ inside_folder() {
 is_protected() {
     case "$1" in
         workspace | workspace/* | .devzone.version | .devzone.modules | .devzone.modules-* | \
-            .devzone.paquets | .password | .app | .devzone.log | .git | .git/*) return 0 ;;
+            .devzone.packages | .password | .app | .devzone.log | .git | .git/*) return 0 ;;
     esac
     return 1
 }

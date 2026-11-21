@@ -18,25 +18,25 @@
 #
 # Safe by construction: paths and commands are adjustable (tests: everything
 # under a temporary folder), and refusal to touch the real socket without
-# DEVZONE_RELAIS_REEL=oui, which only startup.sh and devzone repair set.
+# DEVZONE_RELAY_REAL=yes, which only startup.sh and devzone repair set.
 # Code: 0 check succeeded, 1 check failed (mark written for the devzone
 # summary), 2 refusal by the guard. Compatible with bash 3.2.
 set -euo pipefail
 
-SOCKET="${DEVZONE_RELAIS_SOCKET:-/var/run/docker.sock}"
-SOURCE="${DEVZONE_RELAIS_SOURCE:-/var/run/docker-host.sock}"
+SOCKET="${DEVZONE_RELAY_SOCKET:-/var/run/docker.sock}"
+SOURCE="${DEVZONE_RELAY_SOURCE:-/var/run/docker-host.sock}"
 # Feature files (/usr/local/share/docker-init.sh: SOCAT_PID, SOCAT_LOG)
-PID_FILE="${DEVZONE_RELAIS_PID:-/tmp/vscr-docker-from-docker.pid}"
-JOURNAL="${DEVZONE_RELAIS_LOG:-/tmp/vscr-docker-from-docker.log}"
-RELAY_USER="${DEVZONE_RELAIS_UTILISATEUR:-vscode}"
-DOCKER="${DEVZONE_RELAIS_DOCKER:-docker}"
+PID_FILE="${DEVZONE_RELAY_PID:-/tmp/vscr-docker-from-docker.pid}"
+JOURNAL="${DEVZONE_RELAY_LOG:-/tmp/vscr-docker-from-docker.log}"
+RELAY_USER="${DEVZONE_RELAY_USER:-vscode}"
+DOCKER="${DEVZONE_RELAY_DOCKER:-docker}"
 # Failure mark read by the devzone summary (.devcontainer/devzone): specific to
 # the container, erased at each restart with /tmp
-MARK="${DEVZONE_RELAIS_MARQUE:-/tmp/devzone-relais-docker.echec}"
-WAIT="${DEVZONE_RELAIS_ATTENTE:-10}"
+MARK="${DEVZONE_RELAY_MARKER:-/tmp/devzone-relay.failed}"
+WAIT="${DEVZONE_RELAY_WAIT:-10}"
 # The feature's relay runs as root: sudo unless already root
-if [ -n "${DEVZONE_RELAIS_SUDO+x}" ]; then
-    SUDO="$DEVZONE_RELAIS_SUDO"
+if [ -n "${DEVZONE_RELAY_SUDO+x}" ]; then
+    SUDO="$DEVZONE_RELAY_SUDO"
 elif [ "$(id -u)" = 0 ]; then
     SUDO=""
 else
@@ -48,7 +48,7 @@ if [ -n "${BATS_TEST_TMPDIR:-}" ] && [ "$SOCKET" = /var/run/docker.sock ]; then
     exit 2
 fi
 
-if [ "$SOCKET" = /var/run/docker.sock ] && [ "${DEVZONE_RELAIS_REEL:-}" != oui ]; then
+if [ "$SOCKET" = /var/run/docker.sock ] && [ "${DEVZONE_RELAY_REAL:-}" != yes ]; then
     echo "docker-relay : refused to touch the real socket ($SOCKET): run devzone repair instead" >&2
     exit 2
 fi

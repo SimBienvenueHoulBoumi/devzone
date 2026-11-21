@@ -111,7 +111,7 @@ relancer() {
         $2 == "failure" || $2 == "cancelled" || $2 == "timed_out" { autre++ }
         END {
             if (jamais > 0 && autre == 0) print "relancer"
-            else if (jamais > 0) print "echec-reel"
+            else if (jamais > 0) print "failed-real"
             else print "rien"
         }
     ')" || verdict=rien
@@ -120,7 +120,7 @@ relancer() {
             echo "relance : job jamais démarré (aucun runner, aucune étape) : gh run rerun $run_id --failed"
             gh run rerun "$run_id" --failed || echo "relance : gh run rerun a échoué, rien de plus à faire"
             ;;
-        echec-reel) echo "relance : un job n'a pas démarré, mais un autre a échoué ou été annulé en cours : pas de relance automatique" ;;
+        failed-real) echo "relance : un job n'a pas démarré, mais un autre a échoué ou été annulé en cours : pas de relance automatique" ;;
         *) echo "relance : aucun job jamais démarré : rien à relancer" ;;
     esac
     return 0

@@ -58,6 +58,12 @@ init_modules() {
     fi
 }
 
+# Former French names renamed to English (#733). Idempotent: the script logs one
+# line per rename, and a pair already renamed is left alone
+init_legacy_names() {
+    bash "$HERE/rename-legacy-files.sh" || log "legacy names: not renamed"
+}
+
 init_prompt() {
     local bashrc="$HOME/.bashrc"
     if ! touch "$bashrc" 2>/dev/null; then
@@ -88,5 +94,6 @@ PROMPT
 init_safe_directory
 init_repowarden
 init_modules
+init_legacy_names
 init_prompt
 log "done"

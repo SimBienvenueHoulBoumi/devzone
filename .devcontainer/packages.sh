@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # System packages kept after a rebuild (#351): a list in the devzone folder
-# (<root>/.devzone.paquets, a comment header + one package name per line, sorted,
+# (<root>/.devzone.packages, a comment header + one package name per line, sorted,
 # without duplicates), reinstalled at each container creation (post-create.sh).
 # A package installed by hand is lost by a rebuild, unless it is in this list.
 #   packages.sh or packages.sh list        list with the state of each package
@@ -13,14 +13,14 @@
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
-ROOT="${DEVZONE_RACINE:-$(dirname "$HERE")}"
-LIST="${ROOT}/.devzone.paquets"
-MARK="${DEVZONE_PAQUETS_MARQUE:-/tmp/devzone-paquets.echec}"
-UPDATED="${DEVZONE_PAQUETS_MAJ:-/tmp/devzone-paquets.maj}"
-SUDO="${DEVZONE_PAQUETS_SUDO-sudo}"
-APT="${DEVZONE_PAQUETS_APT:-apt-get}"
-APTCACHE="${DEVZONE_PAQUETS_APTCACHE:-apt-cache}"
-DPKGQUERY="${DEVZONE_PAQUETS_DPKG_QUERY:-dpkg-query}"
+ROOT="${DEVZONE_ROOT:-$(dirname "$HERE")}"
+LIST="${ROOT}/.devzone.packages"
+MARK="${DEVZONE_PACKAGES_MARKER:-/tmp/devzone-packages.failed}"
+UPDATED="${DEVZONE_PACKAGES_UPDATE:-/tmp/devzone-paquets.maj}"
+SUDO="${DEVZONE_PACKAGES_SUDO-sudo}"
+APT="${DEVZONE_PACKAGES_APT:-apt-get}"
+APTCACHE="${DEVZONE_PACKAGES_APTCACHE:-apt-cache}"
+DPKGQUERY="${DEVZONE_PACKAGES_DPKG_QUERY:-dpkg-query}"
 FORMAT="-f=\${Status}"
 # Stored values, kept byte for byte (the users' list file): the header and the
 # « already present » mark are written in UTF-8 as byte escapes (contract).

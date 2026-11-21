@@ -6,11 +6,11 @@
 # The hook is sourced with stubs that log the calls: no cluster is reached.
 
 setup() {
-    DEVZONE_RACINE="$BATS_TEST_TMPDIR/racine"
+    DEVZONE_ROOT="$BATS_TEST_TMPDIR/racine"
     LOG="$BATS_TEST_TMPDIR/log"
-    export DEVZONE_RACINE LOG
-    mkdir -p "$DEVZONE_RACINE/.devcontainer/catalog/mysql"
-    cp "$BATS_TEST_DIRNAME/../../.devcontainer/catalog/mysql/app.conf" "$DEVZONE_RACINE/.devcontainer/catalog/mysql/app.conf"
+    export DEVZONE_ROOT LOG
+    mkdir -p "$DEVZONE_ROOT/.devcontainer/catalog/mysql"
+    cp "$BATS_TEST_DIRNAME/../../.devcontainer/catalog/mysql/app.conf" "$DEVZONE_ROOT/.devcontainer/catalog/mysql/app.conf"
     : >"$LOG"
     HELD=yes
     APP_PRESENT=yes
@@ -121,6 +121,6 @@ setup() {
     [[ "$status" -eq 0 ]] || false
     [[ -z "$output" ]] || false
     [[ "$(cat "$LOG")" == *"create secret generic postgres-admin"* ]] || false
-    [[ -s "$DEVZONE_RACINE/workspace/.postgres/admin-password" ]] || false
-    [[ "$(stat -c %a "$DEVZONE_RACINE/workspace/.postgres/admin-password")" == 600 ]] || false
+    [[ -s "$DEVZONE_ROOT/workspace/.postgres/admin-password" ]] || false
+    [[ "$(stat -c %a "$DEVZONE_ROOT/workspace/.postgres/admin-password")" == 600 ]] || false
 }

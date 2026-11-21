@@ -6,8 +6,8 @@
 # Waits for the workspace pod; missing image or slow pod are reported clearly.
 wait_for_pod() {
     local image="$1" timeout step start state events arch target_revision pod_revision
-    timeout="${DEVZONE_WORKSPACE_ATTENTE:-120}"
-    step="${DEVZONE_WORKSPACE_PAS:-2}"
+    timeout="${DEVZONE_WORKSPACE_WAIT:-120}"
+    step="${DEVZONE_WORKSPACE_STEP:-2}"
     start="$SECONDS"
     while [ $((SECONDS - start)) -lt "$timeout" ]; do
         # Why: after helm upgrade the pod is still the old one; judge only the revision the StatefulSet is updating to, within the same wait bound.

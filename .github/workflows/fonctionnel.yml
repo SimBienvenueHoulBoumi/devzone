@@ -137,7 +137,7 @@ jobs:
           set SORTIE=%errorlevel%
           type %RUNNER_TEMP%\sortie.txt
           if %SORTIE% equ 0 exit /b 1
-          set DEVZONE_SANS_DEMARRER=1
+          set DEVZONE_NO_START=1
           call devzone %RUNNER_TEMP%\dzcmd --docker > %RUNNER_TEMP%\sortie.txt 2>&1
           set SORTIE=%errorlevel%
           type %RUNNER_TEMP%\sortie.txt
@@ -177,7 +177,7 @@ jobs:
           node-version: lts/*
       - name: devzone enable ia, then claude --version and opencode --version
         env:
-          DEVZONE_ETAT: ${{ runner.temp }}/devzone-modules
+          DEVZONE_STATE: ${{ runner.temp }}/devzone-modules
         run: |
           uname -m
           node --version

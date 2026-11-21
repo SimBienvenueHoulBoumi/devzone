@@ -7,8 +7,8 @@
 set -euo pipefail
 
 ICI="$(cd "$(dirname "$0")" && pwd)"
-RACINE="${DEVZONE_RACINE:-$(dirname "$ICI")}"
-ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
+RACINE="${DEVZONE_ROOT:-$(dirname "$ICI")}"
+ETAT="${DEVZONE_STATE:-$RACINE/.devzone.modules}"
 # shellcheck source=SCRIPTDIR/cluster.sh
 # shellcheck disable=SC1091
 . "$ICI/cluster.sh"
@@ -28,7 +28,7 @@ ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
 refuse() { echo "devzone : catalog : $*" >&2; exit 2; }
 
 # Catalog folder (overridable by the tests)
-catalog_dir() { echo "${DEVZONE_CATALOGUE:-$ICI/catalog}"; }
+catalog_dir() { echo "${DEVZONE_CATALOG:-$ICI/catalog}"; }
 
 # Catalog applications: folders holding an app.conf, sorted
 catalog_apps() {
@@ -53,7 +53,7 @@ app_namespace() {
 }
 
 # Failure marker of an application: same scheme as the failure file of the modules
-failure_file() { echo "$ETAT-echec-$1"; }
+failure_file() { echo "$ETAT-failed-$1"; }
 
 # Wanted state: on if the line <app>=on exists, off by default
 wanted() {
@@ -95,11 +95,9 @@ app_ready() {
 # an existing line is never changed), preceded once by the comment; reading and
 # writing hold the same lock (#417): a concurrent write cannot be lost between the two
 catalog_sync() (
-    local app header header_old missing="" tmp
+    local app header missing="" tmp
     [ -f "$ETAT" ] || return 0
     header="# Catalog applications: set to on to install (devzone catalog)"
-    # Header written before #722 (French wording): still recognised, not added twice
-    header_old="$(printf '# Applications du catalogue : passer \303\240 on pour installer (devzone catalog)')"
     state_lock_take || return 1
     # The lock is released on exit, including on an error under set -e
     trap 'state_lock_release' EXIT
@@ -112,7 +110,7 @@ catalog_sync() (
     tmp="$(mktemp)"
     {
         cat "$ETAT"
-        grep -qF -e "$header" -e "$header_old" "$ETAT" || echo "$header"
+        grep -qF -e "$header" "$ETAT" || echo "$header"
         echo "$missing"
     } >"$tmp"
     state_replace "$tmp"

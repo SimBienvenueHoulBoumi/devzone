@@ -36,11 +36,11 @@ egress_params() {
 
 # Waits for the proxy after the redeploy. Argo CD creates its Deployment a few
 # seconds to a minute after the sync: the Deployment is looked up every
-# DEVZONE_EGRESS_PAS s (3 by default) up to DEVZONE_EGRESS_WAIT s (90 by
+# DEVZONE_EGRESS_STEP s (3 by default) up to DEVZONE_EGRESS_WAIT s (90 by
 # default); then its rollout is awaited for DEVZONE_EGRESS_ROLLOUT s (120 by
 # default). Returns 1 when either is not reached.
 egress_wait_proxy() {
-    local limit="${DEVZONE_EGRESS_WAIT:-90}" rollout="${DEVZONE_EGRESS_ROLLOUT:-120}" pas="${DEVZONE_EGRESS_PAS:-3}" attendu=0
+    local limit="${DEVZONE_EGRESS_WAIT:-90}" rollout="${DEVZONE_EGRESS_ROLLOUT:-120}" pas="${DEVZONE_EGRESS_STEP:-3}" attendu=0
     until ak -n "$NAMESPACE" get deployment devzone-workspace-egress-proxy >/dev/null 2>&1; do
         if [ "$attendu" -ge "$limit" ]; then
             echo "⚠ the egress proxy was not created by Argo CD after $limit s: the setting is kept, check devzone workspace argocd status" >&2

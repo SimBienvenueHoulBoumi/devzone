@@ -5,10 +5,10 @@ setup() {
     load commun
     relais_docker_isole
     kube_isole
-    export DEVZONE_RACINE="$BATS_TEST_TMPDIR/racine"
-    export DEVZONE_ETAT="$BATS_TEST_TMPDIR/modules"
-    mkdir -p "$DEVZONE_RACINE/workspace" "$BATS_TEST_TMPDIR/bin"
-    : >"$DEVZONE_ETAT"
+    export DEVZONE_ROOT="$BATS_TEST_TMPDIR/racine"
+    export DEVZONE_STATE="$BATS_TEST_TMPDIR/modules"
+    mkdir -p "$DEVZONE_ROOT/workspace" "$BATS_TEST_TMPDIR/bin"
+    : >"$DEVZONE_STATE"
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
 }
@@ -104,7 +104,7 @@ KUBE
     fake_kubectl
     printf 'docker-desktop\nkind-gitlab\n' >"$BATS_TEST_TMPDIR/contexts"
     printf 'docker-desktop\n' >"$BATS_TEST_TMPDIR/current"
-    printf 'cluster=docker-desktop\n' >"$DEVZONE_ETAT"
+    printf 'cluster=docker-desktop\n' >"$DEVZONE_STATE"
     run bash "$DEVZONE" clusters
     [ "$status" -eq 0 ]
     [[ "$output" == *"★● docker-desktop"* ]] || false
@@ -119,7 +119,7 @@ KUBE
     fake_kubectl
     printf 'docker-desktop\nkind-gitlab\n' >"$BATS_TEST_TMPDIR/contexts"
     printf 'docker-desktop\n' >"$BATS_TEST_TMPDIR/current"
-    printf 'cluster=kind-gitlab\n' >"$DEVZONE_ETAT"
+    printf 'cluster=kind-gitlab\n' >"$DEVZONE_STATE"
     run env LC_ALL=C bash "$DEVZONE" clusters
     [ "$status" -eq 0 ]
     printf '%s\n' "$output" | grep -q '^   CONTEXT' || false

@@ -4,10 +4,10 @@
 # Sourced by .devcontainer/devzone (split of the 1 600 lines file, #722):
 # functions only, shared variables are defined in devzone.
 
-# Runs a long command, writing "still running" every DEVZONE_PROGRESSION s on
+# Runs a long command, writing "still running" every DEVZONE_PROGRESS s on
 # stderr: a silent installation looks blocked (#195)
 with_progress() {
-    local step="${DEVZONE_PROGRESSION:-30}" elapsed=0 pid code=0
+    local step="${DEVZONE_PROGRESS:-30}" elapsed=0 pid code=0
     "$@" &
     pid=$!
     while kill -0 "$pid" 2>/dev/null; do
@@ -24,7 +24,7 @@ with_progress() {
 # File that marks an active module in failure (content: where to look); next to
 # the state, in its volume: the state shows it at each startup
 failure_marker_file() {
-    echo "$ETAT-echec-$1"
+    echo "$ETAT-failed-$1"
 }
 
 # Services in the Kubernetes workspace pod (#528): gitlab, postgres and argocd

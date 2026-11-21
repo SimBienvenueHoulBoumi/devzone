@@ -16,11 +16,11 @@
 
 ICI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # RACINE: the code tree (libraries, charts); STATE_RACINE: the devzone folder
-# (workspace/ secrets, .argocd.conf), the same folder unless DEVZONE_RACINE says so
+# (workspace/ secrets, .argocd.conf), the same folder unless DEVZONE_ROOT says so
 RACINE="$(dirname "$(dirname "$ICI")")"
-STATE_RACINE="${DEVZONE_RACINE:-$RACINE}"
+STATE_RACINE="${DEVZONE_ROOT:-$RACINE}"
 # shellcheck disable=SC2034 # read by catalog-argocd.sh
-ETAT="${DEVZONE_ETAT:-$STATE_RACINE/.devzone.modules}"
+ETAT="${DEVZONE_STATE:-$STATE_RACINE/.devzone.modules}"
 APP_CONF="$RACINE/.devcontainer/catalog/mysql/app.conf"
 HOOK_SERVICES="postgres mysql"
 
