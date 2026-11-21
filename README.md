@@ -162,7 +162,7 @@ To learn more: [Starting a project](https://github.com/SimBienvenueHoulBoumi/dev
 
 | Area | Tools |
 |---|---|
-| Languages | Java 21 + Maven + Gradle, Node LTS + pnpm, Python 3.12 (apt) + uv |
+| Languages | Java 21 + Maven + Gradle, Node LTS + pnpm, Go 1.27.4, Python 3.12 (apt) + uv |
 | Containers, Kubernetes | Host Docker (shared socket), kubectl, helm, k9s, kind; connection to the host cluster (`kubernetes` module); Testcontainers (`TESTCONTAINERS_HOST_OVERRIDE`); mounts (`$LOCAL_WORKSPACE_FOLDER`) |
 | GitHub (or GitLab), quality | gh, or glab connected to a GitLab instance (`devzone platform gitlab` in the container, [manage/docs/reference.md](manage/docs/reference.md#platform-github-or-gitlab)); repowarden (global git hooks), shellcheck, bats, actionlint, gitleaks, ruff, vulture, pytest |
 | AI assistants | Claude Code, opencode (`ia` module, disabled by default) |

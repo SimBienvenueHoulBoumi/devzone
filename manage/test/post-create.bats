@@ -58,3 +58,19 @@ setup() {
 @test "Dockerfile: ~/.local/state and ~/.local/share created for vscode (uid/gid 1000)" {
     grep -Eq 'install -d -o 1000 -g 1000 /home/vscode/.local /home/vscode/.local/bin /home/vscode/.local/state /home/vscode/.local/share /home/vscode/.config' "$DOCKERFILE" || false
 }
+
+# Go (#754): pinned by version and SHA-256 for arm64 and amd64, same minor as go.mod
+@test "Dockerfile: Go pinned by version and SHA-256 (arm64, amd64), same minor as go.mod" {
+    gover="$(sed -nE 's/^ARG GO_VERSION=([^[:space:]]+)$/\1/p' "$DOCKERFILE" | head -1)"
+    modver="$(sed -nE 's/^go ([0-9]+\.[0-9]+)$/\1/p' "$BATS_TEST_DIRNAME/../../go.mod" | head -1)"
+    [ -n "$gover" ] || false
+    [[ "$gover" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || false
+    [ "${gover%.*}" = "$modver" ] || false
+    grep -Eq '^ARG GO_SHA256_AMD64=[0-9a-f]{64}$' "$DOCKERFILE" || false
+    grep -Eq '^ARG GO_SHA256_ARM64=[0-9a-f]{64}$' "$DOCKERFILE" || false
+    grep -Fq 'go.dev/dl/go${GO_VERSION}.linux-${arch}.tar.gz' "$DOCKERFILE" || false
+    grep -Fq '${GO_SHA256_ARM64}' "$DOCKERFILE" || false
+    grep -Fq '${GO_SHA256_AMD64}' "$DOCKERFILE" || false
+    grep -Fq 'echo "$go_sha  $tmp/go.tar.gz" | sha256sum -c' "$DOCKERFILE" || false
+    grep -Fq 'GOTOOLCHAIN=local' "$DOCKERFILE" || false
+}
