@@ -107,6 +107,8 @@ The `status` output of the modules (gitlab, postgres, argocd, mysql) and the sta
 | `runner en ligne`, `runner hors ligne` | `runner online`, `runner offline` |
 | catalog: `disponible`, `installée`, `attendue`, `echec` | `available`, `installed`, `expected`, `failed` |
 
+The refusal of an old name is in English: `✖ « <old> » was renamed: devzone <new>` (it was `a été renommé :`). The help of the CLI (`devzone --help`, with `<folder>` where it said `<dossier>`) and the description of the `mysql` catalog entry are in English too.
+
 ## Agent command
 
 `devzone agent` uses English names for its subcommands, options and JSON keys. The old names are refused with the new one, exit code 1, like the other renamed names.

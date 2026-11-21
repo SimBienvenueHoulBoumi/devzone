@@ -1,27 +1,33 @@
 package command
 
 // helpTemplate is the help text of manage/devzone (show_help), copied line by
-// line from the bash heredoc: the French and English lines are kept as they are.
+// line from the bash heredoc: both copies are identical (parity tested).
 // {version} stands for the version of the package.
-const helpTemplate = `devzone {version} : environnement de développement conteneurisé
+const helpTemplate = `devzone {version}: development workspace in a Kubernetes cluster
 
-  devzone <dossier> [--gitops github|none|<url>] [--kubernetes]
-                           crée un devzone dans <dossier> puis le lance ;
+  devzone <folder> [--gitops github|none|<url>] [--kubernetes]
+                           creates a devzone in <folder> (package files, .argocd.conf,
+                           .devzone.modules), then starts its workspace in the cluster;
+                           a folder that is not empty is refused
                            GitOps repository for Argo CD: github, or a URL, or none
                            --kubernetes: workspace in the cluster (default when it answers;
                            fails with nothing created without one)
-  devzone update [--yes] [--sans-reconstruire]
-                           dans un dossier devzone : passe à la version du paquet
-                           (sauvegarde les fichiers remplacés, propose make rebuild)
-  devzone uninstall        dans un dossier devzone : retire conteneur, image, volumes
-                           (à lancer avant npm uninstall -g devzone)
+  devzone update [--yes]
+                           in a devzone folder: replaces the package files with those of
+                           the installed package, after backing up the replaced files in
+                           .devzone.backup/ (the new image is used at the next workspace start)
+  devzone uninstall        in a devzone folder: lists what devzone installed outside the
+                           folder (leftovers of older versions, kind clusters, services,
+                           metrics-server), asks for confirmation, then removes it;
+                           workspace/ is kept (run before npm uninstall -g devzone)
   devzone workspace start|stop|status|shell|update
   devzone workspace vscode|copy-to|copy-from|clone
-                           poste Kubernetes : pilote le chart devzone-workspace
+                           Kubernetes workspace: drives the devzone-workspace chart
+                           (start installs it, stop removes it from the cluster)
   devzone workspace services enable|disable <service>|status
-                           services (gitlab, postgres, argocd) du workspace Kubernetes
+                           services (gitlab, postgres, argocd) of the Kubernetes workspace
   devzone workspace argocd status|init|apply|app add|list|remove
-                           Argo CD du workspace : dépôt GitOps, .argocd.conf, projets
+                           Argo CD of the workspace: GitOps repository, .argocd.conf, projects
   (old French names: refused with the new name, see the README, « Removed names »)
   devzone --version
 `

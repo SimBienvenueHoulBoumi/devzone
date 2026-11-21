@@ -175,7 +175,7 @@ EOT
     [ "$output" = "1.2.3" ]
     run bash "$PKG/manage/devzone" --help
     [ "$status" -eq 0 ]
-    [[ "${lines[0]}" == "devzone 1.2.3 : "* ]] || false
+    [[ "${lines[0]}" == "devzone 1.2.3: "* ]] || false
 }
 
 @test "launcher-go: no loop when the binary calls the launcher back (DEVZONE_FROM_GO)" {

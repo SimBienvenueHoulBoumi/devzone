@@ -108,7 +108,7 @@ volumes() { docker volume ls -q | grep -c "^${DEVZONE_VOLUMES}-" || true; }
 echo "▶ Sans conteneur (volumes $DEVZONE_VOLUMES-*)"
 humain "make help" 30 0 "make up .*Lance le conteneur" -- make -C "$RACINE" help
 humain "devzone --version" 30 0 "^$(node -p "require('$RACINE/package.json').version")$" -- bash "$RACINE/manage/devzone" --version
-humain "devzone --help" 30 0 "devzone <dossier>" -- bash "$RACINE/manage/devzone" --help
+humain "devzone --help" 30 0 "devzone <folder>" -- bash "$RACINE/manage/devzone" --help
 cd "$TMP" || exit 1
 humain "devzone uninstall hors d'un dossier devzone : refusé" 30 1 "dossier devzone" -- bash "$RACINE/manage/devzone" uninstall
 humain "devzone <dossier> --docker : option retirée, refusée" 30 1 "option inconnue : --docker" -- bash "$RACINE/manage/devzone" "$TMP/mon-devzone" --docker

@@ -146,7 +146,7 @@ GH
     [ "$status" -eq 0 ]
     [ "$output" = "$(node -p "require('$RACINE/package.json').version")" ]
     run bash "$CLI" --help
-    [[ "$output" == *"devzone <dossier>"* ]] || false
+    [[ "$output" == *"devzone <folder>"* ]] || false
     run bash "$CLI" --truc
     [ "$status" -eq 1 ]
 }

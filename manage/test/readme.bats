@@ -103,7 +103,9 @@ verify_command() {
     else
         return 0
     fi
-    case "$word" in ''|--*|devzone|devzone.instance|mon-devzone) return 0 ;;
+    # « devzone : text » is a message of devzone (an output), not a command; the
+    # help used to authorize the word « : » by accident (« devzone : »).
+    case "$word" in ''|--*|:|devzone|devzone.instance|mon-devzone) return 0 ;;
     esac
     case "$word" in devzone-*) return 0 ;; esac
     [ "${word:0:1}" = "<" ] && return 0
