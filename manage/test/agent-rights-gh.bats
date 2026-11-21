@@ -13,7 +13,6 @@ perm_pour() {
 
 setup() {
     load commun
-    relais_docker_isole
     kube_isole
     unset OPENCODE_CONFIG_CONTENT
     export DEVZONE_ROOT="$BATS_TEST_TMPDIR/racine"

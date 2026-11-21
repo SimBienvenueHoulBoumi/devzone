@@ -6,7 +6,6 @@ setup() {
     bats_require_minimum_version 1.5.0
     load commun
     load commun-helm
-    relais_docker_isole
     kube_isole
     # shellcheck disable=SC2034
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"

@@ -13,7 +13,7 @@ devzone_aide() {
   devzone enable <module>                  enable and apply at once
   devzone disable <module> [--yes]         disable and apply at once (--yes: also deletes the data)
   devzone apply                            install what is enabled (post-create.sh)
-  devzone repair                           repair Docker relay, gitlab, postgres, ports, passwords
+  devzone repair                           repair gitlab, postgres, ports, passwords
   devzone start                            full start (startup scripts and summary)
   devzone metrics [context…]               install metrics-server (kubectl top, k9s)
   devzone use CTX [--confirm CTX]          switch the kubectl working cluster

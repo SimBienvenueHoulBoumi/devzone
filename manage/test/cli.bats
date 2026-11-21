@@ -3,7 +3,6 @@
 
 setup() {
     load commun
-    relais_docker_isole
     kube_isole
     RACINE="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
     CLI="$RACINE/manage/devzone"
@@ -339,33 +338,13 @@ fake_docker() {
     [[ "$output" == *"erreur de construction"*"failed"* ]] || false
 }
 
-@test "launch.sh: docker-hote=off → config without the feature, build paths fixed, --config passed" {
-    fake_cli 'exit 0'
-    mkdir -p dz/.devcontainer
-    cp "$RACINE/.devcontainer/devcontainer.json" dz/.devcontainer/devcontainer.json
-    printf 'docker-hote=off\n' >dz/.devzone.modules
-    run bash "$RACINE/manage/scripts/launch.sh" up "$PWD/dz"
-    [ "$status" -eq 0 ]
-    cfg="$PWD/dz/.devcontainer/without-host-docker/devcontainer.json"
-    [ -f "$cfg" ]
-    ! grep -q "docker-outside-of-docker" "$cfg" || false
-    grep -q '"dockerfile": "../Dockerfile"' "$cfg"
-    grep -q '"context": ".."' "$cfg"
-    # JSONC: the comments of the original copy are kept
-    grep -q '// Image de base' "$cfg"
-    [[ "$(cat "$BATS_TEST_TMPDIR/args")" == *"up --workspace-folder $PWD/dz --config $cfg"* ]] || false
-}
-
-@test "launch.sh: docker-hote absent or on → normal config, no --config" {
+@test "launch.sh: no --config passed, up and rebuild" {
     fake_cli 'exit 0'
     run bash "$RACINE/manage/scripts/launch.sh" up "$PWD/dz"
     [ "$status" -eq 0 ]
-    [ ! -e dz/.devcontainer/without-host-docker/devcontainer.json ]
     [[ "$(cat "$BATS_TEST_TMPDIR/args")" != *"--config"* ]] || false
-    printf 'docker-hote=on\n' >dz/.devzone.modules
     run bash "$RACINE/manage/scripts/launch.sh" rebuild "$PWD/dz"
     [ "$status" -eq 0 ]
-    [ ! -e dz/.devcontainer/without-host-docker/devcontainer.json ]
     [[ "$(cat "$BATS_TEST_TMPDIR/args")" != *"--config"* ]] || false
 }
 

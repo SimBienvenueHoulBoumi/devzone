@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 # Network isolation and access authorization between devzone namespaces (#396 step A).
 # Tests with fake kubectl, kind: no cluster touched.
-# Helpers of manage/test/commun.bash: relais_docker_isole, kube_isole.
+# Helpers of manage/test/commun.bash: kube_isole.
 
 # Source of the isolation functions
 source "$BATS_TEST_DIRNAME/../../.devcontainer/isolation.sh"
@@ -10,7 +10,6 @@ load commun
 load commun-helm
 
 setup() {
-    relais_docker_isole
     kube_isole
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
     POSTGRES="$BATS_TEST_DIRNAME/../../.devcontainer/postgres/postgres.sh"

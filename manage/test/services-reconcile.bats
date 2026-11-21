@@ -10,7 +10,6 @@
 
 setup() {
     load commun
-    relais_docker_isole
     kube_isole
     RACINE="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
     CLI="$RACINE/manage/devzone"

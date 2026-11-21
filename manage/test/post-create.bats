@@ -4,7 +4,6 @@
 
 setup() {
     load commun
-    relais_docker_isole
     kube_isole
     SCRIPT="$BATS_TEST_DIRNAME/../../.devcontainer/post-create.sh"
     DEVCONTAINER="$BATS_TEST_DIRNAME/../../.devcontainer/devcontainer.json"

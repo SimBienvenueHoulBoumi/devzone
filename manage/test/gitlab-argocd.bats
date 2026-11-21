@@ -8,7 +8,6 @@
 setup() {
     load commun
     kind_vide
-    relais_docker_isole
     kube_isole
     REPO="$BATS_TEST_DIRNAME/../.."
     GITLAB="$REPO/.devcontainer/gitlab/gitlab.sh"

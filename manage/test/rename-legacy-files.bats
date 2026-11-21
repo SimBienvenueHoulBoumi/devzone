@@ -27,7 +27,6 @@ legacy_tree() {
     mkdir -p "$HOME/.claude/skills/devzone" "$HOME/.config/opencode/skills/devzone"
     echo "abc" >"$HOME/.claude/skills/devzone/.devzone-empreinte"
     echo "def" >"$HOME/.config/opencode/skills/devzone/.devzone-empreinte"
-    echo "relay" >"$DEVZONE_TMP_DIR/devzone-relais-docker.echec"
     echo "packages" >"$DEVZONE_TMP_DIR/devzone-paquets.echec"
 }
 
@@ -43,7 +42,6 @@ legacy_tree() {
     [ "$(cat "$DEVZONE_ROOT/.devzone.modules-failed-gitlab")" = "gitlab" ]
     [ "$(cat "$HOME/.claude/skills/devzone/.devzone-fingerprint")" = "abc" ]
     [ "$(cat "$HOME/.config/opencode/skills/devzone/.devzone-fingerprint")" = "def" ]
-    [ "$(cat "$DEVZONE_TMP_DIR/devzone-relay.failed")" = "relay" ]
     [ "$(cat "$DEVZONE_TMP_DIR/devzone-packages.failed")" = "packages" ]
     [ ! -e "$DEVZONE_ROOT/.devzone.paquets" ]
     [ ! -e "$DEVZONE_ROOT/.devzone.sauvegarde" ]
@@ -52,7 +50,6 @@ legacy_tree() {
     [ ! -e "$DEVZONE_ROOT/.devzone.catalogue-veilleur" ]
     [ ! -e "$DEVZONE_ROOT/.devzone.modules-echec-gitlab" ]
     [ ! -e "$HOME/.claude/skills/devzone/.devzone-empreinte" ]
-    [ ! -e "$DEVZONE_TMP_DIR/devzone-relais-docker.echec" ]
     [ ! -e "$DEVZONE_TMP_DIR/devzone-paquets.echec" ]
 }
 

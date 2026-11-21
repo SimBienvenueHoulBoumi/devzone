@@ -3,7 +3,6 @@
 
 setup() {
     load commun
-    relais_docker_isole
     kube_isole
     export DEVZONE_ROOT="$BATS_TEST_TMPDIR/racine"
     export DEVZONE_STATE="$BATS_TEST_TMPDIR/modules"

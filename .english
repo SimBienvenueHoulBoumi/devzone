@@ -186,8 +186,6 @@ internal/command/run_test.go
 .devcontainer/kube-config.sh
 .devcontainer/kube-reachable.sh
 .devcontainer/isolation.sh
-.devcontainer/docker-relay.sh
-.devcontainer/docker-without-host.sh
 .devcontainer/startup.sh
 .devcontainer/post-create.sh
 .devcontainer/workspace-init.sh
@@ -197,7 +195,6 @@ internal/command/run_test.go
 manage/test/cluster.bats
 manage/test/clusters.bats
 manage/test/docker-host.bats
-manage/test/docker-relay.bats
 manage/test/gitlab-cluster.bats
 manage/test/isolation.bats
 manage/test/kube-account.bats
@@ -244,3 +241,12 @@ internal/command/help_test.go
 .devcontainer/rename-legacy-files.sh
 manage/test/rename-legacy-files.bats
 .devcontainer/catalog.sh
+internal/workspace/runner.go
+internal/workspace/status.go
+internal/workspace/legacy.go
+internal/workspace/runner_test.go
+internal/workspace/status_test.go
+internal/workspace/legacy_test.go
+internal/workspace/fake_test.go
+internal/command/workspace.go
+internal/command/workspace_test.go
