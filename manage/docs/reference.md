@@ -918,9 +918,9 @@ The `bats (macos-latest)` job sometimes gets no runner: it stays queued for abou
 The commands, subcommands and options of devzone are written in English (#502, #557, #695). The old French names are no longer accepted, neither as aliases nor with a warning: devzone refuses the old name, shows the new one on the error output, exits with code 1 and does nothing (no folder is created):
 
 ```
-✖ « activer » a été renommé : devzone enable
-✖ « liste » a été renommé : devzone port list
-✖ « --oui » a été renommé : --yes
+✖ « activer » was renamed: devzone enable
+✖ « liste » was renamed: devzone port list
+✖ « --oui » was renamed: --yes
 ```
 
 ### Commands

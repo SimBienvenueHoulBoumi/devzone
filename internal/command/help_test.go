@@ -8,7 +8,7 @@ import (
 
 func TestHelpTextInsertsVersion(t *testing.T) {
 	text := helpText("1.4.2")
-	if !strings.HasPrefix(text, "devzone 1.4.2 : ") {
+	if !strings.HasPrefix(text, "devzone 1.4.2: ") {
 		t.Fatalf("first line = %q, want the version after devzone", text)
 	}
 	if strings.Contains(text, "{version}") {
