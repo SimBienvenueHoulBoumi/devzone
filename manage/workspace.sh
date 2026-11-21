@@ -175,10 +175,6 @@ copy_from() {
 . "$HERE/scripts/workspace-clone.sh"
 # shellcheck source=manage/scripts/workspace-copies.sh
 . "$HERE/scripts/workspace-copies.sh"
-# shellcheck source=manage/scripts/migrate.sh
-. "$HERE/scripts/migrate.sh"
-# shellcheck source=manage/scripts/migrate-revert.sh
-. "$HERE/scripts/migrate-revert.sh"
 # shellcheck source=manage/scripts/ports-workspace.sh
 . "$HERE/scripts/ports-workspace.sh"
 # shellcheck source=manage/scripts/services-workspace.sh
@@ -217,14 +213,11 @@ case "${1:-}" in
     copy-from) copy_from "${@:2}" ;;
     clone) workspace_clone "${@:2}" ;;
     ports) ports "${@:2}" ;;
-    migrate) migrate_workspace "${@:2}" ;;
-    revert) revert_workspace "${@:2}" ;;
-    clean-docker) clean_docker "${@:2}" ;;
     services) services "${@:2}" ;;
     argocd) argocd_cmd "${@:2}" ;;
     egress) egress_workspace "${@:2}" ;;
     '' | -h | --help | help)
-        echo "devzone workspace start|stop|status|shell|vscode|copy-to|copy-from|clone|ports|services|argocd|migrate|revert|clean-docker|update|egress"
+        echo "devzone workspace start|stop|status|shell|vscode|copy-to|copy-from|clone|ports|services|argocd|update|egress"
         echo "  start [--image repository:tag]  install workspace (image for devzone version by default)"
         echo "  update [--version X.Y.Z] [--yes]  move to the latest stable release (or X.Y.Z); the pod is recreated"
         echo "  clone <url> [<name>]   git clone into the pod projects folder (gh credentials, identity, repowarden hooks)"
@@ -233,13 +226,10 @@ case "${1:-}" in
         echo "                        devzone services (gitlab, postgres, argocd) of the cluster, installed from the workstation"
         echo "  argocd status | init [--repo <url>|--none] | apply | app add <repo url> [path] [--name N] [--revision R] | app list | app remove <N>"
         echo "                        Argo CD of the workspace: .argocd.conf, GitOps repository, your projects as Applications"
-        echo "  migrate [--yes]        copy Docker workstation to Kubernetes workspace (nothing is deleted)"
-        echo "  revert [--bring-back]  back to Docker workstation (deprecated, will be removed); --bring-back: copy pod projects first"
-        echo "  clean-docker           remove devzone-* Docker volumes, after confirmation [y/N] (--yes)"
         echo "  egress observation|strict|off|status|allow <domain>|deny <domain>   egress proxy of the agent sessions (--pod)"
         ;;
     *)
-        echo "✖ unknown subcommand: $1 (devzone workspace start|stop|status|shell|vscode|copy-to|copy-from|clone|ports|services|argocd|migrate|revert|clean-docker|update)" >&2
+        echo "✖ unknown subcommand: $1 (devzone workspace start|stop|status|shell|vscode|copy-to|copy-from|clone|ports|services|argocd|update)" >&2
         exit 1
         ;;
 esac

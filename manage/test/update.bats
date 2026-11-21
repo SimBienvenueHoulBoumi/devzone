@@ -5,6 +5,7 @@
 setup() {
     load commun
     kube_isole
+    cluster_pret
     RACINE="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
     CLI="$RACINE/manage/devzone"
     T="$BATS_TEST_TMPDIR"
@@ -43,7 +44,7 @@ build_package() {
 
 create_v1() {
     DZ="$T/devzone"
-    bash "$T/v1/manage/devzone" "$DZ" --docker >/dev/null
+    bash "$T/v1/manage/devzone" "$DZ" --kubernetes >/dev/null
 }
 
 backup_of() {
@@ -296,6 +297,8 @@ echo moi' ]
 
 @test "without a terminal: rebuild suggested, never started" {
     create_v1
+    # A folder of the former Docker workstation (#735): the rebuild is suggested
+    printf 'workspace=docker\n' >"$DZ/.devzone.modules"
     cd "$DZ"
     run bash "$MAJ" update --yes
     [ "$status" -eq 0 ]
@@ -305,6 +308,7 @@ echo moi' ]
 
 @test "--sans-reconstruire: no rebuild, even with --yes" {
     create_v1
+    printf 'workspace=docker\n' >"$DZ/.devzone.modules"
     cd "$DZ"
     run bash "$MAJ" update --yes --sans-reconstruire
     [ "$status" -eq 0 ]

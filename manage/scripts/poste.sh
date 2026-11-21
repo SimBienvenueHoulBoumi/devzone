@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Why: make up|shell|stop|rebuild always drives the Docker container, even
-# after "devzone workspace migrate", which writes workspace=kubernetes in
-# .devzone.modules (#472). This script reads that mode: in Kubernetes it hands
+# Why: make up|shell|stop|rebuild always drove the Docker container, even
+# once a folder was in Kubernetes mode (#472). The Docker workstation is retired
+# (#735), but a folder still marked workspace=kubernetes in .devzone.modules
+# must keep working. This script reads that mode: in Kubernetes it hands
 # off to manage/workspace.sh (repo clone) or npx devzone@<version> workspace
 # (folder created by npx devzone); in Docker it returns 3 and does nothing, so
 # the Makefile keeps its original recipe. The advice target shows, after an
@@ -68,12 +69,10 @@ if [ -z "$folder" ]; then
     exit 2
 fi
 
-# Advice after update: always exit 0, nothing to do in Docker without reachable Kubernetes.
+# Advice after update: always exit 0, silent for a Docker folder (#735).
 if [ "$target" = "advice" ] || [ "$target" = "conseil" ]; then
     if [ "$(workspace_mode "$folder")" = kubernetes ]; then
         echo "Kubernetes workspace: the new image is used on the next devzone workspace start (or make up)."
-    elif kube_ready_reason >/dev/null; then
-        echo "Kubernetes reachable: devzone workspace migrate moves this workstation to the cluster (nothing is deleted, rollback: devzone workspace revert)."
     fi
     exit 0
 fi
@@ -86,7 +85,7 @@ case "$target" in
     shell) workspace_cmd "$folder" start && workspace_cmd "$folder" shell ;;
     stop) workspace_cmd "$folder" stop ;;
     rebuild)
-        echo "✖ make rebuild: this workstation is in Kubernetes workspace mode (workspace=kubernetes in .devzone.modules), nothing to rebuild on the machine; back to Docker workstation: devzone workspace revert" >&2
+        echo "✖ make rebuild: this workstation is in Kubernetes workspace mode (workspace=kubernetes in .devzone.modules), nothing to rebuild on the machine" >&2
         exit 1
         ;;
 esac

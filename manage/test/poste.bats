@@ -55,8 +55,7 @@ HELM
 }
 
 # Advice target after update (#472): kubernetes mode -> next start message;
-# Docker with reachable Kubernetes -> migrate suggested; otherwise nothing.
-# Always exit 0.
+# Docker folder -> nothing (the migration is removed, #735). Always exit 0.
 
 @test "advice and conseil: kubernetes workspace -> next start message, no kubectl" {
     printf 'workspace=kubernetes\n' >"$T/folder/.devzone.modules"
@@ -71,15 +70,15 @@ HELM
     [[ "$output" == *"next devzone workspace start"* ]] || false
 }
 
-@test "advice: docker, kubectl and helm, cluster-info ok -> migrate suggested with --context devzone" {
+@test "advice: docker folder, cluster-info ok -> nothing, no migrate suggested" {
     rm -f "$T/folder/.devzone.modules"
     fake_kube
     : >"$FAKE_LOG"
     run bash "$POSTE" advice "$T/folder"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"devzone workspace migrate"* ]] || false
-    [[ "$output" == *"devzone workspace revert"* ]] || false
-    [[ "$(cat "$FAKE_LOG")" == *"cluster-info --request-timeout=5s --context devzone"* ]] || false
+    [ -z "$output" ]
+    [[ "$output" != *"migrate"* ]] || false
+    [[ "$output" != *"revert"* ]] || false
 }
 
 @test "advice: docker, cluster-info fails -> nothing" {
@@ -143,11 +142,11 @@ HELM
     [ "$(cat "$FAKE_LOG")" = "workspace stop" ]
 }
 
-@test "kubernetes workspace: rebuild refused and points to devzone workspace revert" {
+@test "kubernetes workspace: rebuild refused, nothing to rebuild on the machine" {
     printf 'workspace=kubernetes\n' >"$T/folder/.devzone.modules"
     run bash "$POSTE" rebuild "$T/folder"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"devzone workspace revert"* ]] || false
+    [[ "$output" == *"nothing to rebuild on the machine"* ]] || false
     [ ! -s "$FAKE_LOG" ]
 }
 

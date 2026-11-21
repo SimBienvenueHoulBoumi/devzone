@@ -59,7 +59,6 @@ choose() {
     [[ "$output" == *"Nothing created"* ]] || false
     [[ "$output" == *"kubectl config use-context"* ]] || false
     [[ "$output" == *"minikube start -p devzone"* ]] || false
-    [[ "$output" == *"--docker still creates the Docker workstation, deprecated"* ]] || false
     [[ "$output" != *"mode="* ]] || false
     [ ! -e "$T/folder/.devzone.modules" ]
 }
@@ -81,14 +80,6 @@ choose() {
     [[ "$output" != *"mode="* ]] || false
 }
 
-@test "--docker: docker mode, deprecation notice, cluster not asked" {
-    choose docker
-    [ "$status" -eq 0 ]
-    [[ "$output" == *"--docker) is deprecated and will be removed"* ]] || false
-    [[ "$output" == *"mode=docker"* ]] || false
-    [[ "$(cat "$FAKE_LOG")" != *"cluster-info"* ]] || false
-}
-
 @test "--kubernetes, cluster unreachable: status 1, error notice, nothing written" {
     FAKE_KUBE_CLUSTER_INFO=fail
     export FAKE_KUBE_CLUSTER_INFO
@@ -104,14 +95,6 @@ choose() {
     choose kubernetes
     [ "$status" -eq 0 ]
     [[ "$output" == *"mode=kubernetes"* ]] || false
-}
-
-@test "--docker: docker, cluster not asked" {
-    choose docker
-    [ "$status" -eq 0 ]
-    [[ "$output" == *"Docker workstation (--docker)"* ]] || false
-    [[ "$output" == *"mode=docker"* ]] || false
-    [ ! -s "$FAKE_LOG" ]
 }
 
 @test "create_mode_write: new folder gets workspace=kubernetes" {
@@ -143,15 +126,6 @@ choose() {
     choose ""
     [ "$status" -eq 0 ]
     [[ "$output" != *"already runs"* ]] || false
-}
-
-@test "--docker: no look at the workspace in the cluster" {
-    FAKE_HELM_RELEASE=present
-    export FAKE_HELM_RELEASE
-    choose docker
-    [ "$status" -eq 0 ]
-    [[ "$output" != *"already runs"* ]] || false
-    [[ "$(cat "$FAKE_LOG")" != *"helm status"* ]] || false
 }
 
 @test "create_mode_write: earlier workspace= replaced, other lines kept" {

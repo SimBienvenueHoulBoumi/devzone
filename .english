@@ -12,12 +12,10 @@ manage/scripts/create-mode.sh
 manage/scripts/create-cluster.sh
 manage/test/create-cluster.bats
 manage/scripts/workspace-wait.sh
-manage/scripts/migrate-revert.sh
 manage/scripts/poste.sh
 manage/scripts/launch.sh
 manage/scripts/versions.sh
 manage/scripts/uninstall.sh
-manage/scripts/migrate.sh
 manage/scripts/ports-apps.sh
 manage/scripts/ports-workspace.sh
 manage/workspace.sh
@@ -35,8 +33,6 @@ manage/test/workspace.bats
 manage/test/workspace-ports-apps.bats
 manage/test/workspace-ports-ready.bats
 manage/test/workspace-ports.bats
-manage/test/workspace-migration.bats
-manage/test/workspace-revert.bats
 manage/test/workspace-projets.bats
 manage/test/workspace-identites.bats
 manage/test/workspace-without-docker.bats
@@ -46,7 +42,6 @@ manage/test/create-mode.bats
 manage/test/create-with-mode.bats
 manage/test/versions.bats
 manage/test/ci-dns.bats
-manage/test/migration.bash
 .devcontainer/workspace-build.sh
 internal/workspace/stop.go
 internal/workspace/stop_ports.go
@@ -112,8 +107,6 @@ manage/test/workspace-clone.bats
 manage/test/ticket.bats
 manage/scripts/workspace-copies.sh
 manage/test/workspace-copies.bats
-manage/scripts/docker-workstation.sh
-manage/test/docker-workstation.bats
 manage/test/kube-reachable.bats
 manage/test/test-gitlab-restes.bats
 .devcontainer/gitlab/test-gitlab-restes.sh

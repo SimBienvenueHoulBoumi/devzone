@@ -79,12 +79,9 @@ else
     echo "  ○ ignoré (hors Windows : pas de cygpath)"
 fi
 
-echo "▶ devzone <dossier> avec DEVZONE_NO_START=1"
-reussit "crée un devzone complet" "DEVZONE_NO_START=1 devzone '$TESTDIR' --docker" "créé dans"
-for f in .devcontainer/devcontainer.json .devcontainer/devzone Makefile .gitattributes manage/scripts/launch.sh manage/scripts/uninstall.sh README.md LICENSE workspace/.gitkeep .gitignore; do
-    reussit "existe : $f" "[ -e '$TESTDIR/$f' ]"
-done
-reussit ".gitignore : workspace ignoré sauf .gitkeep" "grep -q '^workspace/\\*\$' '$TESTDIR/.gitignore'"
+echo "▶ --docker retiré (#735) : refusé comme option inconnue, rien créé"
+echoue "--docker refusé comme option inconnue" "DEVZONE_NO_START=1 devzone '$TESTDIR' --docker" "option inconnue"
+reussit "dossier non créé" "[ ! -e '$TESTDIR' ]"
 
 echo "▶ Dossier non vide refusé, rien n'est écrasé"
 mkdir -p "$TMP/plein"

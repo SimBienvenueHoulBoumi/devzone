@@ -62,9 +62,6 @@ mettre-a-jour|update
 desinstaller|uninstall
 copier-vers|workspace copy-to
 copier-depuis|workspace copy-from
-migrer|workspace migrate
-revenir|workspace revert
-nettoyer-docker|workspace clean-docker
 TABLE
 }
 
@@ -127,9 +124,6 @@ workspace|arreter|stop
 workspace|etat|status
 workspace|copier-vers|copy-to
 workspace|copier-depuis|copy-from
-workspace|migrer|migrate
-workspace|revenir|revert
-workspace|nettoyer-docker|clean-docker
 workspace|aide|help
 workspace ports|demarrer|start
 workspace ports|arreter|stop
@@ -150,7 +144,6 @@ TABLE
 --oui|--yes
 --confirmer|--confirm
 --contexte|--context
---rapatrier|--bring-back
 TABLE
 }
 
@@ -175,7 +168,7 @@ TABLE
 @test "hôte : chaque ancien nom est refusé, code 1, aucun dossier créé" {
     for old in activer desactiver appliquer actif reparer demarrer arreter etat utiliser \
         catalogue paquets mots-de-passe plateforme ia aide mettre-a-jour desinstaller \
-        copier-vers migrer revenir nettoyer-docker; do
+        copier-vers; do
         run --separate-stderr bash "$CLI" "$old"
         [ "$status" -eq 1 ] || { echo "code $status pour $old"; false; }
         [[ "$stderr" == *"« $old » a été renommé : devzone "* ]] || { echo "message : $stderr"; false; }
@@ -213,9 +206,9 @@ DOCKER
     run --separate-stderr bash "$WS" etat
     [ "$status" -eq 1 ]
     [ "$stderr" = "✖ « etat » a été renommé : devzone workspace status" ]
-    run --separate-stderr bash "$WS" migrer --oui
+    run --separate-stderr bash "$WS" copier-vers
     [ "$status" -eq 1 ]
-    [ "$stderr" = "✖ « migrer » a été renommé : devzone workspace migrate" ]
+    [ "$stderr" = "✖ « copier-vers » a été renommé : devzone workspace copy-to" ]
     run --separate-stderr bash "$WS" ports demarrer
     [ "$status" -eq 1 ]
     [ "$stderr" = "✖ « demarrer » a été renommé : devzone workspace ports start" ]
@@ -265,4 +258,55 @@ DOCKER
     DEVZONE_NO_START=1 run bash "$CLI" stop
     [ "$status" -eq 0 ]
     [ -d stop ]
+}
+
+# Noms retirés en 3.0 (#735) : refusés, code 1, message sans le mot docker,
+# aucune sortie, aucun dossier créé
+removed_refus() {
+    run --separate-stderr refus "$@"
+    [ "$status" -eq 1 ] || { echo "code $status pour $*"; false; }
+    [[ "$stderr" == *"was removed in devzone 3.0"* ]] || { echo "message : $stderr"; false; }
+    [[ "$stderr" != *docker* ]] || false
+    [ -z "$output" ] || false
+}
+
+@test "migrer : retiré, refusé en top-level et sous workspace, rien créé" {
+    removed_refus migrer
+    removed_refus workspace migrer
+    run --separate-stderr bash "$CLI" migrer
+    [ "$status" -eq 1 ]
+    [ ! -e migrer ]
+    run --separate-stderr bash "$WS" migrer
+    [ "$status" -eq 1 ]
+    [ ! -e "$T/kubectl.log" ]
+}
+
+@test "revenir : retiré, refusé en top-level et sous workspace, rien créé" {
+    removed_refus revenir
+    removed_refus workspace revenir
+    run --separate-stderr bash "$CLI" revenir
+    [ "$status" -eq 1 ]
+    [ ! -e revenir ]
+    run --separate-stderr bash "$WS" revenir --bring-back
+    [ "$status" -eq 1 ]
+    [ ! -e "$T/kubectl.log" ]
+}
+
+@test "nettoyer-docker : retiré, refusé en top-level et sous workspace, rien créé" {
+    removed_refus nettoyer-docker
+    removed_refus workspace nettoyer-docker
+    run --separate-stderr bash "$CLI" nettoyer-docker
+    [ "$status" -eq 1 ]
+    [ ! -e nettoyer-docker ]
+    run --separate-stderr bash "$WS" nettoyer-docker --yes
+    [ "$status" -eq 1 ]
+    [ ! -e "$T/kubectl.log" ]
+}
+
+@test "--rapatrier : option retirée, refusée avec code 1" {
+    removed_refus workspace revert --rapatrier
+    removed_refus workspace copy-to --rapatrier
+    run --separate-stderr bash "$WS" revert --rapatrier
+    [ "$status" -eq 1 ]
+    [ ! -e "$T/kubectl.log" ]
 }
