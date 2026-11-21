@@ -876,13 +876,13 @@ VS Code et les autres outils. La sortie texte n'est pas changée : ajoute
 - **Stable et versionné** : les noms de champs sont en anglais, sans accent ni
   espace. Depuis #733, sans alias : `nom`→`name`, `actif`→`active`,
   `etat`→`state`, `echec`→`failed`, `commande`→`command`, `outils`→`tools`,
-  `plateforme`→`platform`, `disponible`→`available`, `docker_hote`→`docker_host`,
+  `plateforme`→`platform`, `disponible`→`available`,
   `identite_git`→`git_identity`, `identifiants`→`credentials`,
   `alertes`→`alerts`, `erreurs`→`errors`, `retards`→`outdated`,
   `paquet`/`figee`/`installee`→`package`/`frozen`/`installed`,
   `travail`→`work`, `travail_interne`→`internal_work`,
-  `services_distant`→`services_remote`, `connecte`→`connected`. Seule exception,
-  `docker_hote_actif`, garde son nom jusqu'à sa suppression (#735). Ce renommage
+  `services_distant`→`services_remote`, `connecte`→`connected`. Les champs
+  `docker_hote` et `docker_hote_actif` sont supprimés (#735). Ce renommage
   fait passer `schema` de 1 à 2 : un lecteur écrit pour `schema: 1` doit être
   mis à jour. Ajouter un champ reste dans `schema: 2` ; retirer ou renommer un
   champ fait passer `schema` à 3 : fonde ta lecture dessus.
@@ -899,18 +899,16 @@ VS Code et les autres outils. La sortie texte n'est pas changée : ajoute
   "tools": { "outdated": [ { "package": "…", "frozen": "…", "installed": "…" } ], "command": "devzone apply" },
   "modules": [ { "name": "postgres", "active": true, "description": "…", "state": "ready on docker-desktop…",
                  "failed": null, "command": null } ],
-  "docker_host": true,
-  "docker_hote_actif": true,
   "clusters": { "services": "docker-desktop", "services_remote": false,
                 "work": "docker-desktop", "internal_work": false, "command": null },
   "ports": [ { "port": 8080, "active": true, "application": "…" } ],
   "credentials": "/workspaces/devzone/.password",
-  "alerts": [ { "code": "relais_docker", "message": "…", "command": "devzone repair" } ],
+  "alerts": [ { "code": "packages", "message": "…", "command": "devzone packages apply" } ],
   "errors": {}
 }
 ```
 
-Les alertes possibles : `relais_docker`, `packages`, `worktree`,
+Les alertes possibles : `packages`, `worktree`,
 `cluster_distant` (services sur un cluster distant), `cluster_interne`
 (cluster de travail de devzone, revenir avec `devzone use <ton cluster>`).
 

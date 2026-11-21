@@ -111,14 +111,6 @@ CURL
     [ "$(printf '%s\n' "$output" | jq -r '.errors.github')" != "null" ]
 }
 
-@test "state-json: relay failed → alert relais_docker" {
-    echo "relay broken" >"$BATS_TEST_TMPDIR/relay.failed"
-    export DEVZONE_RELAY_MARKER="$BATS_TEST_TMPDIR/relay.failed"
-    run bash "$DEVZONE" status --json
-    [ "$status" -eq 0 ]
-    [ "$(printf '%s\n' "$output" | jq -r '.alerts[] | select(.code=="relais_docker") | .code')" = "relais_docker" ]
-}
-
 @test "state-json: open port → in ports" {
     printf 'ports=8080\n' >"$DEVZONE_STATE"
     : >"$BATS_TEST_TMPDIR/relais/devzone-devzone-port-8080"
@@ -139,51 +131,6 @@ GH
     [ "$status" -eq 0 ]
     [[ "$output" != *"secret-sentinel-123"* ]] || false
     [[ "$output" != *"secret-gh-456"* ]] || false
-}
-
-@test "state-json: docker-hote on by default, socket present → active" {
-    : >"$DEVZONE_RELAY_SOURCE"
-    run bash "$DEVZONE" status --json
-    [ "$status" -eq 0 ]
-    printf '%s\n' "$output" | jq -e . >/dev/null
-    [ "$(printf '%s\n' "$output" | jq -r '.docker_host')" = "true" ]
-    [ "$(printf '%s\n' "$output" | jq -r '.docker_hote_actif')" = "true" ]
-}
-
-@test "state-json: docker-hote on, socket absent → active false" {
-    rm -f "$DEVZONE_RELAY_SOURCE"
-    run bash "$DEVZONE" status --json
-    [ "$status" -eq 0 ]
-    [ "$(printf '%s\n' "$output" | jq -r '.docker_host')" = "true" ]
-    [ "$(printf '%s\n' "$output" | jq -r '.docker_hote_actif')" = "false" ]
-}
-
-@test "state-json: docker-hote=off, socket still mounted → active true" {
-    : >"$DEVZONE_RELAY_SOURCE"
-    printf 'docker-hote=off\n' >"$DEVZONE_STATE"
-    run bash "$DEVZONE" status --json
-    [ "$status" -eq 0 ]
-    [ "$(printf '%s\n' "$output" | jq -r '.docker_host')" = "false" ]
-    [ "$(printf '%s\n' "$output" | jq -r '.docker_hote_actif')" = "true" ]
-}
-
-@test "state-json: docker-hote=off without socket → false" {
-    printf 'docker-hote=off\n' >"$DEVZONE_STATE"
-    rm -f "$DEVZONE_RELAY_SOURCE"
-    run bash "$DEVZONE" status --json
-    [ "$status" -eq 0 ]
-    [ "$(printf '%s\n' "$output" | jq -r '.docker_host')" = "false" ]
-    [ "$(printf '%s\n' "$output" | jq -r '.docker_hote_actif')" = "false" ]
-}
-
-@test "state-json: DEVZONE_WORKSPACE=kubernetes → socket absent, no alert" {
-    : >"$DEVZONE_RELAY_SOURCE"
-    export DEVZONE_WORKSPACE=kubernetes
-    run bash "$DEVZONE" status --json
-    [ "$status" -eq 0 ]
-    printf '%s\n' "$output" | jq -e . >/dev/null
-    [ "$(printf '%s\n' "$output" | jq -r '.docker_host')" = "false" ]
-    [ "$(printf '%s\n' "$output" | jq -r '.docker_hote_actif')" = "false" ]
 }
 
 @test "state-json: argocd_repo field: the designated GitOps repository" {

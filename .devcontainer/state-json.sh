@@ -30,7 +30,6 @@ state_json() {
     local platform_name platform_url="" github_json="null"
     local tools_late_json='[]' tools_command=""
     local modules_json='[]' m active desc failure_file content state_value failure_value command_value out argocd_repo=""
-    local docker_host=false docker_host_active=false relay_source
     local services_cluster="" services_remote=false
     local work_ctx="" work_internal=false host_ctx=""
     local clusters_services_raw="" clusters_work_raw="" clusters_command=""
@@ -38,7 +37,7 @@ state_json() {
     local applications_json='[]'
     local credentials_raw=""
     local late_out package frozen installed count
-    local relay_marker packages_marker packages_names n path wt_out
+    local packages_marker packages_names n path wt_out
     local gh_status gh_code
 
     if v="$(folder_version 2>/dev/null)"; then
@@ -172,23 +171,6 @@ state_json() {
             <<<"$modules_json")"
     done
 
-    # docker-hote option (#432): absent = on; socket really mounted (same
-    # source as docker-relay.sh), may differ until make rebuild
-    # In the Kubernetes workspace (DEVZONE_WORKSPACE=kubernetes), the pod has
-    # no Docker host socket: the socket is absent (#515)
-    if [ "${DEVZONE_WORKSPACE:-}" = kubernetes ]; then
-        docker_host=false
-        docker_host_active=false
-    else
-        if [ "$(value_of docker-hote)" = on ]; then
-            docker_host=true
-        fi
-        relay_source="${DEVZONE_RELAY_SOURCE:-/var/run/docker-host.sock}"
-        if [ -e "$relay_source" ]; then
-            docker_host_active=true
-        fi
-    fi
-
     services_cluster="$(cluster_saved)"
     if [ -n "$services_cluster" ] && ! cluster_is_local "$services_cluster"; then
         services_remote=true
@@ -230,11 +212,6 @@ state_json() {
         credentials_raw="$RACINE/.password"
     fi
 
-    relay_marker="${DEVZONE_RELAY_MARKER:-/tmp/devzone-relay.failed}"
-    if [ -f "$relay_marker" ]; then
-        msg="$(head -1 "$relay_marker" 2>/dev/null || true)"
-        append_alert relais_docker "$msg" "devzone repair"
-    fi
     packages_marker="${DEVZONE_PACKAGES_MARKER:-/tmp/devzone-packages.failed}"
     if [ -f "$packages_marker" ]; then
         packages_names=""
@@ -273,8 +250,6 @@ state_json() {
         --arg tools_command "$tools_command" \
         --argjson modules "$modules_json" \
         --arg argocd_repo "$argocd_repo" \
-        --argjson docker_host "$docker_host" \
-        --argjson docker_host_active "$docker_host_active" \
         --arg clusters_services "$clusters_services_raw" \
         --argjson services_remote "$services_remote" \
         --arg clusters_work "$clusters_work_raw" \
@@ -293,8 +268,6 @@ state_json() {
             argocd_repo: (if $argocd_repo == "" then null else $argocd_repo end),
             tools: { outdated: $tools_late, command: (if $tools_command=="" then null else $tools_command end) },
             modules: $modules,
-            docker_host: $docker_host,
-            docker_hote_actif: $docker_host_active,
             clusters: { services: (if $clusters_services=="" then null else $clusters_services end), services_remote: $services_remote, work: (if $clusters_work=="" then null else $clusters_work end), internal_work: $work_internal, command: (if $clusters_command=="" then null else $clusters_command end) },
             ports: $ports,
             applications: (if $applications=="" then null else $applications end),
