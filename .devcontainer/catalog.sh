@@ -95,11 +95,9 @@ app_ready() {
 # an existing line is never changed), preceded once by the comment; reading and
 # writing hold the same lock (#417): a concurrent write cannot be lost between the two
 catalog_sync() (
-    local app header header_old missing="" tmp
+    local app header missing="" tmp
     [ -f "$ETAT" ] || return 0
     header="# Catalog applications: set to on to install (devzone catalog)"
-    # Header written before #722 (French wording): still recognised, not added twice
-    header_old="$(printf '# Applications du catalogue : passer \303\240 on pour installer (devzone catalog)')"
     state_lock_take || return 1
     # The lock is released on exit, including on an error under set -e
     trap 'state_lock_release' EXIT
@@ -112,7 +110,7 @@ catalog_sync() (
     tmp="$(mktemp)"
     {
         cat "$ETAT"
-        grep -qF -e "$header" -e "$header_old" "$ETAT" || echo "$header"
+        grep -qF -e "$header" "$ETAT" || echo "$header"
         echo "$missing"
     } >"$tmp"
     state_replace "$tmp"
