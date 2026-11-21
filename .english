@@ -220,3 +220,11 @@ manage/test/catalog-watcher.bats
 manage/test/chart-gitlab.bats
 manage/test/gitlab-argocd.bats
 manage/test/test-gitlab.bats
+.devcontainer/devzone
+.devcontainer/devzone-modules.sh
+.devcontainer/devzone-ai-guard.sh
+.devcontainer/devzone-repair.sh
+.devcontainer/devzone-version.sh
+.devcontainer/devzone-cluster.sh
+.devcontainer/devzone-platform.sh
+.devcontainer/devzone-status.sh

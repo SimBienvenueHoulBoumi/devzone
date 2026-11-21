@@ -5,14 +5,14 @@
 #   make test-cli     (ou bash manage/test/cli-terminal.sh)
 # Couvre : cibles make (help, up, shell, status, stop, down, rebuild,
 # desinstaller), commande npm (manage/devzone <dossier>, desinstaller, --version,
-# --help), commande devzone du conteneur (état, modules, module inconnu),
+# --help), commande devzone du conteneur (état, modules, unknown module),
 # scripts de démarrage (post-create.sh, startup.sh).
 # Isolation, comme functional.sh : devzone créé dans un dossier temporaire
 # (autre conteneur, autre image, autre Docker interne), volumes propres au
 # test (DEVZONE_VOLUMES), tout supprimé à la fin même en cas d'échec. Les
 # clusters de l'hôte ne sont jamais touchés : KUBECONFIG vide sur l'hôte,
 # DEVZONE_KUBE_SOURCE vers un fichier absent dans le conteneur, module
-# kubernetes désactivé avant chaque démarrage.
+# kubernetes disabled avant chaque démarrage.
 # Prérequis : Docker, Node (npx), Python 3. Durée : 10 à 15 min.
 set -uo pipefail
 
@@ -142,12 +142,12 @@ mk shell 180 0 "○ module ia" --envoyer '\$ ' $'devzone\nexit\n'
 echo "▶ Commande devzone du conteneur"
 conteneur "devzone : état" 60 0 "○ module kubernetes" "devzone"
 conteneur "devzone --help" 60 0 "devzone enable <module>" "devzone --help"
-conteneur "devzone enable ia" 600 0 "ia actif" "devzone enable ia"
-conteneur "devzone disable ia" 300 0 "ia désactivé" "devzone disable ia"
+conteneur "devzone enable ia" 600 0 "ai active" "devzone enable ia"
+conteneur "devzone disable ia" 300 0 "ai disabled" "devzone disable ia"
 conteneur "devzone enable kubernetes (aucun cluster de l'hôte)" 180 0 "no reachable cluster" "devzone enable kubernetes"
-conteneur "devzone disable kubernetes" 60 0 "kubernetes désactivé" "devzone disable kubernetes"
-conteneur "devzone enable <module inconnu> : refusé" 60 1 "module inconnu" "devzone enable nexistepas"
-conteneur "devzone <commande inconnue> : refusée" 60 1 "commande inconnue" "devzone nexistepas"
+conteneur "devzone disable kubernetes" 60 0 "kubernetes disabled" "devzone disable kubernetes"
+conteneur "devzone enable <unknown module> : refusé" 60 1 "unknown module" "devzone enable nexistepas"
+conteneur "devzone <unknown command> : refusée" 60 1 "unknown command" "devzone nexistepas"
 
 echo "▶ Scripts de démarrage, sous terminal"
 conteneur "startup.sh : sans question" 180 0 "devzone: state" "bash .devcontainer/startup.sh"

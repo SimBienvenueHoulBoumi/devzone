@@ -232,7 +232,7 @@ GETENT
     printf 'gitlab=on\n' >"$DEVZONE_ETAT"
     run bash "$DEVZONE"
     [ "$status" -eq 0 ] || false
-    [[ "$output" == *"GitLab réinstallé : si le navigateur affiche 422, supprimez les données de site de gitlab.localhost"* ]] || false
+    [[ "$output" == *"GitLab reinstalled: if the browser shows 422, delete the site data of gitlab.localhost"* ]] || false
 }
 
 @test "devzone : summary without warning if the GitLab Rails secret is kept" {
@@ -241,5 +241,5 @@ GETENT
     printf '%s\n' '{"kind":"Secret","metadata":{"name":"gitlab-rails-secret"}}' >"$SECRETS/rails-secret.yaml"
     run bash "$DEVZONE"
     [ "$status" -eq 0 ] || false
-    [[ "$output" != *"GitLab réinstallé"* ]] || false
+    [[ "$output" != *"GitLab reinstalled"* ]] || false
 }

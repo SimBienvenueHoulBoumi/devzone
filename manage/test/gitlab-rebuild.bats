@@ -220,7 +220,7 @@ current_context() {
     echo gitlab >"$DEVZONE_ETAT-echec-gitlab"
     FAKE_RUNNERS='[{"id":1}]' run bash "$DEVZONE" apply
     [ "$status" -eq 0 ] || false
-    [[ "$output" == *"déjà actif, rien à faire"* ]] || false
+    [[ "$output" == *"already active, nothing to do"* ]] || false
     [ ! -e "$DEVZONE_ETAT-echec-gitlab" ] || false
     FAKE_RUNNERS='[{"id":1}]' run bash "$DEVZONE"
     [[ "$output" == *"✔ module gitlab"* ]] || false

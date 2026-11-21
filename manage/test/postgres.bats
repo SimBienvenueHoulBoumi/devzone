@@ -315,7 +315,7 @@ wait_nohup() {
 @test "disable in a terminal: confirmation, Enter = nothing deleted" {
     active_on kind-devzone
     DEVZONE_INTERACTIF=1 run bash "$DEVZONE" disable postgres <<<""
-    [[ "$output" == *"Abandon"* ]] || false
+    [[ "$output" == *"Aborted"* ]] || false
     grep -qx 'postgres=on' "$DEVZONE_ETAT"
     ! grep -q 'delete namespace' "$BATS_TEST_TMPDIR/kubectl.log" 2>/dev/null || false
 }
@@ -349,11 +349,11 @@ wait_nohup() {
 
 @test "cluster: display, refused without --yes outside a terminal, move with --yes" {
     run bash "$DEVZONE" cluster
-    [[ "$output" == *"aucun cluster choisi"* ]] || false
+    [[ "$output" == *"no cluster chosen"* ]] || false
 
     active_on kind-devzone
     run bash "$DEVZONE" cluster
-    [[ "$output" == *"kind-devzone (kind dédié"* ]] || false
+    [[ "$output" == *"kind-devzone (dedicated kind"* ]] || false
 
     run bash "$DEVZONE" cluster docker-desktop </dev/null
     [ "$status" -eq 1 ]
@@ -375,13 +375,13 @@ wait_nohup() {
     grep -qx 'cluster=docker-desktop' "$DEVZONE_ETAT"
     [ ! -f "$BATS_TEST_TMPDIR/apply.log" ]
     run bash "$DEVZONE" cluster docker-desktop </dev/null
-    [[ "$output" == *"déjà sur docker-desktop"* ]] || false
+    [[ "$output" == *"already on docker-desktop"* ]] || false
 }
 
 @test "apply: postgres active, ready without relay → relay restarted, no reinstall" {
     active_on kind-devzone
     run bash "$DEVZONE" apply
-    [[ "$output" == *"relais relancé"* ]] || false
+    [[ "$output" == *"relay restarted"* ]] || false
     [ ! -f "$BATS_TEST_TMPDIR/apply.log" ]
 }
 

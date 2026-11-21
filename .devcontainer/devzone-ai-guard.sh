@@ -7,16 +7,16 @@
 # Docker guard for the folders that are not this repository: a Claude Code
 # PreToolUse hook in the global settings and the two opencode plugins in the
 # global plugins folder. Idempotent, other user settings and hooks preserved.
-poser_garde_docker() {
+install_docker_guard() {
     local script="$ICI/ai/docker-guard.sh" config="$HOME/.claude/settings.json"
     local src="$ICI/ai/plugins" dst="$HOME/.config/opencode/plugins"
     local tmp f
     if ! command -v jq >/dev/null 2>&1; then
-        echo "devzone : jq absent : garde-fou docker non posé pour Claude Code" >&2
+        echo "devzone : jq missing: docker guard not installed for Claude Code" >&2
     elif [ ! -f "$config" ]; then
-        echo "devzone : $config absent : garde-fou docker non posé pour Claude Code" >&2
+        echo "devzone : $config missing: docker guard not installed for Claude Code" >&2
     elif ! jq -e . "$config" >/dev/null 2>&1; then
-        echo "devzone : $config illisible (JSON invalide) : garde-fou docker non posé pour Claude Code" >&2
+        echo "devzone : $config unreadable (invalid JSON): docker guard not installed for Claude Code" >&2
     else
         tmp="$(mktemp)"
         if jq --arg cmd "bash \"$script\" --format claude" '
@@ -30,7 +30,7 @@ poser_garde_docker() {
             mv "$tmp" "$config"
         else
             rm -f "$tmp"
-            echo "devzone : $config inchangé : garde-fou docker non posé pour Claude Code" >&2
+            echo "devzone : $config unchanged: docker guard not installed for Claude Code" >&2
         fi
     fi
     mkdir -p "$dst"
@@ -38,12 +38,12 @@ poser_garde_docker() {
         [ -f "$src/$f" ] || continue
         sed "s|__DEVZONE_DOCKER_GARDE__|$script|g" "$src/$f" >"$dst/$f"
     done
-    echo "devzone : garde-fou docker actif pour Claude Code et opencode"
+    echo "devzone : docker guard active for Claude Code and opencode"
 }
 
 # Removes only the Docker guard entries (commands containing docker-guard.sh)
 # and the two plugins; the rest of settings.json and of the plugins is kept.
-retirer_garde_docker() {
+remove_docker_guard() {
     local config="$HOME/.claude/settings.json" tmp
     if [ -f "$config" ] && jq -e . "$config" >/dev/null 2>&1; then
         tmp="$(mktemp)"

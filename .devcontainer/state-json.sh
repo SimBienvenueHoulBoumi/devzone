@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Machine output of devzone status (--json): stable, versioned JSON object.
-# Sourced by devzone: reuses its functions (valeur, description, …), does not
+# Sourced by devzone: reuses its functions (value_of, description, …), does not
 # rewrite etat(). Built only with jq. JSON keys are a contract: French names kept.
 
 # Adds an entry to $errors: the section that failed and why.
@@ -40,12 +40,12 @@ state_json() {
     local relay_marker packages_marker packages_names n path wt_out
     local gh_status gh_code
 
-    if v="$(version_du_dossier 2>/dev/null)"; then
+    if v="$(folder_version 2>/dev/null)"; then
         dv_raw="$v"
     else
         add_error devzone "version_du_dossier unavailable"
     fi
-    dvp_raw="$(version_publiee 2>/dev/null || true)"
+    dvp_raw="$(published_version 2>/dev/null || true)"
 
     id_name="$(git config --get user.name 2>/dev/null || true)"
     id_email="$(git config --get user.email 2>/dev/null || true)"
@@ -55,9 +55,9 @@ state_json() {
         id_command='gh auth login -s workflow (automatic), or git config --file ~/.config/git/config user.name "<name>" and user.email "<email>"'
     fi
 
-    platform_name="$(plateforme_lue)"
+    platform_name="$(platform_read)"
     if [ "$platform_name" = gitlab ]; then
-        platform_url="$(url_gitlab_lue)"
+        platform_url="$(gitlab_url_read)"
     else
         platform_url=""
     fi
@@ -77,7 +77,7 @@ state_json() {
         github_json="null"
     fi
 
-    if late_out="$(outils_retard 2>/dev/null)"; then
+    if late_out="$(outdated_tools 2>/dev/null)"; then
         tools_late_json='[]'
         while IFS= read -r line; do
             [ -n "$line" ] || continue
@@ -101,12 +101,12 @@ state_json() {
     modules_json='[]'
     for m in "${MODULES[@]}"; do
         active=false
-        [ "$(valeur "$m")" = on ] && active=true
+        [ "$(value_of "$m")" = on ] && active=true
         desc="$(description "$m")"
         failure_value=""
         state_value=""
         command_value=""
-        if dans_pod && service_module "$m"; then
+        if in_pod && service_module "$m"; then
             # Kubernetes workspace pod (#528): presence by the cluster DNS,
             # installation from the workstation; no failure marker read here
             if service_present "$m"; then
@@ -119,7 +119,7 @@ state_json() {
                 command_value="devzone workspace services enable $m"
             fi
         elif [ "$active" = true ]; then
-            failure_file="$(fichier_echec "$m")"
+            failure_file="$(failure_marker_file "$m")"
             if [ -f "$failure_file" ]; then
                 content="$(cat "$failure_file" 2>/dev/null || true)"
                 failure_value="$content"
@@ -179,7 +179,7 @@ state_json() {
         docker_host=false
         docker_host_active=false
     else
-        if [ "$(valeur docker-hote)" = on ]; then
+        if [ "$(value_of docker-hote)" = on ]; then
             docker_host=true
         fi
         relay_source="${DEVZONE_RELAIS_SOURCE:-/var/run/docker-host.sock}"
@@ -243,7 +243,7 @@ state_json() {
         done < "$packages_marker"
         append_alert paquets "$packages_names" "devzone packages"
     fi
-    wt_out="$(worktrees_absents 2>/dev/null || true)"
+    wt_out="$(missing_worktrees 2>/dev/null || true)"
     while IFS= read -r path; do
         [ -n "$path" ] || continue
         append_alert worktree "$path missing here (created outside the container?)" ""

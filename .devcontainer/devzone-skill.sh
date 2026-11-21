@@ -5,21 +5,22 @@
 # functions only, shared variables are defined in devzone.
 
 
-# Repère de la skill devzone : posée si absente, mise à jour si elle porte le
-# repère et n'a pas été modifiée, gardée si personnalisée (#161, règle opencode).
-SKILL_REPERE='<!-- devzone : skill posée par devzone enable ia -->'
-# Empreinte de la version posée, à côté de SKILL.md : elle distingue une skill
-# non modifiée d'une skill personnalisée qui garde encore le repère.
-SKILL_EMPREINTE='.devzone-empreinte'
+# Skill marker: the file is installed if missing, updated while it carries the
+# marker and is unchanged, kept if customised (#161, opencode rule). The marker
+# text is the one written in SKILL.md: it is kept as is.
+SKILL_MARKER='<!-- devzone : skill posée par devzone enable ia -->'
+# Fingerprint of the installed version, next to SKILL.md: it tells an unchanged
+# skill from a customised one that still carries the marker.
+SKILL_FINGERPRINT='.devzone-empreinte'
 
-# Dossiers de la skill devzone, dans les volumes de Claude Code et opencode.
-skill_dossiers() {
+# Folders of the devzone skill, in the volumes of Claude Code and opencode.
+skill_dirs() {
     echo "$HOME/.claude/skills/devzone"
     echo "$HOME/.config/opencode/skills/devzone"
 }
 
-# Somme sha256 d'un fichier (sha256sum sous Linux, shasum sous macOS).
-skill_somme() {
+# sha256 sum of a file (sha256sum on Linux, shasum on macOS).
+skill_checksum() {
     if command -v sha256sum >/dev/null 2>&1; then
         sha256sum "$1" | cut -d' ' -f1
     else
@@ -27,69 +28,69 @@ skill_somme() {
     fi
 }
 
-# Vrai si la skill cible est encore celle posée : empreinte enregistrée, ou à
-# défaut contenu identique au modèle.
-skill_inchangee() {
-    local cible="$1" empreinte="$2" modele="$3"
-    if [ -n "$empreinte" ]; then
-        [ "$(skill_somme "$cible")" = "$empreinte" ]
+# True if the target skill is still the installed one: recorded fingerprint,
+# or else content identical to the model.
+skill_unchanged() {
+    local target="$1" fingerprint="$2" model="$3"
+    if [ -n "$fingerprint" ]; then
+        [ "$(skill_checksum "$target")" = "$fingerprint" ]
     else
-        cmp -s "$modele" "$cible"
+        cmp -s "$model" "$target"
     fi
 }
 
-# Pose la skill devzone (modèle versionné) : écrite si absente, mise à jour
-# tant qu'elle garde le repère et l'empreinte posée, gardée si personnalisée.
-poser_skill_devzone() {
-    local modele="$ICI/skills/devzone/SKILL.md" repere cible d empreinte
-    repere="$SKILL_REPERE"
-    for d in $(skill_dossiers); do
+# Installs the devzone skill (versioned model): written if missing, updated
+# while it keeps the marker and the installed fingerprint, kept if customised.
+install_devzone_skill() {
+    local model="$ICI/skills/devzone/SKILL.md" marker target d fingerprint
+    marker="$SKILL_MARKER"
+    for d in $(skill_dirs); do
         mkdir -p "$d"
-        cible="$d/SKILL.md"
-        if [ ! -f "$cible" ]; then
-            cp "$modele" "$cible"
-            skill_somme "$cible" >"$d/$SKILL_EMPREINTE"
-            echo "devzone : skill devzone posée dans $d"
+        target="$d/SKILL.md"
+        if [ ! -f "$target" ]; then
+            cp "$model" "$target"
+            skill_checksum "$target" >"$d/$SKILL_FINGERPRINT"
+            echo "devzone : devzone skill installed in $d"
             continue
         fi
-        empreinte=""
-        if [ -f "$d/$SKILL_EMPREINTE" ]; then
-            empreinte="$(cat "$d/$SKILL_EMPREINTE")"
+        fingerprint=""
+        if [ -f "$d/$SKILL_FINGERPRINT" ]; then
+            fingerprint="$(cat "$d/$SKILL_FINGERPRINT")"
         fi
-        if grep -qF "$repere" "$cible" && skill_inchangee "$cible" "$empreinte" "$modele"; then
-            if ! cmp -s "$modele" "$cible"; then
-                cp "$modele" "$cible"
-                echo "devzone : skill devzone mise à jour dans $d"
+        if grep -qF "$marker" "$target" && skill_unchanged "$target" "$fingerprint" "$model"; then
+            if ! cmp -s "$model" "$target"; then
+                cp "$model" "$target"
+                echo "devzone : devzone skill updated in $d"
             fi
-            skill_somme "$cible" >"$d/$SKILL_EMPREINTE"
+            skill_checksum "$target" >"$d/$SKILL_FINGERPRINT"
         else
-            echo "devzone : skill devzone personnalisée dans $d, gardée"
+            echo "devzone : customised devzone skill in $d, kept"
         fi
     done
 }
 
-# Retire la skill devzone écrite par devzone si elle porte encore son repère
-# et n'a pas été modifiée ; une skill personnalisée est gardée. Symétrique de
-# poser_skill_devzone.
-retirer_skill_devzone() {
-    local repere modele cible d empreinte
-    repere="$SKILL_REPERE"
-    modele="$ICI/skills/devzone/SKILL.md"
-    for d in $(skill_dossiers); do
-        cible="$d/SKILL.md"
-        if [ ! -f "$cible" ]; then
-            rm -f "$d/$SKILL_EMPREINTE"
+# Removes the devzone skill written by devzone if it still carries its marker
+# and was not changed; a customised skill is kept. Symmetrical with
+# install_devzone_skill.
+remove_devzone_skill() {
+    local marker model target d fingerprint
+    marker="$SKILL_MARKER"
+    model="$ICI/skills/devzone/SKILL.md"
+    for d in $(skill_dirs); do
+        target="$d/SKILL.md"
+        if [ ! -f "$target" ]; then
+            rm -f "$d/$SKILL_FINGERPRINT"
             continue
         fi
-        empreinte=""
-        if [ -f "$d/$SKILL_EMPREINTE" ]; then
-            empreinte="$(cat "$d/$SKILL_EMPREINTE")"
+        fingerprint=""
+        if [ -f "$d/$SKILL_FINGERPRINT" ]; then
+            fingerprint="$(cat "$d/$SKILL_FINGERPRINT")"
         fi
-        if grep -qF "$repere" "$cible" && skill_inchangee "$cible" "$empreinte" "$modele"; then
-            rm -f "$cible" "$d/$SKILL_EMPREINTE"
-            echo "devzone : skill devzone retirée de $d"
+        if grep -qF "$marker" "$target" && skill_unchanged "$target" "$fingerprint" "$model"; then
+            rm -f "$target" "$d/$SKILL_FINGERPRINT"
+            echo "devzone : devzone skill removed from $d"
         else
-            echo "devzone : skill devzone personnalisée dans $d, gardée"
+            echo "devzone : customised devzone skill in $d, kept"
         fi
     done
 }

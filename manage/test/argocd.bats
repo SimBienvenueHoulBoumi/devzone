@@ -147,7 +147,7 @@ wait_nohup() {
     rm -f "$BATS_TEST_TMPDIR/helm.log"
     run bash "$DEVZONE" enable argocd </dev/null
     [ "$status" -eq 0 ]
-    [[ "$output" == *"relais relancé"* ]] || false
+    [[ "$output" == *"relay restarted"* ]] || false
     [ ! -f "$BATS_TEST_TMPDIR/helm.log" ]
     wait_nohup '8443:443'
 }

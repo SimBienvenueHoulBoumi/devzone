@@ -759,7 +759,7 @@ Avec le module `argocd` installé et joignable, `devzone enable postgres|mysql` 
 - **`devzone disable postgres|mysql`** : l'Application part avec ses ressources ; le namespace et les volumes restent, puis le retrait habituel de l'service suit.
 - **`devzone disable argocd`** : les Applications de `postgres`, `mysql` et `gitlab` sont retirées *sans* leurs ressources (finalizer retiré d'abord, `gitops_delete_application … keep`) ; `[services]` passe à `off` pour postgres et mysql. Argo CD est ensuite désinstallé et les services restent, sous helm direct, sans être recréés (adoption par `kubectl apply`, voir `postgres.sh` et `mysql.sh`).
 - **GitLab** garde son Application de l'étape 4 (`gitlab/argocd.sh`) : son namespace peut porter un suffixe d'instance, que la réconciliation (`services_ns_of`) ne connaît pas.
-- Le hook est `.devcontainer/argocd/services-hook.sh`, appelé par `changer` de `devzone` ; code de retour 0 (fait par Argo CD), 3 (chemin helm direct), 1 (échec).
+- Le hook est `.devcontainer/argocd/services-hook.sh`, appelé par `change_module` de `devzone` ; code de retour 0 (fait par Argo CD), 3 (chemin helm direct), 1 (échec).
 
 ### Compte limité aux namespaces devzone
 

@@ -4,73 +4,73 @@
 # Sourced by .devcontainer/devzone (split of the 1 600 lines file, #722):
 # functions only, shared variables are defined in devzone.
 
-# État complet : ✔ prêt, ✖ nécessaire, ○ facultatif, ⚠ à corriger ; chaque
-# point à faire avec sa commande (affiché à chaque démarrage)
-etat() {
-    local nom email statut m retards chemin ports_etat relais_marque ctx_travail ctx_hote paquets_marque paquets_noms argocd_repo
+# Full state: ✔ ready, ✖ required, ○ optional, ⚠ to fix; each point to do with
+# its command (shown at each startup)
+show_state() {
+    local name email status m late path ports_state relay_mark ctx_work ctx_host packages_mark packages_names argocd_repo
     echo "devzone: state (devzone to show it again)"
-    ligne_version_disponible
-    nom="$(git config --get user.name || true)"
+    version_available_line
+    name="$(git config --get user.name || true)"
     email="$(git config --get user.email || true)"
-    if [ -n "$nom" ] && [ -n "$email" ]; then
-        echo "  ✔ git identity    $nom <$email>"
+    if [ -n "$name" ] && [ -n "$email" ]; then
+        echo "  ✔ git identity    $name <$email>"
     else
         echo "  ✖ git identity    needed to commit: gh auth login -s workflow (automatic),"
-        echo "                    ou git config --file ~/.config/git/config user.name \"<nom>\" et user.email \"<email>\""
+        echo "                    or git config --file ~/.config/git/config user.name \"<name>\" and user.email \"<email>\""
     fi
-    if [ "$(plateforme_lue)" = gitlab ]; then
-        # Plateforme gitlab : l'instance et glab, puis les lignes propres à
-        # GitHub (contrôles gh) signalées comme non applicables ici, en
-        # attendant le support GitLab de repowarden (#531)
-        ligne_plateforme
-        url="$(url_gitlab_lue)"
+    if [ "$(platform_read)" = gitlab ]; then
+        # gitlab platform: the instance and glab, then the lines specific to
+        # GitHub (gh checks) reported as not applicable here, pending the GitLab
+        # support of repowarden (#531)
+        platform_line
+        url="$(gitlab_url_read)"
         if git config --global --get "credential.$url.helper" 2>/dev/null | grep -q 'glab auth git-credential'; then
             echo "  ✔ git via glab"
         else
             echo "  ⚠ git via glab    to set: devzone platform gitlab"
         fi
-        echo "  ○ GitHub          inutile ici (plateforme gitlab choisie)"
-        echo "  ⚠ repowarden      reste sur GitHub (bots et tickets) : support GitLab à venir (simdevWarden/repowarden#531)"
+        echo "  ○ GitHub          not needed here (gitlab platform chosen)"
+        echo "  ⚠ repowarden      stays on GitHub (bots and tickets): GitLab support coming (simdevWarden/repowarden#531)"
     else
-        ligne_plateforme
-        if ! statut="$(gh auth status 2>&1)"; then
+        platform_line
+        if ! status="$(gh auth status 2>&1)"; then
             echo "  ○ GitHub          optional (push and PR, repowarden tickets) : gh auth login -s workflow"
-        elif grep -q "Token scopes:" <<<"$statut" && ! grep -q "'workflow'" <<<"$statut"; then
-            echo "  ⚠ GitHub          connecté, sans permission workflow (push de .github/workflows/ refusé) : gh auth refresh -h github.com -s workflow"
+        elif grep -q "Token scopes:" <<<"$status" && ! grep -q "'workflow'" <<<"$status"; then
+            echo "  ⚠ GitHub          connected, without workflow permission (push of .github/workflows/ refused): gh auth refresh -h github.com -s workflow"
         else
-            echo "  ✔ GitHub          connecté"
+            echo "  ✔ GitHub          connected"
         fi
     fi
-    if retards="$(outils_retard)"; then
-        if [ -z "$retards" ]; then
+    if late="$(outdated_tools)"; then
+        if [ -z "$late" ]; then
             echo "  ✔ tools          pinned versions"
         else
-            while read -r paquet figee installee; do
-                [ -n "$paquet" ] || continue
-                echo "  ⚠ tools          $paquet $installee installed, $figee pinned: devzone apply"
-            done <<<"$retards"
+            while read -r package pinned installed; do
+                [ -n "$package" ] || continue
+                echo "  ⚠ tools          $package $installed installed, $pinned pinned: devzone apply"
+            done <<<"$late"
         fi
     fi
-    while IFS= read -r chemin; do
-        [ -n "$chemin" ] || continue
-        echo "  ⚠ worktree        $chemin absent ici (créé hors du conteneur ?) : le gérer de ce côté-là, jamais git worktree prune ici (manage/docs/reference.md, Worktrees git)"
-    done < <(worktrees_absents)
+    while IFS= read -r path; do
+        [ -n "$path" ] || continue
+        echo "  ⚠ worktree        $path absent here (created outside the container?): manage it on that side, never git worktree prune here (manage/docs/reference.md, Git worktrees)"
+    done < <(missing_worktrees)
     for m in "${MODULES[@]}"; do
-        if dans_pod && service_module "$m"; then
+        if in_pod && service_module "$m"; then
             # Kubernetes workspace pod (#528): presence by the cluster DNS
-            service_ligne_pod "$m"
-        elif [ "$(valeur "$m")" = on ] && [ -f "$(fichier_echec "$m")" ]; then
-            printf '  ✖ module %-10s failed: incomplete install (%s): devzone apply\n' "$m" "$(cat "$(fichier_echec "$m")")"
-        elif [ "$(valeur "$m")" = on ] && [ "$m" = gitlab ]; then
-            # GitLab actif : son état réel (prêt, runner, en échec)
+            service_pod_line "$m"
+        elif [ "$(value_of "$m")" = on ] && [ -f "$(failure_marker_file "$m")" ]; then
+            printf '  ✖ module %-10s failed: incomplete install (%s): devzone apply\n' "$m" "$(cat "$(failure_marker_file "$m")")"
+        elif [ "$(value_of "$m")" = on ] && [ "$m" = gitlab ]; then
+            # gitlab active: its real state (ready, runner, failed)
             printf '  ✔ module %-10s %s\n' "$m" "$(bash "$ICI/gitlab/gitlab.sh" status)"
-        elif [ "$(valeur "$m")" = on ] && [ "$m" = postgres ]; then
+        elif [ "$(value_of "$m")" = on ] && [ "$m" = postgres ]; then
             printf '  ✔ module %-10s %s\n' "$m" "$(bash "$ICI/$m/$m.sh" status)"
-        elif [ "$(valeur "$m")" = on ] && [ "$m" = argocd ]; then
+        elif [ "$(value_of "$m")" = on ] && [ "$m" = argocd ]; then
             printf '  ✔ module %-10s %s\n' "$m" "$(bash "$ICI/argocd/argocd.sh" status)"
-        elif [ "$(valeur "$m")" = on ] && [ "$m" = mysql ]; then
+        elif [ "$(value_of "$m")" = on ] && [ "$m" = mysql ]; then
             printf '  ✔ module %-10s %s\n' "$m" "$(bash "$ICI/catalog/mysql/mysql.sh" status)"
-        elif [ "$(valeur "$m")" = on ]; then
+        elif [ "$(value_of "$m")" = on ]; then
             printf '  ✔ module %-10s active: %s\n' "$m" "$(description "$m")"
         else
             printf '  ○ module %-10s optional, %s: devzone enable %s\n' "$m" "$(description "$m")" "$m"
@@ -80,84 +80,84 @@ etat() {
     argocd_repo="$(conf_get argocd repo)"
     if [ -n "$argocd_repo" ] && [ "$argocd_repo" != none ]; then
         printf '  ○ argocd          GitOps repository: %s\n' "$argocd_repo"
-    elif dans_pod; then
+    elif in_pod; then
         gitops_state_line
     else
         printf '  ○ argocd          no GitOps repository: devzone argocd init\n'
     fi
-    # Socket Docker de l'hôte (#432) : l'avertissement montre l'état réel,
-    # le socket monté (même variable que docker-relay.sh), pas l'option :
-    # le montage ne change qu'au make rebuild (faux rassurant en attendant)
+    # Host Docker socket (#432): the warning shows the real state, the mounted
+    # socket (same variable as docker-relay.sh), not the option: the mount only
+    # changes at make rebuild (a reassuring false answer until then)
     # In the Kubernetes workspace (DEVZONE_WORKSPACE=kubernetes), the pod has
     # no Docker host socket: no alert, the service account is the cluster access
     if [ "${DEVZONE_WORKSPACE:-}" = kubernetes ]; then
         printf '  ✔ workspace       Kubernetes pod, service account access only (no Docker socket)\n'
     else
-        relais_source="${DEVZONE_RELAIS_SOURCE:-/var/run/docker-host.sock}"
-        if [ -e "$relais_source" ] && [ "$(valeur docker-hote)" = on ]; then
-            printf '  ⚠ socket Docker de l hôte partagé (agents compris)\n'
-        elif [ -e "$relais_source" ]; then
-            printf '  ⚠ socket Docker de l hôte encore partagé : make rebuild sur le poste\n'
-        elif [ "$(valeur docker-hote)" = on ]; then
-            printf '  ⚠ socket Docker de l hôte absent : make rebuild sur le poste\n'
+        relay_source="${DEVZONE_RELAIS_SOURCE:-/var/run/docker-host.sock}"
+        if [ -e "$relay_source" ] && [ "$(value_of docker-hote)" = on ]; then
+            printf '  ⚠ host Docker socket shared (agents included)\n'
+        elif [ -e "$relay_source" ]; then
+            printf '  ⚠ host Docker socket still shared: make rebuild on the workstation\n'
+        elif [ "$(value_of docker-hote)" = on ]; then
+            printf '  ⚠ host Docker socket absent: make rebuild on the workstation\n'
         fi
     fi
-    # Applications du catalogue (#414)
+    # Catalog applications (#414)
     if [ -d "$ICI/catalog" ]; then
         bash "$ICI/catalog.sh" resume
     fi
-    # Secret Rails GitLab (#347) : avertissement si les secrets ont été perdus
-    if [ "$(valeur gitlab)" = on ] && [ ! -f "$RACINE/workspace/.gitlab/rails-secret.yaml" ]; then
-        echo "  ⚠ gitlab          GitLab réinstallé : si le navigateur affiche 422, supprimez les données de site de gitlab.localhost"
+    # GitLab Rails secret (#347): warning if the secrets were lost
+    if [ "$(value_of gitlab)" = on ] && [ ! -f "$RACINE/workspace/.gitlab/rails-secret.yaml" ]; then
+        echo "  ⚠ gitlab          GitLab reinstalled: if the browser shows 422, delete the site data of gitlab.localhost"
     fi
-    # Cluster de devzone distant : avertissement dans le récapitulatif
-    cluster_actuel="$(cluster_saved)"
-    if [ -n "$cluster_actuel" ] && ! cluster_is_local "$cluster_actuel"; then
-        printf '  ⚠ cluster        remote: %s — services on a remote cluster\n' "$cluster_actuel"
+    # Remote devzone cluster: warning in the summary
+    current_cluster="$(cluster_saved)"
+    if [ -n "$current_cluster" ] && ! cluster_is_local "$current_cluster"; then
+        printf '  ⚠ cluster        remote: %s — services on a remote cluster\n' "$current_cluster"
     fi
-    # Ancien cluster kind-gitlab encore présent : inviter à migrer (#396)
+    # Old kind-gitlab cluster still present: invite to migrate (#396)
     if kind get clusters 2>/dev/null | grep -qx "gitlab${INSTANCE_SUFFIX}"; then
         printf '  ⚠ old kind-gitlab cluster%s: devzone gitlab migrate\n' "$INSTANCE_SUFFIX"
     fi
-    # Cluster de travail interne (kind) : avertissement dans le recapitulatif
-    ctx_travail="$(kubectl config current-context 2>/dev/null || true)"
-    case "$ctx_travail" in
+    # Internal working cluster (kind): warning in the summary
+    ctx_work="$(kubectl config current-context 2>/dev/null || true)"
+    case "$ctx_work" in
         kind-gitlab* | kind-devzone*)
-            ctx_hote="$(KUBECONFIG="${DEVZONE_KUBE_HOTE:-$HOME/.kube/hote.config}" kubectl config current-context 2>/dev/null || true)"
-            if [ -n "$ctx_hote" ] && cluster_reachable "$ctx_hote"; then
-                printf '  ⚠ cluster de travail : %s (cluster interne de devzone) ; revenir : devzone use %s\n' "$ctx_travail" "$ctx_hote"
+            ctx_host="$(KUBECONFIG="${DEVZONE_KUBE_HOTE:-$HOME/.kube/hote.config}" kubectl config current-context 2>/dev/null || true)"
+            if [ -n "$ctx_host" ] && cluster_reachable "$ctx_host"; then
+                printf '  ⚠ working cluster: %s (devzone internal cluster); go back: devzone use %s\n' "$ctx_work" "$ctx_host"
             fi
             ;;
     esac
-    # Contrôle RBAC : vérification d'accès aux secrets PostgreSQL
+    # RBAC check: access check to the PostgreSQL secrets
     ctx_rbac="$(kubectl auth can-i --as=system:serviceaccount:default:default get secrets -n devzone-postgres 2>/dev/null || true)"
     if [ "$ctx_rbac" = "yes" ]; then
-        printf '  ⚠ rbac          : accès aux secrets devzone-postgres non restreint\n'
+        printf '  ⚠ rbac          : access to devzone-postgres secrets not restricted\n'
     fi
-    ports_etat="$(bash "$ICI/ports.sh" resume 2>/dev/null || true)"
-    case "$ports_etat" in
-        none*) printf '  ○ ports to the workstation %s\n' "$ports_etat" ;;
-        *) printf '  ✔ ports to the workstation %s\n' "$ports_etat" ;;
+    ports_state="$(bash "$ICI/ports.sh" resume 2>/dev/null || true)"
+    case "$ports_state" in
+        none*) printf '  ○ ports to the workstation %s\n' "$ports_state" ;;
+        *) printf '  ✔ ports to the workstation %s\n' "$ports_state" ;;
     esac
-    # Identifiants regroupés (#332) : le chemin seulement, jamais le contenu
+    # Grouped credentials (#332): the path only, never the content
     if [ -f "$RACINE/.password" ]; then
         printf '  ○ credentials: %s\n' "$RACINE/.password"
     fi
-    # Marque posée par docker-relay.sh au démarrage (#293) : docker exec
-    # longs coupés, kind et modules en échec
-    relais_marque="${DEVZONE_RELAIS_MARQUE:-/tmp/devzone-relais-docker.echec}"
-    if [ -f "$relais_marque" ]; then
-        printf '  ⚠ Docker relay     %s: devzone repair\n' "$(head -1 "$relais_marque")"
+    # Mark set by docker-relay.sh at startup (#293): long docker exec cut,
+    # kind and modules in failure
+    relay_mark="${DEVZONE_RELAIS_MARQUE:-/tmp/devzone-relais-docker.echec}"
+    if [ -f "$relay_mark" ]; then
+        printf '  ⚠ Docker relay     %s: devzone repair\n' "$(head -1 "$relay_mark")"
     fi
-    # Marque posee par packages.sh a l echec de reapplication (351) : noms des paquets non installes
-    paquets_marque="${DEVZONE_PAQUETS_MARQUE:-/tmp/devzone-paquets.echec}"
-    if [ -f "$paquets_marque" ]; then
-        paquets_noms=""
+    # Mark set by packages.sh at the failed reapplication (351): names of the packages not installed
+    packages_mark="${DEVZONE_PAQUETS_MARQUE:-/tmp/devzone-paquets.echec}"
+    if [ -f "$packages_mark" ]; then
+        packages_names=""
         while IFS= read -r n; do
             if [ -n "$n" ]; then
-                paquets_noms="${paquets_noms:+$paquets_noms, }$n"
+                packages_names="${packages_names:+$packages_names, }$n"
             fi
-        done < "$paquets_marque"
-        echo "  ⚠ packages         $paquets_noms: devzone packages"
+        done < "$packages_mark"
+        echo "  ⚠ packages         $packages_names: devzone packages"
     fi
 }

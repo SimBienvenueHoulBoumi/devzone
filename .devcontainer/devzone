@@ -1,16 +1,15 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2034 # shared variables, read by the sourced devzone-*.sh
-# Aide de devzone (devzone --help) : .devcontainer/help.sh, sourcé ci-dessous.
+# devzone help (devzone --help): .devcontainer/help.sh, sourced below.
 #
-# État propre à chaque instance : $RACINE/.devzone.modules (dossier monté
-# de l'hôte, survit aux rebuilds), une ligne « module=on|off » ; la plateforme
-# choisie y est gardée aussi (plateforme=, gitlab_url=), et le cluster des
-# services (cluster=, voir cluster.sh) ; l'ancien état
-# global (~/.config/devzone/modules) est repris une fois
+# Per-instance state: $RACINE/.devzone.modules (a folder mounted from the host,
+# survives rebuilds), one line "module=on|off"; the chosen platform is kept
+# there too (plateforme=, gitlab_url=), and the services cluster (cluster=, see
+# cluster.sh); the old global state (~/.config/devzone/modules) is read once
 set -euo pipefail
 
-# Dossier du script, liens symboliques suivis à la main : readlink -f n'existe
-# pas sur macOS (tests sous bash 3.2).
+# Script folder, symbolic links followed by hand: readlink -f does not exist
+# on macOS (tests under bash 3.2).
 SOURCE="${BASH_SOURCE[0]}"
 while [ -L "$SOURCE" ]; do
     DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
@@ -25,9 +24,9 @@ ICI="$(cd -P "$(dirname "$SOURCE")" && pwd)"
 # shellcheck disable=SC1091
 . "$ICI/help.sh"
 VERSIONS="$ICI/../manage/scripts/versions.sh"
-# Dossier de devzone (/workspaces/devzone) ; DEVZONE_RACINE pour les tests
+# devzone folder (/workspaces/devzone); DEVZONE_RACINE for the tests
 RACINE="${DEVZONE_RACINE:-$(dirname "$ICI")}"
-# État par défaut de l'instance ; DEVZONE_ETAT garde la priorité (tests, CI)
+# Default state of the instance; DEVZONE_ETAT takes precedence (tests, CI)
 ETAT="${DEVZONE_ETAT:-$RACINE/.devzone.modules}"
 MODULES=(ia kubernetes gitlab postgres argocd mysql)
 # shellcheck source=SCRIPTDIR/cluster.sh
@@ -60,10 +59,10 @@ fi
 # shellcheck disable=SC1091
 . "$ICI/ai/host-check.sh"
 
-# Assistants IA, versions figées : mettre à jour ici, puis devzone apply
-# (ou Rebuild Container). Une ligne par paquet, séparées par une ligne qui ne
-# change pas : deux montées simultanées (workflow versions) se fusionnent sans
-# conflit, git n'en signalant qu'entre lignes voisines modifiées.
+# AI assistants, pinned versions: update here, then devzone apply (or Rebuild
+# Container). One line per package, separated by a line that does not change:
+# two simultaneous bumps (versions workflow) merge without conflict, git only
+# reporting neighbouring lines changed.
 # Claude Code
 IA_CLAUDE=@anthropic-ai/claude-code@2.1.329
 # opencode
@@ -71,16 +70,16 @@ IA_OPENCODE=opencode-ai@1.19.6
 IA_PAQUETS=("$IA_CLAUDE" "$IA_OPENCODE")
 IA_NOMS=("${IA_CLAUDE%@*}" "${IA_OPENCODE%@*}")
 
-# glab (CLI GitLab), installé seulement quand la plateforme gitlab est
-# choisie : binaire de la release officielle (gitlab.com/gitlab-org/cli)
-# dans ~/.local/bin, somme SHA-256 de son archive vérifiée ; retiré au
-# retour à github. Tous ses appels passent par ce chemin (jamais le PATH :
-# ~/.local/bin n'y est pas forcément) ; l'état et la connexion aussi.
+# glab (GitLab CLI), installed only when the gitlab platform is chosen: binary
+# of the official release (gitlab.com/gitlab-org/cli) in ~/.local/bin, SHA-256
+# sum of its archive checked; removed when going back to github. All its calls
+# go through this path (never PATH: ~/.local/bin is not necessarily in it); the
+# state and the login too.
 GLAB="$HOME/.local/bin/glab"
 GLAB_VERSION=v1.126.0
 GLAB_SOMME_ARM64=de5e92c9c8b306eeebb19daa854d48101b78328850e7b9cd677ecd6f98cd4391
 GLAB_SOMME_AMD64=f386519ba83e9482979992ee7f60eeebee4d95b950f95f4fe7289e0a1b1ea74c
-# Instance du module gitlab : son URL d'office et le jeton root de son seed
+# gitlab module instance: its default URL and the root token of its seed
 GITLAB_URL_MODULE=http://gitlab.localhost:8929
 
 # Functions of devzone, by topic (sourced here, defined before any command runs)
@@ -128,28 +127,28 @@ if command -v reject_renamed >/dev/null 2>&1; then
 fi
 
 case "${1:-}" in
-    "" | status | modules) if [ "${2:-}" = "--json" ]; then state_json; else etat; fi ;;
-    enable) changer on "${2:-}" "${@:3}" ;;
-    disable) changer off "${2:-}" "${@:3}" ;;
+    "" | status | modules) if [ "${2:-}" = "--json" ]; then state_json; else show_state; fi ;;
+    enable) change_module on "${2:-}" "${@:3}" ;;
+    disable) change_module off "${2:-}" "${@:3}" ;;
     apply)
-        migrer_llm
-        # L'utilisateur confirme l'état courant (#417, étape 4) : les
-        # veilleurs peuvent de nouveau désinstaller
+        migrate_llm
+        # The user confirms the current state (#417, step 4): the watchers
+        # may uninstall again
         state_recovery_confirm
-        appliquer_repowarden
-        [ "$(valeur ia)" = off ] || appliquer_ia on
+        apply_repowarden
+        [ "$(value_of ia)" = off ] || apply_ia on
         # gitlab, postgres, argocd: installed from the workstation in the
         # Kubernetes workspace pod (#528), by their installer elsewhere
-        [ "$(valeur gitlab)" = off ] || appliquer_service gitlab
-        [ "$(valeur postgres)" = off ] || appliquer_service postgres
-        [ "$(valeur mysql)" = off ] || appliquer_mysql on
-        [ "$(valeur argocd)" = off ] || appliquer_service argocd
+        [ "$(value_of gitlab)" = off ] || apply_service gitlab
+        [ "$(value_of postgres)" = off ] || apply_service postgres
+        [ "$(value_of mysql)" = off ] || apply_mysql on
+        [ "$(value_of argocd)" = off ] || apply_service argocd
         ;;
     is-enabled)
-        connu "${2:-}" || { echo "devzone : module inconnu : ${2:-(aucun)}" >&2; exit 2; }
-        # Test silencieux, appelé par les scripts de démarrage : code 0 si le
-        # module est actif, 1 sinon, sans rien écrire (kube-config.sh:16)
-        [ "$(valeur "$2")" = on ]
+        is_known "${2:-}" || { echo "devzone : unknown module : ${2:-(none)}" >&2; exit 2; }
+        # Silent test, called by the startup scripts: code 0 if the module is
+        # active, 1 otherwise, without writing anything (kube-config.sh:16)
+        [ "$(value_of "$2")" = on ]
         ;;
     agent)
         bash "$ICI/agent.sh" "${@:2}"
@@ -166,16 +165,16 @@ case "${1:-}" in
                 ;;
             *)
                 # Read-only: lists the host (Ollama) models detected and the default model.
-                liste="$(modeles)"
-                def="$(premier)"
-                if [ -z "$liste" ]; then
-                    echo "devzone : aucun modèle Ollama détecté sur ${URL} (répondez sur /api/tags)"
+                models_list="$(modeles)"
+                default_model="$(premier)"
+                if [ -z "$models_list" ]; then
+                    echo "devzone : no Ollama model detected on ${URL} (answer on /api/tags)"
                 else
-                    echo "devzone : modèles détectés sur l'hôte (Ollama) :"
+                    echo "devzone : models detected on the host (Ollama):"
                     while IFS= read -r m; do
                         [ -n "$m" ] && printf '  %s\n' "$m"
-                    done <<<"$liste"
-                    echo "modèle par défaut : ${def:-aucun}"
+                    done <<<"$models_list"
+                    echo "default model: ${default_model:-none}"
                 fi
                 ;;
         esac
@@ -184,12 +183,12 @@ case "${1:-}" in
     build)
         bash "$ICI/workspace-build.sh" "${@:2}"
         ;;
-    repair) reparer ;;
+    repair) repair_workstation ;;
     start) bash "$ICI/startup.sh" ;;
     metrics) bash "$ICI/metrics-server.sh" "${@:2}" ;;
-    use) utiliser "${@:2}" ;;
+    use) use_cluster "${@:2}" ;;
     clusters) DEVZONE_ETAT="$ETAT" bash "$ICI/clusters.sh" "${@:2}" ;;
-    cluster) changer_cluster "${@:2}" ;;
+    cluster) change_cluster "${@:2}" ;;
     postgres) DEVZONE_ETAT="$ETAT" bash "$ICI/postgres/postgres.sh" "${@:2}" ;;
     mysql) DEVZONE_ETAT="$ETAT" bash "$ICI/catalog/mysql/mysql.sh" "${@:2}" ;;
     gitlab) DEVZONE_ETAT="$ETAT" bash "$ICI/gitlab/gitlab.sh" "${@:2}" ;;
@@ -199,7 +198,7 @@ case "${1:-}" in
     packages) bash "$ICI/packages.sh" "${@:2}" ;;
     passwords)
         bash "$ICI/password.sh" regenerer ||
-            echo "devzone : identifiants regroupés non mis à jour" >&2
+            echo "devzone : grouped credentials not updated" >&2
         bash "$ICI/password.sh" chemin
         ;;
     -h | --help | help) devzone_aide ;;
@@ -208,13 +207,13 @@ case "${1:-}" in
     test-gitlab) DEVZONE_ETAT="$ETAT" bash "$ICI/gitlab/test-gitlab.sh" "${@:2}" ;;
     platform)
         if [ -n "${2:-}" ]; then
-            changer_plateforme "${@:2}"
+            change_platform "${@:2}"
         else
-            resume_plateforme
+            platform_summary
         fi
         ;;
     *)
-        echo "devzone : commande inconnue : $1 (devzone --help)" >&2
+        echo "devzone : unknown command : $1 (devzone --help)" >&2
         exit 1
         ;;
 esac

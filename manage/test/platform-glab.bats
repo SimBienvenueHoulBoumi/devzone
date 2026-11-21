@@ -135,6 +135,6 @@ nombre_reglages_credential() {
     mkdir -p "$GIT_CONFIG_GLOBAL"
     run bash "$DEVZONE" platform gitlab --url "$INSTANCE"
     [ "$status" -ne 0 ]
-    [[ "$output" == *"réglage git credential impossible"* ]] || false
+    [[ "$output" == *"cannot set the git credential"* ]] || false
     ! grep -q '^plateforme=' "$DEVZONE_ETAT" 2>/dev/null || false
 }

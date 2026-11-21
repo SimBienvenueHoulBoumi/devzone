@@ -112,10 +112,10 @@ KUBE
 @test "repair: each repaired element and code 0" {
     run bash "$APP" repair
     [ "$status" -eq 0 ]
-    [[ "$output" == *"✔ relais Docker"* ]] || false
-    [[ "$output" == *"✔ relais de ports"* ]] || false
-    [[ "$output" == *"✔ veilleur ports auto"* ]] || false
-    [[ "$output" == *"✔ identifiants"* ]] || false
+    [[ "$output" == *"✔ Docker relay"* ]] || false
+    [[ "$output" == *"✔ ports relay"* ]] || false
+    [[ "$output" == *"✔ ports auto watcher"* ]] || false
+    [[ "$output" == *"✔ credentials"* ]] || false
     [[ "$(cat "$T/actions.log")" == *"relais oui"* ]] || false
     [[ "$(cat "$T/actions.log")" == *"ports restart"* ]] || false
     [[ "$(cat "$T/actions.log")" == *"ports-auto demarrer"* ]] || false
@@ -136,21 +136,21 @@ KUBE
     printf 'cluster=docker-desktop\n' >"$DEVZONE_ETAT"
     run bash "$APP" repair
     [ "$status" -eq 0 ]
-    [[ "$output" == *"✔ compte kubernetes"* ]] || false
+    [[ "$output" == *"✔ kubernetes account"* ]] || false
     grep -q 'create token devzone-agent -n devzone-system --duration=24h' "$T/kubectl.log" || false
 }
 
 @test "repair: without a services cluster, no kubernetes account token" {
     run bash "$APP" repair
     [ "$status" -eq 0 ]
-    [[ "$output" != *"compte kubernetes"* ]] || false
+    [[ "$output" != *"kubernetes account"* ]] || false
     ! grep -q 'create token' "$T/kubectl.log" 2>/dev/null || false
 }
 
 @test "repair: starts the catalog watcher" {
     run bash "$APP" repair
     [ "$status" -eq 0 ]
-    [[ "$output" == *"✔ veilleur catalogue"* ]] || false
+    [[ "$output" == *"✔ catalog watcher"* ]] || false
     [[ "$(cat "$T/actions.log")" == *"catalog-watcher demarrer"* ]] || false
 }
 
@@ -158,7 +158,7 @@ KUBE
     : >"$T/echec-password"
     run bash "$APP" repair
     [ "$status" -eq 1 ]
-    [[ "$output" == *"✖ identifiants : credentials unavailable"* ]] || false
+    [[ "$output" == *"✖ credentials : credentials unavailable"* ]] || false
     [[ "$(cat "$T/actions.log")" == *"ports restart"* ]] || false
 }
 
@@ -179,7 +179,7 @@ KUBE
     printf 'cluster=kind-devzone\n' >"$DEVZONE_ETAT"
     run bash "$APP" use docker-desktop
     [ "$status" -eq 0 ]
-    [[ "$output" == *"cluster de travail : docker-desktop"* ]] || false
+    [[ "$output" == *"working cluster: docker-desktop"* ]] || false
     [[ "$(cat "$T/kubectl.log")" == *"config use-context docker-desktop"* ]] || false
     [ "$(cat "$DEVZONE_ETAT")" = "cluster=kind-devzone" ]
 }
@@ -188,7 +188,7 @@ KUBE
     faux_kubectl
     run bash "$APP" use inconnu
     [ "$status" -eq 2 ]
-    [[ "$output" == *"contexte inconnu : inconnu"* ]] || false
+    [[ "$output" == *"unknown context: inconnu"* ]] || false
     [[ "$(cat "$T/kubectl.log")" != *"use-context"* ]] || false
 }
 
@@ -196,7 +196,7 @@ KUBE
     faux_kubectl
     run bash "$APP" use prod
     [ "$status" -eq 2 ]
-    [[ "$output" == *"cluster distant refusé : prod"* ]] || false
+    [[ "$output" == *"remote cluster refused: prod"* ]] || false
     [[ "$(cat "$T/kubectl.log")" != *"use-context"* ]] || false
 }
 
@@ -209,14 +209,14 @@ KUBE
     : >"$T/kubectl.log"
     run bash "$APP" use prod --confirm autre
     [ "$status" -eq 2 ]
-    [[ "$output" == *"cluster distant refusé : prod"* ]] || false
+    [[ "$output" == *"remote cluster refused: prod"* ]] || false
     [[ "$(cat "$T/kubectl.log")" != *"use-context"* ]] || false
 }
 
 @test "repair: Kubernetes workspace, no auto ports watcher (#517)" {
     DEVZONE_WORKSPACE=kubernetes run bash "$APP" repair
     [ "$status" -eq 0 ]
-    [[ "$output" != *"veilleur ports auto"* ]] || false
+    [[ "$output" != *"ports auto watcher"* ]] || false
     [[ "$(cat "$T/actions.log")" != *"ports-auto demarrer"* ]] || false
     [[ "$(cat "$T/actions.log")" == *"password regenerer"* ]] || false
 }

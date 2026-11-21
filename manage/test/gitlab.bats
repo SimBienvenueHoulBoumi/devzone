@@ -483,7 +483,7 @@ wait_log() {
     mkdir -p "$SECRETS" && echo token >"$SECRETS/root-token"
     FAKE_RUNNERS='[{"id":1}]' run bash "$DEVZONE" enable gitlab
     [ "$status" -eq 0 ]
-    [[ "$output" == *"déjà actif, rien à faire"* ]] || false
+    [[ "$output" == *"already active, nothing to do"* ]] || false
     ! grep -q "upgrade --install" "$BATS_TEST_TMPDIR/helm.log" || false
 }
 
@@ -492,7 +492,7 @@ wait_log() {
     mkdir -p "$SECRETS" && echo token >"$SECRETS/root-token"
     run bash "$DEVZONE" enable gitlab
     [ "$status" -eq 0 ]
-    [[ "$output" != *"déjà actif, rien à faire"* ]] || false
+    [[ "$output" != *"already active, nothing to do"* ]] || false
     grep -Eq -- "helm --kubeconfig [^ ]+ upgrade --install gitlab [^ ]*charts/devzone-gitlab --namespace devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log"
 }
 
@@ -511,7 +511,7 @@ wait_log() {
     mkdir -p "$SECRETS" && echo token >"$SECRETS/root-token"
     FAKE_RUNNERS='[{"id":1}]' run bash "$DEVZONE" apply
     [ "$status" -eq 0 ]
-    [[ "$output" == *"déjà actif, rien à faire"* ]] || false
+    [[ "$output" == *"already active, nothing to do"* ]] || false
     [ ! -e "$BATS_TEST_TMPDIR/helm.log" ]
 }
 
@@ -641,7 +641,7 @@ SUDO
     mkdir -p "$SECRETS" && echo token >"$SECRETS/root-token"
     FAKE_RUNNERS='[{"id":1}]' run bash "$DEVZONE" apply
     [ "$status" -eq 0 ]
-    [[ "$output" == *"déjà actif, rien à faire"* ]] || false
+    [[ "$output" == *"already active, nothing to do"* ]] || false
     grep -q 'devzone:gitlab' "$DEVZONE_HOSTS"
 }
 

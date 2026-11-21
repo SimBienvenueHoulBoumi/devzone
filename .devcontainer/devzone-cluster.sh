@@ -4,139 +4,138 @@
 # Sourced by .devcontainer/devzone (split of the 1 600 lines file, #722):
 # functions only, shared variables are defined in devzone.
 
-# Toutes les bases disparaissent : confirmation en terminal (sans terminal, la
-# commande est explicite) ; un oui ou --yes marque SUPPRIMER_DONNEES, lu par
-# appliquer_mysql pour lancer delete-data (#441). Les arguments passent
-# par reject_renamed : --oui est refusé avant d'arriver ici, seul --yes passe (#695).
-confirmer_suppression() {
-    local app="$1" reponse arg
-    SUPPRIMER_DONNEES=""
-    [ "$(valeur "$app")" = on ] || return 0
+# All the databases disappear: confirmation in the terminal (without a terminal,
+# the command is explicit); a yes or --yes sets DELETE_DATA, read by
+# apply_mysql to run delete-data (#441). The arguments go through reject_renamed:
+# --oui is refused before reaching here, only --yes passes (#695).
+confirm_removal() {
+    local app="$1" answer arg
+    DELETE_DATA=""
+    [ "$(value_of "$app")" = on ] || return 0
     for arg in "${@:2}"; do
-        case "$arg" in --yes) SUPPRIMER_DONNEES=1 ;; esac
+        case "$arg" in --yes) DELETE_DATA=1 ;; esac
     done
-    [ -z "$SUPPRIMER_DONNEES" ] || return 0
+    [ -z "$DELETE_DATA" ] || return 0
     cluster_interactive || return 0
-    # mysql : la question porte sur le namespace (volume et bases restent) ;
-    # postgres : tout part, le refus annule ; gitlab : le secret Rails reste,
-    # sa suppression n'a lieu que sur une désinstallation complète voulue
+    # mysql: the question is about the namespace (volume and databases stay);
+    # postgres: everything goes, the refusal cancels; gitlab: the Rails secret
+    # stays, its deletion only happens on a full uninstall on purpose
     if [ "$app" = mysql ]; then
-        printf 'Désactiver mysql retire le serveur, le volume et les bases restent. Supprimer aussi le namespace devzone-mysql et ses volumes ? [o/N] ' >&2
+        printf 'Disabling mysql removes the server; the volume and databases stay. Also delete the devzone-mysql namespace and its volumes? [o/N] ' >&2
     elif [ "$app" = gitlab ]; then
-        printf 'Désactiver gitlab garde le secret Rails (sessions du navigateur valides à la réinstallation). Supprimer aussi le secret Rails ? [o/N] ' >&2
+        printf 'Disabling gitlab keeps the Rails secret (browser sessions stay valid at reinstall). Also delete the Rails secret? [o/N] ' >&2
     else
-        printf 'Désactiver %s supprime toutes ses bases. Continuer ? [o/N] ' "$app" >&2
+        printf 'Disabling %s deletes all its databases. Continue? [o/N] ' "$app" >&2
     fi
-    read -r reponse || reponse=""
-    case "$reponse" in
-        o | O | oui) SUPPRIMER_DONNEES=1; return 0 ;;
+    read -r answer || answer=""
+    case "$answer" in
+        o | O | oui) DELETE_DATA=1; return 0 ;;
     esac
-    # refus : mysql et gitlab désactivent quand même (données gardées), postgres annule
+    # refusal: mysql and gitlab still disable (data kept), postgres cancels
     case "$app" in
         mysql | gitlab) return 0 ;;
-        *) echo "Abandon : rien n'a été supprimé."; return 1 ;;
+        *) echo "Aborted: nothing was deleted."; return 1 ;;
     esac
 }
 
-# devzone cluster [CTX] [--yes] : affiche le cluster des services, ou les y
-# déplace (désinstallés de l'ancien, installés sur le nouveau : données non
-# migrées, d'où la confirmation)
-changer_cluster() {
-    local voulu="" oui="" confirmer="" attendre="" arg actuel nouveau reponse ctx_ancien ctx_new NS
+# devzone cluster [CTX] [--yes]: shows the services cluster, or moves the
+# services to it (uninstalled from the old one, installed on the new one: data
+# not migrated, hence the confirmation)
+change_cluster() {
+    local wanted="" yes="" confirm_ctx="" expect="" arg current new answer ctx_old ctx_new NS
     NS=devzone-postgres
     for arg in "$@"; do
-        if [ -n "$attendre" ]; then
-            confirmer="$arg"
-            attendre=""
+        if [ -n "$expect" ]; then
+            confirm_ctx="$arg"
+            expect=""
             continue
         fi
         case "$arg" in
-            --yes) oui=1 ;;
-            --confirm) attendre=1 ;;
-            -*) echo "devzone : argument inconnu : $arg (devzone cluster [CTX] [--yes] [--confirm CTX])" >&2; return 2 ;;
-            *) voulu="$arg" ;;
+            --yes) yes=1 ;;
+            --confirm) expect=1 ;;
+            -*) echo "devzone : unknown argument: $arg (devzone cluster [CTX] [--yes] [--confirm CTX])" >&2; return 2 ;;
+            *) wanted="$arg" ;;
         esac
     done
-    if [ -n "$attendre" ]; then
-        echo "devzone : --confirm attend un contexte" >&2
+    if [ -n "$expect" ]; then
+        echo "devzone : --confirm expects a context" >&2
         return 2
     fi
-    actuel="$(cluster_saved)"
-    if [ -z "$voulu" ]; then
-        if [ -z "$actuel" ]; then
-            echo "devzone : aucun cluster choisi (fixé à l'activation d'un module : devzone enable postgres)"
-        elif cluster_is_dedicated "$actuel"; then
-            echo "devzone : cluster $actuel (kind dédié, dans le conteneur)"
+    current="$(cluster_saved)"
+    if [ -z "$wanted" ]; then
+        if [ -z "$current" ]; then
+            echo "devzone : no cluster chosen (set when a module is enabled: devzone enable postgres)"
+        elif cluster_is_dedicated "$current"; then
+            echo "devzone : cluster $current (dedicated kind, in the container)"
         else
-            echo "devzone : cluster $actuel (cluster de l'hôte)"
+            echo "devzone : cluster $current (host cluster)"
         fi
-        echo "  possibles : $(cluster_candidates | tr '\n' ' ')"
+        echo "  possible: $(cluster_candidates | tr '\n' ' ')"
         return 0
     fi
-    if [ -n "$confirmer" ]; then
-        nouveau="$(cluster_choose "$voulu" --confirm "$confirmer")" || return 2
+    if [ -n "$confirm_ctx" ]; then
+        new="$(cluster_choose "$wanted" --confirm "$confirm_ctx")" || return 2
     else
-        nouveau="$(cluster_choose "$voulu")" || return 2
+        new="$(cluster_choose "$wanted")" || return 2
     fi
-    if [ "$nouveau" = "$actuel" ]; then
-        echo "devzone : déjà sur $nouveau, rien à faire."
+    if [ "$new" = "$current" ]; then
+        echo "devzone : already on $new, nothing to do."
         return 0
     fi
-    ctx_ancien="$actuel"
-    ctx_new="$nouveau"
-    if [ "$(valeur postgres)" = on ]; then
-        if [ -z "$oui" ]; then
+    ctx_old="$current"
+    ctx_new="$new"
+    if [ "$(value_of postgres)" = on ]; then
+        if [ -z "$yes" ]; then
             if ! cluster_interactive; then
-                echo "devzone : les bases postgres seront supprimées de $ctx_ancien (non migrées) : devzone cluster $ctx_new --yes" >&2
+                echo "devzone : the postgres databases will be deleted from $ctx_old (not migrated): devzone cluster $ctx_new --yes" >&2
                 return 1
             fi
-            printf 'postgres sera réinstallé sur %s, ses bases supprimées de %s (non migrées). Continuer ? [o/N] ' "$ctx_new" "$ctx_ancien" >&2
-            read -r reponse || reponse=""
-            case "$reponse" in
+            printf 'postgres will be reinstalled on %s, its databases deleted from %s (not migrated). Continue? [o/N] ' "$ctx_new" "$ctx_old" >&2
+            read -r answer || answer=""
+            case "$answer" in
                 o | O | oui) ;;
-                *) echo "Abandon : rien n'a changé."; return 0 ;;
+                *) echo "Aborted: nothing changed."; return 0 ;;
             esac
         fi
-        # Retire PostgreSQL de l'ancien cluster (contexte explicite) ;
-        # namespace et RoleBinding par l'administrateur (#430)
+        # Removes PostgreSQL from the old cluster (explicit context);
+        # namespace and RoleBinding by the administrator (#430)
         export KUBECONFIG="$HOME/.kube/config:$HOME/.kube/hote.config"
-        account_remove "$ctx_ancien" "$NS" >/dev/null 2>&1 || true
-        account_admin "$ctx_ancien" delete namespace "$NS" --wait=true >/dev/null 2>&1 || true
-        cluster_release "$ctx_ancien"
-        # Le nouveau cluster devient le contexte devzone
+        account_remove "$ctx_old" "$NS" >/dev/null 2>&1 || true
+        account_admin "$ctx_old" delete namespace "$NS" --wait=true >/dev/null 2>&1 || true
+        cluster_release "$ctx_old"
+        # The new cluster becomes the devzone context
         cluster_save "$ctx_new"
-        # Pose le contexte devzone sur le nouveau cluster (cluster + user :
-        # commande importante, échec affiché et rendu #396)
+        # Sets the devzone context on the new cluster (cluster + user:
+        # important command, failure shown and rendered #396)
         if ! devzone_context_set "$ctx_new"; then
-            echo "devzone : impossible de poser le contexte devzone sur $ctx_new" >&2
+            echo "devzone : cannot set the devzone context on $ctx_new" >&2
             return 1
         fi
-        # Installe PostgreSQL sur le nouveau cluster (via --context devzone qui pointe maintenant dessus)
+        # Installs PostgreSQL on the new cluster (via --context devzone which now points to it)
         bash "$ICI/postgres/postgres.sh" install
     else
         cluster_save "$ctx_new"
-        # Pose le contexte devzone sur le nouveau cluster (cluster + user :
-        # commande importante, échec affiché et rendu #396)
+        # Sets the devzone context on the new cluster (cluster + user:
+        # important command, failure shown and rendered #396)
         if ! devzone_context_set "$ctx_new"; then
-            echo "devzone : impossible de poser le contexte devzone sur $ctx_new" >&2
+            echo "devzone : cannot set the devzone context on $ctx_new" >&2
             return 1
         fi
     fi
-    echo "devzone : cluster des services : $ctx_new"
+    echo "devzone : services cluster: $ctx_new"
 }
 
-# Bascule le cluster de travail de l'utilisateur (#341). Ne touche jamais au
-# cluster des services de devzone : aucun cluster_save, aucune ligne
-# cluster= dans l'état.
-utiliser() {
-    local ctx="" confirmer="" namespace="" reponse arg courant
+# Switches the user's working cluster (#341). Never touches the devzone services
+# cluster: no cluster_save, no cluster= line in the state.
+use_cluster() {
+    local ctx="" confirm_ctx="" namespace="" answer arg current
     while [ "$#" -gt 0 ]; do
         arg="$1"
         shift
         case "$arg" in
             -n | --namespace)
                 if [ "$#" -eq 0 ]; then
-                    echo "devzone : -n attend un namespace" >&2
+                    echo "devzone : -n expects a namespace" >&2
                     return 2
                 fi
                 namespace="$1"
@@ -145,20 +144,20 @@ utiliser() {
             --namespace=*) namespace="${arg#*=}" ;;
             --confirm)
                 if [ "$#" -eq 0 ]; then
-                    echo "devzone : --confirm attend un contexte" >&2
+                    echo "devzone : --confirm expects a context" >&2
                     return 2
                 fi
-                confirmer="$1"
+                confirm_ctx="$1"
                 shift
                 ;;
-            --confirm=*) confirmer="${arg#*=}" ;;
+            --confirm=*) confirm_ctx="${arg#*=}" ;;
             -*)
-                echo "devzone : argument inconnu : $arg (devzone use CTX [-n NS] [--confirm CTX])" >&2
+                echo "devzone : unknown argument: $arg (devzone use CTX [-n NS] [--confirm CTX])" >&2
                 return 2
                 ;;
             *)
                 if [ -n "$ctx" ]; then
-                    echo "devzone : argument inconnu : $arg (devzone use CTX [-n NS] [--confirm CTX])" >&2
+                    echo "devzone : unknown argument: $arg (devzone use CTX [-n NS] [--confirm CTX])" >&2
                     return 2
                 fi
                 ctx="$arg"
@@ -167,37 +166,37 @@ utiliser() {
     done
     if [ -z "$ctx" ]; then
         if [ -z "$namespace" ]; then
-            echo "devzone : contexte manquant : devzone use CTX" >&2
+            echo "devzone : missing context: devzone use CTX" >&2
             return 2
         fi
-        courant="$(kubectl config current-context 2>/dev/null || true)"
-        if [ -z "$courant" ]; then
-            echo "devzone : aucun contexte courant" >&2
+        current="$(kubectl config current-context 2>/dev/null || true)"
+        if [ -z "$current" ]; then
+            echo "devzone : no current context" >&2
             return 2
         fi
-        ctx="$courant"
+        ctx="$current"
     fi
     if ! kubectl config get-contexts -o name 2>/dev/null | grep -qxF -- "$ctx"; then
-        echo "devzone : contexte inconnu : $ctx (voir kubectl config get-contexts)" >&2
+        echo "devzone : unknown context: $ctx (see kubectl config get-contexts)" >&2
         return 2
     fi
-    courant="$(kubectl config current-context 2>/dev/null || true)"
-    if [ "$ctx" != "$courant" ]; then
+    current="$(kubectl config current-context 2>/dev/null || true)"
+    if [ "$ctx" != "$current" ]; then
         if ! cluster_is_local "$ctx"; then
-            if [ -n "$confirmer" ]; then
-                if [ "$confirmer" != "$ctx" ]; then
-                    echo "devzone : cluster distant refusé : $ctx (--confirm $ctx)" >&2
+            if [ -n "$confirm_ctx" ]; then
+                if [ "$confirm_ctx" != "$ctx" ]; then
+                    echo "devzone : remote cluster refused: $ctx (--confirm $ctx)" >&2
                     return 2
                 fi
             elif cluster_interactive; then
-                printf 'cluster distant : %s ; tape son nom pour confirmer : ' "$ctx" >&2
-                read -r reponse || reponse=""
-                if [ "$reponse" != "$ctx" ]; then
-                    echo "devzone : cluster distant refusé : $ctx (--confirm $ctx)" >&2
+                printf 'remote cluster: %s; type its name to confirm: ' "$ctx" >&2
+                read -r answer || answer=""
+                if [ "$answer" != "$ctx" ]; then
+                    echo "devzone : remote cluster refused: $ctx (--confirm $ctx)" >&2
                     return 2
                 fi
             else
-                echo "devzone : cluster distant refusé : $ctx (--confirm $ctx)" >&2
+                echo "devzone : remote cluster refused: $ctx (--confirm $ctx)" >&2
                 return 2
             fi
         fi
@@ -206,6 +205,6 @@ utiliser() {
     if [ -n "$namespace" ]; then
         kubectl config set-context "$ctx" --namespace "$namespace" >/dev/null
     fi
-    echo "cluster de travail : $ctx"
-    [ -z "$namespace" ] || echo "namespace : $namespace"
+    echo "working cluster: $ctx"
+    [ -z "$namespace" ] || echo "namespace: $namespace"
 }

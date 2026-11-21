@@ -209,7 +209,7 @@ attendre_nohup() {
     printf 'mysql=on\n' >"$DEVZONE_ETAT"
     run bash "$DEVZONE" apply
     [ "$status" -ne 0 ] || false
-    [[ "$output" == *"aucun cluster choisi"* ]] || false
+    [[ "$output" == *"no cluster chosen"* ]] || false
     [ -f "$DEVZONE_ETAT-echec-mysql" ] || false
 }
 
@@ -292,7 +292,7 @@ attendre_nohup() {
     grep -q 'delete statefulset/mysql service/mysql' "$BATS_TEST_TMPDIR/kubectl.log" || false
     ! grep -q 'delete namespace devzone-mysql' "$BATS_TEST_TMPDIR/kubectl.log" 2>/dev/null || false
     grep -qx 'mysql=off' "$DEVZONE_ETAT" || false
-    [[ "$output" == *"Désactiver mysql retire le serveur"* ]] || false
+    [[ "$output" == *"Disabling mysql removes the server"* ]] || false
     [[ "$output" == *"volume donnees-mysql-0 and databases kept"* ]] || false
     [ "$(cat "$SECRETS/root.env")" = "MYSQL_PASSWORD=mdproot" ] || false
 }
