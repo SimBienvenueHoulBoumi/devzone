@@ -140,7 +140,7 @@ pa_status() {
     for f in "$d"/apps/*; do
         [ -e "$f" ] || continue
         loc="$(cat "$f")"
-        pw_alive "$(cat "$d/relais/$loc" 2>/dev/null)" || continue
+        pw_alive "$(cat "$d/relays/$loc" 2>/dev/null)" || continue
         key="$(basename "$f")"
         rest="${key#*.}"
         echo "  http://127.0.0.1:$loc  ${key%%.*}/${rest%%.*}:${rest#*.}"

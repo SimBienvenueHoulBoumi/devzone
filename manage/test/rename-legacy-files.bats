@@ -6,6 +6,7 @@
 # plateforme= of .devzone.modules becomes platform= (lot 4), same rules.
 
 setup() {
+    bats_require_minimum_version 1.5.0
     SCRIPT="$BATS_TEST_DIRNAME/../../.devcontainer/rename-legacy-files.sh"
     T="$BATS_TEST_TMPDIR"
     export DEVZONE_ROOT="$T/devzone"
@@ -37,7 +38,7 @@ legacy_tree() {
     [ "$status" -eq 0 ]
     [ "$(cat "$DEVZONE_ROOT/.devzone.packages")" = "packages" ]
     [ "$(cat "$DEVZONE_ROOT/.devzone.backup/20260101-120000/file")" = "backup" ]
-    [ "$(cat "$DEVZONE_ROOT/.devzone.workspace-ports/relais/3000")" = "3000" ]
+    [ "$(cat "$DEVZONE_ROOT/.devzone.workspace-ports/relays/3000")" = "3000" ]
     [ "$(cat "$DEVZONE_ROOT/.devzone.state")" = "state" ]
     [ "$(cat "$DEVZONE_ROOT/.devzone.catalog-watcher/log")" = "watcher" ]
     [ "$(cat "$DEVZONE_ROOT/.devzone.modules-failed-gitlab")" = "gitlab" ]
@@ -275,4 +276,173 @@ legacy_tree() {
     bash "$SCRIPT" >/dev/null
     run bash "$BATS_TEST_DIRNAME/../../.devcontainer/devzone" is-enabled ai
     [ "$status" -eq 0 ]
+}
+
+# ---- #774, lot 4: watcher folders, state backup, AI measures, packages marker
+
+# Fake port watcher: a script named ports-workspace.sh, as the real one, started
+# in the background. $1 = state folder; $2 = "ignore" to ignore SIGTERM.
+fake_watcher() {
+    local d="$1" ignore="${2:-}" script="$T/ports-workspace.sh"
+    {
+        echo '#!/usr/bin/env bash'
+        if [ "$ignore" = ignore ]; then
+            echo "trap '' TERM"
+        else
+            echo "trap 'rm -rf \"$d/verrou\" \"$d/pid\"; exit 0' TERM"
+        fi
+        echo 'while :; do sleep 0.1; done'
+    } >"$script"
+    bash "$script" &
+    WATCHER=$!
+    echo "$WATCHER" >"$d/pid"
+}
+
+watcher_tree() {
+    local d="$DEVZONE_ROOT/.devzone.workspace-ports"
+    mkdir -p "$d/relais" "$d/pris" "$d/verrou"
+    echo "4242" >"$d/relais/3000"
+    : >"$d/pris/8080"
+    echo "1" >"$d/verrou/pid"
+    echo "log" >"$d/journal.log"
+}
+
+@test "rename-legacy-files: the watcher folders relais, pris and verrou become relays, taken and lock" {
+    watcher_tree
+    run bash "$SCRIPT"
+    [ "$status" -eq 0 ]
+    local d="$DEVZONE_ROOT/.devzone.workspace-ports"
+    [ "$(cat "$d/relays/3000")" = "4242" ]
+    [ -e "$d/taken/8080" ]
+    [ "$(cat "$d/lock/pid")" = "1" ]
+    [ "$(cat "$d/journal.log")" = "log" ]
+    [ ! -e "$d/relais" ] && [ ! -e "$d/pris" ] && [ ! -e "$d/verrou" ]
+    [[ "$output" == *"$d/relais renamed to $d/relays"* ]] || false
+}
+
+@test "rename-legacy-files: an existing relays folder is never overwritten" {
+    watcher_tree
+    local d="$DEVZONE_ROOT/.devzone.workspace-ports"
+    mkdir -p "$d/relays"
+    echo "new" >"$d/relays/3000"
+    echo "5555" >"$d/relais/9000"
+    run --separate-stderr bash "$SCRIPT"
+    [ "$status" -eq 0 ]
+    [ "$(cat "$d/relays/3000")" = "new" ]
+    [ "$(cat "$d/relais/3000")" = "4242" ]
+    [ "$(cat "$d/relays/9000")" = "5555" ]
+    [[ "$stderr" == *"$d/relais/3000 kept: $d/relays/3000 already exists"* ]] || false
+}
+
+@test "rename-legacy-files: a second run after the watcher folders migration changes nothing" {
+    watcher_tree
+    bash "$SCRIPT" >/dev/null
+    run bash "$SCRIPT"
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+    [ "$(cat "$DEVZONE_ROOT/.devzone.workspace-ports/relays/3000")" = "4242" ]
+}
+
+@test "rename-legacy-files: a running port watcher is stopped before its folders are renamed" {
+    watcher_tree
+    local d="$DEVZONE_ROOT/.devzone.workspace-ports"
+    fake_watcher "$d"
+    run bash "$SCRIPT"
+    [ "$status" -eq 0 ]
+    ! kill -0 "$WATCHER" 2>/dev/null
+    [[ "$output" == *"port watcher stopped to rename its folders, restart it: devzone workspace ports start"* ]] || false
+    [ "$(cat "$d/relays/3000")" = "4242" ]
+    [ ! -e "$d/relais" ]
+    [ ! -e "$d/pid" ]
+    run bash "$SCRIPT"
+    [ -z "$output" ]
+}
+
+@test "rename-legacy-files: a port watcher that does not stop leaves its folders untouched" {
+    watcher_tree
+    local d="$DEVZONE_ROOT/.devzone.workspace-ports"
+    fake_watcher "$d" ignore
+    run --separate-stderr bash "$SCRIPT"
+    kill -9 "$WATCHER" 2>/dev/null || true
+    [ "$status" -eq 0 ]
+    [[ "$stderr" == *"port watcher (pid $WATCHER) still running"* ]] || false
+    [ "$(cat "$d/relais/3000")" = "4242" ]
+    [ ! -e "$d/relays" ]
+}
+
+@test "rename-legacy-files: a pid file of another process is never signalled" {
+    watcher_tree
+    local d="$DEVZONE_ROOT/.devzone.workspace-ports"
+    sleep 30 &
+    local other=$!
+    echo "$other" >"$d/pid"
+    run bash "$SCRIPT"
+    local alive=0
+    kill -0 "$other" 2>/dev/null && alive=1
+    kill "$other" 2>/dev/null || true
+    [ "$status" -eq 0 ]
+    [ "$alive" -eq 1 ]
+    [ "$(cat "$d/relays/3000")" = "4242" ]
+}
+
+@test "rename-legacy-files: the state backup .prec becomes .prev with its content" {
+    printf 'ai=on\n' >"$DEVZONE_ROOT/.devzone.modules.prec"
+    run bash "$SCRIPT"
+    [ "$status" -eq 0 ]
+    [ "$output" = "devzone : $DEVZONE_ROOT/.devzone.modules.prec renamed to $DEVZONE_ROOT/.devzone.modules.prev" ]
+    [ "$(cat "$DEVZONE_ROOT/.devzone.modules.prev")" = "ai=on" ]
+    [ ! -e "$DEVZONE_ROOT/.devzone.modules.prec" ]
+    run bash "$SCRIPT"
+    [ -z "$output" ]
+}
+
+@test "rename-legacy-files: an existing .devzone.modules.prev is never overwritten" {
+    echo "old" >"$DEVZONE_ROOT/.devzone.modules.prec"
+    echo "new" >"$DEVZONE_ROOT/.devzone.modules.prev"
+    run --separate-stderr bash "$SCRIPT"
+    [ "$status" -eq 0 ]
+    [ "$(cat "$DEVZONE_ROOT/.devzone.modules.prev")" = "new" ]
+    [ "$(cat "$DEVZONE_ROOT/.devzone.modules.prec")" = "old" ]
+    [[ "$stderr" == *"kept, $DEVZONE_ROOT/.devzone.modules.prev already exists"* ]] || false
+}
+
+@test "rename-legacy-files: ia-mesures.json becomes ai-measures.json with its content" {
+    mkdir -p "$HOME/.config/devzone"
+    echo '{"m":{"reussite":1}}' >"$HOME/.config/devzone/ia-mesures.json"
+    run bash "$SCRIPT"
+    [ "$status" -eq 0 ]
+    [ "$(cat "$HOME/.config/devzone/ai-measures.json")" = '{"m":{"reussite":1}}' ]
+    [ ! -e "$HOME/.config/devzone/ia-mesures.json" ]
+    run bash "$SCRIPT"
+    [ -z "$output" ]
+}
+
+@test "rename-legacy-files: an existing ai-measures.json is never overwritten" {
+    mkdir -p "$HOME/.config/devzone"
+    echo old >"$HOME/.config/devzone/ia-mesures.json"
+    echo new >"$HOME/.config/devzone/ai-measures.json"
+    run --separate-stderr bash "$SCRIPT"
+    [ "$status" -eq 0 ]
+    [ "$(cat "$HOME/.config/devzone/ai-measures.json")" = new ]
+    [ "$(cat "$HOME/.config/devzone/ia-mesures.json")" = old ]
+    [[ "$stderr" == *"kept"* ]] || false
+}
+
+@test "rename-legacy-files: the packages marker devzone-paquets.maj becomes devzone-packages.updated" {
+    echo "2026-11-22" >"$DEVZONE_TMP_DIR/devzone-paquets.maj"
+    run bash "$SCRIPT"
+    [ "$status" -eq 0 ]
+    [ "$(cat "$DEVZONE_TMP_DIR/devzone-packages.updated")" = "2026-11-22" ]
+    [ ! -e "$DEVZONE_TMP_DIR/devzone-paquets.maj" ]
+    run bash "$SCRIPT"
+    [ -z "$output" ]
+}
+
+@test "rename-legacy-files: an existing devzone-packages.updated is never overwritten" {
+    echo old >"$DEVZONE_TMP_DIR/devzone-paquets.maj"
+    echo new >"$DEVZONE_TMP_DIR/devzone-packages.updated"
+    run --separate-stderr bash "$SCRIPT"
+    [ "$status" -eq 0 ]
+    [ "$(cat "$DEVZONE_TMP_DIR/devzone-packages.updated")" = new ]
+    [ "$(cat "$DEVZONE_TMP_DIR/devzone-paquets.maj")" = old ]
 }

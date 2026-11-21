@@ -29,7 +29,7 @@ export KUBECONFIG
 : "${ETAT:=${DEVZONE_STATE:-$HOME/.devzone.modules}}"
 
 # Safe state write (#417): lock, temporary file in the state folder, backup copy
-# .prec — shared by devzone, ports and ports-auto
+# .prev — shared by devzone, ports and ports-auto
 # shellcheck source=SCRIPTDIR/state.sh
 # shellcheck disable=SC1091
 . "$(dirname "${BASH_SOURCE[0]}")/state.sh"

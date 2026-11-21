@@ -157,6 +157,7 @@ renamed_option() {
         --contexte) echo --context ;;
         --modele) echo --model ;;
         --tous) echo --all ;;
+        --sans-reconstruire) echo --no-rebuild ;;
         *) return 1 ;;
     esac
 }

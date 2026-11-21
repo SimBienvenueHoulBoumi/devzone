@@ -3,7 +3,7 @@
 # or removes a line of $ETAT. A mkdir lock prevents two simultaneous writes,
 # the temporary file is created in the state folder (the mv stays atomic: the
 # file is never missing or incomplete for a reader) and a backup copy
-# $ETAT.prec precedes each replacement. The same file creates the state when
+# $ETAT.prev precedes each replacement. The same file creates the state when
 # it is missing: former global state taken over once, backup copy restored,
 # state rebuilt from the services cluster, otherwise first installation.
 # Sourced library: the caller defines ETAT (file name kept: shared by callers).
@@ -29,7 +29,7 @@ state_abort() {
 # Backup copy of the current state, before replacement
 state_backup() {
     [ -f "$ETAT" ] || return 0
-    cp "$ETAT" "${ETAT}.prec"
+    cp "$ETAT" "${ETAT}.prev"
 }
 
 # The state without the line $1, written to the temporary file $2
@@ -41,7 +41,7 @@ state_filter() {
     return 0
 }
 
-# Under lock: replaces the whole state with a file, $ETAT.prec backed up
+# Under lock: replaces the whole state with a file, $ETAT.prev backed up
 state_replace() {
     local src="$1" tmp
     [ -f "$src" ] || return 1
@@ -191,7 +191,7 @@ state_init() {
         return 0
     fi
     # 1. Backup copy left by the last write (#417)
-    if [ -f "${ETAT}.prec" ] && state_replace "${ETAT}.prec"; then
+    if [ -f "${ETAT}.prev" ] && state_replace "${ETAT}.prev"; then
         echo "devzone : state restored from the backup copy: $ETAT (confirm with devzone apply)" >&2
         state_recovery_mark
         state_lock_release

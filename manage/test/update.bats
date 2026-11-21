@@ -60,7 +60,7 @@ poisoned_manifest() {
     printf 'secret\n' >"$T/dehors/secret"
     printf '%064d  %s\n' 0 "$rel" >>"$DZ/.devzone.version"
     cd "$DZ"
-    run bash "$MAJ" update --yes --sans-reconstruire
+    run bash "$MAJ" update --yes --no-rebuild
     [ "$status" -eq 0 ]
     [ "$(cat "$T/dehors/secret")" = secret ]
     [[ "$output" == *"devzone : manifeste : chemin refusé : $rel"* ]] || false
@@ -111,7 +111,7 @@ poisoned_manifest() {
     printf 'app\n' >"$DZ/.app"
     printf 'journal\n' >"$DZ/.devzone.log"
     cd "$DZ"
-    run bash "$MAJ" update --sans-reconstruire
+    run bash "$MAJ" update --no-rebuild
     [ "$status" -eq 0 ]
     grep -q '# makefile nouveau' "$DZ/Makefile"
     grep -qx 'nouveau' "$DZ/.devcontainer/nouveau.txt"
@@ -161,7 +161,7 @@ poisoned_manifest() {
     create_v1
     printf '[argocd]\n    repo = https://github.com/tester/devzone-argocd.git\n' >"$DZ/.argocd.conf"
     cd "$DZ"
-    run bash "$MAJ" update --yes --sans-reconstruire
+    run bash "$MAJ" update --yes --no-rebuild
     [ "$status" -eq 0 ]
     grep -q '^    repo = https://github.com/tester/devzone-argocd.git$' "$DZ/.argocd.conf"
     [ ! -e "$DZ/.devzone.backup/.argocd.conf" ]
@@ -172,7 +172,7 @@ poisoned_manifest() {
     mkdir -p "$DZ/scripts"
     printf '#!/usr/bin/env bash\necho moi\n' >"$DZ/scripts/mon-outil.sh"
     cd "$DZ"
-    run bash "$MAJ" update --sans-reconstruire
+    run bash "$MAJ" update --no-rebuild
     [ "$status" -eq 0 ]
     [ "$(cat "$DZ/scripts/mon-outil.sh")" = '#!/usr/bin/env bash
 echo moi' ]
@@ -187,7 +187,7 @@ echo moi' ]
     mkdir -p "$DZ/scripts"
     printf 'mon outil\n' >"$DZ/scripts/mon-outil.sh"
     cd "$DZ"
-    run bash "$MAJ" update --yes --sans-reconstruire
+    run bash "$MAJ" update --yes --no-rebuild
     [ "$status" -eq 0 ]
     [ "$(cat "$DZ/scripts/mon-outil.sh")" = 'mon outil' ]
     [ "$(sed -n '1p' "$DZ/.devzone.version")" = "version 0.0.2" ]
@@ -200,7 +200,7 @@ echo moi' ]
     printf 'vieux lancer\n' >"$DZ/scripts/launch.sh"
     printf 'mon outil\n' >"$DZ/scripts/mon-outil.sh"
     cd "$DZ"
-    run bash "$MAJ" update --yes --sans-reconstruire
+    run bash "$MAJ" update --yes --no-rebuild
     [ "$status" -eq 0 ]
     [ ! -e "$DZ/scripts/uninstall.sh" ]
     [ ! -e "$DZ/scripts/launch.sh" ]
@@ -219,7 +219,7 @@ echo moi' ]
     printf 'vieux test\n' >"$DZ/core/test/ancien.bats"
     printf 'vieille doc\n' >"$DZ/core/docs/ancien.md"
     cd "$DZ"
-    run bash "$MAJ" update --yes --sans-reconstruire
+    run bash "$MAJ" update --yes --no-rebuild
     [ "$status" -eq 0 ]
     [ ! -e "$DZ/core" ]
     backup="$(backup_of)"
@@ -237,7 +237,7 @@ echo moi' ]
     printf 'fichier a moi\n' >"$DZ/core/autre/mon-fichier"
     printf 'projet\n' >"$DZ/workspace/projet/fichier"
     cd "$DZ"
-    run bash "$MAJ" update --yes --sans-reconstruire
+    run bash "$MAJ" update --yes --no-rebuild
     [ "$status" -eq 0 ]
     [[ "$output" == *"inconnue"* ]] || false
     [ ! -e "$DZ/core/scripts" ]
@@ -287,7 +287,7 @@ echo moi' ]
     grep -v '^\.devzone\.backup/$' "$DZ/.gitignore" >"$T/gitignore.tmp"
     mv "$T/gitignore.tmp" "$DZ/.gitignore"
     cd "$DZ"
-    run bash "$MAJ" update --sans-reconstruire
+    run bash "$MAJ" update --no-rebuild
     [ "$status" -eq 0 ]
     grep -qx 'mon-regle-a-moi' "$DZ/.gitignore"
     grep -qx '.devzone.backup/' "$DZ/.gitignore"
@@ -306,13 +306,13 @@ echo moi' ]
     [ ! -e "$T/reconstruction.log" ]
 }
 
-@test "--sans-reconstruire: no rebuild, even with --yes" {
+@test "--no-rebuild: no rebuild, even with --yes" {
     create_v1
     printf 'workspace=docker\n' >"$DZ/.devzone.modules"
     cd "$DZ"
-    run bash "$MAJ" update --yes --sans-reconstruire
+    run bash "$MAJ" update --yes --no-rebuild
     [ "$status" -eq 0 ]
-    [[ "$output" == *"Reconstruction non lancée (--sans-reconstruire)"* ]] || false
+    [[ "$output" == *"Reconstruction non lancée (--no-rebuild)"* ]] || false
     [ ! -e "$T/reconstruction.log" ]
 }
 
@@ -352,7 +352,7 @@ echo moi' ]
     printf 'a moi\n' >"$DZ/workspace/x"
     printf '%064d  %s\n' 0 'workspace/x' >>"$DZ/.devzone.version"
     cd "$DZ"
-    run bash "$MAJ" update --yes --sans-reconstruire
+    run bash "$MAJ" update --yes --no-rebuild
     [ "$status" -eq 0 ]
     [ "$(cat "$T/dehors/secret")" = secret ]
     [ "$(cat "$DZ/workspace/x")" = 'a moi' ]
@@ -366,7 +366,7 @@ echo moi' ]
     ln -s "$T/dehors" "$DZ/.devcontainer/lien"
     printf '%064d  %s\n' 0 '.devcontainer/lien/secret' >>"$DZ/.devzone.version"
     cd "$DZ"
-    run bash "$MAJ" update --yes --sans-reconstruire
+    run bash "$MAJ" update --yes --no-rebuild
     [ "$status" -eq 0 ]
     [ "$(cat "$T/dehors/secret")" = secret ]
     [[ "$output" == *"devzone : manifeste : chemin refusé : .devcontainer/lien/secret"* ]] || false
@@ -379,7 +379,7 @@ echo moi' ]
     rm -f "$DZ/.devcontainer/devcontainer.json"
     ln -s "$T/dehors/cible" "$DZ/.devcontainer/devcontainer.json"
     cd "$DZ"
-    run bash "$MAJ" update --yes --sans-reconstruire
+    run bash "$MAJ" update --yes --no-rebuild
     [ "$status" -eq 0 ]
     [ "$(cat "$T/dehors/cible")" = intact ]
     [ ! -L "$DZ/.devcontainer/devcontainer.json" ] || false
@@ -394,7 +394,7 @@ echo moi' ]
     rm -f "$DZ/.devcontainer/devcontainer.json"
     ln -s "$T/dehors/cible" "$DZ/.devcontainer/devcontainer.json"
     cd "$DZ"
-    run bash "$MAJ" update --yes --sans-reconstruire
+    run bash "$MAJ" update --yes --no-rebuild
     [ "$status" -eq 0 ]
     [ -L "$(backup_of)/.devcontainer/devcontainer.json" ] || false
     [ "$(cat "$T/dehors/cible")" = intact ]
@@ -410,5 +410,15 @@ echo moi' ]
     cd "$DZ"
     run bash "$MAJ" update --truc
     [ "$status" -eq 1 ]
-    [[ "$output" == *"option inconnue"* ]] || false
+    [[ "$output" == *"unknown option"* ]] || false
+}
+
+@test "update: an unknown option is refused in English, code 1, nothing changed" {
+    bats_require_minimum_version 1.5.0
+    create_v1
+    cd "$DZ"
+    run --separate-stderr bash "$MAJ" update --bogus
+    [ "$status" -eq 1 ]
+    [ "$stderr" = "✖ unknown option: --bogus (devzone update [--yes] [--no-rebuild])" ]
+    [ ! -e "$DZ/.devzone.backup" ]
 }

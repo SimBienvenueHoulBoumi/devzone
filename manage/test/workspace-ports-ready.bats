@@ -130,7 +130,7 @@ alive() {
     round
     [[ "$output" == *"port 3000 relayed"* ]] || false
     sleep 0.3
-    pid="$(cat "$D/relais/3000")"
+    pid="$(cat "$D/relays/3000")"
     alive "$pid" || false
     endpoints
     round
@@ -139,7 +139,7 @@ alive() {
     [ -e "$D/no-ready-pod/default.web.3000" ]
     sleep 0.3
     ! alive "$pid" || false
-    [ ! -e "$D/relais/3000" ]
+    [ ! -e "$D/relays/3000" ]
 }
 
 @test "ready: endpointslices unreadable relays every Service, warned once over two rounds" {
@@ -153,7 +153,7 @@ alive() {
     round
     [[ "$output" != *"endpointslices unreadable"* ]] || false
     sleep 0.3
-    alive "$(cat "$D/relais/3000")" || false
+    alive "$(cat "$D/relays/3000")" || false
     [ -e "$D/endpoints-unreadable" ]
 }
 
