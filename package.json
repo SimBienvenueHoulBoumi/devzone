@@ -13,7 +13,11 @@
   "bin": {
     "devzone": "manage/devzone"
   },
+  "scripts": {
+    "prepack": "bash manage/scripts/ci/build-binaries.sh"
+  },
   "files": [
+    "bin/",
     "manage/devzone",
     ".devcontainer/",
     "Makefile",

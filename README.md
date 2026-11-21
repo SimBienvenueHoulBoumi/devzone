@@ -43,6 +43,8 @@ Nothing is hosted: everything runs on your machine. `workspace/` is kept across 
 
 On Windows: it is recommended to clone with Git for Windows (the scripts keep LF line endings thanks to `.gitattributes`, and the npm command finds the `bash` it requires).
 
+The npm package ships a compiled `devzone` binary for Linux, macOS and Windows (amd64 and arm64): the command runs in Go when a binary exists for your platform, and in bash otherwise.
+
 #### Minimum memory per module
 
 Measurements from 16/11/2026.

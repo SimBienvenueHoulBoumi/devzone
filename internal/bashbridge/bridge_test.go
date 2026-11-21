@@ -117,6 +117,17 @@ func TestRunInheritsEnvironment(t *testing.T) {
 	}
 }
 
+func TestRunSetsFromGoVariable(t *testing.T) {
+	requireBash(t)
+	t.Setenv(FromGoVar, "")
+	script := writeScript(t, "printf '%s' \"${DEVZONE_FROM_GO-unset}\"\n")
+	var out bytes.Buffer
+	Run(script, nil, nil, &out, &bytes.Buffer{})
+	if out.String() != "1" {
+		t.Fatalf("DEVZONE_FROM_GO in the child = %q, want 1", out.String())
+	}
+}
+
 func TestRunInheritsWorkingDirectory(t *testing.T) {
 	requireBash(t)
 	dir, err := filepath.EvalSymlinks(t.TempDir())
