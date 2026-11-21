@@ -40,7 +40,7 @@ refus() {
         [ -n "$old" ] || continue
         run --separate-stderr refus "$old"
         [ "$status" -eq 1 ] || { echo "code $status pour $old"; false; }
-        [ "$stderr" = "✖ « $old » a été renommé : devzone $new" ] || { echo "message pour $old : $stderr"; false; }
+        [ "$stderr" = "✖ « $old » was renamed: devzone $new" ] || { echo "message pour $old : $stderr"; false; }
         [ -z "$output" ] || false
     done <<'TABLE'
 actif|is-enabled
@@ -70,7 +70,7 @@ TABLE
         [ -n "$command" ] || continue
         run --separate-stderr refus "$command" "$old"
         [ "$status" -eq 1 ] || { echo "code $status pour $command $old"; false; }
-        [ "$stderr" = "✖ « $old » a été renommé : devzone $command $new" ] || { echo "message : $stderr"; false; }
+        [ "$stderr" = "✖ « $old » was renamed: devzone $command $new" ] || { echo "message : $stderr"; false; }
     done <<'TABLE'
 postgres|creer|create
 postgres|liste|list
@@ -136,7 +136,7 @@ TABLE
         [ -n "$old" ] || continue
         run --separate-stderr refus postgres create proj "$old"
         [ "$status" -eq 1 ] || { echo "code $status pour $old"; false; }
-        [ "$stderr" = "✖ « $old » a été renommé : $new" ] || { echo "message : $stderr"; false; }
+        [ "$stderr" = "✖ « $old » was renamed: $new" ] || { echo "message : $stderr"; false; }
     done <<'TABLE'
 --fermer|--close
 --supprimer|--delete
@@ -171,7 +171,7 @@ TABLE
         copier-vers; do
         run --separate-stderr bash "$CLI" "$old"
         [ "$status" -eq 1 ] || { echo "code $status pour $old"; false; }
-        [[ "$stderr" == *"« $old » a été renommé : devzone "* ]] || { echo "message : $stderr"; false; }
+        [[ "$stderr" == *"« $old » was renamed: devzone "* ]] || { echo "message : $stderr"; false; }
         [ -z "$output" ] || false
         [ ! -e "$old" ] || { echo "dossier créé : $old"; false; }
     done
@@ -180,20 +180,20 @@ TABLE
 @test "hôte : une sous-commande ou une option retirée est refusée avec le nouveau nom" {
     run --separate-stderr bash "$CLI" argocd etat
     [ "$status" -eq 1 ]
-    [ "$stderr" = "✖ « etat » a été renommé : devzone argocd status" ]
+    [ "$stderr" = "✖ « etat » was renamed: devzone argocd status" ]
     run --separate-stderr bash "$CLI" update --oui
     [ "$status" -eq 1 ]
-    [ "$stderr" = "✖ « --oui » a été renommé : --yes" ]
+    [ "$stderr" = "✖ « --oui » was renamed: --yes" ]
     [ ! -e argocd ]
 }
 
 @test "conteneur : un ancien nom est refusé avant toute action" {
     run --separate-stderr bash "$RACINE/.devcontainer/devzone" activer ia
     [ "$status" -eq 1 ]
-    [ "$stderr" = "✖ « activer » a été renommé : devzone enable" ]
+    [ "$stderr" = "✖ « activer » was renamed: devzone enable" ]
     run --separate-stderr bash "$RACINE/.devcontainer/devzone" catalogue lister
     [ "$status" -eq 1 ]
-    [ "$stderr" = "✖ « catalogue » a été renommé : devzone catalog" ]
+    [ "$stderr" = "✖ « catalogue » was renamed: devzone catalog" ]
 }
 
 @test "workspace.sh: les anciens noms sont refusés, sans appel à kubectl ni docker" {
@@ -205,13 +205,13 @@ DOCKER
     chmod +x "$T/bin/docker"
     run --separate-stderr bash "$WS" etat
     [ "$status" -eq 1 ]
-    [ "$stderr" = "✖ « etat » a été renommé : devzone workspace status" ]
+    [ "$stderr" = "✖ « etat » was renamed: devzone workspace status" ]
     run --separate-stderr bash "$WS" copier-vers
     [ "$status" -eq 1 ]
-    [ "$stderr" = "✖ « copier-vers » a été renommé : devzone workspace copy-to" ]
+    [ "$stderr" = "✖ « copier-vers » was renamed: devzone workspace copy-to" ]
     run --separate-stderr bash "$WS" ports demarrer
     [ "$status" -eq 1 ]
-    [ "$stderr" = "✖ « demarrer » a été renommé : devzone workspace ports start" ]
+    [ "$stderr" = "✖ « demarrer » was renamed: devzone workspace ports start" ]
     [ ! -e "$T/kubectl.log" ]
     [ ! -e "$T/docker.log" ]
 }
