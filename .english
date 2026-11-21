@@ -48,6 +48,11 @@ manage/test/versions.bats
 manage/test/ci-dns.bats
 manage/test/migration.bash
 .devcontainer/workspace-build.sh
+internal/workspace/stop.go
+internal/workspace/stop_ports.go
+internal/workspace/stop_test.go
+internal/workspace/stop_ports_test.go
+internal/command/workspace_stop_test.go
 manage/test/workspace-build.bats
 .devcontainer/services-admin.sh
 manage/scripts/services-workspace.sh

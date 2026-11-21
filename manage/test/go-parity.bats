@@ -68,15 +68,37 @@ parite() {
     parite --version --oui
 }
 
-# faux_cluster : fake kubectl first in PATH, no real cluster touched (#712).
+# faux_cluster : fake kubectl and helm first in PATH, no real cluster touched (#712).
 # FAKE_NO_POD=yes: no pod; FAKE_LEGACY=yes: a legacy copy in the pod;
-# FAKE_KUBE_DOWN=yes: the cluster does not answer.
+# FAKE_KUBE_DOWN=yes: the cluster does not answer; FAKE_NO_RELEASE=yes: no helm
+# release to uninstall; FAKE_ARGO=yes: Argo CD holds the workspace Application.
 faux_cluster() {
     mkdir -p "$BATS_TEST_TMPDIR/bin"
+    cat >"$BATS_TEST_TMPDIR/bin/helm" <<'HELM'
+#!/usr/bin/env bash
+echo "helm $*"
+if [ -n "${FAKE_KUBE_DOWN:-}" ]; then
+    echo "Error: Kubernetes cluster unreachable" >&2
+    exit 1
+fi
+if [ -n "${FAKE_NO_RELEASE:-}" ]; then
+    echo "Error: uninstall: Release not loaded: devzone-workspace: release: not found" >&2
+    exit 1
+fi
+echo 'release "devzone-workspace" uninstalled'
+exit 0
+HELM
+    chmod +x "$BATS_TEST_TMPDIR/bin/helm"
     cat >"$BATS_TEST_TMPDIR/bin/kubectl" <<'KUBE'
 #!/usr/bin/env bash
 case "$*" in
     "config get-contexts -o name") echo lab ;;
+    *"get namespace"*)
+        [ -n "${FAKE_ARGO:-}" ] || exit 1
+        ;;
+    *"get application"*)
+        [ -n "${FAKE_ARGO:-}" ] || exit 1
+        ;;
     *"get pods"*)
         if [ -n "${FAKE_KUBE_DOWN:-}" ]; then
             echo "Unable to connect to the server" >&2
@@ -137,4 +159,53 @@ KUBE
 @test "go-parity: workspace alone is delegated, same help" {
     faux_cluster
     parite workspace
+}
+
+@test "go-parity: workspace stop, release uninstalled: same output and status" {
+    faux_cluster
+    parite workspace stop
+    run "$DZ_GO" workspace stop
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"uninstall devzone-workspace --namespace devzone-workspace"* ]] || false
+}
+
+@test "go-parity: workspace stop, no release: same error and status" {
+    faux_cluster
+    export FAKE_NO_RELEASE=yes
+    parite workspace stop
+}
+
+@test "go-parity: workspace stop, cluster down: same error and status" {
+    faux_cluster
+    export FAKE_KUBE_DOWN=yes
+    parite workspace stop
+}
+
+@test "go-parity: workspace stop with extra words is delegated, same output" {
+    faux_cluster
+    parite workspace stop extra
+}
+
+@test "go-parity: workspace stop, Argo CD holds the workspace: bash removes it, same output" {
+    faux_cluster
+    export FAKE_ARGO=yes
+    parite workspace stop
+}
+
+@test "go-parity: workspace stop cleans the port state, bash and go alike" {
+    faux_cluster
+    local state="$BATS_TEST_TMPDIR/.devzone.workspace-ports"
+    mkdir -p "$state/relais" "$state/pris" "$state/verrou"
+    echo 999999 >"$state/pid"
+    echo 999998 >"$state/relais/5432"
+    touch "$state/pris/5432"
+    bash "$CLI" workspace stop >/dev/null
+    [ ! -e "$state/pid" ] && [ ! -e "$state/verrou" ] && [ ! -e "$state/relais/5432" ]
+    mkdir -p "$state/relais" "$state/pris" "$state/verrou"
+    echo 999999 >"$state/pid"
+    echo 999998 >"$state/relais/5432"
+    touch "$state/pris/5432"
+    run "$DZ_GO" workspace stop
+    [ "$status" -eq 0 ]
+    [ ! -e "$state/pid" ] && [ ! -e "$state/verrou" ] && [ ! -e "$state/relais/5432" ]
 }

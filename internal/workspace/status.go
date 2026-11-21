@@ -41,15 +41,24 @@ func Status(r Runner, out, errOut io.Writer) int {
 // kubeconfig declares it, and none otherwise: the current context is then used,
 // as kubectl_flag does in manage/workspace.sh.
 func contextFlag(r Runner) []string {
+	if !declaresDevzone(r) {
+		return nil
+	}
+	return []string{"--context", kubeContext}
+}
+
+// declaresDevzone reports whether the kubeconfig declares the devzone context
+// (kubectl config get-contexts), as the *_flag functions of manage/workspace.sh test it.
+func declaresDevzone(r Runner) bool {
 	var names bytes.Buffer
 	status, err := r.Kubectl([]string{"config", "get-contexts", "-o", "name"}, nil, &names, io.Discard)
 	if err != nil || status != 0 {
-		return nil
+		return false
 	}
 	for _, name := range strings.Split(names.String(), "\n") {
 		if name == kubeContext {
-			return []string{"--context", kubeContext}
+			return true
 		}
 	}
-	return nil
+	return false
 }
