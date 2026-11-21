@@ -120,7 +120,7 @@ verify_command() {
         local file
         file="$BATS_TEST_TMPDIR/$(basename "$1").filtered"
         # The removed-names sections cite the old names on purpose: skipped.
-        awk '/^## Noms retir/{skip=1;next} /^## /{skip=0} !skip' "$1" > "$file"
+        awk '/^## Removed names/{skip=1;next} /^## /{skip=0} !skip' "$1" > "$file"
         : > "$BATS_TEST_TMPDIR/candidates.txt"
         # Inline code between backticks.
         pattern="\`[^\`]+\`"

@@ -44,7 +44,7 @@ chart_require() {
     if [ -f "$chart/Chart.yaml" ] && grep -qxF "name: devzone-$svc" "$chart/Chart.yaml"; then
         return 0
     fi
-    echo "✖ $svc : chart charts/devzone-$svc missing or misnamed (manage/docs/reference.md#charts-de-devzone)" >&2
+    echo "✖ $svc : chart charts/devzone-$svc missing or misnamed (manage/docs/reference.md#devzone-charts)" >&2
     return 2
 }
 

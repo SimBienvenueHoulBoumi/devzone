@@ -1,669 +1,670 @@
-# Référence détaillée
+# Detailed reference
 
-## Connexions et identité
+## Connections and identity
 
-**GitHub (facultatif)** : sert à pousser et ouvrir des PR sur GitHub, aux tickets et bots repowarden, et donne l'identité git automatiquement. Sans GitHub, git fonctionne normalement (dépôts locaux, autre hébergeur) ; seule l'identité se règle à la main. Pour l'utiliser : `gh auth login -s workflow`. Git passe alors par le jeton de `gh` (https, même pour les remotes en `git@github.com:`), sans clé ssh à recopier. Les dépôts de `/workspaces/devzone` sont déclarés sûrs (`safe.directory`).
-- **Permission `workflow`** : sans elle, GitHub refuse tout push qui modifie `.github/workflows/` (fréquent avec repowarden). Compte déjà connecté : `gh auth refresh -h github.com -s workflow`.
-- **Depuis `make shell`**, aucun navigateur ne s'ouvre depuis le conteneur : copier le code affiché par `gh` et ouvrir https://github.com/login/device à la main. L'avertissement « No clipboard utilities available » est sans conséquence.
+**GitHub (optional)**: used to push and open PRs on GitHub, for tickets and repowarden bots, and it provides the git identity automatically. Without GitHub, git works normally (local repositories, other hosts); only the identity is set by hand. To use it: `gh auth login -s workflow`. Git then goes through the `gh` token (https, even for `git@github.com:` remotes), with no ssh key to copy. The repositories under `/workspaces/devzone` are declared safe (`safe.directory`).
+- **`workflow` permission**: without it, GitHub refuses any push that modifies `.github/workflows/` (common with repowarden). Account already logged in: `gh auth refresh -h github.com -s workflow`.
+- **From `make shell`**, no browser opens from the container: copy the code shown by `gh` and open https://github.com/login/device by hand. The warning “No clipboard utilities available” is harmless.
 
-**Identité git** (nécessaire pour commiter) : sans GitHub, à régler à la main (`git config --file ~/.config/git/config user.name "<nom>"` et `user.email "<email>"`) ; avec GitHub, déduite du compte `gh` à chaque démarrage, tant qu'elle manque (`git-identity.sh`) :
-- nom du profil GitHub (sinon le login) ;
-- email noreply `<id>+<login>@users.noreply.github.com` : les commits sont rattachés au compte, l'email personnel n'est pas exposé.
+**Git identity** (required to commit): without GitHub, set by hand (`git config --file ~/.config/git/config user.name "<name>"` and `user.email "<email>"`); with GitHub, deduced from the `gh` account at each startup as long as it is missing (`git-identity.sh`):
+- name of the GitHub profile (otherwise the login);
+- noreply email `<id>+<login>@users.noreply.github.com`: commits are attached to the account, the personal email is not exposed.
 
-Une identité déjà définie n'est jamais remplacée. Pour un autre email : `git config --file ~/.config/git/config user.email "<email>"`. Après un `gh auth login` en cours de session : `devzone start`.
+An identity already set is never replaced. For another email: `git config --file ~/.config/git/config user.email "<email>"`. After a `gh auth login` during a session: `devzone start`.
 
-**Assistants IA** (module `ia`, voir [Modules](#modules)) : `devzone enable ia`, puis `claude` (puis `/login`), `opencode auth login`.
+**AI assistants** (`ia` module, see [Modules](#modules)): `devzone enable ia`, then `claude` (then `/login`), `opencode auth login`.
 
-Les connexions (**GitHub**, **git**, **Claude Code**, **opencode**) et les caches (**Maven**, **Gradle**, **pnpm**) sont **partagés volontairement** entre les devzone d'une machine : elles vivent dans les volumes Docker (voir [Données conservées](#données-conservées)). Le dépôt ne contient aucun identifiant.
+Logins (**GitHub**, **git**, **Claude Code**, **opencode**) and caches (**Maven**, **Gradle**, **pnpm**) are **deliberately shared** between the devzone instances of a machine: they live in the Docker volumes (see [Data kept](#data-kept)). The repository contains no credentials.
 
 
 
-## Plateforme : GitHub ou GitLab
+## Platform: GitHub or GitLab
 
-devzone est pensé pour GitHub ; `devzone platform` choisit celle à laquelle la CLI se connecte (`github` par défaut, comportement actuel, rien ne change) :
+devzone is designed for GitHub; `devzone platform` chooses the platform the CLI connects to (`github` by default, current behavior, nothing changes):
 
 ```bash
-devzone platform                  # affiche la plateforme et son état
-devzone platform github           # retour à GitHub : glab et sa configuration retirés
+devzone platform                  # shows the platform and its state
+devzone platform github           # back to GitHub: glab and its configuration removed
 devzone platform gitlab --url https://gitlab.example.com:3443
-devzone platform gitlab           # sans --url : l'instance du module gitlab (http://gitlab.localhost:8929)
+devzone platform gitlab           # without --url: the instance of the gitlab module (http://gitlab.localhost:8929)
 ```
 
-- **Choix par instance** : gardé aux rebuilds dans le fichier d'état (`$RACINE/.devzone.modules`, lignes `platform=` et `gitlab_url=`), comme les [modules](#modules).
-- **glab** (CLI GitLab), installé **seulement** quand GitLab est choisi : binaire de la release officielle de gitlab.org (chart de gitlab-org/cli), version figée et somme SHA-256 vérifiées, dans `~/.local/bin` ; au retour à `github`, le binaire et sa configuration (`~/.config/glab-cli/`) sont retirés — la configuration d'un service n'existe que pendant qu'il est choisi.
-- **Connexion** : instance du module `gitlab` → automatique, avec le jeton root du module (`workspace/.gitlab/`, protocole http, jamais affiché) ; autre instance (gitlab.com ou auto-hébergée) → `glab auth login --hostname <hôte>`, interactif (code de connexion à saisir).
-- **État** : la ligne `plateforme` affiche l'instance et « glab connecté », ou « non connecté » avec la commande à lancer. Avec `gitlab`, les lignes propres à GitHub signalent qu'elles ne s'appliquent pas : repowarden (bots, tickets, workflows du dépôt devzone) reste uniquement sur GitHub en attendant son support GitLab ([simdevWarden/repowarden#531](https://github.com/simdevWarden/repowarden/issues/531)). `gh` connecté reste utile pour ces tickets.
-- **Instance de test** : le [module gitlab](#gitlab) fournit l'instance locale du conteneur (utilisateur `root`, secrets dans `workspace/.gitlab/`) ; dès qu'il est actif, `devzone platform gitlab` (sans `--url`) la cible d'office.
-- **Mise à jour de glab** : dans `.devcontainer/devzone`, `GLAB_VERSION` et les deux sommes `GLAB_SOMME_ARM64` / `GLAB_SOMME_AMD64` (checksums.txt de la release), puis `devzone platform gitlab --url URL` (glab est re-téléchargé seulement s'il est absent ou cassé : le retirer d'abord, `rm ~/.local/bin/glab`).
+- **Choice per instance**: kept across rebuilds in the state file (`$RACINE/.devzone.modules`, lines `platform=` and `gitlab_url=`), like the [modules](#modules).
+- **glab** (GitLab CLI), installed **only** when GitLab is chosen: binary from the official gitlab.org release (chart of gitlab-org/cli), pinned version and verified SHA-256 checksum, in `~/.local/bin`; when going back to `github`, the binary and its configuration (`~/.config/glab-cli/`) are removed: the configuration of a service exists only while it is chosen.
+- **Connection**: instance of the `gitlab` module → automatic, with the module's root token (`workspace/.gitlab/`, http protocol, never displayed); other instance (gitlab.com or self-hosted) → `glab auth login --hostname <host>`, interactive (login code to enter).
+- **State**: the `platform` line shows the instance and “glab connected”, or “not connected” with the command to run. With `gitlab`, the GitHub-only lines report that they do not apply: repowarden (bots, tickets, workflows of the devzone repository) stays on GitHub only until it supports GitLab ([simdevWarden/repowarden#531](https://github.com/simdevWarden/repowarden/issues/531)). A connected `gh` remains useful for these tickets.
+- **Test instance**: the [gitlab module](#gitlab) provides the container's local instance (user `root`, secrets in `workspace/.gitlab/`); as soon as it is active, `devzone platform gitlab` (without `--url`) targets it by default.
+- **Updating glab**: in `.devcontainer/devzone`, `GLAB_VERSION` and the two checksums `GLAB_SOMME_ARM64` / `GLAB_SOMME_AMD64` (checksums.txt of the release), then `devzone platform gitlab --url URL` (glab is downloaded again only if it is missing or broken: remove it first, `rm ~/.local/bin/glab`).
 
 
 
-## Mettre en route un projet
+## Starting a project
 
-Tes projets vont dans `workspace/` (`/workspaces/devzone/workspace` dans le conteneur), chacun avec son propre dépôt git. Les hooks repowarden y sont actifs d'office.
+Your projects go into `workspace/` (`/workspaces/devzone/workspace` in the container), each with its own git repository. The repowarden hooks are active there by default.
 
-**Projet existant, déjà équipé de repowarden** (`.repowarden.conf` et workflows présents) : il suffit de le cloner.
+**Existing project, already equipped with repowarden** (`.repowarden.conf` and workflows present): just clone it.
 
 ```bash
 cd /workspaces/devzone/workspace
-git clone https://github.com/<compte>/<projet>.git
-cd <projet>
-repowarden            # état du poste et du dépôt, étape suivante
+git clone https://github.com/<account>/<project>.git
+cd <project>
+repowarden            # state of the workstation and the repository, next step
 ```
 
-**Nouveau projet, ou projet sans repowarden** :
+**New project, or project without repowarden**:
 
 ```bash
 cd /workspaces/devzone/workspace
-mkdir <projet> && cd <projet> && git init -b main     # ou git clone d'un dépôt existant
-# … premiers fichiers, puis un premier commit : git add . && git cc
-gh repo create <compte>/<projet> --private --source . --push   # dépôt GitHub (si absent)
-repowarden bots       # CI, releases, tickets, GitHub App, protection : chacun avec ton accord
-repowarden            # vérifier
+mkdir <project> && cd <project> && git init -b main     # or git clone of an existing repository
+# … first files, then a first commit: git add . && git cc
+gh repo create <account>/<project> --private --source . --push   # GitHub repository (if absent)
+repowarden bots       # CI, releases, tickets, GitHub App, protection: each with your agreement
+repowarden            # check
 ```
 
-`repowarden bots` demande le flux (`main` seule, ou `develop` → `main`), montre ce qu'il va créer, puis attend ta confirmation ; un fichier existant n'est jamais écrasé. Il faut `gh` connecté et les droits d'administration du dépôt GitHub.
+`repowarden bots` asks for the flow (`main` only, or `develop` → `main`), shows what it is going to create, then waits for your confirmation; an existing file is never overwritten. It requires `gh` to be connected and administrator rights on the GitHub repository.
 
-### Worktrees git
+### Git worktrees
 
-**Règle** : un dépôt du workspace se manipule d'un seul côté. Les worktrees se créent **et** se suppriment dans le conteneur (`git worktree add`, `git worktree remove`) ; ne jamais lancer `git worktree prune` sur la machine hôte, ni laisser un outil de l'hôte le faire (VS Code, GitHub Desktop…).
+**Rule**: a workspace repository is handled from one side only. Worktrees are created **and** removed in the container (`git worktree add`, `git worktree remove`); never run `git worktree prune` on the host machine, nor let a host tool do it (VS Code, GitHub Desktop…).
 
-**Pourquoi** : le workspace est monté depuis l'hôte (`/Users/…/devzone` sur Mac → `/workspaces/devzone`). git enregistre le chemin **absolu** de chaque worktree dans `.git/worktrees/<nom>/gitdir` : `/workspaces/…` pour un worktree créé dans le conteneur, `/Users/…` pour un worktree créé sur le Mac. Vu de l'autre côté, ce chemin n'existe pas : le worktree paraît « prunable », et un `git worktree prune` efface ses métadonnées, ce qui casse le worktree là où il a été créé.
+**Why**: the workspace is mounted from the host (`/Users/…/devzone` on a Mac → `/workspaces/devzone`). git records the **absolute** path of each worktree in `.git/worktrees/<name>/gitdir`: `/workspaces/…` for a worktree created in the container, `/Users/…` for a worktree created on the Mac. Seen from the other side, this path does not exist: the worktree looks “prunable”, and a `git worktree prune` erases its metadata, which breaks the worktree where it was created.
 
-**Signalement** : l'état affiché au démarrage (et par `devzone`) liste, sans rien supprimer, les worktrees du dépôt devzone et des dépôts du workspace dont le chemin n'existe pas dans le conteneur : `⚠ worktree        /Users/…/wt-42 absent ici (créé hors du conteneur ?) : …`. Le gérer depuis le côté qui l'a créé (le supprimer là-bas avec `git worktree remove`, puis le recréer dans le conteneur si besoin).
+**Reporting**: the state shown at startup (and by `devzone`) lists, without deleting anything, the worktrees of the devzone repository and of the workspace repositories whose path does not exist in the container: `⚠ worktree        /Users/…/wt-42 absent ici (créé hors du conteneur ?) : …`. Manage it from the side that created it (remove it there with `git worktree remove`, then recreate it in the container if needed).
 
 
 
 ## Modules
 
-Les fonctionnalités facultatives sont des modules, **désactivés par défaut**, activés à la demande depuis le conteneur, sans rebuild :
+Optional features are modules, **disabled by default**, enabled on demand from the container, without a rebuild:
 
 ```bash
-devzone                        # état : identité git, GitHub, outils, modules
-devzone enable <module>       # active et applique tout de suite
-devzone disable <module>    # désactive et applique tout de suite
+devzone                        # state: git identity, GitHub, tools, modules
+devzone enable <module>       # enables and applies at once
+devzone disable <module>    # disables and applies at once
 ```
 
-| Module | Activé | Désactivé |
+| Module | Enabled | Disabled |
 |---|---|---|
-| `ia` | Claude Code et opencode installés (versions figées), réinstallés à chaque rebuild, avec le [garde-fou repowarden](#garde-fou-des-assistants-ia), une [configuration opencode par défaut](#configuration-dopencode) et la [skill devzone](#skill-devzone) posée dans `~/.claude/skills/devzone/` et `~/.config/opencode/skills/devzone/` ; se connecter : `claude` (puis `/login`), `opencode auth login` | désinstallés ; le garde-fou (hook et plugin), la configuration opencode par défaut et la skill devzone non modifiée sont retirés ; l'état de `devzone agent` (volume partagé), les journaux `workspace/.agents/` et les connexions restent | Python 3.12 d Ubuntu 24.04, installé par apt (plus de feature devcontainer, pas de serveur de clés, #464)
-| `kubernetes` | à chaque démarrage : connexion au cluster de ta machine et metrics-server sur les clusters locaux (CPU et RAM dans k9s) | aucune connexion au cluster de ta machine ; kubectl, helm, k9s et kind restent installés, un cluster kind créé à la main reste utilisable ; metrics-server est retiré des clusters où devzone l'a installé |
-| `gitlab` | GitLab CE de test dans le [cluster des services](#cluster-de-devzone), namespace `devzone-gitlab` (chart figé), runner Kubernetes, projet `devzone/demo` avec pipeline ; http://gitlab.localhost:8929 ; au moins 8 Go de RAM allouable (voir [GitLab](#gitlab)) | releases Helm et namespace `devzone-gitlab` retirés, secret Rails gardé (`workspace/.gitlab/rails-secret.yaml`) ; rien d'autre touché |
-| `postgres` | PostgreSQL 16 partagé sur le [cluster de devzone](#cluster-de-devzone), une base par projet (`devzone postgres create <projet>`), joignable sur `127.0.0.1:5432` dans le conteneur (voir [PostgreSQL](#postgresql)) | namespace `devzone-postgres` (toutes les bases) et secrets `workspace/.postgres/` supprimés, après confirmation en terminal ; kind dédié supprimé s'il ne sert plus |
-| `argocd` | Argo CD sur le [cluster de devzone](#cluster-de-devzone), namespace `devzone-argocd` (chart figé), serveur en `ClusterIP` ; https://127.0.0.1:8443 dans le conteneur ; au moins 1 Go de RAM allouable (voir [Argo CD](#argo-cd)) | release Helm et namespace `devzone-argocd` retirés, secret `workspace/.argocd/` supprimé ; les autres services restent, sous helm direct |
+| `ia` | Claude Code and opencode installed (pinned versions), reinstalled at each rebuild, with the [repowarden guard](#ai-assistants-guard), a [default opencode configuration](#opencode-configuration) and the [devzone skill](#devzone-skill) placed in `~/.claude/skills/devzone/` and `~/.config/opencode/skills/devzone/`; to log in: `claude` (then `/login`), `opencode auth login` | uninstalled; the guard (hook and plugin), the default opencode configuration and the unmodified devzone skill are removed; the state of `devzone agent` (shared volume), the logs in `workspace/.agents/` and the logins remain | Python 3.12 on Ubuntu 24.04, installed by apt (no more devcontainer feature, no key server, #464) |
+| `kubernetes` | at each startup: connection to your machine's cluster and metrics-server on local clusters (CPU and RAM in k9s) | no connection to your machine's cluster; kubectl, helm, k9s and kind remain installed, a kind cluster created by hand remains usable; metrics-server is removed from the clusters where devzone installed it |
+| `gitlab` | test GitLab CE in the [services cluster](#devzone-cluster), namespace `devzone-gitlab` (pinned chart), Kubernetes runner, project `devzone/demo` with a pipeline; http://gitlab.localhost:8929; at least 8 GB of allocatable RAM (see [GitLab](#gitlab)) | Helm releases and namespace `devzone-gitlab` removed, Rails secret kept (`workspace/.gitlab/rails-secret.yaml`); nothing else touched |
+| `postgres` | shared PostgreSQL 16 on the [devzone cluster](#devzone-cluster), one database per project (`devzone postgres create <project>`), reachable on `127.0.0.1:5432` in the container (see [PostgreSQL](#postgresql)) | namespace `devzone-postgres` (all databases) and `workspace/.postgres/` secrets deleted, after confirmation in a terminal; dedicated kind cluster deleted if it is no longer used |
+| `argocd` | Argo CD on the [devzone cluster](#devzone-cluster), namespace `devzone-argocd` (pinned chart), server in `ClusterIP`; https://127.0.0.1:8443 in the container; at least 1 GB of allocatable RAM (see [Argo CD](#argo-cd)) | Helm release and namespace `devzone-argocd` removed, secret `workspace/.argocd/` deleted; the other services remain, under direct helm |
 
-Le module `llm` est retiré (#669) : `devzone apply` retire la ligne `llm=` de `.devzone.modules` ; le namespace `devzone-llm` et son volume ne sont pas supprimés automatiquement (`kubectl delete namespace devzone-llm` pour libérer le disque).
+The `llm` module is removed (#669): `devzone apply` removes the `llm=` line from `.devzone.modules`; the `devzone-llm` namespace and its volume are not deleted automatically (`kubectl delete namespace devzone-llm` to free the disk).
 
-### Mémoire minimale par module
+### Minimum memory per module
 
-Mesures du 16/11/2026.
+Measurements from 16/11/2026.
 
-| Module | Consommation mesurée | Mémoire allouable exigée par devzone |
+| Module | Measured consumption | Allocatable memory required by devzone |
 |---|---|---|
-| Cluster de base | ~4 Go | aucune |
-| GitLab | ~3,6 Go | 8 Go |
-| MySQL | ~0,5 Go | aucune |
-| Argo CD | ~0,6 Go | 1 Go |
+| Base cluster | ~4 GB | none |
+| GitLab | ~3.6 GB | 8 GB |
+| MySQL | ~0.5 GB | none |
+| Argo CD | ~0.6 GB | 1 GB |
 
-Sur Docker Desktop (kind), le contrôle compare le minimum à la mémoire d'un seul nœud, donc à la VM ; sur un cluster de vraies machines, à la somme des nœuds.
+On Docker Desktop (kind), the check compares the minimum with the memory of a single node, so with the VM; on a cluster of real machines, with the sum of the nodes.
 
-### Réglage de la RAM
+### Adjusting the RAM
 
-- **Mac** (Docker Desktop) : *Settings → Resources > Memory*. Autre méthode : modifier `MemoryMiB` dans le fichier `settings-store.json` de Docker Desktop (Docker totalement quitté sinon il réécrit la valeur).
-- **Windows** : fichier `%UserProfile%\.wslconfig` avec `[wsl2]` et `memory=<N>GB`, puis `wsl --shutdown`. WSL2 prend 50 % de la RAM par défaut.
-- **Linux** : rien à régler : pas de VM, la RAM de l'hôte sert.
+- **Mac** (Docker Desktop): *Settings → Resources > Memory*. Other method: change `MemoryMiB` in the `settings-store.json` file of Docker Desktop (Docker must be fully quit, otherwise it rewrites the value).
+- **Windows**: file `%UserProfile%\.wslconfig` with `[wsl2]` and `memory=<N>GB`, then `wsl --shutdown`. WSL2 takes 50 % of the RAM by default.
+- **Linux**: nothing to adjust: there is no VM, the host's RAM is used.
 
-Le choix est **propre à chaque devzone** (instance) et gardé dans le dossier `$RACINE/.devzone.modules` (monté de l'hôte, il survit aux rebuilds). Au premier démarrage d'une instance, si une connexion Claude Code ou opencode existe déjà dans les volumes, le module `ia` n'est pas activé : tout est désactivé par défaut et la connexion est signalée une seule fois (« devzone enable ia pour l'utiliser ici »), pas pour un état repris.
+The choice is **specific to each devzone** (instance) and kept in the folder `$RACINE/.devzone.modules` (mounted from the host, it survives rebuilds). At the first startup of an instance, if a Claude Code or opencode login already exists in the volumes, the `ia` module is not enabled: everything is disabled by default and the login is reported only once (“devzone enable ia to use it here”), not for a resumed state.
 
-Dans le [workspace Kubernetes](#services-de-devzone-dans-le-workspace-kubernetes), `gitlab`, `postgres` et `argocd` s'installent depuis le poste (`devzone workspace services enable <service>`) ; le pod n'affiche que leur présence dans le cluster.
+In the [Kubernetes workspace](#devzone-services-in-the-kubernetes-workspace), `gitlab`, `postgres` and `argocd` are installed from the workstation (`devzone workspace services enable <service>`); the pod only shows their presence in the cluster.
 
-### Socket Docker de l'hôte
+### Host Docker socket
 
-Par défaut, la feature `docker-outside-of-docker` monte le socket Docker du poste dans le conteneur : le récapitulatif affiche `⚠ socket Docker de l hôte partagé (agents compris)`. C'est ce qui permet à `docker`, Testcontainers et kind de parler au Docker de l'hôte, mais cela donne aussi au conteneur et à ses agents l'administration du Docker du poste.
+By default, the `docker-outside-of-docker` feature mounts the workstation's Docker socket in the container: the summary shows `⚠ socket Docker de l hôte partagé (agents compris)`. This is what lets `docker`, Testcontainers and kind talk to the host's Docker, but it also gives the container and its agents administration of the workstation's Docker.
 
-Le récapitulatif suit le **socket réellement monté**, pas l'option : tant que `make rebuild` n'a pas été lancé, le conteneur courant garde son ancien montage, signalé par `⚠ socket Docker de l hôte encore partagé : make rebuild sur le poste` (option `off`) ou `⚠ socket Docker de l hôte absent : make rebuild sur le poste` (option `on`, socket absent). Sans socket et avec l'option `off`, tout est cohérent : rien n'est affiché.
+The summary follows the **socket actually mounted**, not the option: as long as `make rebuild` has not been run, the current container keeps its former mount, reported by `⚠ socket Docker de l hôte encore partagé : make rebuild sur le poste` (option `off`) or `⚠ socket Docker de l hôte absent : make rebuild sur le poste` (option `on`, socket absent). Without a socket and with the option `off`, everything is consistent: nothing is shown.
 
-Pour retirer ce partage :
-
-```bash
-devzone disable docker-hote     # écrit docker-hote=off, puis demande une reconstruction
-make rebuild                       # sur le poste, pas dans le conteneur
-```
-
-Au lancement sur le poste, `manage/scripts/launch.sh` lit la ligne `docker-hote` (absente = `on`). À `off`, il génère `.devcontainer/without-host-docker/devcontainer.json` (copie sans la feature, chemins de build adaptés au sous-dossier, dossier ignoré par git) et passe ce fichier au CLI devcontainers avec `--config`. Pour remettre le socket : `devzone enable docker-hote`, puis `make rebuild`.
-
-Sans socket, `docker` n'existe plus dans le conteneur : la commande affiche un message qui renvoie au workspace Kubernetes (`devzone workspace`, kubedock et BuildKit). Le relais du socket ne bloque pas le démarrage, et la connexion au cluster Kubernetes de l'hôte reste disponible ; en revanche, kind et les conteneurs lancés sur le Docker du poste ne le sont plus. `devzone status --json` porte l'option dans le champ `docker_host` et l'état réel du montage dans `docker_hote_actif`.
-
-### Commandes de l'application
-
-Les scripts internes de `.devcontainer/` ne sont pas des commandes utilisateur : `devzone` les enveloppe.
+To remove this sharing:
 
 ```bash
-devzone repair                 # relance relais Docker, gitlab, postgres, ports et identifiants
-devzone start                # démarrage complet (identité git, clusters, relais, récapitulatif)
-devzone metrics [contexte…]     # installe metrics-server sur un cluster local
-devzone use CTX [--confirm CTX]  # bascule le cluster de travail de kubectl
-devzone clusters                       # vue des clusters connectes (travail et services)
+devzone disable docker-hote     # writes docker-hote=off, then asks for a rebuild
+make rebuild                       # on the workstation, not in the container
 ```
 
-`repair` affiche `✔` ou `✖` par élément et rend le code 1 dès qu'un élément échoue. `use` ne modifie jamais le [cluster des services](#cluster-de-devzone) (aucune ligne `cluster=`) : un cluster distant exige `--confirm CTX` hors terminal.
+When launched on the workstation, `manage/scripts/launch.sh` reads the `docker-hote` line (absent = `on`). At `off`, it generates `.devcontainer/without-host-docker/devcontainer.json` (a copy without the feature, build paths adapted to the subfolder, folder ignored by git) and passes this file to the devcontainers CLI with `--config`. To restore the socket: `devzone enable docker-hote`, then `make rebuild`.
 
-### Garde-fou des assistants IA
+Without a socket, `docker` no longer exists in the container: the command displays a message pointing to the Kubernetes workspace (`devzone workspace`, kubedock and BuildKit). The socket relay does not block startup, and the connection to the host's Kubernetes cluster remains available; on the other hand, kind and the containers launched on the workstation's Docker no longer work. `devzone status --json` carries the option in the `docker_host` field and the real mount state in `docker_hote_actif`.
 
-Avec le module `ia` actif, devzone branche le [garde-fou de repowarden](https://github.com/simdevWarden/repowarden/blob/main/docs/agents.md) pour Claude Code et opencode (`repowarden agents init --global`, à l'activation et à chaque démarrage ; relancé, rien ne change). Dans **tout dépôt** du conteneur, l'agent est arrêté **avant** son action, avec la commande repowarden à lancer à la place, quand il veut modifier `main` ou `develop`, commiter sans `repowarden cc` ou contourner les hooks (`--no-verify`).
+### Application commands
 
-- **Où** : `~/.claude/settings.json` (hook `PreToolUse`) et `~/.config/opencode/plugins/repowarden-garde.js`, dans les volumes : gardés aux rebuilds. Un réglage déjà présent est complété, jamais écrasé.
-- **Le voir à l'œuvre** : dans un dépôt sur `main`, demander à l'assistant de modifier un fichier : il est refusé (« branche protégée ») avec la commande à lancer.
-- **Limites** : un filet, pas un mur. Une modification faite par le shell (`sed -i`, redirection `>`, script) n'est vue qu'au commit, par les hooks ; une commande cachée dans `bash -c "…"` n'est pas vue. Sans `repowarden` ni `jq`, rien n'est bloqué. `devzone disable ia` retire le garde-fou (hook et plugin) et la configuration opencode par défaut ; l'état de `devzone agent`, les journaux `workspace/.agents/` et les connexions restent.
-
-### Garde-fou Docker et règle Kubernetes
-
-devzone est **Kubernetes d'abord** : le vocabulaire est **le cluster**, **le pod**, **les nœuds** ; seuls les pods sont des conteneurs. Un essai jetable se fait dans un pod ou un namespace jetable (`kubectl run`, `kubectl create ns`, puis suppression). Un garde-fou arrête les agents qui lancent `docker` ou `docker-compose` comme mot de commande (début de ligne, après `;`, `&&`, `||`, `|`, `$(`, un accent grave, `(`, `sudo` ou une affectation `VAR=valeur`), avec un message qui renvoie à kubectl ; une simple mention (`grep docker fichier`, `git commit -m "docker"`) passe.
-
-- **Deux niveaux** : dans le dépôt, des fichiers de projet versionnés couvrent tout agent qui y travaille, où qu'il tourne et que `ia` soit actif ou non : `.claude/settings.json` (hook `PreToolUse` `Bash`) et `.opencode/plugins/devzone-guard.js` (opencode 1.x) / `devzone-guard-v2.js` (opencode 2.x), de simples réexports du plugin embarqué `.devcontainer/ai/plugins/` (présent dans le clone et dans l'image). Pour les dossiers qui ne sont pas ce dépôt, `devzone enable ia` pose les mêmes entrées dans `~/.claude/settings.json` (par `jq`, sans doublon) et copie les deux plugins dans `~/.config/opencode/plugins/` ; `devzone disable ia` retire seulement ces entrées (commandes contenant `docker-guard.sh`) et ces plugins, le reste de `settings.json` et des plugins intact.
-- **Chemin du script** : le plugin embarqué (`.devcontainer/ai/plugins/`) résout `../docker-guard.sh` depuis son propre emplacement ; la copie globale reçoit à la pose le chemin installé (à côté du script `devzone`), et la variable `DEVZONE_DOCKER_GUARD` le remplace au besoin.
-- **Contournement** : la variable d'environnement `DEVZONE_ALLOW_DOCKER` de l'agent, positionnée à 1, laisse passer ; réservé à une action sur l'**hôte** lui-même, jamais au cluster.
-- **Limite** : un filet, pas un mur. Une commande `docker` cachée dans un script n'est pas vue ; sans `python3` ni `jq`, rien n'est bloqué.
-
-### Configuration d'opencode
-
-Avec le module `ia`, devzone écrit une configuration opencode prête à l'emploi dans `~/.config/opencode/opencode.jsonc` (volume `devzone-opencode-config`) : modèles gratuits par rôle (`build`, `plan`, `general`, `explore`, titre, résumé, compaction), partage et mises à jour désactivés. Elle est mise à jour à chaque `devzone enable ia` et à chaque démarrage, tant que sa première ligne repère `// devzone : default opencode configuration …` est présente.
-
-- **Permissions par défaut** : ce qui sert au travail est permis sans question (`edit`, `git`, `repowarden`, `gh` en lecture, lecture et recherche, fichiers du projet, tests, linters et build) ; le reste demande ton accord (`ask`, dont `webfetch`) ; les fuites possibles de secrets sont interdites (`deny`) : `gh auth token`, `gh auth status --show-token`, `~/.config/gh/hosts.yml`, `*.credentials*`, `auth.json`, `~/.ssh/*`, l'environnement (`env`, `printenv`, `set`, `export -p`), `curl`/`wget`, `nc`, `ssh`, `scp`, `sudo`, `rm -rf /` et les push forcés. Le dernier motif qui correspond l'emporte : les `deny` sont en fin de liste.
-- **Pourquoi `curl`/`wget` sont interdits** : une requête peut envoyer des données (jeton, fichier) vers l'extérieur. Le réseau passe par `webfetch`, qui reste disponible après ton accord.
-- **La personnaliser** : retirer cette ligne repère. devzone la garde alors telle quelle, et signale « configuration personnalisée, gardée » ; pour élargir, y ajouter un `allow` (par exemple une commande de plus).
-- **Changer de modèle** : modifier `model` (modèle par défaut), `small_model` (titre) et les `agent` concernés ; `opencode models` liste les modèles disponibles.
-- **Fournisseur payant** : `opencode auth login` (la connexion reste dans le volume `devzone-opencode-data`).
-- **Modèles de l'hôte (Ollama)** : devzone n'héberge aucun modèle ; ils vivent sur l'hôte (Ollama, `http://host.docker.internal:11434` par défaut, overridable via `DEVZONE_OLLAMA_URL`). Détection à la demande sur `/api/tags` (délai court, les modèles d'embedding sont ignorés, sortie propre et sans écriture si Ollama ne répond pas). À `devzone enable ia` (et à `devzone apply`), le fournisseur `devzone-host` (type `@ai-sdk/openai-compatible`, `baseURL = URL + /v1`) est fusionné dans `~/.config/opencode/config.json` avec la liste des modèles détectés (aucun nom en dur), sans écraser le reste du fichier ; il est retiré par `devzone disable ia`. `devzone enable ia` signale ensuite l'état de la détection (« devzone : N modèle(s) de l hôte (Ollama) branché(s) » ou « devzone : aucun modèle Ollama détecté sur <URL> (modèles de l hôte non branchés) »), avec un code de sortie 0 dans les deux cas. `devzone ai` liste les modèles détectés et le modèle par défaut (lecture seule). Dans la rotation de `devzone agent`, le modèle de l'hôte est essayé en premier. Le nom interne du modèle local n'a jamais de « / » (les caractères hors `[A-Za-z0-9._-]` deviennent « _ ») ; la référence passée à opencode reste `devzone-host/<nom réel>`.
-- **Vérification de mise à jour et rapport** : `devzone ai check` interroge, pour chaque modèle détecté, le manifeste du registre (`DEVZONE_OLLAMA_REGISTRY`, sinon `https://registry.ollama.ai` ; un seul GET, délai 5 s, rien de téléchargé) et compare son empreinte au digest local de `/api/tags` : « à jour », « mise à jour disponible » (la ligne `ollama pull <modèle>` à lancer sur l'hôte est affichée, jamais exécutée) ou « non vérifiable » (nom avec slash comme `hf.co/…`, 404, registre injoignable). `devzone ai rapport` affiche en plus la taille, les mesures et le modèle retenu avec sa raison (variable, mesure ou règle). Le modèle par défaut est choisi par priorité : `DEVZONE_HOST_MODEL`, sinon le meilleur modèle mesuré (fichier `DEVZONE_AI_MEASURES`, sinon `~/.config/devzone/ia-mesures.json`, `{"<modèle>": {"reussite": 0..1, "tok_s": n, "date": "…"}}`, tri par réussite puis vitesse, parmi les modèles détectés), sinon la règle « nom contenant `coder` d'abord, puis plus petite taille, puis ordre du nom ».
-- **Lancer opencode en tâche de fond** : `opencode run --auto "…" < /dev/null`. Sans `--auto`, toute demande de permission est refusée d'office et l'agent s'arrête ; sans `< /dev/null`, il attend son entrée et reste muet.
-
-### Skill devzone
-
-Avec le module `ia`, devzone pose la skill devzone (`.devcontainer/skills/devzone/SKILL.md`) dans `~/.claude/skills/devzone/` et `~/.config/opencode/skills/devzone/` (volumes, gardés aux rebuilds). Elle rappelle que tout se fait dans le conteneur avec les commandes `devzone` (jamais les scripts), les worktrees sous `workspace/wt/`, les modules, `devzone agent` (rotation, `etat`, `liberer`), le garde-fou et les fichiers de droits protégés, les services Kubernetes (contexte `devzone`, namespaces `devzone-*`) et ce qui revient au mainteneur (connexions, Ready, fusions).
-
-- **Pose** : si absente, la skill est écrite depuis le modèle ; si elle porte le repère `<!-- devzone : skill set by devzone enable ia -->` et n'a pas été modifiée, elle est mise à jour ; personnalisée, elle est gardée.
-- **Désactivation** : `devzone disable ia` retire seulement la skill non modifiée ; une skill personnalisée est gardée.
-
-La skill « repowarden » est déjà posée par `repowarden agents init` : vérifiez seulement qu'elle est présente.
-
-### Diriger opencode
-
-Claude Code est le **lead** (conception, consignes, relecture, essais, push, suivi CI) ; opencode est le **développeur** (code, tests, commit `repowarden cc`). Plusieurs sessions opencode tournent en parallèle, une par ticket et par worktree.
+The internal scripts of `.devcontainer/` are not user commands: `devzone` wraps them.
 
 ```bash
-devzone agent [--modele <m>[,<m2>…]] <dossier> <fichier-consigne>  # modèles demandés d'abord (#420)
-devzone agent <dossier> <fichier-consigne>    # au premier plan
-devzone agent <dossier> <fichier-consigne> &  # plusieurs en parallèle (ou nohup)
-devzone agent etat                            # sessions, modèles écartés et leur cause
-devzone agent liberer <modèle>|--tous        # lève un écart de modèle
-devzone agent --pod <dossier> <consigne>     # session agent dans un pod éphémère isolé (#222)
+devzone repair                 # relaunches the Docker relay, gitlab, postgres, ports and credentials
+devzone start                # full startup (git identity, clusters, relays, summary)
+devzone metrics [context…]     # installs metrics-server on a local cluster
+devzone use CTX [--confirm CTX]  # switches the kubectl working cluster
+devzone clusters                       # view of the connected clusters (work and services)
 ```
 
-- **Lancement** : `opencode run --auto -m opencode/<modèle> "<consigne>" < /dev/null` dans le dossier. Le journal est `workspace/.agents/<nom du dossier>.log` (état de devzone, hors dépôt, ignoré par git). `--auto` évite l'attente d'une permission ; `< /dev/null` évite une session muette.
-- **Rotation des modèles gratuits** : `opencode models opencode` fournit la liste (`*-free`, `big-pickle`), avec une liste figée de secours. Un rang partagé et verrouillé fait commencer chaque lancement au modèle suivant : deux sessions simultanées partent sur deux modèles différents.
-- **Bascule** selon la cause de l'échec. Le message n'est cherché que dans les 30 dernières lignes de la tentative et seulement si le code de sortie est non nul ou si opencode a écrit sa ligne d'erreur : du code affiché qui contient « Free usage limit » et finit normalement n'est pas un échec.
-  - **pays** (« not available in your country ») : modèle écarté 7 jours ;
-  - **quota** (« Free usage limit »), **filtre** (« content filter ») et **muet** (rien écrit en 45 s au départ) : modèle écarté 1 h ;
-  - **réseau** (`ENOTFOUND`, `ECONNREFUSED`, `ETIMEDOUT`…) : retenu seulement si le réseau est coupé au moment de l'erreur, sinon traité comme **autre**. Aucun écart. devzone attend le retour du réseau (essai toutes les 30 s, 30 min au plus, journal « réseau coupé, attente »), puis relance le même modèle, 3 fois au plus par modèle ; ensuite modèle suivant. Sans retour : arrêt, « réseau indisponible », code 4 ;
-  - autre (« Model is unavailable », « Upstream request failed »…) : modèle suivant, sans écart.
-- **Écarts** : `devzone agent etat` affiche la cause et l'heure de fin de chaque écart ; `devzone agent liberer <modèle>` (ou `--tous`) le lève.
-- **Modèle demandé** (`--modele`, #420) : liste ordonnée de noms de modèles gratuits (sans préfixe `opencode/`), séparés par des virgules. Ils sont essayés dans cet ordre, sauf ceux écartés ; puis la rotation habituelle reprend depuis le rang partagé, sans réessayer un modèle déjà tenté. Un nom inconnu est refusé avant tout lancement (code 2) avec la liste des modèles gratuits. Un modèle demandé qui démarre ne fait pas avancer le rang partagé. Le journal écrit `=== modèle choisi : <m> (demandé)` au démarrage et `=== modèle demandé <m> écarté (<cause>), suivant` pour un modèle demandé écarté. `devzone agent etat` (et `--json`, champ `demande`) montre le modèle demandé et le modèle utilisé. Non géré avec `--pod`.
-- Une session figée (rien écrit depuis 10 min) est arrêtée et reprise sur une session neuve, modèle suivant, avec une consigne de reprise (`git status`, `git diff`, `git log`). Tous les modèles écartés : « aucun modèle gratuit disponible », code 3.
-- **Permissions** : `.devcontainer/opencode/agent.json` est la configuration par défaut, fusionnée avec `OPENCODE_CONFIG_CONTENT` s'il est défini. opencode applique la dernière règle qui correspond : les `deny` de devzone sont ré-ajoutés en dernier après la fusion, donc l'appelant peut ajouter des permissions mais jamais retirer un interdit de devzone. `webfetch` est permis ; `git push`, `git checkout/reset/restore/stash/clean`, `git branch -D`, les écritures GitHub, `gh api`, `curl`, `sudo`, `rm -rf` (sauf `./.essai`) et la gestion des tickets/PR par repowarden (`repowarden ticket …`, `repowarden proteger`, `repowarden run`) sont interdits ; `git commit` reste permis pour `repowarden cc`. `~/bash32` est toujours protégé (le bash 3.2 du conteneur).
-- **Fichiers de droits protégés** : pendant une session, `agent.json`, `.devcontainer/opencode.jsonc`, `.repowarden.conf` et `.devcontainer/agent-rights.sh` (liste fixe, qu'aucune variable ne change) sont interdits à l'écriture d'opencode (`permission.edit`, `deny` ajoutés en dernier). Comme un agent peut aussi écrire par le shell, `devzone agent` photographie ces fichiers au lancement et les compare après **chaque** session (fin normale, erreur, muet, figée) : tout changement est annulé dans l'arbre (jamais de `reset` ni de `rebase`), le journal reçoit `=== ⚠ droits modifiés : <fichier>` (avec le commit à retirer avant tout push si l'agent a commité) et `devzone agent etat` affiche `⚠ droits modifiés (<projet>)` jusqu'au prochain lancement sur ce projet. Le code de sortie ne change pas. De plus, le garde-fou repowarden (réglage `agentsProtectedPaths` de `.repowarden.conf`, repowarden 4.17.1) refuse à tout agent, Claude Code comme opencode, d'écrire ou de commiter ces fichiers, avant même la fin de la session ; un humain peut toujours les modifier.
-- **Quota des modèles gratuits** : ces modèles sont limités ; la rotation et l'écart d'une heure évitent de bloquer un ticket quand l'un est épuisé. Pour un fournisseur payant : `opencode auth login`.
+`repair` shows `✔` or `✖` per item and returns code 1 as soon as an item fails. `use` never modifies the [services cluster](#devzone-cluster) (no `cluster=` line): a remote cluster requires `--confirm CTX` outside a terminal.
 
+### AI assistants guard
 
+With the `ia` module active, devzone plugs the [repowarden guard](https://github.com/simdevWarden/repowarden/blob/main/docs/agents.md) into Claude Code and opencode (`repowarden agents init --global`, at activation and at each startup; rerunning it changes nothing). In **any repository** of the container, the agent is stopped **before** its action, with the repowarden command to run instead, when it wants to modify `main` or `develop`, commit without `repowarden cc`, or bypass the hooks (`--no-verify`).
 
-## Identifiants regroupés
+- **Where**: `~/.claude/settings.json` (`PreToolUse` hook) and `~/.config/opencode/plugins/repowarden-garde.js`, in the volumes: kept across rebuilds. An existing setting is completed, never overwritten.
+- **Seeing it at work**: in a repository on `main`, ask the assistant to modify a file: it is refused (message `branche protégée`, *protected branch*) with the command to run.
+- **Limits**: a safety net, not a wall. A change made by the shell (`sed -i`, `>` redirection, script) is only seen at commit time, by the hooks; a command hidden in `bash -c "…"` is not seen. Without `repowarden` or `jq`, nothing is blocked. `devzone disable ia` removes the guard (hook and plugin) and the default opencode configuration; the state of `devzone agent`, the logs in `workspace/.agents/` and the logins remain.
 
-Les comptes créés par devzone (modules `gitlab`, `postgres` et `argocd`) sont regroupés dans `$RACINE/.password`, à côté de `.devzone.modules`.
+### Docker guard and Kubernetes rule
+
+devzone is **Kubernetes first**: the vocabulary is **the cluster**, **the pod**, **the nodes**; only pods are containers. A disposable test is done in a disposable pod or namespace (`kubectl run`, `kubectl create ns`, then deletion). A guard stops agents that run `docker` or `docker-compose` as a command word (start of line, after `;`, `&&`, `||`, `|`, `$(`, a backtick, `(`, `sudo` or an assignment `VAR=value`), with a message pointing to kubectl; a simple mention (`grep docker file`, `git commit -m "docker"`) passes.
+
+- **Two levels**: in the repository, versioned project files cover any agent working there, wherever it runs and whether `ia` is active or not: `.claude/settings.json` (`Bash` `PreToolUse` hook) and `.opencode/plugins/devzone-guard.js` (opencode 1.x) / `devzone-guard-v2.js` (opencode 2.x), simple re-exports of the embedded plugin `.devcontainer/ai/plugins/` (present in the clone and in the image). For folders other than this repository, `devzone enable ia` places the same entries in `~/.claude/settings.json` (via `jq`, without duplicates) and copies the two plugins into `~/.config/opencode/plugins/`; `devzone disable ia` removes only these entries (commands containing `docker-guard.sh`) and these plugins, the rest of `settings.json` and of the plugins stays intact.
+- **Script path**: the embedded plugin (`.devcontainer/ai/plugins/`) resolves `../docker-guard.sh` from its own location; the global copy receives, at installation, the installed path (next to the `devzone` script), and the `DEVZONE_DOCKER_GUARD` variable replaces it if needed.
+- **Bypass**: the agent's `DEVZONE_ALLOW_DOCKER` environment variable, set to 1, lets it through; reserved for an action on the **host** itself, never on the cluster.
+- **Limit**: a safety net, not a wall. A `docker` command hidden in a script is not seen; without `python3` or `jq`, nothing is blocked.
+
+### opencode configuration
+
+With the `ia` module, devzone writes a ready-to-use opencode configuration in `~/.config/opencode/opencode.jsonc` (volume `devzone-opencode-config`): free models per role (`build`, `plan`, `general`, `explore`, title, summary, compaction), sharing and updates disabled. It is updated at each `devzone enable ia` and at each startup, as long as its marker first line `// devzone : default opencode configuration …` is present.
+
+- **Default permissions**: what serves the work is allowed without asking (`edit`, `git`, `repowarden`, `gh` in read mode, reading and searching, project files, tests, linters and build); the rest requires your agreement (`ask`, including `webfetch`); possible secret leaks are forbidden (`deny`): `gh auth token`, `gh auth status --show-token`, `~/.config/gh/hosts.yml`, `*.credentials*`, `auth.json`, `~/.ssh/*`, the environment (`env`, `printenv`, `set`, `export -p`), `curl`/`wget`, `nc`, `ssh`, `scp`, `sudo`, `rm -rf /` and force pushes. The last matching pattern wins: the `deny` entries are at the end of the list.
+- **Why `curl`/`wget` are forbidden**: a request can send data (token, file) outward. The network goes through `webfetch`, which remains available with your agreement.
+- **Customizing it**: remove this marker line. devzone then keeps it as is and reports `configuration personnalisée, gardée`; to widen it, add an `allow` entry (for example one more command).
+- **Changing the model**: edit `model` (default model), `small_model` (title) and the relevant `agent` entries; `opencode models` lists the available models.
+- **Paid provider**: `opencode auth login` (the login stays in the volume `devzone-opencode-data`).
+- **Host models (Ollama)**: devzone hosts no model; they live on the host (Ollama, `http://host.docker.internal:11434` by default, overridable via `DEVZONE_OLLAMA_URL`). Detection on demand via `/api/tags` (short timeout, embedding models are ignored, clean output and no write if Ollama does not answer). At `devzone enable ia` (and at `devzone apply`), the `devzone-host` provider (type `@ai-sdk/openai-compatible`, `baseURL = URL + /v1`) is merged into `~/.config/opencode/config.json` with the list of detected models (no name hard-coded), without overwriting the rest of the file; it is removed by `devzone disable ia`. `devzone enable ia` then reports the detection status (`devzone : N modèle(s) de l hôte (Ollama) branché(s)` or `devzone : aucun modèle Ollama détecté sur <URL> (modèles de l hôte non branchés)`), with exit code 0 in both cases. `devzone ai` lists the detected models and the default model (read-only). In the rotation of `devzone agent`, the host model is tried first. The internal name of the local model never contains “/” (characters outside `[A-Za-z0-9._-]` become “_”); the reference passed to opencode stays `devzone-host/<real-name>`.
+- **Update check and report**: `devzone ai check` queries, for each detected model, the manifest of the registry (`DEVZONE_OLLAMA_REGISTRY`, otherwise `https://registry.ollama.ai`; a single GET, 5 s timeout, nothing downloaded) and compares its fingerprint with the local digest of `/api/tags`: `à jour` (*up to date*), `mise à jour disponible` (*update available*; the line `ollama pull <model>` to run on the host is shown, never executed) or `non vérifiable` (*not verifiable*: name with a slash such as `hf.co/…`, 404, registry unreachable). `devzone ai rapport` also shows the size, the measurements and the selected model with its reason (variable, measurement or rule). The default model is chosen by priority: `DEVZONE_HOST_MODEL`, otherwise the best measured model (file `DEVZONE_AI_MEASURES`, otherwise `~/.config/devzone/ia-mesures.json`, `{"<model>": {"reussite": 0..1, "tok_s": n, "date": "…"}}`, sorted by success then speed, among the detected models), otherwise the rule “name containing `coder` first, then smallest size, then name order”.
+- **Running opencode in the background**: `opencode run --auto "…" < /dev/null`. Without `--auto`, any permission request is refused outright and the agent stops; without `< /dev/null`, it waits for its input and stays silent.
+
+### devzone skill
+
+With the `ia` module, devzone places the devzone skill (`.devcontainer/skills/devzone/SKILL.md`) in `~/.claude/skills/devzone/` and `~/.config/opencode/skills/devzone/` (volumes, kept across rebuilds). It recalls that everything is done in the container with the `devzone` commands (never the scripts), worktrees under `workspace/wt/`, modules, `devzone agent` (rotation, `etat`, `liberer`), the guard and the protected rights files, Kubernetes services (context `devzone`, `devzone-*` namespaces) and what falls to the maintainer (logins, Ready, merges).
+
+- **Installation**: if absent, the skill is written from the template; if it carries the marker `<!-- devzone : skill set by devzone enable ia -->` and has not been modified, it is updated; if customized, it is kept.
+- **Disabling**: `devzone disable ia` removes only the unmodified skill; a customized skill is kept.
+
+The “repowarden” skill is already placed by `repowarden agents init`: just check that it is present.
+
+### Directing opencode
+
+Claude Code is the **lead** (design, instructions, review, tests, push, CI tracking); opencode is the **developer** (code, tests, `repowarden cc` commit). Several opencode sessions run in parallel, one per ticket and per worktree.
 
 ```bash
-devzone passwords          # régénère le fichier et affiche seulement son chemin
+devzone agent [--modele <m>[,<m2>…]] <folder> <instruction-file>  # requested models first (#420)
+devzone agent <folder> <instruction-file>    # in the foreground
+devzone agent <folder> <instruction-file> &  # several in parallel (or nohup)
+devzone agent etat                            # sessions, discarded models and their cause
+devzone agent liberer <model>|--tous        # lifts a model discard
+devzone agent --pod <folder> <instruction>     # agent session in a disposable isolated pod (#222)
 ```
 
-- **Format** : en-tête en commentaire, puis une ligne par compte, colonnes séparées par des tabulations : `service`, `adresse`, `utilisateur`, `mot de passe`. Tri stable par service puis utilisateur ; aucune ligne vide.
-- **Source** : les fichiers des modules restent la référence (`workspace/.gitlab/root-password`, `workspace/.gitlab/dev-password`, `workspace/.postgres/admin-password`, `workspace/.postgres/<projet>.env`, `workspace/.argocd/admin.env`). `.password` est une vue régénérée, jamais une seconde copie à tenir à jour.
-- **Mise à jour** : `password_regenerate` (`.devcontainer/password.sh`) est appelée à la fin de chaque création, suppression ou changement de compte : installation, `create`, `delete` et `--new-password` de postgres ; seed et désinstallation de gitlab ; installation et désinstallation d'argocd ; démarrage de devzone. Un échec n'empêche jamais l'opération, il affiche un avertissement.
-- **Protection** : fichier ignoré par git (`.gitignore`) et droits **600** posés avant l'écriture (`umask 077`, fichier temporaire dans le même dossier puis `mv`). Aucune commande ne lit ni n'affiche son contenu ; le récapitulatif et `devzone passwords` citent seulement le chemin. Sans aucun compte, le fichier est supprimé.
+- **Launch**: `opencode run --auto -m opencode/<model> "<instruction>" < /dev/null` in the folder. The log is `workspace/.agents/<folder name>.log` (devzone state, outside the repository, ignored by git). `--auto` avoids waiting for a permission; `< /dev/null` avoids a silent session.
+- **Free model rotation**: `opencode models opencode` provides the list (`*-free`, `big-pickle`), with a fixed fallback list. A shared, locked rank makes each launch start on the next model: two simultaneous sessions start on two different models.
+- **Switching** according to the cause of the failure. The message is only searched in the last 30 lines of the attempt, and only if the exit code is non-zero or if opencode wrote its error line: displayed code containing “Free usage limit” that ends normally is not a failure.
+  - **country** (`not available in your country`): model discarded for 7 days;
+  - **quota** (`Free usage limit`), **filter** (`content filter`) and **silent** (nothing written in 45 s at start): model discarded for 1 h;
+  - **network** (`ENOTFOUND`, `ECONNREFUSED`, `ETIMEDOUT`…): kept only if the network is down at the time of the error, otherwise treated as **other**. No discard. devzone waits for the network to come back (retry every 30 s, 30 min at most, log `réseau coupé, attente`), then relaunches the same model, 3 times at most per model; then the next model. Without a return: stop, `réseau indisponible`, code 4;
+  - **other** (`Model is unavailable`, `Upstream request failed`…): next model, without discard.
+- **Discards**: `devzone agent etat` shows the cause and end time of each discard; `devzone agent liberer <model>` (or `--tous`) lifts it.
+- **Requested model** (`--modele`, #420): ordered list of free model names (without the `opencode/` prefix), separated by commas. They are tried in this order, except the discarded ones; then the usual rotation resumes from the shared rank, without retrying a model already tried. An unknown name is refused before any launch (code 2) with the list of free models. A requested model that starts does not advance the shared rank. The log writes `=== modèle choisi : <m> (demandé)` at startup and `=== modèle demandé <m> écarté (<cause>), suivant` for a requested model that is discarded. `devzone agent etat` (and `--json`, field `demande`) shows the requested model and the model used. Not handled with `--pod`.
+- A frozen session (nothing written for 10 min) is stopped and resumed in a new session, next model, with a resume instruction (`git status`, `git diff`, `git log`). All models discarded: `aucun modèle gratuit disponible`, code 3.
+- **Permissions**: `.devcontainer/opencode/agent.json` is the default configuration, merged with `OPENCODE_CONFIG_CONTENT` if it is defined. opencode applies the last matching rule: devzone's `deny` entries are re-added last after the merge, so the caller can add permissions but never remove a devzone prohibition. `webfetch` is allowed; `git push`, `git checkout/reset/restore/stash/clean`, `git branch -D`, GitHub writes, `gh api`, `curl`, `sudo`, `rm -rf` (except `./.essai`) and ticket/PR management by repowarden (`repowarden ticket …`, `repowarden proteger`, `repowarden run`) are forbidden; `git commit` remains allowed for `repowarden cc`. `~/bash32` is always protected (the bash 3.2 of the container).
+- **Protected rights files**: during a session, `agent.json`, `.devcontainer/opencode.jsonc`, `.repowarden.conf` and `.devcontainer/agent-rights.sh` (fixed list, no variable changes it) are forbidden for writing by opencode (`permission.edit`, `deny` added last). As an agent can also write through the shell, `devzone agent` takes a snapshot of these files at launch and compares them after **each** session (normal end, error, silent, frozen): any change is reverted in the tree (never `reset` nor `rebase`), the log receives `=== ⚠ droits modifiés : <fichier>` (with the commit to remove before any push if the agent committed), and `devzone agent etat` shows `⚠ droits modifiés (<projet>)` until the next launch on this project. The exit code does not change. In addition, the repowarden guard (`agentsProtectedPaths` setting of `.repowarden.conf`, repowarden 4.17.1) refuses any agent, Claude Code as well as opencode, to write or commit these files, even before the end of the session; a human can always modify them.
+- **Free model quota**: these models are limited; rotation and the one-hour discard avoid blocking a ticket when one is exhausted. For a paid provider: `opencode auth login`.
 
 
 
-## Plusieurs devzone sur une machine
+## Grouped credentials
 
-Plusieurs devzone peuvent cohabiter sur une même machine (un par projet, un par usage) : chaque instance est un dossier du workspace, avec son propre état et ses propres modules.
+The accounts created by devzone (`gitlab`, `postgres` and `argocd` modules) are grouped in `$RACINE/.password`, next to `.devzone.modules`.
 
-- **Modules** : **propres à chaque devzone**. L'état vit dans le dossier de l'instance (`$RACINE/.devzone.modules`), monté de l'hôte : un second devzone démarre avec des valeurs par défaut, sans hériter de ceux du premier (un ancien état global, au premier devzone démarré après la mise à jour, est repris une fois, par déplacement).
-- **Plateforme** (GitHub ou GitLab, [voir plus haut](#plateforme-github-ou-gitlab)) : propre à chaque devzone aussi, dans le même fichier d'état, avec l'URL de son instance GitLab.
-- **Connexions** (**GitHub**, **git**, **Claude Code**, **opencode**) et **caches** (**Maven**, **Gradle**, **pnpm**) : **partagés volontairement** entre les devzone d'une machine, dans les volumes `devzone-*`.
-- **Isolation complète** : un préfixe de volumes distinct (comme pour les tests) donne à chaque devzone ses propres volumes ; voir « Pour les contributeurs ».
+```bash
+devzone passwords          # regenerates the file and only shows its path
+```
+
+- **Format**: comment header, then one line per account, columns separated by tabs: `service`, `address`, `user`, `password`. Stable sort by service then user; no empty line.
+- **Source**: the module files remain the reference (`workspace/.gitlab/root-password`, `workspace/.gitlab/dev-password`, `workspace/.postgres/admin-password`, `workspace/.postgres/<project>.env`, `workspace/.argocd/admin.env`). `.password` is a regenerated view, never a second copy to keep up to date.
+- **Update**: `password_regenerate` (`.devcontainer/password.sh`) is called at the end of each creation, deletion or account change: installation, `create`, `delete` and `--new-password` of postgres; seed and uninstall of gitlab; installation and uninstall of argocd; devzone startup. A failure never prevents the operation; it shows a warning.
+- **Protection**: file ignored by git (`.gitignore`) and rights **600** set before writing (`umask 077`, temporary file in the same folder, then `mv`). No command reads or displays its content; the summary and `devzone passwords` only cite the path. Without any account, the file is deleted.
 
 
-## Travailler sur un projet
 
-- **Hooks repowarden** : installés globalement (`repowarden install --global --lang fr`), ils s'appliquent à tout dépôt cloné dans le conteneur (messages de commit, secrets, formatage, tests). Ensuite, suivre les règles du projet (`AGENTS.md`, `CONTRIBUTING.md`) : `repowarden ticket <n>`, `repowarden cc …`.
-- **GitHub App** (proposée par `repowarden bots`, ou `repowarden app init`) : sans elle, les workflows agissent sous le bot `github-actions`, dont les actions ne déclenchent aucun autre workflow (PR brouillon sans CI, merge automatique sans préversion…) ; voir [Dépannage](#dépannage).
-- **Vérifications de la CI de repowarden** en local : `shellcheck`, `actionlint`, `bats test/`. actionlint est à la même version que la CI ; shellcheck et bats sont ceux d'Ubuntu 24.04 et peuvent différer légèrement.
+## Several devzone instances on one machine
+
+Several devzone instances can coexist on one machine (one per project, one per use): each instance is a folder of the workspace, with its own state and its own modules.
+
+- **Modules**: **specific to each devzone**. The state lives in the instance's folder (`$RACINE/.devzone.modules`), mounted from the host: a second devzone starts with default values, without inheriting those of the first (an old global state, at the first devzone started after the update, is taken over once, by moving).
+- **Platform** (GitHub or GitLab, [see above](#platform-github-or-gitlab)): also specific to each devzone, in the same state file, with the URL of its GitLab instance.
+- **Logins** (**GitHub**, **git**, **Claude Code**, **opencode**) and **caches** (**Maven**, **Gradle**, **pnpm**): **deliberately shared** between the devzone instances of a machine, in the `devzone-*` volumes.
+- **Full isolation**: a distinct volume prefix (as for the tests) gives each devzone its own volumes; see [For contributors](#for-contributors).
+
+
+
+## Working on a project
+
+- **repowarden hooks**: installed globally (`repowarden install --global --lang fr`), they apply to any repository cloned in the container (commit messages, secrets, formatting, tests). Then follow the project's rules (`AGENTS.md`, `CONTRIBUTING.md`): `repowarden ticket <n>`, `repowarden cc …`.
+- **GitHub App** (proposed by `repowarden bots`, or `repowarden app init`): without it, the workflows act under the `github-actions` bot, whose actions trigger no other workflow (draft PR without CI, automatic merge without preview…); see [Troubleshooting](#troubleshooting).
+- **repowarden CI checks** locally: `shellcheck`, `actionlint`, `bats test/`. actionlint is at the same version as the CI; shellcheck and bats are those of Ubuntu 24.04 and may differ slightly.
 
 
 
 ## Kubernetes
 
-devzone fournit les outils, pas le cluster, et n'en crée jamais tout seul. Avec le module `kubernetes` actif (`devzone enable kubernetes`), il se connecte à chaque démarrage au cluster de l'hôte s'il existe et répond (en pratique `docker-desktop`) ; sinon, ou en plus, créer un cluster dans le conteneur :
+devzone provides the tools, not the cluster, and never creates one on its own. With the `kubernetes` module active (`devzone enable kubernetes`), it connects at each startup to the host's cluster if it exists and answers (in practice `docker-desktop`); otherwise, or in addition, create a cluster in the container:
 
 ```bash
-kind create cluster          # ~2 min la première fois
-kubectl config get-contexts  # clusters de l'hôte + clusters kind
-devzone use <nom>       # bascule le cluster de travail de kubectl
+kind create cluster          # ~2 min the first time
+kubectl config get-contexts  # host clusters + kind clusters
+devzone use <name>       # switches the kubectl working cluster
 ```
 
-- **Cluster actif** : celui de l'hôte par défaut s'il répond (en pratique `docker-desktop`), sinon kind dédié `kind-devzone`. Un choix fait avec `devzone use` est gardé aux redémarrages.
-- **Clusters kind** : tournent sur le Docker de l'hôte (socket partagé, #291). Leur API écoute sur 127.0.0.1 **du poste**, jamais sur le réseau local ; `kind` (enveloppe de devzone) réécrit l'adresse en `host.docker.internal` dans le kubeconfig du conteneur, en gardant la vérification TLS : un cluster créé à la main par `kind create cluster` est joignable tout de suite. Nom suffixé par instance quand ce n'est pas l'instance par défaut. Ils redémarrent avec Docker Desktop, sont conservés par `make rebuild` et `make down`, et supprimés par `kind delete cluster` (ou `make uninstall`).
-- **Relais du socket Docker** ([#293](https://github.com/SimBienvenueHoulBoumi/devzone/issues/293)) : sous Docker Desktop, la feature `docker-outside-of-docker` relaie le socket de l'hôte par `socat` sans option `-t`. Un `docker exec` sans entrée standard (kind lance ainsi `kubeadm init`) y est coupé au bout de 0,5 s, avec une sortie tronquée et un code 0 : kind croit l'init réussi (« failed to remove control plane taint … connection refused »). Au démarrage, devzone remplace ce relais par le même avec `-t 86400`, puis vérifie qu'un `docker exec` long va au bout. En cas d'échec, une ligne `⚠ relais Docker` apparaît dans le récapitulatif `devzone`, avec la commande à relancer : `devzone repair`. Sous Linux (socket par groupe, sans socat), seul le contrôle est fait.
-- **CPU et RAM dans k9s** (`kubectl top`) : module `kubernetes` actif, metrics-server est installé au démarrage sur les clusters **locaux** qui ne l'ont pas (Docker Desktop, kind…), jamais sur un cluster distant. Après un `kind create cluster` : `devzone metrics` (ou `devzone metrics <contexte>` pour un cluster précis).
-- **Cluster de l'hôte** : `~/.kube` est monté en lecture seule, jamais modifié ; sa copie adaptée est `~/.kube/hote.config` (`127.0.0.1` remplacé par `host.docker.internal`). Après un changement de cluster sur l'hôte : `make stop && make up`.
-- **Messages de démarrage** (`kube-config : …`, `metrics-server : …`, récapitulatif) : dans le terminal de création, ou en relançant `devzone start`.
+- **Active cluster**: the host's by default if it answers (in practice `docker-desktop`), otherwise a dedicated kind cluster `kind-devzone`. A choice made with `devzone use` is kept across restarts.
+- **kind clusters**: run on the host's Docker (shared socket, #291). Their API listens on 127.0.0.1 **of the workstation**, never on the local network; `kind` (devzone wrapper) rewrites the address to `host.docker.internal` in the container's kubeconfig, keeping TLS verification: a cluster created by hand with `kind create cluster` is reachable straight away. The name is suffixed by instance when it is not the default instance. They restart with Docker Desktop, are kept by `make rebuild` and `make down`, and are deleted by `kind delete cluster` (or `make uninstall`).
+- **Docker socket relay** ([#293](https://github.com/SimBienvenueHoulBoumi/devzone/issues/293)): under Docker Desktop, the `docker-outside-of-docker` feature relays the host socket via `socat` without the `-t` option. A `docker exec` without standard input (kind thus launches `kubeadm init`) is cut off after 0.5 s, with truncated output and exit code 0: kind believes the init succeeded (`failed to remove control plane taint … connection refused`). At startup, devzone replaces this relay with the same one using `-t 86400`, then checks that a long `docker exec` completes. On failure, a `⚠ relais Docker` line appears in the `devzone` summary, with the command to rerun: `devzone repair`. Under Linux (socket by group, no socat), only the check is done.
+- **CPU and RAM in k9s** (`kubectl top`): with the `kubernetes` module active, metrics-server is installed at startup on the **local** clusters that lack it (Docker Desktop, kind…), never on a remote cluster. After a `kind create cluster`: `devzone metrics` (or `devzone metrics <context>` for a specific cluster).
+- **Host cluster**: `~/.kube` is mounted read-only, never modified; its adapted copy is `~/.kube/hote.config` (`127.0.0.1` replaced by `host.docker.internal`). After a cluster change on the host: `make stop && make up`.
+- **Startup messages** (`kube-config : …`, `metrics-server : …`, summary): in the creation terminal, or by rerunning `devzone start`.
 
-L'adresse `127.0.0.1` du cluster de l'hôte est réécrite en `host.docker.internal` par `kube-config.sh` au démarrage, rendant le cluster joignable depuis le conteneur. Le certificat de l'API inclut `host.docker.internal` dans ses SAN (configuré via `networking.apiServerAddress` et `kubeadmConfigPatches` dans la config kind).
+The `127.0.0.1` address of the host cluster is rewritten to `host.docker.internal` by `kube-config.sh` at startup, making the cluster reachable from the container. The API certificate includes `host.docker.internal` in its SANs (configured via `networking.apiServerAddress` and `kubeadmConfigPatches` in the kind config).
 
-Le cluster de l'hôte n'est pas joignable dans deux cas (kind fonctionne quand même) :
-- **Codespaces, machine distante** : pas de `~/.kube` local ;
-- **Linux avec Docker Engine** : un cluster kind ou minikube de l'hôte écoute sur `127.0.0.1`, invisible du conteneur sans la réécriture `kube-config.sh`. Un cluster qui écoute sur toutes les interfaces (k3s, kubeadm) est joignable.
+The host cluster is not reachable in two cases (kind still works):
+- **Codespaces, remote machine**: no local `~/.kube`;
+- **Linux with Docker Engine**: a kind or minikube cluster of the host listens on `127.0.0.1`, invisible from the container without the `kube-config.sh` rewrite. A cluster listening on all interfaces (k3s, kubeadm) is reachable.
 
-## Workspace Kubernetes
+## Kubernetes workspace
 
-Le poste de developpement peut tourner dans le cluster, avec Kubernetes 1.30 ou plus comme prerequis minimal (sidecars natifs, et profil AppArmor de BuildKit). Le chart charts/devzone-workspace/ deploie un StatefulSet, sans conteneur privilegie ni Docker du noeud :
+The development workstation can run in the cluster, with Kubernetes 1.30 or newer as the minimum prerequisite (native sidecars, and the BuildKit AppArmor profile). The chart `charts/devzone-workspace/` deploys a StatefulSet, with no privileged container nor node Docker:
 
-- conteneur `workspace` (image ghcr.io/simbienvenuehoulboumi/devzone-workspace:<version>), avec `DOCKER_HOST=tcp://127.0.0.1:2475`, `BUILDKIT_HOST=tcp://127.0.0.1:1234`, `TESTCONTAINERS_RYUK_DISABLED=true` et `TESTCONTAINERS_CHECKS_DISABLE=true` ;
-- sidecar natif `kubedock` (joyrex2001/kubedock:0.23.0, sans privilege), demarre avant `workspace` : une API Docker dont les conteneurs deviennent des pods du namespace ;
-- sidecar natif `buildkitd` (moby/buildkit:v0.34.2-rootless, UID 1000, sans privilege), demarre avant `workspace` : construit les images ;
-- deux PVC : `workspace` (les projets, monte sur `/workspaces/projets`) et `etat` ;
-- un ServiceAccount devzone-workspace avec un Role limite au namespace et une NetworkPolicy meme namespace.
+- container `workspace` (image ghcr.io/simbienvenuehoulboumi/devzone-workspace:<version>), with `DOCKER_HOST=tcp://127.0.0.1:2475`, `BUILDKIT_HOST=tcp://127.0.0.1:1234`, `TESTCONTAINERS_RYUK_DISABLED=true` and `TESTCONTAINERS_CHECKS_DISABLE=true`;
+- native sidecar `kubedock` (joyrex2001/kubedock:0.23.0, unprivileged), starts before `workspace`: a Docker API whose containers become pods of the namespace;
+- native sidecar `buildkitd` (moby/buildkit:v0.34.2-rootless, UID 1000, unprivileged), starts before `workspace`: builds the images;
+- two PVCs: `workspace` (the projects, mounted on `/workspaces/projets`) and `etat` (state);
+- a ServiceAccount `devzone-workspace` with a Role limited to the namespace and a NetworkPolicy within the same namespace.
 
-Depuis le poste :
+From the workstation:
 
 ```bash
-devzone workspace start                # installe ou met a jour le workspace
-devzone workspace update [--version X.Y.Z] [--yes]  # passe a la derniere release stable (pod recree, #622)
-devzone workspace start --image dépôt:tag   # image construite à la main
-devzone workspace stop                 # desinstalle le workspace
-devzone workspace status                    # etat des pods
-devzone workspace shell                   # shell dans le conteneur workspace
-devzone workspace vscode                  # marche a suivre : attache VS Code au pod
-devzone workspace copy-to <dossier>   # copie un dossier du poste vers les projets du pod
-devzone workspace copy-from <dossier> # copie un projet du pod vers le poste
+devzone workspace start                # installs or updates the workspace
+devzone workspace update [--version X.Y.Z] [--yes]  # moves to the latest stable release (pod recreated, #622)
+devzone workspace start --image repo:tag   # image built by hand
+devzone workspace stop                 # uninstalls the workspace
+devzone workspace status                    # state of the pods
+devzone workspace shell                   # shell in the workspace container
+devzone workspace vscode                  # procedure: attach VS Code to the pod
+devzone workspace copy-to <folder>   # copies a workstation folder to the pod's projects
+devzone workspace copy-from <folder> # copies a pod project to the workstation
 devzone workspace ports [start|stop|status] # applications and services from pod on workstation localhost
-devzone workspace services enable <service> [options]  # installe gitlab, postgres ou argocd dans le cluster
-devzone workspace services disable <service> [--yes]   # les retire
-devzone workspace services status          # présents ou non, par namespace
-devzone workspace argocd status            # Argo CD et ses Applications (#516)
-devzone workspace argocd app add <dépôt> [chemin] | app list | app remove <N>  # projets déployés par Argo CD
-devzone workspace egress observation|strict|off  # mandataire de sortie des sessions --pod (#633)
-devzone workspace egress status                  # mode, prêt ou non, domaines contactés
-devzone workspace egress allow|deny <domaine>    # ajoute ou retire un domaine de la liste stricte
-devzone workspace migrate [--yes]          # copie le poste Docker vers le workspace Kubernetes
-devzone workspace revert [--bring-back]   # retour au poste Docker (déprécié, #682)
-devzone workspace clean-docker [--yes] # supprime les volumes Docker devzone-* (confirmation)
+devzone workspace services enable <service> [options]  # installs gitlab, postgres or argocd in the cluster
+devzone workspace services disable <service> [--yes]   # removes them
+devzone workspace services status          # present or not, per namespace
+devzone workspace argocd status            # Argo CD and its Applications (#516)
+devzone workspace argocd app add <repo> [path] | app list | app remove <N>  # projects deployed by Argo CD
+devzone workspace egress observation|strict|off  # egress proxy of --pod sessions (#633)
+devzone workspace egress status                  # mode, ready or not, domains contacted
+devzone workspace egress allow|deny <domain>    # adds or removes a domain from the strict list
+devzone workspace migrate [--yes]          # copies the Docker workstation to the Kubernetes workspace
+devzone workspace revert [--bring-back]   # back to the Docker workstation (deprecated, #682)
+devzone workspace clean-docker [--yes] # deletes the devzone-* Docker volumes (confirmation)
 ```
 
-Les commandes utilisent helm et kubectl du poste, avec le contexte devzone s il existe, sinon le contexte courant. L image est construite par la CI a chaque PR et publiee sur ghcr.io a la livraison.
+The commands use the workstation's helm and kubectl, with the devzone context if it exists, otherwise the current context. The image is built by CI at each PR and published to ghcr.io at delivery.
 
-L'image vient de ghcr.io, avec le tag de la version de devzone (`latest` depuis un clone du dépôt) ; if missing, start reports it and uninstalls the workspace.
+The image comes from ghcr.io, tagged with the devzone version (`latest` from a clone of the repository); if missing, start reports it and uninstalls the workspace.
 
-### Mettre à jour le workspace
+### Updating the workspace
 
-`devzone workspace update` fait passer le workspace à la dernière release stable du dépôt devzone (tags `vX.Y.Z` ; les pré-releases comme `v0.48.0-next.1` sont ignorées), ou à la version donnée avec `--version X.Y.Z`. Il met au même tag l'image, les charts et l'Application Argo CD `devzone-workspace` (sans Argo CD, le chart local est redéployé avec la nouvelle image), puis réconcilie les services tenus par Argo CD (postgres, mysql).
+`devzone workspace update` moves the workspace to the latest stable release of the devzone repository (tags `vX.Y.Z`; pre-releases such as `v0.48.0-next.1` are ignored), or to the version given with `--version X.Y.Z`. It sets the image, the charts and the `devzone-workspace` Argo CD Application to the same tag (without Argo CD, the local chart is redeployed with the new image), then reconciles the services managed by Argo CD (postgres, mysql).
 
-Quand l'utiliser : après une nouvelle release de devzone, ou quand le pod tourne sur une ancienne image. Les projets (volume `workspace`) et l'état sont conservés.
+When to use it: after a new devzone release, or when the pod runs an old image. Projects (`workspace` volume) and state are kept.
 
-Ordre des opérations :
+Order of operations:
 
-1. la version cible est lue dans les tags du dépôt (`git ls-remote`, sans gh ni Docker) ; aucune release trouvée, ou dépôt injoignable : message, code de sortie non nul, rien modifié ;
-2. l'image `ghcr.io/simbienvenuehoulboumi/devzone-workspace:<version>` est vérifiée avant toute écriture (jeton anonyme du registre, puis le manifeste). Absente ou registre injoignable : message, rien modifié. La release vient peut-être d'être publiée : réessayer plus tard. Le jeton n'est jamais affiché ;
-3. si l'Application est déjà à cette version, la commande affiche `already up to date` et sort avec 0, sans rien écrire ;
-4. sinon elle avertit et demande confirmation `[y/N]`. Sans terminal, `--yes` est obligatoire, sinon la commande est refusée.
+1. the target version is read from the repository tags (`git ls-remote`, without gh or Docker); no release found, or repository unreachable: message, non-zero exit code, nothing changed;
+2. the image `ghcr.io/simbienvenuehoulboumi/devzone-workspace:<version>` is checked before any write (anonymous registry token, then the manifest). Missing or registry unreachable: message, nothing changed. The release may have just been published: try again later. The token is never displayed;
+3. if the Application is already at this version, the command shows `already up to date` and exits with 0, without writing anything;
+4. otherwise it warns and asks for confirmation `[y/N]`. Without a terminal, `--yes` is mandatory, otherwise the command is refused.
 
-**Avertissement : le pod `devzone-workspace-0` est recréé.** Les fenêtres VS Code attachées au pod se coupent, et les processus lancés dans le pod s'arrêtent. Si les ports du pod ne répondent plus après la mise à jour, `devzone workspace ports start` les relance.
+**Warning: the pod `devzone-workspace-0` is recreated.** VS Code windows attached to the pod disconnect, and the processes launched in the pod stop. If the pod's ports no longer respond after the update, `devzone workspace ports start` restarts them.
 
 ```bash
-devzone workspace update                  # dernière release stable, avec confirmation
-devzone workspace update --yes            # sans question (obligatoire sans terminal)
-devzone workspace update --version 0.48.0 # une version précise
-devzone workspace status                  # suivre le déploiement ; la dernière ligne indique la version atteinte
+devzone workspace update                  # latest stable release, with confirmation
+devzone workspace update --yes            # without a question (mandatory without a terminal)
+devzone workspace update --version 0.48.0 # a specific version
+devzone workspace status                  # follow the deployment; the last line shows the version reached
 ```
 
-### Projets dans un volume
+### Projects in a volume
 
-- **Montage** : le PVC `workspace` est monte sur `/workspaces/projets`, ou le conteneur demarre (`workingDir`). Sa taille se regle avec `workspace.size` (20 Gi par defaut).
-- **Conservation** : le PVC porte l annotation `helm.sh/resource-policy: keep` et n est jamais supprime par `helm uninstall` : `devzone workspace stop` retire le pod, pas les projets. Le perdre demande une suppression a la main dans le cluster.
-- **Copies** : `devzone workspace copy-to <dossier>` copie le dossier du poste dans `/workspaces/projets/<nom du dossier>` ; `devzone workspace copy-from <dossier>` ramene `/workspaces/projets/<nom du dossier>` dans ce dossier du poste. Les deux passent par `kubectl cp` (tar est present dans l image).
+- **Mount**: the `workspace` PVC is mounted on `/workspaces/projets`, where the container starts (`workingDir`). Its size is set with `workspace.size` (20 Gi by default).
+- **Retention**: the PVC carries the annotation `helm.sh/resource-policy: keep` and is never deleted by `helm uninstall`: `devzone workspace stop` removes the pod, not the projects. Losing them requires a manual deletion in the cluster.
+- **Copies**: `devzone workspace copy-to <folder>` copies the workstation folder to `/workspaces/projets/<folder name>`; `devzone workspace copy-from <folder>` brings `/workspaces/projets/<folder name>` back into that workstation folder. Both go through `kubectl cp` (tar is present in the image).
 
-### Création directe dans le cluster
+### Direct creation in the cluster
 
-`devzone <dossier>` choisit le mode du poste d'après le cluster (#497) :
+`devzone <folder>` chooses the workstation mode from the cluster (#497):
 
-- **Kubernetes** si `kubectl` et `helm` sont là et que le cluster répond (contexte `devzone` s'il est déclaré, sinon le contexte courant, en 5 s). Le dossier est créé avec `workspace=kubernetes` dans `.devzone.modules`, puis le workspace est installé dans le cluster depuis le dossier (comme `devzone workspace start`). Pas de `devzone workspace migrate` : il n'y a pas de volumes Docker à copier.
-- **Rien** sinon (#671) : plus de repli silencieux vers Docker. La commande échoue avec le code 1, sans rien créer, dit pourquoi le cluster ne répond pas et affiche, sans les exécuter, les moyens d'en avoir un : un cluster distant (`aws eks update-kubeconfig`, `gcloud container clusters get-credentials`, `az aks get-credentials`, qui le déclarent dans ton kubeconfig ; il faut en faire le contexte courant de kubectl), Docker Desktop avec Kubernetes activé, ou `minikube start -p devzone`. Aucun identifiant cloud ne passe par devzone. **En terminal** (#653), sans option, la commande propose un menu à la place de l'échec : 1) un **cluster distant**, un contexte de ton kubeconfig (les clusters locaux comme `docker-desktop`, `kind-*`, `minikube` ou un serveur `127.0.0.1` ne sont jamais proposés comme distants) ; il faut **retaper son nom** pour confirmer, après le rappel de ce qui sera installé (un pod, un volume, le namespace `devzone-workspace`, des droits, un coût possible) ; devzone en fait alors le contexte courant de kubectl ; 2) un cluster **minikube** local : si minikube est absent, devzone affiche la commande officielle d'installation de la plateforme et ne l'exécute jamais ; s'il est là, il demande confirmation puis lance `minikube start -p devzone` (profil `devzone`, pilote choisi par minikube). Le choix n'est retenu que si le cluster répond ensuite ; sinon la commande échoue comme sans terminal. Avec `--kubernetes` ou `--docker`, aucun menu. Reste à faire dans #653 : essais réels (un contexte distant fourni par le propriétaire, un minikube créé sur une machine), choix du pilote minikube par plateforme, dimensionnement mémoire.
+- **Kubernetes** if `kubectl` and `helm` are present and the cluster answers (the `devzone` context if declared, otherwise the current context, within 5 s). The folder is created with `workspace=kubernetes` in `.devzone.modules`, then the workspace is installed in the cluster from the folder (like `devzone workspace start`). No `devzone workspace migrate`: there are no Docker volumes to copy.
+- **Nothing** otherwise (#671): no more silent fallback to Docker. The command fails with exit code 1, creates nothing, says why the cluster does not answer, and shows, without running them, the ways to get one: a remote cluster (`aws eks update-kubeconfig`, `gcloud container clusters get-credentials`, `az aks get-credentials`, which declare it in your kubeconfig; it must be made the current kubectl context), Docker Desktop with Kubernetes enabled, or `minikube start -p devzone`. No cloud credential passes through devzone. **In a terminal** (#653), without options, the command offers a menu instead of the failure: 1) a **remote cluster**, a context of your kubeconfig (local clusters such as `docker-desktop`, `kind-*`, `minikube` or a `127.0.0.1` server are never offered as remote); you must **retype its name** to confirm, after a reminder of what will be installed (a pod, a volume, the `devzone-workspace` namespace, rights, a possible cost); devzone then makes it the current kubectl context; 2) a local **minikube** cluster: if minikube is absent, devzone shows the official installation command for the platform and never runs it; if present, it asks for confirmation, then runs `minikube start -p devzone` (`devzone` profile, driver chosen by minikube). The choice is kept only if the cluster then answers; otherwise the command fails as it does without a terminal. With `--kubernetes` or `--docker`, no menu. Still to do in #653: real tests (a remote context provided by its owner, a minikube created on a machine), choice of the minikube driver per platform, memory sizing.
 
-Options : `--kubernetes` exige le cluster et échoue sans rien créer (le contrôle se fait avant la copie des fichiers) ; `--docker` crée le poste Docker, **déprécié** (avertissement, retrait prévu : deux versions mineures après cette livraison, au moins 30 jours), sans contrôler le cluster ; les deux ensemble sont refusés. Sans option, le cluster doit répondre.
+Options: `--kubernetes` requires the cluster and fails without creating anything (the check happens before the files are copied); `--docker` creates the Docker workstation, **deprecated** (warning, removal planned: two minor versions after this delivery, at least 30 days), without checking the cluster; both together are refused. Without an option, the cluster must answer.
 
-Dans ce mode, Docker n'est pas nécessaire sur le poste. Les connexions gh et opencode se font dans le pod, au premier `make shell`.
+In this mode, Docker is not required on the workstation. The gh and opencode logins are done in the pod, at the first `make shell`.
 
-Un workspace déjà installé dans le cluster (release helm `devzone-workspace`, ou Application Argo CD du même nom) est annoncé à la création : le nouveau dossier le pilote aussi, et `devzone workspace start` le met à jour par `helm upgrade`, sans perte (les volumes restent).
+A workspace already installed in the cluster (helm release `devzone-workspace`, or Argo CD Application of the same name) is announced at creation: the new folder drives it too, and `devzone workspace start` updates it by `helm upgrade`, without loss (volumes remain).
 
-### Migration depuis le poste Docker
+### Migration from the Docker workstation
 
-`devzone workspace migrate [--yes]` se lance sur le poste, dans le dossier devzone. Il demande une confirmation [y/N] (`--yes` pour s'en passer ; sans terminal et sans `--yes`, il refuse), puis enchaine cinq etapes, chacune annoncee, et s'arrete a la premiere erreur avec un message clair. Il copie, il ne supprime rien.
+`devzone workspace migrate [--yes]` is run on the workstation, in the devzone folder. It asks for a `[y/N]` confirmation (`--yes` to skip it; without a terminal and without `--yes`, it refuses), then goes through five steps, each announced, and stops at the first error with a clear message. It copies, it deletes nothing.
 
-1. **Verifications** : cluster joignable, pod `devzone-workspace-0` demarre (sinon `devzone workspace start`), Docker du poste en marche, place suffisante sur `/workspaces/projets`.
-2. **Projets** : chaque `./workspace/<projet>` est copie dans `/workspaces/projets/<projet>` (`.git` compris, comme `copy-to`), puis verifie par nombre de fichiers et taille.
-3. **Identites et caches** : chaque volume Docker `devzone-<x>` (ou `$DEVZONE_VOLUMES-<x>`) est lu en lecture seule par un conteneur `docker run --rm -v … :/src:ro` (image `busybox:1.36`, `DEVZONE_IMAGE_COPY` pour une autre), puis copie par `kubectl cp` vers son chemin du volume `etat` (`persistence.state.paths` du chart) : `gh` → `~/.config/gh`, `git` → `~/.config/git`, `claude` → `~/.claude`, `opencode-config` → `~/.config/opencode`, `opencode-data` → `~/.local/share/opencode`, `agent` → `~/.local/state/oc-lancer`, `m2`, `gradle`, `pnpm`. Un volume absent est ignore ; `config` (`~/.config/devzone`, ancien etat) n'a pas de chemin dans le chart et est ignore. Chaque copie est verifiee.
-4. **Etat** : `.devzone.modules` et `.devzone.packages` du poste (s'ils existent) sont copies dans `/workspaces/projets/` du pod.
-5. **Bascule** : la ligne `workspace=kubernetes` est notee dans `.devzone.modules` du poste.
+1. **Checks**: cluster reachable, pod `devzone-workspace-0` starts (otherwise `devzone workspace start`), workstation Docker running, enough space on `/workspaces/projets`.
+2. **Projects**: each `./workspace/<project>` is copied to `/workspaces/projets/<project>` (`.git` included, like `copy-to`), then checked by file count and size.
+3. **Identities and caches**: each Docker volume `devzone-<x>` (or `$DEVZONE_VOLUMES-<x>`) is read read-only by a `docker run --rm -v … :/src:ro` container (image `busybox:1.36`, `DEVZONE_IMAGE_COPY` for another), then copied by `kubectl cp` to its path in the `etat` volume (`persistence.state.paths` of the chart): `gh` → `~/.config/gh`, `git` → `~/.config/git`, `claude` → `~/.claude`, `opencode-config` → `~/.config/opencode`, `opencode-data` → `~/.local/share/opencode`, `agent` → `~/.local/state/oc-lancer`, `m2`, `gradle`, `pnpm`. An absent volume is ignored; `config` (`~/.config/devzone`, old state) has no path in the chart and is ignored. Each copy is verified.
+4. **State**: `.devzone.modules` and `.devzone.packages` of the workstation (if they exist) are copied to `/workspaces/projets/` in the pod.
+5. **Switch**: the line `workspace=kubernetes` is noted in the workstation's `.devzone.modules`.
 
-Apres `devzone workspace migrate`, `make up`, `make shell` et `make stop` pilotent le workspace Kubernetes ; `make rebuild` refuse ; `devzone workspace revert` rend le poste Docker.
+After `devzone workspace migrate`, `make up`, `make shell` and `make stop` drive the Kubernetes workspace; `make rebuild` refuses; `devzone workspace revert` gives back the Docker workstation.
 
-**Retour arriere** (déprécié, #682 : un avertissement s'affiche, le retrait est prévu deux versions mineures et au moins 30 jours après cette livraison ; `migrate` reste) : `devzone workspace revert` remet `workspace=docker` et rappelle `make shell`. Le poste Docker et ses volumes n'ont jamais ete touches par `migrate` : rien d'autre a faire. `--bring-back` recopie d'abord tous les projets du pod dans `./workspace` (`copy-from`, les dossiers du poste du meme nom sont ecrases) ; en cas d'echec, la bascule n'a pas lieu.
+**Rollback** (deprecated, #682: a warning is shown, removal planned two minor versions and at least 30 days after this delivery; `migrate` remains): `devzone workspace revert` sets `workspace=docker` back and recalls `make shell`. The Docker workstation and its volumes were never touched by `migrate`: nothing else to do. `--bring-back` first copies all the pod's projects back into `./workspace` (`copy-from`; workstation folders with the same name are overwritten); on failure, the switch does not happen.
 
-**Nettoyage** : les volumes Docker ne sont jamais supprimes par `migrate` ni `revert`. `devzone workspace clean-docker` liste les volumes `devzone-*` presents puis demande [y/N] avant de les supprimer (`--yes` sans terminal ; sinon refus). Irreversible : apres, `revert` repart de volumes vides.
+**Cleanup**: Docker volumes are never deleted by `migrate` or `revert`. `devzone workspace clean-docker` lists the `devzone-*` volumes present, then asks `[y/N]` before deleting them (`--yes` without a terminal; otherwise refused). Irreversible: afterwards, `revert` starts from empty volumes.
 
-**Poste Docker en veille (#517)** : à la bascule (étape 5), `migrate` arrête le conteneur du dossier poste (étiquette `devcontainer.local_folder`) et les relais de ports automatiques `devzone-<instance>-auto-*` avec `docker stop` ; il ne les supprime jamais. `revert` les relance avec `docker start`. Docker absent ou arrêté : un avertissement, la migration n'échoue pas pour autant. Dans le pod Kubernetes (`DEVZONE_WORKSPACE` valant `kubernetes`), le veilleur de ports automatiques ne démarre pas (`devzone repair` le saute) et le réseau kind n'est pas rejoint : les ports passent par `devzone workspace ports`.
+**Docker workstation on standby (#517)**: at the switch (step 5), `migrate` stops the container of the workstation folder (label `devcontainer.local_folder`) and the `devzone-<instance>-auto-*` automatic port relays with `docker stop`; it never deletes them. `revert` restarts them with `docker start`. Docker absent or stopped: a warning, the migration does not fail for all that. In the Kubernetes pod (`DEVZONE_WORKSPACE` set to `kubernetes`), the automatic port watcher does not start (`devzone repair` skips it) and the kind network is not joined: ports go through `devzone workspace ports`.
 
-Restent légitimes sur Docker : le mode poste Docker (`make`, `lancer`, relais du socket), la lecture des volumes par `migrate` et `revert`, `uninstall`, la CI, et kubedock (API Docker émulée par Kubernetes dans le pod).
+Still legitimate on Docker: the Docker workstation mode (`make`, launch, socket relay), the reading of volumes by `migrate` and `revert`, `uninstall`, CI, and kubedock (Docker API emulated by Kubernetes in the pod).
 
-### Le cluster ne répond pas
+### The cluster does not answer
 
-`devzone workspace start` (donc `make up` et `make shell`) vérifie le cluster en premier, avant Argo CD, helm et l'attente du pod (#565). Un cluster injoignable donne un seul message, code de sortie 1, et rien d'autre n'est lancé ; le workspace déjà installé n'est ni modifié ni supprimé. Le message dit la cause :
+`devzone workspace start` (so `make up` and `make shell`) checks the cluster first, before Argo CD, helm and waiting for the pod (#565). An unreachable cluster gives a single message, exit code 1, and nothing else is launched; the workspace already installed is neither modified nor deleted. The message gives the cause:
 
-- **Docker Desktop arrêté** : `✖ Docker Desktop is stopped: the Kubernetes cluster of this machine runs inside it. Start Docker Desktop, then: make shell`. C'est le cas quand le contexte est `docker-desktop` (ou que le cluster s'appelle `docker-desktop` et répond sur `127.0.0.1` ou `localhost`) et que `docker info` échoue. Le Kubernetes du poste tourne dans Docker Desktop : le lancer, puis `make shell`.
-- **Docker répond, pas le cluster** : `✖ Kubernetes cluster <contexte> unreachable (<serveur>): enable Kubernetes in Docker Desktop (Settings → Kubernetes) or check kubectl config get-contexts`. Activer Kubernetes dans Docker Desktop (Settings → Kubernetes), ou vérifier le contexte.
-- **Autre contexte** : `✖ Kubernetes cluster <contexte> unreachable (<serveur>)`, suivi de `Check the contexts: kubectl config get-contexts`.
+- **Docker Desktop stopped**: `✖ Docker Desktop is stopped: the Kubernetes cluster of this machine runs inside it. Start Docker Desktop, then: make shell`. This is the case when the context is `docker-desktop` (or the cluster is named `docker-desktop` and answers on `127.0.0.1` or `localhost`) and `docker info` fails. The workstation's Kubernetes runs inside Docker Desktop: start it, then `make shell`.
+- **Docker answers, not the cluster**: `✖ Kubernetes cluster <context> unreachable (<server>): enable Kubernetes in Docker Desktop (Settings → Kubernetes) or check kubectl config get-contexts`. Enable Kubernetes in Docker Desktop (Settings → Kubernetes), or check the context.
+- **Other context**: `✖ Kubernetes cluster <context> unreachable (<server>)`, followed by `Check the contexts: kubectl config get-contexts`.
 
-Pour que Docker Desktop démarre à chaque connexion : Settings → General → Start Docker Desktop when you sign in.
+To have Docker Desktop start at each login: Settings → General → Start Docker Desktop when you sign in.
 
-### Applications et services sur localhost du poste
+### Applications and services on the workstation's localhost
 
-`devzone workspace start` lance un veilleur sur le poste (`manage/scripts/ports-workspace.sh`), `devzone workspace stop` l'arrête avec tous ses `kubectl port-forward`. `devzone workspace ports [start|stop|status]` drives it alone.
+`devzone workspace start` starts a watcher on the workstation (`manage/scripts/ports-workspace.sh`), and `devzone workspace stop` stops it along with all its `kubectl port-forward` processes. `devzone workspace ports [start|stop|status]` drives it on its own.
 
-- **Pod** : toutes les 3 s, `kubectl exec` dans le pod lit `ss -ltnH`. Chaque port TCP en écoute ≥ 1024 (hors kubedock 2475 et BuildKit 1234) est relayé vers `127.0.0.1:<même port>` du poste, jamais sur le réseau local (`--address 127.0.0.1`). Un serveur lancé dans le pod (`npm run dev`) est donc joignable sur http://localhost:5173 sans commande ; le port qui disparaît voit son relais arrêté.
-- **Services de devzone** : avec le module `postgres` actif dans `.devzone.modules`, `svc/postgres` du namespace `devzone-postgres` est relayé sur `127.0.0.1:5432`, et pgAdmin (`svc/pgadmin`) s'il existe, par le même mécanisme. Avec le module `mysql` actif, `svc/mysql` du namespace `devzone-mysql` est relayé sur `127.0.0.1:3306`. Quand Argo CD est installé (et `argocd` n'est pas `off`), le port https de `svc/argocd-server` est relayé sur `127.0.0.1:8443` (#516).
-- **Applications du cluster (#611)** : à chaque tour, un seul `kubectl get svc -A` liste les Services ; chaque port TCP d'un Service est relayé, sauf : Services headless (sans IP de cluster), ExternalName, le Service `kubernetes` du namespace `default`, les namespaces `kube-system`, `kube-public`, `kube-node-lease`, `local-path-storage` et ceux des modules devzone (`devzone-system`, `devzone-workspace`, `devzone-postgres`, `devzone-mysql`, `devzone-argocd`, `devzone-gitlab`, `devzone-llm`), les Services annotés `devzone.io/relay: "false"`, et les ports de `ports_exclus=` dans `.devzone.modules`. `devzone-app-demo` et les autres namespaces d'application restent relayés. Port local : le port du Service s'il est ≥ 1024 et libre ; sinon le premier port libre à partir de `port + 8000` (80 → 8080), en incrémentant (au-delà de 65000, à partir de 20000). Un port déjà relayé (services devzone, pod) ou pris sur le poste n'est jamais attribué. L'attribution est gardée dans `.devzone.workspace-ports/apps/<namespace>.<service>.<port>` : elle reste la même tant que le Service existe, et disparaît avec lui (son relais aussi). Quand le Service revient avec le même nom et le même port, il reprend le même port local s'il est encore libre. Plafond de 30 relais d'applications : au-delà, un avertissement une fois par port, sans relais. `devzone workspace ports status` affiche une ligne par application relayée : `http://127.0.0.1:<port local>  <namespace>/<service>:<port>`.
-- **Port déjà pris sur le poste** (`lsof`, sinon `nc -z`) : une seule ligne « ⚠ port <n> déjà pris sur le poste, non relayé » dans `.devzone.workspace-ports/journal.log` et dans `ports etat`, sans boucle d'essais.
-- **Un seul veilleur** : verrou `mkdir` et pid dans `.devzone.workspace-ports/` du dossier devzone ; a second `start` answers "already running".
-- **Garde-fou** : le veilleur ne tourne jamais pendant les tests automatiques (faux kubectl et lsof).
+- **Pod**: every 3 s, `kubectl exec` into the pod reads `ss -ltnH`. Each listening TCP port ≥ 1024 (except kubedock 2475 and BuildKit 1234) is relayed to `127.0.0.1:<same port>` of the workstation, never on the local network (`--address 127.0.0.1`). A server started in the pod (`npm run dev`) is therefore reachable at http://localhost:5173 without a command; a port that disappears has its relay stopped.
+- **devzone services**: with the `postgres` module active in `.devzone.modules`, `svc/postgres` of the `devzone-postgres` namespace is relayed to `127.0.0.1:5432`, and pgAdmin (`svc/pgadmin`) if it exists, by the same mechanism. With the `mysql` module active, `svc/mysql` of the `devzone-mysql` namespace is relayed to `127.0.0.1:3306`. When Argo CD is installed (and `argocd` is not `off`), the https port of `svc/argocd-server` is relayed to `127.0.0.1:8443` (#516).
+- **Cluster applications (#611)**: at each round, a single `kubectl get svc -A` lists the Services; each TCP port of a Service is relayed, except: headless Services (without a cluster IP), ExternalName, the `kubernetes` Service of the `default` namespace, the `kube-system`, `kube-public`, `kube-node-lease`, `local-path-storage` namespaces and those of the devzone modules (`devzone-system`, `devzone-workspace`, `devzone-postgres`, `devzone-mysql`, `devzone-argocd`, `devzone-gitlab`, `devzone-llm`), the Services annotated `devzone.io/relay: "false"`, and the ports of `ports_exclus=` in `.devzone.modules`. `devzone-app-demo` and the other application namespaces remain relayed. Local port: the Service's port if it is ≥ 1024 and free; otherwise the first free port starting from `port + 8000` (80 → 8080), incrementing (beyond 65000, starting from 20000). A port already relayed (devzone services, pod) or taken on the workstation is never assigned. The assignment is kept in `.devzone.workspace-ports/apps/<namespace>.<service>.<port>`: it stays the same as long as the Service exists, and disappears with it (and its relay too). When the Service comes back with the same name and port, it takes the same local port again if it is still free. Cap of 30 application relays: beyond that, a warning once per port, without relay. `devzone workspace ports status` shows one line per relayed application: `http://127.0.0.1:<local port>  <namespace>/<service>:<port>`.
+- **Port already taken on the workstation** (`lsof`, otherwise `nc -z`): a single line `⚠ port <n> déjà pris sur le poste, non relayé` in `.devzone.workspace-ports/journal.log` and in `ports etat`, without retry loops.
+- **Single watcher**: `mkdir` lock and pid in `.devzone.workspace-ports/` in the devzone folder; a second `start` answers "already running".
+- **Safety guard**: the watcher never runs during automatic tests (fake kubectl and lsof).
 
-### Services de devzone dans le workspace Kubernetes
+### devzone services in the Kubernetes workspace
 
-Les modules `gitlab`, `postgres` et `argocd` vivent dans le cluster, mais le pod du workspace n'a pas de kubeconfig et son compte de service est limité à son namespace (#430) : il ne peut ni installer un service ni lire ses namespaces. Depuis #528 :
+The `gitlab`, `postgres` and `argocd` modules live in the cluster, but the workspace pod has no kubeconfig and its service account is limited to its namespace (#430): it can neither install a service nor read its namespaces. Since #528:
 
-- **État dans le pod** : `devzone status` juge la présence d'un service par le DNS du cluster (`gitlab-webservice-default.devzone-gitlab.svc`, `postgres.devzone-postgres.svc`, `argocd-server.devzone-argocd.svc`), comme le catalogue. Présent → `✔ module postgres active: … (postgres.devzone-postgres.svc)` ; absent → `⚠ module gitlab not in the cluster: on the workstation, devzone workspace services enable gitlab` (module actif dans `.devzone.modules`) ou `○ module … optional` (inactif). Aucun « en échec » venu d'un installeur : la marque d'échec n'est pas lue dans le pod. `devzone status --json` porte les mêmes valeurs (`state`, `command`, `failed` à `null`).
-- **Démarrage du pod** : `devzone apply` (lancé par `workspace-init.sh`) n'installe plus ces services ; il l'écrit (« installed from the workstation ») et efface les marques d'échec des anciens démarrages. Dans le pod, `devzone enable gitlab` ou `devzone disable postgres` refusent (code 2) et renvoient à la commande du poste, sans toucher l'état.
-- **Installation depuis le poste** : `devzone workspace services enable <service> [options]` (les options de `devzone enable`, par exemple `--context CTX` pour postgres) et `devzone workspace services disable <service> [--yes]` (`--yes` indispensable : pas de terminal dans le pod pour confirmer ). Le poste crée un ServiceAccount `devzone-services-admin` dans `devzone-workspace`, lié à `cluster-admin` le temps de l'opération, lui demande un jeton d'une heure (`kubectl create token`, kubectl 1.24 ou plus) puis lance l'installeur habituel **dans le pod du workspace** (`kubectl exec`, script `.devcontainer/services-admin.sh`) : le jeton passe sur l'entrée standard, jamais en argument ni affiché, et ne vit que dans un kubeconfig temporaire du pod (droits 600, contextes `devzone-admin` et `devzone`), supprimé à la fin. L'état et les secrets (`workspace/.postgres/`, `workspace/.gitlab/`, `workspace/.argocd/` sous `/workspaces/projets`) restent dans le pod, comme sur le poste Docker. À la fin, même en échec : relais du pod arrêtés (l'accès passe par le DNS du cluster et `devzone workspace ports`), ligne `cluster=` de l'état remise comme avant, ServiceAccount et ClusterRoleBinding supprimés. `devzone workspace services status` dit, par namespace, ce qui est installé. Depuis #516, `argocd` est installé ou retiré par le poste lui-même (helm), et `postgres` passe par une Application Argo CD quand Argo CD est actif (voir [Argo CD dans le workspace Kubernetes](#argo-cd-dans-le-workspace-kubernetes)).
-- **Hors périmètre** : Argo CD comme source des services (#516) ; `mysql` et le catalogue (déjà par DNS, #515) ; les commandes `devzone postgres create …` dans le pod, qui demandent encore un kubeconfig.
+- **State in the pod**: `devzone status` judges whether a service is present through the cluster DNS (`gitlab-webservice-default.devzone-gitlab.svc`, `postgres.devzone-postgres.svc`, `argocd-server.devzone-argocd.svc`), like the catalog does. Present → `✔ module postgres active: … (postgres.devzone-postgres.svc)`; absent → `⚠ module gitlab not in the cluster: on the workstation, devzone workspace services enable gitlab` (module active in `.devzone.modules`) or `○ module … optional` (inactive). No "failed" status coming from an installer: the failure mark is not read in the pod. `devzone status --json` carries the same values (`state`, `command`, `failed` set to `null`).
+- **Pod startup**: `devzone apply` (run by `workspace-init.sh`) no longer installs these services; it writes them (`installed from the workstation`) and clears the failure marks of earlier startups. In the pod, `devzone enable gitlab` or `devzone disable postgres` refuse (code 2) and point to the command to run on the workstation, without touching the state.
+- **Installing from the workstation**: `devzone workspace services enable <service> [options]` (the options of `devzone enable`, for example `--context CTX` for postgres) and `devzone workspace services disable <service> [--yes]` (`--yes` is required: there is no terminal in the pod to confirm). The workstation creates a `devzone-services-admin` service account in `devzone-workspace`, bound to `cluster-admin` for the duration of the operation, asks it for a one-hour token (`kubectl create token`, kubectl 1.24 or newer), then runs the usual installer **in the workspace pod** (`kubectl exec`, script `.devcontainer/services-admin.sh`): the token goes through standard input, never as an argument nor displayed, and lives only in a temporary kubeconfig of the pod (rights 600, contexts `devzone-admin` and `devzone`), deleted at the end. The state and secrets (`workspace/.postgres/`, `workspace/.gitlab/`, `workspace/.argocd/` under `/workspaces/projets`) remain in the pod, as on the Docker workstation. At the end, even on failure: the pod's relays are stopped (access goes through the cluster DNS and `devzone workspace ports`), the `cluster=` line of the state is restored as before, the service account and the ClusterRoleBinding are deleted. `devzone workspace services status` says, per namespace, what is installed. Since #516, `argocd` is installed or removed by the workstation itself (helm), and `postgres` goes through an Argo CD Application when Argo CD is active (see [Argo CD in the Kubernetes workspace](#argo-cd-in-the-kubernetes-workspace)).
+- **Out of scope**: Argo CD as the source of the services (#516); `mysql` and the catalog (already through DNS, #515); the `devzone postgres create …` commands in the pod, which still require a kubeconfig.
 
-### Construire une image dans le workspace
+### Building an image in the workspace
 
-Dans le pod du workspace Kubernetes, le client BuildKit `buildctl` (même version que le sidecar `buildkitd`) est installé dans l'image et parle au sidecar BuildKit du pod (#514, archive officielle https://github.com/moby/buildkit/releases/tag/v0.34.2).
+In the Kubernetes workspace pod, the BuildKit client `buildctl` (same version as the `buildkitd` sidecar) is installed in the image and talks to the pod's BuildKit sidecar (#514, official archive https://github.com/moby/buildkit/releases/tag/v0.34.2).
 
 ```bash
-devzone build <dossier> [--tag <nom>]
+devzone build <folder> [--tag <name>]
 ```
 
-- Sans `--tag` : `buildctl build --frontend dockerfile.v0 --local context=<dossier> --local dockerfile=<dossier> --output type=cacheonly` (validation/cache uniquement).
-- Avec `--tag <nom>` : sortie `--output type=image,name=<nom>,push=false` (image chargée dans le cache du sidecar).
-- Hors du pod, `devzone build` refuse avec « use docker build on the Docker workstation ».
+- Without `--tag`: `buildctl build --frontend dockerfile.v0 --local context=<folder> --local dockerfile=<folder> --output type=cacheonly` (validation/cache only).
+- With `--tag <name>`: output `--output type=image,name=<name>,push=false` (image loaded into the sidecar's cache).
+- Outside the pod, `devzone build` refuses with “use docker build on the Docker workstation”.
 
-Le cache d'images reste dans le système de fichiers du sidecar `buildkitd` : il est perdu au redémarrage de ce conteneur.
+The image cache stays in the filesystem of the `buildkitd` sidecar: it is lost when this container restarts.
 
-### Edition depuis le poste
+### Editing from the workstation
 
-**VS Code** : `devzone workspace vscode` affiche la marche a suivre. Extensions « Kubernetes » et « Dev Containers » ; dans la vue Kubernetes, avec le contexte `devzone` : namespace `devzone-workspace`, pod `devzone-workspace-0`, conteneur `workspace` → « Attach to Running Kubernetes Container », puis ouvre le dossier `/workspaces/projets`.
+**VS Code**: `devzone workspace vscode` displays the procedure. Extensions “Kubernetes” and “Dev Containers”; in the Kubernetes view, with the `devzone` context: namespace `devzone-workspace`, pod `devzone-workspace-0`, container `workspace` → “Attach to Running Kubernetes Container”, then open the folder `/workspaces/projets`.
 
-**IntelliJ (JetBrains Gateway)** : Gateway installe le backend de l IDE dans le pod et l ouvre dans un client leger sur le poste. La connexion se fait en SSH : elle demande le serveur SSH du pod et son transfert de port vers le poste, qui arrivent avec les ports du workspace (#401).
+**IntelliJ (JetBrains Gateway)**: Gateway installs the IDE backend in the pod and opens it in a light client on the workstation. The connection goes over SSH: it needs the pod's SSH server and its port forwarding to the workstation, which come with the workspace ports (#401).
 
-1. Gateway → *Remote Development* → *New Connection* → *SSH* : hôte `127.0.0.1`, port transfere du pod, utilisateur `vscode`.
-2. Dossier ouvert par le backend : `/workspaces/projets/<projet>`.
+1. Gateway → *Remote Development* → *New Connection* → *SSH*: host `127.0.0.1`, port forwarded from the pod, user `vscode`.
+2. Folder opened by the backend: `/workspaces/projets/<project>`.
 
-En attendant ces deux points, edite le projet sur le poste par les copies : `devzone workspace copy-to <dossier>` avant, `devzone workspace copy-from <dossier>` apres.
+While waiting for these two points, edit the project on the workstation through copies: `devzone workspace copy-to <folder>` before, `devzone workspace copy-from <folder>` after.
 
-### Développer devzone et repowarden dans le pod
+### Developing devzone and repowarden in the pod
 
-Les clones de travail, les worktrees des tickets et les agents vivent dans le pod ; le poste ne garde que le pilotage.
+The working clones, the ticket worktrees and the agents live in the pod; the workstation only keeps the control.
 
-1. **Cloner** (depuis le poste) : `devzone workspace clone <url> [<nom>]` fait un `git clone` HTTPS dans `/workspaces/projets/<nom>` du pod (le nom par défaut est celui du dépôt), branche les identifiants git du pod sur `gh`, copie ton identité git du poste dans le clone et y installe les hooks (`repowarden install`). Relancée, elle ne refait rien ; un dossier qui existe avec un autre remote est refusé. Exemples : `devzone workspace clone https://github.com/SimBienvenueHoulBoumi/devzone` et `…/repowarden`.
-2. **Un worktree par ticket** (dans le pod) : `devzone ticket <n> [--repo devzone|repowarden]` crée `/workspaces/projets/devzone-wt/dz-<n>` (ou `/workspaces/projets/repowarden-wt/rw-<n>`), y exécute `repowarden ticket <n>` (branche créée depuis develop et liée) et affiche le chemin. Une fois la PR fusionnée : `devzone ticket done <n>` retire le worktree et la branche locale ; il refuse si le worktree n'est pas propre ou si la branche existe encore sur origin. Dans le conteneur d'outils, la même commande utilise `/workspaces/devzone` et `workspace/wt/dz-<n>` (devzone seulement).
-3. **Agent** : `devzone agent /workspaces/projets/devzone-wt/dz-<n> <consigne>` depuis le poste lance opencode directement dans ce dossier du pod, sans copie (un chemin `/workspaces/projets/…` absent du poste désigne le pod) ; `--local` garde le conteneur d'outils. `devzone workspace start` exécute `repowarden agents init --global` dans le pod quand le module `ia` y est actif : un agent y est arrêté avant de modifier develop.
+1. **Clone** (from the workstation): `devzone workspace clone <url> [<name>]` makes an HTTPS `git clone` into `/workspaces/projets/<name>` in the pod (the default name is that of the repository), connects the pod's git credentials to `gh`, copies your git identity from the workstation into the clone and installs the hooks there (`repowarden install`). Rerun, it does nothing; a folder that exists with another remote is refused. Examples: `devzone workspace clone https://github.com/SimBienvenueHoulBoumi/devzone` and `…/repowarden`.
+2. **One worktree per ticket** (in the pod): `devzone ticket <n> [--repo devzone|repowarden]` creates `/workspaces/projets/devzone-wt/dz-<n>` (or `/workspaces/projets/repowarden-wt/rw-<n>`), runs `repowarden ticket <n>` there (branch created from develop and linked) and shows the path. Once the PR is merged: `devzone ticket done <n>` removes the worktree and the local branch; it refuses if the worktree is not clean or if the branch still exists on origin. In the tools container, the same command uses `/workspaces/devzone` and `workspace/wt/dz-<n>` (devzone only).
+3. **Agent**: `devzone agent /workspaces/projets/devzone-wt/dz-<n> <instruction>` from the workstation launches opencode directly in this pod folder, without a copy (a `/workspaces/projets/…` path absent from the workstation designates the pod); `--local` keeps the tools container. `devzone workspace start` runs `repowarden agents init --global` in the pod when the `ia` module is active there: an agent is stopped there before modifying develop.
 
-4. **Agent par pod éphémère** (`--pod`) : `devzone agent --pod <dossier> <consigne>` lance opencode dans un pod Kubernetes éphémère dédié à la session. Le pod est créé avec des ressources limitées (2 CPU, 4 Gi mémoire), une affinité obligatoire vers le pod workspace `devzone-workspace-0`, et des montages restreints : worktree du ticket au même chemin que dans le workspace (`/workspaces/projets/<repo>-wt/<name>` via subPath), .git du dépôt au même chemin (`/workspaces/projets/<repo>/.git` via subPath), et sous-dossiers d'état (.config/opencode, .local/share/opencode, .local/state/oc-lancer, .local/npm en lecture seule). Le pod isole le worktree et les fichiers de configuration de l'hôte : réseau non filtré (c'est #220), kubeconfig du poste, `~/.config/gh`, `~/.claude`, et autres worktrees ne sont pas isolés et restent accessibles ; comme le `.git` du dépôt est monté, les références des autres branches y sont lisibles et modifiables. Le pod est toujours supprimé à la fin, même en cas d'échec ou d'interruption (trap). Sans `--pod`, le comportement `devzone agent` actuel est strictement inchangé.
+4. **Agent in an ephemeral pod** (`--pod`): `devzone agent --pod <folder> <instruction>` launches opencode in an ephemeral Kubernetes pod dedicated to the session. The pod is created with limited resources (2 CPU, 4 Gi memory), a mandatory affinity to the `devzone-workspace-0` workspace pod, and restricted mounts: the ticket worktree at the same path as in the workspace (`/workspaces/projets/<repo>-wt/<name>` via subPath), the repository `.git` at the same path (`/workspaces/projets/<repo>/.git` via subPath), and state subfolders (.config/opencode, .local/share/opencode, .local/state/oc-lancer, .local/npm read-only). The pod isolates the worktree and the host's configuration files: the network is not filtered (that is #220), the workstation kubeconfig, `~/.config/gh`, `~/.claude` and the other worktrees are not isolated and remain accessible; as the repository `.git` is mounted, the references of the other branches are readable and writable there. The pod is always deleted at the end, even on failure or interruption (trap). Without `--pod`, the current `devzone agent` behavior is strictly unchanged.
 
-   **Mandataire de sortie (#220, désactivé par défaut)** : quand le chart du workspace est rendu avec `egressProxy.enabled=true`, un mandataire HTTP(S) (Squid) est déployé (`egress-proxy`, port 3128). Deux modes (`egressProxy.mode`) :
-   - `observation` : le mandataire accepte tout et journalise, sans NetworkPolicy (rien n'est bloqué). Les pods de session reçoivent `HTTP_PROXY`/`HTTPS_PROXY=http://egress-proxy:3128` et `NO_PROXY=localhost,127.0.0.1,.svc,.cluster.local`.
-   - `strict` : le mandataire n'autorise que `egressProxy.allowedDomains` (défaut `.opencode.ai`, `.npmjs.org`, `.github.com`) ; une NetworkPolicy limite la sortie des pods portant le label `devzone.io/agent-session` au mandataire (3128) et au DNS (kube-system UDP/TCP 53). Un conteneur d'initialisation de garde tente 20 fois (1 s) une connexion directe `curl --noproxy "*"` vers `https://opencode.ai` et ne laisse démarrer l'agent que lorsque la connexion échoue ; si la restriction ne devient jamais effective, la session est refusée (« egress restriction never became effective: session refused »), pour couvrir la fenêtre de 1 à 2 s au démarrage.
+   **Egress proxy (#220, disabled by default)**: when the workspace chart is rendered with `egressProxy.enabled=true`, an HTTP(S) proxy (Squid) is deployed (`egress-proxy`, port 3128). Two modes (`egressProxy.mode`):
+   - `observation`: the proxy accepts everything and logs, without NetworkPolicy (nothing is blocked). Session pods receive `HTTP_PROXY`/`HTTPS_PROXY=http://egress-proxy:3128` and `NO_PROXY=localhost,127.0.0.1,.svc,.cluster.local`.
+   - `strict`: the proxy only allows `egressProxy.allowedDomains` (default `.opencode.ai`, `.npmjs.org`, `.github.com`); a NetworkPolicy limits the outbound traffic of pods carrying the label `devzone.io/agent-session` to the proxy (3128) and to DNS (kube-system UDP/TCP 53). A guard init container tries 20 times (1 s) a direct connection `curl --noproxy "*"` to `https://opencode.ai` and only lets the agent start when the connection fails; if the restriction never becomes effective, the session is refused (“egress restriction never became effective: session refused”), to cover the 1 to 2 s window at startup.
 
-   Lecture des contacts : `kubectl logs deploy/devzone-workspace-egress-proxy -c access-log -n <namespace>`. Limites : le workspace lui-même reste ouvert ; seules les sessions `devzone agent --pod` sont filtrées ; en mode strict, les outils qui ignorent `HTTPS_PROXY` sont bloqués. Sans `egressProxy.enabled=true`, le rendu du chart et le manifeste des pods de session restent identiques.
+   Reading the contacts: `kubectl logs deploy/devzone-workspace-egress-proxy -c access-log -n <namespace>`. Limits: the workspace itself remains open; only `devzone agent --pod` sessions are filtered; in strict mode, tools that ignore `HTTPS_PROXY` are blocked. Without `egressProxy.enabled=true`, the chart rendering and the session pod manifest remain identical.
 
-   **Commandes du poste (#633)** : `devzone workspace egress observation|strict|off` règle le mode ; `status` affiche le mode (label `devzone.io/egress-mode` du service `egress-proxy`, sinon `egress off`), si le mandataire est prêt, le nombre de domaines autorisés et, depuis les 2000 dernières lignes du journal d'accès, chaque domaine contacté avec son nombre d'accès et son état (`allowed`, `refused`, ou `observed` en mode observation). `allow <domaine>` et `deny <domaine>` gèrent la liste ajoutée (`egressProxy.extraDomains`) : un domaine doit être en minuscules, avec au moins un point, un point initial facultatif, sans espace, virgule, `*` ni `/`. `deny` ne retire que les domaines ajoutés ; la liste de base (`.opencode.ai`, `.npmjs.org`, `.github.com`) se change dans `egressProxy.allowedDomains` du chart.
+   **Workstation commands (#633)**: `devzone workspace egress observation|strict|off` sets the mode; `status` shows the mode (label `devzone.io/egress-mode` of the `egress-proxy` service, otherwise `egress off`), whether the proxy is ready, the number of allowed domains and, from the last 2000 lines of the access log, each domain contacted with its access count and its state (`allowed`, `refused`, or `observed` in observation mode). `allow <domain>` and `deny <domain>` manage the added list (`egressProxy.extraDomains`): a domain must be lowercase, with at least one dot, an optional leading dot, no space, comma, `*` nor `/`. `deny` only removes added domains; the base list (`.opencode.ai`, `.npmjs.org`, `.github.com`) is changed in `egressProxy.allowedDomains` of the chart.
 
-   Le mode et les domaines ajoutés sont mémorisés dans `.devzone.modules` (`egress=`, `egress_domains=`) et rejoués à chaque `devzone workspace start` et `devzone workspace update`. Chaque changement redéploie l'Application Argo CD au même tag d'image : le pod du workspace n'est pas recréé, et la commande attend que le mandataire soit prêt (120 s). Sans Application Argo CD (installation directe), le réglage est gardé et `devzone workspace start` l'applique.
+   The mode and the added domains are stored in `.devzone.modules` (`egress=`, `egress_domains=`) and replayed at each `devzone workspace start` and `devzone workspace update`. Each change redeploys the Argo CD Application at the same image tag: the workspace pod is not recreated, and the command waits for the proxy to be ready (120 s). Without an Argo CD Application (direct installation), the setting is kept and `devzone workspace start` applies it.
 
-   Exemple de parcours : `devzone workspace egress observation` (on laisse les sessions travailler), `devzone workspace egress status` (les domaines contactés), `devzone workspace egress allow <domaine>` pour chaque domaine légitime qui manque, puis `devzone workspace egress strict` (seules les sessions `--pod` sont filtrées ; le workspace reste ouvert).
-5. **Pousser** : `git push` depuis le worktree, en HTTPS avec les identifiants de `gh` ; la PR se fait comme partout.
-6. **Copies obsolètes** : `devzone workspace copy-to` refuse d'écraser un dossier du pod qui est un clone git d'un autre remote ; `devzone workspace status` signale les anciennes copies `repogarde/` et `wt/` (leur `.git` pointe hors du pod) avec la commande pour les retirer, à lancer après sauvegarde.
+   Example path: `devzone workspace egress observation` (let the sessions work), `devzone workspace egress status` (the domains contacted), `devzone workspace egress allow <domain>` for each legitimate domain that is missing, then `devzone workspace egress strict` (only `--pod` sessions are filtered; the workspace stays open).
+5. **Push**: `git push` from the worktree, over HTTPS with the `gh` credentials; the PR is made as everywhere else.
+6. **Stale copies**: `devzone workspace copy-to` refuses to overwrite a pod folder that is a git clone of another remote; `devzone workspace status` reports the old `repogarde/` and `wt/` copies (whose `.git` points outside the pod) with the command to remove them, to run after a backup.
 
-Reste sur le poste : `make up` et `make rebuild`, `devzone workspace start` et l'image du devcontainer.
+Remaining on the workstation: `make up` and `make rebuild`, `devzone workspace start` and the devcontainer image.
 
-### Testcontainers et docker dans le workspace
+### Testcontainers and Docker in the workspace
 
-- `docker` et Testcontainers parlent a kubedock (`DOCKER_HOST=tcp://127.0.0.1:2475`) : rien a configurer, et le socket Docker du poste n'est pas monte.
-- Chaque conteneur lance par Testcontainers devient un pod du namespace, cree et supprime par kubedock. Ryuk est desactive (`TESTCONTAINERS_RYUK_DISABLED=true`) : kubedock nettoie lui-meme.
-- Les ports des conteneurs sont relayes par kubedock (`--port-forward --reverse-proxy`) : rien a publier sur le pod.
-- Le conteneur `workspace` ne demarre qu'une fois kubedock et BuildKit joignables (startupProbe, 60 s au plus).
-- Fonctions de Testcontainers non prises en charge par kubedock 0.23.0 : reseaux, montages et compose ne sont pas essayes (#410).
-- **Conteneurs au premier plan** : `docker run --rm` n'attache pas la sortie et les pods terminés/`--rm` peuvent rester en `Completed` (limite de kubedock 0.23.0, constatée). Utiliser `docker run -d` puis `docker logs`, ou Testcontainers (qui lit les logs). Pour limiter l'accumulation, kubedock est lancé avec `--reapmax` et `--prune-start` (https://github.com/joyrex2001/kubedock/blob/master/config.md).
-- Les images construites par BuildKit (`BUILDKIT_HOST=tcp://127.0.0.1:1234`, `devzone build`) restent dans le systeme de fichiers du sidecar `buildkitd` : le cache est perdu quand ce conteneur redemarre.
+- `docker` and Testcontainers talk to kubedock (`DOCKER_HOST=tcp://127.0.0.1:2475`): nothing to configure, and the workstation's Docker socket is not mounted.
+- Each container launched by Testcontainers becomes a pod of the namespace, created and deleted by kubedock. Ryuk is disabled (`TESTCONTAINERS_RYUK_DISABLED=true`): kubedock cleans up by itself.
+- Container ports are relayed by kubedock (`--port-forward --reverse-proxy`): nothing to publish on the pod.
+- The `workspace` container starts only once kubedock and BuildKit are reachable (startupProbe, 60 s at most).
+- Testcontainers features not supported by kubedock 0.23.0: networks, mounts and compose are not tried (#410).
+- **Foreground containers**: `docker run --rm` does not attach the output, and terminated pods or `--rm` ones may stay in `Completed` (a kubedock 0.23.0 limit, observed). Use `docker run -d` then `docker logs`, or Testcontainers (which reads the logs). To limit the accumulation, kubedock is launched with `--reapmax` and `--prune-start` (https://github.com/joyrex2001/kubedock/blob/master/config.md).
+- Images built by BuildKit (`BUILDKIT_HOST=tcp://127.0.0.1:1234`, `devzone build`) stay in the filesystem of the `buildkitd` sidecar: the cache is lost when this container restarts.
 
-### Securite : workspace sans Docker
+### Security: workspace without Docker
 
-- **Aucun conteneur privilegie** : ni kubedock, ni BuildKit, ni le workspace n'ont `privileged: true`. Un test `helm template` (`manage/test/workspace-without-docker.bats`) echoue si un tel conteneur apparait.
-- **BuildKit rootless** : UID 1000, `--oci-worker-no-process-sandbox` (la doc BuildKit le recommande pour Kubernetes, avec ses caveats). seccomp et AppArmor sont `Unconfined` (`buildkit.unconfined`), sans quoi `mount` et `unshare` sont bloques. Le profil est le seul relache de securite du workspace : il ne donne pas de privilege.
-- **Pas de socket du poste** : le socket Docker de l'hote (#291) n'est pas monte, et aucun socket du noeud n'est partage.
-- **Ecoute** : kubedock et BuildKit n'ecoutent que sur `127.0.0.1` du pod, sans TLS. Aucun port n'est declare (ni `containerPort`, ni `hostPort`), et le Service n'expose que le HTTP du workspace.
-- **RBAC** : le ServiceAccount a un Role (pas un ClusterRole) limite au namespace, avec les droits que kubedock 0.23.0 utilise : pods (get, list, watch, create, delete), pods/log (get), pods/exec et pods/portforward (create), services et configmaps (list, create, delete). Aucun droit sur les secrets ni les deployments. Le pod peut donc lancer des conteneurs et les executer dans le namespace, sans rien ecrire hors de lui.
-- **Ports relayes** : les conteneurs de test sont joignables par les autres pods du namespace (la NetworkPolicy l'autorise). Ne pas y mettre de secret.
-- **Cloisonnement** : le workspace voit tous les conteneurs de test de son namespace, y compris ceux lances par d'autres projets. Un projet ne doit pas compter sur une isolation entre ses conteneurs et ceux d'un autre.
+- **No privileged container**: neither kubedock, nor BuildKit, nor the workspace has `privileged: true`. A `helm template` test (`manage/test/workspace-without-docker.bats`) fails if such a container appears.
+- **Rootless BuildKit**: UID 1000, `--oci-worker-no-process-sandbox` (the BuildKit documentation recommends it for Kubernetes, with its caveats). seccomp and AppArmor are `Unconfined` (`buildkit.unconfined`), otherwise `mount` and `unshare` are blocked. This profile is the only security relaxation of the workspace: it does not grant any privilege.
+- **No workstation socket**: the host's Docker socket (#291) is not mounted, and no node socket is shared.
+- **Listening**: kubedock and BuildKit listen only on `127.0.0.1` of the pod, without TLS. No port is declared (neither `containerPort` nor `hostPort`), and the Service only exposes the workspace HTTP.
+- **RBAC**: the service account has a Role (not a ClusterRole) limited to the namespace, with the rights kubedock 0.23.0 uses: pods (get, list, watch, create, delete), pods/log (get), pods/exec and pods/portforward (create), services and configmaps (list, create, delete). No rights on secrets nor deployments. The pod can thus launch containers and run them in the namespace, without writing anything outside it.
+- **Relayed ports**: test containers are reachable by the other pods of the namespace (the NetworkPolicy allows it). Do not put any secret in them.
+- **Isolation**: the workspace sees all the test containers of its namespace, including those launched by other projects. A project must not rely on isolation between its containers and those of another project.
 
 ## GitLab
 
-Le module `gitlab` fournit une instance GitLab de test dans le [cluster des services](#cluster-de-devzone), namespace `devzone-gitlab` (suffixé par instance).
+The `gitlab` module provides a test GitLab instance in the [services cluster](#devzone-cluster), namespace `devzone-gitlab` (suffixed by instance).
 
 ```bash
-devzone                        # état : identité git, GitHub, outils, modules
-devzone enable gitlab         # active et installe GitLab dans le cluster des services
-devzone disable gitlab      # désinstalle GitLab et supprime son namespace
-devzone gitlab migrate          # installe, puis propose de supprimer l'ancien cluster kind
-devzone gitlab migrate --yes    # idem sans confirmation
-devzone gitlab new-password [root|dev]  # mot de passe aléatoire (root ou dev) régénéré
-devzone apply              # applique les modules actifs
-devzone is-enabled gitlab           # code 0 si GitLab est actif
+devzone                        # state: git identity, GitHub, tools, modules
+devzone enable gitlab         # enables and installs GitLab in the services cluster
+devzone disable gitlab      # uninstalls GitLab and deletes its namespace
+devzone gitlab migrate          # installs, then offers to delete the old kind cluster
+devzone gitlab migrate --yes    # same, without confirmation
+devzone gitlab new-password [root|dev]  # random password (root or dev) regenerated
+devzone apply              # applies the active modules
+devzone is-enabled gitlab           # code 0 if GitLab is active
 ```
 
-- **Ressources** : au moins 8 Go de RAM **allouable dans le cluster des services** (somme des nœuds, refus sinon) ; environ 8 Go occupés une fois GitLab installé. Trop lourd pour la CI GitHub : testé à la main.
-- **Durée** (mesurée) : installation complète environ 7 min (dont le chart GitLab, attendu jusqu'à `GITLAB_ATTENTE`, 1200 s par défaut) ; une relance sur une instance prête environ 35 s (rien n'est réinstallé ni re-poussé).
-- **Ce qui est installé** : namespace `devzone-gitlab<instance>` dans le cluster choisi pour les services, étiqueté et isolé par NetworkPolicy ; chart enveloppe [`charts/devzone-gitlab`](#charts-de-devzone) (#538) qui fige les dépendances `gitlab` 9.11.16 (GitLab 18.11 CE) et `gitlab-runner` 0.88.2, depuis `https://charts.gitlab.io` (pas de dépôt OCI publié) ; `Chart.lock` commité, `helm dependency build` avant l'installation. Ses `values.yaml` reprennent les anciennes valeurs (`gitlab` et `gitlab-runner`) : sans cert-manager, Prometheus, registry ni KAS, nginx en une réplique et services en `ClusterIP` (ingress désactivé) ; exécuteur Kubernetes, URL interne et clone des jobs dans le même namespace.
-- **Argo CD tient le chart** (#538) : module `argocd` actif et installé → l'installation est l'Application `devzone-gitlab` (chart `charts/devzone-gitlab` à la révision), et non un passage helm. Une release `gitlab` installée avant par helm est adoptée (ses secrets de release sont supprimés, les objets restent). Sans Argo CD (ou clone de développement en `0.0.0`), `helm upgrade --install` du même chart, en deux passes : le runner est tenu à zéro réplica jusqu'à l'écriture de son Secret par le seed.
-- **Secret du runner** : le seed écrit le Secret `gitlab-runner-secret` (clé `runner-token`, lu depuis `workspace/.gitlab/runner-token`, jamais sur une ligne de commande) ; le chart le lit par `runners.secret`.
-- **Seed hors installation** : `devzone gitlab seed` relance le seed seul (relais, attente de GitLab, données). Dans le pod du workspace, `devzone workspace services seed gitlab` le fait par `services-admin.sh seed gitlab` ; c'est la seule action de seed (les autres services n'en ont pas).
-- **Données de test** : groupe `devzone`, projet `devzone/demo` (Python, pipeline ruff et pytest), utilisateur `dev`, runner enregistré. Sur une relance, rien n'est recréé.
-- **Accès dans le conteneur** : http://gitlab.localhost:8929, utilisateur `root`. Le nom `gitlab.localhost` pointe vers `127.0.0.1` dans `/etc/hosts` (entrée `127.0.0.1	gitlab.localhost # devzone:gitlab`, posée à l'activation et à chaque démarrage, remplacée si son adresse diffère, retirée à la désactivation). Deux relais `kubectl port-forward` écoutent sur `127.0.0.1:8929` et `127.0.0.1:2224` : `svc/gitlab-webservice-default` (8929→8181) et `svc/gitlab-gitlab-shell` (2224→22), dans le namespace de l'instance (PID et journal dans `workspace/.gitlab-web/` et `workspace/.gitlab-ssh/`). Ils sont indispensables à curl et à git en HTTP : libcurl résout tout nom `*.localhost` vers la boucle locale sans lire `/etc/hosts` (RFC 6761). ssh et glab lisent `/etc/hosts` et passent par le même relais.
-- **Accès depuis le poste** : GitLab n'est pas publié directement sur le réseau ; le port-forward écoute dans le conteneur. Depuis le poste, utiliser `devzone port 8929` (et `devzone port 2224` pour SSH) si nécessaire.
-- **Ancien cluster** : un cluster kind `gitlab<instance>` créé avant #396 n'est plus utilisé. Le récapitulatif `devzone` affiche `⚠ old kind-gitlab cluster<instance>: devzone gitlab migrate` tant qu'il existe. `devzone gitlab migrate` installe GitLab dans le cluster des services, puis supprime l'ancien cluster après confirmation (`--yes` sans terminal) ; sans terminal et sans `--yes`, l'installation se fait et l'ancien cluster est conservé (code 2). Les données de test de l'ancien cluster ne sont pas migrées.
-- **Secrets** : mot de passe root, jeton root, mot de passe de `dev` et jeton du runner dans `workspace/.gitlab/` (droits 600, ignorés par git, jamais affichés). Mot de passe root : `cat workspace/.gitlab/root-password`.
-- **Secrets Rails** : le secret `gitlab-rails-secret` du namespace `devzone-gitlab` est conservé dans `workspace/.gitlab/rails-secret.yaml` (600, ignoré par git) à la première installation, puis réappliqué avant `helm upgrade --install` à une réinstallation : le chart le réutilise et les sessions du navigateur restent valides, sans 422.
-- **Réinstallation** : à défaut, si les secrets ont été perdus, la fin d'installation et le récapitulatif préviennent : « GitLab réinstallé : si le navigateur affiche 422, supprimez les données de site de gitlab.localhost ».
-- **Mot de passe régénérable** : `devzone gitlab new-password [root|dev]` applique un mot de passe aléatoire par `gitlab-rails runner` dans le pod toolbox, puis met à jour le fichier source et le regroupé `.password` ; rien n'est affiché, seulement le chemin.
-- **Désactivation** : `devzone disable gitlab` arrête les deux relais, désinstalle les releases Helm `gitlab` et `gitlab-runner`, supprime le namespace `devzone-gitlab<instance>` et le reste de `workspace/.gitlab/`, mais **garde `rails-secret.yaml`** : « secret Rails gardé dans workspace/.gitlab/rails-secret.yaml (sessions du navigateur valides à la réinstallation) ». Le secret ne part qu'avec une désinstallation complète voulue (`devzone disable gitlab --yes`, ou la réponse `o` à la confirmation). Le cluster des services et son contexte courant ne sont pas touchés.
+- **Resources**: at least 8 GB of **allocatable RAM in the services cluster** (sum of the nodes, refused otherwise); about 8 GB used once GitLab is installed. Too heavy for GitHub CI: tested by hand.
+- **Duration** (measured): full installation about 7 min (including the GitLab chart, awaited up to `GITLAB_ATTENTE`, 1200 s by default); a rerun on a ready instance about 35 s (nothing is reinstalled or pushed again).
+- **What is installed**: namespace `devzone-gitlab<instance>` in the cluster chosen for the services, labelled and isolated by NetworkPolicy; the chart wrapper [`charts/devzone-gitlab`](#devzone-charts) (#538) pins the dependencies `gitlab` 9.11.16 (GitLab 18.11 CE) and `gitlab-runner` 0.88.2, from `https://charts.gitlab.io` (no published OCI repository); `Chart.lock` committed, `helm dependency build` before installation. Its `values.yaml` keeps the former values (`gitlab` and `gitlab-runner`): without cert-manager, Prometheus, registry nor KAS, nginx with one replica and services as `ClusterIP` (ingress disabled); Kubernetes executor, internal URL and job clone in the same namespace.
+- **Argo CD holds the chart** (#538): with the `argocd` module active and installed, the installation is the Application `devzone-gitlab` (chart `charts/devzone-gitlab` at the revision), not a helm pass. A `gitlab` release previously installed by helm is adopted (its release secrets are deleted, the objects remain). Without Argo CD (or a development clone at `0.0.0`), `helm upgrade --install` of the same chart, in two passes: the runner is held at zero replicas until its Secret is written by the seed.
+- **Runner secret**: the seed writes the Secret `gitlab-runner-secret` (key `runner-token`, read from `workspace/.gitlab/runner-token`, never on a command line); the chart reads it through `runners.secret`.
+- **Seed outside the installation**: `devzone gitlab seed` reruns the seed alone (relay, waiting for GitLab, data). In the workspace pod, `devzone workspace services seed gitlab` does it through `services-admin.sh seed gitlab`; it is the only seed action (the other services have none).
+- **Test data**: group `devzone`, project `devzone/demo` (Python, ruff and pytest pipeline), user `dev`, registered runner. On a rerun, nothing is recreated.
+- **Access in the container**: http://gitlab.localhost:8929, user `root`. The name `gitlab.localhost` points to `127.0.0.1` in `/etc/hosts` (entry `127.0.0.1	gitlab.localhost # devzone:gitlab`, set at activation and at each startup, replaced if its address differs, removed at deactivation). Two `kubectl port-forward` relays listen on `127.0.0.1:8929` and `127.0.0.1:2224`: `svc/gitlab-webservice-default` (8929→8181) and `svc/gitlab-gitlab-shell` (2224→22), in the instance's namespace (PID and log in `workspace/.gitlab-web/` and `workspace/.gitlab-ssh/`). They are essential for curl and git over HTTP: libcurl resolves any `*.localhost` name to the loopback without reading `/etc/hosts` (RFC 6761). ssh and glab read `/etc/hosts` and go through the same relay.
+- **Access from the workstation**: GitLab is not published directly on the network; the port-forward listens in the container. From the workstation, use `devzone port 8929` (and `devzone port 2224` for SSH) if needed.
+- **Old cluster**: a kind cluster `gitlab<instance>` created before #396 is no longer used. The `devzone` summary displays `⚠ old kind-gitlab cluster<instance>: devzone gitlab migrate` as long as it exists. `devzone gitlab migrate` installs GitLab in the services cluster, then deletes the old cluster after confirmation (`--yes` without a terminal); without a terminal and without `--yes`, the installation is done and the old cluster is kept (code 2). The test data of the old cluster is not migrated.
+- **Secrets**: root password, root token, password of `dev` and runner token in `workspace/.gitlab/` (rights 600, ignored by git, never displayed). Root password: `cat workspace/.gitlab/root-password`.
+- **Rails secrets**: the `gitlab-rails-secret` secret of the `devzone-gitlab` namespace is kept in `workspace/.gitlab/rails-secret.yaml` (600, ignored by git) at the first installation, then reapplied before `helm upgrade --install` on a reinstallation: the chart reuses it and browser sessions remain valid, without 422.
+- **Reinstallation**: failing that, if the secrets were lost, the end of the installation and the summary warn: “GitLab réinstallé : si le navigateur affiche 422, supprimez les données de site de gitlab.localhost” (*GitLab reinstalled: if the browser shows 422, delete the site data of gitlab.localhost*).
+- **Regenerable password**: `devzone gitlab new-password [root|dev]` applies a random password through `gitlab-rails runner` in the toolbox pod, then updates the source file and the grouped `.password`; nothing is displayed, only the path.
+- **Deactivation**: `devzone disable gitlab` stops the two relays, uninstalls the Helm releases `gitlab` and `gitlab-runner`, deletes the namespace `devzone-gitlab<instance>` and the rest of `workspace/.gitlab/`, but **keeps `rails-secret.yaml`**: “Rails secret kept in workspace/.gitlab/rails-secret.yaml (browser sessions valid on reinstallation)”. The secret only goes with a deliberate full uninstallation (`devzone disable gitlab --yes`, or answering `o` to the confirmation). The services cluster and its current context are not touched.
 
-### Essai de bout en bout : `devzone test-gitlab`
+### End-to-end test: `devzone test-gitlab`
 
-`devzone test-gitlab` rejoue sur le poste l'essai réel du module et de la plateforme GitLab, que la CI GitHub ne peut pas lancer (8 Go de RAM). Le script est `.devcontainer/gitlab/test-gitlab.sh`.
+`devzone test-gitlab` replays on the workstation the real test of the GitLab module and platform, which the GitHub CI cannot run (8 GB of RAM). The script is `.devcontainer/gitlab/test-gitlab.sh`.
 
 ```bash
-devzone test-gitlab              # étapes 1 à 7
-devzone test-gitlab --complet    # désactive, contrôle qu'il ne reste rien, puis réinstalle
-devzone test-gitlab --statut     # publie aussi le statut gitlab-integration sur HEAD
+devzone test-gitlab              # steps 1 to 7
+devzone test-gitlab --complet    # disables, checks that nothing remains, then reinstalls
+devzone test-gitlab --statut     # also publishes the gitlab-integration status on HEAD
 ```
 
-- **Étapes**, chacune chronométrée : 1 module actif (sinon activé) ; 2 état « ready » et runner online ; 3 `gitlab.localhost` résolu vers `127.0.0.1` et relais TCP actifs sur 8929 et 2224 (`gitlab.sh hote-poser` et `relais-lancer`), sinon ✖ avec l'adresse ou le port manquant ; 4 pipeline de `devzone/demo` relancé sur `main` et attendu jusqu'à `success` ; 5 clone SSH (clé ed25519 jetable) et clone HTTP authentifié par un assistant d'identifiants (Basic `oauth2` + jeton lu dans le fichier, jamais dans les arguments d'un processus, l'URL ni `.git/config`) ; 6 plateforme `gitlab` avec `glab repo clone`, puis retour à la plateforme d'avant ; 7 suite d'intégration `test/gitlab/` de repowarden ([#533](https://github.com/simdevWarden/repowarden/issues/533)), dossier absent à la réf → étape sautée avec la raison, échec → sortie gardée dans `${TMPDIR:-/tmp}/devzone-test-gitlab-repowarden.log` (jeton masqué) et citée dans la raison. Avec `--complet`, une étape 8 précède les autres : `devzone disable gitlab`, puis contrôle qu'il ne reste ni namespace `devzone-gitlab<instance>` (nom calculé comme `gitlab.sh`), ni conteneur étiqueté `devzone.instance=<instance>` du module sur le Docker de l'hôte, ni `workspace/.gitlab/`, ni ligne `# devzone:gitlab` de `/etc/hosts`.
-- **Résumé** : une ligne par étape (✔/✖/sauté, durée, raison) et un total ; le code de sortie n'est 0 que sans ✖ (une étape sautée n'échoue pas). Un jeton n'est jamais affiché.
-- **Nettoyage garanti** par `trap … EXIT` : clé SSH retirée de GitLab, dossiers temporaires supprimés, plateforme d'avant restaurée, même si une étape échoue.
-- **Variables** : `GITLAB_TEST_PIPELINE` (délai du pipeline, 600 s par défaut), `GITLAB_TEST_INTERVALLE` (intervalle d'interrogation du pipeline, 5 s par défaut), `REPOWARDEN_TEST_REF` (réf. de la suite d'intégration, `develop` par défaut), `DEVZONE_ROOT` (racine du dépôt, comme `gitlab.sh`).
-- **Durée indicative** : quelques dizaines de secondes sur une instance déjà prête ; plusieurs minutes si le module doit être installé (environ 7 min) et davantage avec `--complet`, qui réinstalle.
-- **`--statut`** : publie le résultat comme statut de commit `gitlab-integration` (`success`/`failure`, description = résumé court) sur `HEAD` du dépôt courant, par `gh api repos/<dépôt>/statuses/<sha>` avec le jeton du mainteneur. Refus clair si `gh` n'est pas connecté. Voir la règle dans [Contribuer](contribuer.md).
+- **Steps**, each timed: 1 module active (otherwise activated); 2 state “ready” and runner online; 3 `gitlab.localhost` resolved to `127.0.0.1` and TCP relays active on 8929 and 2224 (`gitlab.sh hote-poser` and `relais-lancer`), otherwise ✖ with the missing address or port; 4 pipeline of `devzone/demo` re-run on `main` and awaited until `success`; 5 SSH clone (disposable ed25519 key) and HTTP clone authenticated by a credential helper (Basic `oauth2` + token read from the file, never in process arguments, the URL nor `.git/config`); 6 `gitlab` platform with `glab repo clone`, then back to the previous platform; 7 integration suite `test/gitlab/` of repowarden ([#533](https://github.com/simdevWarden/repowarden/issues/533)): folder absent at the ref → step skipped with the reason; failure → output kept in `${TMPDIR:-/tmp}/devzone-test-gitlab-repowarden.log` (token masked) and cited in the reason. With `--complet`, a step 8 comes before the others: `devzone disable gitlab`, then a check that there remains neither namespace `devzone-gitlab<instance>` (name computed as `gitlab.sh` does), nor container labelled `devzone.instance=<instance>` of the module on the host's Docker, nor `workspace/.gitlab/`, nor the `# devzone:gitlab` line in `/etc/hosts`.
+- **Summary**: one line per step (✔/✖/skipped, duration, reason) and a total; the exit code is 0 only without ✖ (a skipped step does not fail). A token is never displayed.
+- **Guaranteed cleanup** by `trap … EXIT`: SSH key removed from GitLab, temporary folders deleted, previous platform restored, even if a step fails.
+- **Variables**: `GITLAB_TEST_PIPELINE` (pipeline timeout, 600 s by default), `GITLAB_TEST_INTERVALLE` (pipeline polling interval, 5 s by default), `REPOWARDEN_TEST_REF` (ref of the integration suite, `develop` by default), `DEVZONE_ROOT` (repository root, as for `gitlab.sh`).
+- **Indicative duration**: a few tens of seconds on an already ready instance; several minutes if the module must be installed (about 7 min), and more with `--complet`, which reinstalls.
+- **`--statut`**: publishes the result as the `gitlab-integration` commit status (`success`/`failure`, short summary as description) on `HEAD` of the current repository, through `gh api repos/<repo>/statuses/<sha>` with the maintainer's token. Clear refusal if `gh` is not connected. See the rule in [Contributing](contributing.md).
 
 
 ## PostgreSQL
 
-Le module `postgres` fournit un PostgreSQL partagé : une base et un utilisateur par projet, sur le [cluster de devzone](#cluster-de-devzone).
+The `postgres` module provides a shared PostgreSQL: one database and one user per project, on the [devzone cluster](#devzone-cluster).
 
 ```bash
-devzone enable postgres [--context CTX]   # installe (choix du cluster la première fois)
-devzone postgres create <projet>             # base + utilisateur <projet>, identifiants dans workspace/.postgres/<projet>.env
-devzone postgres create <projet> --new-password
-devzone postgres list                      # bases et propriétaires
-devzone postgres psql [<projet>]            # console psql dans le pod (superutilisateur sans projet)
-devzone postgres delete <projet> [--yes] # base, utilisateur et fichier .env
-devzone disable postgres                 # supprime PostgreSQL et TOUTES ses bases
+devzone enable postgres [--context CTX]   # installs (choice of the cluster the first time)
+devzone postgres create <project>             # database + user <project>, credentials in workspace/.postgres/<project>.env
+devzone postgres create <project> --new-password
+devzone postgres list                      # databases and owners
+devzone postgres psql [<project>]            # psql console in the pod (superuser without project)
+devzone postgres delete <project> [--yes] # database, user and .env file
+devzone disable postgres                 # removes PostgreSQL and ALL its databases
 ```
 
-- **Ce qui est installé** : `charts/devzone-postgres` (release helm `postgres`, #559), StatefulSet `postgres` (image `postgres:16.x-alpine` figée), volume persistant de 5 Gi (`POSTGRES_TAILLE`), Service `postgres:5432`, namespace `devzone-postgres` étiqueté `app.kubernetes.io/managed-by=devzone`. Pas de chart ni d'image Bitnami.
-- **Accès** : un relais `kubectl port-forward` rend le service joignable sur `127.0.0.1:5432` **dans le conteneur** (`POSTGRES_PORT` pour un autre port) ; relancé à chaque démarrage et par `devzone apply`. PID et journal : `workspace/.postgres/relais.*`.
-- **Bases par projet** : nom en minuscules, chiffres et `_`. `create` est idempotent : le mot de passe est gardé (sauf `--new-password`) ; `REVOKE CONNECT … FROM PUBLIC` : un projet ne se connecte pas à la base d'un autre. Le fichier `<projet>.env` (600) contient `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` et `DB_URL` (JDBC).
-- **Secrets** : mot de passe du superutilisateur `postgres` dans le secret `postgres-admin` et `workspace/.postgres/admin-password` (600) ; jamais régénéré tant que le secret existe ; jamais affiché.
-- **Désactivation** : namespace supprimé (volume compris), `workspace/.postgres/` supprimé, kind dédié supprimé s'il ne porte plus aucun service. `make uninstall` supprime aussi le namespace d'un cluster de l'hôte.
+- **What is installed**: `charts/devzone-postgres` (helm release `postgres`, #559), StatefulSet `postgres` (pinned image `postgres:16.x-alpine`), 5 Gi persistent volume (`POSTGRES_TAILLE`), Service `postgres:5432`, namespace `devzone-postgres` labelled `app.kubernetes.io/managed-by=devzone`. No Bitnami chart nor image.
+- **Access**: a `kubectl port-forward` relay makes the service reachable on `127.0.0.1:5432` **in the container** (`POSTGRES_PORT` for another port); relaunched at each startup and by `devzone apply`. PID and log: `workspace/.postgres/relais.*`.
+- **Databases per project**: name in lowercase, digits and `_`. `create` is idempotent: the password is kept (unless `--new-password`); `REVOKE CONNECT … FROM PUBLIC`: a project does not connect to another project's database. The `<project>.env` file (600) contains `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` and `DB_URL` (JDBC).
+- **Secrets**: password of the `postgres` superuser in the secret `postgres-admin` and in `workspace/.postgres/admin-password` (600); never regenerated as long as the secret exists; never displayed.
+- **Deactivation**: namespace deleted (volume included), `workspace/.postgres/` deleted, dedicated kind cluster deleted if it no longer carries any service. `make uninstall` also deletes the namespace of a host cluster.
 
 ## MySQL
 
-Le catalogue `mysql` fournit un MySQL partagé (une base par projet), sur le [cluster de devzone](#cluster-de-devzone), namespace `devzone-mysql`, joignable sur `127.0.0.1:3306` dans le conteneur.
+The `mysql` catalog provides a shared MySQL (one database per project), on the [devzone cluster](#devzone-cluster), namespace `devzone-mysql`, reachable on `127.0.0.1:3306` in the container.
 
 ```bash
 devzone enable mysql
-devzone mysql create <projet> [--new-password]
+devzone mysql create <project> [--new-password]
 devzone mysql list
-devzone mysql delete <projet> [--yes]
-devzone mysql volume                 # liste les PVC *-mysql-0, marque le monté
-devzone mysql volume <nom>           # réapplique le StatefulSet sur ce volume (données gardées)
-devzone mysql volume --delete <nom> [--yes]
-devzone disable mysql             # retire StatefulSet, service et secret ; volume gardé
-devzone mysql delete-data [--yes]  # supprime le namespace et les volumes (confirmé)
+devzone mysql delete <project> [--yes]
+devzone mysql volume                 # lists the *-mysql-0 PVCs, marks the mounted one
+devzone mysql volume <name>          # reapplies the StatefulSet on this volume (data kept)
+devzone mysql volume --delete <name> [--yes]
+devzone disable mysql             # removes StatefulSet, service and secret; volume kept
+devzone mysql delete-data [--yes]  # deletes the namespace and the volumes (confirmed)
 ```
 
-- **Volumes** : avant l'installation, si un seul PVC `*-mysql-0` existe dans le namespace, il est réutilisé ; aucun → claim `donnees` ; plusieurs → refus avec la liste et `devzone mysql volume <nom>`. `devzone mysql volume <nom>` réapplique le StatefulSet sur le PVC choisi sans supprimer les données. `--delete` demande confirmation `[y/N]` en terminal (`--yes` sans terminal) et refuse si le volume est monté. Le récapitulatif signale `⚠ volume <pvc> non utilisé : devzone mysql volume`.
-- **Désinstaller et supprimer les données** : `devzone disable mysql` retire le StatefulSet, le service et le secret, garde le volume (PVC) et les bases, et affiche `✔ mysql retiré du cluster ; volume <pvc> et bases gardés : devzone mysql volume`. En terminal, la question est « Désactiver mysql retire le serveur, le volume et les bases restent. Supprimer aussi le namespace devzone-mysql et ses volumes ? » : un `oui` (ou `--yes` sans terminal) supprime aussi le namespace `devzone-mysql` et ses volumes ; un refus garde le volume et les bases, le serveur part quand même ; sans terminal et sans `--yes`, les données restent. `devzone mysql delete-data [--yes]` fait cette suppression seule : confirmation `[y/N]` en terminal, `--yes` obligatoire sinon (sinon refus avec la commande exacte). Le namespace et les volumes partent, `workspace/.mysql/root.env` est gardé ; `devzone mysql volume` liste ensuite les volumes restants.
+- **Volumes**: before installation, if a single `*-mysql-0` PVC exists in the namespace, it is reused; none → claim `donnees`; several → refused with the list and `devzone mysql volume <name>`. `devzone mysql volume <name>` reapplies the StatefulSet on the chosen PVC without deleting the data. `--delete` asks for `[y/N]` confirmation in a terminal (`--yes` without a terminal) and refuses if the volume is mounted. The summary reports `⚠ volume <pvc> non utilisé : devzone mysql volume` (*volume unused*).
+- **Uninstalling and deleting the data**: `devzone disable mysql` removes the StatefulSet, the service and the secret, keeps the volume (PVC) and the databases, and displays `✔ mysql retiré du cluster ; volume <pvc> et bases gardés : devzone mysql volume`. In a terminal, the question is “Disabling mysql removes the server, the volume and the databases stay. Also delete the devzone-mysql namespace and its volumes?”: a `oui` (or `--yes` without a terminal) also deletes the `devzone-mysql` namespace and its volumes; a refusal keeps the volume and the databases, the server leaves anyway; without a terminal and without `--yes`, the data stays. `devzone mysql delete-data [--yes]` does this deletion alone: `[y/N]` confirmation in a terminal, `--yes` mandatory otherwise (otherwise refused with the exact command). The namespace and the volumes go, `workspace/.mysql/root.env` is kept; `devzone mysql volume` then lists the remaining volumes.
 
-## Charts de devzone
+## devzone charts
 
-Les services de devzone ont chacun leur chart dans `charts/` (#538) : une seule définition par service, source unique de l'installation au poste Docker, dans le conteneur et par Argo CD.
+Each devzone service has its own chart in `charts/` (#538): a single definition per service, the single source of the installation on the Docker workstation, in the container and through Argo CD.
 
-- `charts/devzone-mysql` : le MySQL partagé du catalogue (unique définition de MySQL, installée aussi en helm direct par `.devcontainer/chart-direct.sh`). Le secret `<nom>-admin` (mot de passe root) reste créé à part, jamais par le chart.
-- `charts/devzone-postgres` : le PostgreSQL partagé (même modèle).
-- `charts/devzone-argocd` : enveloppe du chart officiel `argo-cd` (version figée dans `Chart.yaml`, `Chart.lock` fige la version et le condensé de la dépendance), valeurs minimales de devzone dans `values.yaml`. La dépendance est construite avant l'installation (`helm dependency build`) ; le tgz ainsi construit n'est pas commité (`.gitignore`).
+- `charts/devzone-mysql`: the shared MySQL of the catalog (the only MySQL definition, also installed by direct helm through `.devcontainer/chart-direct.sh`). The secret `<name>-admin` (root password) stays created separately, never by the chart.
+- `charts/devzone-postgres`: the shared PostgreSQL (same model).
+- `charts/devzone-argocd`: wrapper of the official `argo-cd` chart (version pinned in `Chart.yaml`, `Chart.lock` pins the version and the digest of the dependency), minimal devzone values in `values.yaml`. The dependency is built before installation (`helm dependency build`); the tgz thus built is not committed (`.gitignore`).
 
-Chaque chart se vérifie par `helm lint` et `helm template` (`manage/test/chart-*.bats`), sans cluster.
+Each chart is checked by `helm lint` and `helm template` (`manage/test/chart-*.bats`), without a cluster.
 
-### Convention des charts devzone
+### devzone chart convention
 
-Le code suppose que chaque service a un chart `charts/devzone-<service>` (#554) : les appels (`services.sh`, `catalog-argocd.sh`, `argocd-services*.sh`, `argocd-workspace.sh`) construisent ce chemin à partir du nom du service. La convention ci-dessous est la règle que ces appels supposent.
+The code assumes that each service has a chart `charts/devzone-<service>` (#554): the calls (`services.sh`, `catalog-argocd.sh`, `argocd-services*.sh`, `argocd-workspace.sh`) build this path from the service name. The convention below is the rule these calls assume.
 
-**Dossier et `Chart.yaml`**
+**Folder and `Chart.yaml`**
 
-- Le dossier s'appelle `charts/devzone-<service>`, `<service>` en minuscules, chiffres et tirets (`[a-z0-9-]+`).
-- `name` vaut exactement le nom du dossier. `type: application`.
-- `version` est un semver (`0.1.0`). `appVersion` est la version du logiciel empaqueté, jamais vide.
-- `description` est en anglais et cite le ticket qui a introduit le chart (`#NNN`).
+- The folder is called `charts/devzone-<service>`, `<service>` in lowercase, digits and hyphens (`[a-z0-9-]+`).
+- `name` is exactly the folder name. `type: application`.
+- `version` is a semver (`0.1.0`). `appVersion` is the version of the packaged software, never empty.
+- `description` is in English and cites the ticket that introduced the chart (`#NNN`).
 
-**Deux familles**
+**Two families**
 
-- **Service** : le chart porte ses propres templates (StatefulSet, Service, etc.). Ses règles :
-  - le namespace n'est jamais écrit en dur, seulement `{{ .Release.Namespace }}` ;
-  - chaque objet porte `app.kubernetes.io/name=<service>`, `app.kubernetes.io/part-of=devzone` et `app.kubernetes.io/managed-by=devzone` ;
-  - aucun `kind: Secret` dans les templates : les secrets sont créés à part, par devzone (#538) ;
-  - aucun `Ingress` ni `LoadBalancer` : l'accès passe par le relais `kubectl port-forward` du poste ;
-  - les valeurs communes ci-dessous sont présentes dans `values.yaml`.
-- **Enveloppe** : le chart n'a que des `dependencies:` (un chart officiel figé). Sa dépendance est une version exacte, de préférence en `oci://`, ses valeurs vivent sous la clé du chart officiel, et `Chart.lock` est commité. Le dépôt sans `oci://` produit un avertissement.
+- **Service**: the chart carries its own templates (StatefulSet, Service, etc.). Its rules:
+  - the namespace is never hard-coded, only `{{ .Release.Namespace }}`;
+  - each object carries `app.kubernetes.io/name=<service>`, `app.kubernetes.io/part-of=devzone` and `app.kubernetes.io/managed-by=devzone`;
+  - no `kind: Secret` in the templates: the secrets are created separately, by devzone (#538);
+  - no `Ingress` nor `LoadBalancer`: access goes through the workstation's `kubectl port-forward` relay;
+  - the common values below are present in `values.yaml`.
+- **Wrapper**: the chart has only `dependencies:` (an official chart, pinned). Its dependency is an exact version, preferably in `oci://`, its values live under the key of the official chart, and `Chart.lock` is committed. A repository without `oci://` produces a warning.
 
-La famille se déduit du chart : `dependencies:` présent = enveloppe, sinon service.
+The family is deduced from the chart: `dependencies:` present = wrapper, otherwise service.
 
-**Clés de valeurs communes**
+**Common values keys**
 
-| Clé | Sens | Exemple |
+| Key | Meaning | Example |
 |---|---|---|
-| `image` | image du conteneur principal, avec sa version figée | `mysql:8.4` |
-| `size` | taille du volume de données (PVC) | `5Gi` |
-| `memory` | mémoire demandée (`requests`) du conteneur principal | `1Gi` |
-| `port` | port du Service (le conteneur écoute sur son port propre) | `3306` |
-| `claim` | nom du volume claim template mouté par le conteneur | `donnees` |
-| `resources` | autres ressources du conteneur (`requests`/`limits` de CPU, etc.) | `requests: {cpu: 100m}` |
+| `image` | image of the main container, with its pinned version | `mysql:8.4` |
+| `size` | size of the data volume (PVC) | `5Gi` |
+| `memory` | memory requested (`requests`) of the main container | `1Gi` |
+| `port` | Service port (the container listens on its own port) | `3306` |
+| `claim` | name of the volume claim template mounted by the container | `donnees` |
+| `resources` | other container resources (`requests`/`limits` of CPU, etc.) | `requests: {cpu: 100m}` |
 
-`devzone-workspace` fait exception : c'est le poste lui-même, dont les volumes se règlent par `workspace.size` et `persistence`, pas par ces clés.
+`devzone-workspace` is an exception: it is the workstation itself, whose volumes are set by `workspace.size` and `persistence`, not by these keys.
 
-**Contrôle**
+**Check**
 
-Le script `manage/scripts/check-charts.sh` applique la convention à chaque dossier de `charts/` et à toute référence `charts/devzone-<x>` du code ; il lance `helm lint` et le rendu quand helm est présent. Un manquement s'affiche `✖ charts/<x> : <règle>` et fait échouer le contrôle. Avant d'appliquer un chart, devzone vérifie que `charts/devzone-<service>/Chart.yaml` existe et porte `name: devzone-<service>` ; sinon il s'arrête avant tout appel à `kubectl` ou `helm`, sort avec le code 2 et affiche `✖ <service> : chart charts/devzone-<service> missing or misnamed (manage/docs/reference.md#charts-de-devzone)`. Les appelants du catalogue (`app.sh`, `mysql.sh`) reçoivent cet échec comme un échec ordinaire et sortent en code 1.
+The script `manage/scripts/check-charts.sh` applies the convention to each folder of `charts/` and to any `charts/devzone-<x>` reference in the code; it runs `helm lint` and the rendering when helm is present. A failure is shown as `✖ charts/<x> : <rule>` and fails the check. Before applying a chart, devzone checks that `charts/devzone-<service>/Chart.yaml` exists and carries `name: devzone-<service>`; otherwise it stops before any call to `kubectl` or `helm`, exits with code 2 and shows `✖ <service> : chart charts/devzone-<service> missing or misnamed (manage/docs/reference.md#devzone-charts)`. The catalog callers (`app.sh`, `mysql.sh`) receive this failure as an ordinary failure and exit with code 1.
 
-**Ajouter un service** : créer `charts/devzone-<service>` selon la famille, ajouter les valeurs communes utiles, lancer `bash manage/scripts/check-charts.sh`, puis un test `chart-<service>.bats` (lint et rendu).
+**Adding a service**: create `charts/devzone-<service>` according to the family, add the useful common values, run `bash manage/scripts/check-charts.sh`, then a test `chart-<service>.bats` (lint and rendering).
 
 ## Argo CD
 
-Le module `argocd` fournit Argo CD sur le [cluster de devzone](#cluster-de-devzone). Sur le poste Docker, c'est un module comme les autres (ci-dessous) ; dans le [workspace Kubernetes](#argo-cd-dans-le-workspace-kubernetes), Argo CD est installé d'office et tient les déploiements de devzone (#516).
+The `argocd` module provides Argo CD on the [devzone cluster](#devzone-cluster). On the Docker workstation, it is a module like the others (below); in the [Kubernetes workspace](#argo-cd-in-the-kubernetes-workspace), Argo CD is installed by default and holds the devzone deployments (#516).
 
 ```bash
-devzone enable argocd      # installe Argo CD dans le cluster des services
-devzone disable argocd   # désinstalle Argo CD, les autres services restent
-devzone argocd status         # état du module
-devzone argocd init [--repo <url>|--none]  # dépôt GitOps (GitHub) : créé, désigné, ou aucun
-devzone <dossier> --gitops <github|none|<url>>  # création du dossier avec le dépôt GitOps (même dépôt que ci-dessus)
-devzone argocd apply        # applique .argocd.conf de l'instance
-devzone argocd app add <dépôt> [chemin] [--name N] [--revision R] [--namespace NS] [--token T] [--username U]  # un projet déployé par Argo CD
-devzone argocd app list     # Applications des projets, synchronisation et santé
-devzone argocd app remove <N>  # retire l'Application et ses ressources
+devzone enable argocd      # installs Argo CD in the services cluster
+devzone disable argocd   # uninstalls Argo CD, the other services remain
+devzone argocd status         # state of the module
+devzone argocd init [--repo <url>|--none]  # GitOps repository (GitHub): created, designated, or none
+devzone <folder> --gitops <github|none|<url>>  # folder creation with the GitOps repository (same repository as above)
+devzone argocd apply        # applies the instance's .argocd.conf
+devzone argocd app add <repo> [path] [--name N] [--revision R] [--namespace NS] [--token T] [--username U]  # a project deployed by Argo CD
+devzone argocd app list     # Applications of the projects, sync and health
+devzone argocd app remove <N>  # removes the Application and its resources
 ```
 
-Les projets sont déclarés dans `.argocd.conf` à la racine de devzone et, s'il y en a un, dans le dépôt GitOps de l'utilisateur : voir [Dépôt GitOps et `.argocd.conf`](#dépôt-gitops-et-argocdconf).
+The projects are declared in `.argocd.conf` at the root of devzone and, if there is one, in the user's GitOps repository: see [GitOps repository and `.argocd.conf`](#gitops-repository-and-argocdconf).
 
-- **Ce qui est installé** : le [chart enveloppe `charts/devzone-argocd`](#charts-de-devzone), qui reprend le chart officiel `argo-cd` en version figée (`10.14.0`, dépendance déclarée dans `Chart.yaml`, `Chart.lock` commite l'empreinte), namespace `devzone-argocd` étiqueté `app.kubernetes.io/managed-by=devzone` et isolé par NetworkPolicy. Valeurs minimales (dans `charts/devzone-argocd/values.yaml`) : un réplica par composant, sans Dex ni notifications, serveur en `ClusterIP`, sans Ingress ni LoadBalancer. L'installation construit d'abord la dépendance (`helm dependency build`), puis installe le chart local, au poste comme dans le conteneur ; la même enveloppe sert à Argo CD lui-même quand il se déploie tout seul (#538).
-- **Mémoire** : l'installation est refusée sous environ 1 Go de mémoire allouable dans le cluster, avec le message pour l'agrandir.
-- **Accès** : un relais `kubectl port-forward` rend l'interface joignable sur https://127.0.0.1:8443 **dans le conteneur** (`ARGOCD_PORT` pour un autre port) ; relancé à chaque démarrage et par `devzone apply`. PID et journal : `workspace/.argocd/relais.*`.
-- **Projets** : `devzone argocd app add <dépôt> [chemin]` déclare une Application `app-<N>` (nom tiré du dépôt, ou `--name`), révision `HEAD` (ou `--revision`), ressources dans le namespace `devzone-app-<N>` (ou `--namespace`), synchronisation automatique avec `prune` et `selfHeal`. Un dépôt **GitHub public** ne demande rien d'autre ; un dépôt **privé** prend `--token T` (et `--username U`, `root` par défaut), rangés dans un Secret de dépôt `repo-<N>` de `devzone-argocd` (étiquette `argocd.argoproj.io/secret-type=repository`), jamais dans l'Application. Le **GitLab de devzone** s'indique avec son URL habituelle (`http://gitlab.localhost:8929/<groupe>/<projet>.git`) : elle est réécrite vers le service du cluster (`http://gitlab-webservice-default.devzone-gitlab.svc:8181/…`, la seule adresse qu'Argo CD atteint), le jeton root du module (`workspace/.gitlab/root-token`) sert sauf `--token`, et la NetworkPolicy de `devzone-gitlab` est ouverte aux namespaces devzone (même règle que `devzone postgres authorize`). `app remove <N>` supprime l'Application, ses ressources, son Secret de dépôt et le namespace `devzone-app-<N>`. Le compte limité (#430) gère tout cela grâce aux rôles agrégés du chart (`createAggregateRoles`). Dépôt de démo : https://github.com/SimBienvenueHoulBoumi/devzone-argocd-demo (`k8s/`).
-- **Mot de passe** : lu dans le Secret `argocd-initial-admin-secret`, rangé dans `workspace/.argocd/admin.env` (600) puis repris dans [`.password`](#identifiants-regroupés) ; utilisateur `admin`, jamais affiché.
-- **Désactivation** : `helm uninstall` de la release et suppression du namespace `devzone-argocd`, puis de `workspace/.argocd/` ; **les autres services restent**, sous helm direct.
+- **What is installed**: the [wrapper chart `charts/devzone-argocd`](#devzone-charts), which takes over the official `argo-cd` chart at a pinned version (`10.14.0`, dependency declared in `Chart.yaml`, `Chart.lock` commits the fingerprint), namespace `devzone-argocd` labelled `app.kubernetes.io/managed-by=devzone` and isolated by NetworkPolicy. Minimal values (in `charts/devzone-argocd/values.yaml`): one replica per component, without Dex nor notifications, server as `ClusterIP`, without Ingress nor LoadBalancer. The installation first builds the dependency (`helm dependency build`), then installs the local chart, on the workstation as in the container; the same wrapper serves Argo CD itself when it deploys itself (#538).
+- **Memory**: the installation is refused under about 1 GB of allocatable memory in the cluster, with the message to enlarge it.
+- **Access**: a `kubectl port-forward` relay makes the interface reachable at https://127.0.0.1:8443 **in the container** (`ARGOCD_PORT` for another port); relaunched at each startup and by `devzone apply`. PID and log: `workspace/.argocd/relais.*`.
+- **Projects**: `devzone argocd app add <repo> [path]` declares an Application `app-<N>` (name taken from the repository, or `--name`), revision `HEAD` (or `--revision`), resources in the namespace `devzone-app-<N>` (or `--namespace`), automatic sync with `prune` and `selfHeal`. A **public GitHub** repository needs nothing else; a **private** repository takes `--token T` (and `--username U`, `root` by default), stored in a repository Secret `repo-<N>` of `devzone-argocd` (label `argocd.argoproj.io/secret-type=repository`), never in the Application. The **devzone GitLab** is given with its usual URL (`http://gitlab.localhost:8929/<group>/<project>.git`): it is rewritten to the cluster service (`http://gitlab-webservice-default.devzone-gitlab.svc:8181/…`, the only address Argo CD reaches), the module's root token (`workspace/.gitlab/root-token`) is used unless `--token` is given, and the NetworkPolicy of `devzone-gitlab` is opened to the devzone namespaces (same rule as `devzone postgres authorize`). `app remove <N>` deletes the Application, its resources, its repository Secret and the namespace `devzone-app-<N>`. The limited account (#430) manages all of this thanks to the aggregated roles of the chart (`createAggregateRoles`). Demo repository: https://github.com/SimBienvenueHoulBoumi/devzone-argocd-demo (`k8s/`).
+- **Password**: read from the `argocd-initial-admin-secret` Secret, stored in `workspace/.argocd/admin.env` (600) then taken into [`.password`](#grouped-credentials); user `admin`, never displayed.
+- **Deactivation**: `helm uninstall` of the release and deletion of the namespace `devzone-argocd`, then of `workspace/.argocd/`; **the other services remain**, under direct helm.
 
-### Argo CD dans le workspace Kubernetes
+### Argo CD in the Kubernetes workspace
 
-En mode workspace Kubernetes, Argo CD devient le moyen de déploiement de devzone (#516). Tout se pilote depuis le poste (`manage/scripts/argocd-workspace.sh`, `argocd-services.sh`), qui a les droits d'administrateur du cluster ; le pod n'en a pas.
+In Kubernetes workspace mode, Argo CD becomes devzone's deployment means (#516). Everything is driven from the workstation (`manage/scripts/argocd-workspace.sh`, `argocd-services.sh`), which has the cluster administrator rights; the pod has none.
 
 ```bash
-devzone workspace start                      # installe Argo CD s'il manque, puis le workspace (Application) et .argocd.conf
-devzone workspace services enable argocd     # installe Argo CD (ou le réinstalle) depuis le poste
-devzone workspace services disable argocd    # le retire ; les services restent, sous helm direct
-devzone workspace argocd status              # installé ou non, dépôt GitOps, Applications (synchronisation, santé, révision)
-devzone workspace argocd init [--repo <url>|--none]   # dépôt GitOps : créé sur GitHub, désigné, ou aucun
-devzone workspace argocd apply               # applique .argocd.conf (Applications ajoutées, retirées)
-devzone workspace argocd app add <dépôt> [chemin] [--name N] [--revision R] [--namespace NS] [--token T] [--username U]
+devzone workspace start                      # installs Argo CD if missing, then the workspace (Application) and .argocd.conf
+devzone workspace services enable argocd     # installs Argo CD (or reinstalls it) from the workstation
+devzone workspace services disable argocd    # removes it; the services remain, under direct helm
+devzone workspace argocd status              # installed or not, GitOps repository, Applications (sync, health, revision)
+devzone workspace argocd init [--repo <url>|--none]   # GitOps repository: created on GitHub, designated, or none
+devzone workspace argocd apply               # applies .argocd.conf (Applications added, removed)
+devzone workspace argocd app add <repo> [path] [--name N] [--revision R] [--namespace NS] [--token T] [--username U]
 devzone workspace argocd app list | app remove <N>
 ```
 
-#### Dépôt GitOps et `.argocd.conf`
+#### GitOps repository and `.argocd.conf`
 
-Les déclarations ne restent pas dans le cluster : elles vivent dans un **dépôt GitOps propre à l'utilisateur**, que suit Argo CD, et dans un **fichier de configuration** du dossier devzone, `.argocd.conf`, de la même forme que `.repowarden.conf` :
+The declarations do not stay in the cluster: they live in a **GitOps repository specific to the user**, which Argo CD follows, and in a **configuration file** of the devzone folder, `.argocd.conf`, in the same form as `.repowarden.conf`:
 
 ```ini
 [argocd]
-    repo = https://github.com/<login>/devzone-argocd.git   # none : application directe, sans dépôt
+    repo = https://github.com/<login>/devzone-argocd.git   # none: direct application, without repository
 
 [services]
-    postgres = on          # mysql, gitlab : pareil (#538)
+    postgres = on          # mysql, gitlab: same (#538)
 
 [app demo]
     repo = https://github.com/argoproj/argocd-example-apps
@@ -672,222 +673,203 @@ Les déclarations ne restent pas dans le cluster : elles vivent dans un **dépô
     namespace = devzone-app-demo
 
 [app interne]
-    repo = http://gitlab.localhost:8929/devzone/interne.git   # GitLab de devzone : URL réécrite vers le service du cluster
+    repo = http://gitlab.localhost:8929/devzone/interne.git   # devzone GitLab: URL rewritten to the cluster service
     path = k8s
     username = root
-    token-file = workspace/.gitlab/root-token                 # jamais le jeton lui-même, seulement son chemin
+    token-file = workspace/.gitlab/root-token                 # never the token itself, only its path
 ```
 
-- **Le fichier est la déclaration** : versionné avec le dossier devzone (il n'est pas ignoré par git), écrit par devzone (`argocd init`, `app add`, `app remove`) et appliqué par `devzone workspace argocd apply` et `workspace start` : chaque `[app N]` devient l'Application `app-N` ; une Application de projet absente du fichier est retirée (avec ses ressources, son Secret de dépôt et son namespace `devzone-app-N`). Il peut aussi s'éditer à la main, puis `apply`.
-- **Section `[services]`** (#538) : les services déployés dans le cluster s'y déclarent (`postgres = on|off`, puis `mysql`, `gitlab`). Pour chaque service `on`, la réconciliation (par `apply` ou `workspace start`) crée le namespace `devzone-<svc>` étiqueté et isolé, le secret **à part** (mot de passe généré ou relu, miroir `workspace/.<svc>/`, `.password`), puis l'Application `devzone-<svc>` (chart `charts/devzone-<svc>` du dépôt devzone à la révision) ; un service `off` voit son Application retirée avec ses ressources, **le namespace et les volumes restent** (les données sont gardées) ; la suppression des données reste la commande explicite `devzone workspace services disable <svc> --yes`. Les lignes `<svc>=on` de `.devzone.modules` sont lues en compatibilité quand la section ne porte pas encore le service, et c'est la section qui gagne dès qu'elle le porte.
-- **Dépôt GitOps** : `devzone workspace argocd init` crée `<login>/devzone-argocd` (privé, `gh repo create` avec la connexion `gh` du poste) s'il manque et le note dans `[argocd] repo` ; `workspace start` le fait sans option. `--repo <url>` désigne un dépôt GitHub existant ; `--none` renonce (les Applications sont appliquées directement, comme sans dépôt). Sans `gh` connecté : un avis, application directe. La même option accompagne la création du dossier : `devzone <dossier> --gitops <github|none|<url>>`.
-- **Ce qui va dans le dépôt** : une Application racine `devzone` (seul objet posé par `kubectl`) suit le dossier `apps/` ; `workspace start`, `services enable|disable postgres` et `app add|remove` y écrivent ou retirent `apps/<nom>.yaml` par l'API GitHub (`gh api`, sans clone ni commit local), puis demandent un `refresh` (Argo CD ne lit Git que toutes les 3 min). Argo CD lit le dépôt avec le jeton `gh auth token` du poste (`DEVZONE_GITOPS_TOKEN` pour un autre), rangé dans le Secret de dépôt `repo-devzone-argocd`. Les secrets des services restent créés à part, jamais dans Git.
-- **Dépôts privés et GitLab de devzone** : `--token T` range le jeton dans `workspace/.argocd/tokens/<N>` (600, hors Git) et note `token-file` ; une URL `gitlab.localhost` est réécrite vers `http://gitlab-webservice-default.devzone-gitlab.svc:8181/…` (la seule adresse qu'Argo CD atteint), le jeton root du module sert à défaut (`workspace/.gitlab/root-token` du poste, sinon celui du pod), et la NetworkPolicy de `devzone-gitlab` est ouverte aux namespaces devzone.
-- **Un GitLab comme dépôt GitOps** (et non seulement comme source d'un projet) : lot B.
+- **The file is the declaration**: versioned with the devzone folder (it is not ignored by git), written by devzone (`argocd init`, `app add`, `app remove`) and applied by `devzone workspace argocd apply` and `workspace start`: each `[app N]` becomes the Application `app-N`; a project Application absent from the file is removed (with its resources, its repository Secret and its namespace `devzone-app-N`). It can also be edited by hand, then `apply`.
+- **`[services]` section** (#538): the services deployed in the cluster are declared there (`postgres = on|off`, then `mysql`, `gitlab`). For each service `on`, the reconciliation (by `apply` or `workspace start`) creates the labelled and isolated namespace `devzone-<svc>`, the secret **separately** (generated or re-read password, mirror `workspace/.<svc>/`, `.password`), then the Application `devzone-<svc>` (chart `charts/devzone-<svc>` of the devzone repository at the revision); a service `off` sees its Application removed with its resources, **the namespace and the volumes remain** (the data is kept); deleting the data remains the explicit command `devzone workspace services disable <svc> --yes`. The `<svc>=on` lines of `.devzone.modules` are read for compatibility when the section does not yet carry the service, and the section wins as soon as it carries it.
+- **GitOps repository**: `devzone workspace argocd init` creates `<login>/devzone-argocd` (private, `gh repo create` with the workstation's `gh` connection) if it is missing and notes it in `[argocd] repo`; `workspace start` does it without an option. `--repo <url>` designates an existing GitHub repository; `--none` gives up (the Applications are applied directly, as without a repository). Without `gh` connected: a notice, direct application. The same option accompanies the folder creation: `devzone <folder> --gitops <github|none|<url>>`.
+- **What goes into the repository**: a root Application `devzone` (the only object applied by `kubectl`) follows the `apps/` folder; `workspace start`, `services enable|disable postgres` and `app add|remove` write or remove `apps/<name>.yaml` through the GitHub API (`gh api`, without clone nor local commit), then request a `refresh` (Argo CD reads Git only every 3 min). Argo CD reads the repository with the workstation's `gh auth token` (`DEVZONE_GITOPS_TOKEN` for another one), stored in the repository Secret `repo-devzone-argocd`. The service secrets stay created separately, never in Git.
+- **Private repositories and devzone GitLab**: `--token T` stores the token in `workspace/.argocd/tokens/<N>` (600, outside Git) and notes `token-file`; a `gitlab.localhost` URL is rewritten to `http://gitlab-webservice-default.devzone-gitlab.svc:8181/…` (the only address Argo CD reaches), the module's root token serves by default (`workspace/.gitlab/root-token` on the workstation, otherwise the one of the pod), and the NetworkPolicy of `devzone-gitlab` is opened to the devzone namespaces.
+- **A GitLab as GitOps repository** (and not only as the source of a project): batch B.
 
-- **D'office** : `devzone workspace start` installe Argo CD (chart enveloppe `charts/devzone-argocd`, au moins 1 Go de mémoire allouable, sinon un avertissement et le workspace part en helm direct) **sauf** si `.devzone.modules` du poste porte `argocd=off`. `services disable argocd` écrit cette ligne ; `services enable argocd` la remet à `on`.
-- **Mot de passe et interface** : le mot de passe `admin` est lu dans `argocd-initial-admin-secret`, rangé dans `workspace/.argocd/admin.env` du **poste** (600) et dans [`.password`](#identifiants-regroupés) du poste ; jamais affiché. Le [veilleur des ports](#ports-vers-le-poste) relaie le port https du service `argocd-server` sur `https://localhost:8443` (127.0.0.1 seulement, certificat auto-signé à accepter).
-- **Le workspace est une Application** : `devzone workspace start` crée l'Application `devzone-workspace` (chart `charts/devzone-workspace` du dépôt devzone public, révision `v<version du paquet>`, paramètres `image.tag`, `image.repository` avec `--image`, `image.pullPolicy=Always` pour `latest`) à la place de `helm upgrade --install`. Une release helm existante est **adoptée** : ses secrets de release sont supprimés, aucune ressource n'est recréée ; le pod ne redémarre que si le chart a changé depuis la release (une mise à jour de devzone, comme avant). `devzone workspace stop` supprime l'Application (le pod part, les volumes restent) ; sans Application, `helm uninstall` comme avant. Un **clone de développement** (version `0.0.0`) reste en helm direct, car son chart local n'est pas dans Git ; la variable d'environnement `DEVZONE_ARGOCD_REVISION` (une branche ou un tag) force une révision, pour les essais.
-- **PostgreSQL par Argo CD** : avec Argo CD actif, `devzone workspace services enable postgres` écrit `[services] postgres = on` et réconcilie : namespace `devzone-postgres` (étiqueté, isolé par NetworkPolicy), secret `postgres-admin` **à part** (mot de passe généré sur le poste, ou relu dans un secret existant ; miroir `workspace/.postgres/admin-password` du poste, `.password` mis à jour), puis l'Application `devzone-postgres` (chart `charts/devzone-postgres`, le chart est l'unique définition : la voie helm direct l'installe avec `.devcontainer/chart-direct.sh`, une installation existante est adoptée sans recréation). `selfHeal` recrée ce qui est supprimé à la main. `disable postgres` retire l'Application, **le namespace, les volumes et les bases restent** ; `disable postgres --yes` supprime aussi le namespace et ses données (miroir `workspace/.postgres` compris). Sans Argo CD, le chemin de #528 (installeur dans le pod) reste.
-- **Projets** : déclarés dans `.argocd.conf` (ci-dessous), mêmes commandes que dans le conteneur, préfixées par `devzone workspace argocd`.
-- **Secrets hors de Git** : les secrets Kubernetes sont créés par devzone, jamais dans le dépôt ; les Applications ne font que les référencer. Pas d'opérateur supplémentaire (Sealed Secrets, External Secrets) : un poste de développement n'a pas de coffre central, et devzone range déjà ses mots de passe dans `.password`.
-- **Retrait** : `services disable argocd` retire d'abord le finaliseur de chaque Application puis la supprime **sans cascade** (les ressources restent), désinstalle la release et le namespace ; les services continuent sous helm direct.
-- **Lot B** (restes de #538, étapes 3 à 6) : Applications `mysql` et `gitlab`, services sur le poste Docker, GitLab comme dépôt GitOps.
+- **By default**: `devzone workspace start` installs Argo CD (wrapper chart `charts/devzone-argocd`, at least 1 GB of allocatable memory, otherwise a warning and the workspace goes through direct helm) **unless** the workstation's `.devzone.modules` carries `argocd=off`. `services disable argocd` writes this line; `services enable argocd` sets it back to `on`.
+- **Password and interface**: the `admin` password is read from `argocd-initial-admin-secret`, stored in `workspace/.argocd/admin.env` of the **workstation** (600) and in the workstation's [`.password`](#grouped-credentials); never displayed. The [port watcher](#ports-to-the-workstation) relays the https port of the `argocd-server` service to `https://localhost:8443` (127.0.0.1 only, self-signed certificate to accept).
+- **The workspace is an Application**: `devzone workspace start` creates the Application `devzone-workspace` (chart `charts/devzone-workspace` of the public devzone repository, revision `v<package version>`, parameters `image.tag`, `image.repository` with `--image`, `image.pullPolicy=Always` for `latest`) in place of `helm upgrade --install`. An existing helm release is **adopted**: its release secrets are deleted, no resource is recreated; the pod restarts only if the chart changed since the release (a devzone update, as before). `devzone workspace stop` deletes the Application (the pod goes, the volumes remain); without an Application, `helm uninstall` as before. A **development clone** (version `0.0.0`) stays on direct helm, because its local chart is not in Git; the environment variable `DEVZONE_ARGOCD_REVISION` (a branch or a tag) forces a revision, for tests.
+- **PostgreSQL through Argo CD**: with Argo CD active, `devzone workspace services enable postgres` writes `[services] postgres = on` and reconciles: namespace `devzone-postgres` (labelled, isolated by NetworkPolicy), secret `postgres-admin` **separately** (password generated on the workstation, or re-read from an existing secret; mirror `workspace/.postgres/admin-password` of the workstation, `.password` updated), then the Application `devzone-postgres` (chart `charts/devzone-postgres`; the chart is the single definition: the direct helm path installs it with `.devcontainer/chart-direct.sh`, an existing installation is adopted without recreation). `selfHeal` recreates what is deleted by hand. `disable postgres` removes the Application, **the namespace, the volumes and the databases remain**; `disable postgres --yes` also deletes the namespace and its data (mirror `workspace/.postgres` included). Without Argo CD, the path of #528 (installer in the pod) remains.
+- **Projects**: declared in `.argocd.conf` (below), same commands as in the container, prefixed by `devzone workspace argocd`.
+- **Secrets outside Git**: the Kubernetes secrets are created by devzone, never in the repository; the Applications only reference them. No additional operator (Sealed Secrets, External Secrets): a development workstation has no central vault, and devzone already keeps its passwords in `.password`.
+- **Removal**: `services disable argocd` first removes the finalizer of each Application then deletes it **without cascade** (the resources remain), uninstalls the release and the namespace; the services continue under direct helm.
+- **Batch B** (remains of #538, steps 3 to 6): Applications `mysql` and `gitlab`, services on the Docker workstation, GitLab as GitOps repository.
 
-## Ports vers le poste
+## Ports to the workstation
 
-`devzone port` rend accessibles depuis le poste les applications qui écoutent **dans** le conteneur devzone : un relais `alpine/socat` par port, sur le Docker de l'hôte (#290).
+`devzone port` makes the applications that listen **inside** the devzone container accessible from the workstation: one `alpine/socat` relay per port, on the host's Docker (#290).
 
 ```bash
-devzone port <n>              # ouvre 127.0.0.1:<n> du poste → <n> du conteneur
-devzone port                  # liste : port, ● actif ou ○ arrêté, application derrière
-devzone port --close <n>     # retire le relais et le port de l'état
-devzone port auto on|off     # active ou coupe le veilleur automatique
-devzone port exclure <n>      # retire un port de la liste automatique
-devzone port inclure <n>      # réintègre un port à la liste automatique
+devzone port <n>              # opens 127.0.0.1:<n> of the workstation → <n> of the container
+devzone port                  # list: port, ● active or ○ stopped, application behind it
+devzone port --close <n>     # removes the relay and the port from the state
+devzone port auto on|off     # enables or stops the automatic watcher
+devzone port exclure <n>      # removes a port from the automatic list
+devzone port inclure <n>      # puts a port back into the automatic list
 ```
 
-- **Relais** : conteneur `devzone-<instance>-port-<n>`, étiqueté `devzone.instance=<instance>` et `devzone.port=<n>`, image figée `SOCAT_IMAGE=alpine/socat:1.8.0.3` (`.devcontainer/ports.sh`). Il publie `-p 127.0.0.1:<n>:<n>` seulement, avec `--restart unless-stopped`.
-- **Veilleur automatique (#394)** : `.devcontainer/ports-auto.sh` surveille les ports écoutés dans le conteneur toutes les 2 s (`ss -ltnH`). Un port non déjà relayé, non exclu, pas un service de devzone (5432, 8929, 2224) et pas un pont du veilleur est relayé : pont interne sur l'IP du conteneur si l'application n'écoute que sur `127.0.0.1`/`::1`, puis relais poste `devzone-<instance>-auto-<n>`. Le port disparu depuis plus de 10 s retire le pont et le relais. Un port déjà pris sur le poste est marqué occupé et n'est plus réessayé. Un seul veilleur tourne (verrou `mkdir` dans `/tmp/devzone-ports-auto/`, rafraîchi à chaque tour ; une instance morte est remplacée). Le veilleur s'arrête seul si le dossier d'état disparaît. Il ne tourne qu'à la demande des scripts de démarrage : tout autre appel est refusé (code 2), affiche la commande à faire (`devzone repair`). Dans le workspace Kubernetes (`DEVZONE_WORKSPACE` valant `kubernetes`), il ne démarre pas (#517) : les ports passent par `devzone workspace ports`.
-- **Désactivation** : `devzone port auto off` arrête le veilleur et retire les relais automatiques ; `devzone port auto on` le réactive : le veilleur repart au prochain démarrage du conteneur ou via `devzone repair`. Au démarrage, les relais automatiques d'une session précédente sont retirés.
-- **Réseau et IP** : lus par `docker inspect "$(hostname)"` sur le Docker de l'hôte ; le relais rejoint le conteneur par son IP sur son réseau Docker. Conteneur devzone introuvable (Docker de l'hôte absent) : refus clair, code 1.
-- **État** : ligne `ports=8080,3000` dans `$RACINE/.devzone.modules`, triée et sans doublon ; `--close` retire le port. Le relais déjà ouvert est idempotent (message, code 0).
-- **Démarrage** : `devzone start` relance chaque relais de l'état vers l'IP actuelle du conteneur (elle change à chaque redémarrage). Un échec affiche un avertissement sans bloquer le démarrage ; `devzone repair` le reprend sans redémarrer.
-- **Refus, code 1** : port non numérique ou hors 1-65535 ; Docker de l'hôte injoignable ; port déjà pris sur le poste (échec de `docker run`, « port is already allocated » ou « address already in use »), l'état restant inchangé.
-- **Plusieurs instances** : le nom du relais et l'étiquette portent `DEVZONE_INSTANCE` ; deux instances qui veulent le même port du poste : la seconde reçoit le refus « déjà utilisé ».
-- **Récapitulatif** : ligne `ports to the workstation` avec `8080 ●, 3000 ○`, ou `none (devzone port <n>)`.
-- **Désinstallation** : `make uninstall` retire les conteneurs étiquetés `devzone.instance` (voir README, « Désinstaller »).
-- **Spring Boot** : l'application doit écouter sur `0.0.0.0` (défaut). Un `server.address=127.0.0.1` la rend injoignable depuis le relais.
+- **Relay**: container `devzone-<instance>-port-<n>`, labelled `devzone.instance=<instance>` and `devzone.port=<n>`, pinned image `SOCAT_IMAGE=alpine/socat:1.8.0.3` (`.devcontainer/ports.sh`). It publishes `-p 127.0.0.1:<n>:<n>` only, with `--restart unless-stopped`.
+- **Automatic watcher (#394)**: `.devcontainer/ports-auto.sh` watches the ports listening in the container every 2 s (`ss -ltnH`). A port not already relayed, not excluded, not a devzone service (5432, 8929, 2224) and not a bridge of the watcher is relayed: an internal bridge on the container's IP if the application only listens on `127.0.0.1`/`::1`, then the workstation relay `devzone-<instance>-auto-<n>`. A port gone for more than 10 s removes the bridge and the relay. A port already taken on the workstation is marked busy and is no longer retried. Only one watcher runs (`mkdir` lock in `/tmp/devzone-ports-auto/`, refreshed at each round; a dead instance is replaced). The watcher stops by itself if the state folder disappears. It only runs on the request of the startup scripts: any other call is refused (code 2), and shows the command to run (`devzone repair`). In the Kubernetes workspace (`DEVZONE_WORKSPACE` set to `kubernetes`), it does not start (#517): the ports go through `devzone workspace ports`.
+- **Deactivation**: `devzone port auto off` stops the watcher and removes the automatic relays; `devzone port auto on` reactivates it: the watcher restarts at the next container startup or through `devzone repair`. At startup, the automatic relays of a previous session are removed.
+- **Network and IP**: read by `docker inspect "$(hostname)"` on the host's Docker; the relay joins the container by its IP on its Docker network. devzone container not found (host Docker absent): clear refusal, code 1.
+- **State**: line `ports=8080,3000` in `$RACINE/.devzone.modules`, sorted and without duplicates; `--close` removes the port. An already open relay is idempotent (message, code 0).
+- **Startup**: `devzone start` relaunches each relay of the state toward the container's current IP (it changes at each restart). A failure shows a warning without blocking startup; `devzone repair` takes it up again without restarting.
+- **Refusal, code 1**: non-numeric port or outside 1-65535; host Docker unreachable; port already taken on the workstation (failure of `docker run`, “port is already allocated” or “address already in use”), the state remaining unchanged.
+- **Several instances**: the relay name and the label carry `DEVZONE_INSTANCE`; two instances that want the same workstation port: the second one receives the refusal `déjà utilisé` (*already used*).
+- **Summary**: line `ports to the workstation` with `8080 ●, 3000 ○`, or `none (devzone port <n>)`.
+- **Uninstalling**: `make uninstall` removes the containers labelled `devzone.instance` (see the README, “Uninstalling”).
+- **Spring Boot**: the application must listen on `0.0.0.0` (default). A `server.address=127.0.0.1` makes it unreachable from the relay.
 
-## Cluster de devzone
+## devzone cluster
 
-Les modules qui déploient un service (`postgres`, `gitlab`) s'installent sur **un seul cluster**, choisi une fois et gardé dans l'état (`cluster=` dans `$RACINE/.devzone.modules`).
+The modules that deploy a service (`postgres`, `gitlab`) are installed on **a single cluster**, chosen once and kept in the state (`cluster=` in `$RACINE/.devzone.modules`).
 
-- **Cluster local vs distant** : un cluster est considéré comme **local** quand son serveur écoute sur une adresse de boucle (`127.0.0.1`, `localhost`, `::1`, `host.docker.internal`) — lu dans la configuration kubeconfig, sans appel réseau. Le cluster kind dédié (`kind-devzone`) est toujours local. Tout autre cluster (serveur sur une adresse distante) est **distant**.
-- **Choix** : à la première activation. `--context CTX` d'abord ; sinon, dans un terminal, un menu : le cluster par défaut est le contexte courant du kubeconfig de l'hôte s'il répond et est local (en pratique `docker-desktop`), sinon kind dédié `kind-devzone`. Le choix est gardé dans l'état et repris aux redémarrages. Le menu propose les clusters **locaux** d'abord, puis le **cluster kind dédié**, enfin les clusters **distants** (marqués « distant ») ; sans terminal : `kind-devzone`. Les clusters de l'hôte n'apparaissent qu'avec le [module `kubernetes`](#kubernetes) actif.
-- **Cluster distant** : choisir un cluster distant nécessite une confirmation en terminal, ou `--confirm CTX` sans terminal. Sans confirmation exacte, le choix est refusé. Quand le cluster de devzone est distant, le récapitulatif `devzone` affiche un avertissement `⚠ cluster distant : <contexte>`.
-- **Voir / changer** : `devzone cluster` affiche le cluster et les possibles ; `devzone cluster CTX [--confirm CTX]` y déplace les services actifs (désinstallés de l'ancien, installés sur le nouveau). **Les données ne sont pas migrées** : confirmation en terminal, `--yes` sans terminal.
-- **Cluster de l'hôte** : devzone n'y crée que ses namespaces étiquetés `app.kubernetes.io/managed-by=devzone`, et les supprime à la désactivation. Désactiver le module `kubernetes` rend ce cluster injoignable pour les services.
-- **Contexte courant** : les clusters kind sont créés sans basculer dessus ; `devzone use CTX` bascule seulement le cluster de travail de kubectl, jamais le cluster des services de devzone. Si tu te retrouves sur un cluster interne (kind-devzone), reviens avec `devzone use <ton cluster>`.
-- **Namespace** : pour un contexte du poste (ceux de `hote.config`, recopié depuis le poste à chaque démarrage), le namespace fixé par `devzone use -n` ne survit pas à un redémarrage ; pour les clusters kind du conteneur, il est gardé jusqu'au rebuild.
+- **Local vs remote cluster**: a cluster is considered **local** when its server listens on a loopback address (`127.0.0.1`, `localhost`, `::1`, `host.docker.internal`), read from the kubeconfig, with no network call. The dedicated kind cluster (`kind-devzone`) is always local. Any other cluster (server on a remote address) is **remote**.
+- **Choice**: at the first activation. `--context CTX` first; otherwise, in a terminal, a menu: the default cluster is the current context of the host kubeconfig if it answers and is local (in practice `docker-desktop`), otherwise the dedicated kind cluster `kind-devzone`. The choice is kept in the state and reused at restarts. The menu offers the **local** clusters first, then the **dedicated kind cluster**, and finally the **remote** clusters (marked “remote”); without a terminal: `kind-devzone`. The host clusters only appear with the [`kubernetes` module](#kubernetes) active.
+- **Remote cluster**: choosing a remote cluster requires a confirmation in a terminal, or `--confirm CTX` without a terminal. Without the exact confirmation, the choice is refused. When the devzone cluster is remote, the `devzone` summary shows a warning `⚠ cluster distant : <context>`.
+- **View / change**: `devzone cluster` shows the cluster and the possible ones; `devzone cluster CTX [--confirm CTX]` moves the active services there (uninstalled from the old one, installed on the new one). **The data is not migrated**: confirmation in a terminal, `--yes` without a terminal.
+- **Host cluster**: devzone only creates its namespaces labelled `app.kubernetes.io/managed-by=devzone` there, and deletes them at deactivation. Disabling the `kubernetes` module makes this cluster unreachable for the services.
+- **Current context**: kind clusters are created without switching to them; `devzone use CTX` only switches the kubectl working cluster, never the devzone services cluster. If you end up on an internal cluster (kind-devzone), go back with `devzone use <your cluster>`.
+- **Namespace**: for a workstation context (those of `hote.config`, copied from the workstation at each startup), the namespace set by `devzone use -n` does not survive a restart; for the kind clusters of the container, it is kept until the rebuild.
 
-- **Deux notions** : `★` marque le cluster de travail de kubectl (kubectl, k9s, helm), `●` le cluster des services de devzone (`devzone cluster`). Un contexte peut porter les deux marques. `devzone clusters` affiche la vue.
-- **Rebuild** : `le choix de kubectl` écrit dans `~/.kube/config`, qui n'est pas dans un volume ; un rebuild repart sur le cluster de l'hôte.
+- **Two notions**: `★` marks the kubectl working cluster (kubectl, k9s, helm), `●` the devzone services cluster (`devzone cluster`). A context may carry both marks. `devzone clusters` shows the view.
+- **Rebuild**: the kubectl choice is written to `~/.kube/config`, which is not in a volume; a rebuild restarts on the host cluster.
 
-### Cluster des services et contexte devzone
+### Services cluster and devzone context
 
-- **Cluster unique** : tous les services (PostgreSQL, GitLab, etc.) vivent sur un seul cluster choisi via `devzone cluster CTX`. Le choix est gardé dans l'état (`cluster=` dans `$RACINE/.devzone.modules`) et survivre aux redémarrages.
-- **Contexte devzone** : le contexte `devzone` de kubectl est posé sur le cluster des services (cluster + user extraits du contexte courant). Il est restauré sur le nouveau cluster quand `devzone cluster` déplace les services. Voir `changer_cluster` dans `cluster.sh`.
-- **Déplacement de cluster** : `devzone cluster CTX [--yes]` déplace PostgreSQL : suppression dans l'ancien cluster, installation dans le nouveau. Les données ne sont pas migrées, d'où la confirmation requise.
-- **Contextes locaux vs distants** : un cluster est local quand son serveur écoute sur une adresse de boucle (`127.0.0.1`, `localhost`, `::1`, `host.docker.internal`) — lu dans la configuration kubeconfig, sans appel réseau. Le cluster kind dédié (`kind-devzone`) est toujours local. Tout autre cluster (serveur sur une adresse distante) est distant. Le choix par défaut est d'abord le contexte courant de l'hôte (en pratique `docker-desktop`), puis kind dédié `kind-devzone`.
-- **Cluster distant** : choisir un cluster distant nécessite une confirmation en terminal, ou `--confirm CTX` sans terminal. Sans confirmation exacte, le choix est refusé. Quand le cluster de devzone est distant, le récapitulatif `devzone` affiche un avertissement `⚠ cluster distant : <contexte>`.
-- **Namespace** : pour un contexte du poste (ceux de `hote.config`, recopié depuis le poste à chaque démarrage), le namespace fixé par `devzone use -n` ne survit pas à un redémarrage ; pour les clusters kind du conteneur, il est gardé jusqu'au rebuild.
+- **Single cluster**: all services (PostgreSQL, GitLab, etc.) live on a single cluster chosen via `devzone cluster CTX`. The choice is kept in the state (`cluster=` in `$RACINE/.devzone.modules`) and survives restarts.
+- **devzone context**: the kubectl `devzone` context is set on the services cluster (cluster and user taken from the current context). It is restored on the new cluster when `devzone cluster` moves the services. See `changer_cluster` in `cluster.sh`.
+- **Cluster move**: `devzone cluster CTX [--yes]` moves PostgreSQL: deletion in the old cluster, installation in the new one. The data is not migrated, hence the required confirmation.
+- **Local vs remote contexts**: a cluster is local when its server listens on a loopback address (`127.0.0.1`, `localhost`, `::1`, `host.docker.internal`), read from the kubeconfig, with no network call. The dedicated kind cluster (`kind-devzone`) is always local. Any other cluster (server on a remote address) is remote. The default choice is first the host's current context (in practice `docker-desktop`), then the dedicated kind cluster `kind-devzone`.
+- **Remote cluster**: choosing a remote cluster requires a confirmation in a terminal, or `--confirm CTX` without a terminal. Without the exact confirmation, the choice is refused. When the devzone cluster is remote, the `devzone` summary shows a warning `⚠ cluster distant : <context>`.
+- **Namespace**: for a workstation context (those of `hote.config`, copied from the workstation at each startup), the namespace set by `devzone use -n` does not survive a restart; for the kind clusters of the container, it is kept until the rebuild.
 
-### GitLab comme dépôt GitOps (conteneur)
+### GitLab as GitOps repository (container)
 
-`devzone argocd init --gitlab` crée le projet `devzone/devzone-argocd` sur le GitLab de devzone, par l'API (pas de clone), privé, avec un premier commit. Il désigne le dépôt dans `[argocd]` (`repo` = URL interne, `provider = gitlab`) : le Secret de dépôt d'Argo CD reprend cette URL, avec l'utilisateur `oauth2` et le jeton root.
+`devzone argocd init --gitlab` creates the project `devzone/devzone-argocd` on devzone's GitLab, through the API (no clone), private, with a first commit. It designates the repository in `[argocd]` (`repo` = internal URL, `provider = gitlab`): the Argo CD repository Secret takes this URL, with the user `oauth2` and the root token.
 
-- Le jeton root vient de `workspace/.gitlab/root-token`, passé à `curl` par un fichier de configuration de mode 600 (jamais en argument, jamais affiché).
-- Les fichiers `apps/<nom>.yaml` sont écrits par `PUT` (existant) ou `POST` (nouveau) sur `/projects/:id/repository/files/:chemin`, et retirés par `DELETE` ; un fichier au contenu identique n'est pas réécrit.
-- Le backend est `.devcontainer/argocd/gitops-gitlab.sh` ; `gitops.sh` le sélectionne quand `provider = gitlab`.
-- Non fait : la commande du poste (`devzone workspace argocd init --gitlab`, par `kubectl exec` dans le pod) reste à brancher.
+- The root token comes from `workspace/.gitlab/root-token`, passed to `curl` through a configuration file with mode 600 (never as an argument, never displayed).
+- The files `apps/<name>.yaml` are written by `PUT` (existing) or `POST` (new) on `/projects/:id/repository/files/:path`, and removed by `DELETE`; a file with identical content is not rewritten.
+- The backend is `.devcontainer/argocd/gitops-gitlab.sh`; `gitops.sh` selects it when `provider = gitlab`.
+- Not done: the workstation command (`devzone workspace argocd init --gitlab`, through `kubectl exec` in the pod) remains to be wired.
 
-### Services tenus par Argo CD dans le conteneur
+### Services held by Argo CD in the container
 
-Avec le module `argocd` installé et joignable, `devzone enable postgres|mysql` déclare le service comme Application `devzone-<service>` (chart `charts/devzone-<service>` du dépôt devzone à la révision) : la section `[services]` de `.argocd.conf` passe à `on`, puis la réconciliation applique le namespace isolé, le secret administrateur (créé à part, miroir dans `workspace/.<service>/admin-password`, jamais affiché) et l'Application ; devzone attend les pods puis relance le relais.
+With the `argocd` module installed and reachable, `devzone enable postgres|mysql` declares the service as an Application `devzone-<service>` (chart `charts/devzone-<service>` of the devzone repository at the revision): the `[services]` section of `.argocd.conf` switches to `on`, then the reconciliation applies the isolated namespace, the administrator secret (created separately, mirrored in `workspace/.<service>/admin-password`, never displayed) and the Application; devzone waits for the pods, then restarts the relay.
 
-- **`devzone disable postgres|mysql`** : l'Application part avec ses ressources ; le namespace et les volumes restent, puis le retrait habituel de l'service suit.
-- **`devzone disable argocd`** : les Applications de `postgres`, `mysql` et `gitlab` sont retirées *sans* leurs ressources (finalizer retiré d'abord, `gitops_delete_application … keep`) ; `[services]` passe à `off` pour postgres et mysql. Argo CD est ensuite désinstallé et les services restent, sous helm direct, sans être recréés (adoption par `kubectl apply`, voir `postgres.sh` et `mysql.sh`).
-- **GitLab** garde son Application de l'étape 4 (`gitlab/argocd.sh`) : son namespace peut porter un suffixe d'instance, que la réconciliation (`services_ns_of`) ne connaît pas.
-- Le hook est `.devcontainer/argocd/services-hook.sh`, appelé par `change_module` de `devzone` ; code de retour 0 (fait par Argo CD), 3 (chemin helm direct), 1 (échec).
+- **`devzone disable postgres|mysql`**: the Application goes with its resources; the namespace and the volumes remain, then the usual removal of the service follows.
+- **`devzone disable argocd`**: the Applications of `postgres`, `mysql` and `gitlab` are removed *without* their resources (finalizer removed first, `gitops_delete_application … keep`); `[services]` switches to `off` for postgres and mysql. Argo CD is then uninstalled and the services remain, under direct helm, without being recreated (adoption by `kubectl apply`, see `postgres.sh` and `mysql.sh`).
+- **GitLab** keeps its Application from step 4 (`gitlab/argocd.sh`): its namespace may carry an instance suffix, which the reconciliation (`services_ns_of`) does not know.
+- The hook is `.devcontainer/argocd/services-hook.sh`, called by `change_module` of `devzone`; return code 0 (done by Argo CD), 3 (direct helm path), 1 (failure).
 
-### Compte limité aux namespaces devzone
+### Account limited to devzone namespaces
 
-Le contexte `devzone` n'agit qu'avec un compte limité : shell, relais et agents n'ont jamais le rôle d'administrateur du cluster ([#430](https://github.com/SimBienvenueHoulBoumi/devzone/issues/430)).
+The `devzone` context only acts with a limited account: the shell, relays and agents never hold the cluster administrator role ([#430](https://github.com/SimBienvenueHoulBoumi/devzone/issues/430)).
 
-- **Compte** : ServiceAccount `devzone-agent` du namespace `devzone-system`, lié au ClusterRole `edit` dans chaque namespace `devzone-*` par un RoleBinding. `edit` couvre lecture, écriture, secrets et NetworkPolicies du namespace ; ni RBAC ni quotas, et rien hors des namespaces `devzone-*` (la suppression d'un namespace, la lecture des nœuds restent des opérations d'administrateur).
-- **Jeton** : TokenRequest de 24 h écrit dans le contexte `devzone` de `~/.kube/config` (user `devzone-agent`, entrée cluster copiée du contexte de l'hôte). Renouvelé à chaque démarrage du conteneur et par `devzone repair` ; expiré, `devzone repair` le renouvelle.
-- **Administrateur réservé aux installeurs** : création du namespace, étiquette, RoleBinding et suppression passent par le contexte administrateur (`~/.kube/hote.config` pour les clusters de l'hôte, `~/.kube/config` pour les clusters kind). Le compte est posé par les installeurs sur un cluster encore vierge, utilisable au prochain renouvellement de jeton.
-- **Sans cluster des services choisi** : `devzone repair` ne renouvelle pas de jeton et le reste de l'application continue sur le contexte courant de kubectl.
+- **Account**: ServiceAccount `devzone-agent` of the namespace `devzone-system`, bound to the ClusterRole `edit` in each `devzone-*` namespace by a RoleBinding. `edit` covers reading, writing, secrets and NetworkPolicies of the namespace; neither RBAC nor quotas, and nothing outside the `devzone-*` namespaces (deleting a namespace and reading the nodes remain administrator operations).
+- **Token**: a 24 h TokenRequest written into the `devzone` context of `~/.kube/config` (user `devzone-agent`, cluster entry copied from the host context). Renewed at each container startup and by `devzone repair`; once expired, `devzone repair` renews it.
+- **Administrator reserved for the installers**: creating the namespace, the label, the RoleBinding and the deletion go through the administrator context (`~/.kube/hote.config` for host clusters, `~/.kube/config` for kind clusters). The account is set up by the installers on a still-blank cluster, and is usable at the next token renewal.
+- **Without a chosen services cluster**: `devzone repair` does not renew any token and the rest of the application continues on kubectl's current context.
 
-### Isolement
+### Isolation
 
-- **NetworkPolicy `devzone-meme-namespace`** : pose une règle isolante dans un namespace : seuls les pods du même namespace peuvent joindre les services devzone (PostgreSQL, etc.). Cette règle est gérée par `devzone postgres authorize <ns>` et `devzone postgres forbid <ns>`.
-- **Que couvre l'isolation** :
-  - Empêche qu'une application dans un namespace extérieur n'accède aux services PostgreSQL ou autres services devzone.
-  - Permet à une application dans le même namespace de joindre les services sans restriction.
-  - Les règles sont gérées via `kubectl --context devzone -n <ns> patch networkpolicy devzone-meme-namespace`.
-- **Limites de l'isolation** :
-  - Ne contrôle pas l'accès au niveau des bases de données PostgreSQL (c'est géré par les rôles et mots de passe PostgreSQL).
-  - Ne s'applique pas aux cluster de l'hôte sans configuration explicite.
-  - Les règles NetworkPolicy peuvent être retirées par `devzone postgres forbid <ns>`.
-- **Vérification** : `devzone clusters` montre « isolé (NetworkPolicy) » pour le cluster des services, ⚠ si la règle manque dans un `devzone-*`.
+- **NetworkPolicy `devzone-meme-namespace`**: sets an isolating rule in a namespace: only the pods of the same namespace can reach the devzone services (PostgreSQL, etc.). This rule is managed by `devzone postgres authorize <ns>` and `devzone postgres forbid <ns>`.
+- **What the isolation covers**:
+  - Prevents an application in an outside namespace from accessing PostgreSQL or other devzone services.
+  - Allows an application in the same namespace to reach the services without restriction.
+  - The rules are managed via `kubectl --context devzone -n <ns> patch networkpolicy devzone-meme-namespace`.
+- **Limits of the isolation**:
+  - Does not control access at the PostgreSQL database level (that is handled by the PostgreSQL roles and passwords).
+  - Does not apply to host clusters without an explicit configuration.
+  - The NetworkPolicy rules can be removed by `devzone postgres forbid <ns>`.
+- **Verification**: `devzone clusters` shows `isolé (NetworkPolicy)` for the services cluster, and ⚠ if the rule is missing in a `devzone-*` namespace.
 
-## Données conservées
+## Data kept
 
-Le conteneur est jetable ; ce qui compte vit dans des volumes Docker, sur ta machine.
+The container is disposable; what matters lives in Docker volumes, on your machine.
 
-| Volume | Contenu | `make stop` | `make down` | `make rebuild` |
+| Volume | Content | `make stop` | `make down` | `make rebuild` |
 |---|---|---|---|---|
-| `devzone-gh` | connexion GitHub (`gh`) | gardé | gardé | gardé |
-| `devzone-git` | identité git (`~/.config/git/config`) | gardé | gardé | gardé |
-| `devzone-claude` | connexion et réglages de Claude Code | gardé | gardé | gardé |
-| `devzone-opencode-config`, `devzone-opencode-data` | connexion et réglages d'opencode | gardé | gardé | gardé |
-| `devzone-agent` | état de `devzone agent` (modèles écartés, rang), partagé entre les devzone | gardé | gardé | gardé |
-| `devzone-config` | modules activés (`devzone enable`) : ancien état utilisateur, repris une fois | gardé | gardé | gardé |
-| `devzone-m2`, `devzone-pnpm` | caches Maven (`~/.m2`) et pnpm | gardé | gardé | gardé |
-| `devzone-gradle` | cache Gradle (`~/.gradle`) | gardé | gardé | gardé |
-| volume du Docker interne | images Docker et clusters kind du conteneur | gardé | gardé | gardé |
-| `workspace/` (dossier de l'hôte) | tes projets | gardé | gardé | gardé |
+| `devzone-gh` | GitHub login (`gh`) | kept | kept | kept |
+| `devzone-git` | git identity (`~/.config/git/config`) | kept | kept | kept |
+| `devzone-claude` | Claude Code login and settings | kept | kept | kept |
+| `devzone-opencode-config`, `devzone-opencode-data` | opencode login and settings | kept | kept | kept |
+| `devzone-agent` | state of `devzone agent` (discarded models, rank), shared among devzone instances | kept | kept | kept |
+| `devzone-config` | modules enabled (`devzone enable`): old user state, taken over once | kept | kept | kept |
+| `devzone-m2`, `devzone-pnpm` | Maven (`~/.m2`) and pnpm caches | kept | kept | kept |
+| `devzone-gradle` | Gradle cache (`~/.gradle`) | kept | kept | kept |
+| internal Docker volume | images and kind clusters of the container | kept | kept | kept |
+| `workspace/` (host folder) | your projects | kept | kept | kept |
 
-Tout le reste du conteneur (paquets installés à la main, fichiers hors de ces emplacements) est perdu à `make down` et `make rebuild`. Le Docker interne est isolé : ses images ne sont pas partagées avec Docker Desktop.
+Everything else in the container (packages installed by hand, files outside these locations) is lost at `make down` and `make rebuild`. The internal Docker is isolated: its images are not shared with Docker Desktop.
 
 
 
-## Mettre à jour devzone
+## Updating devzone
 
-Un dossier devzone garde sa version dans `.devzone.version` : la version, puis une empreinte sha256 (calculée par node) par fichier copié depuis le paquet. La commande se lance **sur le poste**, dans le dossier :
+A devzone folder keeps its version in `.devzone.version`: the version, then a sha256 fingerprint (computed by node) for each file copied from the package. The command is run **on the workstation**, in the folder:
 
 ```bash
 cd mon-devzone
-devzone update              # version du paquet installé
-npx devzone@latest update   # dernière version publiée
+devzone update              # installed package version
+npx devzone@latest update   # latest published version
 ```
 
-- **Déjà à jour** : version du dossier égale à celle du paquet et aucun fichier du paquet manquant → `déjà à jour`, code 0. Le message rappelle `npx devzone@latest update` pour la dernière version publiée.
-- **Fichiers modifiés localement** : leur empreinte diffère de celle du manifeste (sans manifeste, de celle du paquet). Ils sont listés et une confirmation est demandée. `--yes` répond oui pour un script ; sans terminal et sans `--yes`, la commande refuse (code 1) et ne touche à rien.
-- **Sauvegarde** : tout fichier remplacé ou supprimé est copié dans `.devzone.backup/<AAAAMMJJ-HHMMSS>/`, avec la même arborescence. Ce dossier est ajouté au `.gitignore` du devzone.
-- **Remplacement** : les fichiers du paquet sont recopiés, les fichiers de l'ancien manifeste qui n'existent plus sont supprimés, ainsi que les anciennes arborescences `core/` et `scripts/` à la racine. `.gitignore` est complété des lignes manquantes, jamais écrasé.
-- **Jamais touchés** : `workspace/`, `.devzone.modules`, `.devzone.packages`, `.password`, `.app`, `.devzone.log`, les volumes Docker.
-- **Reconstruction** : le nouveau `.devzone.version` est écrit, puis `make rebuild` est proposé avec confirmation dans un terminal. `--sans-reconstruire` saute cette étape ; sans terminal, la reconstruction est indiquée mais jamais lancée.
-- **Clé d'état (#733, lot 4)** : `plateforme=` de `.devzone.modules` devient `platform=`. `.devcontainer/rename-legacy-files.sh` la réécrit une fois, avec sa valeur (si `platform=` existe déjà, seule l'ancienne ligne est retirée), à chaque passage qui lance le script ; les autres lignes ne bougent pas.
-- **Anciens noms (#733)** : `.devzone.paquets`, `.devzone.sauvegarde`, `.devzone.ports-workspace`, `.devzone.etat`, `.devzone.catalogue-veilleur`, `.devzone-empreinte` (skills) et les marqueurs `-echec-` deviennent `.devzone.packages`, `.devzone.backup`, `.devzone.workspace-ports`, `.devzone.state`, `.devzone.catalog-watcher`, `.devzone-fingerprint` et `-failed-`. `.devcontainer/rename-legacy-files.sh` les renomme une fois, avec leur contenu, au démarrage du conteneur, à `devzone update`, à `devzone workspace update` et à `devzone workspace migrate`. Un nouveau nom déjà présent n'est jamais écrasé ; une seconde exécution ne fait rien.
+- **Already up to date**: folder version equal to the package version and no package file missing → `déjà à jour`, code 0. The message recalls `npx devzone@latest update` for the latest published version.
+- **Locally modified files**: their fingerprint differs from that of the manifest (without a manifest, from that of the package). They are listed and a confirmation is requested. `--yes` answers yes for a script; without a terminal and without `--yes`, the command refuses (code 1) and touches nothing.
+- **Backup**: any replaced or deleted file is copied to `.devzone.backup/<YYYYMMDD-HHMMSS>/`, with the same tree. This folder is added to the devzone `.gitignore`.
+- **Replacement**: the package files are copied again, the files of the old manifest that no longer exist are deleted, as well as the old `core/` and `scripts/` trees at the root. `.gitignore` is completed with the missing lines, never overwritten.
+- **Never touched**: `workspace/`, `.devzone.modules`, `.devzone.packages`, `.password`, `.app`, `.devzone.log`, the Docker volumes.
+- **Rebuild**: the new `.devzone.version` is written, then `make rebuild` is proposed with confirmation in a terminal. `--sans-reconstruire` skips this step; without a terminal, the rebuild is indicated but never launched.
+- **State key (#733, batch 4)**: `plateforme=` of `.devzone.modules` becomes `platform=`. `.devcontainer/rename-legacy-files.sh` rewrites it once, with its value (if `platform=` already exists, only the old line is removed), at each run that launches the script; the other lines do not move.
+- **Old names (#733)**: `.devzone.paquets`, `.devzone.sauvegarde`, `.devzone.ports-workspace`, `.devzone.etat`, `.devzone.catalogue-veilleur`, `.devzone-empreinte` (skills) and the `-echec-` markers become `.devzone.packages`, `.devzone.backup`, `.devzone.workspace-ports`, `.devzone.state`, `.devzone.catalog-watcher`, `.devzone-fingerprint` and `-failed-`. `.devcontainer/rename-legacy-files.sh` renames them once, with their contents, at container startup, at `devzone update`, at `devzone workspace update` and at `devzone workspace migrate`. A new name already present is never overwritten; a second run does nothing.
 
-Un dossier créé avant ce manifeste a une version « inconnue » : tous les fichiers différents du paquet sont traités comme modifiés (sauvegarde, puis confirmation).
+A folder created before this manifest has an “unknown” version: all files that differ from the package are treated as modified (backup, then confirmation).
 
-Dans le conteneur, le récapitulatif `devzone` lit `$RACINE/.devzone.version` et la dernière version publiée (`npm view devzone version`, au plus une fois par jour, cache sous `~/.cache/devzone/`, délai de 5 s, silencieux hors ligne). Si elle est plus récente : `○ devzone X.Y.Z disponible : sur le poste, devzone update`.
+In the container, the `devzone` summary reads `$RACINE/.devzone.version` and the latest published version (`npm view devzone version`, at most once a day, cache under `~/.cache/devzone/`, 5 s timeout, silent offline). If it is more recent: `○ devzone X.Y.Z disponible : sur le poste, devzone update`.
 
-## Mettre à jour un outil
+## Updating a tool
 
-| Outil | Où | Puis |
+| Tool | Where | Then |
 |---|---|---|
-| k9s, actionlint, gitleaks, kind | `.devcontainer/Dockerfile` : `ARG …_VERSION` **et** les empreintes `sha256` (arm64 + amd64) | `make rebuild` |
-| uv, ruff, vulture, pytest | `.devcontainer/Dockerfile` : `ARG …_VERSION` | `make rebuild` |
-| repowarden | `.devcontainer/versions.env` : `REPOWARDEN_VERSION=x.y.z` | `devzone apply` (ou `make rebuild`) |
-| Claude Code, opencode | `.devcontainer/devzone` : une ligne par paquet, `IA_CLAUDE=@anthropic-ai/claude-code@x.y.z` et `IA_OPENCODE=opencode-ai@x.y.z` | `devzone enable ia` (ou `make rebuild`) |
-| glab (plateforme gitlab) | `.devcontainer/devzone` : `GLAB_VERSION` et les sommes `GLAB_SOMME_ARM64` / `GLAB_SOMME_AMD64` | `rm ~/.local/bin/glab` puis `devzone platform gitlab --url URL` |
-| metrics-server | `.devcontainer/metrics-server.sh` : `VERSION` | `devzone metrics` sur un nouveau cluster |
-| Java, Node, Python, Docker, kubectl, helm, gh | `.devcontainer/devcontainer.json` (features), versions figées dans `devcontainer-lock.json` | `npx @devcontainers/cli upgrade --workspace-folder .` puis `make rebuild` |
+| k9s, actionlint, gitleaks, kind | `.devcontainer/Dockerfile`: `ARG …_VERSION` **and** the `sha256` fingerprints (arm64 + amd64) | `make rebuild` |
+| uv, ruff, vulture, pytest | `.devcontainer/Dockerfile`: `ARG …_VERSION` | `make rebuild` |
+| repowarden | `.devcontainer/versions.env`: `REPOWARDEN_VERSION=x.y.z` | `devzone apply` (or `make rebuild`) |
+| Claude Code, opencode | `.devcontainer/devzone`: one line per package, `IA_CLAUDE=@anthropic-ai/claude-code@x.y.z` and `IA_OPENCODE=opencode-ai@x.y.z` | `devzone enable ia` (or `make rebuild`) |
+| glab (gitlab platform) | `.devcontainer/devzone`: `GLAB_VERSION` and the checksums `GLAB_SOMME_ARM64` / `GLAB_SOMME_AMD64` | `rm ~/.local/bin/glab` then `devzone platform gitlab --url URL` |
+| metrics-server | `.devcontainer/metrics-server.sh`: `VERSION` | `devzone metrics` on a new cluster |
+| Java, Node, Python, Docker, kubectl, helm, gh | `.devcontainer/devcontainer.json` (features), pinned versions in `devcontainer-lock.json` | `npx @devcontainers/cli upgrade --workspace-folder .` then `make rebuild` |
 
-Empreinte d'une archive : `curl -fsSL <url> | shasum -a 256`.
+Fingerprint of an archive: `curl -fsSL <url> | shasum -a 256`.
 
-**Montées automatiques** : les versions de `repowarden` et des assistants IA (`IA_CLAUDE`, `IA_OPENCODE`) sont comparées toutes les heures à npm par le workflow `versions` (`.github/workflows/versions.yml`). Pour chaque paquet en retard, il ouvre ou met à jour un ticket, y propose une conception (« Conception proposée »), crée sa branche, applique la montée (`manage/scripts/versions.sh --appliquer`), commit et pousse : la PR brouillon s'ouvre et la CI teste le conteneur. Le mainteneur confirme la conception sur le ticket (« Conception retenue », attendue par la vérification `ticket`), puis passe la PR en ready. Une ligne par paquet : deux montées ouvertes en même temps (Claude Code et opencode) se fusionnent l'une après l'autre sans conflit. À la main : *Actions → versions → Run workflow* ; en local, `bash manage/scripts/versions.sh` liste les paquets en retard. Sans nouvelle version, le job s'arrête après la comparaison ; pas de déclenchement croisé depuis repowarden, qui demanderait un jeton d'un autre propriétaire.
+**Automatic upgrades**: the versions of `repowarden` and of the AI assistants (`IA_CLAUDE`, `IA_OPENCODE`) are compared every hour with npm by the `versions` workflow (`.github/workflows/versions.yml`). For each outdated package, it opens or updates a ticket, proposes a design there (“Conception proposée”, *proposed design*), creates its branch, applies the upgrade (`manage/scripts/versions.sh --appliquer`), commits and pushes: the draft PR opens and CI tests the container. The maintainer confirms the design on the ticket (“Conception retenue”, *retained design*, expected by the `ticket` check), then moves the PR to ready. One line per package: two upgrades open at the same time (Claude Code and opencode) are merged one after the other without conflict. By hand: *Actions → versions → Run workflow*; locally, `bash manage/scripts/versions.sh` lists the outdated packages. Without a new version, the job stops after the comparison; there is no cross-trigger from repowarden, which would require a token from another owner.
 
-**Rattraper sans rebuild** : l'état affiché au démarrage (et par `devzone`) compare les outils installés à leur version figée. Une ligne `⚠ outils          repowarden 4.9.2 installé, 4.12.0 figé : devzone apply` signale un écart ; `devzone apply` réinstalle repowarden à la version figée et les modules actifs. `✔ outils          versions figées` indique que tout correspond. Les outils installés par `apt` ou l'image (Java, Node, Python, …) ne sont pas concernés.
+**Catching up without a rebuild**: the state shown at startup (and by `devzone`) compares the installed tools with their frozen version. A line `⚠ outils          repowarden 4.9.2 installé, 4.12.0 figé : devzone apply` signals a gap; `devzone apply` reinstalls repowarden at the frozen version and the active modules. `✔ outils          versions figées` indicates that everything matches. Tools installed by `apt` or by the image (Java, Node, Python, …) are not concerned.
 
 
 
-## Garder des paquets systeme
+## Keeping system packages
 
-Un paquet installe a la main (`sudo apt install tree`) est perdu au prochain rebuild. `devzone packages` maintient la liste des paquets a reinstaller apres un rebuild :
+A package installed by hand (`sudo apt install tree`) is lost at the next rebuild. `devzone packages` maintains the list of packages to reinstall after a rebuild:
 
-| Action | Commande |
+| Action | Command |
 |---|---|
-| Lister | `devzone packages` : ✔ paquets installes, ○ paquets a installer |
-| Ajouter | `devzone packages add <nom>…` : valide (`apt-cache`), installe, ajoute a la liste |
-| Retirer | `devzone packages remove <nom>` : retire la liste et desinstalle |
-| Appliquer | `devzone packages apply` : installe les paquets manquants |
+| List | `devzone packages`: ✔ installed packages, ○ packages to install |
+| Add | `devzone packages add <name>…`: validates (`apt-cache`), installs, adds to the list |
+| Remove | `devzone packages remove <name>`: removes it from the list and uninstalls |
+| Apply | `devzone packages apply`: installs the missing packages |
 
-La liste est relue au post-create et affiche dans le recap (`⚠ paquets : …`) l'etat des paquets non installes. `devzone packages apply` peut etre relance.
+The list is re-read at post-create, and the state of the packages not yet installed is shown in the summary (`⚠ paquets : …`). `devzone packages apply` can be run again.
 
-## Sortie machine
+## Machine output
 
-Deux commandes affichent leur état sous forme d'objet JSON, pour les extensions
-VS Code et les autres outils. La sortie texte n'est pas changée : ajoute
-`--json` à la commande de ton choix.
+Two commands display their state as a JSON object, for the VS Code extensions and other tools. The text output is not changed: add `--json` to the command of your choice.
 
-- **Rien à faire, aucun secret** : chaque point à traiter a sa commande
-  `devzone` prête à lancer (champ `command`, `null` si rien à faire) ; aucun
-  jeton, aucun mot de passe, jamais le contenu des identifiants (chemin seul,
-  via le champ `credentials`).
-- **Robuste** : chaque rubrique est calculée à part. Si l'une échoue, sa valeur
-  est `null`, le champ `errors` explique pourquoi, le JSON reste valide et le
-  code de sortie vaut 0.
-- **Stable et versionné** : les noms de champs sont en anglais, sans accent ni
-  espace. Depuis #733, sans alias : `nom`→`name`, `actif`→`active`,
-  `etat`→`state`, `echec`→`failed`, `commande`→`command`, `outils`→`tools`,
-  `plateforme`→`platform`, `disponible`→`available`,
-  `identite_git`→`git_identity`, `identifiants`→`credentials`,
-  `alertes`→`alerts`, `erreurs`→`errors`, `retards`→`outdated`,
-  `paquet`/`figee`/`installee`→`package`/`frozen`/`installed`,
-  `travail`→`work`, `travail_interne`→`internal_work`,
-  `services_distant`→`services_remote`, `connecte`→`connected`. Les champs
-  `docker_hote` et `docker_hote_actif` sont supprimés (#735). Ce renommage
-  fait passer `schema` de 1 à 2 : un lecteur écrit pour `schema: 1` doit être
-  mis à jour. Ajouter un champ reste dans `schema: 2` ; retirer ou renommer un
-  champ fait passer `schema` à 3 : fonde ta lecture dessus.
+- **Nothing to do, no secret**: each item to process has its ready-to-run `devzone` command (`command` field, `null` if nothing is to be done); no token, no password, never the content of the credentials (path only, through the `credentials` field).
+- **Robust**: each section is computed separately. If one fails, its value is `null`, the `errors` field explains why, the JSON stays valid and the exit code is 0.
+- **Stable and versioned**: field names are in English, without accents or spaces. Since #733, with no aliases: `nom`→`name`, `actif`→`active`, `etat`→`state`, `echec`→`failed`, `commande`→`command`, `outils`→`tools`, `plateforme`→`platform`, `disponible`→`available`, `identite_git`→`git_identity`, `identifiants`→`credentials`, `alertes`→`alerts`, `erreurs`→`errors`, `retards`→`outdated`, `paquet`/`figee`/`installee`→`package`/`frozen`/`installed`, `travail`→`work`, `travail_interne`→`internal_work`, `services_distant`→`services_remote`, `connecte`→`connected`. The fields `docker_hote` and `docker_hote_actif` are removed (#735). This renaming moves `schema` from 1 to 2: a reader written for `schema: 1` must be updated. Adding a field stays within `schema: 2`; removing or renaming a field moves `schema` to 3: base your reading on it.
 
-`devzone status --json` (le récapitulatif complet, rubrique par rubrique) :
+`devzone status --json` (the full summary, section by section):
 
 ```json
 {
@@ -908,11 +890,9 @@ VS Code et les autres outils. La sortie texte n'est pas changée : ajoute
 }
 ```
 
-Les alertes possibles : `packages`, `worktree`,
-`cluster_distant` (services sur un cluster distant), `cluster_interne`
-(cluster de travail de devzone, revenir avec `devzone use <ton cluster>`).
+The possible alerts are: `packages`, `worktree`, `cluster_distant` (services on a remote cluster), `cluster_interne` (devzone's working cluster; go back with `devzone use <your cluster>`).
 
-`devzone agent etat --json` (sessions, écarts, droits modifiés) :
+`devzone agent etat --json` (sessions, discards, modified rights):
 
 ```json
 {
@@ -924,56 +904,54 @@ Les alertes possibles : `packages`, `worktree`,
 }
 ```
 
-`en_cours` vaut `true` quand une session d'agent travaille encore sur ce
-dossier. Un écart (`quota`, `pays`, `muet`…) prend fin à la date `fin` : un
-outil peut relancer la consigne ensuite avec `devzone agent`.
+`en_cours` is `true` when an agent session is still working on this folder. A discard (`quota`, `pays`, `muet`…) ends on the `fin` date; a tool can then rerun the instruction with `devzone agent`.
 
-## Dépannage
+## Troubleshooting
 
-| Symptôme | Cause | Solution |
+| Symptom | Cause | Fix |
 |---|---|---|
-| `✖ Docker introuvable` (`npx devzone`, `make up`, `make rebuild`, `make uninstall`) | Docker n'est pas installé | installer Docker Desktop (macOS, Windows, Linux : https://docs.docker.com/desktop/) ou, sous Linux, Docker Engine (https://docs.docker.com/engine/install/), puis relancer la commande |
-| `✖ Docker est installé mais ne répond pas (arrêté ?)` | Docker Desktop fermé, ou service Docker arrêté (Linux) | démarrer Docker Desktop (Linux sans Docker Desktop : `sudo systemctl start docker`), puis relancer la commande. Après `npx devzone mon-devzone`, le dossier est déjà créé : `cd mon-devzone && make shell` |
-| `✖ Docker refuse l'accès` | Linux : compte hors du groupe `docker` | `sudo usermod -aG docker $USER`, puis une nouvelle session (ou `newgrp docker`), puis relancer la commande |
-| `make up` ou `make rebuild` semble figé | une étape longue (première construction de l'image : plusieurs minutes), ou une question posée dans le conteneur | `make` affiche un signe de vie avec la dernière ligne du journal au moins toutes les 30 s : suivre le détail avec `tail -f .devzone.log`. Une question (ligne finissant par `[y/N]`, `?`…) est signalée et le lancement arrêté : la [signaler](https://github.com/SimBienvenueHoulBoumi/devzone/issues), puis `make rebuild`. Version antérieure de devzone, figée sur « Configurer les bots … ? [o/N] » (invisible) : `Ctrl+C`, mettre devzone à jour puis `make rebuild` ; les bots se configurent à la main dans le conteneur : `repowarden bots` |
-| `git push` refusé : « refusing to allow an OAuth App to create or update workflow … without `workflow` scope » | jeton `gh` sans la permission `workflow` | `gh auth refresh -h github.com -s workflow` |
-| `devzone` affiche `⚠ worktree … absent ici` ; ou un worktree cassé (« not a git repository: …/.git/worktrees/… ») | worktree créé de l'autre côté (hôte ↔ conteneur), ou métadonnées effacées par un `git worktree prune` lancé de l'autre côté | voir [Worktrees git](#worktrees-git) : gérer chaque worktree du côté qui l'a créé, jamais `git worktree prune` sur l'hôte |
-| PR bloquée, run `action_required`, bandeau « Approve workflows to run » | PR ouverte ou poussée par le bot `github-actions` : pour les événements `pull_request` `opened`, `synchronize` et `reopened`, GitHub attend l'accord d'une personne ayant l'écriture ([doc GitHub](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow)) | vérifier les changements (surtout `.github/workflows/`), puis *Approve workflows to run* ; pour ne plus avoir à le faire : `repowarden app init` dans le projet |
-| PR de livraison bloquée : « aucune préversion vX.Y.Z-next.N » | la préversion n'est pas encore publiée (sans `preversion-on-push`, elle part le soir) | attendre celle du soir, *Actions → release → Run workflow* sur `develop`, `preversion-on-push: true`, ou ne plus l'exiger : `preversion-obligatoire: false` |
-| PR de livraison restée ouverte | une vérification rouge (voir la PR), `delivery-auto: false`, ou GitHub App absente ou désinstallée (avertissement dans le run `release`) | corriger la vérification ; installer l'App (`repowarden app init` sur ta machine) |
-| `repowarden app init` depuis `make shell` : la page `http://127.0.0.1:…` ne s'ouvre pas, ou GitHub ne revient pas | la page est servie dans le conteneur, injoignable depuis le navigateur de ta machine | lancer la commande **sur ta machine** : `npx -y repowarden app init --repo <compte>/<dépôt>` |
-| `repowarden app init` : « nom déjà utilisé » | un essai précédent a créé l'App sans en récupérer les identifiants | supprimer l'App orpheline (*GitHub → Settings → Developer settings → GitHub Apps*), ou `--nom <autre-nom>` |
-| `git commit` : « Please tell me who you are » | identité git absente | avec GitHub : `gh auth login -s workflow` puis `devzone start` ; sans GitHub : `git config --file ~/.config/git/config user.name "<nom>"` et `user.email "<email>"` |
-| `gh auth login` : « Press Enter to open … in your browser », rien ne s'ouvre | pas de navigateur dans le conteneur (`make shell`) | ouvrir https://github.com/login/device à la main et saisir le code |
-| `k9s` : `Error: exit status 1` puis son aide ; `kubectl` : `localhost:8080` … `connection refused` | aucun cluster actif (module `kubernetes` désactivé, ou pas de cluster sur ta machine) | `devzone enable kubernetes` (cluster de ta machine), `kind create cluster`, ou `devzone use <nom>` |
-| `claude` ou `opencode` : « command not found » | module `ia` désactivé | `devzone enable ia` |
-| `devzone` affiche `✖ module ia         en échec : installation incomplète (journal npm : …)` | l'installation de Claude Code ou d'opencode a échoué (réseau, paquet) ; le message d'échec nomme les paquets et le journal npm | lire le journal cité, puis `devzone apply` pour réessayer (ou `devzone disable ia`) |
-| `devzone enable ia` ou `devzone apply` sans rien afficher de neuf pendant plusieurs minutes | installation de Claude Code et opencode (plusieurs centaines de Mo) : annoncée, puis une ligne `… toujours en cours (N s)` toutes les 30 s | attendre la ligne `Claude Code et opencode installés` ou le message d'échec |
-| CPU et RAM vides dans k9s | metrics-server absent du cluster | `devzone metrics` |
-| Deux conteneurs devzone | `make up` lancé pendant que VS Code ouvrait le conteneur | `make down`, puis un seul lancement |
-| Windows (Git Bash, MSYS) : `~/.kube` introuvable | `HOME` et `USERPROFILE` concaténés dans le chemin monté | lancer depuis VS Code ou PowerShell |
-| Pas de `~/.kube` sur l'hôte | Docker le crée vide au démarrage (sous Linux avec Docker Engine, il appartient à root) | rien à faire : le conteneur démarre quand même |
+| `✖ Docker introuvable` (`npx devzone`, `make up`, `make rebuild`, `make uninstall`) | Docker is not installed | install Docker Desktop (macOS, Windows, Linux: https://docs.docker.com/desktop/) or, under Linux, Docker Engine (https://docs.docker.com/engine/install/), then rerun the command |
+| `✖ Docker est installé mais ne répond pas (arrêté ?)` | Docker Desktop closed, or the Docker service stopped (Linux) | start Docker Desktop (Linux without Docker Desktop: `sudo systemctl start docker`), then rerun the command. After `npx devzone mon-devzone`, the folder is already created: `cd mon-devzone && make shell` |
+| `✖ Docker refuse l'accès` | Linux: account outside the `docker` group | `sudo usermod -aG docker $USER`, then a new session (or `newgrp docker`), then rerun the command |
+| `make up` or `make rebuild` seems frozen | a long step (first image build: several minutes), or a question asked in the container | `make` shows a sign of life with the last log line at least every 30 s: follow the detail with `tail -f .devzone.log`. A question (line ending with `[y/N]`, `?`…) is reported and the launch stops: [report it](https://github.com/SimBienvenueHoulBoumi/devzone/issues), then `make rebuild`. Earlier devzone version, frozen on “Configurer les bots … ? [o/N]” (invisible): `Ctrl+C`, update devzone, then `make rebuild`; the bots are configured by hand in the container: `repowarden bots` |
+| `git push` refused: “refusing to allow an OAuth App to create or update workflow … without `workflow` scope” | `gh` token without the `workflow` permission | `gh auth refresh -h github.com -s workflow` |
+| `devzone` shows `⚠ worktree … absent ici`; or a broken worktree (“not a git repository: …/.git/worktrees/…”) | worktree created on the other side (host ↔ container), or metadata erased by a `git worktree prune` run on the other side | see [Git worktrees](#git-worktrees): manage each worktree on the side that created it, never `git worktree prune` on the host |
+| PR blocked, run `action_required`, banner “Approve workflows to run” | PR opened or pushed by the `github-actions` bot: for `pull_request` events `opened`, `synchronize` and `reopened`, GitHub waits for the approval of a person with write access ([GitHub doc](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow)) | check the changes (especially `.github/workflows/`), then *Approve workflows to run*; to stop having to do this: `repowarden app init` in the project |
+| Delivery PR blocked: `aucune préversion vX.Y.Z-next.N` (*no preview*) | the preview is not published yet (without `preversion-on-push`, it goes out in the evening) | wait for the evening one, *Actions → release → Run workflow* on `develop`, `preversion-on-push: true`, or stop requiring it: `preversion-obligatoire: false` |
+| Delivery PR left open | a red check (see the PR), `delivery-auto: false`, or the GitHub App absent or uninstalled (warning in the `release` run) | fix the check; install the App (`repowarden app init` on your machine) |
+| `repowarden app init` from `make shell`: the page `http://127.0.0.1:…` does not open, or GitHub does not come back | the page is served in the container, unreachable from your machine's browser | run the command **on your machine**: `npx -y repowarden app init --repo <account>/<repo>` |
+| `repowarden app init`: `nom déjà utilisé` (*name already used*) | a previous attempt created the App without retrieving its credentials | delete the orphan App (*GitHub → Settings → Developer settings → GitHub Apps*), or use `--nom <other-name>` |
+| `git commit`: “Please tell me who you are” | git identity missing | with GitHub: `gh auth login -s workflow` then `devzone start`; without GitHub: `git config --file ~/.config/git/config user.name "<name>"` and `user.email "<email>"` |
+| `gh auth login`: “Press Enter to open … in your browser”, nothing opens | no browser in the container (`make shell`) | open https://github.com/login/device by hand and enter the code |
+| `k9s`: `Error: exit status 1` then its help; `kubectl`: `localhost:8080` … `connection refused` | no active cluster (`kubernetes` module disabled, or no cluster on your machine) | `devzone enable kubernetes` (your machine's cluster), `kind create cluster`, or `devzone use <name>` |
+| `claude` or `opencode`: “command not found” | `ia` module disabled | `devzone enable ia` |
+| `devzone` shows `✖ module ia         en échec : installation incomplète (journal npm : …)` | installation of Claude Code or opencode failed (network, package); the failure message names the packages and the npm log | read the cited log, then `devzone apply` to retry (or `devzone disable ia`) |
+| `devzone enable ia` or `devzone apply` shows nothing new for several minutes | installation of Claude Code and opencode (several hundred MB): announced, then a line `… toujours en cours (N s)` every 30 s | wait for the line `Claude Code et opencode installés` or the failure message |
+| Empty CPU and RAM in k9s | metrics-server absent from the cluster | `devzone metrics` |
+| Two devzone containers | `make up` run while VS Code was opening the container | `make down`, then a single launch |
+| Windows (Git Bash, MSYS): `~/.kube` not found | `HOME` and `USERPROFILE` concatenated in the mounted path | launch from VS Code or PowerShell |
+| No `~/.kube` on the host | Docker creates it empty at startup (under Linux with Docker Engine, it belongs to root) | nothing to do: the container starts anyway |
 
-### Reprise de la construction du conteneur de test (#685)
+### Resuming the test container build (#685)
 
-Le job `fonctionnel` construit le conteneur avec le CLI des devcontainers. SDKMAN (Java, Maven) sert parfois une archive corrompue (« Stop! The archive was corrupt ») : ses 5 tentatives tombent alors dans la même panne, le build échoue sans rapport avec le code (constaté deux fois, #661 et le run 44596691628).
+The `fonctionnel` job builds the container with the devcontainers CLI. SDKMAN (Java, Maven) sometimes serves a corrupt archive (“Stop! The archive was corrupt”): its 5 attempts then fall into the same failure, and the build fails for reasons unrelated to the code (observed twice, #661 and run 44596691628).
 
-`build_with_retry` (`manage/test/journal-error.sh`, utilisée par `manage/test/functional.sh`) refait **une seule fois** la construction quand la partie nouvelle du journal contient ce motif, **après une pause** de 120 s (réglable par `BUILD_RETRY_WAIT`) : une reprise immédiate retombait dans la même panne du serveur de téléchargement (run 44612039534, deux builds corrompus à 75 s d'écart). Le message (« one retry of the build in 120s ») et une ligne du journal le disent. Un autre échec n'est jamais repris, et une seconde panne identique fait échouer le job : un vrai problème n'est pas masqué. Un motif resté dans un journal d'un lancement précédent ne compte pas.
+`build_with_retry` (`manage/test/journal-error.sh`, used by `manage/test/functional.sh`) redoes the build **only once** when the new part of the log contains this pattern, **after a pause** of 120 s (adjustable with `BUILD_RETRY_WAIT`): an immediate retry fell back into the same failure of the download server (run 44612039534, two corrupt builds 75 s apart). The message (“one retry of the build in 120s”) and a log line say so. Another failure is never retried, and an identical second failure makes the job fail: a real problem is not hidden. A pattern left in the log of an earlier launch does not count.
 
-### Relance automatique de la CI (#656)
+### Automatic CI rerun (#656)
 
-Le job `bats (macos-latest)` n'obtient parfois aucun runner : il reste en file une quinzaine de minutes, puis est annulé sans une seule étape (« jamais démarré »), et `tests-conteneur` échoue alors, volontairement (#522). Le workflow `.github/workflows/relance-ci.yml` relance ce cas **une seule fois**, sans intervention.
+The `bats (macos-latest)` job sometimes gets no runner: it stays queued for about fifteen minutes, then is cancelled without a single step (“never started”), and `tests-conteneur` then fails, deliberately (#522). The workflow `.github/workflows/relance-ci.yml` reruns this case **only once**, without intervention.
 
-- **Déclencheur** : le run `fonctionnel` se termine en échec (`workflow_run`).
-- **Décision** (`bash manage/test/ci-container.sh relancer <dépôt> <run> <tentative>`) : relance (`gh run rerun --failed`) seulement si au moins un job est jamais démarré (annulé, sans runner, sans étape) **et** qu'aucun autre job, hors `tests-conteneur`, n'a échoué, expiré ou été annulé en cours d'exécution. Un vrai échec de test n'est jamais masqué, ni un job annulé par un run plus récent.
-- **Une seule relance** : le workflow ne tourne qu'à la tentative 1 ; le run relancé est la tentative 2, donc aucune boucle. Le journal du job dit ce qui a été décidé.
-- **Droits minimaux** : `actions: write` sur ce workflow seul. Il récupère la branche par défaut (jamais le code de la PR) et n'utilise que l'identifiant du run.
-- **Limite** : un workflow `workflow_run` ne s'exécute que depuis la branche par défaut : il n'agit qu'après la première livraison qui le contient dans `main`. Le dépôt repowarden a le même défaut, à traiter là-bas.
-- **Désactiver** : supprimer le fichier, ou « Disable workflow » dans l'onglet Actions de GitHub. Le diagnostic de `tests-conteneur` (#636) continue d'indiquer la commande de relance à la main.
+- **Trigger**: the `fonctionnel` run ends in failure (`workflow_run`).
+- **Decision** (`bash manage/test/ci-container.sh relancer <repo> <run> <attempt>`): rerun (`gh run rerun --failed`) only if at least one job never started (cancelled, without runner, without step) **and** no other job, except `tests-conteneur`, failed, expired or was cancelled during its run. A real test failure is never hidden, nor a job cancelled by a more recent run.
+- **A single rerun**: the workflow only runs at attempt 1; the rerun is attempt 2, so there is no loop. The job log says what was decided.
+- **Minimal rights**: `actions: write` on this workflow alone. It fetches the default branch (never the PR's code) and only uses the run identifier.
+- **Limit**: a `workflow_run` workflow only runs from the default branch: it acts only after the first delivery that contains it in `main`. The repowarden repository has the same default, to be handled there.
+- **Disabling**: delete the file, or “Disable workflow” in the GitHub Actions tab. The diagnosis of `tests-conteneur` (#636) keeps indicating the manual rerun command.
 
-## Noms retirés
+## Removed names
 
-Les commandes, sous-commandes et options de devzone s'écrivent en anglais (#502, #557, #695). Les anciens noms français ne sont plus acceptés, ni en alias, ni avec un avertissement : devzone refuse l'ancien nom, affiche le nouveau sur la sortie d'erreur, sort avec le code 1 et ne fait rien (aucun dossier n'est créé) :
+The commands, subcommands and options of devzone are written in English (#502, #557, #695). The old French names are no longer accepted, neither as aliases nor with a warning: devzone refuses the old name, shows the new one on the error output, exits with code 1 and does nothing (no folder is created):
 
 ```
 ✖ « activer » a été renommé : devzone enable
@@ -981,9 +959,9 @@ Les commandes, sous-commandes et options de devzone s'écrivent en anglais (#502
 ✖ « --oui » a été renommé : --yes
 ```
 
-### Commandes
+### Commands
 
-| Ancien nom | Nouveau nom |
+| Old name | New name |
 |---|---|
 | `devzone actif` | `devzone is-enabled` |
 | `devzone activer` / `desactiver` | `devzone enable` / `disable` |
@@ -1004,9 +982,9 @@ Les commandes, sous-commandes et options de devzone s'écrivent en anglais (#502
 | `devzone workspace aide` | `devzone workspace help` |
 | `devzone workspace ports demarrer` / `arreter` / `etat` | `devzone workspace ports start` / `stop` / `status` |
 
-### Sous-commandes
+### Subcommands
 
-| Commande | Ancien nom | Nouveau nom |
+| Command | Old name | New name |
 |---|---|---|
 | `postgres`, `mysql` | `creer`, `liste`, `supprimer`, `supprimer-donnees`, `etat`, `installer`, `desinstaller` | `create`, `list`, `delete`, `delete-data`, `status`, `install`, `uninstall` |
 | `postgres`, `mysql` | `autoriser`, `interdire` | `authorize`, `forbid` |
@@ -1019,9 +997,9 @@ Les commandes, sous-commandes et options de devzone s'écrivent en anglais (#502
 
 ### Options
 
-| Ancien | Nouveau |
+| Old | New |
 |---|---|
-| `--oui` | `--yes` (partout : `disable <module> --yes` confirme la suppression des données) |
+| `--oui` | `--yes` (everywhere: `disable <module> --yes` confirms the deletion of the data) |
 | `--contexte` | `--context` |
 | `--confirmer` | `--confirm` |
 | `--nouveau-mdp` | `--new-password` |
@@ -1029,19 +1007,17 @@ Les commandes, sous-commandes et options de devzone s'écrivent en anglais (#502
 | `--supprimer` (`mysql volume`) | `--delete` |
 | `--rapatrier` | `--bring-back` |
 
-Les variables d'environnement suivantes ne sont pas des commandes : elles ne sont pas couvertes par ce refus.
+The following environment variables are not commands: they are not covered by this refusal.
 
-| Ancien | Nouveau |
+| Old | New |
 |---|---|
 | `conseil` | `advice` |
 | `GARDER=connexions` | `KEEP=logins` |
 | `CONFIRMER=oui` | `CONFIRM=yes` |
 
-## Pour les contributeurs
+## For contributors
 
-Les commandes de l'application (`devzone repair`, `start`, `metrics`,
-`use`) remplacent les scripts directs pour l'utilisateur. Les scripts
-internes restent appelables pendant le développement et par les tests :
+The application commands (`devzone repair`, `start`, `metrics`, `use`) replace the direct scripts for the user. The internal scripts remain callable during development and by the tests:
 
 ```bash
 bash .devcontainer/startup.sh
@@ -1049,12 +1025,4 @@ bash .devcontainer/docker-relay.sh
 bash .devcontainer/metrics-server.sh
 ```
 
-Les tests isolent le relais Docker (`DEVZONE_RELAY_SOCKET=…`,
-`DEVZONE_RELAY_SOURCE=…`, `DEVZONE_RELAY_PID=…`, `DEVZONE_RELAY_LOG=…`,
-`DEVZONE_RELAY_MARKER=…`, `DEVZONE_RELAY_SUDO=`) et Kubernetes
-(`kube_isole` de `manage/test/commun.bash` : `HOME`, `KUBECONFIG` et
-`DEVZONE_KUBE_HOST` sous le dossier temporaire du test). `cluster.sh` accepte
-`--confirm CTX` et conserve `DEVZONE_CLUSTER_REMOTE=<contexte>` pour les
-tests et la CI. Un changement de contexte direct (`kubectl config
-use-context CTX`) ne doit être fait que dans un test isolé. L'isolation des
-volumes utilise `DEVZONE_VOLUMES=<préfixe>`. `DEVZONE_NO_START=1` fait que `devzone <dossier>` crée le dossier sans lancer le workspace (la commande est affichée) : c'est le mode des tests et de la CI.
+The tests isolate the Docker relay (`DEVZONE_RELAY_SOCKET=…`, `DEVZONE_RELAY_SOURCE=…`, `DEVZONE_RELAY_PID=…`, `DEVZONE_RELAY_LOG=…`, `DEVZONE_RELAY_MARKER=…`, `DEVZONE_RELAY_SUDO=`) and Kubernetes (`kube_isole` of `manage/test/commun.bash`: `HOME`, `KUBECONFIG` and `DEVZONE_KUBE_HOST` under the test's temporary folder). `cluster.sh` accepts `--confirm CTX` and keeps `DEVZONE_CLUSTER_REMOTE=<context>` for the tests and the CI. A direct context change (`kubectl config use-context CTX`) should only be done in an isolated test. The volume isolation uses `DEVZONE_VOLUMES=<prefix>`. `DEVZONE_NO_START=1` makes `devzone <folder>` create the folder without launching the workspace (the command is displayed): this is the mode used by the tests and the CI.
