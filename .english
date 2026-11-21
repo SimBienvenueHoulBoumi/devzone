@@ -255,3 +255,5 @@ internal/workspace/legacy_test.go
 internal/workspace/fake_test.go
 internal/command/workspace.go
 internal/command/workspace_test.go
+internal/workspace/process_unix.go
+internal/workspace/process_windows.go

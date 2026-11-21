@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 )
 
@@ -26,7 +25,7 @@ func stopPorts() {
 	dir := portsDir()
 	pid := readPid(filepath.Join(dir, "pid"))
 	if alive(pid) {
-		_ = syscall.Kill(pid, syscall.SIGTERM)
+		terminate(pid)
 		for i := 0; i < stopPolls && alive(pid); i++ {
 			time.Sleep(stopPoll)
 		}
@@ -72,7 +71,7 @@ func removeRelays(dir string) {
 // files in relais and pris (pw_remove).
 func removeRelay(dir, name string) {
 	if pid := readPid(filepath.Join(dir, "relais", name)); alive(pid) {
-		_ = syscall.Kill(pid, syscall.SIGTERM)
+		terminate(pid)
 	}
 	_ = os.Remove(filepath.Join(dir, "relais", name))
 	_ = os.Remove(filepath.Join(dir, "pris", name))
@@ -90,11 +89,4 @@ func readPid(file string) int {
 		return 0
 	}
 	return pid
-}
-
-// alive reports whether process pid exists and can be signalled (pw_alive, kill -0).
-// A number below 1 is never a process of the watcher: 0 and negative numbers would
-// address groups of processes, so they are refused.
-func alive(pid int) bool {
-	return pid >= 1 && syscall.Kill(pid, 0) == nil
 }
