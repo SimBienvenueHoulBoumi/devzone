@@ -266,3 +266,15 @@ internal/workspace/clone.go
 internal/workspace/clone_script.go
 internal/workspace/clone_test.go
 internal/command/workspace_clone_test.go
+.devcontainer/agent.sh
+.devcontainer/agent-workspace.sh
+.devcontainer/agent-model.sh
+.devcontainer/agent-model.messages
+.devcontainer/agent-session.sh
+.devcontainer/agent-errors.sh
+.devcontainer/agent-state-json.sh
+.devcontainer/agent-local.sh
+.devcontainer/agent-rights.sh
+.devcontainer/agent-pod.sh
+.devcontainer/agent-pod-manifest.sh
+.devcontainer/agent-pod-egress.sh

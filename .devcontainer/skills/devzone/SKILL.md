@@ -42,8 +42,8 @@ The choice is specific to each devzone, kept in `.devzone.modules` of the devzon
 ## Directing opencode (devzone agent)
 
 `devzone agent <folder> <instruction-file>` directs opencode on an instruction, in the foreground or in parallel (`&`, one per ticket and per worktree).
-- `devzone agent etat`: sessions, discarded models and their cause.
-- `devzone agent liberer <model>|--tous`: lifts a model discard.
+- `devzone agent state`: sessions, discarded models and their cause.
+- `devzone agent release <model>|--all`: lifts a model discard.
 
 The log is `workspace/.agents/<folder>.log`. `--auto` avoids waiting for a permission; `< /dev/null` avoids a silent session.
 
