@@ -255,3 +255,9 @@ internal/command/workspace.go
 internal/command/workspace_test.go
 internal/workspace/process_unix.go
 internal/workspace/process_windows.go
+internal/workspace/copy.go
+internal/workspace/copy_guard.go
+internal/workspace/copy_test.go
+internal/workspace/git_helpers_test.go
+internal/workspace/pod_script_test.go
+internal/command/workspace_copy_test.go
