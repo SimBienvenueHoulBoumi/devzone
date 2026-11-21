@@ -36,9 +36,6 @@ renamed_command() {
         desinstaller) echo uninstall ;;
         copier-vers) echo copy-to ;;
         copier-depuis) echo copy-from ;;
-        migrer) echo migrate ;;
-        revenir) echo revert ;;
-        nettoyer-docker) echo clean-docker ;;
         *) return 1 ;;
     esac
 }
@@ -123,9 +120,6 @@ renamed_subcommand() {
                 etat) echo status ;;
                 copier-vers) echo copy-to ;;
                 copier-depuis) echo copy-from ;;
-                migrer) echo migrate ;;
-                revenir) echo revert ;;
-                nettoyer-docker) echo clean-docker ;;
                 aide) echo help ;;
                 *) return 1 ;;
             esac
@@ -151,9 +145,15 @@ renamed_option() {
         --oui) echo --yes ;;
         --confirmer) echo --confirm ;;
         --contexte) echo --context ;;
-        --rapatrier) echo --bring-back ;;
         *) return 1 ;;
     esac
+}
+
+# Names removed in 3.0 (#735): refused with the same exit code, with a notice
+# that names no former feature and never creates a folder.
+removed_notice() {
+    echo "✖ this command or option was removed in devzone 3.0 (see manage/docs/migrating-to-3.md)" >&2
+    return 1
 }
 
 # reject_renamed <command> <args...> : checks the command itself (top level),
@@ -163,10 +163,13 @@ renamed_option() {
 reject_renamed() {
     local command="${1:-}" word new
     if [ "$#" -gt 0 ]; then shift; fi
+    case "$command" in
+        migrer | revenir | nettoyer-docker) removed_notice; return 1 ;;
+    esac
     if new="$(renamed_command "$command")"; then
         # these commands only exist under « devzone workspace »
         case "$command" in
-            migrer | revenir | copier-vers | copier-depuis | nettoyer-docker) new="workspace $new" ;;
+            copier-vers | copier-depuis) new="workspace $new" ;;
         esac
         printf '✖ « %s » a été renommé : devzone %s\n' "$command" "$new" >&2
         return 1
@@ -175,6 +178,11 @@ reject_renamed() {
         case "$word" in
             -*) continue ;;
         esac
+        if [ "$command" = workspace ]; then
+            case "$word" in
+                migrer | revenir | nettoyer-docker) removed_notice; return 1 ;;
+            esac
+        fi
         if new="$(renamed_subcommand "$command" "$word")"; then
             printf '✖ « %s » a été renommé : devzone %s %s\n' "$word" "$command" "$new" >&2
             return 1
@@ -183,6 +191,7 @@ reject_renamed() {
     done
     for word in "$@"; do
         case "$word" in
+            --rapatrier) removed_notice; return 1 ;;
             -*)
                 if new="$(renamed_option "$word")"; then
                     printf '✖ « %s » a été renommé : %s\n' "$word" "$new" >&2

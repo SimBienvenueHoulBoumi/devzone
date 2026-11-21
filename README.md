@@ -31,16 +31,13 @@ devzone avoids them: the same environment on every workstation, on your machine.
 devzone prepares an Ubuntu environment with pinned tool versions, and runs it in one of these two places:
 
 - **inside the Kubernetes cluster** of your machine, by default, as soon as a cluster answers at creation: the workstation is a pod `devzone-workspace-0` (namespace `devzone-workspace`);
-- **inside a Docker container** (“Docker workstation” mode, deprecated, to be removed in an upcoming version): only with `--docker` at creation, or for a workstation already created that way.
-
-In both cases, nothing is hosted: everything runs on your machine. `workspace/` is kept across rebuilds, and the projects of a Kubernetes workstation stay in the pod's volume. The mode of each workstation is written in `.devzone.modules` (`workspace=kubernetes` or `workspace=docker`); the details are in the [reference](manage/docs/reference.md#kubernetes-workspace).
+Nothing is hosted: everything runs on your machine. `workspace/` is kept across rebuilds, and the projects of the workstation stay in the pod's volume. The mode of each workstation is written in `.devzone.modules` (`workspace=kubernetes`); the details are in the [reference](manage/docs/reference.md#kubernetes-workspace).
 
 ## Quick start
 
 ### Prerequisites
 
 - **Kubernetes (default mode)**: a Kubernetes 1.30 or newer cluster that answers, with `kubectl` and `helm` on the machine. On Mac and Windows, the simplest is the Docker Desktop cluster: *Settings → Kubernetes → Enable Kubernetes*. devzone itself does not need Docker in this mode, but the Docker Desktop cluster stops with Docker Desktop (if the cluster does not answer, see [Frequently asked questions](#frequently-asked-questions)). Details in the [Kubernetes workspace](manage/docs/reference.md#kubernetes-workspace).
-- **Docker (deprecated)**: Docker Desktop (or Docker Engine on Linux). It serves the Docker workstation, which is no longer an automatic fallback: without a cluster, creation stops. It remains necessary to read the volumes to migrate (`devzone workspace migrate`, `devzone workspace revert` to go back).
 - Node and npm (for `npx` or the global installation).
 - `make` (needed for `make shell`; on Windows without `make`, see the table “Day to day”).
 
@@ -126,13 +123,13 @@ At creation, devzone needs a Kubernetes cluster that answers.
 devzone mon-devzone
   │
   ├─ cluster answers ─────▶ workspace in the cluster (Kubernetes)
-  │                         make shell opens the pod; no migration
+  │                         make shell opens the pod
   │
   └─ otherwise ───────────▶ nothing is created: devzone lists the ways
                             to get a cluster, then you rerun
 ```
 
-Without a cluster, in a terminal, devzone offers to choose a remote cluster (a context of your kubeconfig, whose name you retype to confirm) or to create a minikube; without a terminal, it stops and shows commands to copy (it never runs them, and no cloud credential passes through it): a remote cluster (`aws eks update-kubeconfig`, `gcloud container clusters get-credentials`, `az aks get-credentials`, which declare it in your kubeconfig; make it the current kubectl context), or a local cluster (Docker Desktop: *Settings → Kubernetes → Enable Kubernetes*, or `minikube start -p devzone`). `devzone mon-devzone --docker` still creates the Docker workstation, **deprecated**: it will be removed, and `devzone workspace migrate` moves it into the cluster. Details in [manage/docs/reference.md](manage/docs/reference.md#direct-creation-in-the-cluster).
+Without a cluster, in a terminal, devzone offers to choose a remote cluster (a context of your kubeconfig, whose name you retype to confirm) or to create a minikube; without a terminal, it stops and shows commands to copy (it never runs them, and no cloud credential passes through it): a remote cluster (`aws eks update-kubeconfig`, `gcloud container clusters get-credentials`, `az aks get-credentials`, which declare it in your kubeconfig; make it the current kubectl context), or a local cluster (Docker Desktop: *Settings → Kubernetes → Enable Kubernetes*, or `minikube start -p devzone`). Details in [manage/docs/reference.md](manage/docs/reference.md#direct-creation-in-the-cluster).
 
 ### Check that everything works
 
@@ -200,7 +197,7 @@ The list lives in `.devzone.packages` at the root of the devzone folder, outside
 | Status | — | `make status` | — |
 | **Uninstall** (everything devzone created, after confirmation) | — | `make uninstall` | `npx devzone uninstall` |
 
-In Kubernetes mode (workstation created while the cluster was answering, or after `devzone workspace migrate`), the same table applies to the pod `devzone-workspace-0`: `make up`, `make shell` and `make stop` control it, and `make rebuild` is refused, because nothing needs rebuilding on the machine. `devzone workspace revert` gives back the Docker workstation (deprecated: a warning is shown, removal planned). The GitLab, PostgreSQL and Argo CD services are installed from the workstation: `devzone workspace services enable postgres` (see [the reference](manage/docs/reference.md#devzone-services-in-the-kubernetes-workspace)). You can also develop there: `devzone workspace clone <url>` makes a working clone in the pod, `devzone ticket <n>` creates the worktree of a ticket there and `devzone agent` launches opencode there without a copy ([developing in the pod](manage/docs/reference.md#developing-devzone-and-repowarden-in-the-pod)). Argo CD is installed by default there and keeps the deployments: interface at https://localhost:8443 (password `admin` in `.password`), GitOps repository `<login>/devzone-argocd` created on your GitHub, projects declared in `.argocd.conf` (`devzone workspace argocd app add <repo>`); see [Argo CD in the Kubernetes workspace](manage/docs/reference.md#argo-cd-in-the-kubernetes-workspace).
+In Kubernetes mode (workstation created while the cluster was answering), the same table applies to the pod `devzone-workspace-0`: `make up`, `make shell` and `make stop` control it, and `make rebuild` is refused, because nothing needs rebuilding on the machine. The GitLab, PostgreSQL and Argo CD services are installed from the workstation: `devzone workspace services enable postgres` (see [the reference](manage/docs/reference.md#devzone-services-in-the-kubernetes-workspace)). You can also develop there: `devzone workspace clone <url>` makes a working clone in the pod, `devzone ticket <n>` creates the worktree of a ticket there and `devzone agent` launches opencode there without a copy ([developing in the pod](manage/docs/reference.md#developing-devzone-and-repowarden-in-the-pod)). Argo CD is installed by default there and keeps the deployments: interface at https://localhost:8443 (password `admin` in `.password`), GitOps repository `<login>/devzone-argocd` created on your GitHub, projects declared in `.argocd.conf` (`devzone workspace argocd app add <repo>`); see [Argo CD in the Kubernetes workspace](manage/docs/reference.md#argo-cd-in-the-kubernetes-workspace).
 
 In the container, `devzone --version` shows the version of the workspace image, and `devzone --help` lists all the commands. Extract:
 
@@ -230,9 +227,7 @@ The command shows the folder's version and the package's, and does nothing if th
 
 `workspace/`, `.devzone.modules`, `.devzone.packages`, `.password`, `.app`, `.devzone.log` and the Docker volumes are never touched.
 
-The old names of files and folders (`.devzone.paquets`, `.devzone.sauvegarde`, `.devzone.ports-workspace`, `.devzone.etat`, `.devzone.catalogue-veilleur`) are renamed once only, with their contents, by `.devcontainer/rename-legacy-files.sh`: at container startup, at update and at migration. A new name already present is never overwritten.
-
-The update never changes the workstation's mode; on a Docker workstation with Kubernetes reachable, it proposes `devzone workspace migrate`.
+The old names of files and folders (`.devzone.paquets`, `.devzone.sauvegarde`, `.devzone.ports-workspace`, `.devzone.etat`, `.devzone.catalogue-veilleur`) are renamed once only, with their contents, by `.devcontainer/rename-legacy-files.sh`: at container startup and at update. A new name already present is never overwritten.
 
 The Kubernetes workspace is updated separately: `devzone workspace update` moves it to the latest stable release (or `--version X.Y.Z`), image, charts and Argo CD at the same tag. **The pod `devzone-workspace-0` is recreated**: the VS Code windows attached to the pod are disconnected. The image is checked on ghcr.io before any write, and nothing changes if it does not exist yet. Details in the [reference](manage/docs/reference.md#updating-the-workspace).
 
@@ -240,7 +235,7 @@ In the container, the `devzone` summary reports a more recent published version 
 
 ## Options
 
-**Mode at creation**: `--kubernetes` (workspace in the cluster, refused without a cluster) or `--docker` (deprecated Docker workstation, without cluster check). Without an option, the cluster must answer, otherwise nothing is created (see [A cluster at creation](#a-cluster-at-creation)).
+**Mode at creation**: `--kubernetes` (workspace in the cluster, refused without a cluster). Without an option, the cluster must answer, otherwise nothing is created (see [A cluster at creation](#a-cluster-at-creation)).
 
 **`ia` module**: enables Claude Code and opencode (pinned versions), with the repowarden guard that stops them before they modify `main` or `develop` or commit without `repowarden cc` (see [manage/docs/reference.md](manage/docs/reference.md#ai-assistants-guard)). To enable it: `devzone enable ia`. They are uninstalled when the module is disabled, but your logins stay in their volumes. The module also sets up a guard that stops the `docker` commands of agents: devzone is Kubernetes first, only pods are containers (`kubectl`, or a disposable pod, instead).
 
@@ -391,7 +386,7 @@ Spring Boot listens on `0.0.0.0` by default: do not set `server.address` to `127
   ✖ Kubernetes not reachable: cluster <contexte> unreachable (<serveur>). Nothing created.
   ```
 
-  Only `--docker` still creates a Docker workstation, deprecated. Then, `devzone workspace start` (so `make up` and `make shell`) checks the cluster first and stops without changing anything. The message gives the cause:
+  `devzone workspace start` (so `make up` and `make shell`) checks the cluster first and stops without changing anything. The message gives the cause:
 
   - **Docker Desktop stopped**: `✖ Docker Desktop is stopped: the Kubernetes cluster of this machine runs inside it. Start Docker Desktop, then: make shell`. Start Docker Desktop, then `make shell`. To have it start at each login: *Settings → General → Start Docker Desktop when you sign in*.
   - **Docker answers, not the cluster**: `✖ Kubernetes cluster <contexte> unreachable (<serveur>): enable Kubernetes in Docker Desktop (Settings → Kubernetes) or check kubectl config get-contexts`. Enable Kubernetes in Docker Desktop (*Settings → Kubernetes → Enable Kubernetes*).

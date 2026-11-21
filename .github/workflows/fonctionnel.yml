@@ -141,11 +141,8 @@ jobs:
           call devzone %RUNNER_TEMP%\dzcmd --docker > %RUNNER_TEMP%\sortie.txt 2>&1
           set SORTIE=%errorlevel%
           type %RUNNER_TEMP%\sortie.txt
-          if not %SORTIE% equ 0 exit /b 1
-          if not exist %RUNNER_TEMP%\dzcmd\Makefile exit /b 1
-          if not exist %RUNNER_TEMP%\dzcmd\.devcontainer\devzone exit /b 1
-          if not exist %RUNNER_TEMP%\dzcmd\manage\scripts\launch.sh exit /b 1
-          if not exist %RUNNER_TEMP%\dzcmd\manage\scripts\uninstall.sh exit /b 1
+          if %SORTIE% equ 0 exit /b 1
+          if exist %RUNNER_TEMP%\dzcmd exit /b 1
           mkdir %RUNNER_TEMP%\plein || exit /b 1
           echo important > %RUNNER_TEMP%\plein\notes.txt
           call devzone %RUNNER_TEMP%\plein > %RUNNER_TEMP%\sortie.txt 2>&1

@@ -49,7 +49,7 @@ The prompts read `[y/N]` and accept `y`, `Y` or `yes`. The old `o` and `oui` are
 
 ## Files and folders
 
-These are renamed once, automatically, when the pod starts and by `devzone update`, `devzone workspace update` and `migrate`. A name is moved only when the old one exists and the new one does not: an existing new name is never overwritten, and a second run does nothing.
+These are renamed once, automatically, when the pod starts and by `devzone update` and `devzone workspace update`. A name is moved only when the old one exists and the new one does not: an existing new name is never overwritten, and a second run does nothing.
 
 | Before | Now |
 |---|---|
@@ -110,6 +110,12 @@ The `status` output of the modules (gitlab, postgres, argocd, mysql) and the sta
 ## Removed
 
 - The relay of the host Docker socket and the option that controlled it: `docker-hote` (a `docker-hote=…` line in `.devzone.modules` is ignored, `devzone enable docker-hote` answers "unknown module"), `DEVZONE_RELAIS_*`, the relay line of `devzone status` and `devzone repair`, the alert `relais_docker`, and the JSON fields `docker_hote` and `docker_hote_actif`. devzone no longer talks to the host Docker socket.
+- The Docker workstation option `--docker` of `devzone <folder>`: refused as an unknown option. Create the devzone with `--kubernetes` (the cluster must answer).
+- The Docker check on the host before `devzone <folder>`: creation no longer uses Docker.
+- `devzone workspace migrate`: copy of a Docker workstation (its folders and its `devzone-*` volumes) to the cluster. Projects moved earlier stay in the pod.
+- `devzone workspace revert [--bring-back]`: back to the Docker workstation.
+- `devzone workspace clean-docker`: removal of the `devzone-*` Docker volumes.
+- The old French names `migrer`, `revenir`, `nettoyer-docker` and the option `--rapatrier`: refused with exit code 1 and a notice that the command or option was removed, without creating any folder.
 - Old French command names stay refused with the new name, as since 1.1.0 (see [Removed names](reference.md#removed-names)).
 
 ## Checking your own scripts

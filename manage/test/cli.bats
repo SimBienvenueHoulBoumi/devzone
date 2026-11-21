@@ -4,6 +4,7 @@
 setup() {
     load commun
     kube_isole
+    cluster_pret
     RACINE="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
     CLI="$RACINE/manage/devzone"
     export DEVZONE_NO_START=1
@@ -11,7 +12,7 @@ setup() {
 }
 
 @test "devzone <folder>: creates a complete devzone in a new folder" {
-    run bash "$CLI" mon-devzone --docker
+    run bash "$CLI" mon-devzone --kubernetes
     [ "$status" -eq 0 ]
     [[ "$output" == *"créé dans"* ]] || false
     for f in .devcontainer/devcontainer.json .devcontainer/devzone Makefile .gitattributes manage/scripts/launch.sh manage/scripts/uninstall.sh README.md LICENSE workspace/.gitkeep .gitignore .devzone.version; do
@@ -27,7 +28,7 @@ setup() {
 }
 
 @test "devzone <folder>: .devzone.version holds the version and one checksum per copied file" {
-    bash "$CLI" mon-devzone --docker
+    bash "$CLI" mon-devzone --kubernetes
     [ "$(sed -n '1p' mon-devzone/.devzone.version)" = "version $(bash "$CLI" --version)" ]
     for f in .devcontainer/devcontainer.json .devcontainer/devzone Makefile .gitattributes manage/scripts/launch.sh manage/scripts/uninstall.sh README.md LICENSE; do
         attendue="$(node -e 'const fs = require("fs"), crypto = require("crypto"); const h = crypto.createHash("sha256"); h.update(fs.readFileSync(process.argv[1])); process.stdout.write(h.digest("hex"))' "mon-devzone/$f")"
@@ -39,7 +40,7 @@ setup() {
 }
 
 @test "devzone <folder>: embeds neither bin/, nor tests, nor CI, nor repository settings" {
-    bash "$CLI" mon-devzone --docker
+    bash "$CLI" mon-devzone --kubernetes
     for f in bin test .github .repowarden.conf package.json .devzone.log; do
         [ ! -e "mon-devzone/$f" ] || { echo "en trop : $f"; return 1; }
     done
@@ -47,7 +48,7 @@ setup() {
 
 @test "devzone <folder>: existing empty folder accepted" {
     mkdir vide
-    run bash "$CLI" vide --docker
+    run bash "$CLI" vide --kubernetes
     [ "$status" -eq 0 ]
     [ -f vide/Makefile ]
 }
@@ -62,7 +63,7 @@ setup() {
 }
 
 @test "devzone <dossier> --gitops none : .argocd.conf note no GitOps" {
-    run bash "$CLI" mon-devzone --gitops none --docker
+    run bash "$CLI" mon-devzone --gitops none --kubernetes
     [ "$status" -eq 0 ]
     grep -q '^\[argocd\]$' mon-devzone/.argocd.conf
     grep -q '^    repo = none$' mon-devzone/.argocd.conf
@@ -72,7 +73,7 @@ setup() {
 }
 
 @test "devzone <dossier> --gitops <url> : .argocd.conf note the URL" {
-    run bash "$CLI" mon-devzone --gitops https://github.com/x/y.git --docker
+    run bash "$CLI" mon-devzone --gitops https://github.com/x/y.git --kubernetes
     [ "$status" -eq 0 ]
     grep -q '^    repo = https://github.com/x/y.git$' mon-devzone/.argocd.conf
 }
@@ -89,13 +90,13 @@ exit 0
 GH
     chmod +x "$BATS_TEST_TMPDIR/bin/gh"
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
-    run bash "$CLI" mon-devzone --gitops github --docker
+    run bash "$CLI" mon-devzone --gitops github --kubernetes
     [ "$status" -eq 0 ]
     grep -q '^    repo = https://github.com/tester/devzone-argocd.git$' mon-devzone/.argocd.conf
 }
 
 @test "devzone <folder> without option nor terminal: none and a notice about --gitops" {
-    run bash "$CLI" mon-devzone --docker
+    run bash "$CLI" mon-devzone --kubernetes
     [ "$status" -eq 0 ]
     [[ "$output" == *"--gitops"* ]] || false
     grep -q '^    repo = none$' mon-devzone/.argocd.conf
@@ -248,7 +249,7 @@ fake_docker() {
 }
 
 @test "uninstall.sh: Docker stopped → clear message, once, nothing else started" {
-    bash "$CLI" dz-des --docker
+    bash "$CLI" dz-des --kubernetes
     fake_cli 'exit 1'
     fake_docker arrete
     run bash dz-des/manage/scripts/uninstall.sh
@@ -261,30 +262,12 @@ fake_docker() {
 }
 
 @test "devzone uninstall: Docker stopped → the command to re-run is devzone desinstaller" {
-    bash "$CLI" dz-des --docker
+    bash "$CLI" dz-des --kubernetes
     fake_cli 'exit 1'
     fake_docker arrete
     cd dz-des
     run bash "$CLI" uninstall
     [ "$status" -ne 0 ]
-}
-
-@test "devzone <folder> without Docker: folder created, how to start later, without a raw error" {
-    unset DEVZONE_NO_START
-    fake_cli 'echo "{\"outcome\":\"error\"}"; exit 1'
-    fake_docker arrete
-    # Cluster unreachable: the mode is Docker, whatever kubectl the host has (#497)
-    printf '#!/usr/bin/env bash\nexit 1\n' >"$BATS_TEST_TMPDIR/faux/kubectl"
-    chmod +x "$BATS_TEST_TMPDIR/faux/kubectl"
-    printf '#!/usr/bin/env bash\necho "make $*" >>"%s/make.log"\n' "$BATS_TEST_TMPDIR" >"$BATS_TEST_TMPDIR/faux/make"
-    chmod +x "$BATS_TEST_TMPDIR/faux/make"
-    run bash "$CLI" mon-devzone --docker
-    [ "$status" -ne 0 ]
-    [ -f mon-devzone/Makefile ]
-    [[ "$output" == *"Start Docker Desktop"*"cd $PWD/mon-devzone && make shell"* ]] || false
-    [ ! -e "$BATS_TEST_TMPDIR/make.log" ]
-    [ ! -e "$BATS_TEST_TMPDIR/args" ]
-    [[ "$output" != *outcome* ]] || false
 }
 
 @test "launch.sh: key steps and state shown, full log kept" {
@@ -398,7 +381,7 @@ fake_docker() {
 }
 
 @test "devzone mon-projet: a free name always creates the folder" {
-    run bash "$CLI" mon-projet --docker
+    run bash "$CLI" mon-projet --kubernetes
     [ "$status" -eq 0 ]
     [ -d mon-projet/.devcontainer ]
 }
