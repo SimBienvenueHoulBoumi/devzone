@@ -8,7 +8,7 @@ setup() {
     kube_isole
     ROOT="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
     CLI="$ROOT/manage/devzone"
-    SCRIPT="$ROOT/manage/scripts/ports-workspace.sh"
+    SCRIPT="$ROOT/manage/scripts/workspace/ports-workspace.sh"
     T="$BATS_TEST_TMPDIR"
     mkdir -p "$T/bin" "$T/workstation"
     : >"$T/ss"

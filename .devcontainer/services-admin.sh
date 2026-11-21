@@ -3,7 +3,7 @@
 # the Kubernetes workspace pod, with a temporary administrator token (#528).
 #   services-admin.sh enable|disable <service> [options of devzone enable]
 #   services-admin.sh seed gitlab   data of gitlab seeded again, in the pod (#538)
-# Run by the workstation (manage/scripts/services-workspace.sh) through
+# Run by the workstation (manage/scripts/workspace/services-workspace.sh) through
 # kubectl exec -i: the token comes on stdin, is never printed and lives only
 # in a temporary kubeconfig removed at the end.
 # Why: the pod has no kubeconfig and its service account is limited (#430),

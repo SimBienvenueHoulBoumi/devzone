@@ -121,7 +121,7 @@ guard() {
     run bash -c '
         kubectl_flag() { :; }
         POD=devzone-workspace-0 NAMESPACE=devzone-workspace
-        . "$1/manage/scripts/workspace-clone.sh"
+        . "$1/manage/scripts/workspace/workspace-clone.sh"
         workspace_agents_guard
     ' _ "$ROOT"
 }

@@ -345,7 +345,7 @@ To have Docker Desktop start at each login: Settings → General → Start Docke
 
 ### Applications and services on the workstation's localhost
 
-`devzone workspace start` starts a watcher on the workstation (`manage/scripts/ports-workspace.sh`), and `devzone workspace stop` stops it along with all its `kubectl port-forward` processes. `devzone workspace ports [start|stop|status]` drives it on its own.
+`devzone workspace start` starts a watcher on the workstation (`manage/scripts/workspace/ports-workspace.sh`), and `devzone workspace stop` stops it along with all its `kubectl port-forward` processes. `devzone workspace ports [start|stop|status]` drives it on its own.
 
 - **Pod**: every 3 s, `kubectl exec` into the pod reads `ss -ltnH`. Each listening TCP port ≥ 1024 (except kubedock 2475 and BuildKit 1234) is relayed to `127.0.0.1:<same port>` of the workstation, never on the local network (`--address 127.0.0.1`). A server started in the pod (`npm run dev`) is therefore reachable at http://localhost:5173 without a command; a port that disappears has its relay stopped.
 - **devzone services**: with the `postgres` module active in `.devzone.modules`, `svc/postgres` of the `devzone-postgres` namespace is relayed to `127.0.0.1:5432`, and pgAdmin (`svc/pgadmin`) if it exists, by the same mechanism. With the `mysql` module active, `svc/mysql` of the `devzone-mysql` namespace is relayed to `127.0.0.1:3306`. When Argo CD is installed (and `argocd` is not `off`), the https port of `svc/argocd-server` is relayed to `127.0.0.1:8443` (#516).
@@ -601,7 +601,7 @@ The projects are declared in `.argocd.conf` at the root of devzone and, if there
 
 ### Argo CD in the Kubernetes workspace
 
-In Kubernetes workspace mode, Argo CD becomes devzone's deployment means (#516). Everything is driven from the workstation (`manage/scripts/argocd-workspace.sh`, `argocd-services.sh`), which has the cluster administrator rights; the pod has none.
+In Kubernetes workspace mode, Argo CD becomes devzone's deployment means (#516). Everything is driven from the workstation (`manage/scripts/workspace/argocd-workspace.sh`, `argocd-services.sh`), which has the cluster administrator rights; the pod has none.
 
 ```bash
 devzone workspace start                      # installs Argo CD if missing, then the workspace (Application) and .argocd.conf

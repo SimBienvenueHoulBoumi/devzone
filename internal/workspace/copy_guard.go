@@ -28,7 +28,7 @@ func Origin(folder string) string {
 // copyGuardScript runs in the pod (bash -s, with the pod folder and the remote of
 // the workstation folder as $1 and $2). It prints the remote of the pod folder
 // and exits 3 when that folder is a clone of another remote. Same script as
-// workspace_copy_pod_script in manage/scripts/workspace-copies.sh.
+// workspace_copy_pod_script in manage/scripts/workspace/workspace-copies.sh.
 const copyGuardScript = `[ -e "$1/.git" ] || exit 0
 r="$(git -C "$1" remote get-url origin 2>/dev/null || true)"
 n() { local u="${1%/}"; echo "${u%.git}"; }

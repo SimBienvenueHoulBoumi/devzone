@@ -19,7 +19,7 @@
 #   services_note <svc> on|off         writes the [services] section
 #   chart_require <svc>                chart charts/devzone-<svc> named devzone-<svc>, or code 2
 # Sourced after conf.sh and gitops.sh by the workstation
-# (manage/scripts/argocd-services.sh) and by the container (argocd.sh). The
+# (manage/scripts/workspace/argocd-services.sh) and by the container (argocd.sh). The
 # includer defines argocd_kubectl, APPS_GENERATOR, ARGOCD_CONF and
 # ARGOCD_CONF_DIR (the devzone folder: relative paths there), DEVZONE_REPO_URL
 # and argocd_revision, the secret hook of each service
