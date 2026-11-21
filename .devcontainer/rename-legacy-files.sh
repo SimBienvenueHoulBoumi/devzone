@@ -5,24 +5,61 @@
 # platform= (lot 4). Called by the pod startup, by the workspace init, and on the
 # workstation by devzone update and workspace update.
 # Idempotent: a name is renamed only when the old one exists and the new one
-# does not, so a second run does nothing. An existing new name is never
-# overwritten. One line per rename on stdout, exit 0. No alias of the old names
-# is kept after this migration. bash 3.2 (macOS).
+# does not, so a second run does nothing. Two folders with both names are
+# merged, the old one emptied and removed. An existing file is never
+# overwritten. One line per rename or merge on stdout, exit 0. No alias of the
+# old names is kept after this migration. bash 3.2 (macOS).
 #   DEVZONE_ROOT   devzone folder (default: the parent of this .devcontainer)
 #   DEVZONE_TMP_DIR temporary folder (default: /tmp), set by the tests
 
 ROOT="${DEVZONE_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
 TMP_DIR="${DEVZONE_TMP_DIR:-/tmp}"
 
+# is_real_dir PATH: true for a folder that is not a symbolic link
+is_real_dir() {
+    [ -d "$1" ] && [ ! -L "$1" ]
+}
+
+# merge_legacy OLD NEW: both are folders. Each entry of OLD that NEW does not
+# have is moved into NEW; an entry present on both sides is never overwritten,
+# it stays in OLD and a message on stderr names it. OLD is removed (rmdir) only
+# when it is left empty, and then the merge is announced on stdout. Hidden
+# entries are merged too. The shell options live in a subshell, so they do not
+# reach the other migrations.
+merge_legacy() {
+    local old="$1" new="$2"
+    (
+        shopt -s dotglob nullglob
+        local entry target
+        for entry in "$old"/*; do
+            target="$new/${entry##*/}"
+            if [ -e "$target" ] || [ -L "$target" ]; then
+                echo "devzone : $entry kept: $target already exists" >&2
+            elif ! mv -- "$entry" "$target"; then
+                echo "devzone : $entry not merged into $target" >&2
+            fi
+        done
+        if rmdir -- "$old" 2>/dev/null; then
+            echo "devzone : $old merged into $new"
+        fi
+    )
+    return 0
+}
+
 # rename_legacy OLD NEW: moves OLD to NEW when OLD exists and NEW does not.
-# A conflict is reported on stderr and both names are left as they are.
+# When both are folders, they are merged (see merge_legacy). Any other conflict
+# is reported on stderr and both names are left as they are.
 rename_legacy() {
     local old="$1" new="$2"
     if [ ! -e "$old" ] && [ ! -L "$old" ]; then
         return 0
     fi
     if [ -e "$new" ] || [ -L "$new" ]; then
-        echo "devzone : $old kept, $new already exists" >&2
+        if is_real_dir "$old" && is_real_dir "$new"; then
+            merge_legacy "$old" "$new"
+        else
+            echo "devzone : $old kept, $new already exists" >&2
+        fi
         return 0
     fi
     if mv -- "$old" "$new"; then

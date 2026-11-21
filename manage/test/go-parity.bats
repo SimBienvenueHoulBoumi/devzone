@@ -76,6 +76,8 @@ parite() {
 # status of "kubectl exec -it" (the shell), 0 by default, which prints its arguments.
 # FAKE_OTHER_REMOTE=url: the guard of copy-to finds a pod clone of another remote
 # ("kubectl cp" prints its arguments, with the copies).
+# FAKE_CLONE_STATUS=n: the status of the pod script of "clone" (0 by default); the
+# fake prints its arguments, as "kubectl exec -i" of the clone does.
 faux_cluster() {
     mkdir -p "$BATS_TEST_TMPDIR/bin"
     cat >"$BATS_TEST_TMPDIR/bin/helm" <<'HELM'
@@ -129,6 +131,10 @@ case "$*" in
     *"exec -i"*)
         input="$(cat)"
         case "$input" in
+            *"gh auth setup-git"*)
+                echo "kubectl $*"
+                exit "${FAKE_CLONE_STATUS:-0}"
+                ;;
             *"git -C"*)
                 if [ -n "${FAKE_OTHER_REMOTE:-}" ]; then
                     echo "$FAKE_OTHER_REMOTE"
@@ -351,4 +357,62 @@ git_clone() {
 @test "go-parity: workspace copy-from without folder is delegated, same message" {
     faux_cluster
     parite workspace copy-from
+}
+
+# clone_identity : git identity of the tests, read from a config file of the test
+clone_identity() {
+    printf '[user]\n\tname = Dev Test\n\temail = dev@example.test\n' >"$BATS_TEST_TMPDIR/gitconfig"
+    export GIT_CONFIG_GLOBAL="$BATS_TEST_TMPDIR/gitconfig" GIT_CONFIG_NOSYSTEM=1
+}
+
+@test "go-parity: workspace clone, url missing: same message and status" {
+    faux_cluster
+    clone_identity
+    parite workspace clone ""
+}
+
+@test "go-parity: workspace clone, name taken from the url: same kubectl arguments" {
+    faux_cluster
+    clone_identity
+    parite workspace clone https://github.com/acme/mine.git
+    run "$DZ_GO" workspace clone https://github.com/acme/mine.git
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"-- bash -s -- /workspaces/projets/mine https://github.com/acme/mine.git Dev Test dev@example.test"* ]] || false
+}
+
+@test "go-parity: workspace clone, name given: same kubectl arguments" {
+    faux_cluster
+    clone_identity
+    parite workspace clone https://github.com/acme/mine.git autre
+    run "$DZ_GO" workspace clone https://github.com/acme/mine.git autre
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"-- bash -s -- /workspaces/projets/autre https://github.com/acme/mine.git"* ]] || false
+}
+
+@test "go-parity: workspace clone, invalid name: same message and status" {
+    faux_cluster
+    clone_identity
+    parite workspace clone https://github.com/acme/mine.git "a/b"
+}
+
+@test "go-parity: workspace clone, no git identity: same kubectl arguments" {
+    faux_cluster
+    clone_identity
+    printf '' >"$BATS_TEST_TMPDIR/gitconfig"
+    parite workspace clone https://github.com/acme/mine.git
+}
+
+@test "go-parity: workspace clone, pod script fails: same status" {
+    faux_cluster
+    clone_identity
+    export FAKE_CLONE_STATUS=3
+    parite workspace clone https://github.com/acme/mine.git
+    run "$DZ_GO" workspace clone https://github.com/acme/mine.git
+    [ "$status" -eq 3 ]
+}
+
+@test "go-parity: workspace clone with extra words is delegated, same output" {
+    faux_cluster
+    clone_identity
+    parite workspace clone https://github.com/acme/mine.git autre extra
 }

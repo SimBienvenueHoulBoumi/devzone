@@ -7,16 +7,33 @@ import (
 	"testing"
 )
 
-// bashScriptsFile is the bash file that holds the scripts run in the pod, as
+// bashScriptsFiles are the bash files that hold the scripts run in the pod, as
 // seen from this package
-const bashScriptsFile = "../../manage/scripts/workspace-copies.sh"
+var bashScriptsFiles = []string{
+	"../../manage/scripts/workspace-copies.sh",
+	"../../manage/scripts/workspace-clone.sh",
+}
 
 // bashPodScript returns the script that the bash function function sends to the
 // pod: the lines between the first "cat <<'POD'" after its definition and the
-// closing "POD". Both copies (bash and Go) must hold the same text.
+// closing "POD", in whichever of bashScriptsFiles defines the function. Both
+// copies (bash and Go) must hold the same text.
 func bashPodScript(t *testing.T, function string) string {
 	t.Helper()
-	data, err := os.ReadFile(filepath.FromSlash(bashScriptsFile))
+	for _, file := range bashScriptsFiles {
+		if script, ok := heredocOf(t, file, function); ok {
+			return script
+		}
+	}
+	t.Fatalf("function %s not found in %s", function, strings.Join(bashScriptsFiles, ", "))
+	return ""
+}
+
+// heredocOf returns the heredoc of the function defined in file, and false when
+// the file does not define it
+func heredocOf(t *testing.T, file, function string) (string, bool) {
+	t.Helper()
+	data, err := os.ReadFile(filepath.FromSlash(file))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -29,7 +46,7 @@ func bashPodScript(t *testing.T, function string) string {
 		}
 	}
 	if start < 0 {
-		t.Fatalf("function %s not found in %s", function, bashScriptsFile)
+		return "", false
 	}
 	var script []string
 	inHeredoc := false
@@ -39,12 +56,12 @@ func bashPodScript(t *testing.T, function string) string {
 			continue
 		}
 		if line == "POD" {
-			return strings.Join(script, "\n") + "\n"
+			return strings.Join(script, "\n") + "\n", true
 		}
 		script = append(script, line)
 	}
-	t.Fatalf("heredoc of %s not closed in %s", function, bashScriptsFile)
-	return ""
+	t.Fatalf("heredoc of %s not closed in %s", function, file)
+	return "", false
 }
 
 // TestLegacyScriptMatchesBash checks that podScript (legacy.go) is the script of
@@ -60,5 +77,13 @@ func TestLegacyScriptMatchesBash(t *testing.T) {
 func TestCopyGuardScriptMatchesBash(t *testing.T) {
 	if want := bashPodScript(t, "workspace_copy_pod_script"); copyGuardScript != want {
 		t.Fatalf("copyGuardScript differs from the bash script:\n%s\nwant:\n%s", copyGuardScript, want)
+	}
+}
+
+// TestCloneScriptMatchesBash checks that cloneScript (clone_script.go) is the
+// script of workspace_clone_pod_script in manage/scripts/workspace-clone.sh
+func TestCloneScriptMatchesBash(t *testing.T) {
+	if want := bashPodScript(t, "workspace_clone_pod_script"); cloneScript != want {
+		t.Fatalf("cloneScript differs from the bash script:\n%s\nwant:\n%s", cloneScript, want)
 	}
 }

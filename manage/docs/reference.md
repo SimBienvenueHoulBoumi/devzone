@@ -791,9 +791,9 @@ In the container, the `devzone` summary reads `$RACINE/.devzone.version` and the
 
 | Tool | Where | Then |
 |---|---|---|
-| k9s, actionlint, gitleaks, kind | `.devcontainer/Dockerfile`: `ARG …_VERSION` **and** the `sha256` fingerprints (arm64 + amd64) | `make rebuild` |
-| Go | `.devcontainer/Dockerfile`: `GO_VERSION` **and** the `sha256` fingerprints `GO_SHA256_ARM64` / `GO_SHA256_AMD64` (go.dev); keep `go.mod` and `.github/workflows/go.yml` at the same version | `make rebuild` |
-| uv, ruff, vulture, pytest | `.devcontainer/Dockerfile`: `ARG …_VERSION` | `make rebuild` |
+| k9s, actionlint, gitleaks, kind | `.devcontainer/Dockerfile`: `ARG …_VERSION` **and** the `sha256` fingerprints (arm64 + amd64), by `bash manage/scripts/ci/versions.sh --apply <tool> <version>` | publish a version, then `devzone workspace update` |
+| Go | `.devcontainer/Dockerfile`: `GO_VERSION` **and** the `sha256` fingerprints `GO_SHA256_ARM64` / `GO_SHA256_AMD64` (go.dev), by `bash manage/scripts/ci/versions.sh --apply go <version>`; keep `go.mod` and `.github/workflows/go.yml` at the same version | publish a version, then `devzone workspace update` |
+| uv, ruff, vulture, pytest | `.devcontainer/Dockerfile`: `ARG …_VERSION` | publish a version, then `devzone workspace update` |
 | repowarden | `.devcontainer/versions.env`: `REPOWARDEN_VERSION=x.y.z` | `devzone apply` (or `make rebuild`) |
 | Claude Code, opencode | `.devcontainer/devzone`: one line per package, `IA_CLAUDE=@anthropic-ai/claude-code@x.y.z` and `IA_OPENCODE=opencode-ai@x.y.z` | `devzone enable ia` (or `make rebuild`) |
 | glab (gitlab platform) | `.devcontainer/devzone`: `GLAB_VERSION` and the checksums `GLAB_SOMME_ARM64` / `GLAB_SOMME_AMD64` | `rm ~/.local/bin/glab` then `devzone platform gitlab --url URL` |
@@ -801,6 +801,8 @@ In the container, the `devzone` summary reads `$RACINE/.devzone.version` and the
 | Java, Node, Python, Docker, kubectl, helm, gh | `.devcontainer/devcontainer.json` (features), pinned versions in `devcontainer-lock.json` | `npx @devcontainers/cli upgrade --workspace-folder .` then `make rebuild` |
 
 Fingerprint of an archive: `curl -fsSL <url> | shasum -a 256`.
+
+**Tools of the image** (Go, k9s, actionlint, gitleaks, kind): `bash manage/scripts/ci/versions.sh --tools` prints one `tool pinned upstream` line per tool behind its upstream release (go.dev for Go, the latest GitHub release otherwise), nothing when all are up to date. A line ending with `majeure` is a new major version: it is never applied alone. `bash manage/scripts/ci/versions.sh --apply <tool> <version>` rewrites the version and recomputes both fingerprints from the arm64 and amd64 archives, nothing else in the Dockerfile; it is refused when an archive cannot be fetched, when go.dev publishes another checksum for it, or for a major version, unless `--major` is given.
 
 **Automatic upgrades**: the versions of `repowarden` and of the AI assistants (`IA_CLAUDE`, `IA_OPENCODE`) are compared every hour with npm by the `versions` workflow (`.github/workflows/versions.yml`). For each outdated package, it opens or updates a ticket, proposes a design there (“Conception proposée”, *proposed design*), creates its branch, applies the upgrade (`manage/scripts/ci/versions.sh --appliquer`), commits and pushes: the draft PR opens and CI tests the container. The maintainer confirms the design on the ticket (“Conception retenue”, *retained design*, expected by the `ticket` check), then moves the PR to ready. One line per package: two upgrades open at the same time (Claude Code and opencode) are merged one after the other without conflict. By hand: *Actions → versions → Run workflow*; locally, `bash manage/scripts/ci/versions.sh` lists the outdated packages. Without a new version, the job stops after the comparison; there is no cross-trigger from repowarden, which would require a token from another owner.
 

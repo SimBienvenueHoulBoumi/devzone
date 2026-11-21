@@ -7,7 +7,7 @@ setup() {
     export HOME="$BATS_TEST_TMPDIR/home"
     mkdir -p "$HOME" "$BATS_TEST_TMPDIR/bin" \
         "$BATS_TEST_TMPDIR/dz/manage/scripts/ci" "$BATS_TEST_TMPDIR/dz/.devcontainer"
-    cp "$ROOT/manage/scripts/ci/versions.sh" "$BATS_TEST_TMPDIR/dz/manage/scripts/ci/"
+    cp "$ROOT/manage/scripts/ci/versions.sh" "$ROOT/manage/scripts/ci/tools-image.sh" "$BATS_TEST_TMPDIR/dz/manage/scripts/ci/"
     VERSIONS="$BATS_TEST_TMPDIR/dz/manage/scripts/ci/versions.sh"
     VERSIONS_ENV="$BATS_TEST_TMPDIR/dz/.devcontainer/versions.env"
     DEVZONE="$BATS_TEST_TMPDIR/dz/.devcontainer/devzone"
