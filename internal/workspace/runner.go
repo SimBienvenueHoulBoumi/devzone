@@ -1,6 +1,6 @@
 // Package workspace holds the subcommands of "devzone workspace" ported to Go
-// (#712). Each one drives kubectl through a Runner, so that tests run without a
-// cluster. Options, outputs and exit statuses follow manage/workspace.sh.
+// (#712). Each one drives kubectl and helm through a Runner, so that tests run
+// without a cluster. Options, outputs and exit statuses follow manage/workspace.sh.
 package workspace
 
 import (
@@ -10,21 +10,32 @@ import (
 	"syscall"
 )
 
-// Runner runs kubectl with args. When stdin is not nil it is piped to the
-// command; the standard output and error of the command go to stdout and
-// stderr. It returns the exit status of kubectl, or an error when kubectl
-// cannot be started.
+// Runner runs kubectl and helm with args. When stdin is not nil it is piped to
+// the command; the standard output and error of the command go to stdout and
+// stderr. Each method returns the exit status of the command, or an error when
+// the command cannot be started.
 type Runner interface {
 	Kubectl(args []string, stdin io.Reader, stdout, stderr io.Writer) (int, error)
+	Helm(args []string, stdin io.Reader, stdout, stderr io.Writer) (int, error)
 }
 
-// ExecRunner runs the kubectl found in PATH, as the bash entry point does.
+// ExecRunner runs the kubectl and helm found in PATH, as the bash entry point does.
 type ExecRunner struct{}
 
-// Kubectl runs kubectl with args (see Runner). A child killed by a signal gives
-// 128 + the signal number, as a shell does.
+// Kubectl runs kubectl with args (see Runner).
 func (ExecRunner) Kubectl(args []string, stdin io.Reader, stdout, stderr io.Writer) (int, error) {
-	cmd := exec.Command("kubectl", args...)
+	return execCommand("kubectl", args, stdin, stdout, stderr)
+}
+
+// Helm runs helm with args (see Runner).
+func (ExecRunner) Helm(args []string, stdin io.Reader, stdout, stderr io.Writer) (int, error) {
+	return execCommand("helm", args, stdin, stdout, stderr)
+}
+
+// execCommand runs the program name found in PATH (see Runner). A child killed by
+// a signal gives 128 + the signal number, as a shell does.
+func execCommand(name string, args []string, stdin io.Reader, stdout, stderr io.Writer) (int, error) {
+	cmd := exec.Command(name, args...)
 	cmd.Stdin = stdin
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr

@@ -27,7 +27,17 @@ type fakeRunner struct {
 
 // Kubectl records the call and writes the reply of the first matching rule
 func (f *fakeRunner) Kubectl(args []string, stdin io.Reader, stdout, stderr io.Writer) (int, error) {
-	line := strings.Join(args, " ")
+	return f.call("", args, stdin, stdout, stderr)
+}
+
+// Helm records the call, prefixed with "helm ", and answers it as Kubectl does
+func (f *fakeRunner) Helm(args []string, stdin io.Reader, stdout, stderr io.Writer) (int, error) {
+	return f.call("helm ", args, stdin, stdout, stderr)
+}
+
+// call answers a call of the named program: prefix is "" for kubectl, "helm " for helm
+func (f *fakeRunner) call(prefix string, args []string, stdin io.Reader, stdout, stderr io.Writer) (int, error) {
+	line := prefix + strings.Join(args, " ")
 	f.calls = append(f.calls, line)
 	input := ""
 	if stdin != nil {
