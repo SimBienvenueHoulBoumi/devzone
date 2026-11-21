@@ -1,7 +1,7 @@
 # internal/bashbridge
 
-- Rôle : exécute le point d'entrée bash (`manage/devzone`) comme processus enfant, en conservant entrées, sorties, environnement et code de sortie (#358).
-- Peut importer : la bibliothèque standard uniquement.
-- Ne doit pas importer : aucun paquet du dépôt (ni `internal/command`, ni `cmd/...`), pour rester réutilisable et sans cycle.
-- Localisation : `DEVZONE_BASH_ENTRY` si définie, sinon `manage/devzone` à côté du binaire, dans son dossier parent, puis dans le dossier courant.
-- Tests : `go test ./internal/bashbridge/` ; les scripts temporaires sont créés dans `t.TempDir()`.
+- Role: runs the bash entry point (`manage/devzone`) as a child process, keeping inputs, outputs, environment and exit code (#358).
+- May import: the standard library only.
+- Must not import: any package of the repository (neither `internal/command`, nor `cmd/...`), to remain reusable and cycle-free.
+- Location: `DEVZONE_BASH_ENTRY` if set, otherwise `manage/devzone` next to the binary, in its parent folder, then in the current folder.
+- Tests: `go test ./internal/bashbridge/`; temporary scripts are created in `t.TempDir()`.

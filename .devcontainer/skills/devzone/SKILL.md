@@ -1,73 +1,73 @@
 ---
 name: devzone
-description: Utiliser pour travailler dans un conteneur devzone — modules et catalogue, devzone agent, worktrees, garde-fou.
+description: Use to work in a devzone container — modules and catalog, devzone agent, worktrees, guard.
 ---
 
 <!-- devzone : skill set by devzone enable ia -->
 
-# Skill devzone (assistants IA)
+# devzone skill (AI assistants)
 
-Cette skill est pour Claude Code (lead) et opencode (développeur) dans un conteneur devzone. Elle est posée par `devzone enable ia` dans `~/.claude/skills/devzone/` et `~/.config/opencode/skills/devzone/` (volumes, gardés aux rebuilds). Pour la personnaliser sans qu'elle soit remplacée, retirer la ligne repère ci-dessus.
+This skill is for Claude Code (lead) and opencode (developer) in a devzone container. It is set by `devzone enable ia` in `~/.claude/skills/devzone/` and `~/.config/opencode/skills/devzone/` (volumes, kept across rebuilds). To customize it without it being replaced, remove the marker line above.
 
-## Règle d'or
+## Golden rule
 
-Tout se fait dans le conteneur, avec les commandes `devzone`, jamais en lançant les scripts de `.devcontainer/` à la main.
+Everything is done in the container, with the `devzone` commands, never by running the scripts of `.devcontainer/` by hand.
 
-Dans les tests bats, n'utilise que de faux outils dans un dossier `bin` temporaire : jamais un script système réel (`devzone`, `kubectl`, `helm`…) sous bats.
+In bats tests, only use fake tools in a temporary `bin` folder: never a real system script (`devzone`, `kubectl`, `helm`…) under bats.
 
 ## Worktrees
 
-Les projets vivent dans `workspace/` ; les worktrees des tickets sous `workspace/wt/`. Un worktree se crée et se supprime **dans le conteneur** (`git worktree add` / `git worktree remove`). Jamais `git worktree prune` de l'hôte, ni un outil de l'hôte (VS Code, GitHub Desktop). Un worktree créé sur le poste a un chemin absolu que le conteneur ne voit pas : le gérer du côté qui l'a créé.
+Projects live in `workspace/`; ticket worktrees under `workspace/wt/`. A worktree is created and removed **in the container** (`git worktree add` / `git worktree remove`). Never `git worktree prune` from the host, nor a host tool (VS Code, GitHub Desktop). A worktree created on the workstation has an absolute path that the container cannot see: manage it on the side that created it.
 
-## Modules et catalogue
+## Modules and catalog
 
-Les modules sont désactivés par défaut, activés à la demande, sans rebuild :
+Modules are disabled by default, enabled on demand, without a rebuild:
 
-- `devzone enable ia` : Claude Code et opencode (versions figées), garde-fou repowarden, configuration opencode par défaut. Se connecter ensuite : `claude` (puis `/login`), `opencode auth login`.
-- `devzone disable ia` : désinstalle les assistants ; retire le garde-fou et la configuration opencode par défaut ; garde l'état de `devzone agent`, les journaux `workspace/.agents/` et les connexions.
-- `devzone enable kubernetes` : se connecte au cluster de la machine à chaque démarrage et installe metrics-server sur les clusters locaux.
-- `devzone enable gitlab` : installe GitLab de test dans le cluster des services (namespace `devzone-gitlab*`).
-- `devzone enable postgres` : PostgreSQL partagé, une base par projet (`devzone postgres create <projet>`).
-- `devzone enable mysql` : MySQL partagé du catalogue, une base par projet.
-- `devzone enable argocd` : Argo CD du cluster des services, interface dans le conteneur sur https://127.0.0.1:8443.
-- `devzone disable docker-hote` : retire le socket Docker de l'hôte (puis `make rebuild` sur le poste) ; `devzone enable docker-hote` le remet.
-- `devzone disable <module>` : désactive et applique tout de suite.
-- `devzone apply` : installe ce qui est actif.
-- `devzone repair` : relance relais Docker, gitlab, postgres, mysql, argocd, ports étiquetés et le veilleur du catalogue.
-- `devzone status --json` : récapitulatif complet en JSON, pour les outils (aucun secret ; le champ `command` de chaque point donne la commande à lancer).
+- `devzone enable ia`: Claude Code and opencode (pinned versions), repowarden guard, default opencode configuration. Then log in: `claude` (then `/login`), `opencode auth login`.
+- `devzone disable ia`: uninstalls the assistants; removes the guard and the default opencode configuration; keeps the state of `devzone agent`, the logs `workspace/.agents/` and the logins.
+- `devzone enable kubernetes`: connects to the machine's cluster at each startup and installs metrics-server on local clusters.
+- `devzone enable gitlab`: installs a test GitLab in the services cluster (namespace `devzone-gitlab*`).
+- `devzone enable postgres`: shared PostgreSQL, one database per project (`devzone postgres create <project>`).
+- `devzone enable mysql`: shared MySQL of the catalog, one database per project.
+- `devzone enable argocd`: Argo CD of the services cluster, interface in the container at https://127.0.0.1:8443.
+- `devzone disable docker-hote`: removes the host's Docker socket (then `make rebuild` on the workstation); `devzone enable docker-hote` restores it.
+- `devzone disable <module>`: disables and applies at once.
+- `devzone apply`: installs what is active.
+- `devzone repair`: relaunches the Docker relay, gitlab, postgres, mysql, argocd, labelled ports and the catalog watcher.
+- `devzone status --json`: full summary in JSON, for tools (no secret; the `command` field of each item gives the command to run).
 
-Le catalogue d'applications se consulte avec `devzone catalog` ; un veilleur applique à chaud les changements de `.devzone.modules`, et `devzone repair` le relance. MySQL se pilote avec `devzone mysql create <projet>`, `devzone mysql list`, `devzone mysql delete <projet>`, `devzone mysql volume [<nom>|--delete <nom>]` et `devzone mysql delete-data` (données gardées par défaut).
+The application catalog is consulted with `devzone catalog`; a watcher applies the changes of `.devzone.modules` on the fly, and `devzone repair` relaunches it. MySQL is driven with `devzone mysql create <project>`, `devzone mysql list`, `devzone mysql delete <project>`, `devzone mysql volume [<name>|--delete <name>]` and `devzone mysql delete-data` (data kept by default).
 
-Le choix est propre à chaque devzone, gardé dans `.devzone.modules` du dossier devzone.
+The choice is specific to each devzone, kept in `.devzone.modules` of the devzone folder.
 
-## Diriger opencode (devzone agent)
+## Directing opencode (devzone agent)
 
-`devzone agent <dossier> <fichier-consigne>` dirige opencode sur une consigne, au premier plan ou en parallèle (`&`, une par ticket et par worktree).
-- `devzone agent etat` : sessions, modèles écartés et leur cause.
-- `devzone agent liberer <modèle>|--tous` : lève un écart de modèle.
+`devzone agent <folder> <instruction-file>` directs opencode on an instruction, in the foreground or in parallel (`&`, one per ticket and per worktree).
+- `devzone agent etat`: sessions, discarded models and their cause.
+- `devzone agent liberer <model>|--tous`: lifts a model discard.
 
-Le journal est `workspace/.agents/<dossier>.log`. `--auto` évite l'attente d'une permission ; `< /dev/null` évite une session muette.
+The log is `workspace/.agents/<folder>.log`. `--auto` avoids waiting for a permission; `< /dev/null` avoids a silent session.
 
-## Garde-fou et fichiers protégés
+## Guard and protected files
 
-Avec `ia` actif, le garde-fou repowarden est branché pour Claude Code et opencode : l'agent est arrêté avant de modifier `main`/`develop`, de commiter sans `repowarden cc` ou de contourner les hooks. `repowarden cc -m "…"` pour commiter.
+With `ia` active, the repowarden guard is plugged in for Claude Code and opencode: the agent is stopped before modifying `main`/`develop`, committing without `repowarden cc` or bypassing the hooks. `repowarden cc -m "…"` to commit.
 
-Fichiers de droits protégés (jamais écrits par un agent, listés fixes, qu'aucune variable ne change) : `.devcontainer/opencode/agent.json`, `.devcontainer/opencode.jsonc`, `.repowarden.conf`, `.devcontainer/agent-rights.sh`. Un agent qui les touche est refusé et le changement est annulé dans l'arbre.
+Protected rights files (never written by an agent, fixed list, no variable changes it): `.devcontainer/opencode/agent.json`, `.devcontainer/opencode.jsonc`, `.repowarden.conf`, `.devcontainer/agent-rights.sh`. An agent that touches them is refused and the change is reverted in the tree.
 
-## Kubernetes seulement
+## Kubernetes only
 
-devzone se décrit avec **le cluster**, **le pod** et **les nœuds** ; jamais « Docker » pour décrire devzone. Seuls les **pods** sont des conteneurs.
+devzone is described with **the cluster**, **the pod** and **the nodes**; never "Docker" to describe devzone. Only **pods** are containers.
 
-Pour un essai jetable, crée un **pod** ou un **namespace** jetable (`kubectl run`, `kubectl create ns`), puis supprime-le. Ne lance pas `docker`.
+For a disposable test, create a disposable **pod** or **namespace** (`kubectl run`, `kubectl create ns`), then delete it. Do not run `docker`.
 
-Un garde-fou arrête les agents qui lancent `docker` ou `docker-compose` ; `DEVZONE_ALLOW_DOCKER=1` est réservé à une action sur l'**hôte** lui-même, jamais au cluster.
+A guard stops agents that run `docker` or `docker-compose`; `DEVZONE_ALLOW_DOCKER=1` is reserved for an action on the **host** itself, never on the cluster.
 
-## Services Kubernetes et workspace
+## Kubernetes services and workspace
 
-Les services (PostgreSQL, MySQL, GitLab, Argo CD) vivent sur le **cluster des services de devzone**, choisi une fois (`devzone cluster CTX`) et gardé dans l'état. Le contexte `devzone` de kubectl est posé sur ce cluster. Namespaces des services : `devzone-*`. `devzone cluster` affiche le cluster et les possibles, `devzone clusters` donne la vue travail/services ; le module `kubernetes` actif relie au cluster de la machine et installe metrics-server au démarrage.
+The services (PostgreSQL, MySQL, GitLab, Argo CD) live on the **devzone services cluster**, chosen once (`devzone cluster CTX`) and kept in the state. The kubectl `devzone` context is set on this cluster. Services namespaces: `devzone-*`. `devzone cluster` shows the cluster and the possible ones, `devzone clusters` gives the work/services view; the active `kubernetes` module connects to the machine's cluster and installs metrics-server at startup.
 
-Le poste de développement peut tourner dans le cluster : `devzone workspace start|stop|status|shell|vscode|copy-to <dossier>|copy-from <dossier>` pilote le workspace Kubernetes (lancé du poste).
+The development workstation can run in the cluster: `devzone workspace start|stop|status|shell|vscode|copy-to <folder>|copy-from <folder>` drives the Kubernetes workspace (run from the workstation).
 
-## Ce qui revient au mainteneur
+## What falls to the maintainer
 
-Le développeur (opencode) code, teste et commite `repowarden cc` ; le lead (Claude Code) relit, pousse, fait l'essai réel, suit la CI et peut passer une PR en ready quand tous ses jobs sont verts. Les connexions (GitHub, Claude Code, opencode), la validation des tickets, les approbations de déploiement et le lancement des releases restent au mainteneur. La skill « repowarden » est déjà posée par `repowarden agents init` : vérifie seulement qu'elle est présente.
+The developer (opencode) codes, tests and commits with `repowarden cc`; the lead (Claude Code) reviews, pushes, does the real test, follows CI and can move a PR to ready when all its jobs are green. Logins (GitHub, Claude Code, opencode), ticket validation, deployment approvals and release launches remain with the maintainer. The “repowarden” skill is already placed by `repowarden agents init`: just check that it is present.
