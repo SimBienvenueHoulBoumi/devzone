@@ -25,6 +25,12 @@ ARG PYTEST_VERSION=9.1.1
 ARG BUILDKIT_VERSION=0.34.2
 ARG BUILDKIT_SHA256_AMD64=b9f18b8e37eb450e9e5df03117045237cdd12d3c4a0034ffeeaa857852a15e13
 ARG BUILDKIT_SHA256_ARM64=a4ad483a33b2f1544c5ccce1c5956c559e1a6e84b8bf6cedd847d695885237a3
+# Go (#754): same version as the CI (go.yml, go 1.27 resolved to its latest patch) and
+# go.mod. Checksums of the archives of https://go.dev/dl/?mode=json&include=all
+# (files linux-arm64 and linux-amd64). To update: change the version AND both checksums.
+ARG GO_VERSION=1.27.4
+ARG GO_SHA256_AMD64=7226736c2339719cda28fbf3a54d71aa63bcefe376e98cef00034268dab24840
+ARG GO_SHA256_ARM64=3392582988a273a87ab5043ee1b2c9c17a2c3c00580bf9326c47a2e0aaaeac92
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
@@ -106,6 +112,33 @@ RUN set -eu; \
     tar -xzf "$tmp/buildkit.tar.gz" -C "$tmp" bin/buildctl; \
     install -m 0755 "$tmp/bin/buildctl" /usr/local/bin/buildctl; \
     rm -rf "$tmp"
+
+# Go (#754): toolchain of the workspace pod, used to develop devzone and to build its
+# binary. The official archive is checked with its SHA-256 before extraction into
+# /usr/local/go (about 280 MB extracted). Symlinks in /usr/local/bin: the statefulset
+# of the workspace sets its own PATH, which replaces the ENV PATH below.
+RUN set -eu; \
+    arch="$(dpkg --print-architecture)"; \
+    case "$arch" in \
+        arm64) go_sha="${GO_SHA256_ARM64}" ;; \
+        amd64) go_sha="${GO_SHA256_AMD64}" ;; \
+        *) echo "Unsupported architecture: $arch" >&2; exit 1 ;; \
+    esac; \
+    tmp="$(mktemp -d)"; \
+    curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-${arch}.tar.gz" -o "$tmp/go.tar.gz"; \
+    echo "$go_sha  $tmp/go.tar.gz" | sha256sum -c --quiet; \
+    tar -xzf "$tmp/go.tar.gz" -C /usr/local; \
+    rm -rf "$tmp"; \
+    ln -sf /usr/local/go/bin/go /usr/local/bin/go; \
+    ln -sf /usr/local/go/bin/gofmt /usr/local/bin/gofmt; \
+    install -d -o 1000 -g 1000 /home/vscode/.cache /home/vscode/.cache/go-build /home/vscode/go
+
+# Go: GOTOOLCHAIN=local as in the CI (no toolchain download); build cache and module
+# path under the home of vscode (uid/gid 1000)
+ENV PATH="/usr/local/go/bin:${PATH}" \
+    GOTOOLCHAIN=local \
+    GOCACHE=/home/vscode/.cache/go-build \
+    GOPATH=/home/vscode/go
 
 # kind passe par une enveloppe (#291) : avec le Docker de l'hôte, un cluster
 # créé à la main doit être rendu joignable depuis le conteneur (kube-reachable.sh)

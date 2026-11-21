@@ -792,6 +792,7 @@ In the container, the `devzone` summary reads `$RACINE/.devzone.version` and the
 | Tool | Where | Then |
 |---|---|---|
 | k9s, actionlint, gitleaks, kind | `.devcontainer/Dockerfile`: `ARG …_VERSION` **and** the `sha256` fingerprints (arm64 + amd64) | `make rebuild` |
+| Go | `.devcontainer/Dockerfile`: `GO_VERSION` **and** the `sha256` fingerprints `GO_SHA256_ARM64` / `GO_SHA256_AMD64` (go.dev); keep `go.mod` and `.github/workflows/go.yml` at the same version | `make rebuild` |
 | uv, ruff, vulture, pytest | `.devcontainer/Dockerfile`: `ARG …_VERSION` | `make rebuild` |
 | repowarden | `.devcontainer/versions.env`: `REPOWARDEN_VERSION=x.y.z` | `devzone apply` (or `make rebuild`) |
 | Claude Code, opencode | `.devcontainer/devzone`: one line per package, `IA_CLAUDE=@anthropic-ai/claude-code@x.y.z` and `IA_OPENCODE=opencode-ai@x.y.z` | `devzone enable ia` (or `make rebuild`) |
