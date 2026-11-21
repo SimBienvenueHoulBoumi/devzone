@@ -35,7 +35,7 @@ ARG GO_SHA256_ARM64=3392582988a273a87ab5043ee1b2c9c17a2c3c00580bf9326c47a2e0aaae
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 # Contrôles shell de repowarden ; jq : lu par son garde-fou des agents IA
-# (repowarden guard, module ia), qui sans lui ne vérifie rien
+# (repowarden guard, module ai), qui sans lui ne vérifie rien
 # Python 3.12 d Ubuntu 24.04, paquets signés par apt, aucun serveur de clés (#464)
 RUN apt-get -o Acquire::Retries=5 update \
     && apt-get -o Acquire::Retries=5 install -y --no-install-recommends shellcheck bats jq python3 python3-venv python3-pip python-is-python3 \

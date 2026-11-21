@@ -172,13 +172,13 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: lts/*
-      - name: devzone enable ia, then claude --version and opencode --version
+      - name: devzone enable ai, then claude --version and opencode --version
         env:
           DEVZONE_STATE: ${{ runner.temp }}/devzone-modules
         run: |
           uname -m
           node --version
-          bash .devcontainer/devzone enable ia
+          bash .devcontainer/devzone enable ai
           claude --version
           opencode --version
 

@@ -73,7 +73,7 @@ CURL
     run bash "$DEVZONE" status --json
     [ "$status" -eq 0 ]
     printf '%s\n' "$output" | jq -e . >/dev/null
-    [ "$(printf '%s\n' "$output" | jq -r '.schema')" = "2" ]
+    [ "$(printf '%s\n' "$output" | jq -r '.schema')" = "3" ]
 }
 
 @test "state-json: git identity absent → ok false with command" {
@@ -95,12 +95,12 @@ CURL
 }
 
 @test "state-json: module failed → echec and command" {
-    printf 'ia=on\n' >"$DEVZONE_STATE"
-    echo "failed npm" >"$DEVZONE_STATE-failed-ia"
+    printf 'ai=on\n' >"$DEVZONE_STATE"
+    echo "failed npm" >"$DEVZONE_STATE-failed-ai"
     run bash "$DEVZONE" status --json
     [ "$status" -eq 0 ]
-    [ "$(printf '%s\n' "$output" | jq -r '.modules[] | select(.name=="ia") | .failed')" = "failed npm" ]
-    [ "$(printf '%s\n' "$output" | jq -r '.modules[] | select(.name=="ia") | .command')" = "devzone apply" ]
+    [ "$(printf '%s\n' "$output" | jq -r '.modules[] | select(.name=="ai") | .failed')" = "failed npm" ]
+    [ "$(printf '%s\n' "$output" | jq -r '.modules[] | select(.name=="ai") | .command')" = "devzone apply" ]
 }
 
 @test "state-json: gh failing → github null and errors.github" {
@@ -151,4 +151,11 @@ GH
     run bash "$DEVZONE"
     [ "$status" -eq 0 ]
     [[ "$output" == *"devzone: state"* ]] || false
+}
+
+@test "state-json: the AI module is named ai, never ia" {
+    run bash "$DEVZONE" status --json
+    [ "$status" -eq 0 ]
+    [ "$(printf '%s\n' "$output" | jq -r '[.modules[] | select(.name=="ai")] | length')" = "1" ]
+    [ "$(printf '%s\n' "$output" | jq -r '[.modules[] | select(.name=="ia")] | length')" = "0" ]
 }

@@ -193,7 +193,7 @@ source_agent_pod() {
 
 @test "agent-pod : without --pod, behavior unchanged (local)" {
     unset DEVZONE_WORKSPACE
-    printf 'ia=on\n' >"$DEVZONE_ROOT/.devzone.modules"
+    printf 'ai=on\n' >"$DEVZONE_ROOT/.devzone.modules"
     run bash "$DEVZONE" agent --local "$FOLDER" "$T/consigne.txt"
     [ "$status" -eq 0 ]
     ! grep -q "create -f" "$T/kubectl.log" || false

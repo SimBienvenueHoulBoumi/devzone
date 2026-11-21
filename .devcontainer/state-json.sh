@@ -236,7 +236,7 @@ state_json() {
     argocd_repo="$(conf_get argocd repo)"
 
     jq -n \
-        --argjson schema 2 \
+        --argjson schema 3 \
         --arg dv "$dv_raw" \
         --arg dvp "$dvp_raw" \
         --argjson id_ok "$id_ok" \

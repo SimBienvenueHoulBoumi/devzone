@@ -95,25 +95,25 @@ ID_HOTE="$(docker info --format '{{.ID}}')"
 reussit "Docker du conteneur = Docker de l'hôte" "docker info --format '{{.ID}}'" "^${ID_HOTE}$"
 
 echo "▶ Premier démarrage (récapitulatif affiché au démarrage)"
-reussit "modules désactivés par défaut" "devzone" "○ module ia"
+reussit "modules désactivés par défaut" "devzone" "○ module ai"
 reussit "kubernetes disabled par défaut" "devzone" "○ module kubernetes"
 echoue "assistants IA absents" "command -v claude"
-for message in "✖ git identity" "○ GitHub          optional" "○ module ia"; do
+for message in "✖ git identity" "○ GitHub          optional" "○ module ai"; do
     if grep -q "$message" "$JOURNAL"; then ok "message : $message"; else ko "message : $message" "$(tail -5 "$JOURNAL")"; fi
 done
 
-echo "▶ Module ia"
-reussit "enable ia" "devzone enable ia && claude --version && opencode --version" "Claude Code"
-reussit "ia : garde-fou repowarden branché (Claude Code, opencode)" "grep -qE 'repowarden (garde|guard)' ~/.claude/settings.json && test -f ~/.config/opencode/plugins/repowarden-garde.js"
-reussit "ia : configuration opencode par défaut en place" "grep -q '^// devzone : default opencode configuration' ~/.config/opencode/opencode.jsonc && grep -q '\"model\": \"opencode/big-pickle\"' ~/.config/opencode/opencode.jsonc"
+echo "▶ Module ai"
+reussit "enable ai" "devzone enable ai && claude --version && opencode --version" "Claude Code"
+reussit "ai : garde-fou repowarden branché (Claude Code, opencode)" "grep -qE 'repowarden (garde|guard)' ~/.claude/settings.json && test -f ~/.config/opencode/plugins/repowarden-garde.js"
+reussit "ai : configuration opencode par défaut en place" "grep -q '^// devzone : default opencode configuration' ~/.config/opencode/opencode.jsonc && grep -q '\"model\": \"opencode/big-pickle\"' ~/.config/opencode/opencode.jsonc"
 # Chaque modèle de la configuration doit être proposé par la version installée
 modeles="$(dz "grep -oE '\"opencode/[^\"]+\"' ~/.config/opencode/opencode.jsonc | tr -d '\"' | sort -u")"
 modeles_dispo="$(dz "timeout 60 opencode models opencode")"
 for modele in $modeles; do
     if grep -qxF "$modele" <<<"$modeles_dispo"; then
-        ok "ia : modèle disponible : $modele"
+        ok "ai : modèle disponible : $modele"
     else
-        ko "ia : modèle absent d'opencode models : $modele" "$modele"
+        ko "ai : modèle absent d'opencode models : $modele" "$modele"
     fi
 done
 # Modèle gratuit : répond si le réseau le permet ; sinon test sauté (pas un échec)
@@ -121,16 +121,16 @@ code_opencode=0
 sortie_opencode="$(dz "timeout 120 opencode run --model opencode/big-pickle 'Réponds OK' < /dev/null")" || code_opencode=$?
 # Code 124 = délai dépassé : lu sur le vrai code de sortie de dz, pas déduit d'une sortie vide
 if [ "$code_opencode" = 124 ]; then
-    echo "  ↷ ia : opencode sans réponse en 120 s (délai dépassé)"
+    echo "  ↷ ai : opencode sans réponse en 120 s (délai dépassé)"
 elif grep -q 'OK' <<<"$sortie_opencode"; then
-    ok "ia : opencode répond avec le modèle par défaut"
+    ok "ai : opencode répond avec le modèle par défaut"
 else
-    echo "  ↷ ia : opencode sans réponse (réseau ou fournisseur indisponible) : $(printf '%s' "$sortie_opencode" | tail -1)"
+    echo "  ↷ ai : opencode sans réponse (réseau ou fournisseur indisponible) : $(printf '%s' "$sortie_opencode" | tail -1)"
 fi
 # Action d'agent sur main dans un dépôt neuf (hooks repowarden globaux) : refusée (code 2)
 # shellcheck disable=SC2016 # commande développée dans le conteneur
-echoue "ia : garde-fou : modification sur main refusée" 'd="$(mktemp -d)" && cd "$d" && git init -q -b main && printf "{\"tool_name\":\"Write\",\"tool_input\":{\"file_path\":\"%s/a.txt\"},\"cwd\":\"%s\"}" "$d" "$d" | repowarden guard --format claude' "branche protégée"
-reussit "disable ia" "devzone disable ia && ! command -v claude"
+echoue "ai : garde-fou : modification sur main refusée" 'd="$(mktemp -d)" && cd "$d" && git init -q -b main && printf "{\"tool_name\":\"Write\",\"tool_input\":{\"file_path\":\"%s/a.txt\"},\"cwd\":\"%s\"}" "$d" "$d" | repowarden guard --format claude' "branche protégée"
+reussit "disable ai" "devzone disable ai && ! command -v claude"
 echoue "unknown module refusé" "devzone enable nexistepas" "unknown module"
 
 echo "▶ Module kubernetes (cluster kind du test, jamais un cluster de l'hôte)"
@@ -171,17 +171,17 @@ reussit "message conventionnel accepté" "$G && echo a >a && git add a && git co
 echoue "jeton GitHub refusé (gitleaks)" "$G && echo \"T='ghp_\$(head -c 300 /dev/urandom | tr -dc A-Za-z0-9 | head -c 36)'\" >c.py && git add c.py && git commit -m 'feat: config'" "Secret"
 
 echo "▶ Persistance"
-dz "devzone enable ia >/dev/null; echo témoin >~/.config/git/temoin" >/dev/null
+dz "devzone enable ai >/dev/null; echo témoin >~/.config/git/temoin" >/dev/null
 # Identité dans le volume, et volume « pollué » comme par une version
 # antérieure (réglages machine en double) : le rebuild doit réussir et le nettoyer
 dz "V=~/.config/git/config; git config --file \$V user.name Test; git config --file \$V user.email test@example.invalid; git config --file \$V --add credential.https://github.com.helper ''; git config --file \$V --add credential.https://github.com.helper '!gh auth git-credential'; git config --file \$V --add safe.directory /workspaces/devzone" >/dev/null
 docker stop "$(docker ps -q --filter "label=devcontainer.local_folder=$COPIE")" >/dev/null
 demarrer
-reussit "redémarrage : modules gardés" "devzone" "✔ module ia"
+reussit "redémarrage : modules gardés" "devzone" "✔ module ai"
 reussit "redémarrage : volume gardé" "cat ~/.config/git/temoin" "témoin"
 demarrer --remove-existing-container
-reussit "rebuild : modules gardés" "devzone" "✔ module ia"
-reussit "rebuild : ia réinstallé" "claude --version" "Claude Code"
+reussit "rebuild : modules gardés" "devzone" "✔ module ai"
+reussit "rebuild : ai réinstallé" "claude --version" "Claude Code"
 reussit "rebuild : volume gardé" "cat ~/.config/git/temoin" "témoin"
 reussit "rebuild : cluster kind conservé" "kind get clusters" "^${KIND_TEST}$"
 reussit "rebuild : identité conservée dans le volume" "git config --file ~/.config/git/config user.name" "^Test$"

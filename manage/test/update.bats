@@ -106,7 +106,7 @@ poisoned_manifest() {
     create_v1
     mkdir -p "$DZ/workspace/projet"
     printf 'projet\n' >"$DZ/workspace/projet/fichier"
-    printf 'ia=on\n' >"$DZ/.devzone.modules"
+    printf 'ai=on\n' >"$DZ/.devzone.modules"
     printf 'secret\n' >"$DZ/.password"
     printf 'app\n' >"$DZ/.app"
     printf 'journal\n' >"$DZ/.devzone.log"
@@ -122,7 +122,7 @@ poisoned_manifest() {
     grep -q '# makefile ancien' "$backup/Makefile"
     grep -q 'echo ancien' "$backup/manage/scripts/ancien.sh"
     [ "$(cat "$DZ/workspace/projet/fichier")" = projet ]
-    [ "$(cat "$DZ/.devzone.modules")" = 'ia=on' ]
+    [ "$(cat "$DZ/.devzone.modules")" = 'ai=on' ]
     [ "$(cat "$DZ/.password")" = secret ]
     [ "$(cat "$DZ/.app")" = app ]
     [ "$(cat "$DZ/.devzone.log")" = journal ]

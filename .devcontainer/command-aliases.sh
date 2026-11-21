@@ -8,6 +8,8 @@
 # renamed_command <name>              : English name of a renamed command, or 1
 # renamed_subcommand <command> <name> : English name of a renamed subcommand, or 1
 # renamed_option <option>             : English name of a renamed option, or 1
+# renamed_module <name>               : new name of a renamed module (argument of
+#                                       enable, disable, is-enabled, apply), or 1
 # reject_renamed <command> <args...>  : refuses the first renamed name of a call
 #                                       (command, first word that is not an
 #                                       option, then each option); 0 if none
@@ -159,6 +161,15 @@ renamed_option() {
     esac
 }
 
+# New name of a renamed module, or return 1. Modules are not commands: the
+# message names the module only (« ia » was renamed: ai).
+renamed_module() {
+    case "${1:-}" in
+        ia) echo ai ;;
+        *) return 1 ;;
+    esac
+}
+
 # Names removed in 3.0 (#735): refused with the same exit code, with a notice
 # that names no former feature and never creates a folder.
 removed_notice() {
@@ -193,6 +204,14 @@ reject_renamed() {
                 migrer | revenir | nettoyer-docker) removed_notice; return 1 ;;
             esac
         fi
+        case "$command" in
+            enable | disable | is-enabled | apply)
+                if new="$(renamed_module "$word")"; then
+                    printf '✖ « %s » was renamed: %s\n' "$word" "$new" >&2
+                    return 1
+                fi
+                ;;
+        esac
         if new="$(renamed_subcommand "$command" "$word")"; then
             printf '✖ « %s » was renamed: devzone %s %s\n' "$word" "$command" "$new" >&2
             return 1

@@ -62,7 +62,7 @@ These are renamed once, automatically, when the pod starts and by `devzone updat
 | `.devzone-empreinte` (next to each `SKILL.md`) | `.devzone-fingerprint` |
 | `/tmp/devzone-paquets.echec` | `/tmp/devzone-packages.failed` |
 
-The old French markers written in `SKILL.md`, `opencode.jsonc` and the header of `.devzone.modules` are no longer recognised. `devzone enable ia` writes the English ones again.
+The old French markers written in `SKILL.md`, `opencode.jsonc` and the header of `.devzone.modules` are no longer recognised. `devzone enable ai` writes the English ones again.
 
 ## State file keys
 
@@ -93,6 +93,21 @@ In `.devzone.modules`, the line `plateforme=<value>` becomes `platform=<value>`.
 | `connecte` | `connected` |
 
 The alert code `paquets` is now `packages`. In `catalog/mysql/app.conf`, `nom=` is now `name=`.
+
+## AI module
+
+The AI module is renamed from `ia` to `ai` (#774). The old name is refused with `✖ « ia » was renamed: ai`, exit code 1, and nothing is done.
+
+| Before | Now |
+|---|---|
+| `devzone enable ia`, `devzone disable ia`, `devzone is-enabled ia` | `devzone enable ai`, `devzone disable ai`, `devzone is-enabled ai` |
+| status line `module ia` | status line `module ai` |
+| line `ia=on` or `ia=off` in `.devzone.modules` | line `ai=on` or `ai=off` |
+| `.devzone.modules-failed-ia` | `.devzone.modules-failed-ai` |
+| `modules[].name`: `"ia"` in `devzone status --json` | `modules[].name`: `"ai"` |
+| `schema`: `2` | `schema`: `3` |
+
+The state line is rewritten once, automatically, at the startup of the pod and by `devzone update`: `ia=<value>` becomes `ai=<value>` with the value kept, other lines untouched, and the message `devzone : ia= renamed to ai=` is printed. If `ai=` already exists, the old line is only removed. The failure marker is renamed the same way. A reader of `devzone status --json` that filters on the module name must look for `ai` and expect `schema: 3`.
 
 ## Words of the outputs
 
