@@ -16,7 +16,7 @@ mtime() {
     fi
 }
 
-# Readable UTC date of an epoch, GNU then BSD date: shown by devzone agent etat.
+# Readable UTC date of an epoch, GNU then BSD date: shown by devzone agent state.
 utc_time() {
     if date -u -d "@$1" '+%Y-%m-%d %H:%M:%S' >/dev/null 2>&1; then
         date -u -d "@$1" '+%Y-%m-%d %H:%M:%S'
@@ -48,18 +48,18 @@ lock_trace() {
 lock_take() {
     local end age lock_pid
     end=$(( $(date +%s) + ${DEVZONE_AGENT_LOCK_MAX:-10} ))
-    while ! mkdir "$AGENT_ETAT/verrou" 2>/dev/null; do
+    while ! mkdir "$AGENT_STATE/verrou" 2>/dev/null; do
         # A lock is orphaned only by its age: the rank is held for a few milliseconds,
         # 30 s can only be a stop to take over; otherwise wait, then give up (code 1).
         age=""
-        if [ -d "$AGENT_ETAT/verrou" ]; then
-            age="$(mtime "$AGENT_ETAT/verrou" 2>/dev/null)" || age=""
+        if [ -d "$AGENT_STATE/verrou" ]; then
+            age="$(mtime "$AGENT_STATE/verrou" 2>/dev/null)" || age=""
         fi
-        lock_pid="$(cat "$AGENT_ETAT/verrou/pid" 2>/dev/null)" || lock_pid=""
+        lock_pid="$(cat "$AGENT_STATE/verrou/pid" 2>/dev/null)" || lock_pid=""
         lock_trace "mkdir failed" "age=${age:-unknown} lock-pid=${lock_pid:-none}"
         if [ -n "$age" ] && [ "$(( $(date +%s) - age ))" -gt 30 ]; then
-            rm -f "$AGENT_ETAT/verrou/pid"
-            if rmdir "$AGENT_ETAT/verrou" 2>/dev/null; then
+            rm -f "$AGENT_STATE/verrou/pid"
+            if rmdir "$AGENT_STATE/verrou" 2>/dev/null; then
                 lock_trace "purged" "age=$age"
                 continue
             fi
@@ -69,18 +69,18 @@ lock_take() {
     done
     # pid before flock: the other agent never removes the folder while we wait on
     # rang.lock, otherwise our pid write would fail with ENOENT.
-    echo "$$" >"$AGENT_ETAT/verrou/pid"
+    echo "$$" >"$AGENT_STATE/verrou/pid"
     if command -v flock >/dev/null 2>&1; then
         # exec in an if makes a failure a condition instead of killing the shell
         # (bash 3.2 and GNU alike); without flock, mkdir remains the only guard (macOS).
-        if { exec 9>"$AGENT_ETAT/rang.lock"; } && flock -w "${DEVZONE_AGENT_LOCK_MAX:-10}" 9; then
+        if { exec 9>"$AGENT_STATE/rang.lock"; } && flock -w "${DEVZONE_AGENT_LOCK_MAX:-10}" 9; then
             AGENT_LOCK_FLOCK=1
         else
             lock_release
             return 1
         fi
     fi
-    lock_trace taken "path=$AGENT_ETAT/verrou"
+    lock_trace taken "path=$AGENT_STATE/verrou"
 }
 
 # Releases the shared rank taken by lock_take: removes the pid, then the folder, only
@@ -90,10 +90,10 @@ lock_take() {
 # rang.lock.
 lock_release() {
     local pid
-    pid="$(cat "$AGENT_ETAT/verrou/pid" 2>/dev/null)" || pid=""
+    pid="$(cat "$AGENT_STATE/verrou/pid" 2>/dev/null)" || pid=""
     if [ "$pid" = "$$" ]; then
-        rm -f "$AGENT_ETAT/verrou/pid"
-        rmdir "$AGENT_ETAT/verrou" 2>/dev/null || true
+        rm -f "$AGENT_STATE/verrou/pid"
+        rmdir "$AGENT_STATE/verrou" 2>/dev/null || true
         lock_trace released
     fi
     if [ "${AGENT_LOCK_FLOCK:-0}" = 1 ]; then
@@ -112,7 +112,7 @@ rank_take() {
     lock_take || return 1
     start=$(( $(cat "$state/rang" 2>/dev/null || echo 0) % ${#FREE_MODELS[@]} ))
     if [ "$PAUSE_RANK" -gt 0 ]; then sleep "$PAUSE_RANK"; fi
-    if modele_rang_avance; then echo $(( start + 1 )) >"$state/rang"; fi
+    if model_rank_advance; then echo $(( start + 1 )) >"$state/rang"; fi
     lock_release
     echo "=== rank $(( start + 1 ))/${#FREE_MODELS[@]}" >>"$journal"
     echo "$start"
@@ -123,7 +123,7 @@ rank_take() {
 rights_edit_deny() {
     local patterns f
     patterns="[]"
-    for f in "${DROITS_AGENT[@]}"; do
+    for f in "${RIGHTS_FILES[@]}"; do
         patterns="$(jq -c --arg f "$f" '. + [$f, "**/" + $f]' <<<"$patterns")"
     done
     jq -ce --argjson patterns "$patterns" '
@@ -138,8 +138,8 @@ rights_edit_deny() {
 # out of the merge, then added back at the end (the key order of a jq object is the
 # insertion order), so the caller can add permissions but never remove a devzone deny.
 # ~/bash32 is always protected: the container's bash 3.2 was already replaced by a
-# link (#210). The name configurer is kept: agent-rights-gh.bats calls it.
-configurer() {
+# link (#210). Also called by agent-rights-gh.bats.
+configure() {
     local def config
     def="$ICI/opencode/agent.json"
     [ -r "$def" ] || refuse "default configuration missing: $def"
@@ -194,12 +194,12 @@ session_model_start() {
     START_SESSION="$(sed -nE 's/.* start ([^ ]+).*/\1/p' <<<"$line")"
 }
 
-# Models asked with devzone agent --modele (#420): the last header line
-# "=== --modele : " of the journal, empty when nothing was asked.
+# Models asked with devzone agent --model (#420): the last header line
+# "=== --model : " of the journal, empty when nothing was asked.
 session_request() {
     local line
-    line="$(grep '^=== --modele : ' "$1" 2>/dev/null | tail -1 || true)"
-    REQUEST_SESSION="${line#=== --modele : }"
+    line="$(grep '^=== --model : ' "$1" 2>/dev/null | tail -1 || true)"
+    REQUEST_SESSION="${line#=== --model : }"
     if [ "$REQUEST_SESSION" = none ]; then REQUEST_SESSION=""; fi
 }
 
@@ -238,5 +238,5 @@ agent_state() {
     done
     [ "$seen" = 1 ] || echo "  no session"
     agent_exclusions
-    droits_alertes
+    rights_alerts
 }

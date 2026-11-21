@@ -136,7 +136,7 @@ agent_pod_validate_folder() {
 # --- Build the session pod manifest ---
 
 agent_pod_build_manifest() {
-    # $2 (the consigne) is never written here: it only goes to the ConfigMap.
+    # $2 (the brief) is never written here: it only goes to the ConfigMap.
     local folder="$1" pod_name="$3"
     local ws_image ws_path pvc_workspace pvc_etat manifest_file ticket_block=""
 

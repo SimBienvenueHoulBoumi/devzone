@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Machine output of devzone agent etat (--json): sessions, exclusions, rights alerts.
-# Keys (schema, sessions, ecarts, fin, alertes_droits...) and values are a public
-# format: they keep their French names.
+# Machine output of devzone agent state (--json): sessions, exclusions, rights alerts.
+# Public format, schema 2: the keys are English names; the values stored in the
+# state files (causes such as pays, quota, muet) keep their stored names.
 set -euo pipefail
 
 SOURCE="${BASH_SOURCE[0]}"
@@ -26,9 +26,9 @@ RACINE="${DEVZONE_ROOT:-$(dirname "$ICI")}"
 # shellcheck disable=SC1091
 . "$ICI/agent-session.sh"
 
-AGENT_ETAT="${DEVZONE_AGENT_STATE:-$HOME/.local/state/oc-lancer}"
+AGENT_STATE="${DEVZONE_AGENT_STATE:-$HOME/.local/state/oc-lancer}"
 
-# UTC ISO-8601 date of an epoch, GNU then BSD date: the fin field of the exclusions.
+# UTC ISO-8601 date of an epoch, GNU then BSD date: the end field of the exclusions.
 iso() {
     if date -u -d "@$1" '+%Y-%m-%dT%H:%M:%SZ' >/dev/null 2>&1; then
         date -u -d "@$1" '+%Y-%m-%dT%H:%M:%SZ'
@@ -38,7 +38,7 @@ iso() {
 }
 
 # Agent state in JSON: reuses the data of agent_state, agent_exclusions and
-# droits_alertes, without copying their logic.
+# rights_alerts, without copying their logic.
 agent_state_json() {
     local sessions_json='[]' exclusions_json='[]' alerts_json='[]'
     local f journal model start last project running name
@@ -50,7 +50,7 @@ agent_state_json() {
         session_model_start "$f"
         session_request "$f"
         model="$MODEL_SESSION"
-        [ -n "$model" ] || model="inconnu"
+        [ -n "$model" ] || model="unknown"
         start="$START_SESSION"
         last="$(utc_time "$(mtime "$f")")"
         project="${journal%.log}"
@@ -63,12 +63,12 @@ agent_state_json() {
             --arg last "$last" \
             --arg request "$REQUEST_SESSION" \
             --argjson running "$running" \
-            '. + [{journal:$journal,modele:$model,debut:(if $start=="" then null else $start end),dernier_ecrit:(if $last=="" then null else $last end),demande:(if $request=="" then null else $request end),en_cours:$running}]' \
+            '. + [{journal:$journal,model:$model,start:(if $start=="" then null else $start end),last_written:(if $last=="" then null else $last end),requested:(if $request=="" then null else $request end),running:$running}]' \
             <<<"$sessions_json")"
     done
 
     now="$(date +%s)"
-    for f in "$AGENT_ETAT"/ecart-*; do
+    for f in "$AGENT_STATE"/ecart-*; do
         [ -e "$f" ] || continue
         model="${f##*/ecart-}"
         read -r e cause d <<<"$(cat "$f" 2>/dev/null || true)"
@@ -77,13 +77,13 @@ agent_state_json() {
         [ "$now" -lt "$end" ] || continue
         end_iso="$(iso "$end")"
         exclusions_json="$(jq -c \
-            --arg modele "$model" \
+            --arg model "$model" \
             --arg cause "${cause:-autre}" \
-            --arg fin "$end_iso" \
-            '. + [{modele:$modele,cause:$cause,fin:$fin}]' \
+            --arg end "$end_iso" \
+            '. + [{model:$model,cause:$cause,end:$end}]' \
             <<<"$exclusions_json")"
     done
-    for f in "$AGENT_ETAT"/muet-*; do
+    for f in "$AGENT_STATE"/muet-*; do
         [ -e "$f" ] || continue
         model="${f##*/muet-}"
         e="$(cat "$f" 2>/dev/null || true)"
@@ -92,14 +92,14 @@ agent_state_json() {
         [ "$now" -lt "$end" ] || continue
         end_iso="$(iso "$end")"
         exclusions_json="$(jq -c \
-            --arg modele "$model" \
+            --arg model "$model" \
             --arg cause "muet" \
-            --arg fin "$end_iso" \
-            '. + [{modele:$modele,cause:$cause,fin:$fin}]' \
+            --arg end "$end_iso" \
+            '. + [{model:$model,cause:$cause,end:$end}]' \
             <<<"$exclusions_json")"
     done
 
-    for f in "$AGENT_ETAT"/droits-*.alerte; do
+    for f in "$AGENT_STATE"/droits-*.alerte; do
         [ -e "$f" ] || continue
         name="${f##*/droits-}"
         name="${name%.alerte}"
@@ -107,11 +107,11 @@ agent_state_json() {
     done
 
     jq -n \
-        --argjson schema 1 \
+        --argjson schema 2 \
         --argjson sessions "$sessions_json" \
-        --argjson ecarts "$exclusions_json" \
-        --argjson alertes "$alerts_json" \
-        '{schema:$schema,sessions:$sessions,ecarts:$ecarts,alertes_droits:$alertes}'
+        --argjson exclusions "$exclusions_json" \
+        --argjson alerts "$alerts_json" \
+        '{schema:$schema,sessions:$sessions,exclusions:$exclusions,rights_alerts:$alerts}'
 }
 
 agent_state_json

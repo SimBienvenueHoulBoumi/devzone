@@ -1,6 +1,6 @@
 #!/usr/bin/env bats
 # devzone agent command: launch, rotation, resume, configuration (#221, #328).
-# Causes of exclusion, network, state and liberer are in agent-gaps.bats.
+# Causes of exclusion, network, state and release are in agent-gaps.bats.
 
 setup() {
     load commun
@@ -154,45 +154,45 @@ KUBECTL
 @test "agent : recent lock without pid -> not taken over, wait then refusal" {
     # A lock without pid is only taken over when its age exceeds 30 s (#377)
     source "$BATS_TEST_DIRNAME/../../.devcontainer/agent-session.sh"
-    AGENT_ETAT="$DEVZONE_AGENT_STATE"
+    AGENT_STATE="$DEVZONE_AGENT_STATE"
     export DEVZONE_AGENT_LOCK_MAX=2
-    mkdir -p "$AGENT_ETAT/verrou"
+    mkdir -p "$AGENT_STATE/verrou"
     start="$(date +%s)"
     run lock_take
     [ "$status" -eq 1 ] || false
     [ $(( $(date +%s) - start )) -ge 1 ] || false
     [ $(( $(date +%s) - start )) -le 5 ] || false
-    [ -d "$AGENT_ETAT/verrou" ] || false
-    [ ! -e "$AGENT_ETAT/verrou/pid" ] || false
+    [ -d "$AGENT_STATE/verrou" ] || false
+    [ ! -e "$AGENT_STATE/verrou/pid" ] || false
 }
 
 @test "agent : recent lock with unknown pid (other container) -> not taken over" {
     # Pid absent from this pid space: only the age of the lock decides (#377)
     source "$BATS_TEST_DIRNAME/../../.devcontainer/agent-session.sh"
-    AGENT_ETAT="$DEVZONE_AGENT_STATE"
+    AGENT_STATE="$DEVZONE_AGENT_STATE"
     export DEVZONE_AGENT_LOCK_MAX=2
-    mkdir -p "$AGENT_ETAT/verrou"
-    echo 999999 >"$AGENT_ETAT/verrou/pid"
+    mkdir -p "$AGENT_STATE/verrou"
+    echo 999999 >"$AGENT_STATE/verrou/pid"
     start="$(date +%s)"
     run lock_take
     [ "$status" -eq 1 ] || false
     [ $(( $(date +%s) - start )) -ge 1 ] || false
-    grep -qx 999999 "$AGENT_ETAT/verrou/pid" || false
+    grep -qx 999999 "$AGENT_STATE/verrou/pid" || false
 }
 
 @test "agent : lock older than 30 s -> taken at once, released lock cleaned up" {
     # Lock left by a stop: age over 30 s, taken over without waiting even if its pid
     # is still alive, the age alone decides (#377)
     source "$BATS_TEST_DIRNAME/../../.devcontainer/agent-session.sh"
-    AGENT_ETAT="$DEVZONE_AGENT_STATE"
-    mkdir -p "$AGENT_ETAT/verrou"
-    echo "$$" >"$AGENT_ETAT/verrou/pid"
-    touch -d '-60 seconds' "$AGENT_ETAT/verrou" 2>/dev/null || touch -t 200001010000 "$AGENT_ETAT/verrou" || false
+    AGENT_STATE="$DEVZONE_AGENT_STATE"
+    mkdir -p "$AGENT_STATE/verrou"
+    echo "$$" >"$AGENT_STATE/verrou/pid"
+    touch -d '-60 seconds' "$AGENT_STATE/verrou" 2>/dev/null || touch -t 200001010000 "$AGENT_STATE/verrou" || false
     start="$(date +%s)"
     run lock_take
     [ "$status" -eq 0 ] || false
     [ $(( $(date +%s) - start )) -le 5 ] || false
-    [ -s "$AGENT_ETAT/verrou/pid" ] || false
+    [ -s "$AGENT_STATE/verrou/pid" ] || false
     lock_release
-    [ ! -e "$AGENT_ETAT/verrou" ] || false
+    [ ! -e "$AGENT_STATE/verrou" ] || false
 }

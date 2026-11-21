@@ -27,7 +27,7 @@ opencode_launch() {
     if agent_in_pod; then
         # In the pod, the limited service account is the only access: no workstation
         # kubeconfig enters the environment of opencode.
-        (cd "$folder" && env -u KUBECONFIG DEVZONE_AGENT_SESSION=1 opencode run --print-logs --log-level ERROR --auto -m "$(modele_ref "$m")" "$(cat "$brief")" </dev/null >>"$journal" 2>&1) &
+        (cd "$folder" && env -u KUBECONFIG DEVZONE_AGENT_SESSION=1 opencode run --print-logs --log-level ERROR --auto -m "$(model_ref "$m")" "$(cat "$brief")" </dev/null >>"$journal" 2>&1) &
     else
         if [ -f "$HOME/.kube/config" ]; then
             (umask 077; KUBECONFIG="$HOME/.kube/config" kubectl config view --minify --flatten --context devzone >"$agent_kube") 2>/dev/null || : >"$agent_kube"
@@ -36,7 +36,7 @@ opencode_launch() {
         else
             : >"$agent_kube"
         fi
-        (cd "$folder" && KUBECONFIG="$agent_kube" DEVZONE_AGENT_SESSION=1 opencode run --print-logs --log-level ERROR --auto -m "$(modele_ref "$m")" "$(cat "$brief")" </dev/null >>"$journal" 2>&1) &
+        (cd "$folder" && KUBECONFIG="$agent_kube" DEVZONE_AGENT_SESSION=1 opencode run --print-logs --log-level ERROR --auto -m "$(model_ref "$m")" "$(cat "$brief")" </dev/null >>"$journal" 2>&1) &
     fi
 }
 
@@ -73,7 +73,7 @@ agent_workspace() {
     echo "devzone agent: Kubernetes workspace (pod devzone-workspace-0, $in_pod); --local for the container"
     agent_kc cp "$brief" "devzone-workspace-0:/tmp/devzone-agent-$name.md" -c workspace
     # shellcheck disable=SC2016 # the pod shell expands MODEL_OPT, not this one
-    agent_kc exec devzone-workspace-0 -c workspace -- env DEVZONE_ROOT="$pod_root" MODEL_OPT="$MODELE_LISTE" bash -lc 'devzone agent ${MODEL_OPT:+--modele "$MODEL_OPT"} "$1" "$2"' _ "$in_pod" "/tmp/devzone-agent-$name.md" || code=$?
+    agent_kc exec devzone-workspace-0 -c workspace -- env DEVZONE_ROOT="$pod_root" MODEL_OPT="$MODEL_LIST" bash -lc 'devzone agent ${MODEL_OPT:+--model "$MODEL_OPT"} "$1" "$2"' _ "$in_pod" "/tmp/devzone-agent-$name.md" || code=$?
     journal="$(journal_of "$name")"
     mkdir -p "$(dirname "$journal")"
     if ! agent_kc exec devzone-workspace-0 -c workspace -- cat "$pod_root/workspace/.agents/$name.log" >>"$journal"; then
@@ -82,16 +82,16 @@ agent_workspace() {
     return "$code"
 }
 
-agent_aide() {
+agent_help() {
     cat <<'AGENTEOF2'
-usage: devzone agent [--modele <m>[,<m2>…]] [--local] <folder> <brief-file>
+usage: devzone agent [--model <m>[,<m2>…]] [--local] <folder> <brief-file>
         runs opencode on the brief, free models in rotation
-        --modele: models tried first, in order, then the rotation
+        --model: models tried first, in order, then the rotation
         Kubernetes workspace first if it runs; --local: this container
         a /workspaces/projets/... path absent from here is a folder of the pod, without copy
-        devzone agent etat
+        devzone agent state [--json]
         known sessions and excluded models
-        devzone agent liberer [<model>|--tous]
+        devzone agent release [<model>|--all]
         lifts a model exclusion
 AGENTEOF2
 }

@@ -175,11 +175,11 @@ The “repowarden” skill is already placed by `repowarden agents init`: just c
 Claude Code is the **lead** (design, instructions, review, tests, push, CI tracking); opencode is the **developer** (code, tests, `repowarden cc` commit). Several opencode sessions run in parallel, one per ticket and per worktree.
 
 ```bash
-devzone agent [--modele <m>[,<m2>…]] <folder> <instruction-file>  # requested models first (#420)
+devzone agent [--model <m>[,<m2>…]] <folder> <instruction-file>  # requested models first (#420)
 devzone agent <folder> <instruction-file>    # in the foreground
 devzone agent <folder> <instruction-file> &  # several in parallel (or nohup)
-devzone agent etat                            # sessions, discarded models and their cause
-devzone agent liberer <model>|--tous        # lifts a model discard
+devzone agent state                           # sessions, discarded models and their cause
+devzone agent release <model>|--all         # lifts a model discard
 devzone agent --pod <folder> <instruction>     # agent session in a disposable isolated pod (#222)
 ```
 
@@ -188,13 +188,13 @@ devzone agent --pod <folder> <instruction>     # agent session in a disposable i
 - **Switching** according to the cause of the failure. The message is only searched in the last 30 lines of the attempt, and only if the exit code is non-zero or if opencode wrote its error line: displayed code containing “Free usage limit” that ends normally is not a failure.
   - **country** (`not available in your country`): model discarded for 7 days;
   - **quota** (`Free usage limit`), **filter** (`content filter`) and **silent** (nothing written in 45 s at start): model discarded for 1 h;
-  - **network** (`ENOTFOUND`, `ECONNREFUSED`, `ETIMEDOUT`…): kept only if the network is down at the time of the error, otherwise treated as **other**. No discard. devzone waits for the network to come back (retry every 30 s, 30 min at most, log `réseau coupé, attente`), then relaunches the same model, 3 times at most per model; then the next model. Without a return: stop, `réseau indisponible`, code 4;
+  - **network** (`ENOTFOUND`, `ECONNREFUSED`, `ETIMEDOUT`…): kept only if the network is down at the time of the error, otherwise treated as **other**. No discard. devzone waits for the network to come back (retry every 30 s, 30 min at most, log `=== network down, waiting`), then relaunches the same model, 3 times at most per model; then the next model. Without a return: stop, log `=== network unavailable`, code 4;
   - **other** (`Model is unavailable`, `Upstream request failed`…): next model, without discard.
-- **Discards**: `devzone agent etat` shows the cause and end time of each discard; `devzone agent liberer <model>` (or `--tous`) lifts it.
-- **Requested model** (`--modele`, #420): ordered list of free model names (without the `opencode/` prefix), separated by commas. They are tried in this order, except the discarded ones; then the usual rotation resumes from the shared rank, without retrying a model already tried. An unknown name is refused before any launch (code 2) with the list of free models. A requested model that starts does not advance the shared rank. The log writes `=== modèle choisi : <m> (demandé)` at startup and `=== modèle demandé <m> écarté (<cause>), suivant` for a requested model that is discarded. `devzone agent etat` (and `--json`, field `demande`) shows the requested model and the model used. Not handled with `--pod`.
-- A frozen session (nothing written for 10 min) is stopped and resumed in a new session, next model, with a resume instruction (`git status`, `git diff`, `git log`). All models discarded: `aucun modèle gratuit disponible`, code 3.
+- **Discards**: `devzone agent state` shows the cause and end time of each discard; `devzone agent release <model>` (or `--all`) lifts it.
+- **Requested model** (`--model`, #420): ordered list of free model names (without the `opencode/` prefix), separated by commas. They are tried in this order, except the discarded ones; then the usual rotation resumes from the shared rank, without retrying a model already tried. An unknown name is refused before any launch (code 2) with the list of free models. A requested model that starts does not advance the shared rank. The log writes `=== requested model chosen: <m>` at startup and `=== requested model <m> excluded (<cause>), next` for a requested model that is discarded. `devzone agent state` (and `--json`, field `requested`) shows the requested model and the model used. Not handled with `--pod`. Journals written before this rename show `=== --modele :`; that header is no longer read, so `requested` is empty for them.
+- A frozen session (nothing written for 10 min) is stopped and resumed in a new session, next model, with a resume instruction (`git status`, `git diff`, `git log`). All models discarded: `no free model available`, code 3.
 - **Permissions**: `.devcontainer/opencode/agent.json` is the default configuration, merged with `OPENCODE_CONFIG_CONTENT` if it is defined. opencode applies the last matching rule: devzone's `deny` entries are re-added last after the merge, so the caller can add permissions but never remove a devzone prohibition. `webfetch` is allowed; `git push`, `git checkout/reset/restore/stash/clean`, `git branch -D`, GitHub writes, `gh api`, `curl`, `sudo`, `rm -rf` (except `./.essai`) and ticket/PR management by repowarden (`repowarden ticket …`, `repowarden proteger`, `repowarden run`) are forbidden; `git commit` remains allowed for `repowarden cc`. `~/bash32` is always protected (the bash 3.2 of the container).
-- **Protected rights files**: during a session, `agent.json`, `.devcontainer/opencode.jsonc`, `.repowarden.conf` and `.devcontainer/agent-rights.sh` (fixed list, no variable changes it) are forbidden for writing by opencode (`permission.edit`, `deny` added last). As an agent can also write through the shell, `devzone agent` takes a snapshot of these files at launch and compares them after **each** session (normal end, error, silent, frozen): any change is reverted in the tree (never `reset` nor `rebase`), the log receives `=== ⚠ droits modifiés : <fichier>` (with the commit to remove before any push if the agent committed), and `devzone agent etat` shows `⚠ droits modifiés (<projet>)` until the next launch on this project. The exit code does not change. In addition, the repowarden guard (`agentsProtectedPaths` setting of `.repowarden.conf`, repowarden 4.17.1) refuses any agent, Claude Code as well as opencode, to write or commit these files, even before the end of the session; a human can always modify them.
+- **Protected rights files**: during a session, `agent.json`, `.devcontainer/opencode.jsonc`, `.repowarden.conf` and `.devcontainer/agent-rights.sh` (fixed list, no variable changes it) are forbidden for writing by opencode (`permission.edit`, `deny` added last). As an agent can also write through the shell, `devzone agent` takes a snapshot of these files at launch and compares them after **each** session (normal end, error, silent, frozen): any change is reverted in the tree (never `reset` nor `rebase`), the log receives `=== ⚠ rights changed: <file>` (with the commit to remove before any push if the agent committed), and `devzone agent state` shows `⚠ rights changed (<project>)` until the next launch on this project. The exit code does not change. In addition, the repowarden guard (`agentsProtectedPaths` setting of `.repowarden.conf`, repowarden 4.17.1) refuses any agent, Claude Code as well as opencode, to write or commit these files, even before the end of the session; a human can always modify them.
 - **Free model quota**: these models are limited; rotation and the one-hour discard avoid blocking a ticket when one is exhausted. For a paid provider: `opencode auth login`.
 
 
@@ -856,19 +856,19 @@ Two commands display their state as a JSON object, for the VS Code extensions an
 
 The possible alerts are: `packages`, `worktree`, `cluster_distant` (services on a remote cluster), `cluster_interne` (devzone's working cluster; go back with `devzone use <your cluster>`).
 
-`devzone agent etat --json` (sessions, discards, modified rights):
+`devzone agent state --json` (sessions, discards, modified rights), schema 2:
 
 ```json
 {
-  "schema": 1,
-  "sessions": [ { "journal": "dz-337.log", "modele": "beam-free", "debut": "2026-11-06T13:17:33Z",
-                  "dernier_ecrit": "2026-11-06 13:20:14", "en_cours": true } ],
-  "ecarts": [ { "modele": "crouton-alpha-free", "cause": "pays", "fin": "2026-11-13T13:24:50Z" } ],
-  "alertes_droits": [ "dz-361" ]
+  "schema": 2,
+  "sessions": [ { "journal": "dz-337.log", "model": "beam-free", "start": "2026-11-06T13:17:33Z",
+                  "last_written": "2026-11-06 13:20:14", "requested": null, "running": true } ],
+  "exclusions": [ { "model": "crouton-alpha-free", "cause": "pays", "end": "2026-11-13T13:24:50Z" } ],
+  "rights_alerts": [ "dz-361" ]
 }
 ```
 
-`en_cours` is `true` when an agent session is still working on this folder. A discard (`quota`, `pays`, `muet`…) ends on the `fin` date; a tool can then rerun the instruction with `devzone agent`.
+`running` is `true` when an agent session is still working on this folder. A discard (`quota`, `pays`, `muet`…) ends on the `end` date; a tool can then rerun the instruction with `devzone agent`.
 
 ## Troubleshooting
 
