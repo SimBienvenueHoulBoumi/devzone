@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// vscodeText is the output of vscode_workspace in manage/workspace.sh, byte for byte
+// vscodeText is the expected output of VSCode, byte for byte.
 const vscodeText = `Attach VS Code to the pod: "Kubernetes" and "Dev Containers" extensions
   1. kubectl context: devzone — namespace devzone-workspace, pod devzone-workspace-0, container workspace
   2. Kubernetes view: right-click the workspace container,
