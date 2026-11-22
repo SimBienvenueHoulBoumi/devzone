@@ -359,6 +359,28 @@ watcher_tree() {
     [ -z "$output" ]
 }
 
+@test "rename-legacy-files: a running Go port watcher (workspace ports loop) is stopped before its folders are renamed" {
+    watcher_tree
+    local d="$DEVZONE_ROOT/.devzone.workspace-ports" script="$T/devzone-fake"
+    # The Go watcher is "devzone workspace ports loop": no ports-workspace.sh in its command line
+    {
+        echo '#!/usr/bin/env bash'
+        echo "trap 'rm -rf \"$d/verrou\" \"$d/pid\"; exit 0' TERM"
+        # bounded, and detached from bats: a failing test must not leave a hanging watcher
+        echo 'for _ in $(seq 1 300); do sleep 0.1; done'
+    } >"$script"
+    bash "$script" workspace ports loop >/dev/null 2>&1 3>&- &
+    WATCHER=$!
+    echo "$WATCHER" >"$d/pid"
+    run bash "$SCRIPT"
+    [ "$status" -eq 0 ]
+    ! kill -0 "$WATCHER" 2>/dev/null || false
+    [[ "$output" == *"port watcher stopped to rename its folders, restart it: devzone workspace ports start"* ]] || false
+    [ "$(cat "$d/relays/3000")" = "4242" ]
+    [ ! -e "$d/relais" ]
+    [ ! -e "$d/pid" ]
+}
+
 @test "rename-legacy-files: a port watcher that does not stop leaves its folders untouched" {
     watcher_tree
     local d="$DEVZONE_ROOT/.devzone.workspace-ports"
