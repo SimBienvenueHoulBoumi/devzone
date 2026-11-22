@@ -184,6 +184,7 @@ internal/command/registry.go
 internal/command/registry_test.go
 internal/command/run.go
 internal/command/run_test.go
+internal/command/routing_test.go
 .devcontainer/cluster.sh
 .devcontainer/clusters.sh
 .devcontainer/kube-account.sh
