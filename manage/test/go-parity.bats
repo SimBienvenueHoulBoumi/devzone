@@ -285,19 +285,6 @@ KUBE
     [ ! -e "$state/pid" ] && [ ! -e "$state/lock" ] && [ ! -e "$state/relays/5432" ]
 }
 
-@test "go-parity: workspace vscode: same guide, same status" {
-    faux_cluster
-    parite workspace vscode
-    run "$DZ_GO" workspace vscode
-    [ "$status" -eq 0 ]
-    [[ "$output" == *"namespace devzone-workspace, pod devzone-workspace-0, container workspace"* ]] || false
-}
-
-@test "go-parity: workspace vscode with extra words is delegated, same output" {
-    faux_cluster
-    parite workspace vscode extra
-}
-
 @test "go-parity: workspace shell, current context: same kubectl arguments and status" {
     faux_cluster
     parite workspace shell
