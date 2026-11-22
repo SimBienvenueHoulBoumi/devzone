@@ -37,9 +37,8 @@ build_package() {
     printf '{"marque":"%s"}\n' "$mark" >"$folder/.devcontainer/devcontainer.json"
     printf '{"marque":"%s"}\n' "$mark" >"$folder/.devcontainer/devcontainer-lock.json"
     printf '#!/usr/bin/env bash\necho %s\n' "$mark" >"$folder/.devcontainer/devzone"
-    printf '#!/usr/bin/env bash\necho lancer-%s\n' "$mark" >"$folder/manage/scripts/launch.sh"
     printf '#!/usr/bin/env bash\necho desinstaller-%s\n' "$mark" >"$folder/manage/scripts/uninstall.sh"
-    chmod +x "$folder/.devcontainer/devzone" "$folder/manage/scripts/launch.sh" "$folder/manage/scripts/uninstall.sh"
+    chmod +x "$folder/.devcontainer/devzone" "$folder/manage/scripts/uninstall.sh"
 }
 
 create_v1() {
@@ -69,7 +68,7 @@ poisoned_manifest() {
 @test "creation: .devzone.version holds the version and one checksum per copied file" {
     create_v1
     [ "$(sed -n '1p' "$DZ/.devzone.version")" = "version 0.0.1" ]
-    for f in .devcontainer/devcontainer.json .devcontainer/devzone Makefile .gitattributes manage/scripts/launch.sh manage/scripts/uninstall.sh README.md LICENSE; do
+    for f in .devcontainer/devcontainer.json .devcontainer/devzone Makefile .gitattributes manage/scripts/uninstall.sh README.md LICENSE; do
         attendue="$(node -e 'const fs = require("fs"), crypto = require("crypto"); const h = crypto.createHash("sha256"); h.update(fs.readFileSync(process.argv[1])); process.stdout.write(h.digest("hex"))' "$DZ/$f")"
         grep -qxF "$attendue  $f" "$DZ/.devzone.version" || { echo "empreinte absente : $f"; return 1; }
     done
@@ -203,11 +202,13 @@ echo moi' ]
     run bash "$MAJ" update --yes --no-rebuild
     [ "$status" -eq 0 ]
     [ ! -e "$DZ/scripts/uninstall.sh" ]
-    [ ! -e "$DZ/scripts/launch.sh" ]
+    # The package no longer ships launch.sh: it is not a known devzone file any more,
+    # so an old scripts/launch.sh is left where it is (never removed by mistake)
+    [ "$(cat "$DZ/scripts/launch.sh")" = 'vieux lancer' ]
     [ "$(cat "$DZ/scripts/mon-outil.sh")" = 'mon outil' ]
     backup="$(backup_of)"
     [ "$(cat "$backup/scripts/uninstall.sh")" = 'vieux desinstaller' ]
-    [ "$(cat "$backup/scripts/launch.sh")" = 'vieux lancer' ]
+    [ ! -e "$backup/scripts/launch.sh" ]
     [ ! -e "$backup/scripts/mon-outil.sh" ]
 }
 
@@ -316,14 +317,13 @@ echo moi' ]
     [ ! -e "$T/reconstruction.log" ]
 }
 
-@test "kubernetes mode: advice shown, make rebuild never offered" {
-    cp "$RACINE/manage/scripts/poste.sh" "$RACINE/manage/scripts/kube-ready.sh" "$T/v2/manage/scripts/"
+@test "kubernetes mode: rebuild never offered" {
+    cp "$RACINE/manage/scripts/kube-ready.sh" "$T/v2/manage/scripts/"
     create_v1
     printf 'workspace=kubernetes\n' >"$DZ/.devzone.modules"
     cd "$DZ"
     run bash "$MAJ" update --yes
     [ "$status" -eq 0 ]
-    [[ "$output" == *"next devzone workspace start"* ]] || false
     [[ "$output" != *"rebuild"* ]] || false
     [ "$(cat "$DZ/.devzone.modules")" = 'workspace=kubernetes' ]
     [ ! -e "$T/reconstruction.log" ]

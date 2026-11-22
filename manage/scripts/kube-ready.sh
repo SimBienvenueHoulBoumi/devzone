@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Shared check of the Kubernetes cluster (#497, #565), sourced by poste.sh,
+# Shared check of the Kubernetes cluster (#497, #565), sourced by create-mode.sh,
 # create-mode.sh (creation) and workspace.sh (workspace start). Sourced only:
 # no code at file level. Compatible with bash 3.2 (macOS) and Linux.
 
@@ -63,7 +63,7 @@ kube_unreachable_hint() {
     if [ "$context" = docker-desktop ] ||
         { [ "$cluster" = docker-desktop ] && { [ "$host" = 127.0.0.1 ] || [ "$host" = localhost ]; }; }; then
         if ! docker info >/dev/null 2>&1; then
-            echo "✖ Docker Desktop is stopped: the Kubernetes cluster of this machine runs inside it. Start Docker Desktop, then: make shell"
+            echo "✖ Docker Desktop is stopped: the Kubernetes cluster of this machine runs inside it. Start Docker Desktop, then: devzone workspace start"
             echo "  Tip: Settings → General → Start Docker Desktop when you sign in"
         else
             echo "✖ Kubernetes cluster $context unreachable ($server): enable Kubernetes in Docker Desktop (Settings → Kubernetes) or check kubectl config get-contexts"

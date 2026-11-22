@@ -76,7 +76,7 @@ for id in ${ids}; do
     v="$(docker inspect "$id" --format '{{range .Mounts}}{{if eq .Destination "/var/lib/docker"}}{{.Name}}{{end}}{{end}}')"
     [ -z "$v" ] || dind+=("$v")
 done
-# Container already removed by make down: image and internal Docker noted then
+# Container already removed: image and internal Docker noted then
 if [ "${#containers[@]}" -eq 0 ] && [ -f "$STATE" ]; then
     # Read only, never executed
     IMAGE="$(sed -n 's/^IMAGE=//p' "$STATE")"
@@ -157,7 +157,7 @@ echo " containers labeled devzone.instance=$DEVZONE_INSTANCE:"
 show_list ${labeled_containers}
 [ "${#kept[@]}" -eq 0 ] || { echo "Kept (KEEP=logins):"; printf '  %s\n' "${kept[@]}"; }
 if [ "$INSIDE_CONTAINER" = false ] && [ "${#containers[@]}" -eq 0 ] && [ ! -f "$STATE" ] && [ "${#images[@]}" -eq 0 ]; then
-    echo "ℹ No container and no image trace: if a make down from an older version left them,"
+    echo "ℹ No container and no image trace: if an older removal left them,"
     echo "  find them with: docker images 'vsc-$(basename "$HERE")-*' ; docker volume ls -q -f name=dind-var-lib-docker"
 fi
 

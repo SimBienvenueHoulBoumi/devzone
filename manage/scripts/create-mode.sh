@@ -99,5 +99,5 @@ create_mode_start() {
         echo "✖ Workspace not started. The folder is ready: only the start remains (cd $folder && devzone workspace start)" >&2
         return 1
     fi
-    echo "Next: cd $folder && make shell (the pod)"
+    echo "Next: cd $folder && devzone workspace shell (the pod)"
 }
