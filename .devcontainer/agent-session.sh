@@ -48,18 +48,18 @@ lock_trace() {
 lock_take() {
     local end age lock_pid
     end=$(( $(date +%s) + ${DEVZONE_AGENT_LOCK_MAX:-10} ))
-    while ! mkdir "$AGENT_STATE/verrou" 2>/dev/null; do
+    while ! mkdir "$AGENT_STATE/lock" 2>/dev/null; do
         # A lock is orphaned only by its age: the rank is held for a few milliseconds,
         # 30 s can only be a stop to take over; otherwise wait, then give up (code 1).
         age=""
-        if [ -d "$AGENT_STATE/verrou" ]; then
-            age="$(mtime "$AGENT_STATE/verrou" 2>/dev/null)" || age=""
+        if [ -d "$AGENT_STATE/lock" ]; then
+            age="$(mtime "$AGENT_STATE/lock" 2>/dev/null)" || age=""
         fi
-        lock_pid="$(cat "$AGENT_STATE/verrou/pid" 2>/dev/null)" || lock_pid=""
+        lock_pid="$(cat "$AGENT_STATE/lock/pid" 2>/dev/null)" || lock_pid=""
         lock_trace "mkdir failed" "age=${age:-unknown} lock-pid=${lock_pid:-none}"
         if [ -n "$age" ] && [ "$(( $(date +%s) - age ))" -gt 30 ]; then
-            rm -f "$AGENT_STATE/verrou/pid"
-            if rmdir "$AGENT_STATE/verrou" 2>/dev/null; then
+            rm -f "$AGENT_STATE/lock/pid"
+            if rmdir "$AGENT_STATE/lock" 2>/dev/null; then
                 lock_trace "purged" "age=$age"
                 continue
             fi
@@ -69,7 +69,7 @@ lock_take() {
     done
     # pid before flock: the other agent never removes the folder while we wait on
     # rang.lock, otherwise our pid write would fail with ENOENT.
-    echo "$$" >"$AGENT_STATE/verrou/pid"
+    echo "$$" >"$AGENT_STATE/lock/pid"
     if command -v flock >/dev/null 2>&1; then
         # exec in an if makes a failure a condition instead of killing the shell
         # (bash 3.2 and GNU alike); without flock, mkdir remains the only guard (macOS).
@@ -80,7 +80,7 @@ lock_take() {
             return 1
         fi
     fi
-    lock_trace taken "path=$AGENT_STATE/verrou"
+    lock_trace taken "path=$AGENT_STATE/lock"
 }
 
 # Releases the shared rank taken by lock_take: removes the pid, then the folder, only
@@ -90,10 +90,10 @@ lock_take() {
 # rang.lock.
 lock_release() {
     local pid
-    pid="$(cat "$AGENT_STATE/verrou/pid" 2>/dev/null)" || pid=""
+    pid="$(cat "$AGENT_STATE/lock/pid" 2>/dev/null)" || pid=""
     if [ "$pid" = "$$" ]; then
-        rm -f "$AGENT_STATE/verrou/pid"
-        rmdir "$AGENT_STATE/verrou" 2>/dev/null || true
+        rm -f "$AGENT_STATE/lock/pid"
+        rmdir "$AGENT_STATE/lock" 2>/dev/null || true
         lock_trace released
     fi
     if [ "${AGENT_LOCK_FLOCK:-0}" = 1 ]; then

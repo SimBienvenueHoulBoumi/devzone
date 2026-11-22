@@ -111,13 +111,19 @@ The state line is rewritten once, automatically, at the startup of the pod and b
 
 ## State file names
 
-Renamed in #774 (lot 4), once, automatically, by the same migration as the names above (pod startup, `devzone update`, `devzone workspace update`), with the same guarantees: the content is kept, an existing new name is never overwritten (the old one stays, a message on stderr says `kept`), a second run does nothing.
+Renamed in #774 (lots 4 and 5), once, automatically, by the same migration as the names above (pod startup, `devzone update`, `devzone workspace update`), with the same guarantees: the content is kept, an existing new name is never overwritten (the old one stays, a message on stderr says `kept`), a second run does nothing.
 
 | Before | Now |
 |---|---|
 | `.devzone.workspace-ports/relais/` | `.devzone.workspace-ports/relays/` |
 | `.devzone.workspace-ports/pris/` | `.devzone.workspace-ports/taken/` |
 | `.devzone.workspace-ports/verrou/` | `.devzone.workspace-ports/lock/` |
+| `.devzone.workspace-ports/plafond/` | `.devzone.workspace-ports/cap/` |
+| key `ports_exclus=` of `.devzone.modules` | `excluded_ports=` (same comma-separated list) |
+| `/tmp/devzone-ports-auto/<instance>/verrou`, `occupes`, `actifs`, `courant` (in the pod) | `lock`, `busy`, `active`, `current` |
+| `~/.local/state/oc-lancer/verrou/` (agent, in the pod) | `lock/` |
+| `.devzone.catalog-watcher/verrou/` | `lock/` |
+| `.devzone.modules.verrou/` (write lock of the state) | `.devzone.modules.lockdir/` (not `.lock`, the flock file of the same script) |
 | `.devzone.modules.prec` | `.devzone.modules.prev` |
 | `~/.config/devzone/ia-mesures.json` | `~/.config/devzone/ai-measures.json` |
 | `/tmp/devzone-paquets.maj` | `/tmp/devzone-packages.updated` |
@@ -125,7 +131,11 @@ Renamed in #774 (lot 4), once, automatically, by the same migration as the names
 
 The old option is refused with `✖ « --sans-reconstruire » was renamed: --no-rebuild`, exit code 1, and nothing is done. The `unknown option` message of `devzone update` is in English too. `DEVZONE_AI_MEASURES`, when set, points to a file of yours that is never renamed.
 
-**Port watcher already running.** A watcher started before the update keeps the old folders open and creates them again at each round, so the migration cannot rename them under it. When it finds a live watcher (the pid in `.devzone.workspace-ports/pid` is a process whose command is `ports-workspace.sh`), it stops it with SIGTERM, which makes the watcher remove its own relays, lock and pid, then renames the folders and prints `devzone : port watcher stopped to rename its folders, restart it: devzone workspace ports start`. It is not restarted by the migration, because the files of the package are replaced after it: `devzone workspace start` or `devzone workspace ports start` starts the new watcher. If the watcher does not stop within 2 seconds, nothing is renamed and a message on stderr says so; run the update again after `devzone workspace ports stop`. A pid file that points to another process is ignored: that process is never signalled.
+**Port watcher already running.** A watcher started before the update keeps the old folders open and creates them again at each round, so the migration cannot rename them under it. When it finds a live watcher (the pid in `.devzone.workspace-ports/pid` is a process whose command is `ports-workspace.sh`), it stops it with SIGTERM, which makes the watcher remove its own relays, lock and pid, then renames the folders and prints `devzone : port watcher stopped to rename its folders, restart it: devzone workspace ports start`. The migration itself does not restart it, because the files of the package are replaced after it (see below for the update). If the watcher does not stop within 2 seconds, nothing is renamed and a message on stderr says so; run the update again after `devzone workspace ports stop`. A pid file that points to another process is ignored: that process is never signalled.
+
+**Keys and locks (#774, lot 5).** The key `ports_exclus=` becomes `excluded_ports=` in `.devzone.modules`: the value is kept as it is, the other lines are copied unchanged, the file is rewritten atomically; when `excluded_ports=` already exists, only the old line is removed. The state files of the port automation and the locks are migrated in the pod too (startup and workspace init run the same script). A lock held by a live process (the `pid` file inside names a running process) is never moved: the message `kept: held by a live process` goes to stderr, and the next run migrates it once its holder has gone; for the port automation, the whole instance folder is left alone while its watcher runs. The write lock of the state (`.devzone.modules.verrou/`) is a short `mkdir` lock without a process number: it is not renamed. The old folder is removed once it is older than 30 seconds, the age after which `state-lock.sh` already considers a lock abandoned; a younger one is left for the next run, so a write in progress is never disturbed.
+
+**Port watcher restarted by the update.** When the migration stops a running port watcher, it leaves the file `.devzone.workspace-ports/restart`. `devzone update` starts the watcher again once the files of the package are replaced (`devzone workspace ports start`) and removes that file. A `devzone workspace ports start` or `stop` by you removes it too, so a watcher you stopped yourself is never started by an update. `devzone workspace update` does not start it: use `devzone workspace start`.
 
 ## Words of the outputs
 

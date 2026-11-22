@@ -240,3 +240,22 @@ wait_stopped() {
     [ "$status" -eq 0 ]
     wait_stopped "$watcher" || false
 }
+
+@test "ports stop: removes the restart signal left by the migration" {
+    mkdir -p "$T/workstation/.devzone.workspace-ports"
+    : >"$T/workstation/.devzone.workspace-ports/restart"
+    cd "$T/workstation"
+    run bash "$CLI" workspace ports stop
+    [ "$status" -eq 0 ]
+    [ ! -e "$T/workstation/.devzone.workspace-ports/restart" ]
+}
+
+@test "ports start: removes the restart signal left by the migration" {
+    mkdir -p "$T/workstation/.devzone.workspace-ports"
+    : >"$T/workstation/.devzone.workspace-ports/restart"
+    cd "$T/workstation"
+    run bash "$CLI" workspace ports start
+    [ "$status" -eq 0 ]
+    [ ! -e "$T/workstation/.devzone.workspace-ports/restart" ]
+    bash "$CLI" workspace ports stop >/dev/null 2>&1 || true
+}
