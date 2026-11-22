@@ -151,14 +151,14 @@ alive() {
 @test "apps: Service gone, its relay and its attribution removed" {
     services "default|web|10.96.0.11|ClusterIP||3000/TCP,"
     round
-    pid="$(cat "$T/workstation/.devzone.workspace-ports/relais/3000")"
+    pid="$(cat "$T/workstation/.devzone.workspace-ports/relays/3000")"
     alive "$pid" || false
     [ -e "$T/workstation/.devzone.workspace-ports/apps/default.web.3000" ]
     services
     round
     sleep 0.3
     ! alive "$pid" || false
-    [ ! -e "$T/workstation/.devzone.workspace-ports/relais/3000" ]
+    [ ! -e "$T/workstation/.devzone.workspace-ports/relays/3000" ]
     [ ! -e "$T/workstation/.devzone.workspace-ports/apps/default.web.3000" ]
 }
 

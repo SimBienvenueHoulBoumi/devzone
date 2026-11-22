@@ -91,16 +91,16 @@ pw_taken() {
 pw_relay() {
     local port="$1" ns="$2" target="$3" remote="${4:-$1}" d pid
     d="$(pw_dir)"
-    pid="$(cat "$d/relais/$port" 2>/dev/null || true)"
+    pid="$(cat "$d/relays/$port" 2>/dev/null || true)"
     pw_alive "$pid" && return 0
     if pw_taken "$port"; then
-        [ -e "$d/pris/$port" ] || { : >"$d/pris/$port"; echo "⚠ port $port already in use on the workstation, not relayed"; }
+        [ -e "$d/taken/$port" ] || { : >"$d/taken/$port"; echo "⚠ port $port already in use on the workstation, not relayed"; }
         return 0
     fi
     # shellcheck disable=SC2046
     kubectl $(pw_ctx) --namespace "$ns" port-forward --address 127.0.0.1 "$target" "$port:$remote" </dev/null >/dev/null 2>&1 &
-    echo $! >"$d/relais/$port"
-    rm -f "$d/pris/$port"
+    echo $! >"$d/relays/$port"
+    rm -f "$d/taken/$port"
     echo "→ port $port relayed on 127.0.0.1"
 }
 
@@ -108,16 +108,16 @@ pw_relay() {
 pw_remove() {
     local d pid
     d="$(pw_dir)"
-    pid="$(cat "$d/relais/$1" 2>/dev/null || true)"
+    pid="$(cat "$d/relays/$1" 2>/dev/null || true)"
     if pw_alive "$pid"; then kill "$pid" 2>/dev/null || true; fi
-    rm -f "$d/relais/$1" "$d/pris/$1"
+    rm -f "$d/relays/$1" "$d/taken/$1"
 }
 
 # One watcher round: relay new ports, remove those that disappeared.
 pw_round() {
     local d wanted="" p ns target remote l f
     d="$(pw_dir)"
-    mkdir -p "$d/relais" "$d/pris"
+    mkdir -p "$d/relays" "$d/taken"
     while IFS='|' read -r p ns target remote; do
         [ -n "$p" ] || continue
         wanted="$wanted $p "
@@ -133,7 +133,7 @@ pw_round() {
         wanted="$wanted $p "
         pw_relay "$p" "$ns" "$target" "$remote"
     done <<<"$(pa_round "$wanted")"
-    for f in "$d"/relais/* "$d"/pris/*; do
+    for f in "$d"/relays/* "$d"/taken/*; do
         [ -e "$f" ] || continue
         l="$(basename "$f")"
         case "$wanted" in *" $l "*) ;; *) pw_remove "$l" ;; esac
@@ -143,7 +143,7 @@ pw_round() {
 # Removes all relays from the state folder.
 pw_remove_all() {
     local f
-    for f in "$(pw_dir)"/relais/*; do
+    for f in "$(pw_dir)"/relays/*; do
         if [ -e "$f" ]; then pw_remove "$(basename "$f")"; fi
     done
 }
@@ -152,7 +152,7 @@ pw_remove_all() {
 pw_loop() {
     local d
     d="$(pw_dir)"
-    trap 'pw_remove_all; rm -rf "$d/verrou" "$d/pid"; exit 0' TERM INT
+    trap 'pw_remove_all; rm -rf "$d/lock" "$d/pid"; exit 0' TERM INT
     while :; do
         pw_round || true
         sleep "${DEVZONE_PORTS_WORKSPACE_STEP:-3}" &
@@ -172,8 +172,8 @@ ports_start() {
         echo "Workspace ports: watcher already running (pid $pid)"
         return 0
     fi
-    rm -rf "$d/verrou"
-    mkdir "$d/verrou" 2>/dev/null || return 0
+    rm -rf "$d/lock"
+    mkdir "$d/lock" 2>/dev/null || return 0
     nohup bash "${BASH_SOURCE[0]}" loop >>"$d/journal.log" 2>&1 &
     echo $! >"$d/pid"
     disown 2>/dev/null || true
@@ -190,7 +190,7 @@ ports_stop() {
         for _ in 1 2 3 4 5 6 7 8 9 10; do pw_alive "$pid" || break; sleep 0.2; done
     fi
     pw_remove_all
-    rm -rf "$d/verrou" "$d/pid"
+    rm -rf "$d/lock" "$d/pid"
 }
 
 # Shows status: watcher, relayed ports, reported taken ports.
@@ -199,10 +199,10 @@ ports_status() {
     d="$(pw_dir)"
     pid="$(cat "$d/pid" 2>/dev/null || true)"
     if pw_alive "$pid"; then echo "Port watcher: running (pid $pid)"; else echo "Port watcher: stopped"; fi
-    for f in "$d"/relais/*; do
+    for f in "$d"/relays/*; do
         if [ -e "$f" ] && pw_alive "$(cat "$f")"; then echo "  127.0.0.1:$(basename "$f") relayed"; fi
     done
-    for f in "$d"/pris/*; do
+    for f in "$d"/taken/*; do
         if [ -e "$f" ]; then echo "  ⚠ port $(basename "$f") already in use on the workstation, not relayed"; fi
     done
     pa_status

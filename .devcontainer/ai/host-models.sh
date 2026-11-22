@@ -9,7 +9,7 @@
 #   host-models.sh check      update check of each model (delegates to host-check.sh)
 #   host-models.sh rapport    report (delegates to host-check.sh)
 # Default URL: http://host.docker.internal:11434, overridable with DEVZONE_OLLAMA_URL.
-# Measurements: DEVZONE_AI_MEASURES, else ~/.config/devzone/ia-mesures.json
+# Measurements: DEVZONE_AI_MEASURES, else ~/.config/devzone/ai-measures.json
 # ({"<model>": {"reussite": 0..1, "tok_s": n, "date": "..."}}).
 # Short timeout; exits 0 and writes nothing when Ollama does not answer.
 # bash 3.2 (macOS). Code and comments in English.
@@ -18,7 +18,7 @@ set -euo pipefail
 URL="${DEVZONE_OLLAMA_URL:-http://host.docker.internal:11434}"
 URL="${URL%/}"
 FILE="$HOME/.config/opencode/config.json"
-MESURES="${DEVZONE_AI_MEASURES:-$HOME/.config/devzone/ia-mesures.json}"
+MEASURES="${DEVZONE_AI_MEASURES:-$HOME/.config/devzone/ai-measures.json}"
 
 # True when a model is an embedding model (Ollama details.type, or a name
 # containing "embed", case-insensitive).
@@ -81,8 +81,8 @@ infos() {
 # or no detected model is measured.
 mesure_choix() {
     local liste="$1" data
-    [ -f "$MESURES" ] || return 0
-    data="$(cat "$MESURES" 2>/dev/null)" || return 0
+    [ -f "$MEASURES" ] || return 0
+    data="$(cat "$MEASURES" 2>/dev/null)" || return 0
     [ -n "$data" ] || return 0
     printf '%s' "$data" | jq -r --arg liste "$liste" '
         ($liste | split("\n") | map(select(length > 0))) as $d

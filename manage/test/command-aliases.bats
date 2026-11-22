@@ -406,3 +406,29 @@ removed_refus() {
     [ ! -e ia ]
     [ ! -e "$T/kubectl.log" ]
 }
+
+@test "renamed_option: --sans-reconstruire gives --no-rebuild" {
+    run bash -c ". '$ALIASES'; renamed_option --sans-reconstruire"
+    [ "$status" -eq 0 ]
+    [ "$output" = "--no-rebuild" ]
+    run bash -c ". '$ALIASES'; renamed_option --no-rebuild"
+    [ "$status" -eq 1 ]
+}
+
+@test "update: old option --sans-reconstruire is refused, code 1, with the new name --no-rebuild" {
+    run --separate-stderr refus update --sans-reconstruire
+    [ "$status" -eq 1 ]
+    [ "$stderr" = "✖ « --sans-reconstruire » was renamed: --no-rebuild" ]
+    [ -z "$output" ]
+}
+
+@test "host: devzone update --sans-reconstruire is refused before any action, nothing created" {
+    mkdir -p .devcontainer
+    run --separate-stderr bash "$CLI" update --yes --sans-reconstruire
+    [ "$status" -eq 1 ]
+    [ "$stderr" = "✖ « --sans-reconstruire » was renamed: --no-rebuild" ]
+    [ -z "$output" ]
+    [ ! -e .devzone.backup ]
+    [ ! -e .devzone.manifest ]
+    [ ! -e "$T/kubectl.log" ]
+}

@@ -31,7 +31,7 @@ func stopPorts() {
 		}
 	}
 	removeRelays(dir)
-	_ = os.RemoveAll(filepath.Join(dir, "verrou"))
+	_ = os.RemoveAll(filepath.Join(dir, "lock"))
 	_ = os.RemoveAll(filepath.Join(dir, "pid"))
 }
 
@@ -51,7 +51,7 @@ func portsDir() string {
 // removeRelays stops every relay of the state folder and removes its files
 // (pw_remove_all). Hidden and missing entries are skipped, as the shell glob does.
 func removeRelays(dir string) {
-	entries, err := os.ReadDir(filepath.Join(dir, "relais"))
+	entries, err := os.ReadDir(filepath.Join(dir, "relays"))
 	if err != nil {
 		return
 	}
@@ -60,7 +60,7 @@ func removeRelays(dir string) {
 		if strings.HasPrefix(name, ".") {
 			continue
 		}
-		if _, err := os.Stat(filepath.Join(dir, "relais", name)); err != nil {
+		if _, err := os.Stat(filepath.Join(dir, "relays", name)); err != nil {
 			continue
 		}
 		removeRelay(dir, name)
@@ -68,13 +68,13 @@ func removeRelays(dir string) {
 }
 
 // removeRelay stops the relay process of port name, if alive, and removes its
-// files in relais and pris (pw_remove).
+// files in relays and taken (pw_remove).
 func removeRelay(dir, name string) {
-	if pid := readPid(filepath.Join(dir, "relais", name)); alive(pid) {
+	if pid := readPid(filepath.Join(dir, "relays", name)); alive(pid) {
 		terminate(pid)
 	}
-	_ = os.Remove(filepath.Join(dir, "relais", name))
-	_ = os.Remove(filepath.Join(dir, "pris", name))
+	_ = os.Remove(filepath.Join(dir, "relays", name))
+	_ = os.Remove(filepath.Join(dir, "taken", name))
 }
 
 // readPid returns the process number written in file, or 0 when the file is

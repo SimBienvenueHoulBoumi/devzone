@@ -73,7 +73,7 @@ func TestStopNamespaceWithoutApplicationUninstalls(t *testing.T) {
 func TestStopArgocdHoldsWorkspaceFallsBackBeforeAnyChange(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("DEVZONE_PORTS_WORKSPACE_DIR", dir)
-	writeFile(t, dir+"/relais/5432", "999999\n")
+	writeFile(t, dir+"/relays/5432", "999999\n")
 	r := &fakeRunner{replies: []reply{
 		{match: contextsCall, stdout: devzoneContexts},
 		{match: "get namespace", stdout: "namespace/devzone-argocd\n"},
@@ -88,7 +88,7 @@ func TestStopArgocdHoldsWorkspaceFallsBackBeforeAnyChange(t *testing.T) {
 			t.Fatalf("helm called although Argo CD holds the workspace: %q", c)
 		}
 	}
-	if !exists(dir + "/relais/5432") {
+	if !exists(dir + "/relays/5432") {
 		t.Fatal("the port state changed before the fallback")
 	}
 }
