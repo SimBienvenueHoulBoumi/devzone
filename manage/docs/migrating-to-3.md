@@ -191,6 +191,27 @@ The journal header of a requested model changes from `=== --modele : …` to `==
 - The old French names `migrer`, `revenir`, `nettoyer-docker` and the option `--rapatrier`: refused with exit code 1 and a notice that the command or option was removed, without creating any folder.
 - Old French command names stay refused with the new name, as since 1.1.0 (see [Removed names](reference.md#removed-names)).
 
+## Make commands removed (7.0.0)
+
+The workstation no longer controls a container on the machine; the `make` commands that did it are removed in 7.0.0, `devzone workspace` replaces them.
+
+| Before | Now |
+|---|---|
+| `make up` | `devzone workspace start` |
+| `make shell` | `devzone workspace shell` |
+| `make stop` | `devzone workspace stop` |
+| `make status` | `devzone workspace status` |
+| `make down` | no equivalent in Kubernetes mode: the pod keeps its state (`devzone workspace stop` stops it) |
+| `make rebuild` | no equivalent: the image of the pod changes with `devzone workspace update` |
+
+When `make` is run for a removed target, it prints `✖ make <target> does not exist (make up, shell, stop, down, rebuild and status were removed): use devzone workspace start|shell|stop|status` and `make` exits with its own error code 2.
+
+What remains in the Makefile: `help`, `test-fonctionnel`, `test-cli`, `desinstaller`, `uninstall` (treated by other lots).
+
+Known limitations:
+(a) The advice that was shown after `devzone update` ("the new image is used on the next devzone workspace start") no longer exists, it will return with the porting of `update` to Go;
+(b) On a very old-style folder (before `manage/`), `devzone update` leaves its `scripts/launch.sh` file in place (harmless orphan file, never a user file deleted by mistake).
+
 ## Checking your own scripts
 
 Search them for the old names of the tables above, for `oui` answers, and for the JSON keys of `schema: 1`.
