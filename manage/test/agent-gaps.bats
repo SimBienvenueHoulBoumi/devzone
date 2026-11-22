@@ -167,3 +167,45 @@ setup() {
     run bash -c '. "$1"; for t in "not available in your country" "Free usage limit" "content filter" ECONNREFUSED ENOTFOUND ETIMEDOUT "Model is unavailable"; do error_cause "$t"; done' _ "$BATS_TEST_DIRNAME/../../.devcontainer/agent-errors.sh"
     [ "$output" = $'pays\nquota\nfiltre\nreseau\nreseau\nreseau\nautre' ]
 }
+
+@test "agent : error_lines filters title model errors" {
+    f="$BATS_TEST_DIRNAME/../../.devcontainer/agent-errors.sh"
+    log="$(printf '%s\n' 'timestamp=2024-01-01T00:00:00Z level=ERROR small=true agent=title Free usage limit reached' 'timestamp=2024-01-01T00:01:00Z level=ERROR small=false agent=build Free usage limit reached' 'timestamp=2024-01-01T00:02:00Z level=ERROR small=true agent=title Model is unavailable' 'timestamp=2024-01-01T00:03:00Z level=ERROR small=false agent=build Upstream request failed')"
+    run bash -c '. "$1"; error_lines "$2"' _ "$f" "$log"
+    [[ "$output" != *"agent=title"* ]] || false
+    [[ "$output" == *"agent=build"* ]]
+    run bash -c '. "$1"; error_cause "$(error_lines "$2")"' _ "$f" "$log"
+    [ "$output" = "quota" ]
+}
+
+@test "agent : title model errors alone are classified as other" {
+    f="$BATS_TEST_DIRNAME/../../.devcontainer/agent-errors.sh"
+    log="$(printf '%s\n' 'timestamp=2024-01-01T00:00:00Z level=ERROR small=true agent=title Free usage limit reached')"
+    run bash -c '. "$1"; error_cause "$(error_lines "$2")"' _ "$f" "$log"
+    [ "$output" = "autre" ]
+}
+
+@test "agent : title model errors with country are classified as other" {
+    f="$BATS_TEST_DIRNAME/../../.devcontainer/agent-errors.sh"
+    log="$(printf '%s\n' 'timestamp=2024-01-01T00:00:00Z level=ERROR small=true agent=title not available in your country')"
+    run bash -c '. "$1"; error_cause "$(error_lines "$2")"' _ "$f" "$log"
+    [ "$output" = "autre" ]
+}
+
+@test "agent : mixed title and build errors are classified as other (title errors filtered)" {
+    f="$BATS_TEST_DIRNAME/../../.devcontainer/agent-errors.sh"
+    log="$(printf '%s\n' 'timestamp=2024-01-01T00:00:00Z level=ERROR small=true agent=title Free usage limit reached' 'timestamp=2024-01-01T00:01:00Z level=ERROR small=false agent=build Upstream request failed')"
+    run bash -c '. "$1"; error_cause "$(error_lines "$2")"' _ "$f" "$log"
+    [ "$output" = "autre" ]
+}
+
+@test "agent : errors of other working agents are kept" {
+    f="$BATS_TEST_DIRNAME/../../.devcontainer/agent-errors.sh"
+    log="$(printf '%s\n' 'timestamp=2024-01-01T00:00:00Z level=ERROR small=false agent=plan Free usage limit reached' 'timestamp=2024-01-01T00:01:00Z level=ERROR small=false agent=explore Upstream request failed' 'timestamp=2024-01-01T00:02:00Z level=ERROR small=true agent=title Upstream request failed')"
+    run bash -c '. "$1"; error_lines "$2"' _ "$f" "$log"
+    [[ "$output" == *"agent=plan"* ]] || false
+    [[ "$output" == *"agent=explore"* ]] || false
+    [[ "$output" != *"agent=title"* ]] || false
+    run bash -c '. "$1"; error_cause "$(error_lines "$2")"' _ "$f" "$log"
+    [ "$output" = "quota" ]
+}
