@@ -4,6 +4,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 )
@@ -96,8 +97,14 @@ func TestDelegateWithoutScript(t *testing.T) {
 func TestPortedIsSorted(t *testing.T) {
 	withHandler(t, "zeta", func(args []string, out, errOut io.Writer) int { return 0 })
 	withHandler(t, "alpha", func(args []string, out, errOut io.Writer) int { return 0 })
-	got := strings.Join(Ported(), ",")
-	if got != "alpha,zeta" {
-		t.Fatalf("Ported: got %q, want %q", got, "alpha,zeta")
+	got := Ported()
+	if !sort.StringsAreSorted(got) {
+		t.Fatalf("Ported is not sorted: %v", got)
+	}
+	joined := "," + strings.Join(got, ",") + ","
+	for _, want := range []string{"alpha", "zeta", "--version"} {
+		if !strings.Contains(joined, ","+want+",") {
+			t.Fatalf("Ported misses %q: %v", want, got)
+		}
 	}
 }
