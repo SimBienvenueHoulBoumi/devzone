@@ -128,8 +128,10 @@ exclusion_clear() {
 # Keeps the opencode log lines of the session written by --print-logs: only the
 # "timestamp=... level=ERROR ..." lines of a failure declare an exclusion, not the
 # rest of the text read or written by the model.
+# Errors from the title model (agent=title) are ignored, as they say nothing about
+# the model that is working.
 error_lines() {
-    printf '%s\n' "$1" | sed -e $'s/\033\[[0-9;]*m//g' | grep -a -E '^timestamp=.* level=ERROR ' || true
+    printf '%s\n' "$1" | sed -e $'s/\033\[[0-9;]*m//g' | grep -a -E '^timestamp=.* level=ERROR ' | grep -a -v ' agent=title ' || true
 }
 
 # Stops the current session when the journal holds quota, country or filter since
