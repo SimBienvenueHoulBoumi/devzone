@@ -153,6 +153,33 @@ KUBE
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
 }
 
+# faux_kubectl_services: fake kubectl where "get namespace devzone-postgres" and
+# "devzone-argocd" succeed, the other namespaces do not; no context declared.
+faux_kubectl_services() {
+    mkdir -p "$BATS_TEST_TMPDIR/bin"
+    cat >"$BATS_TEST_TMPDIR/bin/kubectl" <<'KUBE'
+#!/usr/bin/env bash
+case "$*" in
+    "config get-contexts -o name")
+        echo lab
+        ;;
+    *"get namespace devzone-gitlab"*)
+        exit 1
+        ;;
+    *"get namespace devzone-postgres"*)
+        ;;
+    *"get namespace devzone-mysql"*)
+        exit 1
+        ;;
+    *"get namespace devzone-argocd"*)
+        ;;
+esac
+exit 0
+KUBE
+    chmod +x "$BATS_TEST_TMPDIR/bin/kubectl"
+    export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
+}
+
 @test "go-parity: workspace status, pod listed: same output and status" {
     faux_cluster
     parite workspace status
@@ -189,6 +216,24 @@ KUBE
 @test "go-parity: workspace alone is delegated, same help" {
     faux_cluster
     parite workspace
+}
+
+@test "go-parity: workspace services status, two installed: same output and status" {
+    faux_kubectl_services
+    parite workspace services status
+    run "$DZ_GO" workspace services status
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"devzone workspace services disable postgres"* ]] || false
+    [[ "$output" == *"devzone workspace services enable gitlab"* ]] || false
+}
+
+@test "go-parity: workspace services, two installed: same output and status" {
+    faux_kubectl_services
+    parite workspace services
+    run "$DZ_GO" workspace services
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"devzone workspace services disable argocd"* ]] || false
+    [[ "$output" == *"devzone workspace services enable mysql"* ]] || false
 }
 
 @test "go-parity: workspace stop, release uninstalled: same output and status" {

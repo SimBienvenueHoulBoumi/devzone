@@ -292,6 +292,8 @@ internal/workspace/ports_round_test.go
 internal/workspace/ports_round.go
 internal/workspace/ports_round_apps_test.go
 internal/workspace/ports_round_apps.go
+internal/workspace/services_status.go
+internal/workspace/services_status_test.go
 .devcontainer/agent.sh
 .devcontainer/agent-workspace.sh
 .devcontainer/agent-model.sh
