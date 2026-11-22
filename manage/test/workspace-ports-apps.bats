@@ -139,8 +139,8 @@ alive() {
     ! grep -q "svc/dns" "$T/kubectl.log" || false
 }
 
-@test "apps: ports_exclus= of .devzone.modules respected" {
-    echo "ports_exclus=3000" >"$T/workstation/.devzone.modules"
+@test "apps: excluded_ports= of .devzone.modules respected" {
+    echo "excluded_ports=3000" >"$T/workstation/.devzone.modules"
     services "default|web|10.96.0.11|ClusterIP||3000/TCP,"
     round
     [[ "$output" == *"port 11000 relayed"* ]] || false
@@ -192,4 +192,14 @@ alive() {
     cd "$T/workstation"
     run bash "$CLI" workspace ports status
     [[ "$output" == *"http://127.0.0.1:8080  default/guestbook-ui:80"* ]] || false
+}
+
+@test "apps: over the cap of 30 relays, the marker goes in the cap folder" {
+    local i args=()
+    for i in $(seq 1 31); do args+=("default|s$i|10.96.1.$i|ClusterIP||$((4000 + i))/TCP,"); done
+    services "${args[@]}"
+    round
+    [ "$status" -eq 0 ]
+    [ "$(find "$T/workstation/.devzone.workspace-ports/cap" -type f | wc -l | tr -d ' ')" = 1 ]
+    [ ! -e "$T/workstation/.devzone.workspace-ports/plafond" ]
 }

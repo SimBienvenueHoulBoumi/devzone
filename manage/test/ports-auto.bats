@@ -136,7 +136,7 @@ CURL
 }
 
 @test "auto: ports below 1024, Docker DNS, devzone services, manual, excluded are ignored" {
-    printf 'ports=3000\nports_exclus=8080\n' >"$DEVZONE_STATE"
+    printf 'ports=3000\nexcluded_ports=8080\n' >"$DEVZONE_STATE"
     cat >"$BATS_TEST_TMPDIR/ss.listen" <<'SS'
 LISTEN 0 511 127.0.0.1:80 127.0.0.1:*
 LISTEN 0 511 127.0.0.1:5432 127.0.0.1:*
@@ -185,7 +185,7 @@ SS
     [ "$status" -eq 2 ]
     [[ "$output" == *"refused"* ]] || false
     # The guard acts first: no lock, no relay, no bridge.
-    [ ! -e "$DEVZONE_PORTS_AUTO_DIR/devzone/verrou" ]
+    [ ! -e "$DEVZONE_PORTS_AUTO_DIR/devzone/lock" ]
     [ "$(grep -c 'docker run' "$BATS_TEST_TMPDIR/docker.log")" -eq 0 ]
     [ ! -s "$BATS_TEST_TMPDIR/socat.log" ]
 }
@@ -198,7 +198,7 @@ SS
     run env -u BATS_TEST_TMPDIR bash "$PORTS_AUTO" demarrer
     [ "$status" -eq 2 ]
     [[ "$output" == *"devzone repair"* ]] || false
-    [ ! -e "$DEVZONE_PORTS_AUTO_DIR/devzone/verrou" ]
+    [ ! -e "$DEVZONE_PORTS_AUTO_DIR/devzone/lock" ]
 }
 
 @test "watcher: refused even with the real context set, under bats (code 2)" {
@@ -206,7 +206,7 @@ SS
     [ "$status" -eq 2 ]
     DEVZONE_PORTS_AUTO_REAL=yes run bash "$PORTS_AUTO" demarrer
     [ "$status" -eq 2 ]
-    [ ! -e "$DEVZONE_PORTS_AUTO_DIR/devzone/verrou" ]
+    [ ! -e "$DEVZONE_PORTS_AUTO_DIR/devzone/lock" ]
     [ "$(grep -c 'docker run' "$BATS_TEST_TMPDIR/docker.log")" -eq 0 ]
 }
 
@@ -217,7 +217,7 @@ SS
     [[ "$output" == *"ports go through devzone workspace ports"* ]] || false
     [ ! -s "$BATS_TEST_TMPDIR/docker.log" ] || false
     [ ! -s "$BATS_TEST_TMPDIR/socat.log" ] || false
-    [ ! -e "$DEVZONE_PORTS_AUTO_DIR/devzone/verrou" ] || false
+    [ ! -e "$DEVZONE_PORTS_AUTO_DIR/devzone/lock" ] || false
 }
 
 @test "watcher: lock recycled from a dead instance, held by a live one that refreshes it, stolen when stale" {
@@ -242,11 +242,11 @@ SS
 @test "isolation: a real watcher in another folder is neither read nor changed" {
     # Fake state of a real watcher, set outside the test folder (#394).
     local real="$BATS_TEST_TMPDIR/real"
-    mkdir -p "$real/devzone/bridges" "$real/devzone/verrou"
-    echo $$ >"$real/devzone/verrou/pid"
-    printf '8081\n' >"$real/devzone/occupes"
-    printf 'LISTEN 0 511 127.0.0.1:8081 127.0.0.1:*\n' >"$real/devzone/actifs"
-    before="$(find "$real" -printf '%p %s %T@\n' | sort; cat "$real/devzone/verrou/pid" "$real/devzone/occupes" "$real/devzone/actifs")"
+    mkdir -p "$real/devzone/bridges" "$real/devzone/lock"
+    echo $$ >"$real/devzone/lock/pid"
+    printf '8081\n' >"$real/devzone/busy"
+    printf 'LISTEN 0 511 127.0.0.1:8081 127.0.0.1:*\n' >"$real/devzone/active"
+    before="$(find "$real" -printf '%p %s %T@\n' | sort; cat "$real/devzone/lock/pid" "$real/devzone/busy" "$real/devzone/active")"
     printf 'LISTEN 0 511 127.0.0.1:8080 127.0.0.1:*\n' >"$BATS_TEST_TMPDIR/ss.listen"
     # The test folder is the one of the test, not the one of the real watcher.
     run bash -c '. "$1"; echo "$BASE"' x "$PORTS_AUTO"
@@ -256,7 +256,7 @@ SS
     [ "$status" -eq 0 ]
     grep -q 'docker run -d --restart unless-stopped --name devzone-devzone-auto-8080' "$BATS_TEST_TMPDIR/docker.log"
     [ -d "$BATS_TEST_TMPDIR/ports-auto/devzone/bridges" ]
-    after="$(find "$real" -printf '%p %s %T@\n' | sort; cat "$real/devzone/verrou/pid" "$real/devzone/occupes" "$real/devzone/actifs")"
+    after="$(find "$real" -printf '%p %s %T@\n' | sort; cat "$real/devzone/lock/pid" "$real/devzone/busy" "$real/devzone/active")"
     [ "$before" = "$after" ]
 }
 

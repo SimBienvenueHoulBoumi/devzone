@@ -240,7 +240,7 @@ KUBE
     # Mark older than 60 s: the delay has passed, nothing is confirmed
     echo $(( $(date +%s) - 120 )) >"$DEVZONE_STATE.recouvre"
     mkdir -p "$DEVZONE_PORTS_AUTO_DIR/devzone"
-    printf '8080\n' >"$DEVZONE_PORTS_AUTO_DIR/devzone/actifs"
+    printf '8080\n' >"$DEVZONE_PORTS_AUTO_DIR/devzone/active"
     : >"$BATS_TEST_TMPDIR/relais/devzone-devzone-auto-8080"
     run bash "$PORTS_AUTO" tour
     [ "$status" -eq 0 ]
@@ -251,7 +251,7 @@ KUBE
     printf 'ai=off\ngitlab=off\npostgres=off\nkubernetes=off\nports_auto=off\n' >"$DEVZONE_STATE"
     echo $(( $(date +%s) - 120 )) >"$DEVZONE_STATE.recouvre"
     mkdir -p "$DEVZONE_PORTS_AUTO_DIR/devzone"
-    printf '8080\n' >"$DEVZONE_PORTS_AUTO_DIR/devzone/actifs"
+    printf '8080\n' >"$DEVZONE_PORTS_AUTO_DIR/devzone/active"
     : >"$BATS_TEST_TMPDIR/relais/devzone-devzone-auto-8080"
     run bash "$DEVZONE" apply
     [ "$status" -eq 0 ]

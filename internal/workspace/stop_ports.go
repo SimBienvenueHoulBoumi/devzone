@@ -19,7 +19,7 @@ const (
 )
 
 // stopPorts stops the port watcher and its relays, as ports_stop does: the watcher
-// gets SIGTERM and is waited for, every relay is stopped, then the lock and the pid
+// gets SIGTERM and is waited for, every relay is stopped, then the lock, the pid and the restart signal
 // file are removed. Nothing is printed, and a missing state folder is not an error.
 func stopPorts() {
 	dir := portsDir()
@@ -33,6 +33,7 @@ func stopPorts() {
 	removeRelays(dir)
 	_ = os.RemoveAll(filepath.Join(dir, "lock"))
 	_ = os.RemoveAll(filepath.Join(dir, "pid"))
+	_ = os.Remove(filepath.Join(dir, "restart"))
 }
 
 // portsDir returns the state folder of the port watcher: DEVZONE_PORTS_WORKSPACE_DIR

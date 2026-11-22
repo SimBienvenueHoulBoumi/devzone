@@ -5,6 +5,21 @@
 # devzone-manifest.sh, which provides the manifest helpers.
 # shellcheck disable=SC2154 # PAQUET: set by manage/devzone
 
+# Starts the port watcher again when the legacy names migration stopped it: it
+# leaves the file restart in the watcher folder, which a start or a stop by the
+# user removes, so a watcher the user stopped is never started here. Called once
+# the new files are in place. DEVZONE_PORTS_RESTART replaces the command (tests).
+restart_ports_watcher() {
+    local folder="$1" marker="$1/.devzone.workspace-ports/restart"
+    [ -f "$marker" ] || return 0
+    rm -f "$marker"
+    if [ -n "${DEVZONE_PORTS_RESTART:-}" ]; then
+        (cd "$folder" && sh -c "$DEVZONE_PORTS_RESTART")
+    else
+        (cd "$folder" && bash manage/workspace.sh ports start)
+    fi || echo "devzone : port watcher not restarted: devzone workspace ports start" >&2
+}
+
 # Six steps of the update design (#349)
 update_workstation() {
     local assume_yes="" no_rebuild="" arg folder package installed package_list old_list
@@ -196,6 +211,7 @@ update_workstation() {
     # 6. New manifest, then rebuild offered
     write_manifest "$folder"
     echo "✔ devzone $package : mis à jour."
+    restart_ports_watcher "$folder"
     bash "$PAQUET/manage/scripts/poste.sh" conseil "$folder" || true
     # the update never changes the workstation mode (#472)
     if [ "$(grep -E '^workspace=' "$folder/.devzone.modules" 2>/dev/null | tail -1)" = "workspace=kubernetes" ]; then

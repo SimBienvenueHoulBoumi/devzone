@@ -12,6 +12,7 @@ setup() {
     export DEVZONE_ROOT="$T/devzone"
     export DEVZONE_TMP_DIR="$T/tmp"
     export HOME="$T/home"
+    unset DEVZONE_AGENT_STATE DEVZONE_PORTS_AUTO_DIR
     mkdir -p "$DEVZONE_ROOT" "$DEVZONE_TMP_DIR" "$HOME"
 }
 
@@ -445,4 +446,156 @@ watcher_tree() {
     [ "$status" -eq 0 ]
     [ "$(cat "$DEVZONE_TMP_DIR/devzone-packages.updated")" = new ]
     [ "$(cat "$DEVZONE_TMP_DIR/devzone-paquets.maj")" = old ]
+}
+
+# ---- #774, lot 5: cap folder, excluded_ports= key, port automation files, locks
+
+@test "rename-legacy-files: the watcher folder plafond becomes cap with its content" {
+    local d="$DEVZONE_ROOT/.devzone.workspace-ports"
+    mkdir -p "$d/plafond"
+    : >"$d/plafond/ns.svc.80"
+    run bash "$SCRIPT"
+    [ "$status" -eq 0 ]
+    [ -e "$d/cap/ns.svc.80" ]
+    [ ! -e "$d/plafond" ]
+    [[ "$output" == *"$d/plafond renamed to $d/cap"* ]] || false
+    run bash "$SCRIPT"
+    [ -z "$output" ]
+}
+
+@test "rename-legacy-files: an existing cap folder is never overwritten" {
+    local d="$DEVZONE_ROOT/.devzone.workspace-ports"
+    mkdir -p "$d/plafond" "$d/cap"
+    echo old >"$d/plafond/a"
+    echo new >"$d/cap/a"
+    echo more >"$d/plafond/b"
+    run --separate-stderr bash "$SCRIPT"
+    [ "$status" -eq 0 ]
+    [ "$(cat "$d/cap/a")" = new ]
+    [ "$(cat "$d/plafond/a")" = old ]
+    [ "$(cat "$d/cap/b")" = more ]
+    [[ "$stderr" == *"$d/plafond/a kept: $d/cap/a already exists"* ]] || false
+}
+
+@test "rename-legacy-files: a stopped watcher leaves the restart signal, a missing watcher does not" {
+    watcher_tree
+    local d="$DEVZONE_ROOT/.devzone.workspace-ports"
+    bash "$SCRIPT" >/dev/null
+    [ ! -e "$d/restart" ]
+    mkdir -p "$d/plafond"
+    fake_watcher "$d"
+    bash "$SCRIPT" >/dev/null
+    [ -e "$d/restart" ]
+    [ -d "$d/cap" ]
+}
+
+@test "rename-legacy-files: the key ports_exclus= becomes excluded_ports= with its value" {
+    printf 'ports=3000\nports_exclus=8080,9090\nai=on\n' >"$DEVZONE_ROOT/.devzone.modules"
+    run bash "$SCRIPT"
+    [ "$status" -eq 0 ]
+    [ "$(cat "$DEVZONE_ROOT/.devzone.modules")" = "$(printf 'ports=3000\nexcluded_ports=8080,9090\nai=on')" ]
+    [[ "$output" == *"ports_exclus= renamed to excluded_ports="* ]] || false
+    run bash "$SCRIPT"
+    [ -z "$output" ]
+}
+
+@test "rename-legacy-files: ports_exclus= is only removed when excluded_ports= already exists" {
+    printf 'ports_exclus=1111\nexcluded_ports=2222\n' >"$DEVZONE_ROOT/.devzone.modules"
+    run bash "$SCRIPT"
+    [ "$status" -eq 0 ]
+    [ "$(cat "$DEVZONE_ROOT/.devzone.modules")" = "excluded_ports=2222" ]
+    run bash "$SCRIPT"
+    [ -z "$output" ]
+}
+
+@test "rename-legacy-files: the state files of the port automation get their English names" {
+    export DEVZONE_PORTS_AUTO_DIR="$T/pa"
+    local d="$T/pa/devzone"
+    mkdir -p "$d/verrou"
+    echo 999999 >"$d/verrou/pid"
+    echo 8081 >"$d/occupes"
+    echo 8082 >"$d/actifs"
+    echo "127.0.0.1 8083" >"$d/courant"
+    run bash "$SCRIPT"
+    [ "$status" -eq 0 ]
+    [ "$(cat "$d/lock/pid")" = 999999 ]
+    [ "$(cat "$d/busy")" = 8081 ]
+    [ "$(cat "$d/active")" = 8082 ]
+    [ "$(cat "$d/current")" = "127.0.0.1 8083" ]
+    [ ! -e "$d/verrou" ] && [ ! -e "$d/occupes" ] && [ ! -e "$d/actifs" ] && [ ! -e "$d/courant" ]
+    run bash "$SCRIPT"
+    [ -z "$output" ]
+}
+
+@test "rename-legacy-files: an existing English state file of the port automation is never overwritten" {
+    export DEVZONE_PORTS_AUTO_DIR="$T/pa"
+    local d="$T/pa/devzone"
+    mkdir -p "$d"
+    echo old >"$d/occupes"
+    echo new >"$d/busy"
+    run --separate-stderr bash "$SCRIPT"
+    [ "$status" -eq 0 ]
+    [ "$(cat "$d/busy")" = new ]
+    [ "$(cat "$d/occupes")" = old ]
+    [[ "$stderr" == *"$d/occupes kept, $d/busy already exists"* ]] || false
+}
+
+@test "rename-legacy-files: the port automation of a live watcher is left untouched" {
+    export DEVZONE_PORTS_AUTO_DIR="$T/pa"
+    local d="$T/pa/devzone"
+    mkdir -p "$d/verrou"
+    echo "$$" >"$d/verrou/pid"
+    echo 8081 >"$d/occupes"
+    run --separate-stderr bash "$SCRIPT"
+    [ "$status" -eq 0 ]
+    [ -e "$d/occupes" ] && [ -d "$d/verrou" ]
+    [ ! -e "$d/busy" ] && [ ! -e "$d/lock" ]
+    [[ "$stderr" == *"$d kept: its watcher is running"* ]] || false
+}
+
+@test "rename-legacy-files: the lock of the agent becomes lock, never while a live process holds it" {
+    export DEVZONE_AGENT_STATE="$T/agent"
+    mkdir -p "$DEVZONE_AGENT_STATE/verrou"
+    echo "$$" >"$DEVZONE_AGENT_STATE/verrou/pid"
+    run --separate-stderr bash "$SCRIPT"
+    [ "$status" -eq 0 ]
+    [ -d "$DEVZONE_AGENT_STATE/verrou" ] && [ ! -e "$DEVZONE_AGENT_STATE/lock" ]
+    [[ "$stderr" == *"verrou kept: held by a live process"* ]] || false
+    echo 999999 >"$DEVZONE_AGENT_STATE/verrou/pid"
+    run bash "$SCRIPT"
+    [ "$(cat "$DEVZONE_AGENT_STATE/lock/pid")" = 999999 ]
+    [ ! -e "$DEVZONE_AGENT_STATE/verrou" ]
+    run bash "$SCRIPT"
+    [ -z "$output" ]
+}
+
+@test "rename-legacy-files: the lock of the catalog watcher becomes lock, an existing lock is kept" {
+    local d="$DEVZONE_ROOT/.devzone.catalog-watcher"
+    mkdir -p "$d/verrou"
+    echo 999999 >"$d/verrou/pid"
+    run bash "$SCRIPT"
+    [ "$status" -eq 0 ]
+    [ "$(cat "$d/lock/pid")" = 999999 ]
+    [ ! -e "$d/verrou" ]
+    mkdir -p "$d/verrou"
+    echo 999998 >"$d/verrou/pid"
+    run --separate-stderr bash "$SCRIPT"
+    [ "$(cat "$d/lock/pid")" = 999999 ]
+    [ "$(cat "$d/verrou/pid")" = 999998 ]
+    [[ "$stderr" == *"$d/verrou/pid kept: $d/lock/pid already exists"* ]] || false
+}
+
+@test "rename-legacy-files: an abandoned write lock .verrou of the state is removed, a recent one is kept" {
+    local lock="$DEVZONE_ROOT/.devzone.modules.verrou"
+    mkdir -p "$lock"
+    run bash "$SCRIPT"
+    [ "$status" -eq 0 ]
+    [ -d "$lock" ]
+    touch -d '-60 seconds' "$lock" 2>/dev/null || touch -t 200001010000 "$lock"
+    run bash "$SCRIPT"
+    [ "$status" -eq 0 ]
+    [ ! -e "$lock" ]
+    [[ "$output" == *"$lock removed"* ]] || false
+    run bash "$SCRIPT"
+    [ -z "$output" ]
 }

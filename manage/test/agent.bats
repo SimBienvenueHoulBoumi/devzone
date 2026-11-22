@@ -156,14 +156,14 @@ KUBECTL
     source "$BATS_TEST_DIRNAME/../../.devcontainer/agent-session.sh"
     AGENT_STATE="$DEVZONE_AGENT_STATE"
     export DEVZONE_AGENT_LOCK_MAX=2
-    mkdir -p "$AGENT_STATE/verrou"
+    mkdir -p "$AGENT_STATE/lock"
     start="$(date +%s)"
     run lock_take
     [ "$status" -eq 1 ] || false
     [ $(( $(date +%s) - start )) -ge 1 ] || false
     [ $(( $(date +%s) - start )) -le 5 ] || false
-    [ -d "$AGENT_STATE/verrou" ] || false
-    [ ! -e "$AGENT_STATE/verrou/pid" ] || false
+    [ -d "$AGENT_STATE/lock" ] || false
+    [ ! -e "$AGENT_STATE/lock/pid" ] || false
 }
 
 @test "agent : recent lock with unknown pid (other container) -> not taken over" {
@@ -171,13 +171,13 @@ KUBECTL
     source "$BATS_TEST_DIRNAME/../../.devcontainer/agent-session.sh"
     AGENT_STATE="$DEVZONE_AGENT_STATE"
     export DEVZONE_AGENT_LOCK_MAX=2
-    mkdir -p "$AGENT_STATE/verrou"
-    echo 999999 >"$AGENT_STATE/verrou/pid"
+    mkdir -p "$AGENT_STATE/lock"
+    echo 999999 >"$AGENT_STATE/lock/pid"
     start="$(date +%s)"
     run lock_take
     [ "$status" -eq 1 ] || false
     [ $(( $(date +%s) - start )) -ge 1 ] || false
-    grep -qx 999999 "$AGENT_STATE/verrou/pid" || false
+    grep -qx 999999 "$AGENT_STATE/lock/pid" || false
 }
 
 @test "agent : lock older than 30 s -> taken at once, released lock cleaned up" {
@@ -185,14 +185,14 @@ KUBECTL
     # is still alive, the age alone decides (#377)
     source "$BATS_TEST_DIRNAME/../../.devcontainer/agent-session.sh"
     AGENT_STATE="$DEVZONE_AGENT_STATE"
-    mkdir -p "$AGENT_STATE/verrou"
-    echo "$$" >"$AGENT_STATE/verrou/pid"
-    touch -d '-60 seconds' "$AGENT_STATE/verrou" 2>/dev/null || touch -t 200001010000 "$AGENT_STATE/verrou" || false
+    mkdir -p "$AGENT_STATE/lock"
+    echo "$$" >"$AGENT_STATE/lock/pid"
+    touch -d '-60 seconds' "$AGENT_STATE/lock" 2>/dev/null || touch -t 200001010000 "$AGENT_STATE/lock" || false
     start="$(date +%s)"
     run lock_take
     [ "$status" -eq 0 ] || false
     [ $(( $(date +%s) - start )) -le 5 ] || false
-    [ -s "$AGENT_STATE/verrou/pid" ] || false
+    [ -s "$AGENT_STATE/lock/pid" ] || false
     lock_release
-    [ ! -e "$AGENT_STATE/verrou" ] || false
+    [ ! -e "$AGENT_STATE/lock" ] || false
 }
