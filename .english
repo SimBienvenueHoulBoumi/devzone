@@ -269,6 +269,12 @@ internal/workspace/clone_test.go
 internal/command/workspace_clone_test.go
 internal/workspace/ports_status.go
 internal/workspace/ports_status_test.go
+internal/workspace/ports_apps.go
+internal/workspace/ports_apps_test.go
+internal/workspace/ports_services.go
+internal/workspace/ports_services_test.go
+internal/workspace/ports_bash_test.go
+internal/workspace/ports_bash_services_test.go
 .devcontainer/agent.sh
 .devcontainer/agent-workspace.sh
 .devcontainer/agent-model.sh
