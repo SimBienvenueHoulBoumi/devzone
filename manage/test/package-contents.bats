@@ -7,11 +7,13 @@
 # plus 10 %, rounded up. Raise one only with a reason in the commit.
 MAX_FILES=175
 MAX_UNPACKED=872000
-# With bin/ built by prepack (#773): measured 168 files, 18314524 bytes unpacked
-# and 7792088 bytes packed, plus 10 %, rounded up.
+# With bin/ built by prepack: measured 169 files, 20766171 bytes unpacked and
+# 8754981 bytes packed (the package job of go.yml, #781 lot A1.2b-2), plus 10 %,
+# rounded up. Raised from 20146000 and 8572000 (#773) because wiring the port
+# watcher makes the net package reachable: the linker no longer drops it.
 MAX_FILES_BIN=185
-MAX_UNPACKED_BIN=20146000
-MAX_PACKED_BIN=8572000
+MAX_UNPACKED_BIN=22843000
+MAX_PACKED_BIN=9631000
 # The only files bin/ may hold
 BIN_FILES="bin/SHA256SUMS bin/devzone-linux-amd64 bin/devzone-linux-arm64 bin/devzone-darwin-amd64 bin/devzone-darwin-arm64 bin/devzone-windows-amd64.exe bin/devzone-windows-arm64.exe"
 

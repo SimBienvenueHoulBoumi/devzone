@@ -54,8 +54,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      # Ceiling of the packed package (bytes): measured 7792088 plus 10 %
-      MAX_PACKED: 8572000
+      # Ceiling of the packed package (bytes): measured 8754981 plus 10 %, rounded up
+      # (raised from 8572000 when the watcher was wired: net is then linked, see
+      # contributing.md)
+      MAX_PACKED: 9631000
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7

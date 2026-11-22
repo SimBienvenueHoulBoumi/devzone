@@ -29,12 +29,13 @@ migrate_lock() {
 }
 
 # is_watcher PID: true when PID is a live port watcher (its command line names
-# ports-workspace.sh), so a pid file left by a dead watcher never makes us
-# signal an unrelated process that reuses the number
+# ports-workspace.sh, or is "workspace ports loop" of the Go watcher), so a pid
+# file left by a dead watcher never makes us signal an unrelated process that
+# reuses the number
 is_watcher() {
     [ -n "${1:-}" ] || return 1
     kill -0 "$1" 2>/dev/null || return 1
-    ps -p "$1" -o command= 2>/dev/null | grep -q 'ports-workspace\.sh'
+    ps -p "$1" -o command= 2>/dev/null | grep -Eq 'ports-workspace\.sh|workspace ports loop'
 }
 
 # Folders of the workstation port watcher (#774, lots 4 and 5): relais/ becomes
