@@ -283,6 +283,74 @@ KUBE
     parite workspace shell extra
 }
 
+# ports_state DIR: a state folder with a live sleep watcher and relay, one taken
+# port, one relayed application and one without a ready pod. Prints the pid of
+# the sleep, alive until the end of the test.
+ports_state() {
+    local d="$1" pid
+    mkdir -p "$d/relays" "$d/taken" "$d/apps" "$d/no-ready-pod" "$d/lock"
+    # Detached from the output of the command substitution that calls this function:
+    # otherwise it waits for the sleep to end and the watcher is dead when checked.
+    sleep 60 </dev/null >/dev/null 2>&1 &
+    pid=$!
+    echo "$pid" >"$d/pid"
+    echo "$pid" >"$d/relays/5432"
+    : >"$d/taken/3000"
+    printf '8080' >"$d/apps/default.web.80"
+    echo "$pid" >"$d/relays/8080"
+    : >"$d/no-ready-pod/team.api.9000"
+    printf '9000' >"$d/apps/team.api.9000"
+    printf '7070' >"$d/apps/team.guestbook.ui.80"
+    echo "$pid" >"$d/relays/7070"
+    echo "$pid" >"$d/relays/.6000"
+    : >"$d/restart"
+    echo "$pid"
+}
+
+@test "go-parity: workspace ports status, watcher running: same output and status" {
+    local state pid
+    state="$BATS_TEST_TMPDIR/state"
+    pid="$(ports_state "$state")"
+    export DEVZONE_PORTS_WORKSPACE_DIR="$state" DEVZONE_NO_GO=1
+    parite workspace ports
+    parite workspace ports status
+    run "$DZ_GO" workspace ports status
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Port watcher: running (pid $pid)"* ]] || false
+    kill "$pid" 2>/dev/null || true
+}
+
+@test "go-parity: workspace ports stop: same output, status and final state" {
+    local dbash="$BATS_TEST_TMPDIR/bash-state" dgo="$BATS_TEST_TMPDIR/go-state"
+    local st_bash=0 st_go=0 pidb pidg
+    pidb="$(ports_state "$dbash")"
+    pidg="$(ports_state "$dgo")"
+    DEVZONE_PORTS_WORKSPACE_DIR="$dbash" DEVZONE_NO_GO=1 bash "$CLI" workspace ports stop \
+        >"$BATS_TEST_TMPDIR/bash.out" 2>"$BATS_TEST_TMPDIR/bash.err" || st_bash=$?
+    DEVZONE_PORTS_WORKSPACE_DIR="$dgo" "$DZ_GO" workspace ports stop \
+        >"$BATS_TEST_TMPDIR/go.out" 2>"$BATS_TEST_TMPDIR/go.err" || st_go=$?
+    [ "$st_go" -eq "$st_bash" ] || { echo "status: bash $st_bash, go $st_go"; return 1; }
+    cmp "$BATS_TEST_TMPDIR/bash.out" "$BATS_TEST_TMPDIR/go.out" || { echo "stdout differs"; return 1; }
+    cmp "$BATS_TEST_TMPDIR/bash.err" "$BATS_TEST_TMPDIR/go.err" || { echo "stderr differs"; return 1; }
+    state_tree() { find "$1" -mindepth 1 | sed "s|^$1||" | LC_ALL=C sort; }
+    state_tree "$dbash" >"$BATS_TEST_TMPDIR/bash.tree"
+    state_tree "$dgo" >"$BATS_TEST_TMPDIR/go.tree"
+    cmp "$BATS_TEST_TMPDIR/bash.tree" "$BATS_TEST_TMPDIR/go.tree" || {
+        echo "final state differs"
+        diff "$BATS_TEST_TMPDIR/bash.tree" "$BATS_TEST_TMPDIR/go.tree"
+        return 1
+    }
+    process_dead "$pidb" || false
+    process_dead "$pidg" || false
+}
+
+# process_dead PID: true when the process is gone, or zombie and not reaped yet,
+# as a process stopped by ports stop can be under bats.
+process_dead() {
+    kill -0 "$1" 2>/dev/null || return 0
+    [ "$(ps -o stat= -p "$1" 2>/dev/null | cut -c1)" = Z ]
+}
+
 # git_clone DIR URL : a git folder whose origin is URL (the guard of copy-to reads it)
 git_clone() {
     git init -q "$1"
