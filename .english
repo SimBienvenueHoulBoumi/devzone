@@ -268,6 +268,13 @@ internal/workspace/clone_script.go
 internal/workspace/clone_test.go
 internal/command/workspace_clone_test.go
 internal/workspace/ports_status.go
+internal/workspace/ports_start.go
+internal/workspace/ports_loop.go
+internal/workspace/ports_start_test.go
+internal/workspace/ports_start_state_test.go
+internal/workspace/ports_start_bash_test.go
+internal/workspace/ports_start_helpers_test.go
+internal/workspace/ports_start_loop_test.go
 internal/workspace/ports_status_test.go
 internal/workspace/ports_apps.go
 internal/workspace/ports_apps_test.go

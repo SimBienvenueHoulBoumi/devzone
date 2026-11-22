@@ -3,6 +3,7 @@ package command
 import (
 	"io"
 	"os"
+	"runtime"
 
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/workspace"
 )
@@ -10,11 +11,13 @@ import (
 // workspaceCommand runs the "devzone workspace" subcommands status, stop, vscode
 // and shell in Go (#712), copy-to and copy-from with one folder argument (#754),
 // clone with a url and an optional name (#754), and ports without a word (status)
-// or with status or stop (#781). Any other subcommand, and any subcommand with
-// extra words, is delegated to bash unchanged, as the bash entry point handles
-// them (ports start, renamed words, extra arguments). When the Argo CD
-// Application holds the workspace, stop is delegated too. shell gets the terminal
-// of the user as its standard input.
+// or with start, status or stop (#781); "ports loop" is the internal command of
+// the watcher that "ports start" launches, not listed in the help. On Windows
+// the watcher does not exist in Go: "ports start" stays delegated to bash there.
+// Any other subcommand, and any subcommand with extra words, is delegated to bash
+// unchanged, as the bash entry point handles them (renamed words, extra
+// arguments). When the Argo CD Application holds the workspace, stop is
+// delegated too. shell gets the terminal of the user as its standard input.
 func workspaceCommand(args []string, out, errOut io.Writer) int {
 	if len(args) == 2 || len(args) == 3 {
 		if args[0] == "clone" {
@@ -53,6 +56,14 @@ func workspaceCommand(args []string, out, errOut io.Writer) int {
 		}
 		if len(args) == 2 && args[1] == "stop" {
 			return workspace.PortsStop()
+		}
+		if len(args) == 2 && runtime.GOOS != "windows" {
+			switch args[1] {
+			case "start":
+				return workspace.PortsStart(out, errOut)
+			case "loop":
+				return workspace.PortsLoop(workspace.PortsStep())
+			}
 		}
 	}
 	return delegate(append([]string{"workspace"}, args...), out, errOut)
