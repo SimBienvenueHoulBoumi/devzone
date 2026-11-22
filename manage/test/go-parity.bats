@@ -289,7 +289,9 @@ KUBE
 ports_state() {
     local d="$1" pid
     mkdir -p "$d/relays" "$d/taken" "$d/apps" "$d/no-ready-pod" "$d/lock"
-    sleep 60 &
+    # Detached from the output of the command substitution that calls this function:
+    # otherwise it waits for the sleep to end and the watcher is dead when checked.
+    sleep 60 </dev/null >/dev/null 2>&1 &
     pid=$!
     echo "$pid" >"$d/pid"
     echo "$pid" >"$d/relays/5432"
