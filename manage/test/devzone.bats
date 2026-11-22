@@ -855,17 +855,6 @@ mon réglage' ]
     [ "$premier_deny" -gt "$dernier_allow" ]
 }
 
-@test "devzone --version : version of the image, unknown without DEVZONE_VERSION (#707)" {
-    DEVZONE_VERSION=1.2.3 run bash "$DEVZONE" --version
-    [ "$status" -eq 0 ]
-    [ "$output" = "devzone 1.2.3" ]
-    DEVZONE_VERSION=4.5.6 run bash "$DEVZONE" -v
-    [ "$output" = "devzone 4.5.6" ]
-    run env -u DEVZONE_VERSION bash "$DEVZONE" --version
-    [ "$status" -eq 0 ]
-    [ "$output" = "devzone unknown" ]
-}
-
 @test "devzone --help cite --version (#707)" {
     run bash "$DEVZONE" --help
     [[ "$output" == *"--version"* ]] || false

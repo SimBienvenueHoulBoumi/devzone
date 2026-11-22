@@ -8,7 +8,11 @@ import (
 // Handler func for a command
 type Handler func(args []string, out, errOut io.Writer) int
 
-var ported = map[string]Handler{} // the commands of the pod ported to Go, by name
+// ported lists the commands of the pod ported to Go, by name.
+var ported = map[string]Handler{
+	"--version": printVersion,
+	"-v":        printVersion,
+}
 
 // Ported returns the names of the commands that are ported to Go, sorted
 func Ported() []string {
