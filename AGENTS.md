@@ -23,4 +23,6 @@ Short on purpose: read them every time, apply them without discussion.
 11. When an existing bats file has to be edited: every `[[ ... ]]` condition ends with `|| false` (bash 3.2 does not fail the test otherwise).
 12. Before stopping, `gofmt -l`, `go vet ./...` and `go test ./... -count=1` must pass, and so must the checks the brief lists. If one fails for a reason outside your files, say so in the report; do not fix other files.
 13. Never print or copy a secret, a password file or a token.
-14. Stop as soon as the brief is done: create the marker file the brief names, then exit.
+14. No new external dependency: `go.mod` and `go.sum` do not change unless the brief says so. Tests use the standard library (`testing`), never an assertion library.
+15. Every function you add has a comment above it, in English, that says what it does and why.
+16. Stop as soon as the brief is done: create the marker file the brief names, then exit.
