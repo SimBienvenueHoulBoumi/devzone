@@ -20,6 +20,19 @@ while [ -L "$SOURCE" ]; do
     esac
 done
 ICI="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+# Go first (#754): a command ported to Go runs in the devzone-pod binary of the image.
+# DEVZONE_NO_GO=1 forces the shell, DEVZONE_FROM_GO=1 avoids loops.
+if [ -z "${DEVZONE_NO_GO:-}" ] && [ -z "${DEVZONE_FROM_GO:-}" ]; then
+    case "$(uname -m)" in
+        x86_64) POD_GO_ARCH=amd64 ;;
+        aarch64 | arm64) POD_GO_ARCH=arm64 ;;
+        *) POD_GO_ARCH="" ;;
+    esac
+    POD_GO="$ICI/bin/devzone-pod-linux-$POD_GO_ARCH"
+    if [ -n "$POD_GO_ARCH" ] && [ -x "$POD_GO" ] && "$POD_GO" handles "${1:-}" >/dev/null 2>&1; then
+        exec "$POD_GO" "$@"
+    fi
+fi
 # shellcheck source=SCRIPTDIR/help.sh
 # shellcheck disable=SC1091
 . "$ICI/help.sh"
