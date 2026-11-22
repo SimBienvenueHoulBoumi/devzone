@@ -301,6 +301,9 @@ internal/workspace/modules_state_bash_test.go
 internal/workspace/argocd_state.go
 internal/workspace/argocd_state_test.go
 internal/workspace/argocd_state_bash_test.go
+internal/workspace/argocd_memory.go
+internal/workspace/argocd_memory_test.go
+internal/workspace/argocd_memory_bash_test.go
 .devcontainer/agent.sh
 .devcontainer/agent-workspace.sh
 .devcontainer/agent-model.sh
