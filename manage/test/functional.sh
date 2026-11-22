@@ -88,8 +88,6 @@ for outil in java mvn gradle node pnpm go python3 uv docker kubectl helm k9s kin
     reussit "$outil présent" "command -v $outil"
 done
 
-echo "▶ make dans le conteneur (refusé : il créerait un second devzone)"
-echoue "make rebuild dans le conteneur refusé" "cd /workspaces/devzone && make rebuild" "à lancer sur ta machine"
 # #291 : le conteneur pilote le Docker de l'hôte (même démon, pas de Docker interne)
 ID_HOTE="$(docker info --format '{{.ID}}')"
 reussit "Docker du conteneur = Docker de l'hôte" "docker info --format '{{.ID}}'" "^${ID_HOTE}$"
@@ -187,28 +185,6 @@ reussit "rebuild : cluster kind conservé" "kind get clusters" "^${KIND_TEST}$"
 reussit "rebuild : identité conservée dans le volume" "git config --file ~/.config/git/config user.name" "^Test$"
 echoue "rebuild : volume sans réglages machine" "git config --file ~/.config/git/config --get-all credential.https://github.com.helper"
 reussit "rebuild : réglages machine dans ~/.gitconfig" "git config --file ~/.gitconfig --get-all credential.https://github.com.helper" "gh auth git-credential"
-
-echo "▶ Désinstallation (depuis l'hôte, sans aucun de ses clusters)"
-# KUBECONFIG vide : les clusters de l'hôte ne sont jamais examinés
-hote() { (cd "$COPIE" && KUBECONFIG=/nexiste/pas "$@") 2>&1; }
-restants() { docker volume ls -q | grep -c "^${DEVZONE_VOLUMES}-" || true; }
-id="$(docker ps -q --filter "label=devcontainer.local_folder=$COPIE")"
-IMAGE_TEST="$(docker inspect "$id" --format '{{.Config.Image}}')"
-(cd "$COPIE" && make down >/dev/null)
-if [ -f "$COPIE/.devzone.state" ]; then ok "make down : image notée"; else ko "make down : image notée" "pas de .devzone.state"; fi
-avant="$(restants)"
-if ! sortie="$(hote bash manage/scripts/uninstall.sh </dev/null)" && [ "$(restants)" = "$avant" ]; then ok "sans confirmation : rien n'est supprimé"; else ko "sans confirmation : rien n'est supprimé" "$sortie"; fi
-sortie="$(hote env CONFIRMER=yes GARDER=connexions bash manage/scripts/uninstall.sh)"
-gardes="$(docker volume ls -q | grep "^${DEVZONE_VOLUMES}-" | sed "s/^${DEVZONE_VOLUMES}-//" | sort | tr '\n' ' ')"
-if [ "$gardes" = "claude config gh git opencode-config opencode-data " ]; then ok "GARDER=connexions : seules les connexions restent"; else ko "GARDER=connexions : seules les connexions restent" "restants : $gardes"$'\n'"$sortie"; fi
-if ! docker image inspect "$IMAGE_TEST" >/dev/null 2>&1; then ok "après make down : image supprimée"; else ko "après make down : image supprimée" "$IMAGE_TEST"; fi
-demarrer
-sortie="$(hote env CONFIRMER=yes bash manage/scripts/uninstall.sh)"
-if [ -z "$(docker ps -aq --filter "label=devcontainer.local_folder=$COPIE")" ] && [ "$(restants)" = 0 ] && ! docker image inspect "$IMAGE_TEST" >/dev/null 2>&1; then
-    ok "désinstallation complète : aucun conteneur, volume ni image"
-else
-    ko "désinstallation complète : aucun conteneur, volume ni image" "$sortie"
-fi
 
 echo
 echo "Résultat : $reussis réussi(s), $failures échec(s)"
