@@ -15,4 +15,5 @@ workspace/*
 charts/devzone-argocd/charts/
 charts/devzone-gitlab/charts/
 /bin/
+/.devcontainer/bin/
 /dist/
