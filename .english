@@ -275,6 +275,16 @@ internal/workspace/ports_services.go
 internal/workspace/ports_services_test.go
 internal/workspace/ports_bash_test.go
 internal/workspace/ports_bash_services_test.go
+internal/workspace/process_start_windows.go
+internal/workspace/process_start_unix_test.go
+internal/workspace/process_start_unix.go
+internal/workspace/ports_round_scenarios_test.go
+internal/workspace/ports_round_bash_test.go
+internal/workspace/ports_round_helpers_test.go
+internal/workspace/ports_round_test.go
+internal/workspace/ports_round.go
+internal/workspace/ports_round_apps_test.go
+internal/workspace/ports_round_apps.go
 .devcontainer/agent.sh
 .devcontainer/agent-workspace.sh
 .devcontainer/agent-model.sh
