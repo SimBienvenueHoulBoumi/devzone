@@ -209,22 +209,10 @@ DOCKER
     [ ! -s "$T/kubectl.log" ]
 }
 
-@test "workspace vscode: steps (context, namespace, pod, folder)" {
-    run bash "$CLI" workspace vscode
-    [ "$status" -eq 0 ]
-    [[ "$output" == *"kubectl context: devzone"* ]] || false
-    [[ "$output" == *"pod devzone-workspace-0"* ]] || false
-    [[ "$output" == *"Attach to Running Kubernetes Container"* ]] || false
-    [[ "$output" == *"/workspaces/projets"* ]] || false
-    [[ "$output" == *"devzone workspace status"* ]] || false
-    # No devzone variable shown to the user (#341)
-    ! grep -q "DEVZONE_" <<<"$output" || false
-}
-
 @test "workspace help: lists all subcommands" {
     run bash "$CLI" workspace
     [ "$status" -eq 0 ]
-    [[ "$output" == *"start|stop|status|shell|vscode|copy-to|copy-from"* ]] || false
+    [[ "$output" == *"start|stop|status|shell|copy-to|copy-from"* ]] || false
 }
 
 @test "workspace start: without option, latest tag (package.json at 0.0.0)" {

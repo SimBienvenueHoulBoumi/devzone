@@ -116,20 +116,6 @@ shell_workspace() {
     kubectl $(kubectl_flag) exec -it devzone-workspace-0 --namespace devzone-workspace -c workspace -- bash
 }
 
-# VS Code steps (#399): attach to the pod with Kubernetes and Dev Containers
-# extensions, without any command other than devzone.
-vscode_workspace() {
-    cat <<EOF
-Attach VS Code to the pod: "Kubernetes" and "Dev Containers" extensions
-  1. kubectl context: devzone — namespace $NAMESPACE, pod $POD, container workspace
-  2. Kubernetes view: right-click the workspace container,
-     "Attach to Running Kubernetes Container"
-     (with Dev Containers extension: "Dev Containers: Attach to Running Container")
-  3. Open folder $PROJECTS_DIR in the attached window
-Pod not ready: devzone workspace status
-EOF
-}
-
 # Copies a workstation folder to $PROJECTS_DIR in the pod (#399, kubectl cp):
 # the project keeps its folder name in the pod.
 copy_to() {
@@ -208,7 +194,6 @@ case "${1:-}" in
     stop) stop_workspace ;;
     status) status_workspace ;;
     shell) shell_workspace ;;
-    vscode) vscode_workspace ;;
     copy-to) copy_to "${@:2}" ;;
     copy-from) copy_from "${@:2}" ;;
     clone) workspace_clone "${@:2}" ;;
@@ -217,7 +202,7 @@ case "${1:-}" in
     argocd) argocd_cmd "${@:2}" ;;
     egress) egress_workspace "${@:2}" ;;
     '' | -h | --help | help)
-        echo "devzone workspace start|stop|status|shell|vscode|copy-to|copy-from|clone|ports|services|argocd|update|egress"
+        echo "devzone workspace start|stop|status|shell|copy-to|copy-from|clone|ports|services|argocd|update|egress"
         echo "  start [--image repository:tag]  install workspace (image for devzone version by default)"
         echo "  update [--version X.Y.Z] [--yes]  move to the latest stable release (or X.Y.Z); the pod is recreated"
         echo "  clone <url> [<name>]   git clone into the pod projects folder (gh credentials, identity, repowarden hooks)"
@@ -229,7 +214,7 @@ case "${1:-}" in
         echo "  egress observation|strict|off|status|allow <domain>|deny <domain>   egress proxy of the agent sessions (--pod)"
         ;;
     *)
-        echo "✖ unknown subcommand: $1 (devzone workspace start|stop|status|shell|vscode|copy-to|copy-from|clone|ports|services|argocd|update)" >&2
+        echo "✖ unknown subcommand: $1 (devzone workspace start|stop|status|shell|copy-to|copy-from|clone|ports|services|argocd|update)" >&2
         exit 1
         ;;
 esac
