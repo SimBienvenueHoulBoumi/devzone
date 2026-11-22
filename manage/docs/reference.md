@@ -4,7 +4,7 @@
 
 **GitHub (optional)**: used to push and open PRs on GitHub, for tickets and repowarden bots, and it provides the git identity automatically. Without GitHub, git works normally (local repositories, other hosts); only the identity is set by hand. To use it: `gh auth login -s workflow`. Git then goes through the `gh` token (https, even for `git@github.com:` remotes), with no ssh key to copy. The repositories under `/workspaces/devzone` are declared safe (`safe.directory`).
 - **`workflow` permission**: without it, GitHub refuses any push that modifies `.github/workflows/` (common with repowarden). Account already logged in: `gh auth refresh -h github.com -s workflow`.
-- **From `make shell`**, no browser opens from the container: copy the code shown by `gh` and open https://github.com/login/device by hand. The warning “No clipboard utilities available” is harmless.
+- **From `devzone workspace shell`**, no browser opens from the container: copy the code shown by `gh` and open https://github.com/login/device by hand. The warning “No clipboard utilities available” is harmless.
 
 **Git identity** (required to commit): without GitHub, set by hand (`git config --file ~/.config/git/config user.name "<name>"` and `user.email "<email>"`); with GitHub, deduced from the `gh` account at each startup as long as it is missing (`git-identity.sh`):
 - name of the GitHub profile (otherwise the login);
@@ -244,9 +244,9 @@ devzone use <name>       # switches the kubectl working cluster
 ```
 
 - **Active cluster**: the host's by default if it answers (in practice `docker-desktop`), otherwise a dedicated kind cluster `kind-devzone`. A choice made with `devzone use` is kept across restarts.
-- **kind clusters**: run on the host's Docker (shared socket, #291). Their API listens on 127.0.0.1 **of the workstation**, never on the local network; `kind` (devzone wrapper) rewrites the address to `host.docker.internal` in the container's kubeconfig, keeping TLS verification: a cluster created by hand with `kind create cluster` is reachable straight away. The name is suffixed by instance when it is not the default instance. They restart with Docker Desktop, are kept by `make rebuild` and `make down`, and are deleted by `kind delete cluster` (or `make uninstall`).
+- **kind clusters**: run on the host's Docker (shared socket, #291). Their API listens on 127.0.0.1 **of the workstation**, never on the local network; `kind` (devzone wrapper) rewrites the address to `host.docker.internal` in the container's kubeconfig, keeping TLS verification: a cluster created by hand with `kind create cluster` is reachable straight away. The name is suffixed by instance when it is not the default instance. They restart with Docker Desktop and are deleted by `kind delete cluster` (or `make uninstall`).
 - **CPU and RAM in k9s** (`kubectl top`): with the `kubernetes` module active, metrics-server is installed at startup on the **local** clusters that lack it (Docker Desktop, kind…), never on a remote cluster. After a `kind create cluster`: `devzone metrics` (or `devzone metrics <context>` for a specific cluster).
-- **Host cluster**: `~/.kube` is mounted read-only, never modified; its adapted copy is `~/.kube/hote.config` (`127.0.0.1` replaced by `host.docker.internal`). After a cluster change on the host: `make stop && make up`.
+- **Host cluster**: `~/.kube` is mounted read-only, never modified; its adapted copy is `~/.kube/hote.config` (`127.0.0.1` replaced by `host.docker.internal`). After a cluster change on the host: `devzone workspace stop && devzone workspace start`.
 - **Startup messages** (`kube-config : …`, `metrics-server : …`, summary): in the creation terminal, or by rerunning `devzone start`.
 
 The `127.0.0.1` address of the host cluster is rewritten to `host.docker.internal` by `kube-config.sh` at startup, making the cluster reachable from the container. The API certificate includes `host.docker.internal` in its SANs (configured via `networking.apiServerAddress` and `kubeadmConfigPatches` in the kind config).
@@ -329,15 +329,15 @@ devzone workspace status                  # follow the deployment; the last line
 
 Options: `--kubernetes` requires the cluster and fails without creating anything (the check happens before the files are copied). Without an option, the cluster must answer. The former `--docker` option (Docker workstation) is removed (#735): it is refused as an unknown option.
 
-In this mode, Docker is not required on the workstation. The gh and opencode logins are done in the pod, at the first `make shell`.
+In this mode, Docker is not required on the workstation. The gh and opencode logins are done in the pod, at the first `devzone workspace shell`.
 
 A workspace already installed in the cluster (helm release `devzone-workspace`, or Argo CD Application of the same name) is announced at creation: the new folder drives it too, and `devzone workspace start` updates it by `helm upgrade`, without loss (volumes remain).
 
 ### The cluster does not answer
 
-`devzone workspace start` (so `make up` and `make shell`) checks the cluster first, before Argo CD, helm and waiting for the pod (#565). An unreachable cluster gives a single message, exit code 1, and nothing else is launched; the workspace already installed is neither modified nor deleted. The message gives the cause:
+`devzone workspace start` (and `devzone workspace shell`) checks the cluster first, before Argo CD, helm and waiting for the pod (#565). An unreachable cluster gives a single message, exit code 1, and nothing else is launched; the workspace already installed is neither modified nor deleted. The message gives the cause:
 
-- **Docker Desktop stopped**: `✖ Docker Desktop is stopped: the Kubernetes cluster of this machine runs inside it. Start Docker Desktop, then: make shell`. This is the case when the context is `docker-desktop` (or the cluster is named `docker-desktop` and answers on `127.0.0.1` or `localhost`) and `docker info` fails. The workstation's Kubernetes runs inside Docker Desktop: start it, then `make shell`.
+- **Docker Desktop stopped**: `✖ Docker Desktop is stopped: the Kubernetes cluster of this machine runs inside it. Start Docker Desktop, then: devzone workspace start`. This is the case when the context is `docker-desktop` (or the cluster is named `docker-desktop` and answers on `127.0.0.1` or `localhost`) and `docker info` fails. The workstation's Kubernetes runs inside Docker Desktop: start it, then `devzone workspace start`.
 - **Docker answers, not the cluster**: `✖ Kubernetes cluster <context> unreachable (<server>): enable Kubernetes in Docker Desktop (Settings → Kubernetes) or check kubectl config get-contexts`. Enable Kubernetes in Docker Desktop (Settings → Kubernetes), or check the context.
 - **Other context**: `✖ Kubernetes cluster <context> unreachable (<server>)`, followed by `Check the contexts: kubectl config get-contexts`.
 
@@ -412,7 +412,7 @@ The working clones, the ticket worktrees and the agents live in the pod; the wor
 5. **Push**: `git push` from the worktree, over HTTPS with the `gh` credentials; the PR is made as everywhere else.
 6. **Stale copies**: `devzone workspace copy-to` refuses to overwrite a pod folder that is a git clone of another remote; `devzone workspace status` reports the old `repogarde/` and `wt/` copies (whose `.git` points outside the pod) with the command to remove them, to run after a backup.
 
-Remaining on the workstation: `make up` and `make rebuild`, `devzone workspace start` and the devcontainer image.
+Remaining on the workstation: `devzone workspace start` and the devcontainer image.
 
 ### Testcontainers and Docker in the workspace
 
@@ -747,7 +747,7 @@ The `devzone` context only acts with a limited account: the shell, relays and ag
 
 The container is disposable; what matters lives in Docker volumes, on your machine.
 
-| Volume | Content | `make stop` | `make down` | `make rebuild` |
+| Volume | Content | Kept across rebuilds | `make uninstall` |
 |---|---|---|---|---|
 | `devzone-gh` | GitHub login (`gh`) | kept | kept | kept |
 | `devzone-git` | git identity (`~/.config/git/config`) | kept | kept | kept |
@@ -760,7 +760,7 @@ The container is disposable; what matters lives in Docker volumes, on your machi
 | internal Docker volume | images and kind clusters of the container | kept | kept | kept |
 | `workspace/` (host folder) | your projects | kept | kept | kept |
 
-Everything else in the container (packages installed by hand, files outside these locations) is lost at `make down` and `make rebuild`. The internal Docker is isolated: its images are not shared with Docker Desktop.
+Everything else in the container (packages installed by hand, files outside these locations) is lost at rebuild. The internal Docker is isolated: its images are not shared with Docker Desktop.
 
 
 
@@ -779,7 +779,7 @@ npx devzone@latest update   # latest published version
 - **Backup**: any replaced or deleted file is copied to `.devzone.backup/<YYYYMMDD-HHMMSS>/`, with the same tree. This folder is added to the devzone `.gitignore`.
 - **Replacement**: the package files are copied again, the files of the old manifest that no longer exist are deleted, as well as the old `core/` and `scripts/` trees at the root. `.gitignore` is completed with the missing lines, never overwritten.
 - **Never touched**: `workspace/`, `.devzone.modules`, `.devzone.packages`, `.password`, `.app`, `.devzone.log`, the Docker volumes.
-- **Rebuild**: the new `.devzone.version` is written, then `make rebuild` is proposed with confirmation in a terminal. `--no-rebuild` skips this step; without a terminal, the rebuild is indicated but never launched.
+- **Rebuild**: the new `.devzone.version` is written, then the rebuild is proposed with confirmation in a terminal. `--no-rebuild` skips this step; without a terminal, the rebuild is indicated but never launched.
 - **State key (#733, batch 4)**: `plateforme=` of `.devzone.modules` becomes `platform=`. `.devcontainer/rename-legacy-files.sh` rewrites it once, with its value (if `platform=` already exists, only the old line is removed), at each run that launches the script; the other lines do not move.
 - **Old names (#733)**: `.devzone.paquets`, `.devzone.sauvegarde`, `.devzone.ports-workspace`, `.devzone.etat`, `.devzone.catalogue-veilleur`, `.devzone-empreinte` (skills) and the `-echec-` markers become `.devzone.packages`, `.devzone.backup`, `.devzone.workspace-ports`, `.devzone.state`, `.devzone.catalog-watcher`, `.devzone-fingerprint` and `-failed-`. `.devcontainer/rename-legacy-files.sh` renames them once, with their contents, at container startup, at `devzone update`, at `devzone workspace update` and at `devzone workspace migrate`. A new name already present is never overwritten; a second run does nothing.
 
@@ -794,11 +794,11 @@ In the container, the `devzone` summary reads `$RACINE/.devzone.version` and the
 | k9s, actionlint, gitleaks, kind | `.devcontainer/Dockerfile`: `ARG …_VERSION` **and** the `sha256` fingerprints (arm64 + amd64), by `bash manage/scripts/ci/versions.sh --apply <tool> <version>` | publish a version, then `devzone workspace update` |
 | Go | `.devcontainer/Dockerfile`: `GO_VERSION` **and** the `sha256` fingerprints `GO_SHA256_ARM64` / `GO_SHA256_AMD64` (go.dev), by `bash manage/scripts/ci/versions.sh --apply go <version>`; keep `go.mod` and `.github/workflows/go.yml` at the same version | publish a version, then `devzone workspace update` |
 | uv, ruff, vulture, pytest | `.devcontainer/Dockerfile`: `ARG …_VERSION` | publish a version, then `devzone workspace update` |
-| repowarden | `.devcontainer/versions.env`: `REPOWARDEN_VERSION=x.y.z` | `devzone apply` (or `make rebuild`) |
-| Claude Code, opencode | `.devcontainer/devzone`: one line per package, `IA_CLAUDE=@anthropic-ai/claude-code@x.y.z` and `IA_OPENCODE=opencode-ai@x.y.z` | `devzone enable ai` (or `make rebuild`) |
+| repowarden | `.devcontainer/versions.env`: `REPOWARDEN_VERSION=x.y.z` | `devzone apply` |
+| Claude Code, opencode | `.devcontainer/devzone`: one line per package, `IA_CLAUDE=@anthropic-ai/claude-code@x.y.z` and `IA_OPENCODE=opencode-ai@x.y.z` | `devzone enable ai` |
 | glab (gitlab platform) | `.devcontainer/devzone`: `GLAB_VERSION` and the checksums `GLAB_SOMME_ARM64` / `GLAB_SOMME_AMD64` | `rm ~/.local/bin/glab` then `devzone platform gitlab --url URL` |
 | metrics-server | `.devcontainer/metrics-server.sh`: `VERSION` | `devzone metrics` on a new cluster |
-| Java, Node, Python, Docker, kubectl, helm, gh | `.devcontainer/devcontainer.json` (features), pinned versions in `devcontainer-lock.json` | `npx @devcontainers/cli upgrade --workspace-folder .` then `make rebuild` |
+| Java, Node, Python, Docker, kubectl, helm, gh | `.devcontainer/devcontainer.json` (features), pinned versions in `devcontainer-lock.json` | `npx @devcontainers/cli upgrade --workspace-folder .` then rebuild the container |
 
 Fingerprint of an archive: `curl -fsSL <url> | shasum -a 256`.
 
@@ -874,25 +874,25 @@ The possible alerts are: `packages`, `worktree`, `cluster_distant` (services on 
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `✖ Docker introuvable` (`npx devzone`, `make up`, `make rebuild`, `make uninstall`) | Docker is not installed | install Docker Desktop (macOS, Windows, Linux: https://docs.docker.com/desktop/) or, under Linux, Docker Engine (https://docs.docker.com/engine/install/), then rerun the command |
-| `✖ Docker est installé mais ne répond pas (arrêté ?)` | Docker Desktop closed, or the Docker service stopped (Linux) | start Docker Desktop (Linux without Docker Desktop: `sudo systemctl start docker`), then rerun the command. After `npx devzone mon-devzone`, the folder is already created: `cd mon-devzone && make shell` |
+| `✖ Docker introuvable` (`npx devzone`, `devzone workspace start`, `make uninstall`) | Docker is not installed | install Docker Desktop (macOS, Windows, Linux: https://docs.docker.com/desktop/) or, under Linux, Docker Engine (https://docs.docker.com/engine/install/), then rerun the command |
+| `✖ Docker est installé mais ne répond pas (arrêté ?)` | Docker Desktop closed, or the Docker service stopped (Linux) | start Docker Desktop (Linux without Docker Desktop: `sudo systemctl start docker`), then rerun the command. After `npx devzone mon-devzone`, the folder is already created: `cd mon-devzone && devzone workspace start` |
 | `✖ Docker refuse l'accès` | Linux: account outside the `docker` group | `sudo usermod -aG docker $USER`, then a new session (or `newgrp docker`), then rerun the command |
-| `make up` or `make rebuild` seems frozen | a long step (first image build: several minutes), or a question asked in the container | `make` shows a sign of life with the last log line at least every 30 s: follow the detail with `tail -f .devzone.log`. A question (line ending with `[y/N]`, `?`…) is reported and the launch stops: [report it](https://github.com/SimBienvenueHoulBoumi/devzone/issues), then `make rebuild`. Earlier devzone version, frozen on “Configurer les bots … ? [o/N]” (invisible): `Ctrl+C`, update devzone, then `make rebuild`; the bots are configured by hand in the container: `repowarden bots` |
+| `devzone workspace start` seems frozen | a long step or a question asked in the container | follow the detail with `devzone workspace status` and the pod logs. A question is reported and the launch stops: [report it](https://github.com/SimBienvenueHoulBoumi/devzone/issues), then retry `devzone workspace start` |
 | `git push` refused: “refusing to allow an OAuth App to create or update workflow … without `workflow` scope” | `gh` token without the `workflow` permission | `gh auth refresh -h github.com -s workflow` |
 | `devzone` shows `⚠ worktree … absent ici`; or a broken worktree (“not a git repository: …/.git/worktrees/…”) | worktree created on the other side (host ↔ container), or metadata erased by a `git worktree prune` run on the other side | see [Git worktrees](#git-worktrees): manage each worktree on the side that created it, never `git worktree prune` on the host |
 | PR blocked, run `action_required`, banner “Approve workflows to run” | PR opened or pushed by the `github-actions` bot: for `pull_request` events `opened`, `synchronize` and `reopened`, GitHub waits for the approval of a person with write access ([GitHub doc](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow)) | check the changes (especially `.github/workflows/`), then *Approve workflows to run*; to stop having to do this: `repowarden app init` in the project |
 | Delivery PR blocked: `aucune préversion vX.Y.Z-next.N` (*no preview*) | the preview is not published yet (without `preversion-on-push`, it goes out in the evening) | wait for the evening one, *Actions → release → Run workflow* on `develop`, `preversion-on-push: true`, or stop requiring it: `preversion-obligatoire: false` |
 | Delivery PR left open | a red check (see the PR), `delivery-auto: false`, or the GitHub App absent or uninstalled (warning in the `release` run) | fix the check; install the App (`repowarden app init` on your machine) |
-| `repowarden app init` from `make shell`: the page `http://127.0.0.1:…` does not open, or GitHub does not come back | the page is served in the container, unreachable from your machine's browser | run the command **on your machine**: `npx -y repowarden app init --repo <account>/<repo>` |
+| `repowarden app init` from `devzone workspace shell`: the page `http://127.0.0.1:…` does not open, or GitHub does not come back | the page is served in the container, unreachable from your machine's browser | run the command **on your machine**: `npx -y repowarden app init --repo <account>/<repo>` |
 | `repowarden app init`: `nom déjà utilisé` (*name already used*) | a previous attempt created the App without retrieving its credentials | delete the orphan App (*GitHub → Settings → Developer settings → GitHub Apps*), or use `--nom <other-name>` |
 | `git commit`: “Please tell me who you are” | git identity missing | with GitHub: `gh auth login -s workflow` then `devzone start`; without GitHub: `git config --file ~/.config/git/config user.name "<name>"` and `user.email "<email>"` |
-| `gh auth login`: “Press Enter to open … in your browser”, nothing opens | no browser in the container (`make shell`) | open https://github.com/login/device by hand and enter the code |
+| `gh auth login`: “Press Enter to open … in your browser”, nothing opens | no browser in the container (`devzone workspace shell`) | open https://github.com/login/device by hand and enter the code |
 | `k9s`: `Error: exit status 1` then its help; `kubectl`: `localhost:8080` … `connection refused` | no active cluster (`kubernetes` module disabled, or no cluster on your machine) | `devzone enable kubernetes` (your machine's cluster), `kind create cluster`, or `devzone use <name>` |
 | `claude` or `opencode`: “command not found” | `ai` module disabled | `devzone enable ai` |
 | `devzone` shows `✖ module ai         en échec : installation incomplète (journal npm : …)` | installation of Claude Code or opencode failed (network, package); the failure message names the packages and the npm log | read the cited log, then `devzone apply` to retry (or `devzone disable ai`) |
 | `devzone enable ai` or `devzone apply` shows nothing new for several minutes | installation of Claude Code and opencode (several hundred MB): announced, then a line `… toujours en cours (N s)` every 30 s | wait for the line `Claude Code et opencode installés` or the failure message |
 | Empty CPU and RAM in k9s | metrics-server absent from the cluster | `devzone metrics` |
-| Two devzone containers | `make up` run while VS Code was opening the container | `make down`, then a single launch |
+| Two devzone containers | two launches at the same time | stop one of them, then relaunch once |
 | Windows (Git Bash, MSYS): `~/.kube` not found | `HOME` and `USERPROFILE` concatenated in the mounted path | launch from VS Code or PowerShell |
 | No `~/.kube` on the host | Docker creates it empty at startup (under Linux with Docker Engine, it belongs to root) | nothing to do: the container starts anyway |
 

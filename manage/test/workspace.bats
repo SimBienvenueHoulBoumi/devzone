@@ -103,7 +103,7 @@ DOCKER
     : >"$T/kubectl.log"
     run bash "$CLI" workspace start
     [ "$status" -eq 1 ]
-    [[ "$output" == *"✖ Docker Desktop is stopped: the Kubernetes cluster of this machine runs inside it. Start Docker Desktop, then: make shell"* ]] || false
+    [[ "$output" == *"✖ Docker Desktop is stopped: the Kubernetes cluster of this machine runs inside it. Start Docker Desktop, then: devzone workspace start"* ]] || false
     [ "$(grep -c '^✖' <<<"$output")" -eq 1 ]
     [[ "$output" != *"helm directly"* ]] || false
     [ ! -s "$T/helm.log" ]

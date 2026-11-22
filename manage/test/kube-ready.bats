@@ -100,7 +100,7 @@ hint() {
     export FAKE_KUBE_CLUSTER_INFO FAKE_CLUSTER FAKE_DOCKER
     hint
     [ "$status" -eq 1 ]
-    [[ "$output" == *"✖ Docker Desktop is stopped: the Kubernetes cluster of this machine runs inside it. Start Docker Desktop, then: make shell"* ]] || false
+    [[ "$output" == *"✖ Docker Desktop is stopped: the Kubernetes cluster of this machine runs inside it. Start Docker Desktop, then: devzone workspace start"* ]] || false
     [[ "$output" == *"Settings → General → Start Docker Desktop when you sign in"* ]] || false
     [ "$(grep -c '^✖' <<<"$output")" -eq 1 ]
     grep -q '^docker info' "$FAKE_LOG" || false
@@ -148,8 +148,3 @@ hint() {
     [ "$output" = "cluster kind-poste unreachable (https://127.0.0.1:6443)" ]
 }
 
-@test "shared file is sourced by poste.sh: kube_ready_reason defined there" {
-    run grep -c 'kube_ready_reason' "$RACINE/manage/scripts/poste.sh"
-    [ "$output" -ge 1 ] || false
-    ! grep -q '^kube_ready()' "$RACINE/manage/scripts/poste.sh" || false
-}

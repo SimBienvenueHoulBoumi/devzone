@@ -212,7 +212,6 @@ update_workstation() {
     write_manifest "$folder"
     echo "✔ devzone $package : mis à jour."
     restart_ports_watcher "$folder"
-    bash "$PAQUET/manage/scripts/poste.sh" conseil "$folder" || true
     # the update never changes the workstation mode (#472)
     if [ "$(grep -E '^workspace=' "$folder/.devzone.modules" 2>/dev/null | tail -1)" = "workspace=kubernetes" ]; then
         return 0
@@ -225,7 +224,7 @@ update_workstation() {
         echo "Reconstruction : make -C $folder rebuild (à lancer dans un terminal)"
         return 0
     fi
-    printf 'Rebuild the container now (make rebuild)? [y/N] ' >&2
+    printf 'Rebuild the container now? [y/N] ' >&2
     read -r answer || answer=""
     case "$answer" in
         y | Y | yes) ;;

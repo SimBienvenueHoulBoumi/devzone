@@ -22,7 +22,7 @@ setup() {
 }
 
 @test "a-tester : conteneur, tests, CLI, .gitattributes, package.json, workflow → true" {
-    for f in .devcontainer/devzone manage/scripts/launch.sh manage/test/cli.bats manage/devzone Makefile .gitattributes package.json .github/workflows/fonctionnel.yml; do
+    for f in .devcontainer/devzone manage/test/cli.bats manage/devzone Makefile .gitattributes package.json .github/workflows/fonctionnel.yml; do
         run bash "$SCRIPT" a-tester <<<$'README.md\n'"$f"
         [ "$status" -eq 0 ]
         [ "$output" = true ] || { echo "non détecté : $f"; false; }

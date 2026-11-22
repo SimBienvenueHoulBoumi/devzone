@@ -63,7 +63,7 @@ WS
     [ "$status" -eq 0 ]
     [[ "$(cat "$FAKE_LOG")" == *"workspace start in mon"* ]] || false
     [[ "$(cat "$FAKE_LOG")" != *"docker"* ]] || false
-    [[ "$output" == *"Next: cd "*"make shell (the pod)"* ]] || false
+    [[ "$output" == *"Next: cd "*"devzone workspace shell (the pod)"* ]] || false
 }
 
 @test "cluster unreachable, no option: status 1, folder not created, ways to get a cluster" {

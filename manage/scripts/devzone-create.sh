@@ -66,7 +66,7 @@ create_workstation() {
     # npm never includes .gitignore: written here
     : >"$target/.gitignore"
     complete_gitignore "$target"
-    chmod +x "$target/manage/scripts/uninstall.sh" "$target/manage/scripts/launch.sh"
+    chmod +x "$target/manage/scripts/uninstall.sh"
     create_mode_write "$target" "$CREATE_MODE"
     # The GitOps repository of the new devzone (#539): github, an existing URL,
     # or none, written in the .argocd.conf of the new devzone (conf.sh writes

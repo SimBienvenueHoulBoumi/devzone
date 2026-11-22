@@ -11,7 +11,7 @@
 
 **GitLab rule**: a PR that touches `.devcontainer/gitlab/` or the platform runs `devzone test-gitlab --statut` before it is ready; the `gitlab-integration` status is then visible on its commit. This test is the end-to-end test of the GitLab module and platform, impossible in GitHub CI (8 GB of RAM): the lead runs it on the container. Details of the steps, options and variables in [Reference, GitLab](reference.md#gitlab).
 
-**Windows (CI): what is checked / what is not (container, VS Code).** The `windows` job checks on `windows-latest` (checkout with `core.autocrlf=true`, like a Windows workstation): no CRLF in the scripts (every tracked file starting with `#!`, plus the `Makefile`); npm packaging (`npm pack`) and installation of the archive, in an isolated npm prefix under `$TMP` (the machine's global is never touched); `devzone --version`, `devzone --help`, unknown option (with error exit); `devzone <folder>` with `DEVZONE_NO_START=1` (creation of the expected files, non-empty folder refused without overwriting); `devzone uninstall` outside a devzone folder refused. The same path then goes through `cmd`, that is the npm `.cmd` shortcut, this time with a real global installation (the case of a Windows user). What is **not** checked on Windows CI: `make up` and the Linux container (impossible on GitHub's Windows runners), as well as VS Code and Docker Desktop (checked by hand).
+**Windows (CI): what is checked / what is not (container, VS Code).** The `windows` job checks on `windows-latest` (checkout with `core.autocrlf=true`, like a Windows workstation): no CRLF in the scripts (every tracked file starting with `#!`, plus the `Makefile`); npm packaging (`npm pack`) and installation of the archive, in an isolated npm prefix under `$TMP` (the machine's global is never touched); `devzone --version`, `devzone --help`, unknown option (with error exit); `devzone <folder>` with `DEVZONE_NO_START=1` (creation of the expected files, non-empty folder refused without overwriting); `devzone uninstall` outside a devzone folder refused. The same path then goes through `cmd`, that is the npm `.cmd` shortcut, this time with a real global installation (the case of a Windows user). What is **not** checked on Windows CI: the Linux container (impossible on GitHub's Windows runners), as well as VS Code and Docker Desktop (checked by hand).
 
 The functional and CLI tests work on a copy of the repository, with their own volumes (`devzone-test-…`), then delete everything (container, volumes, image), even on failure: your devzone, your logins and the cluster of your machine are never touched (only a test kind cluster is used). In CI, the `fonctionnel` workflow runs them (jobs `fonctionnel`, `cli` and `windows`, plus `ia-arm64`: `devzone enable ai` on an arm64 runner `ubuntu-24.04-arm`, like an Apple Silicon Mac, then `claude --version` and `opencode --version` at the pinned versions) on each PR that changes `.devcontainer/`, `manage/` (npm command, scripts, tests), the `Makefile`, `.gitattributes` or `package.json`, and by hand (*Actions → fonctionnel → Run workflow*).
 
@@ -86,11 +86,10 @@ devzone/
 ├── manage/                       # the devzone tool (at the root: only what must be there)
 │   ├── devzone                 # npm command: npx devzone <folder>, devzone uninstall
 │   ├── scripts/
-│   │   ├── launch.sh           # make up / rebuild: displayed steps, container question flagged
 │   │   └── uninstall.sh     # make desinstaller: removes everything devzone created
 │   └── test/
 │       ├── devzone.bats        # tests of the devzone command (bats manage/test/)
-│       ├── cli.bats            # npm command, package contents, manage/scripts/launch.sh, tree paths
+│       ├── cli.bats            # npm command and package contents
 │       ├── functional.sh      # functional tests (make test-fonctionnel)
 │       ├── cli-terminal.sh     # CLI tests in a real terminal (make test-cli)
 │       ├── ci-container.sh     # CI: container tests to run (by path) and tests-conteneur summary
