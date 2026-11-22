@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Checks Docker on the host before any call (sourced by launch.sh,
+# Checks Docker on the host before any call (sourced by uninstall.sh,
 # uninstall.sh and the npm command manage/devzone): without it the user
 # would only see the raw devcontainers CLI or docker error.
 # DEVZONE_DOCKER: docker command name (tests: simulate its absence).

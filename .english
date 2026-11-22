@@ -12,8 +12,6 @@ manage/scripts/create-mode.sh
 manage/scripts/create-cluster.sh
 manage/test/create-cluster.bats
 manage/scripts/workspace/workspace-wait.sh
-manage/scripts/poste.sh
-manage/scripts/launch.sh
 manage/scripts/ci/versions.sh
 manage/scripts/ci/tools-image.sh
 manage/scripts/uninstall.sh
@@ -37,7 +35,6 @@ manage/test/workspace-ports.bats
 manage/test/workspace-projets.bats
 manage/test/workspace-identites.bats
 manage/test/workspace-without-docker.bats
-manage/test/poste.bats
 manage/test/kube-ready.bats
 manage/test/create-mode.bats
 manage/test/create-with-mode.bats

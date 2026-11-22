@@ -39,7 +39,7 @@ Nothing is hosted: everything runs on your machine. `workspace/` is kept across 
 
 - **Kubernetes (default mode)**: a Kubernetes 1.30 or newer cluster that answers, with `kubectl` and `helm` on the machine. On Mac and Windows, the simplest is the Docker Desktop cluster: *Settings → Kubernetes → Enable Kubernetes*. devzone itself does not need Docker in this mode, but the Docker Desktop cluster stops with Docker Desktop (if the cluster does not answer, see [Frequently asked questions](#frequently-asked-questions)). Details in the [Kubernetes workspace](manage/docs/reference.md#kubernetes-workspace).
 - Node and npm (for `npx` or the global installation).
-- `make` (needed for `make shell`; on Windows without `make`, see the table “Day to day”).
+- `make` (only for `make uninstall`; on Windows without `make`, use `npx devzone uninstall`).
 
 On Windows: it is recommended to clone with Git for Windows (the scripts keep LF line endings thanks to `.gitattributes`, and the npm command finds the `bash` it requires).
 
@@ -70,7 +70,7 @@ Two ways via npm. Without installation, on each use:
 ```bash
 npx devzone mon-devzone
 cd mon-devzone
-make shell
+devzone workspace shell
 ```
 
 You can also install it once and for all:
@@ -81,7 +81,7 @@ devzone --version
 devzone --help
 devzone mon-devzone
 cd mon-devzone
-make shell
+devzone workspace shell
 ```
 
 With a GitHub account, the option `--gitops <github|none|<url>>` sets up the GitOps repository as soon as the folder is created:
@@ -95,7 +95,7 @@ Or fetch the code directly:
 ```bash
 git clone https://github.com/SimBienvenueHoulBoumi/devzone.git
 cd devzone
-make shell
+devzone workspace shell
 ```
 
 You can also use VS Code: open the `mon-devzone` (or `devzone`) folder, then *Dev Containers: Reopen in Container*.
@@ -125,7 +125,7 @@ At creation, devzone needs a Kubernetes cluster that answers.
 devzone mon-devzone
   │
   ├─ cluster answers ─────▶ workspace in the cluster (Kubernetes)
-  │                         make shell opens the pod
+  │                         devzone workspace shell opens the pod
   │
   └─ otherwise ───────────▶ nothing is created: devzone lists the ways
                             to get a cluster, then you rerun
@@ -148,7 +148,7 @@ With an active Kubernetes cluster: `kubectl get nodes`.
 
 ## Your first project
 
-Your projects go into `workspace/` (kept on your machine, even after `make down` or `make rebuild`).
+Your projects go into `workspace/` (kept on your machine).
 
 Example:
 ```bash
@@ -171,7 +171,7 @@ To learn more: [Starting a project](https://github.com/SimBienvenueHoulBoumi/dev
 
 ## Installing a tool that stays
 
-A tool installed by hand (`sudo apt install tree`) does not survive a `make rebuild`: the image is rebuilt from scratch. For a tool that must stay, `devzone packages` keeps the list of packages to reinstall:
+A tool installed by hand (`sudo apt install tree`) does not survive a rebuild: the image is rebuilt from scratch. For a tool that must stay, `devzone packages` keeps the list of packages to reinstall:
 
 ```sh
 devzone packages
@@ -189,17 +189,15 @@ The list lives in `.devzone.packages` at the root of the devzone folder, outside
 
 ## Day to day
 
-| Action | VS Code (`Cmd+Shift+P`) | `make` | Without `make` (Windows) |
-|---|---|---|---|
-| Launch | *Dev Containers: Reopen in Container* | `make up` | `npx @devcontainers/cli up --workspace-folder .` |
-| Open a shell | VS Code terminal | `make shell` | `npx @devcontainers/cli exec --workspace-folder . bash` |
-| Stop | *Remote: Close Remote Connection* (the container stops with the window) | `make stop` | — |
-| Remove the container | — | `make down` | — |
-| Rebuild (after a change to `.devcontainer/`) | *Dev Containers: Rebuild Container* | `make rebuild` | `npx @devcontainers/cli up --workspace-folder . --remove-existing-container` |
-| Status | — | `make status` | — |
-| **Uninstall** (everything devzone created, after confirmation) | — | `make uninstall` | `npx devzone uninstall` |
+| Action | VS Code (`Cmd+Shift+P`) | `devzone workspace` |
+|---|---|---|
+| Launch | *Dev Containers: Reopen in Container* | `devzone workspace start` |
+| Open a shell | VS Code terminal | `devzone workspace shell` |
+| Stop | *Remote: Close Remote Connection* (the container stops with the window) | `devzone workspace stop` |
+| Status | — | `devzone workspace status` |
+| **Uninstall** (everything devzone created, after confirmation) | — | `make uninstall` or `npx devzone uninstall` |
 
-In Kubernetes mode (workstation created while the cluster was answering), the same table applies to the pod `devzone-workspace-0`: `make up`, `make shell` and `make stop` control it, and `make rebuild` is refused, because nothing needs rebuilding on the machine. The GitLab, PostgreSQL and Argo CD services are installed from the workstation: `devzone workspace services enable postgres` (see [the reference](manage/docs/reference.md#devzone-services-in-the-kubernetes-workspace)). You can also develop there: `devzone workspace clone <url>` makes a working clone in the pod, `devzone ticket <n>` creates the worktree of a ticket there and `devzone agent` launches opencode there without a copy ([developing in the pod](manage/docs/reference.md#developing-devzone-and-repowarden-in-the-pod)). Argo CD is installed by default there and keeps the deployments: interface at https://localhost:8443 (password `admin` in `.password`), GitOps repository `<login>/devzone-argocd` created on your GitHub, projects declared in `.argocd.conf` (`devzone workspace argocd app add <repo>`); see [Argo CD in the Kubernetes workspace](manage/docs/reference.md#argo-cd-in-the-kubernetes-workspace).
+In Kubernetes mode, the same commands apply to the pod `devzone-workspace-0`. The GitLab, PostgreSQL and Argo CD services are installed from the workstation: `devzone workspace services enable postgres` (see [the reference](manage/docs/reference.md#devzone-services-in-the-kubernetes-workspace)). You can also develop there: `devzone workspace clone <url>` makes a working clone in the pod, `devzone ticket <n>` creates the worktree of a ticket there and `devzone agent` launches opencode there without a copy ([developing in the pod](manage/docs/reference.md#developing-devzone-and-repowarden-in-the-pod)). Argo CD is installed by default there and keeps the deployments: interface at https://localhost:8443 (password `admin` in `.password`), GitOps repository `<login>/devzone-argocd` created on your GitHub, projects declared in `.argocd.conf` (`devzone workspace argocd app add <repo>`); see [Argo CD in the Kubernetes workspace](manage/docs/reference.md#argo-cd-in-the-kubernetes-workspace).
 
 In the container, `devzone --version` shows the version of the workspace image, and `devzone --help` lists all the commands. Extract:
 
@@ -225,7 +223,7 @@ cd mon-devzone
 npx devzone@latest update
 ```
 
-The command shows the folder's version and the package's, and does nothing if they are equal. Otherwise, it backs up the replaced or deleted files to `.devzone.backup/<date>/`, lists the locally modified files and asks for confirmation (`--yes` for a script; without a terminal, `--yes` is required), replaces the package files, removes the old trees (`core/`, `scripts/`), completes `.gitignore` without overwriting it, then proposes `make rebuild`. `--no-rebuild` skips this proposal; without a terminal, the rebuild is never launched.
+The command shows the folder's version and the package's, and does nothing if they are equal. Otherwise, it backs up the replaced or deleted files to `.devzone.backup/<date>/`, lists the locally modified files and asks for confirmation (`--yes` for a script; without a terminal, `--yes` is required), replaces the package files, removes the old trees (`core/`, `scripts/`), completes `.gitignore` without overwriting it, then proposes `--no-rebuild` skips the rebuild proposal; without a terminal, the rebuild is never launched.
 
 `workspace/`, `.devzone.modules`, `.devzone.packages`, `.password`, `.app`, `.devzone.log` and the Docker volumes are never touched.
 
@@ -284,7 +282,7 @@ The GitLab Rails secret is kept in `workspace/.gitlab/rails-secret.yaml` (600) a
 
 ## Connecting to PostgreSQL
 
-The `postgres` module installs a shared PostgreSQL 16 on the devzone cluster: one database and one user per project. All commands are run in the container (`make shell`).
+The `postgres` module installs a shared PostgreSQL 16 on the devzone cluster: one database and one user per project. All commands are run in the container (`devzone workspace shell`).
 
 ```sh
 devzone enable postgres          # the first time: choice of the cluster (dedicated kind or host cluster)
@@ -378,7 +376,7 @@ Spring Boot listens on `0.0.0.0` by default: do not set `server.address` to `127
 
 ## Frequently asked questions
 
-- **Docker absent or stopped**: `npx devzone`, `make up`, `make rebuild` and `make uninstall` check Docker first and tell you what to do: install it (Docker Desktop, or Docker Engine on Linux), start Docker Desktop, or, on Linux, add your account to the `docker` group (`sudo usermod -aG docker $USER`, then a new session). With `npx devzone mon-devzone`, the folder is created anyway: once Docker is started, `cd mon-devzone && make shell`.
+- **Docker absent or stopped**: `npx devzone`, `devzone workspace start` and `make uninstall` check Docker first and tell you what to do: install it (Docker Desktop, or Docker Engine on Linux), start Docker Desktop, or, on Linux, add your account to the `docker` group (`sudo usermod -aG docker $USER`, then a new session). With `npx devzone mon-devzone`, the folder is created anyway: once Docker is started, `cd mon-devzone && devzone workspace start`.
 - **Access to the host's Docker socket**: the host machine's Docker socket is mounted in the container. This grants administrator access to the host's Docker, including for AI agents. It is a deliberate security trade-off documented in the Limits section. To restrict access, use the mechanisms specific to Docker Desktop/Linux.
 - **The first launch is long**: this is normal (building the image, downloading the base images). It takes 4 to 5 min as measured, plus the download of the base images on a new machine.
 - **`make` is missing on Windows**: you can use `npx @devcontainers/cli` (see the table “Day to day”) or Git Bash. The scripts are compatible (LF line endings).
@@ -388,15 +386,15 @@ Spring Boot listens on `0.0.0.0` by default: do not set `server.address` to `127
   ✖ Kubernetes not reachable: cluster <contexte> unreachable (<serveur>). Nothing created.
   ```
 
-  `devzone workspace start` (so `make up` and `make shell`) checks the cluster first and stops without changing anything. The message gives the cause:
+  `devzone workspace start` checks the cluster first and stops without changing anything. The message gives the cause:
 
-  - **Docker Desktop stopped**: `✖ Docker Desktop is stopped: the Kubernetes cluster of this machine runs inside it. Start Docker Desktop, then: make shell`. Start Docker Desktop, then `make shell`. To have it start at each login: *Settings → General → Start Docker Desktop when you sign in*.
+  - **Docker Desktop stopped**: `✖ Docker Desktop is stopped: the Kubernetes cluster of this machine runs inside it. Start Docker Desktop, then: devzone workspace start`. Start Docker Desktop, then `devzone workspace start`. To have it start at each login: *Settings → General → Start Docker Desktop when you sign in*.
   - **Docker answers, not the cluster**: `✖ Kubernetes cluster <contexte> unreachable (<serveur>): enable Kubernetes in Docker Desktop (Settings → Kubernetes) or check kubectl config get-contexts`. Enable Kubernetes in Docker Desktop (*Settings → Kubernetes → Enable Kubernetes*).
   - **Other cluster**: `✖ Kubernetes cluster <contexte> unreachable (<serveur>)`, followed by `Check the contexts: kubectl config get-contexts`. Check the chosen context, or change it with `devzone use CTX`.
 
   Details in the [reference](manage/docs/reference.md#the-cluster-does-not-answer).
 - **Git identity problem when committing**: set it once. With GitHub: `gh auth login -s workflow` (the identity is deduced automatically). Without GitHub: `git config --file ~/.config/git/config user.name "<nom>"` and `git config --file ~/.config/git/config user.email "<email>"`.
-- **`make up` seems stuck**: it shows its steps and a sign of life at least every 30 s; the full log is in `.devzone.log`.
+- **`devzone workspace start` seems stuck**: follow the detail with `devzone workspace status` and the pod logs.
 
 ## Changing cluster
 

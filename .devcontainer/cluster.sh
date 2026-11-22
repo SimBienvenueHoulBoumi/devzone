@@ -353,7 +353,7 @@ relay_start() {
     mkdir -p "$dir"
     relay_active "$name" && return 0
     # setsid: separate session, the relay survives the end of the script that
-    # started it (postStartCommand, make shell); absent on macOS (bash 3.2 tests)
+    # started it (postStartCommand, devzone workspace shell); absent on macOS (bash 3.2 tests)
     local detached=()
     command -v setsid >/dev/null 2>&1 && detached=(setsid)
     # port-forward targets one precise pod and sees its disappearance only at the
