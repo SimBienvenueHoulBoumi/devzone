@@ -69,15 +69,15 @@ pa_new() {
 }
 
 # One round of applications, from the ports already wanted "$1" (services, pod).
-# Prints the relay lines; writes apps/ (stable local port), plafond/ (cap marker) and
+# Prints the relay lines; writes apps/ (stable local port), cap/ (cap marker) and
 # no-ready-pod/ (Service without ready endpoint, not relayed nor counted), removes the
 # state of Services gone, warns once per port over the cap of PA_MAX.
 pa_round() {
     local d used excl ns name ip type annot ports pp port key stored loc n=0 seen="" f
     local ready="" ready_ok=1 unready
     d="$(pw_dir)"
-    mkdir -p "$d/apps" "$d/plafond"
-    excl="$(grep -E '^ports_exclus=' .devzone.modules 2>/dev/null | tail -1 | cut -d= -f2- | tr ',' ' ')"
+    mkdir -p "$d/apps" "$d/cap"
+    excl="$(grep -E '^excluded_ports=' .devzone.modules 2>/dev/null | tail -1 | cut -d= -f2- | tr ',' ' ')"
     used=" $1 $excl "
     # One kubectl call per round. If it fails, every Service is relayed, warned once.
     if ready="$(pa_ready)"; then
@@ -118,15 +118,15 @@ pa_round() {
             rm -f "$d/no-ready-pod/$key"
             if [ "$n" -lt "$PA_MAX" ]; then
                 n=$((n + 1))
-                rm -f "$d/plafond/$key"
+                rm -f "$d/cap/$key"
                 echo "$loc|$ns|svc/$name|$port"
-            elif [ ! -e "$d/plafond/$key" ]; then
-                : >"$d/plafond/$key"
+            elif [ ! -e "$d/cap/$key" ]; then
+                : >"$d/cap/$key"
                 echo "⚠ cap of $PA_MAX application relays reached, $ns/$name:$port not relayed" >&2
             fi
         done
     done <<<"$(pa_discover)"
-    for f in "$d"/apps/* "$d"/plafond/* "$d"/no-ready-pod/*; do
+    for f in "$d"/apps/* "$d"/cap/* "$d"/no-ready-pod/*; do
         [ -e "$f" ] || continue
         case "$seen" in *" $(basename "$f") "*) ;; *) rm -f "$f" ;; esac
     done

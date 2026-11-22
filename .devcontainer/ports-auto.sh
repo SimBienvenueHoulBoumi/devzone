@@ -6,19 +6,19 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PORTS_AUTO_DIR="${DEVZONE_PORTS_AUTO_DIR:-/tmp/devzone-ports-auto}"
 BASE="$PORTS_AUTO_DIR/${INSTANCE:-devzone}"
 BRIDGES="$BASE/bridges"
-# State file names on disk (verrou, occupes, actifs, courant) are kept: tests and the watcher use them
-LOCK="$BASE/verrou"; BUSY="$BASE/occupes"; ACTIVE="$BASE/actifs"
-PENDING="$BASE/pending"; CURRENT="$BASE/courant"
+# State file names on disk (lock, busy, active, current): the watcher and the tests use them (#774)
+LOCK="$BASE/lock"; BUSY="$BASE/busy"; ACTIVE="$BASE/active"
+PENDING="$BASE/pending"; CURRENT="$BASE/current"
 JSON_APP_BUSY=$'occup\303\251 sur le poste' # JSON value, contract (see ports.sh)
 mkdir -p "$BASE" "$BRIDGES"
 
 # Automatic watcher state: off as soon as ports_auto= is off (« non » kept as a stored value)
 auto_enabled() { local v; v="$(grep -E '^ports_auto=' "$ETAT" 2>/dev/null | tail -1 | cut -d= -f2- || true)"; case "$v" in off|false|0|non|no) echo off ;; *) echo on ;; esac; }
-# List of the ports excluded by the user (ports_exclus=, comma-separated)
-excluded_read() { grep -E '^ports_exclus=' "$ETAT" 2>/dev/null | tail -1 | cut -d= -f2- || true; }
+# List of the ports excluded by the user (excluded_ports=, comma-separated)
+excluded_read() { grep -E '^excluded_ports=' "$ETAT" 2>/dev/null | tail -1 | cut -d= -f2- || true; }
 # Writes a key=value line in the state, like write_ports does for ports=
 write_key() { state_write "$1" "${2:-}" || { echo "devzone : port : state not saved : $ETAT" >&2; return 1; }; }
-# A port is excluded when it is listed in ports_exclus=.
+# A port is excluded when it is listed in excluded_ports=.
 port_excluded() { case ",$(excluded_read)," in *",$1,"*) return 0 ;; esac; return 1; }
 # Name of the automatic relay of a port: devzone-<instance>-auto-<port>.
 auto_relay_name() { echo "devzone-$INSTANCE-auto-$1"; }
@@ -185,10 +185,10 @@ auto_loop() {
     done
 }
 
-# Excludes a port from the automatic list (writes ports_exclus=).
-auto_exclude() { validate_port "${1:-}"; local current; current="$(excluded_read)"; case ",$current," in *",$1,"*) echo "port $1 already excluded"; return 0 ;; esac; write_key ports_exclus "$(sort_ports "$current,$1")"; echo "✔ port $1 excluded"; }
-# Puts a port back in the automatic list (removes it from ports_exclus=).
-auto_include() { validate_port "${1:-}"; local current rest p; current="$(excluded_read)"; rest=""; for p in $(printf '%s' "$current" | tr ',' ' '); do [ "$p" = "$1" ] || rest="$rest${rest:+,}$p"; done; write_key ports_exclus "$(sort_ports "$rest")"; echo "✔ port $1 included"; }
+# Excludes a port from the automatic list (writes excluded_ports=).
+auto_exclude() { validate_port "${1:-}"; local current; current="$(excluded_read)"; case ",$current," in *",$1,"*) echo "port $1 already excluded"; return 0 ;; esac; write_key excluded_ports "$(sort_ports "$current,$1")"; echo "✔ port $1 excluded"; }
+# Puts a port back in the automatic list (removes it from excluded_ports=).
+auto_include() { validate_port "${1:-}"; local current rest p; current="$(excluded_read)"; rest=""; for p in $(printf '%s' "$current" | tr ',' ' '); do [ "$p" = "$1" ] || rest="$rest${rest:+,}$p"; done; write_key excluded_ports "$(sort_ports "$rest")"; echo "✔ port $1 included"; }
 
 # Lists the automatic relays alive (or busy on the workstation).
 auto_list() {

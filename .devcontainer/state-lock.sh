@@ -10,14 +10,14 @@ state_lock_take() {
     [ "${STATE_LOCK_DEPTH:-0}" -gt 0 ] && { STATE_LOCK_DEPTH=$((STATE_LOCK_DEPTH + 1)); return 0; }
     mkdir -p "$(dirname "$ETAT")" || return 1
     start="$(date +%s)"
-    while ! mkdir "${ETAT}.verrou" 2>/dev/null; do
-        age="$(stat -c %Y "${ETAT}.verrou" 2>/dev/null || stat -f %m "${ETAT}.verrou" 2>/dev/null || true)"
+    while ! mkdir "${ETAT}.lockdir" 2>/dev/null; do
+        age="$(stat -c %Y "${ETAT}.lockdir" 2>/dev/null || stat -f %m "${ETAT}.lockdir" 2>/dev/null || true)"
         if [ -n "$age" ] && [ "$(( $(date +%s) - age ))" -gt 30 ]; then
-            rm -rf "${ETAT}.verrou"
+            rm -rf "${ETAT}.lockdir"
             continue
         fi
         if [ "$(( $(date +%s) - start ))" -ge 10 ]; then
-            echo "devzone : state locked elsewhere: ${ETAT}.verrou" >&2
+            echo "devzone : state locked elsewhere: ${ETAT}.lockdir" >&2
             return 1
         fi
         sleep 1
@@ -28,7 +28,7 @@ state_lock_take() {
         if { exec 8>"${ETAT}.lock"; } && flock -w 10 8; then
             STATE_LOCK_FLOCK=1
         else
-            rm -rf "${ETAT}.verrou" 2>/dev/null || true
+            rm -rf "${ETAT}.lockdir" 2>/dev/null || true
             echo "devzone : state locked elsewhere (flock): ${ETAT}.lock" >&2
             return 1
         fi
@@ -48,6 +48,6 @@ state_lock_release() {
         exec 8>&-
         STATE_LOCK_FLOCK=0
     fi
-    rm -rf "${ETAT}.verrou" 2>/dev/null || true
+    rm -rf "${ETAT}.lockdir" 2>/dev/null || true
     return 0
 }

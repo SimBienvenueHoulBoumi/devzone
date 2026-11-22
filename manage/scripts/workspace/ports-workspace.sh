@@ -167,6 +167,7 @@ ports_start() {
     local d pid
     d="$(pw_dir)"
     mkdir -p "$d"
+    rm -f "$d/restart"
     pid="$(cat "$d/pid" 2>/dev/null || true)"
     if pw_alive "$pid"; then
         echo "Workspace ports: watcher already running (pid $pid)"
@@ -190,7 +191,7 @@ ports_stop() {
         for _ in 1 2 3 4 5 6 7 8 9 10; do pw_alive "$pid" || break; sleep 0.2; done
     fi
     pw_remove_all
-    rm -rf "$d/lock" "$d/pid"
+    rm -rf "$d/lock" "$d/pid" "$d/restart"
 }
 
 # Shows status: watcher, relayed ports, reported taken ports.

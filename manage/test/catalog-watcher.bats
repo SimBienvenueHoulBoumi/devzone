@@ -106,8 +106,8 @@ CATALOGUE
     mkdir -p "$base"
     cat >"$BATS_TEST_TMPDIR/bin/nohup" <<NOHUP
 #!/usr/bin/env bash
-mkdir -p "$base/verrou"
-echo \$\$ >"$base/verrou/pid"
+mkdir -p "$base/lock"
+echo \$\$ >"$base/lock/pid"
 exit 0
 NOHUP
     chmod +x "$BATS_TEST_TMPDIR/bin/nohup"

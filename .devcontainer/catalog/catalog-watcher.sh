@@ -11,7 +11,7 @@ ETAT="${DEVZONE_STATE:-$RACINE/.devzone.modules}"
 # shellcheck disable=SC1091
 . "$(dirname "$ICI")/state.sh"
 BASE="${DEVZONE_CATALOG_WATCHER_DIR:-$RACINE/.devzone.catalog-watcher}"
-LOCK_DIR="$BASE/verrou"
+LOCK_DIR="$BASE/lock"
 LAST_FILE="$BASE/dernier"
 
 refuse() { echo "devzone : catalog-watcher : $*" >&2; exit 2; }
