@@ -18,7 +18,7 @@ setup() {
     export FAKE_REGISTRY=on
     export FAKE_MANIFEST_DIR="$BATS_TEST_TMPDIR/manifests"
     export FAKE_TAGS='{"models":[{"name":"qwen3-coder:32k","size":12345,"digest":"sha256:aaaaaaaa","details":{"type":"llm"}},{"name":"nomic-embed-text:latest","size":67890,"details":{"type":"embedding"}},{"name":"deepseek-coder:latest","size":99999,"digest":"sha256:bbbbbbbb","details":{"type":"llm"}}]}'
-    rm -f "$HOME/.config/opencode/config.json" "$HOME/.config/devzone/ia-mesures.json"
+    rm -f "$HOME/.config/opencode/config.json" "$HOME/.config/devzone/ai-measures.json"
     # Fake Ollama: /api/tags returns $FAKE_TAGS; fake registry: a manifest file
     # per name/tag, exit 1 (404) when absent; honors -o like curl.
     cat >"$BATS_TEST_TMPDIR/bin/curl" <<'FAKE'
@@ -136,7 +136,7 @@ pose_manifest() {
 
 @test "premier: la mesure l'emporte, un modèle non détecté est ignoré" {
     mkdir -p "$HOME/.config/devzone"
-    cat >"$HOME/.config/devzone/ia-mesures.json" <<'EOF'
+    cat >"$HOME/.config/devzone/ai-measures.json" <<'EOF'
 {"qwen3-coder:32k":{"reussite":0.8,"tok_s":500,"date":"2026-11-19"},"deepseek-coder:latest":{"reussite":0.9,"tok_s":100,"date":"2026-11-19"},"inconnu:latest":{"reussite":1.0,"tok_s":999,"date":"2026-11-19"}}
 EOF
     run bash "$HM" first
@@ -146,7 +146,7 @@ EOF
 
 @test "premier: à reussite égale, la plus grande vitesse tok_s gagne" {
     mkdir -p "$HOME/.config/devzone"
-    cat >"$HOME/.config/devzone/ia-mesures.json" <<'EOF'
+    cat >"$HOME/.config/devzone/ai-measures.json" <<'EOF'
 {"qwen3-coder:32k":{"reussite":0.9,"tok_s":500,"date":"2026-11-19"},"deepseek-coder:latest":{"reussite":0.9,"tok_s":100,"date":"2026-11-19"}}
 EOF
     run bash "$HM" first
@@ -247,7 +247,7 @@ EOF
     pose_manifest deepseek-coder latest '{"schemaVersion":2}' >/dev/null
     export FAKE_TAGS='{"models":[{"name":"qwen3-coder:32k","size":12345,"digest":"sha256:aaaaaaaa","details":{"type":"llm"}},{"name":"deepseek-coder:latest","size":99999,"digest":"sha256:bbbbbbbb","details":{"type":"llm"}}]}'
     mkdir -p "$HOME/.config/devzone"
-    cat >"$HOME/.config/devzone/ia-mesures.json" <<'EOF'
+    cat >"$HOME/.config/devzone/ai-measures.json" <<'EOF'
 {"qwen3-coder:32k":{"reussite":0.8,"tok_s":500,"date":"2026-11-19"},"deepseek-coder:latest":{"reussite":0.9,"tok_s":100,"date":"2026-11-19"}}
 EOF
     run bash "$HC" rapport

@@ -225,19 +225,19 @@ KUBE
 @test "go-parity: workspace stop cleans the port state, bash and go alike" {
     faux_cluster
     local state="$BATS_TEST_TMPDIR/.devzone.workspace-ports"
-    mkdir -p "$state/relais" "$state/pris" "$state/verrou"
+    mkdir -p "$state/relays" "$state/taken" "$state/lock"
     echo 999999 >"$state/pid"
-    echo 999998 >"$state/relais/5432"
-    touch "$state/pris/5432"
+    echo 999998 >"$state/relays/5432"
+    touch "$state/taken/5432"
     bash "$CLI" workspace stop >/dev/null
-    [ ! -e "$state/pid" ] && [ ! -e "$state/verrou" ] && [ ! -e "$state/relais/5432" ]
-    mkdir -p "$state/relais" "$state/pris" "$state/verrou"
+    [ ! -e "$state/pid" ] && [ ! -e "$state/lock" ] && [ ! -e "$state/relays/5432" ]
+    mkdir -p "$state/relays" "$state/taken" "$state/lock"
     echo 999999 >"$state/pid"
-    echo 999998 >"$state/relais/5432"
-    touch "$state/pris/5432"
+    echo 999998 >"$state/relays/5432"
+    touch "$state/taken/5432"
     run "$DZ_GO" workspace stop
     [ "$status" -eq 0 ]
-    [ ! -e "$state/pid" ] && [ ! -e "$state/verrou" ] && [ ! -e "$state/relais/5432" ]
+    [ ! -e "$state/pid" ] && [ ! -e "$state/lock" ] && [ ! -e "$state/relays/5432" ]
 }
 
 @test "go-parity: workspace vscode: same guide, same status" {

@@ -86,8 +86,8 @@ etat_modele() {
 # Prints "reussite tok_s" for a model, empty when it has no measurement.
 mesure_pour() {
     local nom="$1" data
-    [ -f "$MESURES" ] || return 0
-    data="$(cat "$MESURES" 2>/dev/null)" || return 0
+    [ -f "$MEASURES" ] || return 0
+    data="$(cat "$MEASURES" 2>/dev/null)" || return 0
     [ -n "$data" ] || return 0
     printf '%s' "$data" | jq -r --arg nom "$nom" '
         .[$nom] | if . == null then empty else "\(.reussite // 0) \(.tok_s // 0)" end

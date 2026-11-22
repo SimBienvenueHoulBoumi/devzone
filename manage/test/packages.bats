@@ -15,7 +15,7 @@ setup() {
     export DEVZONE_ROOT="$BATS_TEST_TMPDIR/racine"
     export DEVZONE_PACKAGES_SUDO=""
     export DEVZONE_PACKAGES_MARKER="$BATS_TEST_TMPDIR/packages.failed"
-    export DEVZONE_PACKAGES_UPDATE="$BATS_TEST_TMPDIR/paquets.maj"
+    export DEVZONE_PACKAGES_UPDATE="$BATS_TEST_TMPDIR/packages.updated"
     mkdir -p "$HOME" "$DEVZONE_ROOT/workspace" "$BATS_TEST_TMPDIR/bin"
     : >"$BATS_TEST_TMPDIR/apt.log"
     : >"$BATS_TEST_TMPDIR/apt-cache.log"

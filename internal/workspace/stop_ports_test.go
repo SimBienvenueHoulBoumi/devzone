@@ -59,17 +59,17 @@ func TestStopPortsStopsWatcherAndRelays(t *testing.T) {
 	watcher, watcherDone := startSleep(t)
 	relay, relayDone := startSleep(t)
 	writeFile(t, filepath.Join(dir, "pid"), strconv.Itoa(watcher)+"\n")
-	writeFile(t, filepath.Join(dir, "verrou", "lock"), "")
-	writeFile(t, filepath.Join(dir, "relais", "5432"), strconv.Itoa(relay)+"\n")
-	writeFile(t, filepath.Join(dir, "pris", "5432"), "")
-	writeFile(t, filepath.Join(dir, "relais", "8080"), "999999\n")
-	writeFile(t, filepath.Join(dir, "pris", "8080"), "")
+	writeFile(t, filepath.Join(dir, "lock", "lock"), "")
+	writeFile(t, filepath.Join(dir, "relays", "5432"), strconv.Itoa(relay)+"\n")
+	writeFile(t, filepath.Join(dir, "taken", "5432"), "")
+	writeFile(t, filepath.Join(dir, "relays", "8080"), "999999\n")
+	writeFile(t, filepath.Join(dir, "taken", "8080"), "")
 
 	stopPorts()
 
 	waitExit(t, watcherDone)
 	waitExit(t, relayDone)
-	for _, path := range []string{"pid", "verrou", "relais/5432", "pris/5432", "relais/8080", "pris/8080"} {
+	for _, path := range []string{"pid", "lock", "relays/5432", "taken/5432", "relays/8080", "taken/8080"} {
 		if exists(filepath.Join(dir, path)) {
 			t.Fatalf("%s still exists after stopPorts", path)
 		}

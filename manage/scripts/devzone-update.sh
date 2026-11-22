@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Update of a devzone (devzone update [--yes] [--sans-reconstruire]): replaces
+# Update of a devzone (devzone update [--yes] [--no-rebuild]): replaces
 # the files of the package, backs up the replaced or removed ones, removes the
 # old layout, then offers the rebuild. Sourced by manage/devzone, after
 # devzone-manifest.sh, which provides the manifest helpers.
@@ -12,9 +12,9 @@ update_workstation() {
     for arg in "$@"; do
         case "$arg" in
             --yes) assume_yes=1 ;;
-            --sans-reconstruire) no_rebuild=1 ;;
+            --no-rebuild) no_rebuild=1 ;;
             *)
-                echo "✖ option inconnue : $arg (devzone update [--yes] [--sans-reconstruire])" >&2
+                echo "✖ unknown option: $arg (devzone update [--yes] [--no-rebuild])" >&2
                 exit 1
                 ;;
         esac
@@ -202,7 +202,7 @@ update_workstation() {
         return 0
     fi
     if [ -n "$no_rebuild" ]; then
-        echo "Reconstruction non lancée (--sans-reconstruire)."
+        echo "Reconstruction non lancée (--no-rebuild)."
         return 0
     fi
     if [ ! -t 0 ]; then

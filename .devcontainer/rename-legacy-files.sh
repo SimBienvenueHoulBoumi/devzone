@@ -2,7 +2,9 @@
 # shellcheck shell=bash
 # Renames the files and folders that devzone wrote under their former French
 # names to their English names (#733, lot 3), and the state keys plateforme= to
-# platform= (lot 4) and ia= to ai= (#774, lot 3). Called by the pod startup, by the workspace init, and on the
+# platform= (lot 4) and ia= to ai= (#774, lot 3). #774, lot 4 adds the folders of the
+# port watcher, the state backup, the AI measures file and the packages marker.
+# Called by the pod startup, by the workspace init, and on the
 # workstation by devzone update and workspace update.
 # Idempotent: a name is renamed only when the old one exists and the new one
 # does not, so a second run does nothing. Two folders with both names are
@@ -93,6 +95,48 @@ migrate_root() {
     migrate_markers
     # Failure marker of the AI module, renamed with it (#774)
     rename_legacy "$ROOT/.devzone.modules-failed-ia" "$ROOT/.devzone.modules-failed-ai"
+    # Backup of the previous state (#774, lot 4)
+    rename_legacy "$ROOT/.devzone.modules.prec" "$ROOT/.devzone.modules.prev"
+    migrate_ports
+}
+
+# is_watcher PID: true when PID is a live port watcher (its command line names
+# ports-workspace.sh), so a pid file left by a dead watcher never makes us
+# signal an unrelated process that reuses the number
+is_watcher() {
+    [ -n "${1:-}" ] || return 1
+    kill -0 "$1" 2>/dev/null || return 1
+    ps -p "$1" -o command= 2>/dev/null | grep -q 'ports-workspace\.sh'
+}
+
+# Folders of the workstation port watcher (#774, lot 4): relais/ becomes
+# relays/, pris/ taken/ and verrou lock. A watcher that is running keeps the
+# old folders and creates them again at each round, so it is stopped first:
+# SIGTERM, and its own handler removes its relays, its lock and its pid. It is
+# not restarted here (the files of the package are replaced after this
+# script): devzone workspace start, or devzone workspace ports start, starts
+# the new one. If it does not stop within 2 s, nothing is renamed.
+migrate_ports() {
+    local d="$ROOT/.devzone.workspace-ports" pid
+    is_real_dir "$d" || return 0
+    [ -e "$d/relais" ] || [ -L "$d/relais" ] || [ -e "$d/pris" ] || [ -L "$d/pris" ] ||
+        [ -e "$d/verrou" ] || [ -L "$d/verrou" ] || return 0
+    pid="$(cat "$d/pid" 2>/dev/null || true)"
+    if is_watcher "$pid"; then
+        kill "$pid" 2>/dev/null || true
+        for _ in 1 2 3 4 5 6 7 8 9 10; do
+            is_watcher "$pid" || break
+            sleep 0.2
+        done
+        if is_watcher "$pid"; then
+            echo "devzone : port watcher (pid $pid) still running, $d folders kept under their old names" >&2
+            return 0
+        fi
+        echo "devzone : port watcher stopped to rename its folders, restart it: devzone workspace ports start"
+    fi
+    rename_legacy "$d/relais" "$d/relays"
+    rename_legacy "$d/pris" "$d/taken"
+    rename_legacy "$d/verrou" "$d/lock"
 }
 
 # Fingerprint of the devzone skill, next to its SKILL.md in each assistant folder
@@ -102,11 +146,15 @@ migrate_skills() {
     for d in "$HOME/.claude/skills/devzone" "$HOME/.config/opencode/skills/devzone"; do
         rename_legacy "$d/.devzone-empreinte" "$d/.devzone-fingerprint"
     done
+    # Measures of the host models (#774, lot 4); DEVZONE_AI_MEASURES points to
+    # a file of the user, never renamed
+    rename_legacy "$HOME/.config/devzone/ia-mesures.json" "$HOME/.config/devzone/ai-measures.json"
 }
 
 # Markers written in the temporary folder by the packages check
 migrate_tmp() {
     rename_legacy "$TMP_DIR/devzone-paquets.echec" "$TMP_DIR/devzone-packages.failed"
+    rename_legacy "$TMP_DIR/devzone-paquets.maj" "$TMP_DIR/devzone-packages.updated"
 }
 
 # Key of the state file: the line <old>=<v> becomes <new>=<v>. When a <new>=

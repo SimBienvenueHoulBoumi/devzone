@@ -225,7 +225,7 @@ cd mon-devzone
 npx devzone@latest update
 ```
 
-The command shows the folder's version and the package's, and does nothing if they are equal. Otherwise, it backs up the replaced or deleted files to `.devzone.backup/<date>/`, lists the locally modified files and asks for confirmation (`--yes` for a script; without a terminal, `--yes` is required), replaces the package files, removes the old trees (`core/`, `scripts/`), completes `.gitignore` without overwriting it, then proposes `make rebuild`. `--sans-reconstruire` skips this proposal; without a terminal, the rebuild is never launched.
+The command shows the folder's version and the package's, and does nothing if they are equal. Otherwise, it backs up the replaced or deleted files to `.devzone.backup/<date>/`, lists the locally modified files and asks for confirmation (`--yes` for a script; without a terminal, `--yes` is required), replaces the package files, removes the old trees (`core/`, `scripts/`), completes `.gitignore` without overwriting it, then proposes `make rebuild`. `--no-rebuild` skips this proposal; without a terminal, the rebuild is never launched.
 
 `workspace/`, `.devzone.modules`, `.devzone.packages`, `.password`, `.app`, `.devzone.log` and the Docker volumes are never touched.
 

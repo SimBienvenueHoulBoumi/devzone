@@ -109,6 +109,24 @@ The AI module is renamed from `ia` to `ai` (#774). The old name is refused with 
 
 The state line is rewritten once, automatically, at the startup of the pod and by `devzone update`: `ia=<value>` becomes `ai=<value>` with the value kept, other lines untouched, and the message `devzone : ia= renamed to ai=` is printed. If `ai=` already exists, the old line is only removed. The failure marker is renamed the same way. A reader of `devzone status --json` that filters on the module name must look for `ai` and expect `schema: 3`.
 
+## State file names
+
+Renamed in #774 (lot 4), once, automatically, by the same migration as the names above (pod startup, `devzone update`, `devzone workspace update`), with the same guarantees: the content is kept, an existing new name is never overwritten (the old one stays, a message on stderr says `kept`), a second run does nothing.
+
+| Before | Now |
+|---|---|
+| `.devzone.workspace-ports/relais/` | `.devzone.workspace-ports/relays/` |
+| `.devzone.workspace-ports/pris/` | `.devzone.workspace-ports/taken/` |
+| `.devzone.workspace-ports/verrou/` | `.devzone.workspace-ports/lock/` |
+| `.devzone.modules.prec` | `.devzone.modules.prev` |
+| `~/.config/devzone/ia-mesures.json` | `~/.config/devzone/ai-measures.json` |
+| `/tmp/devzone-paquets.maj` | `/tmp/devzone-packages.updated` |
+| `devzone update --sans-reconstruire` | `devzone update --no-rebuild` |
+
+The old option is refused with `✖ « --sans-reconstruire » was renamed: --no-rebuild`, exit code 1, and nothing is done. The `unknown option` message of `devzone update` is in English too. `DEVZONE_AI_MEASURES`, when set, points to a file of yours that is never renamed.
+
+**Port watcher already running.** A watcher started before the update keeps the old folders open and creates them again at each round, so the migration cannot rename them under it. When it finds a live watcher (the pid in `.devzone.workspace-ports/pid` is a process whose command is `ports-workspace.sh`), it stops it with SIGTERM, which makes the watcher remove its own relays, lock and pid, then renames the folders and prints `devzone : port watcher stopped to rename its folders, restart it: devzone workspace ports start`. It is not restarted by the migration, because the files of the package are replaced after it: `devzone workspace start` or `devzone workspace ports start` starts the new watcher. If the watcher does not stop within 2 seconds, nothing is renamed and a message on stderr says so; run the update again after `devzone workspace ports stop`. A pid file that points to another process is ignored: that process is never signalled.
+
 ## Words of the outputs
 
 The `status` output of the modules (gitlab, postgres, argocd, mysql) and the states of the catalog use English words, which scripts may match:

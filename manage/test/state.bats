@@ -147,7 +147,7 @@ reader() {
 }
 
 @test "state removed with a backup copy: restored" {
-    printf 'ai=on\nkubernetes=off\ngitlab=on\npostgres=on\n' >"$DEVZONE_STATE.prec"
+    printf 'ai=on\nkubernetes=off\ngitlab=on\npostgres=on\n' >"$DEVZONE_STATE.prev"
     rm -f "$DEVZONE_STATE"
     run bash "$DEVZONE" is-enabled postgres
     [ "$status" -eq 0 ]
@@ -196,7 +196,7 @@ KUBE
     grep -qx 'ai=off' "$DEVZONE_STATE"
     grep -qx 'kubernetes=off' "$DEVZONE_STATE"
     grep -qx 'gitlab=off' "$DEVZONE_STATE"
-    run test -e "$DEVZONE_STATE.prec"
+    run test -e "$DEVZONE_STATE.prev"
     [ "$status" -ne 0 ]
     run test -e "$DEVZONE_STATE.recouvre"
     [ "$status" -ne 0 ]
@@ -223,7 +223,7 @@ KUBE
 }
 
 @test "fresh restore: the port watcher does nothing for 60 s" {
-    printf 'ai=on\nports_auto=on\n' >"$DEVZONE_STATE.prec"
+    printf 'ai=on\nports_auto=on\n' >"$DEVZONE_STATE.prev"
     rm -f "$DEVZONE_STATE"
     run bash "$DEVZONE" is-enabled ai
     [ "$status" -eq 0 ]
