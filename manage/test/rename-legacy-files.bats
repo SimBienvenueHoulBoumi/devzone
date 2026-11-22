@@ -349,7 +349,7 @@ watcher_tree() {
     fake_watcher "$d"
     run bash "$SCRIPT"
     [ "$status" -eq 0 ]
-    ! kill -0 "$WATCHER" 2>/dev/null
+    ! kill -0 "$WATCHER" 2>/dev/null || false
     [[ "$output" == *"port watcher stopped to rename its folders, restart it: devzone workspace ports start"* ]] || false
     [ "$(cat "$d/relays/3000")" = "4242" ]
     [ ! -e "$d/relais" ]
