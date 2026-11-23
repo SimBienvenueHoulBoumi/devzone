@@ -105,8 +105,6 @@ manage/test/charts-convention.bats
 manage/test/chart-require.bats
 manage/scripts/workspace/workspace-clone.sh
 manage/test/workspace-clone.bats
-.devcontainer/ticket.sh
-manage/test/ticket.bats
 manage/scripts/workspace/workspace-copies.sh
 manage/test/workspace-copies.bats
 manage/test/kube-reachable.bats
