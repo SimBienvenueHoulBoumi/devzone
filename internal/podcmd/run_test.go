@@ -102,7 +102,7 @@ func TestPortedIsSorted(t *testing.T) {
 		t.Fatalf("Ported is not sorted: %v", got)
 	}
 	joined := "," + strings.Join(got, ",") + ","
-	for _, want := range []string{"alpha", "zeta", "--version"} {
+	for _, want := range []string{"alpha", "zeta", "--version", "ticket"} {
 		if !strings.Contains(joined, ","+want+",") {
 			t.Fatalf("Ported misses %q: %v", want, got)
 		}
