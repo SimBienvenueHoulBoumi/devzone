@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Argo CD of the Kubernetes workspace, driven from the workstation (#516).
-# Sourced by manage/workspace.sh (drapeau_kubectl, drapeau_helm, RACINE: the
+# Sourced by manage/workspace.sh (kubectl_flag, helm_flag, RACINE: the
 # package; $PWD: the devzone folder of the workstation, its .devzone.modules,
 # workspace/.argocd and .password).
 #   argocd_wanted        0 unless .devzone.modules says argocd=off (on by default)
@@ -29,7 +29,7 @@ argocd_secrets_dir() { printf '%s/workspace/.argocd' "$PWD"; }
 # kubectl of the workstation, context devzone when it exists
 ak() {
     # shellcheck disable=SC2046
-    kubectl $(drapeau_kubectl) "$@"
+    kubectl $(kubectl_flag) "$@"
 }
 
 # Last value of a key of .devzone.modules of the workstation (empty if none)
@@ -146,7 +146,7 @@ argocd_install() {
     # first, then installed from the local chart (#538)
     helm dependency build "$(argocd_chart)" >/dev/null
     # shellcheck disable=SC2046
-    helm $(drapeau_helm) upgrade --install argocd "$(argocd_chart)" \
+    helm $(helm_flag) upgrade --install argocd "$(argocd_chart)" \
         --namespace "$ARGOCD_NS" \
         --timeout "${ARGOCD_WAIT}s" --wait || return 1
     argocd_save_admin_password
@@ -179,7 +179,7 @@ argocd_uninstall() {
             gitops_direct_delete_application "${app#*/}" keep
         done <<<"$(ak -n "$ARGOCD_NS" get applications.argoproj.io -o name 2>/dev/null || true)"
         # shellcheck disable=SC2046
-        helm $(drapeau_helm) uninstall argocd --namespace "$ARGOCD_NS" >/dev/null 2>&1 || true
+        helm $(helm_flag) uninstall argocd --namespace "$ARGOCD_NS" >/dev/null 2>&1 || true
         ak delete namespace "$ARGOCD_NS" --wait=true --ignore-not-found >/dev/null
     fi
     rm -rf "$(argocd_secrets_dir)"

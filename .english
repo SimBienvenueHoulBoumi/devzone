@@ -18,7 +18,6 @@ manage/scripts/uninstall.sh
 manage/scripts/workspace/ports-apps.sh
 manage/scripts/workspace/ports-workspace.sh
 manage/workspace.sh
-manage/scripts/workspace/workspace-aliases.sh
 manage/test/check-english.bats
 manage/test/readme.bats
 manage/test/services-hook.bats

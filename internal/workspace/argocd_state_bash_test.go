@@ -125,7 +125,7 @@ func TestArgocdInstalledMatchesBash(t *testing.T) {
 			h := newArgocdBashHarness(t)
 			bashLog := filepath.Join(t.TempDir(), "bash.log")
 			goLog := filepath.Join(t.TempDir(), "go.log")
-			_, bashStatus := h.bash(`drapeau_kubectl() { :; }; argocd_installed`,
+			_, bashStatus := h.bash(`kubectl_flag() { :; }; argocd_installed`,
 				"FAKE_LOG="+bashLog, "FAKE_STATUS="+strconv.Itoa(status))
 			h.addFakeKubectl(t, goLog, status)
 			got := argocdInstalled(ExecRunner{})
@@ -164,7 +164,7 @@ func TestArgocdActiveMatchesBash(t *testing.T) {
 			}
 			bashLog := filepath.Join(t.TempDir(), "bash.log")
 			goLog := filepath.Join(t.TempDir(), "go.log")
-			_, bashStatus := h.bash(`drapeau_kubectl() { :; }; argocd_active`,
+			_, bashStatus := h.bash(`kubectl_flag() { :; }; argocd_active`,
 				"FAKE_LOG="+bashLog, "FAKE_STATUS="+strconv.Itoa(tc.status))
 			h.addFakeKubectl(t, goLog, tc.status)
 			got := argocdActive(ExecRunner{}, filepath.Join(h.dir, modulesFile))
