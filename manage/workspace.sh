@@ -6,7 +6,9 @@ set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
 # Pod, namespace and projects folder inside the container (#399).
+# shellcheck disable=SC2034 # read by the scripts sourced from scripts/workspace/
 POD="devzone-workspace-0"
+# shellcheck disable=SC2034 # read by the scripts sourced from scripts/workspace/
 NAMESPACE="devzone-workspace"
 PROJECTS_DIR="/workspaces/projets"
 # compatibility alias, removed with lot 4 (#509)
@@ -116,40 +118,6 @@ shell_workspace() {
     kubectl $(kubectl_flag) exec -it devzone-workspace-0 --namespace devzone-workspace -c workspace -- bash
 }
 
-# Copies a workstation folder to $PROJECTS_DIR in the pod (#399, kubectl cp):
-# the project keeps its folder name in the pod.
-copy_to() {
-    local folder="${1:-}"
-    if [ -z "$folder" ]; then
-        echo "✖ provide a workstation folder: devzone workspace copy-to <folder>" >&2
-        exit 1
-    fi
-    if [ ! -d "$folder" ]; then
-        echo "✖ folder not found: $folder" >&2
-        exit 1
-    fi
-    folder="$(cd "$folder" && pwd)"
-    copy_guard "$folder" || exit 1
-    # shellcheck disable=SC2046
-    kubectl $(kubectl_flag) cp "$folder" "$POD:$PROJECTS_DIR/$(basename "$folder")" \
-        --namespace "$NAMESPACE" -c workspace
-}
-
-# Copies a project from $PROJECTS_DIR in the pod to the workstation (#399, kubectl cp):
-# the workstation folder gets the project name.
-copy_from() {
-    local folder="${1:-}"
-    if [ -z "$folder" ]; then
-        echo "✖ provide a workstation folder: devzone workspace copy-from <folder>" >&2
-        exit 1
-    fi
-    # Absolute path: "copy-from ." gives the current folder name.
-    folder="$(cd "$folder" 2>/dev/null && pwd || echo "$folder")"
-    # shellcheck disable=SC2046
-    kubectl $(kubectl_flag) cp "$POD:$PROJECTS_DIR/$(basename "$folder")" "$folder" \
-        --namespace "$NAMESPACE" -c workspace
-}
-
 # French names of the command and compatibility aliases (lot 3, #508)
 # shellcheck source=manage/scripts/workspace/workspace-aliases.sh
 . "$HERE/scripts/workspace/workspace-aliases.sh"
@@ -194,18 +162,14 @@ case "${1:-}" in
     stop) stop_workspace ;;
     status) status_workspace ;;
     shell) shell_workspace ;;
-    copy-to) copy_to "${@:2}" ;;
-    copy-from) copy_from "${@:2}" ;;
-    clone) workspace_clone "${@:2}" ;;
     ports) ports "${@:2}" ;;
     services) services "${@:2}" ;;
     argocd) argocd_cmd "${@:2}" ;;
     egress) egress_workspace "${@:2}" ;;
     '' | -h | --help | help)
-        echo "devzone workspace start|stop|status|shell|copy-to|copy-from|clone|ports|services|argocd|update|egress"
+        echo "devzone workspace start|stop|status|shell|ports|services|argocd|update|egress"
         echo "  start [--image repository:tag]  install workspace (image for devzone version by default)"
         echo "  update [--version X.Y.Z] [--yes]  move to the latest stable release (or X.Y.Z); the pod is recreated"
-        echo "  clone <url> [<name>]   git clone into the pod projects folder (gh credentials, identity, repowarden hooks)"
         echo "  ports [start|stop|status]       applications and services from pod on workstation localhost"
         echo "  services enable|disable <service> [options] | status"
         echo "                        devzone services (gitlab, postgres, argocd) of the cluster, installed from the workstation"
@@ -214,7 +178,7 @@ case "${1:-}" in
         echo "  egress observation|strict|off|status|allow <domain>|deny <domain>   egress proxy of the agent sessions (--pod)"
         ;;
     *)
-        echo "✖ unknown subcommand: $1 (devzone workspace start|stop|status|shell|copy-to|copy-from|clone|ports|services|argocd|update)" >&2
+        echo "✖ unknown subcommand: $1 (devzone workspace start|stop|status|shell|ports|services|argocd|update)" >&2
         exit 1
         ;;
 esac

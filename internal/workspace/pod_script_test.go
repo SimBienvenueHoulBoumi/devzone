@@ -71,19 +71,3 @@ func TestLegacyScriptMatchesBash(t *testing.T) {
 		t.Fatalf("podScript differs from the bash script:\n%s\nwant:\n%s", podScript, want)
 	}
 }
-
-// TestCopyGuardScriptMatchesBash checks that copyGuardScript (copy_guard.go) is
-// the script of workspace_copy_pod_script in manage/scripts/workspace/workspace-copies.sh
-func TestCopyGuardScriptMatchesBash(t *testing.T) {
-	if want := bashPodScript(t, "workspace_copy_pod_script"); copyGuardScript != want {
-		t.Fatalf("copyGuardScript differs from the bash script:\n%s\nwant:\n%s", copyGuardScript, want)
-	}
-}
-
-// TestCloneScriptMatchesBash checks that cloneScript (clone_script.go) is the
-// script of workspace_clone_pod_script in manage/scripts/workspace/workspace-clone.sh
-func TestCloneScriptMatchesBash(t *testing.T) {
-	if want := bashPodScript(t, "workspace_clone_pod_script"); cloneScript != want {
-		t.Fatalf("cloneScript differs from the bash script:\n%s\nwant:\n%s", cloneScript, want)
-	}
-}

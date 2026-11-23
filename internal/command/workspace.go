@@ -9,33 +9,36 @@ import (
 )
 
 // workspaceCommand runs the "devzone workspace" subcommands status, stop, vscode
-// and shell in Go (#712), copy-to and copy-from with one folder argument (#754),
-// clone with a url and an optional name (#754), ports without a word (status)
-// or with start, status or stop (#781), and services without a word or with the
-// word status (#781, lot A1.3a); "ports loop" is the internal command of the
-// watcher that "ports start" launches, not listed in the help. On Windows
-// the watcher does not exist in Go: "ports start" stays delegated to bash there.
-// Any other subcommand, and any subcommand with extra words, is delegated to bash
-// unchanged, as the bash entry point handles them (renamed words, extra
-// arguments). When the Argo CD Application holds the workspace, stop is
-// delegated too. shell gets the terminal of the user as its standard input.
+// and shell in Go (#712), copy-to, copy-from and clone (#754): the usage when
+// the argument is missing, extra words ignored for copy-to and copy-from, ports
+// without a word (status) or with start, status or stop (#781), and services
+// without a word or with the word status (#781, lot A1.3a); "ports loop" is the
+// internal command of the watcher that "ports start" launches, not listed in the
+// help. On Windows the watcher does not exist in Go: "ports start" stays
+// delegated to bash there. Any other subcommand is delegated to bash unchanged,
+// as the bash entry point handles them (renamed words). When the Argo CD
+// Application holds the workspace, stop is delegated too. shell gets the
+// terminal of the user as its standard input.
 func workspaceCommand(args []string, out, errOut io.Writer) int {
-	if len(args) == 2 || len(args) == 3 {
-		if args[0] == "clone" {
-			name := ""
-			if len(args) == 3 {
-				name = args[2]
-			}
-			return workspace.Clone(workspace.ExecRunner{}, workspace.Identity, args[1], name, out, errOut)
+	if len(args) >= 1 && args[0] == "clone" {
+		url, name := "", ""
+		if len(args) == 2 || len(args) == 3 {
+			url = args[1]
 		}
+		if len(args) == 3 {
+			name = args[2]
+		}
+		return workspace.Clone(workspace.ExecRunner{}, workspace.Identity, url, name, out, errOut)
 	}
-	if len(args) == 2 {
-		switch args[0] {
-		case "copy-to":
-			return workspace.CopyTo(workspace.ExecRunner{}, workspace.Origin, args[1], out, errOut)
-		case "copy-from":
-			return workspace.CopyFrom(workspace.ExecRunner{}, args[1], out, errOut)
+	if len(args) >= 1 && (args[0] == "copy-to" || args[0] == "copy-from") {
+		folder := ""
+		if len(args) >= 2 {
+			folder = args[1]
 		}
+		if args[0] == "copy-to" {
+			return workspace.CopyTo(workspace.ExecRunner{}, workspace.Origin, folder, out, errOut)
+		}
+		return workspace.CopyFrom(workspace.ExecRunner{}, folder, out, errOut)
 	}
 	if len(args) == 1 {
 		switch args[0] {
