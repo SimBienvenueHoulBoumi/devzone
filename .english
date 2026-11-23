@@ -264,7 +264,6 @@ internal/command/workspace_copy_test.go
 internal/workspace/clone.go
 internal/workspace/clone_script.go
 internal/workspace/clone_test.go
-internal/command/workspace_clone_test.go
 internal/workspace/ports_status.go
 internal/workspace/ports_start.go
 internal/workspace/ports_loop.go

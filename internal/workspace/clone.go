@@ -12,8 +12,8 @@ import (
 // that tests need no git.
 type IdentityFunc func(key string) string
 
-// cloneUsage is the message of "devzone workspace clone" without url, as
-// workspace_clone prints it in manage/scripts/workspace/workspace-clone.sh.
+// cloneUsage is the message of "devzone workspace clone" without url, as the
+// command always printed it.
 const cloneUsage = "✖ usage: devzone workspace clone <url> [<name>]"
 
 // Identity returns the value of the git setting key on the workstation, as
@@ -25,12 +25,12 @@ func Identity(key string) string {
 }
 
 // Clone clones the git repository url into the projects folder of the pod, under
-// name, or under the name taken from url when name is "", as workspace_clone in
-// manage/scripts/workspace/workspace-clone.sh does. cloneScript runs in the pod, with the
-// git name and email given by identity. It returns 1 (message on errOut) when url
-// is "" or the folder name is not valid. Otherwise it returns the status of the
-// kubectl exec, which is the status of the pod script (3 when the folder holds
-// another project), or 127 when kubectl cannot start.
+// name, or under the name taken from url when name is "", as the command always
+// did. cloneScript runs in the pod, with the git name and email given by
+// identity. It returns 1 (message on errOut) when url is "" or the folder name
+// is not valid. Otherwise it returns the status of the kubectl exec, which is the
+// status of the pod script (3 when the folder holds another project), or 127
+// when kubectl cannot start.
 func Clone(r Runner, identity IdentityFunc, url, name string, out, errOut io.Writer) int {
 	if url == "" {
 		fmt.Fprintln(errOut, cloneUsage)
@@ -69,7 +69,7 @@ func cloneName(url string) string {
 
 // validFolderName reports whether name may be a folder of the projects folder:
 // not empty, not "." or "..", not starting with "-", and made of letters, digits,
-// "." "_" and "-" only, as the case of workspace_clone in manage/scripts/workspace/workspace-clone.sh.
+// "." "_" and "-" only, as the command always required.
 func validFolderName(name string) bool {
 	if name == "" || name == "." || name == ".." || strings.HasPrefix(name, "-") {
 		return false

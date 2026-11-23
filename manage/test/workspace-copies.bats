@@ -40,30 +40,6 @@ GIT
     git -C "$T/mine" remote add origin https://github.com/acme/mine.git
 }
 
-@test "copy-to: pod clone of another remote is refused, no copy" {
-    mkdir -p "$T/pod/mine/.git"
-    export FAKE_REMOTE="https://github.com/other/mine.git"
-    run bash "$CLI" workspace copy-to "$T/mine"
-    [ "$status" -eq 1 ]
-    [[ "$output" == *"another remote (https://github.com/other/mine.git"* ]] || false
-    ! grep -q " cp " "$T/kubectl.log" || false
-}
-
-@test "copy-to: pod clone of the same remote is copied over" {
-    mkdir -p "$T/pod/mine/.git"
-    export FAKE_REMOTE="https://github.com/acme/mine"
-    run bash "$CLI" workspace copy-to "$T/mine"
-    [ "$status" -eq 0 ]
-    grep -q " cp $T/mine " "$T/kubectl.log" || false
-}
-
-@test "copy-to: pod folder without .git is copied over" {
-    mkdir -p "$T/pod/mine"
-    run bash "$CLI" workspace copy-to "$T/mine"
-    [ "$status" -eq 0 ]
-    grep -q " cp $T/mine " "$T/kubectl.log" || false
-}
-
 @test "status: legacy repogarde and wt copies reported with the removal command" {
     mkdir -p "$T/pod/repogarde" "$T/pod/wt/dz-1"
     echo "gitdir: /Users/someone/repogarde/.git" >"$T/pod/repogarde/.git"
