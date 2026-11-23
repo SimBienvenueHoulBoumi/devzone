@@ -3,8 +3,7 @@ package workspace
 // cloneScript runs in the pod (bash -s, with the clone folder, the url, the git
 // name and the git email as $1 to $4). It clones the url into the folder when the
 // folder is missing, checks the remote of an existing clone, sets the git identity
-// and installs the repowarden hooks. Same script as workspace_clone_pod_script in
-// manage/scripts/workspace/workspace-clone.sh: exit 3 when the folder holds another project.
+// and installs the repowarden hooks. Exit 3 when the folder holds another project.
 const cloneScript = `set -eu
 dir="$1" url="$2" name="$3" email="$4"
 norm() { local u="${1%/}"; echo "${u%.git}"; }

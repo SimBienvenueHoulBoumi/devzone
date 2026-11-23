@@ -148,71 +148,10 @@ DOCKER
     grep -q -- "-c workspace" "$T/kubectl.log" || false
 }
 
-@test "workspace copy-to: kubectl cp from workstation to /workspaces/projets in pod" {
-    export FAKE_CONTEXTS="devzone docker-desktop"
-    mkdir -p "$T/my-project"
-    : >"$T/kubectl.log"
-    run bash "$CLI" workspace copy-to "$T/my-project"
-    [ "$status" -eq 0 ]
-    grep -q -- "cp $T/my-project devzone-workspace-0:/workspaces/projets/my-project" "$T/kubectl.log" || false
-    grep -q -- "--context devzone" "$T/kubectl.log" || false
-    grep -q -- "--namespace devzone-workspace" "$T/kubectl.log" || false
-    grep -q -- "-c workspace" "$T/kubectl.log" || false
-}
-
-@test "workspace copy-to: without folder, usage and no kubectl" {
-    export FAKE_CONTEXTS="devzone docker-desktop"
-    : >"$T/kubectl.log"
-    run bash "$CLI" workspace copy-to
-    [ "$status" -eq 1 ]
-    [[ "$output" == *"devzone workspace copy-to <folder>"* ]] || false
-    [ ! -s "$T/kubectl.log" ]
-}
-
-@test "workspace copy-to: missing folder, no kubectl" {
-    export FAKE_CONTEXTS="devzone docker-desktop"
-    : >"$T/kubectl.log"
-    run bash "$CLI" workspace copy-to "$T/missing"
-    [ "$status" -eq 1 ]
-    [[ "$output" == *"folder not found"* ]] || false
-    [ ! -s "$T/kubectl.log" ]
-}
-
-@test "workspace copy-from: kubectl cp from /workspaces/projets to workstation" {
-    export FAKE_CONTEXTS="devzone docker-desktop"
-    : >"$T/kubectl.log"
-    run bash "$CLI" workspace copy-from "$T/recovery/my-project"
-    [ "$status" -eq 0 ]
-    grep -q -- "cp devzone-workspace-0:/workspaces/projets/my-project $T/recovery/my-project" "$T/kubectl.log" || false
-    grep -q -- "--context devzone" "$T/kubectl.log" || false
-    grep -q -- "--namespace devzone-workspace" "$T/kubectl.log" || false
-    grep -q -- "-c workspace" "$T/kubectl.log" || false
-}
-
-@test "workspace copy-from .: project gets current folder name" {
-    export FAKE_CONTEXTS="devzone docker-desktop"
-    mkdir -p "$T/cwd-project"
-    cd "$T/cwd-project"
-    : >"$T/kubectl.log"
-    run bash "$CLI" workspace copy-from .
-    [ "$status" -eq 0 ]
-    grep -q -- "cp devzone-workspace-0:/workspaces/projets/cwd-project $T/cwd-project" "$T/kubectl.log" || false
-    ! grep -q -- "projets/\.$" "$T/kubectl.log" || false
-}
-
-@test "workspace copy-from: without folder, usage and no kubectl" {
-    export FAKE_CONTEXTS="devzone docker-desktop"
-    : >"$T/kubectl.log"
-    run bash "$CLI" workspace copy-from
-    [ "$status" -eq 1 ]
-    [[ "$output" == *"devzone workspace copy-from <folder>"* ]] || false
-    [ ! -s "$T/kubectl.log" ]
-}
-
 @test "workspace help: lists all subcommands" {
     run bash "$CLI" workspace
     [ "$status" -eq 0 ]
-    [[ "$output" == *"start|stop|status|shell|copy-to|copy-from"* ]] || false
+    [[ "$output" == *"start|stop|status|shell|ports"* ]] || false
 }
 
 @test "workspace start: without option, latest tag (package.json at 0.0.0)" {

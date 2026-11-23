@@ -17,5 +17,3 @@ image_par_defaut() { default_image_tag "$@"; }
 demarrer() { start_workspace "$@"; }
 arreter() { stop_workspace "$@"; }
 etat() { status_workspace "$@"; }
-copier_vers() { copy_to "$@"; }
-copier_depuis() { copy_from "$@"; }

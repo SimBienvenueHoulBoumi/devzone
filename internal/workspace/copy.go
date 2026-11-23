@@ -7,17 +7,17 @@ import (
 	"path/filepath"
 )
 
-// Messages of copy-to and copy-from without a folder argument, as copy_to and
-// copy_from print them in manage/workspace.sh.
+// Messages of copy-to and copy-from without a folder argument, as the commands
+// always printed them.
 const (
 	copyToUsage   = "✖ provide a workstation folder: devzone workspace copy-to <folder>"
 	copyFromUsage = "✖ provide a workstation folder: devzone workspace copy-from <folder>"
 )
 
 // CopyTo copies a workstation folder to the projects folder of the pod, under
-// its own name, with kubectl cp, as copy_to in manage/workspace.sh does. It
-// returns 1 (message on errOut) when no folder is given, when the folder is not
-// a directory, or when the pod holds a clone of another remote (see copyGuard).
+// its own name, with kubectl cp, as the command always did. It returns 1
+// (message on errOut) when no folder is given, when the folder is not a
+// directory, or when the pod holds a clone of another remote (see copyGuard).
 // Otherwise it returns the status of kubectl cp, or 127 when kubectl cannot
 // start. origin gives the remote of the workstation folder.
 func CopyTo(r Runner, origin OriginFunc, folder string, out, errOut io.Writer) int {
@@ -37,11 +37,10 @@ func CopyTo(r Runner, origin OriginFunc, folder string, out, errOut io.Writer) i
 }
 
 // CopyFrom copies a project of the projects folder of the pod to the workstation
-// folder of the same name, with kubectl cp, as copy_from in manage/workspace.sh
-// does. The folder may not exist yet; when it does, it is made absolute, so
-// "copy-from ." takes the name of the current folder. It returns 1 when no
-// folder is given, otherwise the status of kubectl cp (127 when kubectl cannot
-// start).
+// folder of the same name, with kubectl cp, as the command always did. The
+// folder may not exist yet; when it does, it is made absolute, so "copy-from ."
+// takes the name of the current folder. It returns 1 when no folder is given,
+// otherwise the status of kubectl cp (127 when kubectl cannot start).
 func CopyFrom(r Runner, folder string, out, errOut io.Writer) int {
 	if folder == "" {
 		fmt.Fprintln(errOut, copyFromUsage)
@@ -64,8 +63,8 @@ func runCopy(r Runner, src, dst string, out, errOut io.Writer) int {
 }
 
 // absoluteFolder returns the absolute path of folder when it is a directory, as
-// "cd folder && pwd" gives it in manage/workspace.sh. Otherwise it returns folder
-// as given, which is what copy-from keeps for a folder not yet created.
+// the command always did. Otherwise it returns folder as given, which is what
+// copy-from keeps for a folder not yet created.
 func absoluteFolder(folder string) string {
 	if !isDir(folder) {
 		return folder
