@@ -5,6 +5,8 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
+# shellcheck disable=SC2034 # read by the argocd scripts and by .devcontainer/argocd/services.sh (shared with the pod)
+RACINE="$ROOT"
 # Pod, namespace and projects folder inside the container (#399).
 # shellcheck disable=SC2034 # read by the scripts sourced from scripts/workspace/
 POD="devzone-workspace-0"
@@ -118,9 +120,6 @@ shell_workspace() {
     kubectl $(kubectl_flag) exec -it devzone-workspace-0 --namespace devzone-workspace -c workspace -- bash
 }
 
-# French names of the command and compatibility aliases (lot 3, #508)
-# shellcheck source=manage/scripts/workspace/workspace-aliases.sh
-. "$HERE/scripts/workspace/workspace-aliases.sh"
 # shellcheck source=manage/scripts/kube-ready.sh
 . "$HERE/scripts/kube-ready.sh"
 # shellcheck source=manage/scripts/workspace/workspace-wait.sh
