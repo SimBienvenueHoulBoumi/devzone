@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # devzone workspace services (#528): installs or removes the devzone services
 # (gitlab, postgres, mysql, argocd) of a Kubernetes workspace from the workstation.
-# Sourced by manage/workspace.sh (drapeau_kubectl, POD, NAMESPACE).
+# Sourced by manage/workspace.sh (kubectl_flag, POD, NAMESPACE).
 #   devzone workspace services enable <service> [options]
 #   devzone workspace services disable <service> [--yes]
 #   devzone workspace services status
@@ -53,7 +53,7 @@ services_namespace() {
 services_pod_running() {
     local phase
     # shellcheck disable=SC2046
-    phase="$(kubectl $(drapeau_kubectl) get pod "$POD" --namespace "$NAMESPACE" \
+    phase="$(kubectl $(kubectl_flag) get pod "$POD" --namespace "$NAMESPACE" \
         -o jsonpath='{.status.phase}' 2>/dev/null)" || phase=""
     [ "$phase" = Running ]
 }
@@ -62,7 +62,7 @@ services_pod_running() {
 # cluster-admin (idempotent apply)
 services_admin_create() {
     # shellcheck disable=SC2046
-    kubectl $(drapeau_kubectl) apply -f - >/dev/null <<EOF
+    kubectl $(kubectl_flag) apply -f - >/dev/null <<EOF
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -86,10 +86,10 @@ EOF
 
 services_admin_delete() {
     # shellcheck disable=SC2046
-    kubectl $(drapeau_kubectl) delete clusterrolebinding "$SERVICES_ADMIN_SA" \
+    kubectl $(kubectl_flag) delete clusterrolebinding "$SERVICES_ADMIN_SA" \
         --ignore-not-found >/dev/null 2>&1 || true
     # shellcheck disable=SC2046
-    kubectl $(drapeau_kubectl) delete serviceaccount "$SERVICES_ADMIN_SA" \
+    kubectl $(kubectl_flag) delete serviceaccount "$SERVICES_ADMIN_SA" \
         --namespace "$NAMESPACE" --ignore-not-found >/dev/null 2>&1 || true
 }
 
@@ -134,7 +134,7 @@ services_run() {
     fi
     trap services_admin_delete EXIT
     # shellcheck disable=SC2046
-    if ! token="$(kubectl $(drapeau_kubectl) create token "$SERVICES_ADMIN_SA" \
+    if ! token="$(kubectl $(kubectl_flag) create token "$SERVICES_ADMIN_SA" \
         --namespace "$NAMESPACE" --duration "$SERVICES_TOKEN_DURATION")" || [ -z "$token" ]; then
         echo "✖ cannot get a token of the temporary administrator (kubectl 1.24 or more)" >&2
         services_admin_delete
@@ -144,7 +144,7 @@ services_run() {
     echo "▶ $action $service in the pod ${POD}…"
     # The installer of the pod takes --yes (#557) : no translation, no warning
     # shellcheck disable=SC2046
-    printf '%s\n' "$token" | kubectl $(drapeau_kubectl) exec -i "$POD" --namespace "$NAMESPACE" \
+    printf '%s\n' "$token" | kubectl $(kubectl_flag) exec -i "$POD" --namespace "$NAMESPACE" \
         -c workspace -- bash "$SERVICES_ADMIN_SCRIPT" "$action" "$service" "$@" || code=$?
     services_admin_delete
     trap - EXIT
@@ -162,7 +162,7 @@ services_status() {
     for s in gitlab postgres mysql argocd; do
         ns="$(services_namespace "$s")"
         # shellcheck disable=SC2046
-        if kubectl $(drapeau_kubectl) get namespace "$ns" >/dev/null 2>&1; then
+        if kubectl $(kubectl_flag) get namespace "$ns" >/dev/null 2>&1; then
             echo "  ✔ $s installed (namespace $ns): devzone workspace services disable $s"
         else
             echo "  ○ $s not installed: devzone workspace services enable $s"

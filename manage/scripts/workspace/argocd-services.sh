@@ -128,7 +128,7 @@ workspace_undeploy() {
         argocd_delete_application "$WORKSPACE_APP"
     else
         # shellcheck disable=SC2046
-        helm $(drapeau_helm) uninstall devzone-workspace --namespace devzone-workspace
+        helm $(helm_flag) uninstall devzone-workspace --namespace devzone-workspace
     fi
 }
 

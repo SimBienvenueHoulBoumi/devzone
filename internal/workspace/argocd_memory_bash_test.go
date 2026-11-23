@@ -60,8 +60,8 @@ func argocdMemoryBashErr(errOut string) string {
 const (
 	argocdNodesCallDevzone = `--context devzone get nodes -o jsonpath={range .items[*]}{.status.allocatable.memory}{"\n"}{end}`
 	argocdNodesCallCurrent = `get nodes -o jsonpath={range .items[*]}{.status.allocatable.memory}{"\n"}{end}`
-	argocdNoFlag           = `drapeau_kubectl() { :; }; argocd_memory_ok`
-	argocdDevzoneFlag      = `drapeau_kubectl() { echo --context devzone; :; }; argocd_memory_ok`
+	argocdNoFlag           = `kubectl_flag() { :; }; argocd_memory_ok`
+	argocdDevzoneFlag      = `kubectl_flag() { echo --context devzone; :; }; argocd_memory_ok`
 )
 
 // TestArgocdMemoryOKMatchesBash compares argocdMemoryOK with argocd_memory_ok
