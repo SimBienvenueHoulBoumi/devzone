@@ -192,7 +192,6 @@ case "${1:-}" in
                 ;;
         esac
         ;;
-    ticket) bash "$ICI/ticket.sh" "${@:2}" ;;
     build)
         bash "$ICI/workspace-build.sh" "${@:2}"
         ;;

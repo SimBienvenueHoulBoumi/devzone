@@ -12,6 +12,7 @@ type Handler func(args []string, out, errOut io.Writer) int
 var ported = map[string]Handler{
 	"--version": printVersion,
 	"-v":        printVersion,
+	"ticket":    runTicket,
 }
 
 // Ported returns the names of the commands that are ported to Go, sorted
