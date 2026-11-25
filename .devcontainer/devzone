@@ -206,7 +206,7 @@ case "${1:-}" in
     clusters) DEVZONE_STATE="$ETAT" bash "$ICI/clusters.sh" "${@:2}" ;;
     cluster) change_cluster "${@:2}" ;;
     # Go only: reached when the binary did not take the call. Never call
-    # "devzone" again from here (endless loop, #864)
+    # "devzone" again from here, it would loop forever, see #864
     postgres | mysql)
         echo "devzone $1: Go binary of the pod unavailable (.devcontainer/bin)" >&2
         exit 1
