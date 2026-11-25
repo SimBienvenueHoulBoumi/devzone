@@ -30,7 +30,7 @@ func launcherSetup(t *testing.T, withBinary bool) string {
 		if err := os.MkdirAll(binDir, 0o755); err != nil {
 			t.Fatal(err)
 		}
-		binary := "#!/usr/bin/env bash\nif [ \"$1\" = handles ]; then [ \"$2\" = ported ] && exit 0; exit 1; fi\necho \"go:$*\"\nexit 0\n"
+		binary := "#!/usr/bin/env bash\nif [ \"$1\" = handles ]; then [ \"$2\" = ported ] && exit 0; exit 1; fi\necho \"go:$*\"\necho \"script:$DEVZONE_POD_SCRIPT\"\nexit 0\n"
 		binPath := filepath.Join(binDir, "devzone-pod-linux-"+runtime.GOARCH)
 		if err := os.WriteFile(binPath, []byte(binary), 0o755); err != nil {
 			t.Fatal(err)
@@ -71,6 +71,25 @@ func TestLauncherRunsPortedCommandInGo(t *testing.T) {
 	}
 	if strings.Contains(out, "SHELL-PATH-REACHED") {
 		t.Fatalf("out = %q, must not contain %q", out, "SHELL-PATH-REACHED")
+	}
+}
+
+// TestLauncherPassesItsOwnShellToGo checks that the Go binary is told which shell to
+// delegate back to: the launcher of this devzone folder, not the copy installed in the
+// image (#857: a command ported in part, like cluster clean, sends the rest of cluster
+// back to the shell).
+func TestLauncherPassesItsOwnShellToGo(t *testing.T) {
+	if runtime.GOOS == "windows" || (runtime.GOARCH != "amd64" && runtime.GOARCH != "arm64") {
+		t.Skip()
+	}
+	dir := launcherSetup(t, true)
+	out, code := runLauncher(t, dir, []string{"DEVZONE_POD_SCRIPT="}, "ported")
+	if code != 0 {
+		t.Fatalf("code = %d, want 0", code)
+	}
+	want := "script:" + filepath.Join(dir, "devzone")
+	if !strings.Contains(out, want) {
+		t.Fatalf("out = %q, want it to contain %q", out, want)
 	}
 }
 
