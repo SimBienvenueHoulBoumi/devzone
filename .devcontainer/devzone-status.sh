@@ -106,6 +106,7 @@ show_state() {
             echo "  ⚠ limited account token expired: devzone repair"
         fi
     fi
+    devzone cluster clean --quiet || true
     # Old kind-gitlab cluster still present: invite to migrate (#396)
     if kind get clusters 2>/dev/null | grep -qx "gitlab${INSTANCE_SUFFIX}"; then
         printf '  ⚠ old kind-gitlab cluster%s: devzone gitlab migrate\n' "$INSTANCE_SUFFIX"

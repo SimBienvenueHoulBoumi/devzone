@@ -65,6 +65,13 @@ for p in ${FAUX_REPOND:-}; do
 done
 exit 7
 CURL
+    cat >"$BATS_TEST_TMPDIR/bin/devzone" <<'DEVZONE'
+#!/usr/bin/env bash
+case "$*" in
+    "cluster clean"*) exit 0 ;;
+esac
+exit 0
+DEVZONE
     chmod +x "$BATS_TEST_TMPDIR/bin/"*
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
 }

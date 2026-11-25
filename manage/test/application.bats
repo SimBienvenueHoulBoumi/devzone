@@ -66,6 +66,14 @@ DEMARRAGE
 printf 'metrics %s\n' "$*" >>"$BATS_TEST_TMPDIR/actions.log"
 METRICS
     chmod +x "$T/app"/*.sh "$T/app/gitlab/gitlab.sh" "$T/app/postgres/postgres.sh" "$T/app/catalog/catalog-watcher.sh" "$T/app/catalog/mysql/mysql.sh"
+    cat >"$T/bin/devzone" <<'DEVZONE'
+#!/usr/bin/env bash
+case "$*" in
+    "cluster clean"*) exit 0 ;;
+esac
+exit 0
+DEVZONE
+    chmod +x "$T/bin/devzone"
 }
 
 faux_kubectl() {

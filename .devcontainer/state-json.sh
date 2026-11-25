@@ -199,6 +199,7 @@ state_json() {
         fi
     fi
 
+    devzone cluster clean --quiet >/dev/null 2>&1 || [ $? -ne 3 ] || append_alert cluster_disk "cluster disk almost full" "devzone repair"
     if ports_out="$(bash "$ICI/ports.sh" list --json 2>/dev/null)"; then
         if printf '%s' "$ports_out" | jq -e . >/dev/null 2>&1; then
             ports_json="$ports_out"
