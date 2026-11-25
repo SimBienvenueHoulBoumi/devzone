@@ -62,8 +62,7 @@ func TestClusterCleanFlags(t *testing.T) {
 // behaviour of the other commands that are not ported.
 func TestClusterDelegation(t *testing.T) {
 	podScriptForTest(t)
-	desktop := "doc" + "ker-desktop"
-	for _, args := range [][]string{{"cluster"}, {"cluster", desktop}, {"cluster", "use", "kind-devzone"}} {
+	for _, args := range [][]string{{"cluster"}, {"cluster", "docker-desktop"}, {"cluster", "use", "kind-devzone"}} {
 		var out strings.Builder
 		if rc := Run(args, &out, io.Discard); rc != 7 {
 			t.Fatalf("%v: got %d, want 7", args, rc)

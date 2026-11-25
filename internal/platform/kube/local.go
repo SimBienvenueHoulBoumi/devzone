@@ -6,12 +6,6 @@ import (
 	"strings"
 )
 
-// desktopName is the name of the workstation cluster context.
-const desktopName = "doc" + "ker-desktop"
-
-// workstationHost is the API host seen from inside a container.
-const workstationHost = "host." + "doc" + "ker" + ".internal"
-
 // IsLocal reports whether the services context is a local cluster, by its name
 // or by the loopback host of its API server.
 func IsLocal(contextName string) bool {
@@ -47,7 +41,7 @@ func nameIsLocal(contextName string) bool {
 		return true
 	}
 	switch contextName {
-	case desktopName, "rancher-desktop", "orbstack", "minikube":
+	case "docker-desktop", "rancher-desktop", "orbstack", "minikube":
 		return true
 	}
 	return false
@@ -71,7 +65,7 @@ func serverIsLocal(server string) bool {
 		host = host[:i]
 	}
 	switch host {
-	case "127.0.0.1", "localhost", "::1", workstationHost:
+	case "127.0.0.1", "localhost", "::1", "host.docker.internal":
 		return true
 	}
 	return strings.HasSuffix(host, "-control-plane")

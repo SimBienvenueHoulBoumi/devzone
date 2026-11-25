@@ -43,7 +43,7 @@ func (f *fixture) withStats(stats ...exec.Result) *sequenceRunner {
 func alpineNode() exec.Result {
 	return exec.Result{Stdout: []byte(`{"status":{"images":[
 		{"names":["registry.k8s.io/pause:3.9"]},
-		{"names":["library/alpine:3.20"]}
+		{"names":["docker.io/library/alpine:3.20"]}
 	]}}`)}
 }
 
@@ -72,7 +72,7 @@ func TestCleanOneNode(t *testing.T) {
 	f.on([]string{"get", "nodes", "-o", "name"}, exec.Result{Stdout: []byte("node/node1\n")})
 	f.withStats(summary(10, 1e11), summary(30, 1e11))
 	f.on([]string{"get", "node", "node1", "-o", "json"}, alpineNode())
-	f.on(debugArgs("node1", "library/alpine:3.20")[2:], exec.Result{
+	f.on(debugArgs("node1", "docker.io/library/alpine:3.20")[2:], exec.Result{
 		Stdout: []byte("Pod/node-debugger-node1-abc created\n")})
 	f.on([]string{"get", "pod", "node-debugger-node1-abc", "-o", "jsonpath={.status.phase}"},
 		exec.Result{Stdout: []byte("Succeeded")})
@@ -88,7 +88,7 @@ func TestCleanOneNode(t *testing.T) {
 	if report.Code != 0 || report.FreedBytes != 2e10 {
 		t.Fatalf("report = %+v, want 20 GB freed", report)
 	}
-	if len(report.Nodes) != 1 || report.Nodes[0].Image != "library/alpine:3.20" {
+	if len(report.Nodes) != 1 || report.Nodes[0].Image != "docker.io/library/alpine:3.20" {
 		t.Fatalf("nodes = %+v", report.Nodes)
 	}
 	if len(report.Nodes[0].Deleted) != 1 || !strings.Contains(report.Nodes[0].Deleted[0], "Deleted") {
@@ -99,7 +99,7 @@ func TestCleanOneNode(t *testing.T) {
 	}
 	var debugFound, deleteFound bool
 	for _, c := range f.r.Calls() {
-		if strings.Join(c.Args, "\x00") == strings.Join(debugArgs("node1", "library/alpine:3.20"), "\x00") {
+		if strings.Join(c.Args, "\x00") == strings.Join(debugArgs("node1", "docker.io/library/alpine:3.20"), "\x00") {
 			debugFound = true
 		}
 		if isDeleteCall(c.Args) {
@@ -157,7 +157,7 @@ func TestCleanFailedPodContinues(t *testing.T) {
 		if i == 0 {
 			phase = "Failed"
 		}
-		f.on(debugArgs(node, "library/alpine:3.20")[2:], exec.Result{
+		f.on(debugArgs(node, "docker.io/library/alpine:3.20")[2:], exec.Result{
 			Stdout: []byte("Pod/" + pod + " created\n")})
 		f.on([]string{"get", "pod", pod, "-o", "jsonpath={.status.phase}"}, exec.Result{Stdout: []byte(phase)})
 		f.on([]string{"logs", pod}, exec.Result{Stdout: []byte("Deleted image sha256:aaa\n")})

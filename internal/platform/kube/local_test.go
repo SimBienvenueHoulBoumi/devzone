@@ -31,7 +31,7 @@ func programServer(t *testing.T, r *fake.Runner, name, server string) string {
 // TestIsLocalByContextName checks every local context name without a config call.
 func TestIsLocalByContextName(t *testing.T) {
 	for _, name := range []string{
-		"kind-devzone", "kind-other", desktopName, "rancher-desktop", "orbstack", "minikube",
+		"kind-devzone", "kind-other", "docker-desktop", "rancher-desktop", "orbstack", "minikube",
 	} {
 		t.Run(name, func(t *testing.T) {
 			r := withRunner(t)
@@ -49,7 +49,7 @@ func TestIsLocalByContextName(t *testing.T) {
 func TestIsLocalByServer(t *testing.T) {
 	for _, server := range []string{
 		"https://127.0.0.1:6443", "https://localhost:6443", "https://[::1]:6443",
-		"https://[::1]:6443/path", "https://" + workstationHost + ":6443",
+		"https://[::1]:6443/path", "https://host.docker.internal:6443",
 		"https://127.0.0.1-control-plane:6443", "http://127.0.0.1",
 	} {
 		t.Run(server, func(t *testing.T) {
