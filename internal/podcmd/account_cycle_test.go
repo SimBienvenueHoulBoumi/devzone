@@ -89,17 +89,21 @@ func TestAccountTokenReportsUnreachableContext(t *testing.T) {
 	}
 }
 
-// TestAccountTokenSilentFailure checks that a failure the shell did not print
-// stays silent: only the exit code reports it.
-func TestAccountTokenSilentFailure(t *testing.T) {
+// TestAccountTokenFailureIsReported checks that any failure of the renewal is
+// written on stderr: a token that is not renewed is never silent (in the
+// shell, kubectl wrote its own error).
+func TestAccountTokenFailureIsReported(t *testing.T) {
 	accountFixture(t, "docker-desktop")
 	r := testkit.FakeRunner(t)
 	programAccountToken(r, "docker-desktop")
 	r.On("kubectl", []string{"--context", "docker-desktop", "create", "namespace", "devzone-system",
 		"--dry-run=client", "-o", "yaml"}, exec.Result{Code: 1})
 	code, out, errOut := runAccountArgs([]string{"token"}, r)
-	if code != 1 || out != "" || errOut != "" {
-		t.Fatalf("account token = %d, %q, %q; want 1 and no output", code, out, errOut)
+	if code != 1 || out != "" {
+		t.Fatalf("account token = %d, %q; want 1 and nothing on stdout", code, out)
+	}
+	if !strings.Contains(errOut, "devzone : limited account token not renewed:") {
+		t.Fatalf("stderr = %q, want the failure reported", errOut)
 	}
 }
 

@@ -57,16 +57,19 @@ func runAccountToken(ctx *cli.Context) int {
 }
 
 // accountFail writes the failure of the limited account and returns its code.
-// Only the errors that the shell token cycle printed are shown: the other
-// failures keep the silent behaviour of the shell original.
+// The messages of the shell token cycle are kept as they were; any other
+// failure is shown too (in the shell, kubectl wrote its own error on stderr):
+// a token that is not renewed is never silent.
 func accountFail(err error, errOut io.Writer) int {
+	if errOut == nil {
+		errOut = io.Discard
+	}
 	var message kube.MessageError
 	if errors.As(err, &message) {
-		if errOut == nil {
-			errOut = io.Discard
-		}
 		fmt.Fprintf(errOut, "devzone : %s\n", message.Text)
+		return 1
 	}
+	fmt.Fprintf(errOut, "devzone : limited account token not renewed: %v\n", err)
 	return 1
 }
 
