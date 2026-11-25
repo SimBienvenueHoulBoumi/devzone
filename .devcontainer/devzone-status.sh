@@ -101,8 +101,8 @@ show_state() {
     # Limited account token (#845): renewed as soon as it is close to expiry,
     # only outside the pod and with a services cluster chosen (the cases where
     # kube-account.sh is used); a failed renewal is reported for devzone repair
-    if ! in_pod && [ -n "$current_cluster" ] && ! account_token_fresh; then
-        if ! bash "$ICI/kube-account.sh" jeton >/dev/null 2>&1; then
+    if ! in_pod && [ -n "$current_cluster" ] && ! devzone account fresh; then
+        if ! devzone account token >/dev/null 2>&1; then
             echo "  ⚠ limited account token expired: devzone repair"
         fi
     fi

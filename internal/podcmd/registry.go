@@ -24,6 +24,10 @@ func newDefaultRegistry() *cli.Registry {
 		Name: "cluster",
 		Run:  runCluster,
 	})
+	r.Register(cli.Command{
+		Name: "account",
+		Run:  runAccount,
+	})
 	return r
 }
 

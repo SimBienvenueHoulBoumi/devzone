@@ -7,6 +7,7 @@
 PRESENT_MARK=$'# d\303\251j\303\240 pr\303\251sent'
 
 setup() {
+    bats_require_minimum_version 1.5.0
     load commun
     kind_vide
     kube_isole

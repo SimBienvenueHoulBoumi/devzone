@@ -68,8 +68,11 @@ METRICS
     chmod +x "$T/app"/*.sh "$T/app/gitlab/gitlab.sh" "$T/app/postgres/postgres.sh" "$T/app/catalog/catalog-watcher.sh" "$T/app/catalog/mysql/mysql.sh"
     cat >"$T/bin/devzone" <<'DEVZONE'
 #!/usr/bin/env bash
+echo "devzone $*" >>"$BATS_TEST_TMPDIR/devzone.log"
 case "$*" in
     "cluster clean"*) exit 0 ;;
+    "account token"*) exit 0 ;;
+    "account fresh"*) exit 0 ;;
 esac
 exit 0
 DEVZONE
@@ -141,7 +144,7 @@ KUBE
     run bash "$APP" repair
     [ "$status" -eq 0 ]
     [[ "$output" == *"✔ kubernetes account"* ]] || false
-    grep -q 'create token devzone-agent -n devzone-system --duration=24h' "$T/kubectl.log" || false
+    grep -q 'account token' "$T/devzone.log" || false
 }
 
 @test "repair: without a services cluster, no kubernetes account token" {
