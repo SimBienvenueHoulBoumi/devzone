@@ -69,6 +69,38 @@ CURL
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
 }
 
+# Fake kubectl for the limited token (#845): a working renewal unless the
+# token.fail marker exists; it replaces the default failing fake of setup.
+kubectl_jeton() {
+    cat >"$BATS_TEST_TMPDIR/bin/kubectl" <<'KUBE'
+#!/usr/bin/env bash
+echo "kubectl $*" >>"$BATS_TEST_TMPDIR/kubectl.log"
+case "$*" in
+    *"config get-contexts -o name"*) echo "kind-devzone" ;;
+    *"config current-context"*) echo "kind-devzone" ;;
+    *"config view"*)
+        case "$*" in
+            *'.context.cluster'*) echo cluster-hote ;;
+            *'.cluster.server'*) echo "https://127.0.0.1:6443" ;;
+        esac
+        ;;
+    *"config set-cluster"* | *"config set-credentials"* | *"config set-context"*) ;;
+    *"create token"*)
+        [ -f "$BATS_TEST_TMPDIR/token.fail" ] && exit 1
+        printf 'token-test\n2030-01-01T00:00:00Z\n'
+        ;;
+    *"create namespace"*) printf 'kind: Namespace\nmetadata:\n  name: devzone-system\n' ;;
+    *"create serviceaccount"*) printf 'kind: ServiceAccount\nmetadata:\n  name: devzone-agent\n' ;;
+    *"create rolebinding"*) printf 'kind: RoleBinding\nmetadata:\n  name: devzone-agent\n' ;;
+    *"get namespaces -l"*) ;;
+    *"apply -f -"*) cat >/dev/null ;;
+    *) exit 1 ;;
+esac
+exit 0
+KUBE
+    chmod +x "$BATS_TEST_TMPDIR/bin/kubectl"
+}
+
 @test "state-json: schema 2 and valid JSON" {
     run bash "$DEVZONE" status --json
     [ "$status" -eq 0 ]
@@ -101,6 +133,29 @@ CURL
     [ "$status" -eq 0 ]
     [ "$(printf '%s\n' "$output" | jq -r '.modules[] | select(.name=="ai") | .failed')" = "failed npm" ]
     [ "$(printf '%s\n' "$output" | jq -r '.modules[] | select(.name=="ai") | .command')" = "devzone apply" ]
+}
+
+@test "state-json: expired limited account token renewed without an alert" {
+    printf 'cluster=kind-devzone\n' >"$DEVZONE_STATE"
+    export DEVZONE_KUBE_TOKEN_EXPIRY="$BATS_TEST_TMPDIR/expiry"
+    printf '%s\n' "$(( $(date +%s) - 10 ))" >"$DEVZONE_KUBE_TOKEN_EXPIRY"
+    kubectl_jeton
+    run bash "$DEVZONE" status --json
+    [ "$status" -eq 0 ]
+    printf '%s\n' "$output" | jq -e '.alerts | map(select(.command == "devzone repair")) | length == 0' >/dev/null
+    grep -q 'create token' "$BATS_TEST_TMPDIR/kubectl.log"
+    [ "$(cat "$DEVZONE_KUBE_TOKEN_EXPIRY")" = 1893456000 ]
+}
+
+@test "state-json: failed limited account token renewal → alert with devzone repair" {
+    printf 'cluster=kind-devzone\n' >"$DEVZONE_STATE"
+    export DEVZONE_KUBE_TOKEN_EXPIRY="$BATS_TEST_TMPDIR/expiry"
+    printf '%s\n' "$(( $(date +%s) - 10 ))" >"$DEVZONE_KUBE_TOKEN_EXPIRY"
+    kubectl_jeton
+    : >"$BATS_TEST_TMPDIR/token.fail"
+    run bash "$DEVZONE" status --json
+    [ "$status" -eq 0 ]
+    printf '%s\n' "$output" | jq -e '.alerts[] | select(.code == "limited_account_token" and .message == "limited account token expired" and .command == "devzone repair")' >/dev/null
 }
 
 @test "state-json: gh failing → github null and errors.github" {

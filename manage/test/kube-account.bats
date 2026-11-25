@@ -50,7 +50,18 @@ case "$*" in
         printf 'user: %s %s\n' "$(after set-credentials "$@")" "$4" >>"$CONFIG" ;;
     *"config set-context"*)
         printf 'context: %s %s %s\n' "$(after set-context "$@")" "$4" "$5" >>"$CONFIG" ;;
-    *"create token"*) echo token-test ;;
+    *"create token"*)
+        case "$*" in
+            *jsonpath*)
+                if [ -n "${FAKE_TOKEN_EXPIRY:-}" ]; then
+                    printf 'token-test\n%s\n' "$FAKE_TOKEN_EXPIRY"
+                else
+                    echo token-test
+                fi
+                ;;
+            *) echo token-test ;;
+        esac
+        ;;
     *"create namespace"*)
         printf 'kind: Namespace\nmetadata:\n  name: %s\n' "$(after namespace "$@")" ;;
     *"create serviceaccount"*)
@@ -132,6 +143,64 @@ KUBE
     grep -qF -- "--kubeconfig=$HOME/.kube/config --context kind-devzone create token devzone-agent" \
         "$BATS_TEST_TMPDIR/kubectl.log" || false
     grep -qx 'context: devzone --cluster=kind-devzone --user=devzone-agent' "$HOME/.kube/config" || false
+}
+
+@test "account_token : expiry written as 600 from the TokenRequest response" {
+    export DEVZONE_KUBE_TOKEN_EXPIRY="$BATS_TEST_TMPDIR/expiry"
+    export FAKE_TOKEN_EXPIRY="2030-01-01T00:00:00Z"
+    (
+        set -e
+        source "$KUBE_ACCOUNT"
+        account_token kind-devzone
+    ) || false
+    [ "$(cat "$DEVZONE_KUBE_TOKEN_EXPIRY")" = 1893456000 ] || false
+    [ "$(stat -c %a "$DEVZONE_KUBE_TOKEN_EXPIRY" 2>/dev/null || stat -f %Lp "$DEVZONE_KUBE_TOKEN_EXPIRY")" = 600 ] || false
+}
+
+@test "account_token : unreadable expiry timestamp falls back to now + 24 h" {
+    export DEVZONE_KUBE_TOKEN_EXPIRY="$BATS_TEST_TMPDIR/expiry"
+    unset FAKE_TOKEN_EXPIRY
+    before="$(date +%s)"
+    (
+        set -e
+        source "$KUBE_ACCOUNT"
+        account_token kind-devzone
+    ) || false
+    after="$(date +%s)"
+    value="$(cat "$DEVZONE_KUBE_TOKEN_EXPIRY")"
+    [ "$value" -ge $((before + 86400)) ] || false
+    [ "$value" -le $((after + 86400)) ] || false
+}
+
+@test "account_token_fresh : true when the expiry is more than one hour away" {
+    export DEVZONE_KUBE_TOKEN_EXPIRY="$BATS_TEST_TMPDIR/expiry"
+    printf '%s\n' "$(( $(date +%s) + 7200 ))" >"$DEVZONE_KUBE_TOKEN_EXPIRY"
+    run bash -c '. "$1"; account_token_fresh' _ "$KUBE_ACCOUNT"
+    [ "$status" -eq 0 ] || false
+}
+
+@test "account_token_fresh : false when less than one hour remains" {
+    export DEVZONE_KUBE_TOKEN_EXPIRY="$BATS_TEST_TMPDIR/expiry"
+    printf '%s\n' "$(( $(date +%s) + 1800 ))" >"$DEVZONE_KUBE_TOKEN_EXPIRY"
+    run bash -c '. "$1"; account_token_fresh' _ "$KUBE_ACCOUNT"
+    [ "$status" -eq 1 ] || false
+}
+
+@test "account_token_fresh : false once expired" {
+    export DEVZONE_KUBE_TOKEN_EXPIRY="$BATS_TEST_TMPDIR/expiry"
+    printf '%s\n' "$(( $(date +%s) - 10 ))" >"$DEVZONE_KUBE_TOKEN_EXPIRY"
+    run bash -c '. "$1"; account_token_fresh' _ "$KUBE_ACCOUNT"
+    [ "$status" -eq 1 ] || false
+}
+
+@test "account_token_fresh : false without a readable expiry file" {
+    export DEVZONE_KUBE_TOKEN_EXPIRY="$BATS_TEST_TMPDIR/expiry"
+    rm -f "$DEVZONE_KUBE_TOKEN_EXPIRY"
+    run bash -c '. "$1"; account_token_fresh' _ "$KUBE_ACCOUNT"
+    [ "$status" -eq 1 ] || false
+    printf 'not-a-number\n' >"$DEVZONE_KUBE_TOKEN_EXPIRY"
+    run bash -c '. "$1"; account_token_fresh' _ "$KUBE_ACCOUNT"
+    [ "$status" -eq 1 ] || false
 }
 
 @test "kube-account.sh jeton : without a chosen services cluster, nothing runs" {

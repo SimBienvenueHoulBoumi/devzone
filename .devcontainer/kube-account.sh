@@ -3,10 +3,10 @@
 # agents) can only act in the devzone-* namespaces. The account is the
 # ServiceAccount devzone-agent of the devzone-system namespace, bound to the
 # edit ClusterRole (no RBAC, no quotas) in each devzone namespace by a
-# RoleBinding, with a 24 h TokenRequest token renewed at startup (startup.sh) and
-# by « devzone repair ». The installers alone use the admin context (host context
-# in ~/.kube/hote.config, kind cluster in ~/.kube/config); shells and agents only
-# have ~/.kube/config.
+# RoleBinding, with a 24 h TokenRequest token renewed at startup (startup.sh),
+# by « devzone repair » and by the summary before expiry. The installers alone
+# use the admin context (host context in ~/.kube/hote.config, kind cluster in
+# ~/.kube/config); shells and agents only have ~/.kube/config.
 # Library sourced by cluster.sh; executable for the token:
 #   kube-account.sh jeton   (argument kept: called by startup.sh and devzone repair)
 
@@ -14,6 +14,7 @@ ACCOUNT_NS=devzone-system
 ACCOUNT_SA=devzone-agent
 ACCOUNT_DURATION=24h
 ACCOUNT_CONFIG="${DEVZONE_KUBE_CONFIG:-$HOME/.kube/config}"
+ACCOUNT_TOKEN_EXPIRY="${DEVZONE_KUBE_TOKEN_EXPIRY:-$HOME/.kube/devzone-token.expiry}"
 
 # kubeconfig file that holds the admin context ctx: hote.config if it lists it
 # (host clusters), otherwise ~/.kube/config (kind clusters of the container).
@@ -129,16 +130,49 @@ account_catch_up() {
     done < <(account_admin "$ctx" get namespaces -l "$label" -o name 2>/dev/null || true)
 }
 
+# Epoch seconds of the RFC 3339 expiration timestamp of a TokenRequest
+# response; empty when the local date cannot read it, so the caller falls back
+# to now + 24 h (Bash 3.2: GNU date -d, then the BSD date form).
+account_expiry_epoch() {
+    local ts="$1" epoch
+    [ -n "$ts" ] || return 0
+    epoch="$(date -u -d "$ts" +%s 2>/dev/null || true)"
+    if [ -n "$epoch" ]; then
+        echo "$epoch"
+        return 0
+    fi
+    epoch="$(date -j -u -f '%Y-%m-%dT%H:%M:%SZ' "$ts" +%s 2>/dev/null || true)"
+    [ -n "$epoch" ] && echo "$epoch"
+}
+
+# True when the token has more than one hour left, read from the expiry file
+# without any cluster call: absent, unreadable, non-numeric, close or past
+# expiry → false.
+account_token_fresh() {
+    local expiry now
+    [ -f "$ACCOUNT_TOKEN_EXPIRY" ] || return 1
+    expiry="$(cat "$ACCOUNT_TOKEN_EXPIRY" 2>/dev/null || true)"
+    case "$expiry" in
+        '' | *[!0-9]*) return 1 ;;
+    esac
+    now="$(date +%s)"
+    [ "$expiry" -gt $((now + 3600)) ]
+}
+
 # Renews the account's token (24 h TokenRequest) and writes it into the devzone
 # context of ~/.kube/config: user devzone-agent, same cluster as the admin
 # context (cluster entry copied: server, certificate authority and
-# tls-server-name of the host context).
+# tls-server-name of the host context). The expiry timestamp of the TokenRequest
+# response is kept in ACCOUNT_TOKEN_EXPIRY (now + 24 h if it is unreadable).
 account_token() {
-    local ctx="$1" conf token cluster server tls ca_data ca_file
+    local ctx="$1" conf token cluster server tls ca_data ca_file out expires expiry now
     local entry=()
     conf="$(account_admin_config "$ctx")"
-    token="$(account_admin "$ctx" create token "$ACCOUNT_SA" -n "$ACCOUNT_NS" \
-        --duration="$ACCOUNT_DURATION")" || return 1
+    out="$(account_admin "$ctx" create token "$ACCOUNT_SA" -n "$ACCOUNT_NS" \
+        --duration="$ACCOUNT_DURATION" \
+        -o jsonpath='{.status.token}{"\n"}{.status.expirationTimestamp}')" || return 1
+    token="$(printf '%s\n' "$out" | sed -n '1p')"
+    expires="$(printf '%s\n' "$out" | sed -n '2p')"
     if [ -z "$token" ]; then
         echo "devzone : limited account token is empty" >&2
         return 1
@@ -175,7 +209,13 @@ account_token() {
     KUBECONFIG="$ACCOUNT_CONFIG" kubectl config set-credentials "$ACCOUNT_SA" \
         --token="$token" >/dev/null
     KUBECONFIG="$ACCOUNT_CONFIG" kubectl config set-context devzone \
-        --cluster="$cluster" --user="$ACCOUNT_SA" >/dev/null
+        --cluster="$cluster" --user="$ACCOUNT_SA" >/dev/null || return 1
+    now="$(date +%s)"
+    expiry="$(account_expiry_epoch "$expires")"
+    [ -n "$expiry" ] || expiry=$((now + 86400))
+    mkdir -p "$(dirname "$ACCOUNT_TOKEN_EXPIRY")"
+    printf '%s\n' "$expiry" >"$ACCOUNT_TOKEN_EXPIRY"
+    chmod 600 "$ACCOUNT_TOKEN_EXPIRY"
 }
 
 # Direct execution: account token renewed at startup (startup.sh) and by
