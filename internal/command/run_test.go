@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/bashbridge"
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/cli"
 )
 
 // requireBash skips the test when bash cannot run the fake entry point
@@ -76,12 +77,14 @@ func TestRunMissingEntryPoint(t *testing.T) {
 
 func TestRunPortedCommand(t *testing.T) {
 	var gotArgs []string
-	ported["fake"] = func(args []string, out, errOut io.Writer) int {
-		gotArgs = args
-		io.WriteString(out, "handled\n")
+	Registry.Register(cli.Command{Name: "fake", Run: func(ctx *cli.Context) int {
+		gotArgs = ctx.Args
+		io.WriteString(ctx.Out, "handled\n")
 		return 5
-	}
-	t.Cleanup(func() { delete(ported, "fake") })
+	}})
+	t.Cleanup(func() {
+		Registry = newDefaultRegistry()
+	})
 	// A missing entry point would fail a delegation: bash must not run here
 	t.Setenv(bashbridge.EnvVar, filepath.Join(t.TempDir(), "absent"))
 	var out bytes.Buffer

@@ -2,11 +2,13 @@ package workspace
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
-	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec"
 )
 
 // guardRefused is the status of copyGuardScript when the pod folder is a clone
@@ -21,8 +23,12 @@ type OriginFunc func(folder string) string
 // "git -C folder remote get-url origin" prints it, or "" when the folder is not
 // a git clone or has no origin. The errors of git are not shown.
 func Origin(folder string) string {
-	out, _ := exec.Command("git", "-C", folder, "remote", "get-url", "origin").Output()
-	return strings.TrimRight(string(out), "\n")
+	r := exec.ExecRunner{}
+	res, err := r.Run(context.Background(), "git", []string{"-C", folder, "remote", "get-url", "origin"}, exec.Opts{})
+	if err != nil || res.Code != 0 {
+		return ""
+	}
+	return strings.TrimRight(string(res.Stdout), "\n")
 }
 
 // copyGuardScript runs in the pod (bash -s, with the pod folder and the remote of

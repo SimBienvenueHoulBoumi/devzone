@@ -9,6 +9,8 @@ import (
 	"os"
 
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/bashbridge"
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/cli"
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec"
 )
 
 // Run executes the command line args (without the program name) and returns
@@ -18,8 +20,9 @@ func Run(args []string, out, errOut io.Writer) int {
 	if len(args) == 0 {
 		args = []string{"help"}
 	}
-	if handler, ok := ported[args[0]]; ok {
-		return handler(args[1:], out, errOut)
+	ctx := &cli.Context{Out: out, Err: errOut, Runner: exec.ExecRunner{}}
+	if code, ok := Registry.Run(args, ctx); ok {
+		return code
 	}
 	return delegate(args, out, errOut)
 }

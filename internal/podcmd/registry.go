@@ -1,26 +1,29 @@
 package podcmd
 
 import (
-	"io"
-	"sort"
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/cli"
 )
 
-// Handler func for a command
-type Handler func(args []string, out, errOut io.Writer) int
+// Registry is the single registry of commands for this binary.
+var Registry = newDefaultRegistry()
 
-// ported lists the commands of the pod ported to Go, by name.
-var ported = map[string]Handler{
-	"--version": printVersion,
-	"-v":        printVersion,
-	"ticket":    runTicket,
+// newDefaultRegistry builds the registry with the commands ported to Go.
+func newDefaultRegistry() *cli.Registry {
+	r := cli.NewRegistry()
+	for _, name := range []string{"--version", "-v"} {
+		r.Register(cli.Command{
+			Name: name,
+			Run:  printVersion,
+		})
+	}
+	r.Register(cli.Command{
+		Name: "ticket",
+		Run:  runTicket,
+	})
+	return r
 }
 
-// Ported returns the names of the commands that are ported to Go, sorted
+// Ported returns the names of the commands implemented in Go, sorted.
 func Ported() []string {
-	cmds := make([]string, 0, len(ported))
-	for cmd := range ported {
-		cmds = append(cmds, cmd)
-	}
-	sort.Strings(cmds)
-	return cmds
+	return Registry.Names()
 }
