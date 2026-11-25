@@ -90,5 +90,6 @@ repair_workstation() {
     fi
     repair_item "catalog watcher" env DEVZONE_CATALOG_REAL=yes bash "$ICI/catalog/catalog-watcher.sh" demarrer
     repair_item "credentials" bash "$ICI/password.sh" regenerer
+    devzone cluster clean || true
     return "$repair_failed"
 }
