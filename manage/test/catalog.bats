@@ -3,6 +3,7 @@
 # Fake kubectl, kind, openssl, nohup: no cluster touched.
 
 setup() {
+    bats_require_minimum_version 1.5.0
     load commun
     load commun-helm
     kube_isole
