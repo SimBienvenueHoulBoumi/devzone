@@ -77,7 +77,7 @@ fi
 # two simultaneous bumps (versions workflow) merge without conflict, git only
 # reporting neighbouring lines changed.
 # Claude Code
-IA_CLAUDE=@anthropic-ai/claude-code@2.1.331
+IA_CLAUDE=@anthropic-ai/claude-code@2.1.332
 # opencode
 IA_OPENCODE=opencode-ai@1.19.6
 IA_PAQUETS=("$IA_CLAUDE" "$IA_OPENCODE")
