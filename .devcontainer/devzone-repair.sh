@@ -68,7 +68,7 @@ repair_workstation() {
     # Limited Kubernetes account token (#430): 24 h, renewed here; without the
     # kubernetes module and without a services cluster, nothing to do
     if [ "$(value_of kubernetes)" = on ] || [ -n "$(cluster_saved)" ]; then
-        repair_item "kubernetes account" bash "$ICI/kube-account.sh" jeton
+        repair_item "kubernetes account" devzone account token
     fi
     if [ "$(value_of gitlab)" = on ]; then
         repair_item "gitlab name" bash "$ICI/gitlab/gitlab.sh" hote-poser
