@@ -47,7 +47,7 @@ func TestInstallCreatesKind(t *testing.T) {
 	assertCall(t, calls, "kubectl", []string{"--context", "devzone", "-n", ns, "create", "secret", "generic",
 		"postgres-admin", "--from-file=password=" + filepath.Join(f.root, "workspace", ".postgres", "admin-password")})
 	assertCall(t, calls, "helm", []string{"--kube-context", "devzone", "upgrade", "--install", "postgres",
-		filepath.Join(f.codeRoot, "charts", "devzone-postgres"), "-n", ns, "--set", "size=5Gi"})
+		filepath.Join(filepath.Dir(f.codeRoot), "charts", "devzone-postgres"), "-n", ns, "--set", "size=5Gi"})
 	if len(f.launches) != 1 || f.launches[0].ports[0] != "5432:5432" || f.launches[0].ctxName != "kind-devzone" {
 		t.Fatalf("relay launches = %+v", f.launches)
 	}

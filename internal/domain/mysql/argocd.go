@@ -19,7 +19,7 @@ func (e *env) argocdActive() bool {
 	if e.codeRoot == "" {
 		return false
 	}
-	if _, err := os.Stat(filepath.Join(e.codeRoot, "charts", "devzone-mysql")); err != nil {
+	if _, err := os.Stat(filepath.Join(e.root, "charts", "devzone-mysql")); err != nil {
 		return false
 	}
 	if !e.namespaceExists(e.activeAdminContext(), "devzone-argocd") {
@@ -85,7 +85,7 @@ func (e *env) installArgoCD(ctxName string) int {
 // shellEnv is the environment of the Argo CD shell library called below.
 func (e *env) shellEnv() []string {
 	return append(os.Environ(),
-		"RACINE="+e.codeRoot,
+		"RACINE="+e.root,
 		"DEVZONE_ROOT="+e.root,
 		"DEVZONE_STATE="+e.state.Path(),
 		"ETAT="+e.state.Path(),
@@ -97,7 +97,7 @@ func (e *env) shellEnv() []string {
 func (e *env) argocdApply(namespace, extra string) error {
 	body := `. "$1"; catalogue_argocd_apply mysql "$2" "$3" "$4" "$5" "$6" "$7"`
 	args := []string{"-c", body, "_", filepath.Join(e.codeRoot, "argocd", "catalog-argocd.sh"),
-		"mysql", namespace, setting("MYSQL_IMAGE", "mysql:8.4"), setting("MYSQL_PORT", "3306"),
+		namespace, setting("MYSQL_IMAGE", "mysql:8.4"), setting("MYSQL_PORT", "3306"),
 		setting("MYSQL_MEMOIRE", "1Gi"), setting("MYSQL_TAILLE", "5Gi"), extra}
 	res, err := e.execEnv("bash", args, nil, e.shellEnv())
 	if err != nil {

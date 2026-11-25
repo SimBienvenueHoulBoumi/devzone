@@ -57,13 +57,16 @@ func newFixture(t *testing.T) *fixture {
 	root := t.TempDir()
 	home := filepath.Join(root, "home")
 	codeRoot := filepath.Join(root, "code")
+	if err := os.MkdirAll(codeRoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.MkdirAll(filepath.Join(home, ".kube"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.MkdirAll(filepath.Join(codeRoot, "charts", "devzone-mysql"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(root, "charts", "devzone-mysql"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(codeRoot, "charts", "devzone-mysql", "Chart.yaml"), []byte("name: devzone-mysql\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(root, "charts", "devzone-mysql", "Chart.yaml"), []byte("name: devzone-mysql\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(codeRoot, "password.sh"), []byte("#!/usr/bin/env bash\nexit 0\n"), 0o755); err != nil {
@@ -150,7 +153,7 @@ func (f *fixture) contextReady(ctxName, cluster, user string) {
 func (f *fixture) programChart(claim string) {
 	manifest := "kind: StatefulSet\n  name: " + claim + "\n  storage: 5Gi\n"
 	sets := []string{"image=mysql:8.4", "port=3306", "memory=1Gi", "size=5Gi", "claim=" + claim}
-	chart := filepath.Join(f.codeRoot, "charts", "devzone-mysql")
+	chart := filepath.Join(filepath.Dir(f.codeRoot), "charts", "devzone-mysql")
 	f.r.On("helm", append([]string{"template", "mysql", chart, "-n", ns}, flags(sets)...), exec.Result{Stdout: []byte(manifest)})
 	f.r.On("helm", append([]string{"--kube-context", "devzone", "upgrade", "--install", "mysql", chart, "-n", ns}, flags(sets)...), exec.Result{})
 }

@@ -22,7 +22,11 @@ done
 ICI="$(cd -P "$(dirname "$SOURCE")" && pwd)"
 # Go first (#754): a command ported to Go runs in the devzone-pod binary of the image.
 # DEVZONE_NO_GO=1 forces the shell, DEVZONE_FROM_GO=1 avoids loops.
-if [ -z "${DEVZONE_NO_GO:-}" ] && [ -z "${DEVZONE_FROM_GO:-}" ]; then
+# DEVZONE_FROM_GO only concerns this call: not inherited, so that a "devzone …"
+# run by this script reaches the Go command again (#864).
+FROM_GO="${DEVZONE_FROM_GO:-}"
+unset DEVZONE_FROM_GO
+if [ -z "${DEVZONE_NO_GO:-}" ] && [ -z "$FROM_GO" ]; then
     case "$(uname -m)" in
         x86_64) POD_GO_ARCH=amd64 ;;
         aarch64 | arm64) POD_GO_ARCH=arm64 ;;
@@ -201,8 +205,12 @@ case "${1:-}" in
     use) use_cluster "${@:2}" ;;
     clusters) DEVZONE_STATE="$ETAT" bash "$ICI/clusters.sh" "${@:2}" ;;
     cluster) change_cluster "${@:2}" ;;
-    postgres) DEVZONE_STATE="$ETAT" devzone postgres "${@:2}" ;;
-    mysql) DEVZONE_STATE="$ETAT" devzone mysql "${@:2}" ;;
+    # Go only: reached when the binary did not take the call. Never call
+    # "devzone" again from here (endless loop, #864)
+    postgres | mysql)
+        echo "devzone $1: Go binary of the pod unavailable (.devcontainer/bin)" >&2
+        exit 1
+        ;;
     gitlab) DEVZONE_STATE="$ETAT" bash "$ICI/gitlab/gitlab.sh" "${@:2}" ;;
     catalog) DEVZONE_STATE="$ETAT" bash "$ICI/catalog.sh" list ;;
     argocd) DEVZONE_STATE="$ETAT" bash "$ICI/argocd/argocd.sh" "${@:2}" ;;

@@ -18,8 +18,22 @@ func runPostgres(ctx *cli.Context) int {
 		Err:      ctx.Err,
 		Stdin:    ctx.Stdin,
 		CodeRoot: codeRoot(),
+		Root:     devzoneRoot(),
 	}
 	return postgres.Run(context.Background(), opts, ctx.Args)
+}
+
+// devzoneRoot returns the devzone folder (state file, workspace/ secrets) as the
+// shell did: DEVZONE_ROOT, else the parent of the shell entry point folder,
+// never the current directory.
+func devzoneRoot() string {
+	if root := os.Getenv("DEVZONE_ROOT"); root != "" {
+		return root
+	}
+	if code := codeRoot(); code != "" {
+		return filepath.Dir(code)
+	}
+	return ""
 }
 
 // codeRoot returns the folder of the devzone shell entry point, which holds

@@ -16,6 +16,7 @@ func runMysql(ctx *cli.Context) int {
 		Err:      ctx.Err,
 		Stdin:    ctx.Stdin,
 		CodeRoot: codeRoot(),
+		Root:     devzoneRoot(),
 	}
 	return mysql.Run(context.Background(), opts, ctx.Args)
 }

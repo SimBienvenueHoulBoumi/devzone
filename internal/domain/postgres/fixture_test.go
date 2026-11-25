@@ -56,13 +56,16 @@ func newFixture(t *testing.T) *fixture {
 	root := t.TempDir()
 	home := filepath.Join(root, "home")
 	codeRoot := filepath.Join(root, "code")
+	if err := os.MkdirAll(codeRoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.MkdirAll(filepath.Join(home, ".kube"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.MkdirAll(filepath.Join(codeRoot, "charts", "devzone-postgres"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(root, "charts", "devzone-postgres"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(codeRoot, "charts", "devzone-postgres", "Chart.yaml"), []byte("name: devzone-postgres\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(root, "charts", "devzone-postgres", "Chart.yaml"), []byte("name: devzone-postgres\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(codeRoot, "password.sh"), []byte("#!/usr/bin/env bash\nexit 0\n"), 0o755); err != nil {
@@ -163,10 +166,10 @@ func (f *fixture) contextReady(ctxName, cluster, user string) {
 // programChart programs the helm template and upgrade responses for postgres.
 func (f *fixture) programChart(size string) {
 	manifest := "kind: StatefulSet\n  image: postgres:16\n  storage: " + size + "\n"
-	args := []string{"template", "postgres", filepath.Join(f.codeRoot, "charts", "devzone-postgres"), "-n", ns, "--set", "size=" + size}
+	args := []string{"template", "postgres", filepath.Join(filepath.Dir(f.codeRoot), "charts", "devzone-postgres"), "-n", ns, "--set", "size=" + size}
 	f.r.On("helm", args, exec.Result{Stdout: []byte(manifest)})
 	f.r.On("helm", []string{"--kube-context", "devzone", "upgrade", "--install", "postgres",
-		filepath.Join(f.codeRoot, "charts", "devzone-postgres"), "-n", ns, "--set", "size=" + size}, exec.Result{})
+		filepath.Join(filepath.Dir(f.codeRoot), "charts", "devzone-postgres"), "-n", ns, "--set", "size=" + size}, exec.Result{})
 }
 
 // assertCall fails when calls does not contain name with the exact arguments.

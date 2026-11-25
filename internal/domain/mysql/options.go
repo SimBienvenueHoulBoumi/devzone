@@ -78,7 +78,7 @@ func newEnv(ctx context.Context, opts Options) *env {
 		ctx:      ctx,
 		opts:     opts,
 		kube:     kube.Kube{Runner: opts.Runner},
-		state:    state.New(statePath),
+		state:    state.At(statePath),
 		root:     root,
 		codeRoot: codeRoot,
 		secrets:  filepath.Join(root, "workspace", ".mysql"),

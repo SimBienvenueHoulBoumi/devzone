@@ -25,6 +25,10 @@ func New(location string) *State {
 	return &State{path: path}
 }
 
+// At returns a handle on exactly this file, whatever its name: DEVZONE_STATE
+// names the state file itself, as in the shell.
+func At(file string) *State { return &State{path: file} }
+
 // Open is an alias for New.
 func Open(location string) *State { return New(location) }
 

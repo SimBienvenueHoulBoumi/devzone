@@ -20,7 +20,9 @@ func Install(ctx context.Context, runner exec.Runner, codeRoot, svc, ns string, 
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	chart := filepath.Join(codeRoot, "charts", "devzone-"+svc)
+	// codeRoot is the .devcontainer folder: the charts are beside it, at the
+	// root of the code tree (CHART_CODE of chart-direct.sh)
+	chart := filepath.Join(filepath.Dir(codeRoot), "charts", "devzone-"+svc)
 	if _, err := os.Stat(filepath.Join(chart, "Chart.yaml")); err != nil {
 		fmt.Fprintf(errOut, "✖ %s : chart charts/devzone-%s missing (manage/docs/reference.md#devzone-charts)\n", svc, svc)
 		return "", 2
