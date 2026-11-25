@@ -96,3 +96,24 @@ devzone/
 │       └── terminal.py         # runs a command under a pseudo-terminal, with a maximum delay
 └── workspace/                  # your projects (ignored by git, each with its own repository)
 ```
+
+## Architecture Go
+
+### Layout
+
+- `cmd/`: the two binaries, `main` only (`cmd/devzone`, `cmd/devzone-pod`).
+- `internal/framework`: shared building blocks (`cli`, `output`, `exec`, `state`, `testkit`).
+- `internal/platform`: kube, helm, git, github (to come).
+- `internal/domain`: one directory per domain (to come).
+
+### Dependency rule
+
+`domain → platform → framework`, never the reverse; a domain never imports another domain.
+
+### Adding a command
+
+Register it in the registry built in `internal/command` (workstation) or `internal/podcmd` (pod). Commands not registered are delegated to the shell through the bash bridge.
+
+### Scope
+
+Go checks run on `./cmd/... ./internal/...` only, never `./...` (which would descend into `workspace/`).

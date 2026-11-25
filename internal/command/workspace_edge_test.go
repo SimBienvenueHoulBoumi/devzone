@@ -2,6 +2,8 @@ package command
 
 import (
 	"os"
+
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/cli"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -12,7 +14,7 @@ import (
 // output and the exit code, so edge-case tests can check the usage messages.
 func runWorkspace(args ...string) (string, int) {
 	var out, errOut strings.Builder
-	code := workspaceCommand(args, &out, &errOut)
+	code := workspaceCommand(&cli.Context{Args: args, Out: &out, Err: &errOut})
 	return errOut.String(), code
 }
 
@@ -118,7 +120,7 @@ func TestCloneRoutesUrlAndNameToGo(t *testing.T) {
 	}
 	logPath := fakeKubectlLogging(t)
 	var out, errOut strings.Builder
-	code := workspaceCommand([]string{"clone", "https://github.com/acme/mine.git", "custom"}, &out, &errOut)
+	code := workspaceCommand(&cli.Context{Args: []string{"clone", "https://github.com/acme/mine.git", "custom"}, Out: &out, Err: &errOut})
 	if code != 0 {
 		t.Fatalf("exit status = %d, want 0", code)
 	}
@@ -143,7 +145,7 @@ func TestCloneRoutesUrlOnlyToGo(t *testing.T) {
 	}
 	logPath := fakeKubectlLogging(t)
 	var out, errOut strings.Builder
-	code := workspaceCommand([]string{"clone", "https://github.com/acme/mine.git"}, &out, &errOut)
+	code := workspaceCommand(&cli.Context{Args: []string{"clone", "https://github.com/acme/mine.git"}, Out: &out, Err: &errOut})
 	if code != 0 {
 		t.Fatalf("exit status = %d, want 0", code)
 	}

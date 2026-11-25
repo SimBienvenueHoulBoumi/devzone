@@ -5,13 +5,18 @@ import (
 	"fmt"
 	"io"
 	"os"
+
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/cli"
 	"os/exec"
 	"path/filepath"
 	"strings"
 )
 
 // runTicket is the devzone ticket command: parse, then start or done.
-func runTicket(args []string, out, errOut io.Writer) int {
+func runTicket(ctx *cli.Context) int {
+	args := ctx.Args
+	out := ctx.Out
+	errOut := ctx.Err
 	req, err := parseTicket(args)
 	if err == errTicketUsage {
 		fmt.Fprintln(errOut, "usage: devzone ticket <n> [--repo devzone|repowarden]")

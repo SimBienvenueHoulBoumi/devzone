@@ -1,10 +1,10 @@
 package command
 
 import (
-	"io"
 	"os"
 	"runtime"
 
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/cli"
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/workspace"
 )
 
@@ -19,7 +19,10 @@ import (
 // as the bash entry point handles them (renamed words). When the Argo CD
 // Application holds the workspace, stop is delegated too. shell gets the
 // terminal of the user as its standard input.
-func workspaceCommand(args []string, out, errOut io.Writer) int {
+func workspaceCommand(ctx *cli.Context) int {
+	args := ctx.Args
+	out := ctx.Out
+	errOut := ctx.Err
 	if len(args) >= 1 && args[0] == "clone" {
 		url, name := "", ""
 		if len(args) == 2 || len(args) == 3 {

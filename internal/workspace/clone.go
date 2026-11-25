@@ -1,10 +1,12 @@
 package workspace
 
 import (
+	"context"
 	"fmt"
 	"io"
-	"os/exec"
 	"strings"
+
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec"
 )
 
 // IdentityFunc returns the value of a git setting of the workstation (user.name
@@ -20,8 +22,12 @@ const cloneUsage = "✖ usage: devzone workspace clone <url> [<name>]"
 // "git config --get key" prints it, or "" when it is not set. The errors of git
 // are not shown, as in the bash entry point.
 func Identity(key string) string {
-	out, _ := exec.Command("git", "config", "--get", key).Output()
-	return strings.TrimRight(string(out), "\n")
+	r := exec.ExecRunner{}
+	res, err := r.Run(context.Background(), "git", []string{"config", "--get", key}, exec.Opts{})
+	if err != nil || res.Code != 0 {
+		return ""
+	}
+	return strings.TrimRight(string(res.Stdout), "\n")
 }
 
 // Clone clones the git repository url into the projects folder of the pod, under
