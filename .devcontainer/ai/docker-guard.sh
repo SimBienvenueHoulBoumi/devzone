@@ -4,19 +4,24 @@
 # stderr when a shell command runs docker/docker-compose as the command word.
 # With python3, one program parses the JSON and detects. Otherwise jq extracts
 # the tool and command and a best-effort shell detection runs. Without either,
-# nothing is blocked.
+# nothing is blocked. The cluster context check runs first: the host override
+# only concerns commands on the host itself, never the administrator context.
 
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MESSAGE_FILE="$SCRIPT_DIR/docker-guard.message"
+KUBE_MESSAGE_FILE="$SCRIPT_DIR/kube-guard.message"
 FALLBACK="devzone is Kubernetes-first: only pods are containers. Use kubectl, or a throwaway pod or namespace. Host action: set DEVZONE_ALLOW_DOCKER to 1."
+FALLBACK_KUBE="Cluster administrator access is reserved for installers. Use the devzone context or the devzone commands (enable, disable, repair). An explicit host override does not lift this refusal."
 MESSAGE="$FALLBACK"
+KUBE_MESSAGE="$FALLBACK_KUBE"
 if [ -r "$MESSAGE_FILE" ]; then
     MESSAGE="$(cat "$MESSAGE_FILE" 2>/dev/null)" || MESSAGE="$FALLBACK"
 fi
-
-[ "${DEVZONE_ALLOW_DOCKER:-}" = "1" ] && exit 0
+if [ -r "$KUBE_MESSAGE_FILE" ]; then
+    KUBE_MESSAGE="$(cat "$KUBE_MESSAGE_FILE" 2>/dev/null)" || KUBE_MESSAGE="$FALLBACK_KUBE"
+fi
 
 FORMAT="opencode"
 [ "${1:-}" = "--format" ] && [ "${2:-}" = "claude" ] && FORMAT="claude"
@@ -25,6 +30,54 @@ INPUT="$(cat 2>/dev/null)" || exit 0
 [ -n "$INPUT" ] || exit 0
 
 block() { printf '%s\n' "$MESSAGE" >&2; exit 2; }
+# Refuses a command that reaches the administrator kubeconfig, with a message
+# of its own: the host override never lifts this refusal (#844).
+block_kube() { printf '%s\n' "$KUBE_MESSAGE" >&2; exit 2; }
+
+if command -v python3 >/dev/null 2>&1; then
+    HIT="$(__DG_INPUT="$INPUT" __DG_FORMAT="$FORMAT" python3 <<'KUBE_PYTHON'
+import json, os, re, sys
+
+try:
+    data = json.loads(os.environ.get("__DG_INPUT", ""))
+except Exception:
+    sys.exit(0)
+if not isinstance(data, dict):
+    sys.exit(0)
+if os.environ.get("__DG_FORMAT", "opencode") == "claude":
+    tool = data.get("tool_name") or ""
+    inner = data.get("tool_input")
+else:
+    tool = data.get("tool") or ""
+    inner = data.get("args")
+cmd = (inner.get("command") if isinstance(inner, dict) else "") or ""
+if tool not in ("bash", "shell", "Bash") or not isinstance(cmd, str) or not cmd:
+    sys.exit(0)
+pattern = re.compile(
+    r"\.kube/hote\.config|\.kube-host|(?:^|[^\w])KUBECONFIG\s*=|"
+    r"(?:^|[^\w])export\s+KUBECONFIG\b|--kubeconfig(?:[=\s]|$)"
+)
+if pattern.search(cmd):
+    print("kube")
+KUBE_PYTHON
+)"
+    [ "$HIT" = kube ] && block_kube
+elif command -v jq >/dev/null 2>&1; then
+    if [ "$FORMAT" = "claude" ]; then
+        KUBE_TOOL="$(printf '%s' "$INPUT" | jq -r '.tool_name // ""' 2>/dev/null)" || exit 0
+        KUBE_COMMAND="$(printf '%s' "$INPUT" | jq -r '.tool_input.command // ""' 2>/dev/null)" || exit 0
+    else
+        KUBE_TOOL="$(printf '%s' "$INPUT" | jq -r '.tool // ""' 2>/dev/null)" || exit 0
+        KUBE_COMMAND="$(printf '%s' "$INPUT" | jq -r '.args.command // ""' 2>/dev/null)" || exit 0
+    fi
+    case "$KUBE_TOOL" in bash|shell|Bash) ;; *) exit 0 ;; esac
+    [ -n "$KUBE_COMMAND" ] || exit 0
+    if printf '%s' "$KUBE_COMMAND" | grep -qE '(^|[^[:alnum:]_])KUBECONFIG[[:space:]]*=|\.kube/hote\.config|\.kube-host|(^|[^[:alnum:]_])export[[:space:]]+KUBECONFIG([^[:alnum:]_]|$)|--kubeconfig([[:space:]]|=|$)'; then
+        block_kube
+    fi
+fi
+
+[ "${DEVZONE_ALLOW_DOCKER:-}" = "1" ] && exit 0
 
 if command -v python3 >/dev/null 2>&1; then
     __DG_INPUT="$INPUT" __DG_FORMAT="$FORMAT" __DG_MESSAGE="$MESSAGE" python3 <<'PYTHON'

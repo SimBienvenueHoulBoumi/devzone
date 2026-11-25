@@ -1,0 +1,1 @@
+Cluster administrator access is reserved for the installers. Use the devzone context or the devzone commands (enable, disable, repair). An explicit host override does not lift this refusal.
