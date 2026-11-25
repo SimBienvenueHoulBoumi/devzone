@@ -27,7 +27,8 @@
 set -euo pipefail
 
 # Chemins qui lancent les tests du conteneur : mêmes que l'ancien filtre paths
-CHEMINS='^(\.devcontainer/|manage/(devzone|scripts|test)|Makefile$|\.gitattributes$|package\.json$|\.github/workflows/fonctionnel\.yml$)'
+# (+ code Go du binaire distribué, #856 : cmd/, internal/, go.mod, go.sum)
+CHEMINS='^(\.devcontainer/|manage/(devzone|scripts|test)|Makefile$|\.gitattributes$|package\.json$|\.github/workflows/fonctionnel\.yml$|cmd/|internal/|go\.(mod|sum)$)'
 
 # Lit les fichiers changés sur l'entrée : true si l'un d'eux touche un chemin
 # suivi, false sinon

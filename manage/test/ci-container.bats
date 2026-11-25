@@ -22,7 +22,7 @@ setup() {
 }
 
 @test "a-tester : conteneur, tests, CLI, .gitattributes, package.json, workflow → true" {
-    for f in .devcontainer/devzone manage/test/cli.bats manage/devzone Makefile .gitattributes package.json .github/workflows/fonctionnel.yml; do
+    for f in .devcontainer/devzone manage/test/cli.bats manage/devzone Makefile .gitattributes package.json .github/workflows/fonctionnel.yml cmd/devzone/main.go internal/framework/cli/cli.go go.mod go.sum; do
         run bash "$SCRIPT" a-tester <<<$'README.md\n'"$f"
         [ "$status" -eq 0 ]
         [ "$output" = true ] || { echo "non détecté : $f"; false; }
@@ -30,7 +30,7 @@ setup() {
 }
 
 @test "a-tester : nom proche d'un chemin suivi (manage/docs/Makefile.md, package.json.bak) → false" {
-    run bash "$SCRIPT" a-tester <<<$'manage/docs/Makefile.md\npackage.json.bak\nautre/manage/x'
+    run bash "$SCRIPT" a-tester <<<$'manage/docs/Makefile.md\npackage.json.bak\nautre/manage/x\nworkspace/projet/internal/x.go\ngo.mod.bak'
     [ "$status" -eq 0 ]
     [ "$output" = false ]
 }
