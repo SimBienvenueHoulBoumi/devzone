@@ -28,6 +28,14 @@ func newDefaultRegistry() *cli.Registry {
 		Name: "account",
 		Run:  runAccount,
 	})
+	r.Register(cli.Command{
+		Name: "postgres",
+		Run:  runPostgres,
+	})
+	r.Register(cli.Command{
+		Name: "mysql",
+		Run:  runMysql,
+	})
 	return r
 }
 

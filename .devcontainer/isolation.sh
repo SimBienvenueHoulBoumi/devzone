@@ -2,7 +2,7 @@
 # Network isolation and access authorization between devzone namespaces.
 # File <= 250 lines: functions namespace_isolate, allow, forbid.
 # These functions modify NetworkPolicies in the Kubernetes cluster.
-# Loaded by argocd.sh, catalog.sh, mysql.sh, gitlab.sh and postgres.sh; shipped with the package.
+# Loaded by argocd.sh, catalog.sh, the mysql and postgres Go modules, gitlab.sh; shipped with the package.
 
 # Sets an isolating NetworkPolicy in a namespace.
 # Only the pods of the same namespace can reach the services.

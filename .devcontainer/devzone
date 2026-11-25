@@ -201,8 +201,8 @@ case "${1:-}" in
     use) use_cluster "${@:2}" ;;
     clusters) DEVZONE_STATE="$ETAT" bash "$ICI/clusters.sh" "${@:2}" ;;
     cluster) change_cluster "${@:2}" ;;
-    postgres) DEVZONE_STATE="$ETAT" bash "$ICI/postgres/postgres.sh" "${@:2}" ;;
-    mysql) DEVZONE_STATE="$ETAT" bash "$ICI/catalog/mysql/mysql.sh" "${@:2}" ;;
+    postgres) DEVZONE_STATE="$ETAT" devzone postgres "${@:2}" ;;
+    mysql) DEVZONE_STATE="$ETAT" devzone mysql "${@:2}" ;;
     gitlab) DEVZONE_STATE="$ETAT" bash "$ICI/gitlab/gitlab.sh" "${@:2}" ;;
     catalog) DEVZONE_STATE="$ETAT" bash "$ICI/catalog.sh" list ;;
     argocd) DEVZONE_STATE="$ETAT" bash "$ICI/argocd/argocd.sh" "${@:2}" ;;
