@@ -84,7 +84,8 @@ case "$*" in
             *'.cluster.server'*) echo "https://127.0.0.1:6443" ;;
         esac
         ;;
-    *"config set-cluster"* | *"config set-credentials"* | *"config set-context"*) ;;
+    *"config set-cluster"* | *"config set "* | *"config set-credentials"* | *"config set-context"*) ;;
+    *"auth can-i"*) echo yes ;;
     *"create token"*)
         [ -f "$BATS_TEST_TMPDIR/token.fail" ] && exit 1
         printf 'token-test\n2030-01-01T00:00:00Z\n'
