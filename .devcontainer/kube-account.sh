@@ -6,7 +6,8 @@
 # RoleBinding, with a 24 h TokenRequest token renewed at startup (startup.sh),
 # by « devzone repair » and by the summary before expiry. The installers alone
 # use the admin context (host context in ~/.kube/hote.config, kind cluster in
-# ~/.kube/config); shells and agents only have ~/.kube/config.
+# ~/.kube/config); the shells use ~/.kube/config and the agents the limited
+# ~/.kube/agent.config (devzone context only, #844).
 # Library sourced by cluster.sh; executable for the token:
 #   kube-account.sh jeton   (argument kept: called by startup.sh and devzone repair)
 
@@ -230,6 +231,21 @@ account_token() {
     chmod 600 "$ACCOUNT_TOKEN_EXPIRY"
 }
 
+# Writes the limited agent kubeconfig: the devzone context only, current context
+# set to it, for the agents that hold the limited account (Claude Code, #844).
+# The contexts are read from ACCOUNT_CONFIG, never from the file being written:
+# the view goes to a temporary file of the same folder, moved in place (atomic,
+# mode 600); a failure empties the target and returns 1.
+account_agent_config() {
+    local conf="${DEVZONE_KUBE_AGENT_CONFIG:-$HOME/.kube/agent.config}" tmp
+    tmp="$(mktemp "$(dirname "$conf")/.agent.config.XXXXXX")" || return 1
+    # shellcheck disable=SC2015 # the failure branch must empty the target too
+    ( umask 077; KUBECONFIG="$ACCOUNT_CONFIG" kubectl config view --minify --flatten \
+        --context devzone >"$tmp" ) && KUBECONFIG="$tmp" kubectl config use-context devzone >/dev/null 2>&1 \
+        || { rm -f "$tmp"; : >"$conf"; return 1; }
+    chmod 600 "$tmp"; mv "$tmp" "$conf"
+}
+
 # Direct execution: account token renewed at startup (startup.sh) and by
 # « devzone repair ». Without a chosen services cluster: nothing to do.
 # When the file is sourced, $0 differs from BASH_SOURCE: nothing runs.
@@ -248,4 +264,5 @@ if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
     account_setup "$ctx" || exit 1
     account_catch_up "$ctx" || exit 1
     account_token "$ctx" || exit 1
+    account_agent_config || exit 1
 fi

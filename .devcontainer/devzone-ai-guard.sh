@@ -7,6 +7,7 @@
 # Docker guard for the folders that are not this repository: a Claude Code
 # PreToolUse hook in the global settings and the two opencode plugins in the
 # global plugins folder. Idempotent, other user settings and hooks preserved.
+# Claude Code also receives the limited Kubernetes context via env.KUBECONFIG.
 install_docker_guard() {
     local script="$ICI/ai/docker-guard.sh" config="$HOME/.claude/settings.json"
     local src="$ICI/ai/plugins" dst="$HOME/.config/opencode/plugins"
@@ -19,13 +20,17 @@ install_docker_guard() {
         echo "devzone : $config unreadable (invalid JSON): docker guard not installed for Claude Code" >&2
     else
         tmp="$(mktemp)"
-        if jq --arg cmd "bash \"$script\" --format claude" '
+        if jq --arg cmd "bash \"$script\" --format claude" \
+            --arg kube "$HOME/.kube/agent.config" '
             .hooks = (.hooks // {}) |
             .hooks.PreToolUse = (.hooks.PreToolUse // []) |
             if ([.hooks.PreToolUse[]? | .hooks[]? | (.command // "")] | any(contains("docker-guard.sh")))
             then .
             else .hooks.PreToolUse += [{"matcher": "Bash", "hooks": [{"type": "command", "command": $cmd}]}]
-            end
+            end |
+            if (.env | type) == "object" then .env = (.env + {"KUBECONFIG": $kube})
+            elif (.env | type) == "null" then .env = {"KUBECONFIG": $kube}
+            else . end
         ' "$config" >"$tmp" 2>/dev/null; then
             mv "$tmp" "$config"
         else
@@ -43,8 +48,9 @@ install_docker_guard() {
 
 # Removes only the Docker guard entries (commands containing docker-guard.sh)
 # and the two plugins; the rest of settings.json and of the plugins is kept.
+# The Kubernetes context key is removed too, and an empty env object is dropped.
 remove_docker_guard() {
-    local config="$HOME/.claude/settings.json" tmp
+    local config="$HOME/.claude/settings.json" tmp tmp2
     if [ -f "$config" ] && jq -e . "$config" >/dev/null 2>&1; then
         tmp="$(mktemp)"
         if jq '
@@ -65,7 +71,23 @@ remove_docker_guard() {
             if [ "$(cat "$tmp")" = "{}" ]; then
                 rm -f "$tmp" "$config"
             else
-                mv "$tmp" "$config"
+                tmp2="$(mktemp)"
+                if jq '
+                    if (.env | type) == "object" then
+                        .env = (.env | del(.KUBECONFIG)) |
+                        if (.env | length) == 0 then del(.env) else . end
+                    else . end
+                ' "$tmp" >"$tmp2" 2>/dev/null; then
+                    if [ "$(cat "$tmp2")" = "{}" ]; then
+                        rm -f "$tmp2" "$config"
+                    else
+                        mv "$tmp2" "$config"
+                    fi
+                else
+                    rm -f "$tmp2"
+                    mv "$tmp" "$config"
+                fi
+                rm -f "$tmp"
             fi
         else
             rm -f "$tmp"

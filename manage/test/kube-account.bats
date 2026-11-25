@@ -35,7 +35,16 @@ after() {
 case "$*" in
     *"config get-contexts -o name"*) cat "$T/hote.contexts" 2>/dev/null || true ;;
     *"config view"*)
-        if [[ "$*" == *'.context.cluster'* ]]; then
+        if [[ "$*" == *--minify* ]]; then
+            # The agent kubeconfig is minified from the source file only: a
+            # function reading the file it writes would get nothing here (#844).
+            if [ "${FAKE_MINIFY_FAIL:-}" = 1 ]; then
+                exit 1
+            fi
+            if [ "${KUBECONFIG:-}" = "$CONFIG" ]; then
+                printf '# agent context minified from %s\n' "$KUBECONFIG"
+            fi
+        elif [[ "$*" == *'.context.cluster'* ]]; then
             case "$*" in
                 *"docker-desktop"*) echo cluster-hote ;;
                 *"kind-devzone"*) echo kind-devzone ;;
@@ -276,6 +285,28 @@ KUBE
     [ "$status" -eq 1 ] || false
 }
 
+@test "account_agent_config : minified from the source kubeconfig, 600, current context devzone" {
+    (
+        set -e
+        source "$KUBE_ACCOUNT"
+        account_agent_config
+    ) || false
+    # The content comes from ACCOUNT_CONFIG, never from the file being written
+    grep -qF "# agent context minified from $HOME/.kube/config" "$HOME/.kube/agent.config" || false
+    [ "$(stat -c %a "$HOME/.kube/agent.config" 2>/dev/null || stat -f %Lp "$HOME/.kube/agent.config")" = 600 ] || false
+    grep -q 'config use-context devzone' "$BATS_TEST_TMPDIR/kubectl.log" || false
+    # Atomic write: no temporary file left in the folder
+    [ -z "$(find "$HOME/.kube" -name '.agent.config.*' -print 2>/dev/null)" ] || false
+}
+
+@test "account_agent_config : failing kubectl → code 1 and emptied file" {
+    export FAKE_MINIFY_FAIL=1
+    run bash -c '. "$1"; account_agent_config' _ "$KUBE_ACCOUNT"
+    [ "$status" -eq 1 ] || false
+    [ -f "$HOME/.kube/agent.config" ] || false
+    [ ! -s "$HOME/.kube/agent.config" ] || false
+}
+
 @test "kube-account.sh jeton : without a chosen services cluster, nothing runs" {
     run bash "$KUBE_ACCOUNT" jeton
     [ "$status" -eq 0 ] || false
@@ -290,6 +321,18 @@ KUBE
     grep -qF -- "--context docker-desktop create token devzone-agent -n devzone-system --duration=24h" \
         "$BATS_TEST_TMPDIR/kubectl.log" || false
     grep -qx 'user: devzone-agent --token=token-test' "$HOME/.kube/config" || false
+}
+
+@test "kube-account.sh jeton : agent kubeconfig written after the token" {
+    printf 'cluster=kind-devzone\n' >"$DEVZONE_STATE"
+    run bash "$KUBE_ACCOUNT" jeton
+    [ "$status" -eq 0 ] || false
+    grep -qF "# agent context minified from $HOME/.kube/config" "$HOME/.kube/agent.config" || false
+    [ "$(stat -c %a "$HOME/.kube/agent.config" 2>/dev/null || stat -f %Lp "$HOME/.kube/agent.config")" = 600 ] || false
+    # The direct execution block calls it after account_token
+    token_line="$(grep -n 'create token' "$BATS_TEST_TMPDIR/kubectl.log" | head -1 | cut -d: -f1)"
+    view_line="$(grep -n 'config view --minify' "$BATS_TEST_TMPDIR/kubectl.log" | head -1 | cut -d: -f1)"
+    [ -n "$token_line" ] && [ -n "$view_line" ] && [ "$token_line" -lt "$view_line" ] || false
 }
 
 @test "kube-account.sh : without argument, refusal and usage" {
