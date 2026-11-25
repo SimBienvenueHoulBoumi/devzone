@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/cli"
 	"testing"
 )
 
@@ -91,7 +93,7 @@ func (f ticketFixture) clone(t *testing.T, dest string) {
 // runTicketArgs runs runTicket with args and returns its standard output, error output and status.
 func runTicketArgs(args ...string) (string, string, int) {
 	var out, errOut strings.Builder
-	code := runTicket(args, &out, &errOut)
+	code := runTicket(&cli.Context{Args: args, Out: &out, Err: &errOut})
 	return out.String(), errOut.String(), code
 }
 

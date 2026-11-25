@@ -7,13 +7,23 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/cli"
 )
 
-// withHandler registers h as the handler of name in the ported map, and removes it when the test ends.
+// Handler is the legacy test handler signature.
+type Handler func(args []string, out, errOut io.Writer) int
+
+// withHandler registers h as the handler of name in the registry, and resets the
+// registry when the test ends.
 func withHandler(t *testing.T, name string, h Handler) {
 	t.Helper()
-	ported[name] = h
-	t.Cleanup(func() { delete(ported, name) })
+	Registry.Register(cli.Command{Name: name, Run: func(ctx *cli.Context) int {
+		return h(ctx.Args, ctx.Out, ctx.Err)
+	}})
+	t.Cleanup(func() {
+		Registry = newDefaultRegistry()
+	})
 }
 
 // TestHandlesPortedAndUnknown checks the handles command: 0 for a ported command name, 1 otherwise.

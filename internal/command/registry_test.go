@@ -1,12 +1,13 @@
 package command
 
 import (
-	"io"
 	"reflect"
 	"testing"
+
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/cli"
 )
 
-func noop(args []string, out, errOut io.Writer) int { return 0 }
+func noop(ctx *cli.Context) int { return 0 }
 
 func TestPortedCommands(t *testing.T) {
 	want := []string{"--help", "--version", "-h", "-v", "help", "workspace"}
@@ -16,14 +17,12 @@ func TestPortedCommands(t *testing.T) {
 }
 
 func TestPortedSorted(t *testing.T) {
-	names := []string{"zeta", "alpha", "mid"}
-	for _, name := range names {
-		ported[name] = noop
+	for _, name := range []string{"zeta", "alpha", "mid"} {
+		Registry.Register(cli.Command{Name: name, Run: noop})
 	}
 	t.Cleanup(func() {
-		for _, name := range names {
-			delete(ported, name)
-		}
+		// rebuild registry to original state
+		Registry = newDefaultRegistry()
 	})
 	want := []string{"--help", "--version", "-h", "-v", "alpha", "help", "mid", "workspace", "zeta"}
 	if got := Ported(); !reflect.DeepEqual(got, want) {

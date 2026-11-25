@@ -5,6 +5,8 @@ import (
 	"os"
 
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/bashbridge"
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/cli"
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec"
 )
 
 // Run runs a pod command: handles <command> tells whether it is ported, a ported command runs in Go, any other command is delegated to the shell.
@@ -19,13 +21,14 @@ func Run(args []string, out, errOut io.Writer) int {
 			io.WriteString(errOut, "usage: devzone-pod handles <command>\n")
 			return 2
 		}
-		if _, ok := ported[args[1]]; ok {
+		if _, ok := Registry.Lookup(args[1]); ok {
 			return 0
 		}
 		return 1
 	default:
-		if handler, ok := ported[args[0]]; ok {
-			return handler(args[1:], out, errOut)
+		ctx := &cli.Context{Out: out, Err: errOut, Runner: exec.ExecRunner{}}
+		if code, ok := Registry.Run(args, ctx); ok {
+			return code
 		}
 		return delegate(args, out, errOut)
 	}

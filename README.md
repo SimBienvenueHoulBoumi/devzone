@@ -24,7 +24,8 @@ devzone avoids them: the same environment on every workstation, on your machine.
 
 - No systemd: the services provided by devzone start with devzone, not with `systemctl`.
 - No graphical desktop: everything happens in a terminal or in VS Code.
-- The terminal keeps the cluster administrator; agents only have the account limited to the `devzone-*` namespaces (`edit` role, token renewed every 24 h). Only the installers act as administrator ([#430](https://github.com/SimBienvenueHoulBoumi/devzone/issues/430)).
+- Pod mode (default): the terminal in the pod has no rights on the cluster; the workstation acts as administrator for the time of an operation ([#528](https://github.com/SimBienvenueHoulBoumi/devzone/issues/528)).
+- Container mode: the terminal keeps the cluster administrator; agents (opencode and Claude Code) only have the account limited to the `devzone-*` namespaces (`edit` role, token renewed every 24 h), Claude Code with the reduced kubeconfig `~/.kube/agent.config` ([#430](https://github.com/SimBienvenueHoulBoumi/devzone/issues/430), [#844](https://github.com/SimBienvenueHoulBoumi/devzone/issues/844)).
 
 ## How it works
 

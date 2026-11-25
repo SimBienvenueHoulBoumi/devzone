@@ -4,9 +4,20 @@
 
 setup() {
     GUARD="$BATS_TEST_DIRNAME/../../.devcontainer/ai/docker-guard.sh"
-    # The message lives in a text file next to the script (French user text, not listed in .english)
+    # The messages live in text files next to the script (not listed in .english)
     MSG="$(cat "$BATS_TEST_DIRNAME/../../.devcontainer/ai/docker-guard.message")"
-    export MSG
+    KMSG="$(cat "$BATS_TEST_DIRNAME/../../.devcontainer/ai/kube-guard.message")"
+    export MSG KMSG
+    export HOME="$BATS_TEST_TMPDIR/home"
+    mkdir -p "$HOME" "$BATS_TEST_TMPDIR/fake-bin"
+    # No cluster command is ever run: these fakes would fail the test if used.
+    for cmd in kubectl devzone; do
+        printf '#!/usr/bin/env bash\necho "unexpected %s call" >&2\nexit 99\n' "$cmd" >"$BATS_TEST_TMPDIR/fake-bin/$cmd"
+        chmod +x "$BATS_TEST_TMPDIR/fake-bin/$cmd"
+    done
+    export PATH="$BATS_TEST_TMPDIR/fake-bin:$PATH"
+    ALLOW_VAR="DEVZONE_ALLOW_$(printf '\104\117\103\113\105\122')"
+    export ALLOW_VAR
 }
 
 opencode_call() {
@@ -38,6 +49,11 @@ path_without() {
 assert_blocked() {
     [ "$status" -eq 2 ]
     [ "$output" = "$MSG" ]
+}
+
+assert_blocked_kube() {
+    [ "$status" -eq 2 ]
+    [ "$output" = "$KMSG" ]
 }
 
 # --- blocked cases (opencode format) ---
@@ -107,6 +123,125 @@ assert_blocked() {
 @test "allows: kubectl get pods" {
     run bash -c 'printf "%s" "$1" | bash "$2"' _ "$(opencode_call bash 'kubectl get pods')" "$GUARD"
     [ "$status" -eq 0 ]
+}
+
+# --- administrator context is refused in both formats ---
+
+@test "kube context: reading the administrator file is refused (opencode)" {
+    run bash -c 'printf "%s" "$1" | bash "$2"' _ "$(opencode_call bash 'cat ~/.kube/hote.config')" "$GUARD"
+    assert_blocked_kube
+}
+
+@test "kube context: listing the host context directory is refused (opencode)" {
+    run bash -c 'printf "%s" "$1" | bash "$2"' _ "$(opencode_call bash 'ls ~/.kube-host')" "$GUARD"
+    assert_blocked_kube
+}
+
+@test "kube context: a KUBECONFIG assignment is refused (opencode)" {
+    run bash -c 'printf "%s" "$1" | bash "$2"' _ "$(opencode_call bash 'KUBECONFIG=x kubectl get pods')" "$GUARD"
+    assert_blocked_kube
+}
+
+@test "kube context: exporting KUBECONFIG is refused (opencode)" {
+    run bash -c 'printf "%s" "$1" | bash "$2"' _ "$(opencode_call bash 'export KUBECONFIG=x')" "$GUARD"
+    assert_blocked_kube
+}
+
+@test "kube context: an explicit kubeconfig option is refused (opencode)" {
+    run bash -c 'printf "%s" "$1" | bash "$2"' _ "$(opencode_call bash 'kubectl --kubeconfig x get pods')" "$GUARD"
+    assert_blocked_kube
+}
+
+@test "kube context: reading the administrator file is refused (claude)" {
+    run bash -c 'printf "%s" "$1" | bash "$2" --format claude' _ "$(claude_call 'cat ~/.kube/hote.config')" "$GUARD"
+    assert_blocked_kube
+}
+
+@test "kube context: listing the host context directory is refused (claude)" {
+    run bash -c 'printf "%s" "$1" | bash "$2" --format claude' _ "$(claude_call 'ls ~/.kube-host')" "$GUARD"
+    assert_blocked_kube
+}
+
+@test "kube context: a KUBECONFIG assignment is refused (claude)" {
+    run bash -c 'printf "%s" "$1" | bash "$2" --format claude' _ "$(claude_call 'KUBECONFIG=x kubectl get pods')" "$GUARD"
+    assert_blocked_kube
+}
+
+@test "kube context: exporting KUBECONFIG is refused (claude)" {
+    run bash -c 'printf "%s" "$1" | bash "$2" --format claude' _ "$(claude_call 'export KUBECONFIG=x')" "$GUARD"
+    assert_blocked_kube
+}
+
+@test "kube context: an explicit kubeconfig option is refused (claude)" {
+    run bash -c 'printf "%s" "$1" | bash "$2" --format claude' _ "$(claude_call 'kubectl --kubeconfig x get pods')" "$GUARD"
+    assert_blocked_kube
+}
+
+@test "kube context: kubectl get pods is allowed (claude)" {
+    run bash -c 'printf "%s" "$1" | bash "$2" --format claude' _ "$(claude_call 'kubectl get pods')" "$GUARD"
+    [ "$status" -eq 0 ]
+}
+
+@test "kube context: devzone repair is allowed (opencode)" {
+    run bash -c 'printf "%s" "$1" | bash "$2"' _ "$(opencode_call bash 'devzone repair')" "$GUARD"
+    [ "$status" -eq 0 ]
+}
+
+@test "kube context: devzone repair is allowed (claude)" {
+    run bash -c 'printf "%s" "$1" | bash "$2" --format claude' _ "$(claude_call 'devzone repair')" "$GUARD"
+    [ "$status" -eq 0 ]
+}
+
+# --- the file name alone and the variable are not an override ---
+
+@test "kube context: a recursive grep on the administrator file name is allowed (opencode)" {
+    run bash -c 'printf "%s" "$1" | bash "$2"' _ "$(opencode_call bash 'grep -rn hote.config .devcontainer')" "$GUARD"
+    [ "$status" -eq 0 ]
+}
+
+@test "kube context: a recursive grep on the administrator file name is allowed (claude)" {
+    run bash -c 'printf "%s" "$1" | bash "$2" --format claude' _ "$(claude_call 'grep -rn hote.config .devcontainer')" "$GUARD"
+    [ "$status" -eq 0 ]
+}
+
+@test "kube context: git grep on the administrator file name is allowed (opencode)" {
+    run bash -c 'printf "%s" "$1" | bash "$2"' _ "$(opencode_call bash 'git grep hote.config')" "$GUARD"
+    [ "$status" -eq 0 ]
+}
+
+@test "kube context: git grep on the administrator file name is allowed (claude)" {
+    run bash -c 'printf "%s" "$1" | bash "$2" --format claude' _ "$(claude_call 'git grep hote.config')" "$GUARD"
+    [ "$status" -eq 0 ]
+}
+
+@test "kube context: sed on a project file is allowed (opencode)" {
+    run bash -c 'printf "%s" "$1" | bash "$2"' _ "$(opencode_call bash 'sed -n 1p .devcontainer/cluster.sh')" "$GUARD"
+    [ "$status" -eq 0 ]
+}
+
+@test "kube context: sed on a project file is allowed (claude)" {
+    run bash -c 'printf "%s" "$1" | bash "$2" --format claude' _ "$(claude_call 'sed -n 1p .devcontainer/cluster.sh')" "$GUARD"
+    [ "$status" -eq 0 ]
+}
+
+@test "kube context: reading the KUBECONFIG variable is allowed (opencode)" {
+    run bash -c 'printf "%s" "$1" | bash "$2"' _ "$(opencode_call bash 'echo $KUBECONFIG')" "$GUARD"
+    [ "$status" -eq 0 ]
+}
+
+@test "kube context: reading the KUBECONFIG variable is allowed (claude)" {
+    run bash -c 'printf "%s" "$1" | bash "$2" --format claude' _ "$(claude_call 'echo $KUBECONFIG')" "$GUARD"
+    [ "$status" -eq 0 ]
+}
+
+@test "host override never lifts the administrator context refusal (opencode)" {
+    run bash -c 'printf "%s" "$1" | env "$3=1" bash "$2"' _ "$(opencode_call bash 'kubectl --kubeconfig x get pods')" "$GUARD" "$ALLOW_VAR"
+    assert_blocked_kube
+}
+
+@test "host override never lifts the administrator context refusal (claude)" {
+    run bash -c 'printf "%s" "$1" | env "$3=1" bash "$2" --format claude' _ "$(claude_call 'cat ~/.kube/hote.config')" "$GUARD" "$ALLOW_VAR"
+    assert_blocked_kube
 }
 
 # --- env bypass ---
@@ -180,6 +315,64 @@ assert_blocked() {
     local p
     p="$(path_without jq python3)"
     run bash -c 'PATH="$1" printf "%s" "$2" | PATH="$1" bash "$3"' _ "$p" "$(opencode_call bash 'docker ps')" "$GUARD"
+    [ "$status" -eq 0 ]
+}
+
+# --- jq only, without python3: the administrator context is still refused ---
+
+@test "jq without python3: refuses the administrator file (opencode)" {
+    local p
+    p="$(path_without python3)"
+    run bash -c 'PATH="$1" printf "%s" "$2" | PATH="$1" bash "$3"' _ "$p" "$(opencode_call bash 'cat ~/.kube/hote.config')" "$GUARD"
+    assert_blocked_kube
+}
+
+@test "jq without python3: refuses the administrator file (claude)" {
+    local p
+    p="$(path_without python3)"
+    run bash -c 'PATH="$1" printf "%s" "$2" | PATH="$1" bash "$3" --format claude' _ "$p" "$(claude_call 'cat ~/.kube/hote.config')" "$GUARD"
+    assert_blocked_kube
+}
+
+@test "jq without python3: refuses a KUBECONFIG assignment" {
+    local p
+    p="$(path_without python3)"
+    run bash -c 'PATH="$1" printf "%s" "$2" | PATH="$1" bash "$3"' _ "$p" "$(opencode_call bash 'KUBECONFIG=x kubectl get pods')" "$GUARD"
+    assert_blocked_kube
+}
+
+@test "jq without python3: refuses exporting KUBECONFIG" {
+    local p
+    p="$(path_without python3)"
+    run bash -c 'PATH="$1" printf "%s" "$2" | PATH="$1" bash "$3"' _ "$p" "$(opencode_call bash 'export KUBECONFIG=x')" "$GUARD"
+    assert_blocked_kube
+}
+
+@test "jq without python3: refuses an explicit kubeconfig option" {
+    local p
+    p="$(path_without python3)"
+    run bash -c 'PATH="$1" printf "%s" "$2" | PATH="$1" bash "$3"' _ "$p" "$(opencode_call bash 'kubectl --kubeconfig x get pods')" "$GUARD"
+    assert_blocked_kube
+}
+
+@test "jq without python3: allows a grep on the administrator file name" {
+    local p
+    p="$(path_without python3)"
+    run bash -c 'PATH="$1" printf "%s" "$2" | PATH="$1" bash "$3"' _ "$p" "$(opencode_call bash 'grep -rn hote.config .devcontainer')" "$GUARD"
+    [ "$status" -eq 0 ]
+}
+
+@test "jq without python3: allows reading the KUBECONFIG variable" {
+    local p
+    p="$(path_without python3)"
+    run bash -c 'PATH="$1" printf "%s" "$2" | PATH="$1" bash "$3"' _ "$p" "$(opencode_call bash 'echo $KUBECONFIG')" "$GUARD"
+    [ "$status" -eq 0 ]
+}
+
+@test "jq without python3: allows kubectl get pods" {
+    local p
+    p="$(path_without python3)"
+    run bash -c 'PATH="$1" printf "%s" "$2" | PATH="$1" bash "$3"' _ "$p" "$(opencode_call bash 'kubectl get pods')" "$GUARD"
     [ "$status" -eq 0 ]
 }
 

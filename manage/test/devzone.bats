@@ -164,6 +164,7 @@ case "$*" in
             *'.cluster.server'*) echo "https://127.0.0.1:6443" ;;
         esac
         ;;
+    *"config use-context"*) ;;
     *"config set-cluster"* | *"config set "* | *"config set-credentials"* | *"config set-context"*) ;;
     *"auth can-i"*) echo yes ;;
     *"create token"*)
@@ -700,6 +701,7 @@ KUBE
     [ -f "$HOME/.claude/settings.json" ]
     [ "$(jq '[.hooks.PreToolUse[] | .hooks[] | select((.command // "") | contains("docker-guard.sh"))] | length' "$HOME/.claude/settings.json")" -eq 1 ]
     grep -q -- "--format claude" "$HOME/.claude/settings.json"
+    [ "$(jq -r '.env.KUBECONFIG' "$HOME/.claude/settings.json")" = "$HOME/.kube/agent.config" ]
     [ -f "$HOME/.config/opencode/plugins/devzone-guard.js" ]
     [ -f "$HOME/.config/opencode/plugins/devzone-guard-v2.js" ]
     grep -q "docker-guard.sh" "$HOME/.config/opencode/plugins/devzone-guard.js"
@@ -724,6 +726,7 @@ KUBE
     cp "$BATS_TEST_DIRNAME/../../.devcontainer/ai/host-check.sh" "$BATS_TEST_TMPDIR/app/ai/host-check.sh"
     cp "$BATS_TEST_DIRNAME/../../.devcontainer/ai/host-check.message" "$BATS_TEST_TMPDIR/app/ai/host-check.message"
     cp "$BATS_TEST_DIRNAME/../../.devcontainer/ai/docker-guard.sh" "$BATS_TEST_TMPDIR/app/ai/docker-guard.sh"
+    cp "$BATS_TEST_DIRNAME/../../.devcontainer/ai/kube-guard.message" "$BATS_TEST_TMPDIR/app/ai/kube-guard.message"
     cp "$BATS_TEST_DIRNAME/../../.devcontainer/ai/plugins/devzone-guard.js" "$BATS_TEST_TMPDIR/app/ai/plugins/devzone-guard.js"
     cp "$BATS_TEST_DIRNAME/../../.devcontainer/ai/plugins/devzone-guard-v2.js" "$BATS_TEST_TMPDIR/app/ai/plugins/devzone-guard-v2.js"
     cp "$BATS_TEST_DIRNAME/../../.devcontainer/opencode.jsonc" "$BATS_TEST_TMPDIR/app/opencode.jsonc"
@@ -756,6 +759,66 @@ HOOK
     bash "$DEVZONE" enable ai >/dev/null
     bash "$DEVZONE" enable ai >/dev/null
     [ "$(jq '[.hooks.PreToolUse[] | .hooks[] | select((.command // "") | contains("docker-guard.sh"))] | length' "$HOME/.claude/settings.json")" -eq 1 ]
+}
+
+@test "guard: install sets env.KUBECONFIG once and keeps the other keys" {
+    mkdir -p "$HOME/.claude"
+    ICI="$BATS_TEST_DIRNAME/../../.devcontainer"
+    . "$ICI/devzone-ai-guard.sh"
+    F="$HOME/.claude/settings.json"
+    printf '{"model":"x/y","env":{"AUTRE":"valeur","KUBECONFIG":"/ancien"},"hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"outil-personnel"}]}]}}' >"$F"
+    install_docker_guard
+    [ "$(jq -r '.env.KUBECONFIG' "$F")" = "$HOME/.kube/agent.config" ]
+    [ "$(jq -r '.env.AUTRE' "$F")" = "valeur" ]
+    [ "$(jq -r '.model' "$F")" = "x/y" ]
+    [ "$(jq '[.hooks.PreToolUse[] | .hooks[] | select((.command // "") | contains("guard.sh"))] | length' "$F")" -eq 1 ]
+    avant="$(cat "$F")"
+    install_docker_guard
+    [ "$(cat "$F")" = "$avant" ]
+}
+
+@test "guard: install with missing or invalid settings leaves the file unchanged" {
+    ICI="$BATS_TEST_DIRNAME/../../.devcontainer"
+    . "$ICI/devzone-ai-guard.sh"
+    F="$HOME/.claude/settings.json"
+    run install_docker_guard
+    [ "$status" -eq 0 ]
+    [ ! -e "$F" ]
+    [[ "$output" == *"missing"* ]] || false
+    mkdir -p "$HOME/.claude"
+    printf '{ nope' >"$F"
+    run install_docker_guard
+    [ "$status" -eq 0 ]
+    [ "$(cat "$F")" = '{ nope' ]
+    [[ "$output" == *"invalid JSON"* ]] || false
+}
+
+@test "guard: remove deletes env.KUBECONFIG and keeps the rest" {
+    mkdir -p "$HOME/.claude"
+    ICI="$BATS_TEST_DIRNAME/../../.devcontainer"
+    . "$ICI/devzone-ai-guard.sh"
+    F="$HOME/.claude/settings.json"
+    printf '{"model":"x/y","env":{"AUTRE":"valeur"},"hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"outil-personnel"}]}]}}' >"$F"
+    install_docker_guard
+    remove_docker_guard
+    [ -f "$F" ]
+    [ "$(jq -r '.env.KUBECONFIG' "$F")" = null ]
+    [ "$(jq -r '.env.AUTRE' "$F")" = "valeur" ]
+    [ "$(jq -r '.model' "$F")" = "x/y" ]
+    grep -q "outil-personnel" "$F"
+    [ "$(jq '[.hooks.PreToolUse[] | .hooks[] | select((.command // "") | contains("--format claude"))] | length' "$F")" -eq 0 ]
+}
+
+@test "guard: remove drops an empty env and keeps the other settings" {
+    mkdir -p "$HOME/.claude"
+    ICI="$BATS_TEST_DIRNAME/../../.devcontainer"
+    . "$ICI/devzone-ai-guard.sh"
+    F="$HOME/.claude/settings.json"
+    printf '{"model":"x/y","env":{"KUBECONFIG":"/ancien"}}' >"$F"
+    remove_docker_guard
+    [ -f "$F" ]
+    [ "$(jq -r '.env' "$F")" = null ]
+    [ "$(jq -r '.model' "$F")" = "x/y" ]
 }
 
 @test "garde-fou docker : désactiver ia retire ses entrées et garde un hook utilisateur" {

@@ -1,44 +1,45 @@
 package command
 
 import (
-	"io"
-	"sort"
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/cli"
 )
 
-// Handler runs a command ported to Go: it writes to out and errOut and returns
-// the exit status.
-type Handler func(args []string, out, errOut io.Writer) int
+// Registry is the single registry of commands for this binary.
+var Registry = newDefaultRegistry()
 
-// ported lists the commands implemented in Go, by name (#358). A name runs in Go
-// only when it stands alone: with an argument, see bare. The workspace name runs
-// in Go for its status and stop subcommands alone (#712), see workspaceCommand.
-var ported = map[string]Handler{
-	"--version": bare("--version", printVersion),
-	"-v":        bare("-v", printVersion),
-	"help":      bare("help", printHelp),
-	"-h":        bare("-h", printHelp),
-	"--help":    bare("--help", printHelp),
-	"workspace": workspaceCommand,
-}
-
-// bare builds the handler of a command that takes no argument. With an argument,
-// the whole command line goes to bash: bash checks the renamed names first
-// (reject_renamed) and stays the reference for the extra words.
-func bare(name string, run func(out io.Writer) int) Handler {
-	return func(args []string, out, errOut io.Writer) int {
-		if len(args) > 0 {
-			return delegate(append([]string{name}, args...), out, errOut)
-		}
-		return run(out)
+// newDefaultRegistry builds the registry with the commands ported to Go.
+func newDefaultRegistry() *cli.Registry {
+	r := cli.NewRegistry()
+	for _, name := range []string{"--version", "-v"} {
+		n := name
+		r.Register(cli.Command{
+			Name: n,
+			Bare: true,
+			Run:  func(ctx *cli.Context) int { return printVersion(ctx.Out) },
+			Delegate: func(ctx *cli.Context) int {
+				return delegate(append([]string{n}, ctx.Args...), ctx.Out, ctx.Err)
+			},
+		})
 	}
+	for _, name := range []string{"help", "-h", "--help"} {
+		n := name
+		r.Register(cli.Command{
+			Name: n,
+			Bare: true,
+			Run:  func(ctx *cli.Context) int { return printHelp(ctx.Out) },
+			Delegate: func(ctx *cli.Context) int {
+				return delegate(append([]string{n}, ctx.Args...), ctx.Out, ctx.Err)
+			},
+		})
+	}
+	r.Register(cli.Command{
+		Name: "workspace",
+		Run:  workspaceCommand,
+	})
+	return r
 }
 
 // Ported returns the names of the commands implemented in Go, sorted.
 func Ported() []string {
-	names := make([]string, 0, len(ported))
-	for name := range ported {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-	return names
+	return Registry.Names()
 }
