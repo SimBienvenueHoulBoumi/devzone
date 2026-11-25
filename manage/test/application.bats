@@ -83,6 +83,9 @@ case "$*" in
     *"create token"*)
         echo jeton-de-test
         ;;
+    *"auth can-i"*)
+        echo yes
+        ;;
 esac
 KUBE
     chmod +x "$T/bin/kubectl"

@@ -42,14 +42,37 @@ case "$*" in
             esac
         elif [[ "$*" == *'.cluster.server'* ]]; then
             echo "https://127.0.0.1:6443"
+        elif [[ "$*" == *'.cluster.certificate-authority-data'* ]]; then
+            if [[ "$*" == *"--raw"* ]]; then
+                if [ -z "${FAKE_NO_CA_DATA:-}" ]; then echo "Y2EtdGVzdAo="; fi
+            else
+                echo "DATA+OMITTED"
+            fi
         fi
         ;;
     *"config set-cluster"*)
+        # kubectl 1.37 refuses --certificate-authority-data at set-cluster
+        case "$*" in
+            *--certificate-authority-data*)
+                echo "error: unknown flag: --certificate-authority-data" >&2
+                exit 1 ;;
+        esac
+        if [ -n "${FAKE_FAIL_SET_CLUSTER:-}" ]; then exit 1; fi
         printf 'cluster: %s %s\n' "$(after set-cluster "$@")" "$4" >>"$CONFIG" ;;
+    *"config set "*)
+        if [ -n "${FAKE_FAIL_SET:-}" ]; then exit 1; fi
+        printf 'set: %s %s\n' "$3" "$4" >>"$CONFIG" ;;
     *"config set-credentials"*)
+        if [ -n "${FAKE_FAIL_SET_CREDENTIALS:-}" ]; then exit 1; fi
         printf 'user: %s %s\n' "$(after set-credentials "$@")" "$4" >>"$CONFIG" ;;
     *"config set-context"*)
+        if [ -n "${FAKE_FAIL_SET_CONTEXT:-}" ]; then exit 1; fi
         printf 'context: %s %s %s\n' "$(after set-context "$@")" "$4" "$5" >>"$CONFIG" ;;
+    *"auth can-i"*)
+        printf 'kubeconfig=%s args=%s\n' "${KUBECONFIG:-}" "$*" >>"$T/auth.log"
+        if [ -n "${FAKE_AUTH_FAIL:-}" ]; then exit 1; fi
+        if [ -n "${FAKE_AUTH_NO:-}" ]; then echo no; exit 1; fi
+        echo yes ;;
     *"create token"*)
         case "$*" in
             *jsonpath*)
@@ -79,6 +102,7 @@ KUBE
     chmod +x "$BATS_TEST_TMPDIR/bin/kubectl"
     : >"$BATS_TEST_TMPDIR/kubectl.log"
     : >"$BATS_TEST_TMPDIR/apply.log"
+    : >"$BATS_TEST_TMPDIR/auth.log"
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
 }
 
@@ -132,6 +156,55 @@ KUBE
     grep -qx 'user: devzone-agent --token=token-test' "$HOME/.kube/config" || false
     grep -qx 'cluster: cluster-hote --server=https://127.0.0.1:6443' "$HOME/.kube/config" || false
     grep -qx 'context: devzone --cluster=cluster-hote --user=devzone-agent' "$HOME/.kube/config" || false
+    grep -qx "kubeconfig=$HOME/.kube/config args=--context devzone auth can-i get pods -n devzone-system" \
+        "$BATS_TEST_TMPDIR/auth.log" || false
+}
+
+@test "account_token : certificate authority data set via config set on a fresh kubeconfig" {
+    export DEVZONE_KUBE_TOKEN_EXPIRY="$BATS_TEST_TMPDIR/expiry"
+    (
+        set -e
+        source "$KUBE_ACCOUNT"
+        account_token kind-devzone
+    ) || false
+    grep -qx 'cluster: kind-devzone --server=https://127.0.0.1:6443' "$HOME/.kube/config" || false
+    grep -qx 'set: clusters.kind-devzone.certificate-authority-data Y2EtdGVzdAo=' "$HOME/.kube/config" || false
+    if grep -q -- '--certificate-authority-data' "$BATS_TEST_TMPDIR/kubectl.log"; then false; fi
+    [ -f "$DEVZONE_KUBE_TOKEN_EXPIRY" ] || false
+}
+
+@test "account_token : failed context write → code 1, no expiry file" {
+    export DEVZONE_KUBE_TOKEN_EXPIRY="$BATS_TEST_TMPDIR/expiry"
+    for fail in FAKE_FAIL_SET_CLUSTER FAKE_FAIL_SET FAKE_FAIL_SET_CREDENTIALS FAKE_FAIL_SET_CONTEXT; do
+        rm -f "$DEVZONE_KUBE_TOKEN_EXPIRY"
+        export "$fail=1"
+        run bash -c '. "$1"; account_token kind-devzone' _ "$KUBE_ACCOUNT"
+        unset "$fail"
+        [ "$status" -eq 1 ] || false
+        [ ! -e "$DEVZONE_KUBE_TOKEN_EXPIRY" ] || false
+    done
+}
+
+@test "account_token : auth can-i answers no with code 1 → accepted, expiry file written" {
+    export DEVZONE_KUBE_TOKEN_EXPIRY="$BATS_TEST_TMPDIR/expiry"
+    export FAKE_AUTH_NO=1
+    export FAKE_TOKEN_EXPIRY="2030-01-01T00:00:00Z"
+    run bash -c '. "$1"; account_token kind-devzone' _ "$KUBE_ACCOUNT"
+    unset FAKE_AUTH_NO
+    [ "$status" -eq 0 ] || false
+    [ "$(cat "$DEVZONE_KUBE_TOKEN_EXPIRY")" = 1893456000 ] || false
+    [ "$(stat -c %a "$DEVZONE_KUBE_TOKEN_EXPIRY" 2>/dev/null || stat -f %Lp "$DEVZONE_KUBE_TOKEN_EXPIRY")" = 600 ] || false
+}
+
+@test "account_token : unreachable devzone context → code 1, message, no expiry file" {
+    export DEVZONE_KUBE_TOKEN_EXPIRY="$BATS_TEST_TMPDIR/expiry"
+    printf '1234\n' >"$DEVZONE_KUBE_TOKEN_EXPIRY"
+    export FAKE_AUTH_FAIL=1
+    run bash -c '. "$1"; account_token kind-devzone' _ "$KUBE_ACCOUNT"
+    unset FAKE_AUTH_FAIL
+    [ "$status" -eq 1 ] || false
+    [[ "$output" == *"devzone : limited account context not reachable"* ]] || false
+    [ ! -e "$DEVZONE_KUBE_TOKEN_EXPIRY" ] || false
 }
 
 @test "account_token : container kind cluster → kubeconfig ~/.kube/config" {

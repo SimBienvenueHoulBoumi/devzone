@@ -163,9 +163,10 @@ account_token_fresh() {
 # context of ~/.kube/config: user devzone-agent, same cluster as the admin
 # context (cluster entry copied: server, certificate authority and
 # tls-server-name of the host context). The expiry timestamp of the TokenRequest
-# response is kept in ACCOUNT_TOKEN_EXPIRY (now + 24 h if it is unreadable).
+# response is kept in ACCOUNT_TOKEN_EXPIRY (now + 24 h if it is unreadable), only
+# once a real call through the devzone context has succeeded.
 account_token() {
-    local ctx="$1" conf token cluster server tls ca_data ca_file out expires expiry now
+    local ctx="$1" conf token cluster server tls ca_data ca_file out expires expiry now answer
     local entry=()
     conf="$(account_admin_config "$ctx")"
     out="$(account_admin "$ctx" create token "$ACCOUNT_SA" -n "$ACCOUNT_NS" \
@@ -189,14 +190,11 @@ account_token() {
         echo "devzone : server of cluster $cluster not found in $conf" >&2
         return 1
     fi
-    ca_data="$(KUBECONFIG="$conf" kubectl config view \
-        -o jsonpath="{.clusters[?(@.name==\"$cluster\")].cluster.certificate-authority-data}" 2>/dev/null || true)"
+    ca_data="$(KUBECONFIG="$conf" kubectl config view --raw -o jsonpath="{.clusters[?(@.name==\"$cluster\")].cluster.certificate-authority-data}" 2>/dev/null || true)"
     ca_file="$(KUBECONFIG="$conf" kubectl config view \
         -o jsonpath="{.clusters[?(@.name==\"$cluster\")].cluster.certificate-authority}" 2>/dev/null || true)"
     entry=(--server="$server")
-    if [ -n "$ca_data" ]; then
-        entry+=(--certificate-authority-data="$ca_data")
-    elif [ -n "$ca_file" ]; then
+    if [ -n "$ca_file" ]; then
         entry+=(--certificate-authority="$ca_file" --embed-certs=true)
     fi
     tls="$(KUBECONFIG="$conf" kubectl config view \
@@ -205,11 +203,25 @@ account_token() {
         entry+=(--tls-server-name="$tls")
     fi
     KUBECONFIG="$ACCOUNT_CONFIG" kubectl config set-cluster "$cluster" \
-        ${entry[@]+"${entry[@]}"} >/dev/null
+        ${entry[@]+"${entry[@]}"} >/dev/null || return 1
+    if [ -n "$ca_data" ]; then
+        KUBECONFIG="$ACCOUNT_CONFIG" kubectl config set \
+            "clusters.$cluster.certificate-authority-data" "$ca_data" >/dev/null || return 1
+    fi
     KUBECONFIG="$ACCOUNT_CONFIG" kubectl config set-credentials "$ACCOUNT_SA" \
-        --token="$token" >/dev/null
+        --token="$token" >/dev/null || return 1
     KUBECONFIG="$ACCOUNT_CONFIG" kubectl config set-context devzone \
         --cluster="$cluster" --user="$ACCOUNT_SA" >/dev/null || return 1
+    answer="$(KUBECONFIG="$ACCOUNT_CONFIG" kubectl --context devzone \
+        auth can-i get pods -n "$ACCOUNT_NS" 2>/dev/null || true)"
+    case "$answer" in
+        yes | no) ;;
+        *)
+            echo "devzone : limited account context not reachable" >&2
+            rm -f "$ACCOUNT_TOKEN_EXPIRY"
+            return 1
+            ;;
+    esac
     now="$(date +%s)"
     expiry="$(account_expiry_epoch "$expires")"
     [ -n "$expiry" ] || expiry=$((now + 86400))
