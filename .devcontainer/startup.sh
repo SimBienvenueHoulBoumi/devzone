@@ -31,7 +31,7 @@ fi
 # postgres module enabled: the relay (port-forward to 127.0.0.1:5432) does not
 # survive the container stop, restarted here after the clusters
 if bash "$ICI/devzone" is-enabled postgres; then
-    bash "$ICI/postgres/postgres.sh" relay-start || echo "startup : postgres relay not started (devzone repair)"
+    devzone postgres relay-start || echo "startup : postgres relay not started (devzone repair)"
 fi
 # argocd module enabled: relay (port-forward to 127.0.0.1:8443), restarted
 # after the clusters like the one of postgres
@@ -41,7 +41,7 @@ fi
 # mysql module enabled: the relay 127.0.0.1:3306, restarted like the one of
 # postgres after each startup
 if bash "$ICI/devzone" is-enabled mysql; then
-    bash "$ICI/catalog/mysql/mysql.sh" relay-start || echo "startup : mysql relay not started (devzone repair)"
+    devzone mysql relay-start || echo "startup : mysql relay not started (devzone repair)"
 fi
 # Port relays to the workstation (#290): the container IP changes at each
 # startup, each relay of the state is recreated; a failure prevents nothing

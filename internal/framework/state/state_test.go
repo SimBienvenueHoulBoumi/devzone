@@ -62,3 +62,23 @@ func TestStateHelpers(t *testing.T) {
 		t.Fatalf("got=%q", got)
 	}
 }
+
+// TestStateAtFreeName checks that At reads and writes a state file of any name,
+// as DEVZONE_STATE allows.
+func TestStateAtFreeName(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "modules")
+	if err := os.WriteFile(file, []byte("cluster=kind-devzone\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	s := At(file)
+	if got := s.Get("cluster"); got != "kind-devzone" {
+		t.Fatalf("get=%q", got)
+	}
+	if err := s.Set("mysql", "on"); err != nil {
+		t.Fatal(err)
+	}
+	data, _ := os.ReadFile(file)
+	if string(data) != "cluster=kind-devzone\nmysql=on\n" {
+		t.Fatalf("data=%q", string(data))
+	}
+}

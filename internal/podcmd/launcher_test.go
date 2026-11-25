@@ -152,3 +152,20 @@ func TestLauncherWithoutBinaryUsesShell(t *testing.T) {
 		t.Fatalf("out = %q, want it to contain %q", out, "SHELL-PATH-REACHED")
 	}
 }
+
+// TestLauncherFromGoNotInherited checks that a command run by the shell path does
+// not inherit DEVZONE_FROM_GO: its own devzone calls must reach Go again.
+func TestLauncherFromGoNotInherited(t *testing.T) {
+	if runtime.GOOS == "windows" || (runtime.GOARCH != "amd64" && runtime.GOARCH != "arm64") {
+		t.Skip()
+	}
+	dir := launcherSetup(t, true)
+	help := "printf 'from=%s\\n' \"${DEVZONE_FROM_GO-unset}\"; exit 42\n"
+	if err := os.WriteFile(filepath.Join(dir, "help.sh"), []byte(help), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out, code := runLauncher(t, dir, []string{"DEVZONE_FROM_GO=1"}, "ported")
+	if code != 42 || !strings.Contains(out, "from=unset") {
+		t.Fatalf("code = %d, out = %q, want 42 and from=unset", code, out)
+	}
+}

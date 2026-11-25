@@ -75,13 +75,13 @@ repair_workstation() {
         repair_item "gitlab relay" bash "$ICI/gitlab/gitlab.sh" relay-start
     fi
     if [ "$(value_of postgres)" = on ]; then
-        repair_item "postgres relay" bash "$ICI/postgres/postgres.sh" relay-start
+        repair_item "postgres relay" devzone postgres relay-start
     fi
     if [ "$(value_of argocd)" = on ]; then
         repair_item "argocd relay" bash "$ICI/argocd/argocd.sh" relay-start
     fi
     if [ "$(value_of mysql)" = on ]; then
-        repair_item "mysql relay" bash "$ICI/catalog/mysql/mysql.sh" relay-start
+        repair_item "mysql relay" devzone mysql relay-start
     fi
     repair_item "ports relay" bash "$ICI/ports.sh" restart
     # Kubernetes workspace (#517): no automatic port watcher

@@ -210,6 +210,16 @@ jobs:
           mkdir -p "$RUNNER_TEMP/bash32"
           ln -s /bin/bash "$RUNNER_TEMP/bash32/bash"
           echo "$RUNNER_TEMP/bash32" >>"$GITHUB_PATH"
+      # The remaining shell calls the commands ported to Go (devzone postgres,
+      # mysql, cluster clean…): the pod binary of this commit, in the place where
+      # the launcher looks for it (#864)
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        if: runner.os == 'Linux'
+        with:
+          go-version: '1.27'
+      - name: Go binary of the pod for the bats
+        if: runner.os == 'Linux'
+        run: go build -o ".devcontainer/bin/devzone-pod-linux-$(go env GOARCH)" ./cmd/devzone-pod
       - name: bats manage/test/ (ubuntu, shard)
         if: runner.os == 'Linux'
         env:

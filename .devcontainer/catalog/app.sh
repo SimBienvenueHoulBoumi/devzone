@@ -89,10 +89,7 @@ app_install() {
     app_secret "$app" "$ns"
     local claim=donnees
     if [ "$app" = mysql ]; then
-        # shellcheck source=SCRIPTDIR/mysql/volume.sh
-        # shellcheck disable=SC1091
-        . "$(catalog_dir)/mysql/volume.sh"
-        claim="$(mysql_claim_choose "$ns")" || return 2
+        claim="$(devzone mysql claim "$ns")" || return 2
         [ "$claim" = donnees ] || extra="claim=$claim"
     fi
     if catalogue_argocd_active "$app"; then

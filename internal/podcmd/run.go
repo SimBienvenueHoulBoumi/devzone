@@ -26,7 +26,7 @@ func Run(args []string, out, errOut io.Writer) int {
 		}
 		return 1
 	default:
-		ctx := &cli.Context{Out: out, Err: errOut, Runner: exec.ExecRunner{}}
+		ctx := &cli.Context{Out: out, Err: errOut, Stdin: os.Stdin, Runner: exec.ExecRunner{}}
 		if code, ok := Registry.Run(args, ctx); ok {
 			return code
 		}

@@ -41,14 +41,6 @@ hook_load() {
     SERVICES_LIST="$HOOK_SERVICES"
 }
 
-# The relay script of a service (started once its pods are ready)
-hook_script() {
-    case "$1" in
-        postgres) printf '%s' "$ICI/../postgres/postgres.sh" ;;
-        mysql) printf '%s' "$ICI/../catalog/mysql/mysql.sh" ;;
-    esac
-}
-
 # Waits for the pods of devzone-<svc> to be ready (the Application syncs
 # within a few minutes); the relay needs a ready pod to forward to
 hook_wait() {
@@ -66,7 +58,7 @@ hook_wait() {
 
 # Starts the relay of the service, after the pods are ready
 hook_relay() {
-    bash "$(hook_script "$1")" relay-start
+    devzone "$1" relay-start
 }
 
 # Admin secret <svc>-admin of the namespace, created apart and mirrored in

@@ -13,6 +13,7 @@ type Context struct {
 	Args   []string
 	Out    io.Writer
 	Err    io.Writer
+	Stdin  io.Reader
 	Runner exec.Runner
 }
 
