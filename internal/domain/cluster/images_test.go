@@ -6,11 +6,11 @@ import "testing"
 func TestChooseImagePreference(t *testing.T) {
 	names := []string{
 		"registry.k8s.io/pause:3.9",
-		"docker.io/library/alpine:3.20",
-		"docker.io/library/postgres:16",
+		"library/alpine:3.20",
+		"library/postgres:16",
 		"registry.k8s.io/kube-proxy:v1.30.0",
 	}
-	if got := chooseImage(names); got != "docker.io/library/postgres:16" {
+	if got := chooseImage(names); got != "library/postgres:16" {
 		t.Fatalf("chooseImage = %q, want postgres", got)
 	}
 }
@@ -26,7 +26,7 @@ func TestChooseImageOrder(t *testing.T) {
 // TestChooseImageDigests checks that tags and digests do not hide a usable image.
 func TestChooseImageDigests(t *testing.T) {
 	for _, name := range []string{
-		"ghcr.io/devzone/debian@sha256:abcdef", "docker.io/library/busybox:1.36",
+		"ghcr.io/devzone/debian@sha256:abcdef", "library/busybox:1.36",
 	} {
 		if got := chooseImage([]string{name}); got != name {
 			t.Fatalf("chooseImage(%q) = %q, want the image itself", name, got)

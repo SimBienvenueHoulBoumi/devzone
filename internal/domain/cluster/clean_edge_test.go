@@ -16,7 +16,7 @@ func TestCleanLowDiskAfter(t *testing.T) {
 	f.on([]string{"get", "nodes", "-o", "name"}, exec.Result{Stdout: []byte("node/node1\n")})
 	f.withStats(summary(3, 1e11), summary(4, 1e11))
 	f.on([]string{"get", "node", "node1", "-o", "json"}, alpineNode())
-	f.on(debugArgs("node1", "docker.io/library/alpine:3.20")[2:], exec.Result{
+	f.on(debugArgs("node1", "library/alpine:3.20")[2:], exec.Result{
 		Stdout: []byte("Pod/low-pod created\n")})
 	f.on([]string{"get", "pod", "low-pod", "-o", "jsonpath={.status.phase}"},
 		exec.Result{Stdout: []byte("Succeeded")})
@@ -52,7 +52,7 @@ func TestCleanDryRun(t *testing.T) {
 	if report.Code != 0 || report.FreedBytes != 0 {
 		t.Fatalf("report = %+v", report)
 	}
-	if !strings.Contains(f.out.String(), "[dry-run]: would clean node1 with docker.io/library/alpine:3.20") {
+	if !strings.Contains(f.out.String(), "[dry-run]: would clean node1 with library/alpine:3.20") {
 		t.Fatalf("output = %q", f.out.String())
 	}
 	for _, c := range f.r.Calls() {
