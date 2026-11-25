@@ -12,7 +12,6 @@ load commun-helm
 setup() {
     kube_isole
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
-    POSTGRES="$BATS_TEST_DIRNAME/../../.devcontainer/postgres/postgres.sh"
     export HOME="$BATS_TEST_TMPDIR/home"
     export DEVZONE_ROOT="$BATS_TEST_TMPDIR/racine"
     export DEVZONE_STATE="$BATS_TEST_TMPDIR/modules"

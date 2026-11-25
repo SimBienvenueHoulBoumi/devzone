@@ -3,12 +3,12 @@
 # Fake kubectl, kind, openssl, nohup: no cluster touched.
 
 setup() {
+    bats_require_minimum_version 1.5.0
     load commun
     load commun-helm
     kube_isole
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
     CATALOGUE="$BATS_TEST_DIRNAME/../../.devcontainer/catalog.sh"
-    MYSQL="$BATS_TEST_DIRNAME/../../.devcontainer/catalog/mysql/mysql.sh"
     SECRETS="$BATS_TEST_TMPDIR/racine/workspace/.mysql"
     export HOME="$BATS_TEST_TMPDIR/home"
     export DEVZONE_ROOT="$BATS_TEST_TMPDIR/racine"
@@ -100,13 +100,33 @@ case "$2" in
 esac
 exit 2
 GETENT
+    # The catalog calls "devzone mysql claim": answer with the fake kubectl.
+    # Every other command keeps the entry point found before this fake PATH.
+    export DEVZONE_REAL="$(command -v devzone)"
+    cat >"$BATS_TEST_TMPDIR/bin/devzone" <<'DEVZONE'
+#!/usr/bin/env bash
+T="$BATS_TEST_TMPDIR"
+if [ "${1:-} ${2:-}" != "mysql claim" ]; then
+    [ -n "${DEVZONE_REAL:-}" ] && exec "$DEVZONE_REAL" "$@"
+    exit 1
+fi
+ns="${3:-}"
+list="$(kubectl --context devzone -n "$ns" get pvc -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null | grep -E '\-mysql-0$' || true)"
+if [ -z "$list" ]; then echo donnees; exit 0; fi
+count="$(printf '%s\n' "$list" | grep -c . || true)"
+if [ "$count" -eq 1 ]; then echo "${list%-mysql-0}"; exit 0; fi
+echo "devzone : catalog mysql : several volumes found:" >&2
+printf '%s\n' "$list" | sed 's/^/  /' >&2
+echo "devzone : catalog mysql : choose one with devzone mysql volume <name>" >&2
+exit 2
+DEVZONE
     chmod +x "$BATS_TEST_TMPDIR"/bin/*
     helm_fake_install
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
 }
 
 teardown() {
-    bash "$MYSQL" relay-stop >/dev/null 2>&1 || true
+    DEVZONE_STATE="$DEVZONE_STATE" DEVZONE_ROOT="$DEVZONE_ROOT" bash "$DEVZONE" mysql relay-stop >/dev/null 2>&1 || true
 }
 
 attendre_nohup() {

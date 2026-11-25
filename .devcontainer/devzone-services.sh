@@ -164,20 +164,20 @@ apply_postgres() {
         fi
         # Choice kept before the installation: a resume targets the same cluster
         cluster_save "$ctx"
-        current_state="$(bash "$ICI/postgres/postgres.sh" status)"
+        current_state="$(devzone postgres status)"
         # "relay stopped" first: this line also starts with "ready on"
         if [[ "$current_state" == *"relay stopped"* ]]; then
-            bash "$ICI/postgres/postgres.sh" relay-start
+            devzone postgres relay-start
             echo "devzone : postgres : relay restarted"
         elif [[ "$current_state" == "ready on"* ]]; then
             echo "devzone : postgres already active, nothing to do."
-        elif ! bash "$ICI/postgres/postgres.sh" install; then
+        elif ! devzone postgres install; then
             echo "postgres" >"$(failure_marker_file postgres)"
             return 1
         fi
         rm -f "$(failure_marker_file postgres)"
     else
-        bash "$ICI/postgres/postgres.sh" uninstall
+        devzone postgres uninstall
         rm -f "$(failure_marker_file postgres)"
     fi
 }
@@ -206,7 +206,7 @@ apply_argocd() {
 }
 
 # Catalog MySQL (#414): same logic as postgres (relay restarted if stopped),
-# installation delegated to mysql.sh
+# installation delegated to the Go module
 apply_mysql() {
     local current_state ctx
     if [ "$1" = on ]; then
@@ -217,14 +217,14 @@ apply_mysql() {
             echo mysql >"$(failure_marker_file mysql)"
             return 2
         fi
-        current_state="$(bash "$ICI/catalog/mysql/mysql.sh" status)"
+        current_state="$(devzone mysql status)"
         # "relay stopped" first: this line also starts with "ready on"
         if [[ "$current_state" == *"relay stopped"* ]]; then
-            bash "$ICI/catalog/mysql/mysql.sh" relay-start
+            devzone mysql relay-start
             echo "devzone : mysql: relay restarted"
         elif [[ "$current_state" == "ready on"* ]]; then
             echo "devzone : mysql already active, nothing to do."
-        elif ! bash "$ICI/catalog/mysql/mysql.sh" install; then
+        elif ! devzone mysql install; then
             echo mysql >"$(failure_marker_file mysql)"
             return 1
         fi
@@ -234,7 +234,7 @@ apply_mysql() {
         # only leave with a yes (confirm_removal)
         bash "$ICI/catalog.sh" remove mysql
         if [ -n "${DELETE_DATA:-}" ]; then
-            bash "$ICI/catalog/mysql/mysql.sh" delete-data --yes
+            devzone mysql delete-data --yes
         fi
         rm -f "$(failure_marker_file mysql)"
     fi

@@ -18,7 +18,7 @@ bash "$ICI/kube-config.sh" || echo "startup : clusters not handled (devzone star
 # Token of the limited Kubernetes account (#430): 24 h, renewed at each
 # startup; account set up on the way if missing. Without a chosen services
 # cluster, nothing to do
-bash "$ICI/kube-account.sh" jeton || echo "startup : kubernetes account token not renewed (devzone repair)"
+devzone account token || echo "startup : kubernetes account token not renewed (devzone repair)"
 # gitlab module enabled: /etc/hosts is a Docker mount regenerated at each
 # startup, gitlab.localhost must be set again (ssh, glab and getent go through
 # the system resolver); hote-poser never fails (warning only)
@@ -31,7 +31,7 @@ fi
 # postgres module enabled: the relay (port-forward to 127.0.0.1:5432) does not
 # survive the container stop, restarted here after the clusters
 if bash "$ICI/devzone" is-enabled postgres; then
-    bash "$ICI/postgres/postgres.sh" relay-start || echo "startup : postgres relay not started (devzone repair)"
+    devzone postgres relay-start || echo "startup : postgres relay not started (devzone repair)"
 fi
 # argocd module enabled: relay (port-forward to 127.0.0.1:8443), restarted
 # after the clusters like the one of postgres
@@ -41,7 +41,7 @@ fi
 # mysql module enabled: the relay 127.0.0.1:3306, restarted like the one of
 # postgres after each startup
 if bash "$ICI/devzone" is-enabled mysql; then
-    bash "$ICI/catalog/mysql/mysql.sh" relay-start || echo "startup : mysql relay not started (devzone repair)"
+    devzone mysql relay-start || echo "startup : mysql relay not started (devzone repair)"
 fi
 # Port relays to the workstation (#290): the container IP changes at each
 # startup, each relay of the state is recreated; a failure prevents nothing

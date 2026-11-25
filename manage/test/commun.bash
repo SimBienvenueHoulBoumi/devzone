@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
+# The shell still present calls the commands ported to Go as « devzone … »: the
+# tests resolve « devzone » to the launcher of the repository under test (and its
+# Go binary in .devcontainer/bin, built by the CI), never to a devzone installed on
+# the machine (#864). A fake devzone put in PATH by a test still comes first.
+PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.devcontainer" && pwd):$PATH"
+export PATH
+
 # Aide commune de Kubernetes (#341) : le kubeconfig, le HOME et la copie du
 # kubeconfig de l'hôte restent sous $BATS_TEST_TMPDIR, jamais ceux du poste.
 kube_isole() {

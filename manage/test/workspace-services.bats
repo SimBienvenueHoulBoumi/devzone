@@ -4,6 +4,7 @@
 # stdin. Fake kubectl in $BATS_TEST_TMPDIR/bin: no cluster is touched.
 
 setup() {
+    bats_require_minimum_version 1.5.0
     load commun
     kube_isole
     RACINE="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"

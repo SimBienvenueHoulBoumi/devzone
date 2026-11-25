@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"os"
 	"os/exec"
 )
 
@@ -44,8 +45,11 @@ func (ExecRunner) Run(ctx context.Context, name string, args []string, opts Opts
 	if opts.Dir != "" {
 		cmd.Dir = opts.Dir
 	}
+	// Opts.Env is added to the environment of this process, never replaces it:
+	// without HOME, kubectl writes its cache in the current folder (.kube/cache),
+	// and PATH, proxies or locale would be lost (#863)
 	if len(opts.Env) > 0 {
-		cmd.Env = opts.Env
+		cmd.Env = append(os.Environ(), opts.Env...)
 	}
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout

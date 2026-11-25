@@ -18,7 +18,7 @@ func (k Kube) IsLocal(contextName string) bool {
 		return true
 	}
 	conf := k.AdminKubeconfig(contextName)
-	query := fmt.Sprintf("{.contexts[?(@.name==%q)].context.cluster}", contextName)
+	query := fmt.Sprintf("jsonpath={.contexts[?(@.name==%q)].context.cluster}", contextName)
 	res, err := k.Run(context.Background(), conf, "config", "view", "-o", query)
 	if err != nil || res.Code != 0 {
 		return false
@@ -27,7 +27,7 @@ func (k Kube) IsLocal(contextName string) bool {
 	if clusterName == "" {
 		return false
 	}
-	query = fmt.Sprintf("{.clusters[?(@.name==%q)].cluster.server}", clusterName)
+	query = fmt.Sprintf("jsonpath={.clusters[?(@.name==%q)].cluster.server}", clusterName)
 	res, err = k.Run(context.Background(), conf, "config", "view", "-o", query)
 	if err != nil || res.Code != 0 {
 		return false

@@ -69,6 +69,19 @@ CURL
 #!/usr/bin/env bash
 case "$*" in
     "cluster clean"*) exit 0 ;;
+    "account token")
+        if [ -f "$BATS_TEST_TMPDIR/token.fail" ]; then exit 1; fi
+        printf '%s\n' 1893456000 >"$BATS_TEST_TMPDIR/expiry"
+        echo "kubectl create token devzone-agent -n devzone-system --duration=24h" >>"$BATS_TEST_TMPDIR/kubectl.log"
+        ;;
+    "account fresh")
+        expiry="$(cat "$BATS_TEST_TMPDIR/expiry" 2>/dev/null || echo 0)"
+        case "$expiry" in
+            ""|*[!0-9]*) exit 1 ;;
+        esac
+        if [ "$expiry" -gt "$(date +%s)" ]; then exit 0; fi
+        exit 1
+        ;;
 esac
 exit 0
 DEVZONE

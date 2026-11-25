@@ -68,7 +68,7 @@ NPM
 }
 
 teardown() {
-    bash "$BATS_TEST_DIRNAME/../../.devcontainer/catalog/mysql/mysql.sh" relay-stop >/dev/null 2>&1 || true
+    DEVZONE_STATE="$DEVZONE_STATE" DEVZONE_ROOT="$DEVZONE_ROOT" bash "$BATS_TEST_DIRNAME/../../.devcontainer/devzone" mysql relay-stop >/dev/null 2>&1 || true
 }
 
 @test "watcher: refused without DEVZONE_CATALOG_REAL" {

@@ -68,20 +68,20 @@ repair_workstation() {
     # Limited Kubernetes account token (#430): 24 h, renewed here; without the
     # kubernetes module and without a services cluster, nothing to do
     if [ "$(value_of kubernetes)" = on ] || [ -n "$(cluster_saved)" ]; then
-        repair_item "kubernetes account" bash "$ICI/kube-account.sh" jeton
+        repair_item "kubernetes account" devzone account token
     fi
     if [ "$(value_of gitlab)" = on ]; then
         repair_item "gitlab name" bash "$ICI/gitlab/gitlab.sh" hote-poser
         repair_item "gitlab relay" bash "$ICI/gitlab/gitlab.sh" relay-start
     fi
     if [ "$(value_of postgres)" = on ]; then
-        repair_item "postgres relay" bash "$ICI/postgres/postgres.sh" relay-start
+        repair_item "postgres relay" devzone postgres relay-start
     fi
     if [ "$(value_of argocd)" = on ]; then
         repair_item "argocd relay" bash "$ICI/argocd/argocd.sh" relay-start
     fi
     if [ "$(value_of mysql)" = on ]; then
-        repair_item "mysql relay" bash "$ICI/catalog/mysql/mysql.sh" relay-start
+        repair_item "mysql relay" devzone mysql relay-start
     fi
     repair_item "ports relay" bash "$ICI/ports.sh" restart
     # Kubernetes workspace (#517): no automatic port watcher

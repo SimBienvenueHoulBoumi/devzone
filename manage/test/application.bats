@@ -45,18 +45,10 @@ PASSWORD
 #!/usr/bin/env bash
 printf 'gitlab %s\n' "$*" >>"$BATS_TEST_TMPDIR/actions.log"
 GITLAB
-    cat >"$T/app/postgres/postgres.sh" <<'POSTGRES'
-#!/usr/bin/env bash
-printf 'postgres %s\n' "$*" >>"$BATS_TEST_TMPDIR/actions.log"
-POSTGRES
     cat >"$T/app/catalog/catalog-watcher.sh" <<'VEILLEUR'
 #!/usr/bin/env bash
 printf 'catalog-watcher %s\n' "$*" >>"$BATS_TEST_TMPDIR/actions.log"
 VEILLEUR
-    cat >"$T/app/catalog/mysql/mysql.sh" <<'MYSQL'
-#!/usr/bin/env bash
-printf 'mysql %s\n' "$*" >>"$BATS_TEST_TMPDIR/actions.log"
-MYSQL
     cat >"$T/app/startup.sh" <<'DEMARRAGE'
 #!/usr/bin/env bash
 printf 'startup %s\n' "$*" >>"$BATS_TEST_TMPDIR/actions.log"
@@ -65,11 +57,16 @@ DEMARRAGE
 #!/usr/bin/env bash
 printf 'metrics %s\n' "$*" >>"$BATS_TEST_TMPDIR/actions.log"
 METRICS
-    chmod +x "$T/app"/*.sh "$T/app/gitlab/gitlab.sh" "$T/app/postgres/postgres.sh" "$T/app/catalog/catalog-watcher.sh" "$T/app/catalog/mysql/mysql.sh"
+    chmod +x "$T/app"/*.sh "$T/app/gitlab/gitlab.sh" "$T/app/catalog/catalog-watcher.sh"
     cat >"$T/bin/devzone" <<'DEVZONE'
 #!/usr/bin/env bash
+echo "devzone $*" >>"$BATS_TEST_TMPDIR/devzone.log"
+printf 'devzone %s\n' "$*" >>"$BATS_TEST_TMPDIR/actions.log"
 case "$*" in
     "cluster clean"*) exit 0 ;;
+    "account token"*) exit 0 ;;
+    "account fresh"*) exit 0 ;;
+    postgres\ *|mysql\ *) exit 0 ;;
 esac
 exit 0
 DEVZONE
@@ -132,7 +129,7 @@ KUBE
     [ "$status" -eq 0 ]
     [[ "$(cat "$T/actions.log")" == *"gitlab hote-poser"* ]] || false
     [[ "$(cat "$T/actions.log")" == *"gitlab relay-start"* ]] || false
-    [[ "$(cat "$T/actions.log")" == *"postgres relay-start"* ]] || false
+    [[ "$(cat "$T/actions.log")" == *"devzone postgres relay-start"* ]] || false
 }
 
 @test "repair: the kubernetes account token is renewed" {
@@ -141,7 +138,7 @@ KUBE
     run bash "$APP" repair
     [ "$status" -eq 0 ]
     [[ "$output" == *"✔ kubernetes account"* ]] || false
-    grep -q 'create token devzone-agent -n devzone-system --duration=24h' "$T/kubectl.log" || false
+    grep -q 'account token' "$T/devzone.log" || false
 }
 
 @test "repair: without a services cluster, no kubernetes account token" {

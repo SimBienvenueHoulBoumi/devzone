@@ -65,11 +65,11 @@ show_state() {
             # gitlab active: its real state (ready, runner, failed)
             printf '  ✔ module %-10s %s\n' "$m" "$(bash "$ICI/gitlab/gitlab.sh" status)"
         elif [ "$(value_of "$m")" = on ] && [ "$m" = postgres ]; then
-            printf '  ✔ module %-10s %s\n' "$m" "$(bash "$ICI/$m/$m.sh" status)"
+            printf '  ✔ module %-10s %s\n' "$m" "$(devzone postgres status)"
         elif [ "$(value_of "$m")" = on ] && [ "$m" = argocd ]; then
             printf '  ✔ module %-10s %s\n' "$m" "$(bash "$ICI/argocd/argocd.sh" status)"
         elif [ "$(value_of "$m")" = on ] && [ "$m" = mysql ]; then
-            printf '  ✔ module %-10s %s\n' "$m" "$(bash "$ICI/catalog/mysql/mysql.sh" status)"
+            printf '  ✔ module %-10s %s\n' "$m" "$(devzone mysql status)"
         elif [ "$(value_of "$m")" = on ]; then
             printf '  ✔ module %-10s active: %s\n' "$m" "$(description "$m")"
         else
@@ -101,8 +101,8 @@ show_state() {
     # Limited account token (#845): renewed as soon as it is close to expiry,
     # only outside the pod and with a services cluster chosen (the cases where
     # kube-account.sh is used); a failed renewal is reported for devzone repair
-    if ! in_pod && [ -n "$current_cluster" ] && ! account_token_fresh; then
-        if ! bash "$ICI/kube-account.sh" jeton >/dev/null 2>&1; then
+    if ! in_pod && [ -n "$current_cluster" ] && ! devzone account fresh; then
+        if ! devzone account token >/dev/null 2>&1; then
             echo "  ⚠ limited account token expired: devzone repair"
         fi
     fi

@@ -18,11 +18,11 @@ func programServer(t *testing.T, r *fake.Runner, name, server string) string {
 	t.Setenv("DEVZONE_KUBE_HOST", filepath.Join(home, ".kube", "absent.config"))
 	t.Setenv("DEVZONE_KUBE_CONFIG", conf)
 	r.On("kubectl", []string{"config", "view", "-o",
-		fmt.Sprintf("{.contexts[?(@.name==%q)].context.cluster}", name)}, exec.Result{
+		fmt.Sprintf("jsonpath={.contexts[?(@.name==%q)].context.cluster}", name)}, exec.Result{
 		Stdout: []byte("cluster-test\n"),
 	})
 	r.On("kubectl", []string{"config", "view", "-o",
-		`{.clusters[?(@.name=="cluster-test")].cluster.server}`}, exec.Result{
+		`jsonpath={.clusters[?(@.name=="cluster-test")].cluster.server}`}, exec.Result{
 		Stdout: []byte(server),
 	})
 	return conf
@@ -84,7 +84,7 @@ func TestIsLocalMissingConfig(t *testing.T) {
 	r := withRunner(t)
 	programServer(t, r, "empty", "https://127.0.0.1:6443")
 	r.On("kubectl", []string{"config", "view", "-o",
-		`{.contexts[?(@.name=="unknown")].context.cluster}`}, exec.Result{})
+		`jsonpath={.contexts[?(@.name=="unknown")].context.cluster}`}, exec.Result{})
 	if IsLocal("unknown") {
 		t.Fatal("IsLocal(unknown) = true, want false")
 	}

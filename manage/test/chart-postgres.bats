@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 # Chart charts/devzone-postgres (#516): the chart alone, rendered by helm template.
 # The expected values are written in this file. The helm-direct path
-# (chart_install in .devcontainer/postgres/postgres.sh) passes the size with --set.
+# (devzone postgres install) passes the size with --set.
 # Skipped without helm.
 
 setup() {

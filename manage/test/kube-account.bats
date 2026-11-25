@@ -1,9 +1,9 @@
 #!/usr/bin/env bats
-# Limited Kubernetes account (#430): account_setup, account_allow,
-# account_remove, account_token and the token interface of kube-account.sh. Fake
-# kubectl in $BATS_TEST_TMPDIR/bin, which logs and keeps the state of the
-# `config set-*` commands in $HOME/.kube/config: no cluster touched, never the
-# workstation's kubeconfig.
+# Limited Kubernetes account (#430): the token cycle moved to Go (devzone
+# account token, #863); the library of the modules and the removal of the
+# account stay in kube-account.sh. Fake kubectl in $BATS_TEST_TMPDIR/bin, which
+# logs and keeps the state of the `config set-*` commands in $HOME/.kube/config:
+# no cluster touched, never the workstation's kubeconfig.
 
 setup() {
     load commun
@@ -115,33 +115,6 @@ KUBE
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
 }
 
-@test "account_setup : devzone-system namespace and ServiceAccount set by the administrator" {
-    (
-        set -e
-        source "$KUBE_ACCOUNT"
-        account_setup docker-desktop
-    ) || false
-    grep -qF -- "--kubeconfig=$BATS_TEST_TMPDIR/hote.config --context docker-desktop create namespace devzone-system --dry-run=client -o yaml" \
-        "$BATS_TEST_TMPDIR/kubectl.log" || false
-    grep -qF -- "--context docker-desktop -n devzone-system create serviceaccount devzone-agent --dry-run=client -o yaml" \
-        "$BATS_TEST_TMPDIR/kubectl.log" || false
-    grep -q 'kind: ServiceAccount' "$BATS_TEST_TMPDIR/apply.log" || false
-}
-
-@test "account_allow : devzone-agent RoleBinding to edit, account set up first" {
-    (
-        set -e
-        source "$KUBE_ACCOUNT"
-        account_allow docker-desktop devzone-postgres
-    ) || false
-    grep -qF -- "--context docker-desktop -n devzone-postgres create rolebinding devzone-agent --clusterrole=edit --serviceaccount=devzone-system:devzone-agent" \
-        "$BATS_TEST_TMPDIR/kubectl.log" || false
-    grep -q 'kind: RoleBinding' "$BATS_TEST_TMPDIR/apply.log" || false
-    # The account (devzone-system namespace + ServiceAccount) is set up first
-    grep -q 'create namespace devzone-system' "$BATS_TEST_TMPDIR/kubectl.log" || false
-    grep -q 'create serviceaccount devzone-agent' "$BATS_TEST_TMPDIR/kubectl.log" || false
-}
-
 @test "account_remove : RoleBinding deleted in the namespace" {
     (
         set -e
@@ -152,210 +125,15 @@ KUBE
         "$BATS_TEST_TMPDIR/kubectl.log" || false
 }
 
-@test "account_token : 24 h token written to the devzone context of ~/.kube/config" {
-    (
-        set -e
-        source "$KUBE_ACCOUNT"
-        account_token docker-desktop
-    ) || false
-    grep -qF -- "--context docker-desktop create token devzone-agent -n devzone-system --duration=24h" \
-        "$BATS_TEST_TMPDIR/kubectl.log" || false
-    # User devzone-agent with the token, cluster entry copied, devzone context
-    # on the same cluster as the host context
-    grep -qx 'user: devzone-agent --token=token-test' "$HOME/.kube/config" || false
-    grep -qx 'cluster: cluster-hote --server=https://127.0.0.1:6443' "$HOME/.kube/config" || false
-    grep -qx 'context: devzone --cluster=cluster-hote --user=devzone-agent' "$HOME/.kube/config" || false
-    grep -qx "kubeconfig=$HOME/.kube/config args=--context devzone auth can-i get pods -n devzone-system" \
-        "$BATS_TEST_TMPDIR/auth.log" || false
-}
-
-@test "account_token : certificate authority data set via config set on a fresh kubeconfig" {
-    export DEVZONE_KUBE_TOKEN_EXPIRY="$BATS_TEST_TMPDIR/expiry"
-    (
-        set -e
-        source "$KUBE_ACCOUNT"
-        account_token kind-devzone
-    ) || false
-    grep -qx 'cluster: kind-devzone --server=https://127.0.0.1:6443' "$HOME/.kube/config" || false
-    grep -qx 'set: clusters.kind-devzone.certificate-authority-data Y2EtdGVzdAo=' "$HOME/.kube/config" || false
-    if grep -q -- '--certificate-authority-data' "$BATS_TEST_TMPDIR/kubectl.log"; then false; fi
-    [ -f "$DEVZONE_KUBE_TOKEN_EXPIRY" ] || false
-}
-
-@test "account_token : failed context write → code 1, no expiry file" {
-    export DEVZONE_KUBE_TOKEN_EXPIRY="$BATS_TEST_TMPDIR/expiry"
-    for fail in FAKE_FAIL_SET_CLUSTER FAKE_FAIL_SET FAKE_FAIL_SET_CREDENTIALS FAKE_FAIL_SET_CONTEXT; do
-        rm -f "$DEVZONE_KUBE_TOKEN_EXPIRY"
-        export "$fail=1"
-        run bash -c '. "$1"; account_token kind-devzone' _ "$KUBE_ACCOUNT"
-        unset "$fail"
-        [ "$status" -eq 1 ] || false
-        [ ! -e "$DEVZONE_KUBE_TOKEN_EXPIRY" ] || false
-    done
-}
-
-@test "account_token : auth can-i answers no with code 1 → accepted, expiry file written" {
-    export DEVZONE_KUBE_TOKEN_EXPIRY="$BATS_TEST_TMPDIR/expiry"
-    export FAKE_AUTH_NO=1
-    export FAKE_TOKEN_EXPIRY="2030-01-01T00:00:00Z"
-    run bash -c '. "$1"; account_token kind-devzone' _ "$KUBE_ACCOUNT"
-    unset FAKE_AUTH_NO
-    [ "$status" -eq 0 ] || false
-    [ "$(cat "$DEVZONE_KUBE_TOKEN_EXPIRY")" = 1893456000 ] || false
-    [ "$(stat -c %a "$DEVZONE_KUBE_TOKEN_EXPIRY" 2>/dev/null || stat -f %Lp "$DEVZONE_KUBE_TOKEN_EXPIRY")" = 600 ] || false
-}
-
-@test "account_token : unreachable devzone context → code 1, message, no expiry file" {
-    export DEVZONE_KUBE_TOKEN_EXPIRY="$BATS_TEST_TMPDIR/expiry"
-    printf '1234\n' >"$DEVZONE_KUBE_TOKEN_EXPIRY"
-    export FAKE_AUTH_FAIL=1
-    run bash -c '. "$1"; account_token kind-devzone' _ "$KUBE_ACCOUNT"
-    unset FAKE_AUTH_FAIL
-    [ "$status" -eq 1 ] || false
-    [[ "$output" == *"devzone : limited account context not reachable"* ]] || false
-    [ ! -e "$DEVZONE_KUBE_TOKEN_EXPIRY" ] || false
-}
-
-@test "account_token : container kind cluster → kubeconfig ~/.kube/config" {
-    (
-        set -e
-        source "$KUBE_ACCOUNT"
-        account_token kind-devzone
-    ) || false
-    grep -qF -- "--kubeconfig=$HOME/.kube/config --context kind-devzone create token devzone-agent" \
-        "$BATS_TEST_TMPDIR/kubectl.log" || false
-    grep -qx 'context: devzone --cluster=kind-devzone --user=devzone-agent' "$HOME/.kube/config" || false
-}
-
-@test "account_token : expiry written as 600 from the TokenRequest response" {
-    export DEVZONE_KUBE_TOKEN_EXPIRY="$BATS_TEST_TMPDIR/expiry"
-    export FAKE_TOKEN_EXPIRY="2030-01-01T00:00:00Z"
-    (
-        set -e
-        source "$KUBE_ACCOUNT"
-        account_token kind-devzone
-    ) || false
-    [ "$(cat "$DEVZONE_KUBE_TOKEN_EXPIRY")" = 1893456000 ] || false
-    [ "$(stat -c %a "$DEVZONE_KUBE_TOKEN_EXPIRY" 2>/dev/null || stat -f %Lp "$DEVZONE_KUBE_TOKEN_EXPIRY")" = 600 ] || false
-}
-
-@test "account_token : unreadable expiry timestamp falls back to now + 24 h" {
-    export DEVZONE_KUBE_TOKEN_EXPIRY="$BATS_TEST_TMPDIR/expiry"
-    unset FAKE_TOKEN_EXPIRY
-    before="$(date +%s)"
-    (
-        set -e
-        source "$KUBE_ACCOUNT"
-        account_token kind-devzone
-    ) || false
-    after="$(date +%s)"
-    value="$(cat "$DEVZONE_KUBE_TOKEN_EXPIRY")"
-    [ "$value" -ge $((before + 86400)) ] || false
-    [ "$value" -le $((after + 86400)) ] || false
-}
-
-@test "account_token_fresh : true when the expiry is more than one hour away" {
-    export DEVZONE_KUBE_TOKEN_EXPIRY="$BATS_TEST_TMPDIR/expiry"
-    printf '%s\n' "$(( $(date +%s) + 7200 ))" >"$DEVZONE_KUBE_TOKEN_EXPIRY"
-    run bash -c '. "$1"; account_token_fresh' _ "$KUBE_ACCOUNT"
-    [ "$status" -eq 0 ] || false
-}
-
-@test "account_token_fresh : false when less than one hour remains" {
-    export DEVZONE_KUBE_TOKEN_EXPIRY="$BATS_TEST_TMPDIR/expiry"
-    printf '%s\n' "$(( $(date +%s) + 1800 ))" >"$DEVZONE_KUBE_TOKEN_EXPIRY"
-    run bash -c '. "$1"; account_token_fresh' _ "$KUBE_ACCOUNT"
-    [ "$status" -eq 1 ] || false
-}
-
-@test "account_token_fresh : false once expired" {
-    export DEVZONE_KUBE_TOKEN_EXPIRY="$BATS_TEST_TMPDIR/expiry"
-    printf '%s\n' "$(( $(date +%s) - 10 ))" >"$DEVZONE_KUBE_TOKEN_EXPIRY"
-    run bash -c '. "$1"; account_token_fresh' _ "$KUBE_ACCOUNT"
-    [ "$status" -eq 1 ] || false
-}
-
-@test "account_token_fresh : false without a readable expiry file" {
-    export DEVZONE_KUBE_TOKEN_EXPIRY="$BATS_TEST_TMPDIR/expiry"
-    rm -f "$DEVZONE_KUBE_TOKEN_EXPIRY"
-    run bash -c '. "$1"; account_token_fresh' _ "$KUBE_ACCOUNT"
-    [ "$status" -eq 1 ] || false
-    printf 'not-a-number\n' >"$DEVZONE_KUBE_TOKEN_EXPIRY"
-    run bash -c '. "$1"; account_token_fresh' _ "$KUBE_ACCOUNT"
-    [ "$status" -eq 1 ] || false
-}
-
-@test "account_agent_config : minified from the source kubeconfig, 600, current context devzone" {
-    (
-        set -e
-        source "$KUBE_ACCOUNT"
-        account_agent_config
-    ) || false
-    # The content comes from ACCOUNT_CONFIG, never from the file being written
-    grep -qF "# agent context minified from $HOME/.kube/config" "$HOME/.kube/agent.config" || false
-    [ "$(stat -c %a "$HOME/.kube/agent.config" 2>/dev/null || stat -f %Lp "$HOME/.kube/agent.config")" = 600 ] || false
-    grep -q 'config use-context devzone' "$BATS_TEST_TMPDIR/kubectl.log" || false
-    # Atomic write: no temporary file left in the folder
-    [ -z "$(find "$HOME/.kube" -name '.agent.config.*' -print 2>/dev/null)" ] || false
-}
-
-@test "account_agent_config : failing kubectl → code 1 and emptied file" {
-    export FAKE_MINIFY_FAIL=1
-    run bash -c '. "$1"; account_agent_config' _ "$KUBE_ACCOUNT"
-    [ "$status" -eq 1 ] || false
-    [ -f "$HOME/.kube/agent.config" ] || false
-    [ ! -s "$HOME/.kube/agent.config" ] || false
-}
-
-@test "kube-account.sh jeton : without a chosen services cluster, nothing runs" {
+@test "kube-account.sh jeton : renamed to devzone account token" {
+    cat >"$BATS_TEST_TMPDIR/bin/devzone" <<'DEVZONE'
+#!/usr/bin/env bash
+echo "devzone $*" >>"$BATS_TEST_TMPDIR/devzone.log"
+exit 0
+DEVZONE
+    chmod +x "$BATS_TEST_TMPDIR/bin/devzone"
     run bash "$KUBE_ACCOUNT" jeton
     [ "$status" -eq 0 ] || false
-    [ ! -s "$BATS_TEST_TMPDIR/kubectl.log" ] || false
-}
-
-@test "kube-account.sh jeton : account set up and token renewed" {
-    printf 'cluster=docker-desktop\n' >"$DEVZONE_STATE"
-    run bash "$KUBE_ACCOUNT" jeton
-    [ "$status" -eq 0 ] || false
-    grep -q 'create namespace devzone-system' "$BATS_TEST_TMPDIR/kubectl.log" || false
-    grep -qF -- "--context docker-desktop create token devzone-agent -n devzone-system --duration=24h" \
-        "$BATS_TEST_TMPDIR/kubectl.log" || false
-    grep -qx 'user: devzone-agent --token=token-test' "$HOME/.kube/config" || false
-}
-
-@test "kube-account.sh jeton : agent kubeconfig written after the token" {
-    printf 'cluster=kind-devzone\n' >"$DEVZONE_STATE"
-    run bash "$KUBE_ACCOUNT" jeton
-    [ "$status" -eq 0 ] || false
-    grep -qF "# agent context minified from $HOME/.kube/config" "$HOME/.kube/agent.config" || false
-    [ "$(stat -c %a "$HOME/.kube/agent.config" 2>/dev/null || stat -f %Lp "$HOME/.kube/agent.config")" = 600 ] || false
-    # The direct execution block calls it after account_token
-    token_line="$(grep -n 'create token' "$BATS_TEST_TMPDIR/kubectl.log" | head -1 | cut -d: -f1)"
-    view_line="$(grep -n 'config view --minify' "$BATS_TEST_TMPDIR/kubectl.log" | head -1 | cut -d: -f1)"
-    [ -n "$token_line" ] && [ -n "$view_line" ] && [ "$token_line" -lt "$view_line" ] || false
-}
-
-@test "kube-account.sh : without argument, refusal and usage" {
-    run bash "$KUBE_ACCOUNT"
-    [ "$status" -eq 1 ] || false
-    [[ "$output" == *"kube-account : jeton"* ]] || false
-    [ ! -s "$BATS_TEST_TMPDIR/kubectl.log" ] || false
-}
-
-@test "kube-account.sh jeton : catches up the existing devzone namespaces (idempotent)" {
-    printf 'cluster=docker-desktop\n' >"$DEVZONE_STATE"
-    printf 'namespace/devzone-mysql\nnamespace/devzone-gitlab\n' >"$BATS_TEST_TMPDIR/namespaces"
-    run bash "$KUBE_ACCOUNT" jeton
-    [ "$status" -eq 0 ] || false
-    [ "$(grep -c 'get namespaces -l app.kubernetes.io/managed-by=devzone' "$BATS_TEST_TMPDIR/kubectl.log")" -eq 1 ] || false
-    [ "$(grep -c -- '--context docker-desktop -n devzone-mysql create rolebinding devzone-agent' "$BATS_TEST_TMPDIR/kubectl.log")" -eq 1 ] || false
-    [ "$(grep -c -- '--context docker-desktop -n devzone-gitlab create rolebinding devzone-agent' "$BATS_TEST_TMPDIR/kubectl.log")" -eq 1 ] || false
-    [ "$(grep -c 'kind: RoleBinding' "$BATS_TEST_TMPDIR/apply.log")" -eq 2 ] || false
-    : >"$BATS_TEST_TMPDIR/kubectl.log"
-    : >"$BATS_TEST_TMPDIR/apply.log"
-    run bash "$KUBE_ACCOUNT" jeton
-    [ "$status" -eq 0 ] || false
-    [ "$(grep -c -- '--context docker-desktop -n devzone-mysql create rolebinding devzone-agent' "$BATS_TEST_TMPDIR/kubectl.log")" -eq 1 ] || false
-    [ "$(grep -c -- '--context docker-desktop -n devzone-gitlab create rolebinding devzone-agent' "$BATS_TEST_TMPDIR/kubectl.log")" -eq 1 ] || false
-    [ "$(grep -c 'kind: RoleBinding' "$BATS_TEST_TMPDIR/apply.log")" -eq 2 ] || false
+    [[ "$output" == *"devzone : « kube-account.sh jeton » was renamed: devzone account token"* ]] || false
+    grep -q "account token" "$BATS_TEST_TMPDIR/devzone.log" || false
 }

@@ -147,7 +147,7 @@ state_json() {
                     add_error modules "argocd.sh status unavailable"
                 fi
             elif [ "$m" = mysql ]; then
-                if out="$(bash "$ICI/catalog/mysql/mysql.sh" status 2>/dev/null)"; then
+                if out="$(devzone mysql status 2>/dev/null)"; then
                     state_value="$out"
                 else
                     state_value=""
@@ -193,8 +193,8 @@ state_json() {
     # Limited account token (#845): renewed as soon as it is close to expiry,
     # only outside the pod and with a services cluster chosen; a failed renewal
     # becomes an alert with the repair command.
-    if ! in_pod && [ -n "$services_cluster" ] && ! account_token_fresh; then
-        if ! bash "$ICI/kube-account.sh" jeton >/dev/null 2>&1; then
+    if ! in_pod && [ -n "$services_cluster" ] && ! devzone account fresh; then
+        if ! devzone account token >/dev/null 2>&1; then
             append_alert limited_account_token "limited account token expired" "devzone repair"
         fi
     fi
