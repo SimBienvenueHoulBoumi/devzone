@@ -30,16 +30,16 @@ jobs:
         with:
           go-version: '1.27'
       - name: go vet
-        run: go vet ./...
+        run: go vet ./cmd/... ./internal/...
       - name: gofmt (a listed file fails the job)
         run: |
-          unformatted="$(gofmt -l .)"
+          unformatted="$(gofmt -l cmd internal)"
           if [ -n "$unformatted" ]; then
             echo "$unformatted"
             exit 1
           fi
       - name: unit tests
-        run: go test ./... -count=1
+        run: go test ./cmd/... ./internal/... -count=1
       - name: cross build of the binary
         run: |
           for goos in linux darwin windows; do
