@@ -108,9 +108,9 @@ func TestCleanWorkspacePod(t *testing.T) {
 func TestCleanDistantCluster(t *testing.T) {
 	f := newFixture(t)
 	f.saveCluster(t, "production")
-	f.onRaw([]string{"config", "view", "-o", `{.contexts[?(@.name=="production")].context.cluster}`},
+	f.onRaw([]string{"config", "view", "-o", `jsonpath={.contexts[?(@.name=="production")].context.cluster}`},
 		exec.Result{Stdout: []byte("remote\n")})
-	f.onRaw([]string{"config", "view", "-o", `{.clusters[?(@.name=="remote")].cluster.server}`},
+	f.onRaw([]string{"config", "view", "-o", `jsonpath={.clusters[?(@.name=="remote")].cluster.server}`},
 		exec.Result{Stdout: []byte("https://cluster.example.test:6443")})
 	report, err := Clean(context.Background(), f.opts)
 	if err != nil {

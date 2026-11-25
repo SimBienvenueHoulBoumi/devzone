@@ -41,23 +41,23 @@ func programTokenRequest(r *fake.Runner, contextName string, out []byte) {
 // (read with --raw) and its TLS server name.
 func programTokenReads(r *fake.Runner, contextName, cluster, server, caData, caFile, tls string) {
 	r.On("kubectl", []string{"config", "view", "-o",
-		`{.contexts[?(@.name=="` + contextName + `")].context.cluster}`}, exec.Result{
+		`jsonpath={.contexts[?(@.name=="` + contextName + `")].context.cluster}`}, exec.Result{
 		Stdout: []byte(cluster + "\n"),
 	})
 	r.On("kubectl", []string{"config", "view", "-o",
-		`{.clusters[?(@.name=="` + cluster + `")].cluster.server}`}, exec.Result{
+		`jsonpath={.clusters[?(@.name=="` + cluster + `")].cluster.server}`}, exec.Result{
 		Stdout: []byte(server + "\n"),
 	})
 	r.On("kubectl", []string{"config", "view", "--raw", "-o",
-		`{.clusters[?(@.name=="` + cluster + `")].cluster.certificate-authority-data}`}, exec.Result{
+		`jsonpath={.clusters[?(@.name=="` + cluster + `")].cluster.certificate-authority-data}`}, exec.Result{
 		Stdout: []byte(caData),
 	})
 	r.On("kubectl", []string{"config", "view", "-o",
-		`{.clusters[?(@.name=="` + cluster + `")].cluster.certificate-authority}`}, exec.Result{
+		`jsonpath={.clusters[?(@.name=="` + cluster + `")].cluster.certificate-authority}`}, exec.Result{
 		Stdout: []byte(caFile),
 	})
 	r.On("kubectl", []string{"config", "view", "-o",
-		`{.clusters[?(@.name=="` + cluster + `")].cluster.tls-server-name}`}, exec.Result{
+		`jsonpath={.clusters[?(@.name=="` + cluster + `")].cluster.tls-server-name}`}, exec.Result{
 		Stdout: []byte(tls),
 	})
 }
@@ -188,9 +188,9 @@ func TestTokenMissingClusterOrServerIsReported(t *testing.T) {
 			serverOut = ""
 		}
 		r.On("kubectl", []string{"config", "view", "-o",
-			`{.contexts[?(@.name=="docker-desktop")].context.cluster}`}, exec.Result{Stdout: []byte(clusterOut)})
+			`jsonpath={.contexts[?(@.name=="docker-desktop")].context.cluster}`}, exec.Result{Stdout: []byte(clusterOut)})
 		r.On("kubectl", []string{"config", "view", "-o",
-			`{.clusters[?(@.name=="cluster-hote")].cluster.server}`}, exec.Result{Stdout: []byte(serverOut)})
+			`jsonpath={.clusters[?(@.name=="cluster-hote")].cluster.server}`}, exec.Result{Stdout: []byte(serverOut)})
 		err := (Kube{Runner: r}).Token(context.Background(), "docker-desktop")
 		var message MessageError
 		if !errors.As(err, &message) || !strings.HasPrefix(message.Text, missing+" of ") {

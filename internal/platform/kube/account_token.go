@@ -137,7 +137,7 @@ func tokenResponse(out []byte) (string, string, error) {
 // kubeconfig conf.
 func (k Kube) contextCluster(ctx context.Context, conf string, contextName string) (string, error) {
 	res, err := k.Run(ctx, conf, "config", "view", "-o",
-		fmt.Sprintf(`{.contexts[?(@.name=="%s")].context.cluster}`, contextName))
+		fmt.Sprintf(`jsonpath={.contexts[?(@.name=="%s")].context.cluster}`, contextName))
 	if err != nil {
 		return "", err
 	}
@@ -154,7 +154,7 @@ func (k Kube) contextCluster(ctx context.Context, conf string, contextName strin
 // clusterServer returns the server of a cluster of the kubeconfig conf.
 func (k Kube) clusterServer(ctx context.Context, conf string, cluster string) (string, error) {
 	res, err := k.Run(ctx, conf, "config", "view", "-o",
-		fmt.Sprintf(`{.clusters[?(@.name=="%s")].cluster.server}`, cluster))
+		fmt.Sprintf(`jsonpath={.clusters[?(@.name=="%s")].cluster.server}`, cluster))
 	if err != nil {
 		return "", err
 	}
@@ -173,7 +173,7 @@ func (k Kube) clusterServer(ctx context.Context, conf string, cluster string) (s
 // fails (the context then keeps the cluster entry without authority).
 func (k Kube) clusterCAData(ctx context.Context, conf string, cluster string) string {
 	res, err := k.Run(ctx, conf, "config", "view", "--raw", "-o",
-		fmt.Sprintf(`{.clusters[?(@.name=="%s")].cluster.certificate-authority-data}`, cluster))
+		fmt.Sprintf(`jsonpath={.clusters[?(@.name=="%s")].cluster.certificate-authority-data}`, cluster))
 	if err != nil {
 		return ""
 	}
@@ -184,7 +184,7 @@ func (k Kube) clusterCAData(ctx context.Context, conf string, cluster string) st
 // cluster of the kubeconfig conf; empty when the cluster has none.
 func (k Kube) clusterCAFile(ctx context.Context, conf string, cluster string) string {
 	res, err := k.Run(ctx, conf, "config", "view", "-o",
-		fmt.Sprintf(`{.clusters[?(@.name=="%s")].cluster.certificate-authority}`, cluster))
+		fmt.Sprintf(`jsonpath={.clusters[?(@.name=="%s")].cluster.certificate-authority}`, cluster))
 	if err != nil {
 		return ""
 	}
@@ -195,7 +195,7 @@ func (k Kube) clusterCAFile(ctx context.Context, conf string, cluster string) st
 // empty when the cluster has none.
 func (k Kube) clusterTLS(ctx context.Context, conf string, cluster string) string {
 	res, err := k.Run(ctx, conf, "config", "view", "-o",
-		fmt.Sprintf(`{.clusters[?(@.name=="%s")].cluster.tls-server-name}`, cluster))
+		fmt.Sprintf(`jsonpath={.clusters[?(@.name=="%s")].cluster.tls-server-name}`, cluster))
 	if err != nil {
 		return ""
 	}

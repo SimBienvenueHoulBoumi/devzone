@@ -114,7 +114,7 @@ func TestTokenReadsAuthorityWithRaw(t *testing.T) {
 	programTokenRequest(r, "docker-desktop", []byte("token-test\n2030-01-01T00:00:00Z\n"))
 	programTokenReads(r, "docker-desktop", "cluster-hote", "https://127.0.0.1:6443", "Y2EtdGVzdAo=", "", "")
 	r.On("kubectl", []string{"config", "view", "-o",
-		`{.clusters[?(@.name=="cluster-hote")].cluster.certificate-authority-data}`}, exec.Result{
+		`jsonpath={.clusters[?(@.name=="cluster-hote")].cluster.certificate-authority-data}`}, exec.Result{
 		Stdout: []byte("DATA+OMITTED\n"),
 	})
 	programTokenWrites(r, "cluster-hote", "token-test", "Y2EtdGVzdAo=")

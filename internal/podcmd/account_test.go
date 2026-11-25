@@ -50,19 +50,19 @@ func programAccountToken(r *fake.Runner, contextName string) {
 		Stdout: []byte("token-test\n2030-01-01T00:00:00Z\n"),
 	})
 	r.On("kubectl", []string{"config", "view", "-o",
-		`{.contexts[?(@.name=="` + contextName + `")].context.cluster}`}, exec.Result{
+		`jsonpath={.contexts[?(@.name=="` + contextName + `")].context.cluster}`}, exec.Result{
 		Stdout: []byte(contextName + "\n"),
 	})
 	r.On("kubectl", []string{"config", "view", "-o",
-		`{.clusters[?(@.name=="` + contextName + `")].cluster.server}`}, exec.Result{
+		`jsonpath={.clusters[?(@.name=="` + contextName + `")].cluster.server}`}, exec.Result{
 		Stdout: []byte("https://127.0.0.1:6443\n"),
 	})
 	r.On("kubectl", []string{"config", "view", "--raw", "-o",
-		`{.clusters[?(@.name=="` + contextName + `")].cluster.certificate-authority-data}`}, exec.Result{})
+		`jsonpath={.clusters[?(@.name=="` + contextName + `")].cluster.certificate-authority-data}`}, exec.Result{})
 	r.On("kubectl", []string{"config", "view", "-o",
-		`{.clusters[?(@.name=="` + contextName + `")].cluster.certificate-authority}`}, exec.Result{})
+		`jsonpath={.clusters[?(@.name=="` + contextName + `")].cluster.certificate-authority}`}, exec.Result{})
 	r.On("kubectl", []string{"config", "view", "-o",
-		`{.clusters[?(@.name=="` + contextName + `")].cluster.tls-server-name}`}, exec.Result{})
+		`jsonpath={.clusters[?(@.name=="` + contextName + `")].cluster.tls-server-name}`}, exec.Result{})
 	r.On("kubectl", []string{"config", "set-cluster", contextName, "--server=https://127.0.0.1:6443"}, exec.Result{})
 	r.On("kubectl", []string{"config", "set-credentials", "devzone-agent", "--token", "token-test"}, exec.Result{})
 	r.On("kubectl", []string{"config", "set-context", "devzone", "--cluster", contextName,
