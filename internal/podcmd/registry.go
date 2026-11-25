@@ -20,6 +20,10 @@ func newDefaultRegistry() *cli.Registry {
 		Name: "ticket",
 		Run:  runTicket,
 	})
+	r.Register(cli.Command{
+		Name: "cluster",
+		Run:  runCluster,
+	})
 	return r
 }
 

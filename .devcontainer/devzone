@@ -30,7 +30,7 @@ if [ -z "${DEVZONE_NO_GO:-}" ] && [ -z "${DEVZONE_FROM_GO:-}" ]; then
     esac
     POD_GO="$ICI/bin/devzone-pod-linux-$POD_GO_ARCH"
     if [ -n "$POD_GO_ARCH" ] && [ -x "$POD_GO" ] && "$POD_GO" handles "${1:-}" >/dev/null 2>&1; then
-        exec "$POD_GO" "$@"
+        DEVZONE_POD_SCRIPT="$ICI/devzone" exec "$POD_GO" "$@"
     fi
 fi
 # shellcheck source=SCRIPTDIR/help.sh
