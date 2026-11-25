@@ -18,7 +18,7 @@ bash "$ICI/kube-config.sh" || echo "startup : clusters not handled (devzone star
 # Token of the limited Kubernetes account (#430): 24 h, renewed at each
 # startup; account set up on the way if missing. Without a chosen services
 # cluster, nothing to do
-bash "$ICI/kube-account.sh" jeton || echo "startup : kubernetes account token not renewed (devzone repair)"
+devzone account token || echo "startup : kubernetes account token not renewed (devzone repair)"
 # gitlab module enabled: /etc/hosts is a Docker mount regenerated at each
 # startup, gitlab.localhost must be set again (ssh, glab and getent go through
 # the system resolver); hote-poser never fails (warning only)
