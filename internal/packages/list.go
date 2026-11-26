@@ -8,10 +8,10 @@ import (
 )
 
 // header is written byte for byte at the top of the user's package list.
-const header = "# paquets ajoutés par devzone packages add ; réinstallés à chaque création du conteneur\n"
+const header = "# paquets ajout\u00e9s par devzone packages add ; r\u00e9install\u00e9s \u00e0 chaque cr\u00e9ation du conteneur\n"
 
 // presentMark tags a package that was already installed by the image.
-const presentMark = "# déjà présent"
+const presentMark = "# d\u00e9j\u00e0 pr\u00e9sent"
 
 // PresentMark returns the exact mark written for an image package.
 func PresentMark() string { return presentMark }

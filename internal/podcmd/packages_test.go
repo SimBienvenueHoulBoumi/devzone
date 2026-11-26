@@ -123,7 +123,7 @@ func TestPackagesRefusals(t *testing.T) {
 func TestPackagesApplyMarksFailure(t *testing.T) {
 	_, dir := usePackagesFixture(t)
 	if err := os.WriteFile(filepath.Join(dir, ".devzone.packages"),
-		[]byte("# paquets ajoutés par devzone packages add ; réinstallés à chaque création du conteneur\nghost\n"), 0o644); err != nil {
+		[]byte("# paquets ajout\u00e9s par devzone packages add ; r\u00e9install\u00e9s \u00e0 chaque cr\u00e9ation du conteneur\nghost\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	previous := newPackagesEnvironment

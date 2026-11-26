@@ -11,7 +11,7 @@ import (
 const (
 	appResponds  = "application responds"
 	appNone      = "no application"
-	jsonResponds = "application répond"
+	jsonResponds = "application r\u00e9pond"
 	jsonNone     = "aucune application"
 )
 

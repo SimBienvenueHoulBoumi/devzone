@@ -151,10 +151,10 @@ func TestWriteListAtomicFailure(t *testing.T) {
 // TestStoredHeaderBytes fixes the UTF-8 bytes of the stored header and mark,
 // which are a contract with the user's package list file.
 func TestStoredHeaderBytes(t *testing.T) {
-	if header != "# paquets ajoutés par devzone packages add ; réinstallés à chaque création du conteneur\n" {
+	if header != "# paquets ajout\u00e9s par devzone packages add ; r\u00e9install\u00e9s \u00e0 chaque cr\u00e9ation du conteneur\n" {
 		t.Fatalf("header = %q", header)
 	}
-	if presentMark != "# déjà présent" {
+	if presentMark != "# d\u00e9j\u00e0 pr\u00e9sent" {
 		t.Fatalf("mark = %q", presentMark)
 	}
 }

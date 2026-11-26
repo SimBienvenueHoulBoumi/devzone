@@ -85,7 +85,7 @@ func TestJSONFixesKeysAndFrenchValues(t *testing.T) {
 	if err := env.JSON(); err != nil {
 		t.Fatal(err)
 	}
-	want := `[{"port":8080,"active":true,"application":"application répond","auto":false}]` + "\n"
+	want := "[{\"port\":8080,\"active\":true,\"application\":\"application r\u00e9pond\",\"auto\":false}]\n"
 	if out.String() != want {
 		t.Fatalf("json = %q, want %q", out.String(), want)
 	}
