@@ -50,17 +50,17 @@ func PortsEnable(out, errOut io.Writer) int {
 	if portsPlatform == "darwin" {
 		// A loaded agent would make the bootstrap fail; unloading an absent one
 		// fails too and is ignored, which keeps enable repeatable.
-		_ = portsDaemon(portsDaemonTool(), "bootout", portsDaemonServiceTarget())
+		_ = portsDaemon(portsDaemonTool(), true, "bootout", portsDaemonServiceTarget())
 	}
 	tool := portsDaemonTool()
 	args := portsDaemonEnableArgs(definition)
-	if status := portsDaemon(tool, args...); status != 0 {
+	if status := portsDaemon(tool, false, args...); status != 0 {
 		fmt.Fprintf(errOut, "✖ port watcher automatic start not enabled: %s %v failed (status %d)\n", tool, args, status)
 		return 1
 	}
 	if replaced && portsPlatform != "darwin" {
 		restart := portsDaemonRestartArgs()
-		if status := portsDaemon(tool, restart...); status != 0 {
+		if status := portsDaemon(tool, false, restart...); status != 0 {
 			fmt.Fprintf(errOut, "✖ port watcher automatic start not restarted: %s %v failed (status %d)\n", tool, restart, status)
 			return 1
 		}
@@ -85,7 +85,7 @@ func PortsDisable(out, errOut io.Writer) int {
 	tool := portsDaemonTool()
 	if existed {
 		args := portsDaemonDisableArgs()
-		status := portsDaemon(tool, args...)
+		status := portsDaemon(tool, portsPlatform == "darwin", args...)
 		if status != 0 && portsPlatform != "darwin" {
 			fmt.Fprintf(errOut, "✖ port watcher automatic start not disabled: %s %v failed (status %d)\n", tool, args, status)
 			return status
@@ -111,7 +111,7 @@ func portsDaemonReload(tool string) {
 	if portsPlatform == "darwin" {
 		return
 	}
-	_ = portsDaemon(tool, "--user", "daemon-reload")
+	_ = portsDaemon(tool, false, "--user", "daemon-reload")
 }
 
 // portsAutoStartGuard refuses to load a service manager during bats unless the

@@ -14,8 +14,8 @@ import (
 func recordingDaemon(h *portsEnableHarness, failRestart int) (*[]portsDaemonCall, *[]string) {
 	calls := &[]portsDaemonCall{}
 	binaries := &[]string{}
-	portsDaemon = func(tool string, args ...string) int {
-		*calls = append(*calls, portsDaemonCall{tool: tool, args: append([]string(nil), args...)})
+	portsDaemon = func(tool string, quiet bool, args ...string) int {
+		*calls = append(*calls, portsDaemonCall{tool: tool, quiet: quiet, args: append([]string(nil), args...)})
 		data, _ := os.ReadFile(h.copyPath)
 		*binaries = append(*binaries, string(data))
 		if failRestart != 0 && hasArg(args, "restart") {
