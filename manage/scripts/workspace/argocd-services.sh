@@ -155,7 +155,7 @@ argocd_toggle() {
 # devzone workspace argocd status | app …
 argocd_cmd() {
     case "${1:-status}" in
-        status | etat) argocd_status ;;
+        status) argocd_status ;;
         init)
             gitops_init "${@:2}" || return $?
             if argocd_installed; then gitops_root; fi

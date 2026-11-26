@@ -96,9 +96,6 @@ update_workspace() {
                 ;;
         esac
     fi
-    # Former French names renamed once the update is confirmed (#733); the
-    # script comes from the package, the devzone folder is the current one
-    DEVZONE_ROOT="$PWD" bash "$ROOT/.devcontainer/rename-legacy-files.sh" || true
     # Same path as workspace start, at the release: Argo CD revision and image tag
     export DEVZONE_ARGOCD_REVISION="v$version"
     workspace_deploy "$IMAGE_REPO" "$version" ""

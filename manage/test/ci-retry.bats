@@ -36,7 +36,7 @@ jobs_tsv() {
     jobs_tsv $'bats (macos-latest)\tcancelled\t\t0' $'tests-conteneur\tfailure\tGitHub Actions 2\t5' $'cli\tsuccess\tGitHub Actions 1\t9'
     run bash "$SCRIPT" relancer octo/repo 4242 1
     [ "$status" -eq 0 ]
-    [[ "$output" == *"jamais démarré"* ]] || false
+    [[ "$output" == *"never started"* ]] || false
     grep -q "^gh run rerun 4242 --failed$" "$FAUX_GH_LOG"
 }
 
@@ -51,7 +51,7 @@ jobs_tsv() {
     jobs_tsv $'bats (macos-latest)\tcancelled\t\t0' $'fonctionnel\tfailure\tGitHub Actions 1\t12' $'tests-conteneur\tfailure\tGitHub Actions 2\t5'
     run bash "$SCRIPT" relancer octo/repo 4242 1
     [ "$status" -eq 0 ]
-    [[ "$output" == *"pas de relance automatique"* ]] || false
+    [[ "$output" == *"no automatic rerun"* ]] || false
     ! grep -q "^gh run rerun" "$FAUX_GH_LOG" || false
 }
 
@@ -59,7 +59,7 @@ jobs_tsv() {
     jobs_tsv $'bats (macos-latest)\tcancelled\t\t0'
     run bash "$SCRIPT" relancer octo/repo 4242 2
     [ "$status" -eq 0 ]
-    [[ "$output" == *"une seule relance"* ]] || false
+    [[ "$output" == *"a single rerun"* ]] || false
     [ ! -s "$FAUX_GH_LOG" ]
 }
 
@@ -84,7 +84,7 @@ jobs_tsv() {
     export FAUX_GH_RERUN_ECHEC=1
     run bash "$SCRIPT" relancer octo/repo 4242 1
     [ "$status" -eq 0 ]
-    [[ "$output" == *"gh run rerun a échoué"* ]] || false
+    [[ "$output" == *"gh run rerun failed"* ]] || false
 }
 
 @test "relancer: wrong number of arguments -> usage, code 0" {

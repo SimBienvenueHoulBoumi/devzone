@@ -223,7 +223,7 @@ case "${1:-}" in
     json) catalog_json ;;
     # Removal of an application: StatefulSet and service, volume kept (#441)
     remove) app_remove "$2" ;;
-    -h | --help | aide) sed -n '2,6p' "$0" | sed 's/^# \{0,1\}//' ;;
+    -h | --help) sed -n '2,6p' "$0" | sed 's/^# \{0,1\}//' ;;
     *)
         echo "devzone : catalog : sync | apply | list | resume | json | remove <app>" >&2
         exit 1

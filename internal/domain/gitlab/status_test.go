@@ -113,11 +113,11 @@ func failingServer(t *testing.T) *httptest.Server {
 func TestInstalled(t *testing.T) {
 	f := newFixture(t)
 	f.onNamespace(true)
-	if code := f.run("installe"); code != 0 {
+	if code := f.run("installed"); code != 0 {
 		t.Fatalf("code = %d", code)
 	}
 	f.onNamespace(false)
-	if code := f.run("installe"); code != 1 {
+	if code := f.run("installed"); code != 1 {
 		t.Fatalf("code = %d, want 1", code)
 	}
 }

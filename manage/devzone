@@ -26,7 +26,7 @@ PAQUET="$(cd "$(dirname "$(readlink -f "$SCRIPT" 2>/dev/null || echo "$SCRIPT")"
 PACKAGE_ITEMS=(.devcontainer Makefile .gitattributes README.md LICENSE)
 # Lines always present in the .gitignore of a devzone: added to, never overwritten
 GITIGNORE_LINES=(
-    '# Chaque projet du workspace a son propre dépôt git'
+    '# Each workspace project has its own git repository'
     'workspace/*'
     '!workspace/.gitkeep'
     '.DS_Store'
@@ -173,7 +173,6 @@ devzone $(version): development workspace in a Kubernetes cluster
                            services (gitlab, postgres, argocd) of the Kubernetes workspace
   devzone workspace argocd status|init|apply|app add|list|remove
                            Argo CD of the workspace: GitOps repository, .argocd.conf, projects
-  (old French names: refused with the new name, see the README, « Removed names »)
   devzone --version
 EOT
 }
@@ -191,18 +190,6 @@ container_command() {
 }
 
 go_launch "$@"
-
-# Renamed names (#695): the French names of the host and container commands are
-# refused before anything is created (« devzone mettre-a-jour » must not create a
-# folder; « devzone stop » still creates ./stop). A copied devzone may miss the
-# aliases file: then no check.
-# shellcheck source=SCRIPTDIR/../.devcontainer/command-aliases.sh
-# shellcheck disable=SC1091
-if [ -f "$PAQUET/.devcontainer/command-aliases.sh" ]; then
-    . "$PAQUET/.devcontainer/command-aliases.sh"
-    reject_renamed "$@" || exit 1
-fi
-
 
 case "${1:-}" in
     "" | -h | --help | help) show_help ;;
@@ -224,7 +211,7 @@ case "${1:-}" in
             done
         fi
         if [ -z "$uninstaller" ]; then
-            echo "✖ À lancer dans un dossier devzone (uninstall.sh introuvable ici)." >&2
+            echo "✖ Run this in a devzone folder (uninstall.sh not found here)." >&2
             exit 1
         fi
         DEVZONE_COMMAND="devzone uninstall" bash "$uninstaller"
@@ -238,7 +225,7 @@ case "${1:-}" in
         ;;
     *)
         if container_command "$1"; then
-            echo "✖ devzone $1 : commande du conteneur ; lance-la dans devzone (make shell), ou choisis un autre nom de dossier" >&2
+            echo "✖ devzone $1: pod command; run it in the pod (make shell), or choose another folder name" >&2
             exit 2
         fi
         # shellcheck source=SCRIPTDIR/scripts/devzone-manifest.sh

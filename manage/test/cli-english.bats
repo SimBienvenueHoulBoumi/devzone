@@ -56,9 +56,3 @@ french_found() {
     [ -n "$output" ]
     ! french_found "$output" || false
 }
-
-@test "cli-english: the refusal of an old name is in English" {
-    run env DEVZONE_NO_GO=1 bash "$RACINE/manage/devzone" activer
-    [ "$status" -eq 1 ]
-    [ "$output" = "✖ « activer » was renamed: devzone enable" ]
-}

@@ -38,6 +38,5 @@ devzone_aide() {
   devzone port [--close <n>]              list or remove a relay of the workstation
   devzone passwords                        regenerate .password and print its path
   devzone packages [add|remove|apply] …    system packages kept after a rebuild
-  Old French names are refused and print the new name (see the reference).
 AIDE
 }

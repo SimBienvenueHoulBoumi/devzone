@@ -23,7 +23,7 @@ func decodeB64(s string) (string, bool) {
 
 // regenerateCredentials refreshes the grouped .password view; failure is non-fatal.
 func (m *module) regenerateCredentials() {
-	res, err := m.runner.Run(m.ctx, "bash", []string{filepath.Join(m.codeRoot, "password.sh"), "regenerer"}, fexec.Opts{})
+	res, err := m.runner.Run(m.ctx, "bash", []string{filepath.Join(m.codeRoot, "password.sh"), "regenerate"}, fexec.Opts{})
 	if err != nil || res.Code != 0 {
 		fmt.Fprintln(m.errOut, "devzone : argocd : grouped credentials not updated (devzone passwords)")
 	}

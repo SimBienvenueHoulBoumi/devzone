@@ -22,9 +22,10 @@
 # actions: the push triggers the CI and the ticket tracking, like the other
 # workflows.
 #
-# The posted design is "## Conception proposée", never "retenue": the ticket
-# check only accepts a design from the maintainer, who takes it over
-# ("## Conception retenue") on the ticket, then marks the PR ready.
+# The posted design uses the proposed heading of the ticket protocol, never the
+# validated one: the ticket check only accepts a design from the maintainer, who
+# takes it over on the ticket, then marks the PR ready. The exact headings are
+# read from manage/scripts/ci/ticket-protocol.txt (data).
 #
 # Accepted exception (version bumps only, packages and image tools): the workflow
 # validates the ticket it creates, so that the ticket branch can be created; the
@@ -135,9 +136,16 @@ jobs:
           APP_SLUG: ${{ steps.app.outputs.app-slug }}
         run: |
           set -euo pipefail
+          protocol() { sed -n "${1}p" manage/scripts/ci/ticket-protocol.txt; }
+          label="$(protocol 2)"
+          need_heading="$(protocol 3)"
+          notes_heading="$(protocol 4)"
+          done_heading="$(protocol 5)"
+          design_heading="$(protocol 6)"
+          validated_heading="$(protocol 7)"
           while read -r paquet ancienne nouvelle; do
             [ -n "$paquet" ] || continue
-            titre="$paquet $nouvelle dans le conteneur"
+            titre="$paquet $nouvelle in the pod image"
             # A ticket opened by the App already exists for this package (title "package ...");
             # same title opened by someone else: ignored, it does not block the bump.
             existant="$(bash manage/scripts/ci/versions.sh --ticket-existant "$paquet" "app/${APP_SLUG}")"
@@ -146,44 +154,44 @@ jobs:
               titre_existant="${existant#*$'\t'}"
               if [ "$titre_existant" != "$titre" ]; then
                 gh issue edit "$n" --title "$titre"
-                gh issue comment "$n" --body "Nouvelle version npm : $nouvelle (la version figée était $ancienne)."
+                gh issue comment "$n" --body "New npm version: $nouvelle (the pinned version was $ancienne)."
               fi
               continue
             fi
             notes="https://www.npmjs.com/package/$paquet/v/$nouvelle"
             corps="$(cat <<EOF
-          ## Besoin
-          La version figée de $paquet dans le conteneur ($ancienne) est dépassée : la dernière version npm est $nouvelle.
+          $need_heading
+          The pinned version of $paquet in the pod image ($ancienne) is behind: the latest npm version is $nouvelle.
 
-          ## Notes de version
+          $notes_heading
           $notes
 
-          ## Terminé quand…
-          - [ ] $paquet@$nouvelle est figé dans le fichier du conteneur
-          - [ ] les tests fonctionnels et la CLI passent sur la PR
+          $done_heading
+          - [ ] $paquet@$nouvelle is pinned in the image file
+          - [ ] the functional tests and the CLI pass on the PR
           EOF
             )"
             n="$(repowarden ticket nouveau "$titre" --type chore --description "$corps" --porcelain)"
             conception="$(cat <<EOF
-          ## Conception proposée
+          $design_heading
 
-          À confirmer par le mainteneur (« ## Conception retenue ») : la vérification \`ticket\` de la PR l'attend.
+          To be confirmed by the maintainer ("$validated_heading"): the PR \`ticket\` check waits for it.
 
-          - Monter \`$paquet\` de \`$ancienne\` à \`$nouvelle\` (dernière version npm).
-          - \`manage/scripts/ci/versions.sh --appliquer $paquet $nouvelle\` remplace la seule version figée, dans son fichier.
-          - Commit \`chore(devcontainer): $paquet $nouvelle\`, puis push : la PR brouillon s'ouvre, la CI teste le conteneur.
+          - Bump \`$paquet\` from \`$ancienne\` to \`$nouvelle\` (latest npm version).
+          - \`manage/scripts/ci/versions.sh --appliquer $paquet $nouvelle\` replaces the single pinned version, in its file.
+          - Commit \`chore(devcontainer): $paquet $nouvelle\`, then push: the draft PR opens and the CI tests the pod.
           EOF
             )"
             repowarden ticket comment "$n" "$conception"
             # Validated automatically so that the ticket branch can be created
-            repowarden ticket label "$n" validé
+            repowarden ticket label "$n" "$label"
             repowarden ticket "$n"
             bash manage/scripts/ci/versions.sh --appliquer "$paquet" "$nouvelle"
             # versions.env holds the repowarden version since #503
             git add -- .devcontainer/versions.env .devcontainer/devzone
             repowarden cc -m "$paquet $nouvelle" \
               --type chore --scope devcontainer \
-              --body "Monte $paquet de $ancienne à $nouvelle, dernière version npm." \
+              --body "Bumps $paquet from $ancienne to $nouvelle, latest npm version." \
               --refs "Ticket : #$n"
             git push -u origin "$(git branch --show-current)"
           done <retards.txt
@@ -214,48 +222,55 @@ jobs:
           APP_SLUG: ${{ steps.app.outputs.app-slug }}
         run: |
           set -euo pipefail
+          protocol() { sed -n "${1}p" manage/scripts/ci/ticket-protocol.txt; }
+          label="$(protocol 2)"
+          need_heading="$(protocol 3)"
+          notes_heading="$(protocol 4)"
+          done_heading="$(protocol 5)"
+          design_heading="$(protocol 6)"
+          validated_heading="$(protocol 7)"
           while IFS=$'\t' read -r kind outil ancienne nouvelle titre notes numero; do
             case "$kind" in
               majeure) continue ;;
               existant)
                 # Open ticket of the App for this tool, with the title of an older version
                 gh issue edit "$numero" --title "$titre"
-                gh issue comment "$numero" --body "Nouvelle version amont : $nouvelle (la version figée était $ancienne)."
+                gh issue comment "$numero" --body "New upstream version: $nouvelle (the pinned version was $ancienne)."
                 continue
                 ;;
             esac
             corps="$(cat <<EOF
-          ## Besoin
-          La version figée de $outil dans l'image ($ancienne, Dockerfile) est dépassée : la dernière version amont est $nouvelle.
+          $need_heading
+          The pinned version of $outil in the image ($ancienne, build file) is behind: the latest upstream version is $nouvelle.
 
-          ## Notes de version
+          $notes_heading
           $notes
 
-          ## Terminé quand…
-          - [ ] $outil $nouvelle est figé dans le Dockerfile de l'image (version et empreintes sha256)
-          - [ ] les tests fonctionnels et la CLI passent sur la PR
+          $done_heading
+          - [ ] $outil $nouvelle is pinned in the image build file (version and sha256 checksums)
+          - [ ] the functional tests and the CLI pass on the PR
           EOF
             )"
             n="$(repowarden ticket nouveau "$titre" --type chore --description "$corps" --porcelain)"
             conception="$(cat <<EOF
-          ## Conception proposée
+          $design_heading
 
-          À confirmer par le mainteneur (« ## Conception retenue ») : la vérification \`ticket\` de la PR l'attend.
+          To be confirmed by the maintainer ("$validated_heading"): the PR \`ticket\` check waits for it.
 
-          - Monter \`$outil\` de \`$ancienne\` à \`$nouvelle\` (dernière version amont).
-          - \`manage/scripts/ci/versions.sh --apply $outil $nouvelle\` remplace la version et recalcule les deux empreintes sha256 de l'outil dans le Dockerfile, rien d'autre.
-          - Commit \`chore(devcontainer): $outil $nouvelle dans l'image\`, puis push : la PR brouillon s'ouvre, la CI teste le conteneur.
+          - Bump \`$outil\` from \`$ancienne\` to \`$nouvelle\` (latest upstream version).
+          - \`manage/scripts/ci/versions.sh --apply $outil $nouvelle\` replaces the version and recomputes both sha256 checksums of the tool in the image build file, nothing else.
+          - Commit \`chore(devcontainer): $outil $nouvelle in the image\`, then push: the draft PR opens and the CI tests the pod.
           EOF
             )"
             repowarden ticket comment "$n" "$conception"
             # Validated automatically so that the ticket branch can be created
-            repowarden ticket label "$n" validé
+            repowarden ticket label "$n" "$label"
             repowarden ticket "$n"
             bash manage/scripts/ci/versions.sh --apply "$outil" "$nouvelle"
             git add -- .devcontainer/Dockerfile
-            repowarden cc -m "$outil $nouvelle dans l'image" \
+            repowarden cc -m "$outil $nouvelle in the image" \
               --type chore --scope devcontainer \
-              --body "Monte $outil de $ancienne à $nouvelle, dernière version amont." \
+              --body "Bumps $outil from $ancienne to $nouvelle, latest upstream version." \
               --refs "Ticket : #$n"
             git push -u origin "$(git branch --show-current)"
           done <plan.txt

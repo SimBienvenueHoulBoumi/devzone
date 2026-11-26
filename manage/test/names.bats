@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 # check-names.sh (#716): a tracked path with a French word in its name fails,
-# .github/ is not checked. The former user data names fail too (#733: they are
-# renamed by rename-legacy-files.sh, the allowlist no longer holds them).
+# .github/ is not checked. The former user data names fail too: they are no
+# longer in the allowlist.
 
 setup() {
     SCRIPT="$BATS_TEST_DIRNAME/../scripts/ci/check-names.sh"

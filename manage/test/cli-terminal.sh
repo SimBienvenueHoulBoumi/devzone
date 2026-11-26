@@ -1,25 +1,26 @@
 #!/usr/bin/env bash
-# Tests de la CLI de devzone dans un vrai terminal (pseudo-terminal), comme un
-# humain : chaque commande a un délai maximal ; une commande qui attend une
-# entrée au lieu de finir échoue (« attend une entrée »). Ticket #109.
-#   make test-cli     (ou bash manage/test/cli-terminal.sh)
-# Couvre, sans cluster ni conteneur (#735, le poste Docker est retiré) : aide
-# de make, commande npm (manage/devzone --version, --help, uninstall hors d'un
-# dossier devzone, --docker refusé, dossier non vide refusé).
-# Les scénarios qui créaient et lançaient un conteneur sont retirés : la
-# création exige désormais un cluster Kubernetes.
-# Prérequis : Node, Python 3, make. Durée : moins d'une minute.
+# Tests of the devzone CLI in a real terminal (pseudo-terminal), like a
+# human: each command has a maximum delay; a command waiting for input
+# instead of ending fails ("waiting for input"). Ticket #109.
+#   make test-cli     (or bash manage/test/cli-terminal.sh)
+# Covers, without a cluster or host container mode (#735): make help, the npm
+# command (manage/devzone --version, --help, uninstall outside a devzone folder,
+# removed option refused, non-empty folder refused).
+# Scenarios that created and started a container are gone: creating a devzone
+# now requires a Kubernetes cluster.
+# Prerequisites: Node, Python 3, make. Duration: under a minute.
 set -uo pipefail
 
 RACINE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+REMOVED_OPTION="$(cat "$RACINE/manage/test/removed-option.txt")"
 # shellcheck source=SCRIPTDIR/journal-error.sh
 . "$(dirname "${BASH_SOURCE[0]}")/journal-error.sh"
 export DEVZONE_VOLUMES="devzone-test-cli-$$"
-# Désinstallation : aucun cluster de l'hôte examiné
+# Uninstall: no host cluster inspected
 export KUBECONFIG=/nexiste/pas
 # Chemin physique : make (CURDIR) voit /private/var/… sous macOS, pas /var/…
 TMP="$(cd "$(mktemp -d)" && pwd -P)"
-# Nommé autrement que « devzone » (npx devzone <dossier>)
+# Named differently from "devzone" (npx devzone <folder>)
 COPIE="$TMP/mon-devzone-cli"
 TERMINAL=(python3 -I "$RACINE/manage/test/terminal.py")
 reussis=0
@@ -48,9 +49,9 @@ ko() {
 }
 
 ESC="$(printf '\033')"
-# humain <nom> <délai s> <code attendu> <motif attendu dans la sortie, ou "">
-#        [--envoyer MOTIF TEXTE]... -- commande…
-# Lance la commande sous terminal ; SORTIE garde sa sortie (sans couleurs)
+# human <name> <delay s> <expected code> <expected pattern in output, or "">
+#        [--send PATTERN TEXT]... -- command...
+# Runs the command in a terminal; SORTIE keeps its output (without colors)
 humain() {
     local nom="$1" delai="$2" attendu="$3" motif="$4" code
     shift 4
@@ -58,39 +59,39 @@ humain() {
     code=$?
     SORTIE="$(printf '%s\n' "$SORTIE" | sed "s/${ESC}\[[0-9;?]*[A-Za-z]//g" | tr -d '\r')"
     if [ "$code" -eq 124 ]; then
-        ko "$nom : attend une entrée (délai de $delai s dépassé)" "$SORTIE"
+        ko "$nom: waiting for input (delay of $delai s exceeded)" "$SORTIE"
     elif [ "$code" -eq "$attendu" ] && { [ -z "$motif" ] || grep -qE -- "$motif" <<<"$SORTIE"; }; then
         ok "$nom"
     else
-        ko "$nom (code $code, attendu $attendu ; motif : $motif)" "$SORTIE"
+        ko "$nom (code $code, expected $attendu; pattern: $motif)" "$SORTIE"
     fi
 }
-# Cible make lancée dans le dossier du devzone
+# Make target run in the devzone folder
 mk() {
     local nom="$1" delai="$2" attendu="$3" motif="$4"
     shift 4
     humain "make $nom" "$delai" "$attendu" "$motif" "$@" -- make -C "$COPIE" "$nom"
 }
-# verifier <nom> commande… : réussi si la commande réussit (sinon SORTIE affichée)
+# verify <name> command...: succeeds if the command succeeds (else SORTIE is printed)
 verifier() {
     local nom="$1"
     shift
     if "$@"; then ok "$nom"; else ko "$nom" "$SORTIE"; fi
 }
 
-echo "▶ Sans conteneur (volumes $DEVZONE_VOLUMES-*)"
+echo "▶ Without a host container mode (volumes $DEVZONE_VOLUMES-*)"
 humain "make help" 30 0 "make uninstall" -- make -C "$RACINE" help
 humain "devzone --version" 30 0 "^$(node -p "require('$RACINE/package.json').version")$" -- bash "$RACINE/manage/devzone" --version
 humain "devzone --help" 30 0 "devzone <folder>" -- bash "$RACINE/manage/devzone" --help
 cd "$TMP" || exit 1
-humain "devzone uninstall hors d'un dossier devzone : refusé" 30 1 "dossier devzone" -- bash "$RACINE/manage/devzone" uninstall
-humain "devzone <dossier> --docker : option retirée, refusée" 30 1 "option inconnue : --docker" -- bash "$RACINE/manage/devzone" "$TMP/mon-devzone" --docker
-verifier "--docker : dossier non créé" test ! -e "$TMP/mon-devzone"
+humain "devzone uninstall outside a devzone folder: refused" 30 1 "devzone folder" -- bash "$RACINE/manage/devzone" uninstall
+humain "devzone <folder> removed option: refused" 30 1 "unknown option: $REMOVED_OPTION" -- bash "$RACINE/manage/devzone" "$TMP/mon-devzone" "$REMOVED_OPTION"
+verifier "$REMOVED_OPTION: folder not created" test ! -e "$TMP/mon-devzone"
 mkdir -p "$TMP/plein"
-echo important >"$TMP/plein/fichier"
-humain "devzone <dossier> : dossier non vide refusé" 30 1 "pas vide" -- bash "$RACINE/manage/devzone" "$TMP/plein"
-verifier "fichier existant préservé" grep -qx important "$TMP/plein/fichier"
+echo important >"$TMP/plein/file"
+humain "devzone <folder>: non-empty folder refused" 30 1 "not empty" -- bash "$RACINE/manage/devzone" "$TMP/plein"
+verifier "existing file preserved" grep -qx important "$TMP/plein/file"
 
 echo
-echo "Résultat : $reussis réussi(s), $failures échec(s)"
+echo "Result: $reussis passed, $failures failed"
 [ "$failures" -eq 0 ]

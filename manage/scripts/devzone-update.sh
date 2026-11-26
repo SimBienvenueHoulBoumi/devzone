@@ -35,7 +35,7 @@ update_workstation() {
         esac
     done
     if [ ! -d .devcontainer ]; then
-        echo "✖ À lancer dans un dossier devzone (.devcontainer introuvable ici)." >&2
+        echo "✖ Run this in a devzone folder (.devcontainer not found here)." >&2
         exit 1
     fi
 
@@ -55,11 +55,11 @@ update_workstation() {
         [ -f "$folder/$rel" ] || missing=1
     done <"$package_list"
     if [ "$installed" = "$package" ] && [ -z "$missing" ]; then
-        echo "✔ devzone $installed : déjà à jour."
-        echo "Pour la dernière version publiée : npx devzone@latest update"
+        echo "✔ devzone $installed: already up to date."
+        echo "For the latest published version: npx devzone@latest update"
         return 0
     fi
-    echo "devzone : dossier $installed, paquet $package"
+    echo "devzone: folder $installed, package $package"
 
     # 2. Files modified locally (checksum different from the manifest; without
     # a manifest, different from the one of the package)
@@ -81,13 +81,13 @@ update_workstation() {
     while IFS= read -r rel; do
         [ -n "$rel" ] || continue
         if ! path_allowed "$rel"; then
-            echo "devzone : manifeste : chemin refusé : $rel" >&2
+            echo "devzone: manifest: refused path: $rel" >&2
             continue
         fi
         in_list "$package_list" "$rel" && continue
         is_protected "$rel" && continue
         if ! inside_folder "$folder" "$rel"; then
-            echo "devzone : manifeste : chemin refusé : $rel" >&2
+            echo "devzone: manifest: refused path: $rel" >&2
             continue
         fi
         printf '%s\n' "$rel" >>"$work/to_remove"
@@ -106,7 +106,7 @@ update_workstation() {
         while IFS= read -r f; do
             rel="${f#"$folder"/}"
             if ! path_allowed "$rel"; then
-                echo "devzone : manifeste : chemin refusé : $rel" >&2
+                echo "devzone: manifest: refused path: $rel" >&2
                 continue
             fi
             is_protected "$rel" && continue
@@ -125,13 +125,13 @@ update_workstation() {
     mv "$work/to_save.sorted" "$work/to_save"
 
     if [ -s "$work/modified" ]; then
-        echo "Fichiers modifiés localement :"
+        echo "Locally modified files:"
         while IFS= read -r rel; do
             printf '  %s\n' "$rel"
         done <"$work/modified"
         if [ -z "$assume_yes" ]; then
             if [ ! -t 0 ]; then
-                echo "✖ Fichiers modifiés localement : relance avec --yes pour les remplacer (sauvegarde dans .devzone.backup/)." >&2
+                echo "✖ Locally modified files: rerun with --yes to replace them (backup in .devzone.backup/)." >&2
                 exit 1
             fi
             printf 'Replace these files (backup in .devzone.backup/)? [y/N] ' >&2
@@ -139,16 +139,12 @@ update_workstation() {
             case "$answer" in
                 y | Y | yes) ;;
                 *)
-                    echo "Abandon : rien n'a été modifié."
+                    echo "Aborted: nothing was modified."
                     return 1
                     ;;
             esac
         fi
     fi
-
-    # Former French names renamed before the backup (#733): the backup folder is
-    # .devzone.backup. The script comes from the package, the folder may be old
-    DEVZONE_ROOT="$folder" bash "$PAQUET/.devcontainer/rename-legacy-files.sh" || true
 
     # 3. Backup of every file replaced or removed
     if [ -s "$work/to_save" ]; then
@@ -162,7 +158,7 @@ update_workstation() {
         while IFS= read -r rel; do
             [ -f "$folder/$rel" ] || continue
             if ! inside_folder "$folder" "$rel"; then
-                echo "devzone : manifeste : chemin refusé : $rel" >&2
+                echo "devzone: manifest: refused path: $rel" >&2
                 continue
             fi
             mkdir -p "$backup/$(dirname "$rel")"
@@ -178,13 +174,13 @@ update_workstation() {
     while IFS= read -r rel; do
         mkdir -p "$folder/$(dirname "$rel")"
         if ! inside_folder "$folder" "$rel"; then
-            echo "devzone : manifeste : chemin refusé : $rel" >&2
+            echo "devzone: manifest: refused path: $rel" >&2
             continue
         fi
         # Never write through a link: the link (not its target) is removed
         if [ -L "$folder/$rel" ]; then
             rm -f -- "$folder/$rel"
-            echo "devzone : manifeste : lien remplacé : $rel" >&2
+            echo "devzone: manifest: link replaced: $rel" >&2
         fi
         cp -p "$PAQUET/$rel" "$folder/$rel"
         if [ -x "$PAQUET/$rel" ]; then
@@ -195,7 +191,7 @@ update_workstation() {
         [ -n "$rel" ] || continue
         [ -f "$folder/$rel" ] || continue
         if ! inside_folder "$folder" "$rel"; then
-            echo "devzone : manifeste : chemin refusé : $rel" >&2
+            echo "devzone: manifest: refused path: $rel" >&2
             continue
         fi
         # rm does not follow links: only the link is removed, never its target
@@ -210,18 +206,18 @@ update_workstation() {
 
     # 6. New manifest, then rebuild offered
     write_manifest "$folder"
-    echo "✔ devzone $package : mis à jour."
+    echo "✔ devzone $package: updated."
     restart_ports_watcher "$folder"
     # the update never changes the workstation mode (#472)
     if [ "$(grep -E '^workspace=' "$folder/.devzone.modules" 2>/dev/null | tail -1)" = "workspace=kubernetes" ]; then
         return 0
     fi
     if [ -n "$no_rebuild" ]; then
-        echo "Reconstruction non lancée (--no-rebuild)."
+        echo "Rebuild not started (--no-rebuild)."
         return 0
     fi
     if [ ! -t 0 ]; then
-        echo "Reconstruction : make -C $folder rebuild (à lancer dans un terminal)"
+        echo "Rebuild: make -C $folder rebuild (run in a terminal)"
         return 0
     fi
     printf 'Rebuild the container now? [y/N] ' >&2
@@ -229,7 +225,7 @@ update_workstation() {
     case "$answer" in
         y | Y | yes) ;;
         *)
-            echo "Reconstruction non lancée : make -C $folder rebuild"
+            echo "Rebuild not started: make -C $folder rebuild"
             return 0
             ;;
     esac

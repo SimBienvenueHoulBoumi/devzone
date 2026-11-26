@@ -1,8 +1,8 @@
 #!/usr/bin/env bats
-# Plateforme GitHub (défaut) ou GitLab (#240) : commande devzone platform,
-# glab installé depuis la release officielle (somme vérifiée), connexion et
-# état. Faux glab dans ~/.local/bin du HOME de test (hors PATH, comme le vrai
-# binaire), curl et sha256sum dans le PATH : aucun téléchargement réel.
+# GitHub platform (default) or GitLab (#240): devzone platform command,
+# glab installed from the official release (checksum verified), login and
+# state. Fake glab in ~/.local/bin of the test HOME (outside PATH, like the real
+# binary), curl and sha256sum in PATH: no real download.
 
 setup() {
     load commun
@@ -18,8 +18,8 @@ setup() {
     export GLAB_CURL_LOG="$BATS_TEST_TMPDIR/curl.log"
     export GLAB_LOG="$BATS_TEST_TMPDIR/glab.log"
     export GLAB_HOSTS="$BATS_TEST_TMPDIR/glab-hosts"
-    # Somme SHA-256 attendue : lue dans le script devzone (versions figées),
-    # selon l'architecture du conteneur ; une somme fausse la fait échouer
+    # Expected SHA-256 sum: read from the devzone script (pinned versions),
+    # based on the pod architecture; a wrong sum makes it fail
     ARM64="$(sed -nE 's/^GLAB_SOMME_ARM64=([0-9a-f]+)$/\1/p' "$DEVZONE")"
     AMD64="$(sed -nE 's/^GLAB_SOMME_AMD64=([0-9a-f]+)$/\1/p' "$DEVZONE")"
     [ "$(wc -c <<<"$ARM64")" -eq 65 ] && [ "$(wc -c <<<"$AMD64")" -eq 65 ] || false
@@ -28,9 +28,9 @@ setup() {
         *) export GLAB_SOMME_LOCALE="$AMD64" ;;
     esac
 
-    # glab simulé : journalise ses arguments, garde les hôtes connectés ; le
-    # jeton reçu est prouvé par le journal ($BATS_TEST_TMPDIR, jamais l'écran).
-    # Hors du PATH (comme le vrai binaire dans ~/.local/bin) : la connexion
+    # Fake glab: logs its arguments, keeps the hosts connected; the token it
+    # received is proven by the journal ($BATS_TEST_TMPDIR, never the screen).
+    # Outside PATH (like the real binary in ~/.local/bin): the login
     # doit l'appeler par son chemin
     mkdir -p "$HOME/.local/bin"
     cat >"$HOME/.local/bin/glab" <<'GLAB'
@@ -75,18 +75,18 @@ for a in "$@"; do
 done
 exit 0
 CURL
-    # sha256sum simulé : renvoie la somme attendue (somme différente → échec)
+    # Fake sha256sum: returns the expected sum (a different sum -> failure)
     cat >"$BATS_TEST_TMPDIR/bin/sha256sum" <<'SHA'
 #!/usr/bin/env bash
 echo "${GLAB_SOMME_FAUX:-$GLAB_SOMME_LOCALE}  $*"
 SHA
-    # gh simulé : GH_ETAT = absent (défaut), sans (connecté sans workflow), avec
+    # Fake gh: GH_ETAT = absent (default), without (connected without workflow), with
     cat >"$BATS_TEST_TMPDIR/bin/gh" <<'GH'
 #!/usr/bin/env bash
 case "${GH_ETAT:-absent}" in
     absent) echo "You are not logged into any GitHub hosts." >&2; exit 1 ;;
-    sans) echo "  - Token scopes: 'gist', 'read:org', 'repo'" ;;
-    avec) echo "  - Token scopes: 'gist', 'read:org', 'repo', 'workflow'" ;;
+    without) echo "  - Token scopes: 'gist', 'read:org', 'repo'" ;;
+    with) echo "  - Token scopes: 'gist', 'read:org', 'repo', 'workflow'" ;;
 esac
 GH
     chmod +x "$BATS_TEST_TMPDIR/bin/"*
@@ -94,34 +94,34 @@ GH
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
 }
 
-# Empreinte de l'état modules : les clés platform/gitlab_url n'existent
-# que pendant que la plateforme gitlab est choisie
+# Snapshot of the modules state: the platform/gitlab_url keys exist
+# only while the gitlab platform is chosen
 empreinte_etat() {
     cat "$DEVZONE_STATE"
 }
 
-@test "défaut : plateforme github, contrôles gh actuels" {
-    GH_ETAT=avec run bash "$DEVZONE"
+@test "default: github platform, current gh checks" {
+    GH_ETAT=with run bash "$DEVZONE"
     [ "$status" -eq 0 ]
     [[ "$output" == *"platform       github"* ]] || false
     [[ "$output" == *"GitHub          connected"* ]] || false
     [[ "$output" != *"gitlab :"* ]] || false
 }
 
-@test "plateforme : affiche la plateforme, github par défaut" {
+@test "platform: shows the platform, github by default" {
     run bash "$DEVZONE" platform
     [ "$status" -eq 0 ]
     [[ "$output" == *"devzone : github platform (default)"* ]] || false
 }
 
-@test "plateforme : affiche gitlab et son URL une fois choisi" {
+@test "platform: shows gitlab and its URL once chosen" {
     run bash "$DEVZONE" platform gitlab --url "$INSTANCE"
     [ "$status" -eq 0 ]
     run bash "$DEVZONE" platform
     [[ "$output" == *"devzone : gitlab platform: $INSTANCE, glab connected"* ]] || false
 }
 
-@test "plateforme gitlab --url : glab installé de la release officielle, somme vérifiée" {
+@test "gitlab platform --url: glab installed from the official release, checksum verified" {
     rm -f "$HOME/.local/bin/glab"
     run bash "$DEVZONE" platform gitlab --url "$INSTANCE"
     [ "$status" -eq 0 ]
@@ -130,20 +130,20 @@ empreinte_etat() {
     [ -x "$HOME/.local/bin/glab" ]
 }
 
-@test "gitlab platform: autre instance, interactive (sans jeton), état correct" {
+@test "gitlab platform: other instance, interactive (without token), correct state" {
     run bash "$DEVZONE" platform gitlab --url "$INSTANCE"
     [ "$status" -eq 0 ]
     grep -q "auth login --hostname example.gitlab:8443" "$GLAB_LOG" || false
     ! grep -q -- "--token" "$GLAB_LOG" || false
     ! grep -q -- "--git-protocol" "$GLAB_LOG" || false
-    GH_ETAT=avec run bash "$DEVZONE"
+    GH_ETAT=with run bash "$DEVZONE"
     [[ "$output" == *"platform       gitlab: $INSTANCE, glab connected"* ]] || false
     [[ "$output" == *"GitHub          not needed here"*"gitlab platform chosen"* ]] || false
     [[ "$output" == *"repowarden      stays on GitHub"* ]] || false
     [[ "$output" != *"GitHub          connected"* ]] || false
 }
 
-@test "URL par défaut avec le module gitlab actif, connexion par le root token (jamais affiché)" {
+@test "default URL with the gitlab module active, login via the root token (never printed)" {
     printf 'gitlab=on\n' >"$DEVZONE_STATE"
     mkdir -p "$DEVZONE_ROOT/workspace/.gitlab"
     printf 'jeton-root-secret' >"$DEVZONE_ROOT/workspace/.gitlab/root-token"
@@ -157,7 +157,7 @@ empreinte_etat() {
     grep -q -- "--token jeton-root-secret" "$GLAB_LOG" || false
 }
 
-@test "sans URL et sans module gitlab actif → refus, rien installé" {
+@test "without URL and without an active gitlab module -> refusal, nothing installed" {
     rm -f "$HOME/.local/bin/glab"
     run bash "$DEVZONE" platform gitlab
     [ "$status" -eq 1 ]
@@ -167,13 +167,13 @@ empreinte_etat() {
     ! grep -q '^platform=' "$DEVZONE_STATE" || false
 }
 
-@test "--url sans valeur → refus" {
+@test "--url without a value -> refusal" {
     run bash "$DEVZONE" platform gitlab --url
     [ "$status" -eq 1 ]
     [[ "$output" == *"--url expects a URL"* ]] || false
 }
 
-@test "unknown platform → refus, état intact" {
+@test "unknown platform -> refusal, state intact" {
     rm -f "$HOME/.local/bin/glab"
     run bash "$DEVZONE" platform machines
     [ "$status" -eq 1 ]
@@ -191,7 +191,7 @@ empreinte_etat() {
     ! grep -q '^gitlab_url=' "$DEVZONE_STATE" || false
 }
 
-@test "SHA-256 sum différente → échec, glab absent, plateforme non retenue" {
+@test "different SHA-256 sum -> failure, no glab, platform not chosen" {
     bash "$DEVZONE" >/dev/null
     rm -f "$HOME/.local/bin/glab"
     GLAB_SOMME_FAUX=0000000000000000000000000000000000000000000000000000000000000000 \
@@ -203,7 +203,7 @@ empreinte_etat() {
     [ -f "$DEVZONE_STATE" ]
 }
 
-@test "téléchargement en échec → message, glab absent, plateforme non retenue" {
+@test "failed download -> message, no glab, platform not chosen" {
     rm -f "$HOME/.local/bin/glab"
     FAUX_CURL_KO=1 run bash "$DEVZONE" platform gitlab --url "$INSTANCE"
     [ "$status" -ne 0 ]
@@ -212,7 +212,7 @@ empreinte_etat() {
     ! grep -q '^platform=' "$DEVZONE_STATE" || false
 }
 
-@test "connexion refusée par glab → échec, plateforme non retenue, rien à corriger" {
+@test "login refused by glab -> failure, platform not chosen, nothing to fix" {
     FAUX_GLAB_KO=1 run bash "$DEVZONE" platform gitlab --url "$INSTANCE"
     [ "$status" -ne 0 ]
     [[ "$output" != *"glab connected"* ]] || false
@@ -221,7 +221,7 @@ empreinte_etat() {
     [ -x "$HOME/.local/bin/glab" ]
 }
 
-@test "module gitlab : connexion impossible → plateforme gardée, état glab not connected" {
+@test "gitlab module: login impossible -> platform kept, state glab not connected" {
     printf 'gitlab=on\nplatform=gitlab\ngitlab_url=http://gitlab.localhost:8929\n' >"$DEVZONE_STATE"
     mkdir -p "$DEVZONE_ROOT/workspace/.gitlab"
     printf 'jeton-root-secret' >"$DEVZONE_ROOT/workspace/.gitlab/root-token"
@@ -234,7 +234,7 @@ empreinte_etat() {
     [[ "$output" == *"devzone : gitlab platform: http://gitlab.localhost:8929, glab not connected: glab auth login --hostname gitlab.localhost:8929"* ]] || false
 }
 
-@test "retour github : glab et sa configuration retirés, état identique à avant" {
+@test "back to github: glab and its configuration removed, state unchanged" {
     bash "$DEVZONE" >/dev/null
     avant="$(empreinte_etat)"
     run bash "$DEVZONE" platform gitlab --url "$INSTANCE"
@@ -246,12 +246,12 @@ empreinte_etat() {
     [ ! -e "$HOME/.local/bin/glab" ]
     [ ! -e "$HOME/.config/glab-cli" ]
     [ "$(empreinte_etat)" = "$avant" ]
-    GH_ETAT=avec run bash "$DEVZONE"
+    GH_ETAT=with run bash "$DEVZONE"
     [[ "$output" == *"platform       github"*"GitHub          connected"* ]] || false
     [[ "$output" != *"inutile ici"* ]] || false
 }
 
-@test "choix gitlab répété : glab pas re-téléchargé, rien ne change" {
+@test "gitlab chosen again: glab not downloaded again, nothing changes" {
     rm -f "$HOME/.local/bin/glab"
     run bash "$DEVZONE" platform gitlab --url "$INSTANCE"
     [ "$status" -eq 0 ]

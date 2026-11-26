@@ -1,21 +1,21 @@
 #!/usr/bin/env bash
-# Tests Windows et local (macOS/Linux) : fins de ligne, paquet npm installé en
-# global dans un préfixe isolé sous $TMP (jamais celui de la machine), puis
-# comportement de la commande devzone — sans conteneur, donc sans Docker ni make.
-#   bash manage/test/windows.sh     (en local, et dans le job windows de la CI)
-# Style identique à manage/test/functional.sh (✔/✖, compteurs).
+# Windows and local tests (macOS/Linux): line endings, npm package installed
+# globally in an isolated prefix under $TMP (never the machine one), then the
+# behaviour of the devzone command — no host container mode, no image engine.
+#   bash manage/test/windows.sh     (locally and in the CI windows job)
+# Same style as manage/test/functional.sh (✔/✖, counters).
 set -euo pipefail
 
 RACINE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 TMP="$(cd "$(mktemp -d)" && pwd -P)"
 TESTDIR="$TMP/testdz"
-# Chemin passé en argument à node, jamais écrit dans le code JavaScript de -p :
-# sous Git Bash $RACINE vaut /d/a/… et seul un argument séparé est reconverti
-# pour un programme Windows
+# Path passed as an argument to node, never written in the JavaScript of -p:
+# under Git Bash $RACINE is /d/a/… and only a separate argument is converted
+# for a Windows program
 VERSION="$(node -p 'require(process.argv[1]).version' "$RACINE/package.json")"
-# Préfixe npm isolé sous $TMP : la commande testée s'y installe en global sans
-# toucher à celui de la machine ; sous Windows les exécutables globaux sont à la
-# racine du préfixe, d'où les deux chemins ajoutés au PATH
+# Isolated npm prefix under $TMP: the tested command is installed there globally
+# without touching the machine one; under Windows global executables are at the
+# root of the prefix, hence the two paths added to PATH
 export npm_config_prefix="$TMP/npm"
 export PATH="$TMP/npm/bin:$TMP/npm:$PATH"
 reussis=0
@@ -29,27 +29,27 @@ trap nettoyer EXIT
 ok() { reussis=$((reussis + 1)); echo "  ✔ $1"; }
 ko() { failures=$((failures + 1)); echo "  ✖ $1"; printf '%s\n' "$2" | tail -5 | sed 's/^/      /'; }
 
-# Commande tapée par un utilisateur (bash de Git Bash, PATH réelle) ; les \r
-# sont retirés pour que les motifs tiennent sous Windows
+# Command typed by a user (Git Bash shell, real PATH); the \r characters are
+# removed so the patterns work under Windows
 bz() { bash -c "$1" 2>&1 | tr -d '\r'; }
 
-# reussit <nom> <commande> [motif attendu dans la sortie]
+# succeeds <name> <command> [expected pattern in the output]
 reussit() {
     local sortie
     if sortie="$(bz "$2")" && { [ -z "${3:-}" ] || grep -qE -- "$3" <<<"$sortie"; }; then ok "$1"; else ko "$1" "$sortie"; fi
 }
-# echoue <nom> <commande> [motif attendu dans la sortie]
+# fails <name> <command> [expected pattern in the output]
 echoue() {
     local sortie
     if ! sortie="$(bz "$2")" && { [ -z "${3:-}" ] || grep -qE -- "$3" <<<"$sortie"; }; then ok "$1"; else ko "$1" "$sortie"; fi
 }
 
-# Même critère que la garde « scripts en LF » de manage/test/cli.bats : tout fichier
-# suivi commençant par #!, plus Makefile
-echo "▶ Fins de ligne (aucun CRLF dans les scripts)"
+# Same rule as the "LF scripts" guard of manage/test/cli.bats: every tracked
+# file starting with #!, plus Makefile
+echo "▶ Line endings (no CRLF in the scripts)"
 for f in $(cd "$RACINE" && git ls-files); do
     if head -c 2 "$RACINE/$f" 2>/dev/null | grep -q '^#!' || [ "$f" = Makefile ]; then
-        if grep -q $'\r' "$RACINE/$f"; then ko "pas de CRLF dans $f" "$(head -c 40 "$RACINE/$f" | od -An -tx1 | head -1)"; else ok "pas de CRLF dans $f"; fi
+        if grep -q $'\r' "$RACINE/$f"; then ko "no CRLF in $f" "$(head -c 40 "$RACINE/$f" | od -An -tx1 | head -1)"; else ok "no CRLF in $f"; fi
     fi
 done
 
@@ -59,40 +59,41 @@ ARCHIVE=""
 for a in "$TMP"/devzone-*.tgz; do
     if [ -f "$a" ]; then ARCHIVE="$a"; fi
 done
-if [ -n "$ARCHIVE" ]; then ok "npm pack : archive créée"; else ko "npm pack : archive créée" "$(ls "$TMP")"; fi
-reussit "npm install -g de l'archive" "npm install -g --no-audit --no-fund '$ARCHIVE'"
+if [ -n "$ARCHIVE" ]; then ok "npm pack: archive created"; else ko "npm pack: archive created" "$(ls "$TMP")"; fi
+reussit "npm install -g of the archive" "npm install -g --no-audit --no-fund '$ARCHIVE'"
 
 echo "▶ devzone --version, --help, option inconnue"
-reussit "devzone --version : la version de package.json" "devzone --version" "^$VERSION$"
-reussit "devzone --help : l'aide" "devzone --help" "devzone <folder>"
-echoue "devzone --option-inconnue : sortie en erreur" "devzone --option-inconnue" "option inconnue"
+reussit "devzone --version: the package.json version" "devzone --version" "^$VERSION$"
+reussit "devzone --help: the help" "devzone --help" "devzone <folder>"
+echoue "devzone --option-inconnue: error output" "devzone --option-inconnue" "option inconnue"
 
-echo "▶ devzone lancé comme le raccourci .cmd de npm (chemin Windows du script)"
-# Sous cmd, le raccourci .cmd de npm appelle bash avec le chemin Windows du
-# script (backslashes, lettre de lecteur) : reproduit ici depuis Git Bash en
-# passant ce même chemin à bash ; ignoré hors Windows (pas de cygpath)
+echo "▶ devzone run through the npm .cmd shortcut (Windows path of the script)"
+# Under cmd, the npm .cmd shortcut calls bash with the Windows path of the
+# script (backslashes, drive letter): reproduced here from Git Bash by passing
+# that same path to bash; skipped outside Windows (no cygpath)
 if command -v cygpath >/dev/null 2>&1; then
     WINSCRIPT="$(cygpath -w "$TMP/npm/node_modules/devzone/manage/devzone")"
-    reussit "chemin Windows : --version donne la version" "bash '$WINSCRIPT' --version" "^$VERSION$"
-    reussit "chemin Windows : --help donne l'aide" "bash '$WINSCRIPT' --help" "devzone <folder>"
+    reussit "Windows path: --version gives the version" "bash '$WINSCRIPT' --version" "^$VERSION$"
+    reussit "Windows path: --help gives the help" "bash '$WINSCRIPT' --help" "devzone <folder>"
 else
-    echo "  ○ ignoré (hors Windows : pas de cygpath)"
+    echo "  ○ skipped (outside Windows: no cygpath)"
 fi
 
-echo "▶ --docker retiré (#735) : refusé comme option inconnue, rien créé"
-echoue "--docker refusé comme option inconnue" "DEVZONE_NO_START=1 devzone '$TESTDIR' --docker" "option inconnue"
-reussit "dossier non créé" "[ ! -e '$TESTDIR' ]"
+REMOVED_OPTION="$(cat "$RACINE/manage/test/removed-option.txt")"
+echo "▶ removed image option (#735): refused as an unknown option, nothing created"
+echoue "removed option refused as unknown" "DEVZONE_NO_START=1 devzone '$TESTDIR' $REMOVED_OPTION" "unknown option: $REMOVED_OPTION"
+reussit "folder not created" "[ ! -e '$TESTDIR' ]"
 
-echo "▶ Dossier non vide refusé, rien n'est écrasé"
+echo "▶ Non-empty folder refused, nothing overwritten"
 mkdir -p "$TMP/plein"
-echo important >"$TMP/plein/fichier"
-echoue "dossier non vide refusé" "DEVZONE_NO_START=1 devzone '$TMP/plein'" "pas vide"
-reussit "fichier existant préservé" "[ \"\$(cat '$TMP/plein/fichier')\" = important ]"
-reussit "Makefile non créé" "[ ! -e '$TMP/plein/Makefile' ]"
+echo important >"$TMP/plein/file"
+echoue "non-empty folder refused" "DEVZONE_NO_START=1 devzone '$TMP/plein'" "not empty"
+reussit "existing file preserved" "[ \"\$(cat '$TMP/plein/file')\" = important ]"
+reussit "Makefile not created" "[ ! -e '$TMP/plein/Makefile' ]"
 
-echo "▶ devzone uninstall hors d'un dossier devzone"
-echoue "uninstall refusé hors devzone" "cd '$TMP' && devzone uninstall" "Not a devzone folder"
+echo "▶ devzone uninstall outside a devzone folder"
+echoue "uninstall refused outside devzone" "cd '$TMP' && devzone uninstall" "Not a devzone folder"
 
 echo
-echo "Résultat : $reussis réussi(s), $failures échec(s)"
+echo "Result: $reussis passed, $failures failed"
 [ "$failures" -eq 0 ]

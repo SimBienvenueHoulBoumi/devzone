@@ -17,6 +17,15 @@ const (
 	pgAdminPath   = `jsonpath={.spec.ports[0].port}`
 	argocdPath    = `jsonpath={.spec.ports[?(@.name=="https")].port}`
 	argocdDefault = 8443
+	// GitLab module relays: the web service on 8929 to its port 8181, and the
+	// SSH shell on 2224, when the gitlab module is active (gitlab of
+	// internal/domain).
+	gitlabWebService = "svc/gitlab-webservice-default"
+	gitlabSSHService = "svc/gitlab-gitlab-shell"
+	gitlabWebLocal   = 8929
+	gitlabWebRemote  = 8181
+	gitlabSSHLocal   = 2224
+	gitlabSSHRemote  = 2224
 	// dialTimeout bounds the connection test of portTaken: a closed local port
 	// answers at once, only a filtered one waits.
 	dialTimeout = 200 * time.Millisecond
@@ -100,10 +109,12 @@ func moduleOn(lines map[string]bool, key string) bool {
 
 // watchedServices lists the devzone services to relay, from the modules file
 // (pw_services), in this order: postgres on 5432, pgAdmin when its service
-// answers with a number, mysql on 3306, then the Argo CD interface (https port
-// of svc/argocd-server) on DEVZONE_ARGOCD_PORT (8443 by default) unless the
-// line argocd=off is there. A value of DEVZONE_ARGOCD_PORT that is not a number
-// gives the default, where the shell would print it as it is.
+// answers with a number, mysql on 3306, the GitLab relays (web on 8929 to its
+// port 8181, SSH on 2224) when the gitlab module is active, then the Argo CD
+// interface (https port of svc/argocd-server) on DEVZONE_ARGOCD_PORT (8443 by
+// default) unless the line argocd=off is there. A value of DEVZONE_ARGOCD_PORT
+// that is not a number gives the default, where the shell would print it as it
+// is.
 func watchedServices(r Runner, file string) []relayService {
 	var services []relayService
 	lines := moduleLines(file)
@@ -116,6 +127,11 @@ func watchedServices(r Runner, file string) []relayService {
 	if moduleOn(lines, "mysql") {
 		services = append(services, relayService{local: 3306, namespace: "devzone-mysql", target: "svc/mysql"})
 	}
+	if moduleOn(lines, "gitlab") {
+		namespace := gitlabNamespace()
+		services = append(services, relayService{local: gitlabWebLocal, namespace: namespace, target: gitlabWebService, remote: gitlabWebRemote})
+		services = append(services, relayService{local: gitlabSSHLocal, namespace: namespace, target: gitlabSSHService, remote: gitlabSSHRemote})
+	}
 	if !lines["argocd=off"] {
 		if port, ok := serviceNumber(r, "devzone-argocd", "argocd-server", argocdPath); ok {
 			local, valid := toPort(os.Getenv("DEVZONE_ARGOCD_PORT"))
@@ -126,6 +142,25 @@ func watchedServices(r Runner, file string) []relayService {
 		}
 	}
 	return services
+}
+
+// gitlabNamespace returns the namespace of the GitLab instance relayed by the
+// watcher: devzone-gitlab plus the instance suffix, the same rule as the
+// gitlab module of internal/domain/gitlab (DEVZONE_INSTANCE, "devzone" without
+// suffix).
+func gitlabNamespace() string {
+	return "devzone-gitlab" + instanceSuffix()
+}
+
+// instanceSuffix returns the instance suffix of a devzone module: the value of
+// DEVZONE_INSTANCE, empty and "devzone" without suffix, like the calculation of
+// the gitlab module of internal/domain/gitlab.
+func instanceSuffix() string {
+	instance := os.Getenv("DEVZONE_INSTANCE")
+	if instance != "" && instance != "devzone" {
+		return "-" + instance
+	}
+	return ""
 }
 
 // podPorts lists the TCP ports of 1024 and above that listen in the workspace
