@@ -159,7 +159,7 @@ func TestServicesSeedAndRefusals(t *testing.T) {
 	t.Run("installer fails", func(t *testing.T) {
 		h := newServicesHarness(t)
 		h.env.Runner.(*fakeRunner).replies[4] = reply{match: "exec -i", status: 3}
-		if status := h.env.Run([]string{"disable", "gitlab"}); status != 1 ||
+		if status := h.env.Run([]string{"disable", "gitlab"}); status != 3 ||
 			!strings.Contains(h.errOut.String(), "failed (code 3)") {
 			t.Fatalf("status = %d, errOut = %q", status, h.errOut.String())
 		}

@@ -40,6 +40,9 @@ func (e kubeEnv) ready(hint bool) (string, bool) {
 	}
 	context, server := e.describe(flag)
 	if hint {
+		if specific := unreachableHint(context, server); specific != "" {
+			return specific, false
+		}
 		return fmt.Sprintf("✖ Kubernetes cluster %s unreachable (%s)\n  Check the contexts: kubectl config get-contexts", context, server), false
 	}
 	return fmt.Sprintf("cluster %s unreachable (%s)", context, server), false

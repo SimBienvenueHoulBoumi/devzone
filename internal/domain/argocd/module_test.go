@@ -28,6 +28,7 @@ func newModFixture(t *testing.T) *modFixture {
 	t.Setenv("DEVZONE_STATE", filepath.Join(root, ".devzone.modules"))
 	t.Setenv("DEVZONE_KUBE_HOST", filepath.Join(root, "hote.config"))
 	t.Setenv("DEVZONE_KUBE_CONFIG", filepath.Join(root, "config"))
+	t.Setenv("DEVZONE_POD_SCRIPT", "")
 	t.Setenv("DEVZONE_WORKSPACE", "")
 	t.Setenv("HOME", t.TempDir())
 	if err := os.MkdirAll(filepath.Join(root, "workspace"), 0o755); err != nil {

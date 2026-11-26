@@ -84,8 +84,8 @@ func (e ServicesEnv) run(action, service string, options []string) int {
 		return 1
 	}
 	flag := contextFlag(e.Runner)
-	phase := kubectlText(e.Runner, append(flag, "get", "pod", pod, "--namespace", namespace,
-		"-o", `jsonpath={.status.phase}`))
+	phase := strings.TrimSpace(kubectlText(e.Runner, append(flag, "get", "pod", pod, "--namespace", namespace,
+		"-o", `jsonpath={.status.phase}`)))
 	if phase != "Running" {
 		fmt.Fprintf(e.ErrOut, "✖ workspace pod %s not running: devzone workspace start\n", pod)
 		return 1
@@ -121,7 +121,10 @@ func (e ServicesEnv) run(action, service string, options []string) int {
 	e.removeAdmin(flag)
 	if err != nil || status != 0 {
 		fmt.Fprintf(e.ErrOut, "✖ %s %s failed (code %d); in the pod: devzone status\n", action, service, status)
-		return 1
+		if err != nil {
+			return 1
+		}
+		return status
 	}
 	if value, ok := map[string]string{"enable": "on", "disable": "off"}[action]; ok {
 		if err := noteModulesKey(e.Modules, service, value); err != nil {
