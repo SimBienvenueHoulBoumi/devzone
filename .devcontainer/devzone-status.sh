@@ -63,7 +63,7 @@ show_state() {
             printf '  ✖ module %-10s failed: incomplete install (%s): devzone apply\n' "$m" "$(cat "$(failure_marker_file "$m")")"
         elif [ "$(value_of "$m")" = on ] && [ "$m" = gitlab ]; then
             # gitlab active: its real state (ready, runner, failed)
-            printf '  ✔ module %-10s %s\n' "$m" "$(bash "$ICI/gitlab/gitlab.sh" status)"
+            printf '  ✔ module %-10s %s\n' "$m" "$(devzone gitlab status)"
         elif [ "$(value_of "$m")" = on ] && [ "$m" = postgres ]; then
             printf '  ✔ module %-10s %s\n' "$m" "$(devzone postgres status)"
         elif [ "$(value_of "$m")" = on ] && [ "$m" = argocd ]; then

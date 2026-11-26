@@ -71,8 +71,8 @@ repair_workstation() {
         repair_item "kubernetes account" devzone account token
     fi
     if [ "$(value_of gitlab)" = on ]; then
-        repair_item "gitlab name" bash "$ICI/gitlab/gitlab.sh" hote-poser
-        repair_item "gitlab relay" bash "$ICI/gitlab/gitlab.sh" relay-start
+        repair_item "gitlab name" devzone gitlab hote-poser
+        repair_item "gitlab relay" devzone gitlab relay-start
     fi
     if [ "$(value_of postgres)" = on ]; then
         repair_item "postgres relay" devzone postgres relay-start
