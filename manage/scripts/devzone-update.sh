@@ -146,10 +146,6 @@ update_workstation() {
         fi
     fi
 
-    # Former French names renamed before the backup (#733): the backup folder is
-    # .devzone.backup. The script comes from the package, the folder may be old
-    DEVZONE_ROOT="$folder" bash "$PAQUET/.devcontainer/rename-legacy-files.sh" || true
-
     # 3. Backup of every file replaced or removed
     if [ -s "$work/to_save" ]; then
         base="$folder/.devzone.backup/$(date +%Y%m%d-%H%M%S)"

@@ -445,22 +445,3 @@ echo moi' ]
     [ "$status" -eq 0 ]
     [ ! -e "$T/restart.log" ]
 }
-
-@test "update: a watcher stopped by the migration is started again after the files are replaced" {
-    create_v1
-    cp "$RACINE/.devcontainer/rename-legacy-files.sh" "$RACINE/.devcontainer/rename-legacy-ports.sh" "$T/v2/.devcontainer/"
-    local d="$DZ/.devzone.workspace-ports"
-    mkdir -p "$d/relais" "$T/tmp"
-    printf '#!/usr/bin/env bash\ntrap "exit 0" TERM\nwhile :; do sleep 0.1; done\n' >"$T/ports-workspace.sh"
-    bash "$T/ports-workspace.sh" &
-    local watcher=$!
-    echo "$watcher" >"$d/pid"
-    export DEVZONE_TMP_DIR="$T/tmp" DEVZONE_PORTS_RESTART="echo restarted >>$T/restart.log"
-    cd "$DZ"
-    run bash "$MAJ" update --yes --no-rebuild
-    kill -9 "$watcher" 2>/dev/null || true
-    [ "$status" -eq 0 ]
-    [ -d "$d/relays" ]
-    [ "$(cat "$T/restart.log")" = restarted ]
-    [ ! -e "$d/restart" ]
-}
