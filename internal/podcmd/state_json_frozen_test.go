@@ -82,7 +82,8 @@ func TestStateJSONFrozenFull(t *testing.T) {
       "description": "AI assistants: Claude Code, opencode",
       "state": "active",
       "failed": null,
-      "command": null
+      "command": null,
+      "held-by-argocd": false
     },
     {
       "name": "kubernetes",
@@ -90,7 +91,8 @@ func TestStateJSONFrozenFull(t *testing.T) {
       "description": "connection to the host cluster and metrics-server at startup",
       "state": "active",
       "failed": null,
-      "command": null
+      "command": null,
+      "held-by-argocd": false
     },
     {
       "name": "gitlab",
@@ -98,7 +100,8 @@ func TestStateJSONFrozenFull(t *testing.T) {
       "description": "test GitLab in the services cluster",
       "state": "gitlab ready",
       "failed": null,
-      "command": null
+      "command": null,
+      "held-by-argocd": true
     },
     {
       "name": "postgres",
@@ -106,7 +109,8 @@ func TestStateJSONFrozenFull(t *testing.T) {
       "description": "shared PostgreSQL, one database per project",
       "state": "postgres ready",
       "failed": null,
-      "command": null
+      "command": null,
+      "held-by-argocd": true
     },
     {
       "name": "argocd",
@@ -114,7 +118,8 @@ func TestStateJSONFrozenFull(t *testing.T) {
       "description": "Argo CD, deployment interface of the services cluster",
       "state": "argocd ready",
       "failed": null,
-      "command": null
+      "command": null,
+      "held-by-argocd": false
     },
     {
       "name": "mysql",
@@ -122,7 +127,8 @@ func TestStateJSONFrozenFull(t *testing.T) {
       "description": "shared MySQL, one database per project",
       "state": "mysql ready",
       "failed": null,
-      "command": null
+      "command": null,
+      "held-by-argocd": true
     }
   ],
   "clusters": {
