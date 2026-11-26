@@ -80,17 +80,17 @@ func TestWorkspaceOtherSubcommandIsDelegated(t *testing.T) {
 }
 
 // TestWorkspaceStartEnablesWatcher checks that a successful cluster start
-// installs the automatic start and that a failed one does not.
+// triggers the single automatic-start function and that a failed one does not.
 func TestWorkspaceStartEnablesWatcher(t *testing.T) {
 	requireBash(t)
+	t.Setenv("DEVZONE_ROOT", devzoneRootForAutoStart(t))
 	calls := 0
-	previous := commandPortsEnable
-	commandPortsEnable = func(out, _ io.Writer) int {
+	previous := commandEnsureAutoStart
+	commandEnsureAutoStart = func(out, _ io.Writer) {
 		calls++
 		fmt.Fprintln(out, "✔ port watcher: automatic start enabled")
-		return 0
 	}
-	t.Cleanup(func() { commandPortsEnable = previous })
+	t.Cleanup(func() { commandEnsureAutoStart = previous })
 	entry(t, echoArgs+"\n")
 	var out, errOut bytes.Buffer
 	if got := Run([]string{"workspace", "start", "--image", "x:1"}, &out, &errOut); got != 0 {
