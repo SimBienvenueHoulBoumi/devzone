@@ -20,6 +20,23 @@ var (
 	commandPortsAutoStartExists = workspace.PortsAutoStartExists
 )
 
+// portsEnableForUser clears a memorised refusal before installing the automatic
+// start, so an explicit ports enable is always obeyed.
+func portsEnableForUser(out, errOut io.Writer) int {
+	commandForgetPortsRefusal()
+	return commandPortsEnable(out, errOut)
+}
+
+// portsDisableForUser removes the automatic start and memorises the refusal in
+// the devzone folder, so no later command reinstalls it without a new request.
+func portsDisableForUser(out, errOut io.Writer) int {
+	status := commandPortsDisable(out, errOut)
+	if status == 0 {
+		commandMemorizePortsRefusal()
+	}
+	return status
+}
+
 // retirePortsAutoStart removes the automatic start only when one was installed
 // for this devzone folder, and returns the status of the removal.
 func retirePortsAutoStart(out, errOut io.Writer) int {
@@ -27,4 +44,12 @@ func retirePortsAutoStart(out, errOut io.Writer) int {
 		return 0
 	}
 	return commandPortsDisable(out, errOut)
+}
+
+// retirePortsAutoStartAfterUninstall retires the automatic start and memorises
+// the refusal: removing a devzone is a choice never to reinstall its watcher.
+func retirePortsAutoStartAfterUninstall(out, errOut io.Writer) int {
+	status := retirePortsAutoStart(out, errOut)
+	commandMemorizePortsRefusal()
+	return status
 }
