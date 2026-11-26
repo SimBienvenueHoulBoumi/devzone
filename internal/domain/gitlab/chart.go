@@ -9,11 +9,15 @@ import (
 
 // chartDepend adds the gitlab repository to helm (idempotent) and builds the
 // dependencies of the wrapper chart (chart.sh gitlab_chart_depend).
-func (r *run) chartDepend() {
+func (r *run) chartDepend() int {
 	_, _ = r.runner().Run(r.ctx, "helm",
 		[]string{"repo", "add", "gitlab", "https://charts.gitlab.io", "--force-update"}, exec.Opts{})
-	_, _ = r.runner().Run(r.ctx, "helm",
+	res, err := r.runner().Run(r.ctx, "helm",
 		[]string{"dependency", "build", r.root + "/charts/devzone-gitlab"}, exec.Opts{})
+	if err != nil || res.Code != 0 {
+		return 1
+	}
+	return 0
 }
 
 // attente is the timeout of the helm passes and of the waits of the module

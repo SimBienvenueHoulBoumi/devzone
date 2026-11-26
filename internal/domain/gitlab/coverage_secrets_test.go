@@ -119,7 +119,7 @@ func TestSeedPushUsesCredentialHelper(t *testing.T) {
 	if code := f.run("seed"); code != 0 {
 		t.Fatalf("seed: code = %d, stderr = %q", code, f.errStr())
 	}
-	if !f.hasCall("remote add origin http://gitlab.localhost:8929/devzone/demo.git") {
+	if !f.hasCall("remote add origin http://127.0.0.1:8929/devzone/demo.git") {
 		t.Errorf("remote without token missing in %v", f.calls())
 	}
 	if !f.hasCall("credential.helper=!f()") || !f.hasCall("username=oauth2") {
