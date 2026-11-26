@@ -65,11 +65,11 @@ show_state() {
             # gitlab active: its real state (ready, runner, failed)
             printf '  ✔ module %-10s %s\n' "$m" "$("$ICI/devzone" gitlab status)"
         elif [ "$(value_of "$m")" = on ] && [ "$m" = postgres ]; then
-            printf '  ✔ module %-10s %s\n' "$m" "$(devzone postgres status)"
+            printf '  ✔ module %-10s %s\n' "$m" "$("$ICI/devzone" postgres status)"
         elif [ "$(value_of "$m")" = on ] && [ "$m" = argocd ]; then
             printf '  ✔ module %-10s %s\n' "$m" "$("$ICI/devzone" argocd status)"
         elif [ "$(value_of "$m")" = on ] && [ "$m" = mysql ]; then
-            printf '  ✔ module %-10s %s\n' "$m" "$(devzone mysql status)"
+            printf '  ✔ module %-10s %s\n' "$m" "$("$ICI/devzone" mysql status)"
         elif [ "$(value_of "$m")" = on ]; then
             printf '  ✔ module %-10s active: %s\n' "$m" "$(description "$m")"
         else
