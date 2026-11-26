@@ -10,13 +10,13 @@ import (
 // TestModulesRegistered checks that postgres and mysql are handled by the pod
 // binary and that Ported lists them.
 func TestModulesRegistered(t *testing.T) {
-	for _, name := range []string{"postgres", "mysql"} {
+	for _, name := range []string{"postgres", "mysql", "gitlab", "test-gitlab"} {
 		if _, ok := Registry.Lookup(name); !ok {
 			t.Fatalf("%s not registered", name)
 		}
 	}
 	joined := "," + strings.Join(Ported(), ",") + ","
-	for _, name := range []string{",postgres,", ",mysql,"} {
+	for _, name := range []string{",postgres,", ",mysql,", ",gitlab,", ",test-gitlab,"} {
 		if !strings.Contains(joined, name) {
 			t.Fatalf("Ported misses %s: %v", name, Ported())
 		}

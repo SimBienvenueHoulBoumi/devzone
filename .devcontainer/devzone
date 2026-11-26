@@ -206,11 +206,10 @@ case "${1:-}" in
     cluster) change_cluster "${@:2}" ;;
     # Go only: reached when the binary did not take the call. Never call
     # "devzone" again from here, it would loop forever, see #864
-    postgres | mysql)
+    postgres | mysql | gitlab | test-gitlab)
         echo "devzone $1: Go binary of the pod unavailable (.devcontainer/bin)" >&2
         exit 1
         ;;
-    gitlab) DEVZONE_STATE="$ETAT" bash "$ICI/gitlab/gitlab.sh" "${@:2}" ;;
     catalog) DEVZONE_STATE="$ETAT" bash "$ICI/catalog.sh" list ;;
     argocd) DEVZONE_STATE="$ETAT" bash "$ICI/argocd/argocd.sh" "${@:2}" ;;
     port) DEVZONE_STATE="$ETAT" bash "$ICI/ports.sh" "${@:2}" ;;
@@ -222,7 +221,6 @@ case "${1:-}" in
         ;;
     -h | --help | help) devzone_aide ;;
     test-bash32) bash "$RACINE/manage/test/bash32.sh" ;;
-    test-gitlab) DEVZONE_STATE="$ETAT" bash "$ICI/gitlab/test-gitlab.sh" "${@:2}" ;;
     platform)
         if [ -n "${2:-}" ]; then
             change_platform "${@:2}"

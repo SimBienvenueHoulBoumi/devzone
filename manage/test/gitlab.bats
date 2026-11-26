@@ -5,6 +5,30 @@
 # created. Each fake binary logs its arguments in
 # $BATS_TEST_TMPDIR/<tool>.log.
 
+# Fake devzone: the gitlab module is Go (#866), only its calls are logged.
+# Ready once the namespace exists; runner online when FAKE_RUNNERS is set.
+fake_devzone_gitlab() {
+    cat >"$BATS_TEST_TMPDIR/bin/devzone" <<'FAKE'
+#!/usr/bin/env bash
+T="$BATS_TEST_TMPDIR"
+printf 'devzone %s\n' "$*" >>"$T/devzone.log"
+case "$*" in
+    "gitlab status")
+        if [ ! -f "$T/namespace" ]; then
+            echo "disabled"
+        elif [ -n "${FAKE_RUNNERS:-}" ]; then
+            echo "ready, runner online"
+        else
+            echo "ready, no runner"
+        fi
+        ;;
+    "gitlab installe") [ -f "$T/namespace" ] ;;
+    "gitlab hote-poser") echo "127.0.0.1 gitlab.localhost # devzone:gitlab" >>"$DEVZONE_HOSTS" ;;
+esac
+FAKE
+    chmod +x "$BATS_TEST_TMPDIR/bin/devzone"
+}
+
 setup() {
     bats_require_minimum_version 1.5.0
     load commun
@@ -207,6 +231,7 @@ PGREP
     chmod +x "$BATS_TEST_TMPDIR"/bin/*
     HELM_BIN="$(command -v helm)"
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
+    fake_devzone_gitlab
 }
 
 wait_log() {
@@ -222,265 +247,13 @@ wait_log() {
     return 1
 }
 
-@test "gitlab : disabled by default" {
-    run bash "$DEVZONE"
-    [ "$status" -eq 0 ]
-    [[ "$output" == *"○ module gitlab"* ]] || false
-    run bash "$DEVZONE" is-enabled gitlab
-    [ "$status" -ne 0 ]
-}
-
-@test "gitlab : less than 8 GiB of allocatable memory in the cluster → refused, nothing started" {
-    FAKE_CLUSTER_MEMORY='4000000Ki' run bash "$GITLAB" install
-    [ "$status" -eq 2 ] || false
-    [[ "$output" == *"8 GiB"* ]] || false
-    [ ! -e "$BATS_TEST_TMPDIR/helm.log" ] || false
-    [ ! -e "$BATS_TEST_TMPDIR/kind.log" ] || false
-}
-
-@test "gitlab : installation in the services cluster, no kind cluster created" {
-    echo "dev" >"$KIND_CLUSTERS"
-    run bash "$GITLAB" install
-    [ "$status" -eq 0 ] || false
-    grep -Eq -- "helm --kubeconfig [^ ]+ upgrade --install gitlab [^ ]*charts/devzone-gitlab --namespace devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log" || false
-    ! grep -q "create cluster" "$BATS_TEST_TMPDIR/kind.log" || false
-}
-
-@test "gitlab : the kubectl working context is not switched" {
-    mkdir -p "$HOME/.kube"
-    printf 'current-context: docker-desktop\n' >"$HOME/.kube/config"
-    run bash "$GITLAB" install
-    [ "$status" -eq 0 ] || false
-    ! grep -q "config use-context" "$BATS_TEST_TMPDIR/kubectl.log" || false
-    ! grep -q "config unset current-context" "$BATS_TEST_TMPDIR/kubectl.log" || false
-    [ "$(sed -n 's/^current-context:[[:space:]]*//p' "$HOME/.kube/config")" = docker-desktop ] || false
-}
-
-@test "gitlab : old gitlab cluster already there → no kind created or used" {
-    echo "gitlab" >"$KIND_CLUSTERS"
-    run bash "$GITLAB" install
-    [ "$status" -eq 0 ] || false
-    ! grep -q "create cluster" "$BATS_TEST_TMPDIR/kind.log" || false
-    grep -Eq -- "helm --kubeconfig [^ ]+ upgrade --install gitlab [^ ]*charts/devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log" || false
-}
-
-@test "gitlab : values.yaml configures the SSH clone (port 2224) and ClusterIP services" {
-    local values="$BATS_TEST_DIRNAME/../../charts/devzone-gitlab/values.yaml"
-    grep -q "port: 2224" "$values" || false
-    grep -q "type: ClusterIP" "$values" || false
-    grep -q "nginx-ingress:" "$values" || false
-    grep -A1 "nginx-ingress:" "$values" | grep -q "enabled: false" || false
-}
-
-@test "gitlab : values.yaml pins the HPAs to 1 replica (#490)" {
-    local values="$BATS_TEST_DIRNAME/../../charts/devzone-gitlab/values.yaml"
-    local name block
-    for name in webservice sidekiq gitlab-shell; do
-        block="$(awk -v n="$name" '
-            $0 == "    " n ":" { inside=1; next }
-            inside && /^    [^ ]/ { inside=0 }
-            inside { print }
-        ' "$values")"
-        [[ "$block" == *"minReplicas: 1"* ]] || false
-        [[ "$block" == *"maxReplicas: 1"* ]] || false
-    done
-}
-
-@test "gitlab : kind.yaml and the kind-gitlab cluster are removed" {
-    [ ! -e "$BATS_TEST_DIRNAME/../../.devcontainer/gitlab/kind.yaml" ] || false
-    ! grep -q "kind create cluster --name gitlab" "$BATS_TEST_DIRNAME/../../.devcontainer/gitlab/installation.sh" || false
-}
-
-@test "gitlab : values without NodePort, LoadBalancer or hostPort" {
-    local values="$BATS_TEST_DIRNAME/../../charts/devzone-gitlab/values.yaml"
-    ! grep -q "NodePort" "$values" || false
-    ! grep -q "LoadBalancer" "$values" || false
-    ! grep -q "hostPort" "$values" || false
-}
-
-@test "gitlab : helm template: ssh_port 2224, no nodePort nor exposed service" {
-    if [ -z "${DEVZONE_GITLAB_CHART:-}" ] || ! command -v helm >/dev/null 2>&1; then
-        skip "helm unavailable (DEVZONE_GITLAB_CHART or helm)"
-    fi
-    local helm_bin="${HELM_BIN:-$(command -v helm)}"
-    [ -x "$helm_bin" ] || skip "helm unavailable (DEVZONE_GITLAB_CHART or helm)"
-    local output_text
-    output_text="$("$helm_bin" template gitlab "${DEVZONE_GITLAB_CHART:-/tmp/gl/devzone-gitlab}" 2>&1)"
-    [[ "$output_text" == *"ssh_port: 2224"* ]] || false
-    [[ "$output_text" != *"nodePort: 32022"* ]] || false
-    [[ "$output_text" != *"nodePort: 2224"* ]] || false
-    [[ "$output_text" != *"type: NodePort"* ]] || false
-}
-
-@test "gitlab : installation without node SSH mapping warning" {
-    echo "gitlab" >"$KIND_CLUSTERS"
-    run bash "$GITLAB" install
-    [ "$status" -eq 0 ] || false
-    [[ "$output" != *"SSH clone (port 2224) unavailable"* ]] || false
-}
-
-@test "gitlab : old cluster present → no network exposure warning" {
-    echo "gitlab" >"$KIND_CLUSTERS"
-    run bash "$GITLAB" install
-    [ "$status" -eq 0 ] || false
-    [[ "$output" != *"exposed to the local network"* ]] || false
-}
-
-@test "gitlab : charts pinned, devzone context and instance namespace" {
-    run bash "$GITLAB" install
-    [ "$status" -eq 0 ]
-    grep -Eq -- "helm --kubeconfig [^ ]+ upgrade --install gitlab [^ ]*charts/devzone-gitlab --namespace devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log"
-    grep -Eq -- "helm --kubeconfig [^ ]+ upgrade --install gitlab [^ ]*charts/devzone-gitlab .*replicas=1" "$BATS_TEST_TMPDIR/helm.log"
-}
-
-@test "gitlab : secrets in workspace/.gitlab (600), never in the repository nor shown" {
-    run bash "$GITLAB" install
-    [ "$status" -eq 0 ]
-    for f in root-password root-token runner-token dev-password; do
-        [ -f "$SECRETS/$f" ] || { echo "missing: $f"; false; }
-        [ "$(stat -c %a "$SECRETS/$f" 2>/dev/null || stat -f %Lp "$SECRETS/$f")" = 600 ]
-    done
-    [ "$(cat "$SECRETS/root-password")" = password123 ]
-    [ ! -e "$BATS_TEST_DIRNAME/../../.devcontainer/workspace" ]
-    [[ "$output" != *"password123"* ]] || false
-    [[ "$output" != *"token-root-secret"* ]] || false
-    [[ "$output" != *"token-runner-secret"* ]] || false
-}
-
-@test "gitlab : seed and uninstall regenerate .password" {
-    run bash "$GITLAB" install
-    [ "$status" -eq 0 ]
-    grep -q $'^gitlab\thttp://gitlab.localhost:8929\tdev\t' "$DEVZONE_ROOT/.password"
-    grep -q $'^gitlab\thttp://gitlab.localhost:8929\troot\tpassword123$' "$DEVZONE_ROOT/.password"
-    run bash "$GITLAB" uninstall
-    [ "$status" -eq 0 ]
-    [ ! -e "$DEVZONE_ROOT/.password" ]
-}
-
-@test "gitlab : project created with the numeric group ID, push with the root token" {
-    run bash "$GITLAB" install
-    [ "$status" -eq 0 ]
-    grep -q "namespace_id=42" "$BATS_TEST_TMPDIR/curl.log"
-    grep -q "oauth2:token-root-secret@127.0.0.1:8929/devzone/demo.git" "$BATS_TEST_TMPDIR/git.log"
-    ! grep -q "token-runner-secret@" "$BATS_TEST_TMPDIR/git.log" || false
-}
-
-@test "gitlab : installation rerun → demo project not pushed again" {
-    run bash "$GITLAB" install
-    [ "$status" -eq 0 ]
-    [ "$(grep -c " push " "$BATS_TEST_TMPDIR/git.log")" -eq 1 ]
-    run bash "$GITLAB" install
-    [ "$status" -eq 0 ]
-    [ "$(grep -c " push " "$BATS_TEST_TMPDIR/git.log")" -eq 1 ]
-}
-
-@test "gitlab : seed failure → installation fails, clear message, no runner" {
-    export FAKE_GROUP_FAIL=1
-    run bash "$GITLAB" install
-    [ "$status" -ne 0 ]
-    [[ "$output" == *"devzone group"* ]] || false
-    ! grep -q "upgrade --install gitlab-runner" "$BATS_TEST_TMPDIR/helm.log" || false
-}
-
-@test "gitlab : seed: runner-token present and verified 200 → token kept, no creation" {
-    mkdir -p "$SECRETS"
-    printf 'token-runner-secret' >"$SECRETS/runner-token"
-    export FAKE_RUNNER_VERIFY_CODE=200
-    run bash "$GITLAB" seed
-    [ "$status" -eq 0 ]
-    [ "$(cat "$SECRETS/runner-token")" = "token-runner-secret" ]
-    ! grep -q "api/v4/user/runners" "$BATS_TEST_TMPDIR/curl.log" || false
-    [[ "$output" != *"token-runner-secret"* ]] || false
-}
-
-@test "gitlab : seed: runner-token present and refused 403 → token recreated, file overwritten" {
-    mkdir -p "$SECRETS"
-    printf 'old-runner-token' >"$SECRETS/runner-token"
-    export FAKE_RUNNER_VERIFY_CODE=403
-    run bash "$GITLAB" seed
-    [ "$status" -eq 0 ]
-    [[ "$output" == *"refused: recreated"* ]] || false
-    grep -q "api/v4/user/runners" "$BATS_TEST_TMPDIR/curl.log"
-    [ "$(cat "$SECRETS/runner-token")" = "token-runner-secret" ]
-}
-
-@test "gitlab : seed: runner-token missing → token created" {
-    rm -f "$SECRETS/runner-token"
-    run bash "$GITLAB" seed
-    [ "$status" -eq 0 ]
-    [ -f "$SECRETS/runner-token" ]
-    grep -q "api/v4/user/runners" "$BATS_TEST_TMPDIR/curl.log"
-}
-
-@test "gitlab : seed: runner token check unreachable → seed stopped" {
-    mkdir -p "$SECRETS"
-    printf 'token-runner-secret' >"$SECRETS/runner-token"
-    export FAKE_RUNNER_UNREACHABLE=1
-    run bash "$GITLAB" seed
-    [ "$status" -ne 0 ]
-    [[ "$output" == *"seed stopped"* ]] || false
-}
-
-@test "gitlab : seed: runner token never shown" {
-    mkdir -p "$SECRETS"
-    printf 'token-runner-secret' >"$SECRETS/runner-token"
-    export FAKE_RUNNER_VERIFY_CODE=200
-    run bash "$GITLAB" seed
-    [ "$status" -eq 0 ]
-    [[ "$output" != *"token-runner-secret"* ]] || false
-    ! grep -q "token-runner-secret" "$BATS_TEST_TMPDIR/curl.log" || false
-}
-
-@test "gitlab : uninstall removes the releases, the namespace and the secrets" {
-    run bash "$GITLAB" install
-    [ "$status" -eq 0 ]
-    run bash "$GITLAB" uninstall
-    [ "$status" -eq 0 ]
-    grep -Eq -- "helm --kubeconfig [^ ]+ uninstall gitlab --namespace devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log"
-    # Namespace deleted by the administrator, not by the limited account (#430)
-    grep -q -- "--kubeconfig=.* delete namespace devzone-gitlab --ignore-not-found" "$BATS_TEST_TMPDIR/kubectl.log"
-    ! grep -q -- "--context devzone delete namespace devzone-gitlab" "$BATS_TEST_TMPDIR/kubectl.log" || false
-    [ -f "$SECRETS/rails-secret.yaml" ]
-    [ ! -e "$SECRETS/root-password" ] || false
-    [ ! -e "$SECRETS/root-token" ] || false
-    [ ! -f "$BATS_TEST_TMPDIR/namespace" ] || false
-    [ ! -s "$KIND_CLUSTERS" ] || false
-}
-
-@test "gitlab : status disabled, ready (runner online or not), failed" {
-    run bash "$GITLAB" status
-    [ "$output" = "disabled" ]
-    touch "$BATS_TEST_TMPDIR/namespace"
-    mkdir -p "$SECRETS" && echo token >"$SECRETS/root-token"
-    run bash "$GITLAB" status
-    [ "$output" = "ready: http://gitlab.localhost:8929, runner offline" ]
-    FAKE_RUNNERS='[{"id":1}]' run bash "$GITLAB" status
-    [ "$output" = "ready: http://gitlab.localhost:8929, runner online" ]
-    FAKE_GITLAB_FAIL=1 run bash "$GITLAB" status
-    [ "$output" = "failed: devzone apply" ]
-}
-
-@test "gitlab : status no longer reports a node published on 0.0.0.0" {
-    touch "$BATS_TEST_TMPDIR/namespace"
-    FAKE_DOCKER_PORT_EXPOSED=1 run bash "$GITLAB" status
-    [ "$status" -eq 0 ]
-    [[ "$output" != *"GitLab exposed to the local network"* ]] || false
-}
-
-@test "gitlab : status without exposure warning for a local node" {
-    touch "$BATS_TEST_TMPDIR/namespace"
-    FAKE_DOCKER_PORT_LOCAL=1 run bash "$GITLAB" status
-    [ "$status" -eq 0 ]
-    [[ "$output" != *"GitLab exposed to the local network"* ]] || false
-}
-
 @test "devzone : enabling gitlab skips the installation if ready and runner online" {
     touch "$BATS_TEST_TMPDIR/namespace"
     mkdir -p "$SECRETS" && echo token >"$SECRETS/root-token"
     FAKE_RUNNERS='[{"id":1}]' run bash "$DEVZONE" enable gitlab
     [ "$status" -eq 0 ]
     [[ "$output" == *"already active, nothing to do"* ]] || false
-    ! grep -q "upgrade --install" "$BATS_TEST_TMPDIR/helm.log" || false
+    ! grep -qx "devzone gitlab install" "$BATS_TEST_TMPDIR/devzone.log" || false
 }
 
 @test "devzone : enable gitlab: ready without runner online → install (seed, runner)" {
@@ -489,7 +262,7 @@ wait_log() {
     run bash "$DEVZONE" enable gitlab
     [ "$status" -eq 0 ]
     [[ "$output" != *"already active, nothing to do"* ]] || false
-    grep -Eq -- "helm --kubeconfig [^ ]+ upgrade --install gitlab [^ ]*charts/devzone-gitlab --namespace devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log"
+    grep -qx "devzone gitlab install" "$BATS_TEST_TMPDIR/devzone.log"
 }
 
 @test "devzone apply: gitlab active, ready without runner online → install" {
@@ -498,7 +271,7 @@ wait_log() {
     mkdir -p "$SECRETS" && echo token >"$SECRETS/root-token"
     run bash "$DEVZONE" apply
     [ "$status" -eq 0 ]
-    grep -Eq -- "helm --kubeconfig [^ ]+ upgrade --install gitlab [^ ]*charts/devzone-gitlab --namespace devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log"
+    grep -qx "devzone gitlab install" "$BATS_TEST_TMPDIR/devzone.log"
 }
 
 @test "devzone apply: gitlab active, ready with runner online → no install" {
@@ -508,7 +281,7 @@ wait_log() {
     FAKE_RUNNERS='[{"id":1}]' run bash "$DEVZONE" apply
     [ "$status" -eq 0 ]
     [[ "$output" == *"already active, nothing to do"* ]] || false
-    [ ! -e "$BATS_TEST_TMPDIR/helm.log" ]
+    ! grep -qx "devzone gitlab install" "$BATS_TEST_TMPDIR/devzone.log" || false
 }
 
 @test "devzone apply: gitlab disabled → nothing" {
@@ -517,118 +290,6 @@ wait_log() {
     [ "$status" -eq 0 ]
     [ ! -e "$BATS_TEST_TMPDIR/helm.log" ]
     [ ! -e "$BATS_TEST_TMPDIR/kind.log" ]
-}
-
-@test "gitlab : hote-poser sets gitlab.localhost once, keeps localhost" {
-    run bash "$GITLAB" hote-poser
-    [ "$status" -eq 0 ]
-    run bash "$GITLAB" hote-poser
-    [ "$status" -eq 0 ]
-    [ "$(grep -c 'devzone:gitlab' "$DEVZONE_HOSTS")" -eq 1 ]
-    grep -q '^127\.0\.0\.1 localhost$' "$DEVZONE_HOSTS"
-    grep -q $'^127\.0\.0\.1\tgitlab\.localhost # devzone:gitlab$' "$DEVZONE_HOSTS"
-}
-
-@test "gitlab : hote-poser replaces an IPv6 line already set by 127.0.0.1" {
-    printf '127.0.0.1 localhost\nfdc4:f303:9324::254\tgitlab.localhost # devzone:gitlab\n' >"$DEVZONE_HOSTS"
-    run bash "$GITLAB" hote-poser
-    [ "$status" -eq 0 ]
-    [ "$(grep -c 'devzone:gitlab' "$DEVZONE_HOSTS")" -eq 1 ]
-    grep -q $'^127\.0\.0\.1\tgitlab\.localhost # devzone:gitlab$' "$DEVZONE_HOSTS"
-    ! grep -q 'fdc4:f303' "$DEVZONE_HOSTS" || false
-    grep -q '^127\.0\.0\.1 localhost$' "$DEVZONE_HOSTS"
-}
-
-@test "gitlab : web and SSH relays port-forward to the namespace services" {
-    run bash "$GITLAB" relay-start
-    [ "$status" -eq 0 ] || false
-    grep -q "devzone devzone-gitlab svc/gitlab-webservice-default 8929:8181" "$BATS_TEST_TMPDIR/setsid.log" || false
-    grep -q "devzone devzone-gitlab svc/gitlab-gitlab-shell 2224:22" "$BATS_TEST_TMPDIR/setsid.log" || false
-    ! grep -q "gitlab-control-plane" "$BATS_TEST_TMPDIR/setsid.log" || false
-}
-
-@test "gitlab : relays without kind network nor socat" {
-    run bash "$GITLAB" relay-start
-    [ "$status" -eq 0 ] || false
-    [ ! -e "$BATS_TEST_TMPDIR/docker.log" ] || false
-    [ ! -e "$BATS_TEST_TMPDIR/socat.log" ] || false
-}
-
-@test "gitlab : old kind target 32022 is no longer used" {
-    run bash "$GITLAB" relay-start
-    [ "$status" -eq 0 ] || false
-    ! grep -q "32022" "$BATS_TEST_TMPDIR/setsid.log" || false
-    ! grep -q "TCP-LISTEN" "$BATS_TEST_TMPDIR/setsid.log" || false
-}
-
-@test "gitlab : relay-stop stops both relays" {
-    mkdir -p "$DEVZONE_ROOT/workspace/.gitlab-web" "$DEVZONE_ROOT/workspace/.gitlab-ssh"
-    echo "999999" >"$DEVZONE_ROOT/workspace/.gitlab-web/relais.pid"
-    echo "999998" >"$DEVZONE_ROOT/workspace/.gitlab-ssh/relais.pid"
-    run bash "$GITLAB" relay-stop
-    [ "$status" -eq 0 ] || false
-    grep -q "pgrep -P 999999" "$BATS_TEST_TMPDIR/pgrep.log" || false
-    grep -q "pgrep -P 999998" "$BATS_TEST_TMPDIR/pgrep.log" || false
-    [ ! -e "$DEVZONE_ROOT/workspace/.gitlab-web/relais.pid" ] || false
-    [ ! -e "$DEVZONE_ROOT/workspace/.gitlab-ssh/relais.pid" ] || false
-}
-
-@test "gitlab : uninstall stops the web and SSH relays" {
-    local pid
-    { true; } &
-    pid=$!
-    wait "$pid" || true
-    mkdir -p "$DEVZONE_ROOT/workspace/.gitlab-web" "$DEVZONE_ROOT/workspace/.gitlab-ssh"
-    echo "$pid" >"$DEVZONE_ROOT/workspace/.gitlab-web/relais.pid"
-    echo "$pid" >"$DEVZONE_ROOT/workspace/.gitlab-ssh/relais.pid"
-    run bash "$GITLAB" uninstall
-    [ "$status" -eq 0 ]
-    grep -q "pgrep -P $pid" "$BATS_TEST_TMPDIR/pgrep.log"
-    [ ! -e "$DEVZONE_ROOT/workspace/.gitlab-web" ]
-    [ ! -e "$DEVZONE_ROOT/workspace/.gitlab-ssh" ]
-}
-
-@test "gitlab : hote-retirer removes the line, keeps localhost; without line → nothing, code 0" {
-    run bash "$GITLAB" hote-poser
-    [ "$status" -eq 0 ]
-    run bash "$GITLAB" hote-retirer
-    [ "$status" -eq 0 ]
-    ! grep -q 'devzone:gitlab' "$DEVZONE_HOSTS" || false
-    grep -q '^127\.0\.0\.1 localhost$' "$DEVZONE_HOSTS"
-    # No line to remove: file unchanged, code 0
-    local before
-    before="$(cat "$DEVZONE_HOSTS")"
-    run bash "$GITLAB" hote-retirer
-    [ "$status" -eq 0 ]
-    [ "$(cat "$DEVZONE_HOSTS")" = "$before" ]
-}
-
-@test "gitlab : hote-poser without rights nor usable sudo → warning, code 0" {
-    chmod 444 "$DEVZONE_HOSTS"
-    cat >"$BATS_TEST_TMPDIR/bin/sudo" <<'SUDO'
-#!/usr/bin/env bash
-echo "sudo $*" >>"$BATS_TEST_TMPDIR/sudo.log"
-exit 1
-SUDO
-    chmod +x "$BATS_TEST_TMPDIR/bin/sudo"
-    run bash "$GITLAB" hote-poser
-    [ "$status" -eq 0 ]
-    [[ "$output" == *"gitlab.localhost name not set"* ]] || false
-    ! grep -q 'devzone:gitlab' "$DEVZONE_HOSTS" || false
-    # Rerun: same failure, same code 0 (never breaks the installation)
-    run bash "$GITLAB" hote-poser
-    [ "$status" -eq 0 ]
-    [[ "$output" == *"gitlab.localhost name not set"* ]] || false
-}
-
-@test "gitlab : install sets the line, uninstall removes it" {
-    run bash "$GITLAB" install
-    [ "$status" -eq 0 ]
-    grep -q 'devzone:gitlab' "$DEVZONE_HOSTS"
-    run bash "$GITLAB" uninstall
-    [ "$status" -eq 0 ]
-    ! grep -q 'devzone:gitlab' "$DEVZONE_HOSTS" || false
-    grep -q '^127\.0\.0\.1 localhost$' "$DEVZONE_HOSTS"
 }
 
 @test "devzone apply: gitlab active, ready → gitlab.localhost line set" {
@@ -641,50 +302,3 @@ SUDO
     grep -q 'devzone:gitlab' "$DEVZONE_HOSTS"
 }
 
-@test "gitlab : values — host without port, external port via GITLAB_PORT" {
-    local values="$BATS_TEST_DIRNAME/../../charts/devzone-gitlab/values.yaml"
-    grep -Eq 'name: gitlab\.localhost([[:space:]]|$)' "$values"
-    grep -q 'GITLAB_PORT: "8929"' "$values"
-    ! grep -q "hostnameOverride" "$values" || false
-    ! grep -Eq 'gitlab-shell:[[:space:]]*2224' "$values" || false
-}
-
-@test "gitlab : helm values — host without port, external port via GITLAB_PORT" {
-    [ -n "${DEVZONE_GITLAB_CHART:-}" ] || skip "DEVZONE_GITLAB_CHART missing"
-    local helm_bin
-    helm_bin="$(PATH=/usr/local/bin:/usr/bin:/bin command -v helm 2>/dev/null || true)"
-    [ -n "$helm_bin" ] || skip "helm missing"
-    local chart="$DEVZONE_GITLAB_CHART"
-    [ -d "$chart" ] || skip "chart missing"
-    run "$helm_bin" template gitlab "$chart" --namespace gitlab
-    [ "$status" -eq 0 ]
-    local rendered="$output"
-    printf '%s\n' "$rendered" | grep -qE '^[[:space:]]*host: gitlab\.localhost$' || false
-    local webservice
-    webservice="$(printf '%s\n' "$rendered" | awk '
-        /^kind: Deployment$/ { inside = 1; name = 0; block = "" }
-        inside { block = block $0 "\n" }
-        inside && /^  name: gitlab-webservice-default$/ { name = 1 }
-        inside && /^---$/ { if (name) printf "%s", block; inside = 0; name = 0 }
-        END { if (inside && name) printf "%s", block }
-    ')"
-    [[ "$webservice" == *"name: GITLAB_PORT"* ]] || false
-    [[ "$webservice" == *'value: "8929"'* ]] || false
-    ! printf '%s\n' "$rendered" | grep -q "nodePort: 2224" || false
-}
-
-# ---- Former French names (#557): same result as the English name, with a warning ----
-
-@test "gitlab : English names give no warning" {
-    mkdir -p "$SECRETS"
-    printf '{}\n' >"$SECRETS/rails-secret.yaml"
-    run --separate-stderr bash "$GITLAB" status
-    [ "$status" -eq 0 ] || false
-    [[ "$stderr" != *"deprecated"* ]] || false
-    run --separate-stderr bash "$GITLAB" relay-start
-    [ "$status" -eq 0 ] || false
-    [[ "$stderr" != *"deprecated"* ]] || false
-    run --separate-stderr bash "$GITLAB" uninstall --yes
-    [ "$status" -eq 0 ] || false
-    [[ "$stderr" != *"deprecated"* ]] || false
-}

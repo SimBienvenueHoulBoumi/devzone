@@ -32,6 +32,14 @@ func newDefaultRegistry() *cli.Registry {
 		Name: "mysql",
 		Run:  runMysql,
 	})
+	r.Register(cli.Command{
+		Name: "gitlab",
+		Run:  runGitlab,
+	})
+	r.Register(cli.Command{
+		Name: "test-gitlab",
+		Run:  runTestGitlab,
+	})
 	return r
 }
 
