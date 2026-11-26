@@ -22,30 +22,10 @@ TMP="$(cd "$(mktemp -d)" && pwd -P)"
 # Nommé autrement que « devzone » (npx devzone <dossier>)
 COPIE="$TMP/mon-devzone-cli"
 TERMINAL=(python3 -I "$RACINE/manage/test/terminal.py")
-DC=(npx -y @devcontainers/cli)
 reussis=0
 failures=0
 
 nettoyer() {
-    local ids id image dind volume
-    ids="$(docker ps -aq --filter "label=devcontainer.local_folder=$COPIE")"
-    for id in $ids; do
-        image="$(docker inspect "$id" --format '{{.Config.Image}}')"
-        dind="$(docker inspect "$id" --format '{{range .Mounts}}{{if eq .Destination "/var/lib/docker"}}{{.Name}}{{end}}{{end}}')"
-        docker rm -f "$id" >/dev/null
-        [ -z "$dind" ] || docker volume rm "$dind" >/dev/null 2>&1 || true
-        [ -z "$image" ] || docker rmi "$image" >/dev/null 2>&1 || true
-    done
-    # Après make down : image et Docker interne notés dans .devzone.state
-    if [ -f "$COPIE/.devzone.state" ]; then
-        image="$(sed -n 's/^IMAGE=//p' "$COPIE/.devzone.state")"
-        dind="$(sed -n 's/^DIND=//p' "$COPIE/.devzone.state")"
-        [ -z "$dind" ] || docker volume rm "$dind" >/dev/null 2>&1 || true
-        [ -z "$image" ] || docker rmi "$image" >/dev/null 2>&1 || true
-    fi
-    for volume in $(docker volume ls -q | grep "^${DEVZONE_VOLUMES}-" || true); do
-        docker volume rm "$volume" >/dev/null 2>&1 || true
-    done
     rm -rf "$TMP"
 }
 trap nettoyer EXIT
@@ -85,12 +65,6 @@ humain() {
         ko "$nom (code $code, attendu $attendu ; motif : $motif)" "$SORTIE"
     fi
 }
-# Commande du conteneur tapée dans un terminal (devcontainer exec, avec tty)
-conteneur() {
-    local nom="$1" delai="$2" attendu="$3" motif="$4"
-    humain "$nom" "$delai" "$attendu" "$motif" -- "${DC[@]}" exec --workspace-folder "$COPIE" \
-        env DEVZONE_KUBE_SOURCE=/nexiste/pas bash -lc "$5"
-}
 # Cible make lancée dans le dossier du devzone
 mk() {
     local nom="$1" delai="$2" attendu="$3" motif="$4"
@@ -103,7 +77,6 @@ verifier() {
     shift
     if "$@"; then ok "$nom"; else ko "$nom" "$SORTIE"; fi
 }
-volumes() { docker volume ls -q | grep -c "^${DEVZONE_VOLUMES}-" || true; }
 
 echo "▶ Sans conteneur (volumes $DEVZONE_VOLUMES-*)"
 humain "make help" 30 0 "make uninstall" -- make -C "$RACINE" help

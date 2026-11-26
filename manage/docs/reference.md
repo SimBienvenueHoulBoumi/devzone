@@ -66,13 +66,13 @@ repowarden            # check
 
 **Why**: the workspace is mounted from the host (`/Users/…/devzone` on a Mac → `/workspaces/devzone`). git records the **absolute** path of each worktree in `.git/worktrees/<name>/gitdir`: `/workspaces/…` for a worktree created in the container, `/Users/…` for a worktree created on the Mac. Seen from the other side, this path does not exist: the worktree looks “prunable”, and a `git worktree prune` erases its metadata, which breaks the worktree where it was created.
 
-**Reporting**: the state shown at startup (and by `devzone`) lists, without deleting anything, the worktrees of the devzone repository and of the workspace repositories whose path does not exist in the container: `⚠ worktree        /Users/…/wt-42 absent ici (créé hors du conteneur ?) : …`. Manage it from the side that created it (remove it there with `git worktree remove`, then recreate it in the container if needed).
+**Reporting**: the state shown at startup (and by `devzone`) lists, without deleting anything, the worktrees of the devzone repository and of the workspace repositories whose path does not exist in the workspace pod: `⚠ worktree        /Users/…/wt-42 absent ici (créé hors du conteneur ?) : …`. Manage it from the side that created it (remove it there with `git worktree remove`, then recreate it in the container if needed).
 
 
 
 ## Modules
 
-Optional features are modules, **disabled by default**, enabled on demand from the container, without a rebuild:
+Optional features are modules, **disabled by default**, enabled on demand in the workspace pod, without a rebuild:
 
 ```bash
 devzone                        # state: git identity, GitHub, tools, modules
@@ -115,7 +115,7 @@ In the [Kubernetes workspace](#devzone-services-in-the-kubernetes-workspace), `g
 
 ### Application commands
 
-The internal scripts of `.devcontainer/` are not user commands: `devzone` wraps them.
+The internal scripts of `.devcontainer/` are not user commands: `devzone` wraps them in the workspace pod.
 
 ```bash
 devzone repair                 # relaunches the module relays, watchers and credentials

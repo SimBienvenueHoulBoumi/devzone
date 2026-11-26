@@ -159,7 +159,7 @@ git clone https://github.com/ton-compte/ton-projet.git
 mkdir mon-projet && cd mon-projet && git init -b main
 ```
 
-To learn more: [Starting a project](https://github.com/SimBienvenueHoulBoumi/devzone/blob/main/manage/docs/reference.md#starting-a-project).
+To learn more: [Starting a project](https://github.com/SimBienvenueHoulBoumi/devzone/blob/main/manage/docs/reference.md#starting-a-project). Develop devzone in the pod with `devzone workspace start|shell|vscode`.
 
 ## What devzone contains
 
@@ -172,7 +172,7 @@ To learn more: [Starting a project](https://github.com/SimBienvenueHoulBoumi/dev
 
 ## Installing a tool that stays
 
-A tool installed by hand (`sudo apt install tree`) does not survive a rebuild: the image is rebuilt from scratch. For a tool that must stay, `devzone packages` keeps the list of packages to reinstall:
+A tool installed by hand in the workspace pod does not survive a pod recreation: the image is rebuilt from scratch. For a tool that must stay, `devzone packages` keeps the list of packages to reinstall:
 
 ```sh
 devzone packages
@@ -196,7 +196,7 @@ The list lives in `.devzone.packages` at the root of the devzone folder, outside
 | Open a shell | VS Code terminal | `devzone workspace shell` |
 | Stop | *Remote: Close Remote Connection* (the container stops with the window) | `devzone workspace stop` |
 | Status | — | `devzone workspace status` |
-| **Uninstall** (everything devzone created, after confirmation) | — | `make uninstall` or `npx devzone uninstall` |
+| **Uninstall** (Kubernetes objects of this devzone instance, after confirmation) | — | `devzone uninstall` (in a devzone folder) |
 
 In Kubernetes mode, the same commands apply to the pod `devzone-workspace-0`. The GitLab, PostgreSQL and Argo CD services are installed from the workstation: `devzone workspace services enable postgres` (see [the reference](manage/docs/reference.md#devzone-services-in-the-kubernetes-workspace)). You can also develop there: `devzone workspace clone <url>` makes a working clone in the pod, `devzone ticket <n>` creates the worktree of a ticket there and `devzone agent` launches opencode there without a copy ([developing in the pod](manage/docs/reference.md#developing-devzone-and-repowarden-in-the-pod)). Argo CD is installed by default there and keeps the deployments: interface at https://localhost:8443 (password `admin` in `.password`), GitOps repository `<login>/devzone-argocd` created on your GitHub, projects declared in `.argocd.conf` (`devzone workspace argocd app add <repo>`); see [Argo CD in the Kubernetes workspace](manage/docs/reference.md#argo-cd-in-the-kubernetes-workspace).
 
@@ -232,7 +232,7 @@ The old names of files and folders (`.devzone.paquets`, `.devzone.sauvegarde`, `
 
 The Kubernetes workspace is updated separately: `devzone workspace update` moves it to the latest stable release (or `--version X.Y.Z`), image, charts and Argo CD at the same tag. **The pod `devzone-workspace-0` is recreated**: the VS Code windows attached to the pod are disconnected. The image is checked on ghcr.io before any write, and nothing changes if it does not exist yet. Details in the [reference](manage/docs/reference.md#updating-the-workspace).
 
-In the container, the `devzone` summary reports a more recent published version (npm check at most once a day, without blocking offline): `○ devzone X.Y.Z disponible : sur le poste, devzone update`.
+In the workspace pod, the `devzone` summary reports a more recent published version (npm check at most once a day, without blocking offline): `○ devzone X.Y.Z disponible : sur le poste, devzone update`.
 
 ## Options
 
@@ -408,25 +408,19 @@ The shell prompt shows `⎈ ctx/ns` (cyan if local, bold red if remote otherwise
 
 ## Uninstalling
 
-```bash
-make uninstall
-```
-
-This command removes the container, the image `vsc-devzone-…`, the `devzone-*` volumes, the events of the host's Docker and the kind clusters created on the host, the `devzone-postgres` namespaces and the `app.kubernetes.io/managed-by=devzone` labels on the host's clusters, as well as any metrics-server installed by devzone. Resources are filtered by the `devzone.instance` label to target only the current instance. It **never touches** `workspace/` (your projects). To keep your logins (GitHub, git, Claude Code, opencode and modules): `make uninstall KEEP=logins` (old `GARDER=connexions` still accepted).
-
-With the command installed globally (`npm install -g devzone`), you can also run, in the devzone folder:
+From a devzone folder, remove the Kubernetes objects created by this devzone instance:
 
 ```bash
 devzone uninstall
 ```
 
-Same effect as `make uninstall`. Then only, to remove the command from your machine:
+The command lists the namespaces, Argo CD Applications, temporary accounts and `.devzone.*` files targeted by this instance, asks for confirmation, then removes them. `workspace/` is kept. Without a terminal, use `devzone uninstall --yes`.
+
+To remove the `devzone` command from your machine:
 
 ```bash
 npm uninstall -g devzone
 ```
-
-This command only removes the `devzone` command from your machine; it deletes neither the container, nor the volumes, nor the folder.
 
 ## Removed names
 
