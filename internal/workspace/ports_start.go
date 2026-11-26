@@ -30,8 +30,12 @@ func PortsStart(out, errOut io.Writer) int {
 		fmt.Fprintln(errOut, "✖ port watcher refused under bats (DEVZONE_PORTS_WORKSPACE_REAL=yes required)")
 		return 0
 	}
+	if portsAgentExists() {
+		return portsStartService(out, errOut)
+	}
 	dir := portsDir()
 	_ = os.MkdirAll(dir, 0o755)
+	trimJournal(dir)
 	_ = os.Remove(filepath.Join(dir, "restart"))
 	if pid := readPid(filepath.Join(dir, "pid")); alive(pid) {
 		fmt.Fprintf(out, "Workspace ports: watcher already running (pid %d)\n", pid)
@@ -51,6 +55,27 @@ func PortsStart(out, errOut io.Writer) int {
 	}
 	_ = os.WriteFile(filepath.Join(dir, "pid"), []byte(strconv.Itoa(pid)+"\n"), 0o644)
 	fmt.Fprintf(out, "Workspace ports: watcher started, log %s/journal.log\n", dir)
+	return 0
+}
+
+// portsStartService starts the watcher through the service manager that owns it
+// when the automatic start is installed. On macOS a loaded job is kickstarted;
+// bootstrap is the fallback for one that is not loaded. The manager, not this
+// command, keeps the watcher and relaunches it after an abnormal exit.
+func portsStartService(out, errOut io.Writer) int {
+	tool := portsDaemonTool()
+	if portsPlatform == "darwin" {
+		if status := portsDaemon(tool, "kickstart", "-k", portsDaemonDomain()+"/"+portsAgentName()); status == 0 {
+			fmt.Fprintln(out, "Workspace ports: watcher started by the service manager")
+			return 0
+		}
+	}
+	args := portsDaemonStartArgs()
+	if status := portsDaemon(tool, args...); status != 0 {
+		fmt.Fprintf(errOut, "✖ port watcher not started: %s %v failed (status %d)\n", tool, args, status)
+		return 1
+	}
+	fmt.Fprintln(out, "Workspace ports: watcher started by the service manager")
 	return 0
 }
 

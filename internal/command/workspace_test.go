@@ -2,6 +2,8 @@ package command
 
 import (
 	"bytes"
+	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -71,8 +73,40 @@ func TestWorkspaceOtherSubcommandIsDelegated(t *testing.T) {
 	requireBash(t)
 	entry(t, echoArgs+"\n")
 	var out, errOut bytes.Buffer
-	Run([]string{"workspace", "start", "--image", "x:1"}, &out, &errOut)
-	if out.String() != "args:[workspace][start][--image][x:1]\n" {
+	Run([]string{"workspace", "nope", "x"}, &out, &errOut)
+	if out.String() != "args:[workspace][nope][x]\n" {
 		t.Fatalf("stdout = %q", out.String())
+	}
+}
+
+// TestWorkspaceStartEnablesWatcher checks that a successful cluster start
+// installs the automatic start and that a failed one does not.
+func TestWorkspaceStartEnablesWatcher(t *testing.T) {
+	requireBash(t)
+	calls := 0
+	previous := commandPortsEnable
+	commandPortsEnable = func(out, _ io.Writer) int {
+		calls++
+		fmt.Fprintln(out, "✔ port watcher: automatic start enabled")
+		return 0
+	}
+	t.Cleanup(func() { commandPortsEnable = previous })
+	entry(t, echoArgs+"\n")
+	var out, errOut bytes.Buffer
+	if got := Run([]string{"workspace", "start", "--image", "x:1"}, &out, &errOut); got != 0 {
+		t.Fatalf("status = %d, err = %q", got, errOut.String())
+	}
+	want := "args:[workspace][start][--image][x:1]\n✔ port watcher: automatic start enabled\n"
+	if out.String() != want || calls != 1 {
+		t.Fatalf("stdout = %q, enable calls = %d, want %q and 1", out.String(), calls, want)
+	}
+	entry(t, echoArgs+"\nexit 4\n")
+	out.Reset()
+	errOut.Reset()
+	if got := Run([]string{"workspace", "start"}, &out, &errOut); got != 4 {
+		t.Fatalf("failed start status = %d, want 4", got)
+	}
+	if calls != 1 || strings.Contains(out.String(), "automatic start") {
+		t.Fatalf("failed start enabled the watcher: calls = %d, out = %q", calls, out.String())
 	}
 }

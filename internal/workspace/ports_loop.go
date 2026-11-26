@@ -1,6 +1,7 @@
 package workspace
 
 import (
+	"io"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -33,9 +34,36 @@ func PortsStep() time.Duration {
 // would forbid the next start. The output of the rounds goes to the standard
 // streams, which the start redirected to journal.log.
 func PortsLoop(step time.Duration) int {
+	return portsLoop(os.Stdout, os.Stderr, step)
+}
+
+// portsLoopRunner is the loop run by the automatic start. It is a variable so
+// that a test can check that no second watcher starts, without waiting in a
+// real loop.
+var portsLoopRunner = portsLoop
+
+// portsLoopRound and portsLoopTrim are the two actions of each round. They are
+// variables so a test can drive the loop with fakes: no real kubectl is called
+// and no real journal has to grow past its limit.
+var (
+	portsLoopRound = PortsRound
+	portsLoopTrim  = trimJournal
+)
+
+// portsLoop runs the watcher until it is asked to stop, writing its rounds to
+// the two streams given by the caller, so the agent can use the journal.
+func portsLoop(out, errOut io.Writer, step time.Duration) int {
 	signal.Ignore(syscall.SIGHUP)
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGTERM, os.Interrupt)
+	return portsLoopUntil(out, errOut, step, stop)
+}
+
+// portsLoopUntil runs watcher rounds until stop is signalled, trimming the
+// journal before each round so it stays bounded for the whole life of the loop.
+// The caller owns the stop channel, which makes the loop testable without
+// sending a signal to the test process.
+func portsLoopUntil(out, errOut io.Writer, step time.Duration, stop <-chan os.Signal) int {
 	dir := portsDir()
 	for {
 		select {
@@ -43,7 +71,8 @@ func PortsLoop(step time.Duration) int {
 			return stopWatcher(dir)
 		default:
 		}
-		PortsRound(os.Stdout, os.Stderr)
+		portsLoopTrim(dir)
+		portsLoopRound(out, errOut)
 		select {
 		case <-stop:
 			return stopWatcher(dir)
