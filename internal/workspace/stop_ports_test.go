@@ -28,7 +28,9 @@ func exists(path string) bool {
 }
 
 // startSleep starts a real process that the port watcher can stop. Its exit is
-// reaped in the background, so that a stopped process is not seen as alive.
+// reaped in the background, so that a stopped process is not seen as alive. The
+// process is stopped at the end of the test when it still runs, so that no test
+// leaves a process behind; done is closed once the exit is reaped.
 func startSleep(t *testing.T) (int, <-chan error) {
 	t.Helper()
 	if runtime.GOOS == "windows" {
@@ -39,8 +41,22 @@ func startSleep(t *testing.T) (int, <-chan error) {
 		t.Fatal(err)
 	}
 	done := make(chan error, 1)
-	go func() { done <- cmd.Wait() }()
-	return cmd.Process.Pid, done
+	go func() {
+		done <- cmd.Wait()
+		close(done)
+	}()
+	pid := cmd.Process.Pid
+	t.Cleanup(func() {
+		if alive(pid) {
+			terminate(pid)
+		}
+		select {
+		case <-done:
+		case <-time.After(5 * time.Second):
+			t.Errorf("sleep process %d was not reaped", pid)
+		}
+	})
+	return pid, done
 }
 
 // waitExit fails the test unless the process reaped on done has exited in time
