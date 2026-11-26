@@ -1,5 +1,0 @@
-*.password
-*.env.local
-root.env
-without-host-docker/
-**/.password

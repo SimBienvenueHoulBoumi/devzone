@@ -1,2 +1,0 @@
-# Pod binaries built locally or by the CI: never in the npm package (#864)
-bin/
