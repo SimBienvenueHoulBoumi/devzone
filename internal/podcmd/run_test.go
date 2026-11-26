@@ -37,6 +37,13 @@ func TestHandlesPortedAndUnknown(t *testing.T) {
 	}
 }
 
+// TestAgentIsPorted checks that the agent command is declared ported, so the devzone launcher routes it to the Go binary (Ticket #878).
+func TestAgentIsPorted(t *testing.T) {
+	if got := Run([]string{"handles", "agent"}, io.Discard, io.Discard); got != 0 {
+		t.Fatalf("handles agent: got %d, want 0", got)
+	}
+}
+
 // TestHandlesUsage checks the usage error of the handles command.
 func TestHandlesUsage(t *testing.T) {
 	var errOut strings.Builder

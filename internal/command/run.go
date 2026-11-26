@@ -21,10 +21,14 @@ func Run(args []string, out, errOut io.Writer) int {
 		args = []string{"help"}
 	}
 	ctx := &cli.Context{Out: out, Err: errOut, Runner: exec.ExecRunner{}}
-	if code, ok := Registry.Run(args, ctx); ok {
-		return code
+	code, handled := Registry.Run(args, ctx)
+	if !handled {
+		code = delegate(args, out, errOut)
 	}
-	return delegate(args, out, errOut)
+	if code == 0 {
+		maybeEnsurePortsAutoStart(args, out, errOut)
+	}
+	return code
 }
 
 // delegate hands the command line to the bash entry point, unchanged: a command

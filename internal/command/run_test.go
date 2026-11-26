@@ -25,6 +25,18 @@ func requireBash(t *testing.T) {
 	}
 }
 
+// devzoneRootForAutoStart creates a temporary devzone folder so a test of a
+// command can prove that the automatic start is reached from a devzone folder,
+// without writing anything in the repository.
+func devzoneRootForAutoStart(t *testing.T) string {
+	t.Helper()
+	root := filepath.Join(t.TempDir(), "devzone")
+	if err := os.MkdirAll(filepath.Join(root, ".devcontainer"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return root
+}
+
 // entry writes a fake bash entry point with the given body and points
 // DEVZONE_BASH_ENTRY at it
 func entry(t *testing.T, body string) {

@@ -88,10 +88,10 @@ func workspaceCommand(ctx *cli.Context) int {
 			return workspace.PortsStop()
 		}
 		if len(args) == 2 && args[1] == "enable" {
-			return commandPortsEnable(out, errOut)
+			return portsEnableForUser(out, errOut)
 		}
 		if len(args) == 2 && args[1] == "disable" {
-			return commandPortsDisable(out, errOut)
+			return portsDisableForUser(out, errOut)
 		}
 		if len(args) == 2 {
 			switch args[1] {
