@@ -76,6 +76,24 @@ else
   ko "workspace start" "$start_out"
 fi
 
+# A CI node has too few CPUs for the chart defaults (a limit without request
+# reserves the whole limit): lower the requests of this test release only. A
+# never-ready StatefulSet pod does not roll by itself, hence the deletion.
+set +e
+fit_out="$(helm --kube-context "kind-$CLUSTER" -n "$NAMESPACE" upgrade devzone-workspace "$ROOT/charts/devzone-workspace" --reuse-values \
+  --set resources.requests.cpu=100m --set resources.requests.memory=256Mi \
+  --set kubedock.resources.requests.cpu=100m --set kubedock.resources.requests.memory=128Mi \
+  --set buildkit.resources.requests.cpu=100m --set buildkit.resources.requests.memory=256Mi 2>&1 &&
+  kubectl --context "kind-$CLUSTER" -n "$NAMESPACE" delete "pod/$POD" --ignore-not-found 2>&1 &&
+  kubectl --context "kind-$CLUSTER" -n "$NAMESPACE" wait --for=create "pod/$POD" --timeout=60s 2>&1)"
+fit_rc=$?
+set -e
+if [ "$fit_rc" -eq 0 ]; then
+  ok "resource requests fitted to the node"
+else
+  ko "resource requests fitted to the node" "$fit_out"
+fi
+
 set +e
 status_out="$(cd "$DEVZONE_DIR" && bash "$ROOT/manage/workspace.sh" status 2>&1)"
 status_rc=$?
