@@ -12,7 +12,20 @@ import (
 
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/bashbridge"
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/cli"
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/workspace"
 )
+
+// fakeClusterReady fakes the preflight of workspace start so a routing test
+// can run without a cluster, a fake kubectl or a real shell command.
+func fakeClusterReady(t *testing.T) {
+	t.Helper()
+	oldReady, oldInstalled := commandKubeReady, commandArgoCDInstalled
+	t.Cleanup(func() {
+		commandKubeReady, commandArgoCDInstalled = oldReady, oldInstalled
+	})
+	commandKubeReady = func(workspace.Runner, bool) (string, bool) { return "", true }
+	commandArgoCDInstalled = func(workspace.Runner) bool { return false }
+}
 
 // requireBash skips the test when bash cannot run the fake entry point
 func requireBash(t *testing.T) {

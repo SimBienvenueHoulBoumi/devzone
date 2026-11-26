@@ -15,8 +15,8 @@ import (
 // twice replaces the copy and the definition without ever leaving two watchers:
 // it is the manager, not enable, that owns the process afterwards. On Linux a
 // replaced copy is followed by an explicit restart, because enable --now leaves
-// an already active unit running the old binary. Windows has no Go watcher and
-// the automatic start there is refused (#883).
+// an already active unit running the old binary. The watcher itself runs in Go
+// on Windows too, but its automatic start is another ticket and is refused here.
 func PortsEnable(out, errOut io.Writer) int {
 	if portsAutoStartGuard(errOut) {
 		return 0

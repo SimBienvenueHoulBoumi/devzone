@@ -36,6 +36,9 @@ func uninstallCommand(ctx *cli.Context) int {
 		fmt.Fprintln(ctx.Err, "✖ Not a devzone folder (.devcontainer/ not found here).")
 		return 1
 	}
+	if script := legacyUninstaller(root); script != "" {
+		return runLegacyUninstaller(ctx, script)
+	}
 	yes := false
 	for _, a := range ctx.Args {
 		if a == "--yes" {

@@ -50,14 +50,30 @@ jobs:
       - name: line limit of the Go files
         run: bash manage/scripts/ci/check-go-layout.sh
 
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version: '1.27'
+      # The port watcher runs in Go on Windows too (#883): its process
+      # primitives and the workspace commands it drives are tested on the real
+      # platform. The fake tools of the shell parity tests are skipped there.
+      - name: workspace commands on Windows
+        run: go test ./internal/workspace/ ./internal/command/ -count=1 -timeout 90s
+
   package:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      # Ceiling of the packed package (bytes): measured 8754981 plus 10 %, rounded up
-      # (raised from 8572000 when the watcher was wired: net is then linked, see
-      # contributing.md)
-      MAX_PACKED: 9631000
+      # Ceiling of the packed package (bytes): measured 10052425 after the merge
+      # plus 10 %, rounded up to the next thousand (measured in .essai with
+      # build-binaries.sh and npm pack --dry-run). The Windows port watcher in Go
+      # is the measured cause: 9379707 -> 9777216 bytes packed when it was
+      # ported; see contributing.md)
+      MAX_PACKED: 11058000
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
