@@ -10,9 +10,10 @@ import (
 )
 
 // PortsStatus writes the status of the workstation port watcher, as ports_status
-// does: the watcher line, then the live relays, the ports reported taken, the
-// relayed applications and those without a ready pod. It reads the state folder
-// of portsDir() and returns 0 even when that folder is missing or unreadable.
+// does: the watcher line, then the automatic start of the watcher, the relays, the
+// ports reported taken, the relayed applications and those without a ready pod. It
+// reads the state folder of portsDir() and returns 0 even when that folder is
+// missing or unreadable.
 func PortsStatus(out io.Writer) int {
 	dir := portsDir()
 	pid := readPid(filepath.Join(dir, "pid"))
@@ -20,6 +21,11 @@ func PortsStatus(out io.Writer) int {
 		fmt.Fprintf(out, "Port watcher: running (pid %d)\n", pid)
 	} else {
 		fmt.Fprintln(out, "Port watcher: stopped")
+	}
+	if portsAutoStartActive() {
+		fmt.Fprintln(out, "Port watcher automatic start: enabled")
+	} else {
+		fmt.Fprintln(out, "Port watcher automatic start: disabled")
 	}
 	for _, name := range stateNames(filepath.Join(dir, "relays")) {
 		if alive(readPid(filepath.Join(dir, "relays", name))) {
@@ -48,12 +54,24 @@ func PortsStatus(out io.Writer) int {
 	return 0
 }
 
+// PortsAutoStartExists reports whether this devzone folder has an automatic
+// start definition to retire. It lets a caller announce a disabled start only
+// when there really was one.
+func PortsAutoStartExists() bool {
+	return portsAgentExists()
+}
+
 // PortsStop stops the port watcher and all its relays, as ports_stop does, by
 // calling stopPorts. Nothing is printed and the status is 0.
 func PortsStop() int {
 	stopPorts()
 	return 0
 }
+
+// portsAutoStartActive reports whether the automatic start of the port watcher
+// is enabled, through the automatic start file of the devzone instance (the
+// launch agent or the user unit); as a var it is injectable in tests.
+var portsAutoStartActive = func() bool { return portsAgentExists() }
 
 // stateNames returns the names of the entries of a state folder, sorted as the
 // shell glob sorts them, without the hidden ones it ignores. A missing folder

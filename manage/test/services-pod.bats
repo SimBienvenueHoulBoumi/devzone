@@ -145,8 +145,7 @@ admin_setup() {
     # services-admin.sh runs the devzone beside it (#591): a copy of the script
     # and of its state helpers in $T/pod, with a fake devzone next to them
     mkdir -p "$T/pod"
-    cp "$RACINE/.devcontainer/services-admin.sh" "$RACINE/.devcontainer/state.sh" \
-        "$RACINE/.devcontainer/state-lock.sh" "$T/pod/"
+    cp "$RACINE/.devcontainer/services-admin.sh" "$T/pod/"
     ADMIN="$T/pod/services-admin.sh"
     # Fake devzone beside the script: logs its arguments, keeps a copy of the
     # kubeconfig and of the state as seen during the run
@@ -154,6 +153,13 @@ admin_setup() {
 #!/usr/bin/env bash
 T="$BATS_TEST_TMPDIR"
 echo "devzone $*" >>"$T/devzone.log"
+if [ "${1:-}" = state ]; then
+    case "${2:-}" in
+        write) key="${3:-}"; val="${4:-}"; grep -vE "^${key}=" "$DEVZONE_STATE" >"$T/etat.tmp" 2>/dev/null || true; printf '%s=%s\n' "$key" "$val" >>"$T/etat.tmp"; mv "$T/etat.tmp" "$DEVZONE_STATE" ;;
+        remove) key="${3:-}"; grep -vE "^${key}=" "$DEVZONE_STATE" >"$T/etat.tmp" 2>/dev/null || true; mv "$T/etat.tmp" "$DEVZONE_STATE" ;;
+    esac
+    exit 0
+fi
 if [ "${1:-}" != relay-stop ] && [ "${2:-}" != relay-stop ]; then
     [ -n "${KUBECONFIG:-}" ] && [ -f "$KUBECONFIG" ] && cp "$KUBECONFIG" "$T/kubeconfig.copy"
     cp "$DEVZONE_STATE" "$T/etat.during" 2>/dev/null || true

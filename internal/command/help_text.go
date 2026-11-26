@@ -26,6 +26,8 @@ const helpTemplate = `devzone {version}: development workspace in a Kubernetes c
                            (start installs it, stop removes it from the cluster)
   devzone workspace services enable|disable <service>|status
                            services (gitlab, postgres, argocd) of the Kubernetes workspace
+  devzone workspace ports enable|disable
+                           automatic start of the port watcher on the workstation
   devzone workspace argocd status|init|apply|app add|list|remove
                            Argo CD of the workspace: GitOps repository, .argocd.conf, projects
   devzone --version

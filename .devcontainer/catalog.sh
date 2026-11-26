@@ -12,9 +12,6 @@ ETAT="${DEVZONE_STATE:-$RACINE/.devzone.modules}"
 # shellcheck source=SCRIPTDIR/cluster.sh
 # shellcheck disable=SC1091
 . "$ICI/cluster.sh"
-# shellcheck source=SCRIPTDIR/state.sh
-# shellcheck disable=SC1091
-. "$ICI/state.sh"
 # shellcheck source=SCRIPTDIR/password.sh
 # shellcheck disable=SC1091
 . "$ICI/password.sh"
@@ -92,30 +89,10 @@ app_ready() {
 }
 
 # Adds to the state the <app>=off lines of the absent applications (once each,
-# an existing line is never changed), preceded once by the comment; reading and
-# writing hold the same lock (#417): a concurrent write cannot be lost between the two
-catalog_sync() (
-    local app header missing="" tmp
-    [ -f "$ETAT" ] || return 0
-    header="# Catalog applications: set to on to install (devzone catalog)"
-    state_lock_take || return 1
-    # The lock is released on exit, including on an error under set -e
-    trap 'state_lock_release' EXIT
-    while IFS= read -r app; do
-        [ -n "$app" ] || continue
-        grep -qE "^${app}=" "$ETAT" 2>/dev/null && continue
-        missing="${missing}${missing:+$'\n'}${app}=off"
-    done <<<"$(catalog_apps)"
-    [ -n "$missing" ] || return 0
-    tmp="$(mktemp)"
-    {
-        cat "$ETAT"
-        grep -qF -e "$header" "$ETAT" || echo "$header"
-        echo "$missing"
-    } >"$tmp"
-    state_replace "$tmp"
-    rm -f "$tmp"
-)
+# an existing line is never changed), under the Go state lock (#879).
+catalog_sync() {
+    DEVZONE_STATE="$ETAT" bash "$ICI/devzone" state catalog-sync
+}
 
 # Real state of an application: available, expected, installed, failed. These
 # values are the etat field of devzone status --json: keep them

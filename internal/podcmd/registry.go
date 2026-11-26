@@ -48,6 +48,10 @@ func newDefaultRegistry() *cli.Registry {
 		Name: "test-gitlab",
 		Run:  runTestGitlab,
 	})
+	r.Register(cli.Command{
+		Name: "state",
+		Run:  runState,
+	})
 	return r
 }
 

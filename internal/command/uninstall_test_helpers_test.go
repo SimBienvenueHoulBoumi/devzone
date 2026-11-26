@@ -1,6 +1,7 @@
 package command
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -30,6 +31,12 @@ func devzoneDir(t *testing.T, stateLines ...string) string {
 	t.Setenv("DEVZONE_INSTANCE", "")
 	t.Setenv("DEVZONE_VOLUMES", "")
 	t.Setenv("DEVZONE_ROOT", "")
+	previous, previousExists := commandPortsDisable, commandPortsAutoStartExists
+	commandPortsDisable = func(io.Writer, io.Writer) int { return 0 }
+	commandPortsAutoStartExists = func() bool { return true }
+	t.Cleanup(func() {
+		commandPortsDisable, commandPortsAutoStartExists = previous, previousExists
+	})
 	return root
 }
 

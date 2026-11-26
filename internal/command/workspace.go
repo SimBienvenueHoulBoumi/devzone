@@ -11,18 +11,22 @@ import (
 // workspaceCommand runs the "devzone workspace" subcommands status, stop, vscode
 // and shell in Go (#712), copy-to, copy-from and clone (#754): the usage when
 // the argument is missing, extra words ignored for copy-to and copy-from, ports
-// without a word (status) or with start, status or stop (#781), and services
-// without a word or with the word status (#781, lot A1.3a); "ports loop" is the
-// internal command of the watcher that "ports start" launches, not listed in the
-// help. On Windows the watcher does not exist in Go: "ports start" stays
-// delegated to bash there. Any other subcommand is delegated to bash unchanged,
-// as the bash entry point handles them (renamed words). When the Argo CD
-// Application holds the workspace, stop is delegated too. shell gets the
+// without a word (status), with start, status, stop, enable or disable (#901), or
+// with the internal loop and agent: these are the commands of the watcher that
+// "ports start" and the automatic start launch, not listed in the help. "start"
+// delegates the cluster work to bash, then enables the automatic start in Go.
+// On Windows the watcher does not exist in Go: "ports start" stays delegated to
+// bash there, and the automatic start refused by Go. Any other subcommand is delegated to bash
+// unchanged, as the bash entry point handles them (renamed words). When the Argo
+// CD Application holds the workspace, stop is delegated too. shell gets the
 // terminal of the user as its standard input.
 func workspaceCommand(ctx *cli.Context) int {
 	args := ctx.Args
 	out := ctx.Out
 	errOut := ctx.Err
+	if len(args) >= 1 && args[0] == "start" {
+		return startWorkspace(ctx)
+	}
 	if len(args) >= 1 && args[0] == "clone" {
 		url, name := "", ""
 		if len(args) == 2 || len(args) == 3 {
@@ -73,12 +77,20 @@ func workspaceCommand(ctx *cli.Context) int {
 		if len(args) == 2 && args[1] == "stop" {
 			return workspace.PortsStop()
 		}
+		if len(args) == 2 && args[1] == "enable" {
+			return commandPortsEnable(out, errOut)
+		}
+		if len(args) == 2 && args[1] == "disable" {
+			return commandPortsDisable(out, errOut)
+		}
 		if len(args) == 2 && runtime.GOOS != "windows" {
 			switch args[1] {
 			case "start":
-				return workspace.PortsStart(out, errOut)
+				return commandPortsStart(out, errOut)
 			case "loop":
 				return workspace.PortsLoop(workspace.PortsStep())
+			case "agent":
+				return commandPortsAgent(out, errOut)
 			}
 		}
 	}

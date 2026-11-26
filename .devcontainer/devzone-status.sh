@@ -81,7 +81,7 @@ show_state() {
     if [ -n "$argocd_repo" ] && [ "$argocd_repo" != none ]; then
         printf '  ○ argocd          GitOps repository: %s\n' "$argocd_repo"
     elif in_pod; then
-        gitops_state_line
+        DEVZONE_STATE="$ETAT" bash "$ICI/devzone" state gitops-line
     else
         printf '  ○ argocd          no GitOps repository: devzone argocd init\n'
     fi
