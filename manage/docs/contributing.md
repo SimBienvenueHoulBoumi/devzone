@@ -19,6 +19,8 @@ In CI, the `fonctionnel` workflow runs pod-workspace scenarios on a kind cluster
 
 **Developing devzone in the pod.** The pod is the only supported devzone mode. Use `devzone workspace start|shell|vscode` to work in the workspace pod, keep worktrees under `workspace/wt/`, and run Go checks in that environment (`export GOTOOLCHAIN=local`, `gofmt -l`, `go vet ./...`, `go test ./... -count=1 -timeout 90s`). Do not run host container-engine commands; disposable cluster tests use kind/kubectl/helm in CI or a disposable namespace/pod when explicitly appropriate.
 
+**Go tests that run Git.** The pre-push hook runs `go test` with the `GIT_*` variables of the repository: a test that runs `git` without clearing them writes to the real repository, even with `git -C`. Use the shared helpers of `internal/framework/testhygiene`; a guard test fails otherwise.
+
 
 
 ## Versions and delivery

@@ -138,9 +138,10 @@ setup() {
     [[ "$bloc" == *'manage/test/shard.sh "$SHARD" "$TOTAL"'* ]] || false
     [[ "$bloc" == *"ln -s /bin/bash"* ]] || false
     [[ "$bloc" == *'BASH_VERSINFO[0]}" = 3'* ]] || false
-    for f in cli.bats versions.bats ci-container.bats agent.bats agent-gaps.bats; do
+    for f in cli.bats versions.bats ci-container.bats; do
         [[ "$bloc" == *"manage/test/$f"* ]] || { echo "not run on macOS: $f"; false; }
     done
+    [[ "$bloc" != *"manage/test/agent"* ]] || { echo "agent bats ported to Go must not be cited"; false; }
 }
 
 @test "fonctionnel.yml: also run on each push of develop and main (bats only)" {
@@ -203,7 +204,7 @@ DOCKER
     run bash "$SCRIPT"
     [ "$status" -eq 0 ]
     grep -q "bash:3.2" "$BATS_TEST_TMPDIR/docker.log"
-    grep -q "manage/test/cli.bats manage/test/versions.bats manage/test/ci-container.bats manage/test/agent.bats manage/test/agent-gaps.bats" "$BATS_TEST_TMPDIR/docker.log" || false
+    grep -q "manage/test/cli.bats manage/test/versions.bats manage/test/ci-container.bats" "$BATS_TEST_TMPDIR"/*.log || false
 }
 
 @test "bash32.sh: without the engine -> code 2 and message" {
@@ -251,6 +252,6 @@ DOCKER
     run bash "$SCRIPT"
     [ "$status" -eq 0 ]
     grep -q "bash:3.2" "$BATS_TEST_TMPDIR/docker.log"
-    grep -q "manage/test/cli.bats manage/test/versions.bats manage/test/ci-container.bats manage/test/agent.bats manage/test/agent-gaps.bats" "$BATS_TEST_TMPDIR/docker.log" || false
+    grep -q "manage/test/cli.bats manage/test/versions.bats manage/test/ci-container.bats" "$BATS_TEST_TMPDIR"/*.log || false
     grep -q "v1.10.0" "$BATS_TEST_TMPDIR/docker.log" || false
 }
