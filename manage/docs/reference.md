@@ -120,6 +120,7 @@ The internal scripts of `.devcontainer/` are not user commands: `devzone` wraps 
 ```bash
 devzone repair                 # relaunches the module relays, watchers and credentials
 devzone metrics [context…]     # installs metrics-server on a local cluster
+devzone metrics remove [context…]  # removes it where devzone installed it
 devzone use CTX [--confirm CTX]  # switches the kubectl working cluster
 devzone clusters                       # view of the connected clusters (work and services)
 ```
@@ -240,7 +241,7 @@ devzone use <name>       # switches the kubectl working cluster
 
 - **Active cluster**: the host's by default if it answers (in practice `docker-desktop`), otherwise a dedicated kind cluster `kind-devzone`. A choice made with `devzone use` is kept across restarts.
 - **kind clusters**: created from the workstation (#291). Their API listens on 127.0.0.1 **of the workstation**, never on the local network. The name is suffixed by instance when it is not the default instance. They restart with the host engine and are deleted by `kind delete cluster` (or `make uninstall`).
-- **CPU and RAM in k9s** (`kubectl top`): `devzone metrics` installs metrics-server on the **local** clusters that lack it, never on a remote cluster (or `devzone metrics <context>` for a specific cluster). With Argo CD active, it declares the dependency as a pinned Application from the official chart instead (see [Services held by Argo CD](#services-held-by-argo-cd-in-the-container)).
+- **CPU and RAM in k9s** (`kubectl top`): `devzone metrics` installs metrics-server on the **local** clusters that lack it, never on a remote cluster (or `devzone metrics <context>` for a specific cluster). `devzone metrics remove [context…]` removes it from the clusters where devzone installed it and leaves the other installations untouched (also triggered by `devzone disable kubernetes`). With Argo CD active, it declares the dependency as a pinned Application from the official chart instead (see [Services held by Argo CD](#services-held-by-argo-cd-in-the-container)).
 - **Host cluster**: the workstation keeps its own kubeconfig; the pod uses the cluster service account. After a cluster change on the host: `devzone workspace stop && devzone workspace start`.
 
 The API certificate includes the names expected by the workstation tools (configured via `networking.apiServerAddress` and `kubeadmConfigPatches` in the kind config).
@@ -683,7 +684,7 @@ The modules that deploy a service (`postgres`, `gitlab`) are installed on **a si
 ### Services cluster and devzone context
 
 - **Single cluster**: all services (PostgreSQL, GitLab, etc.) live on a single cluster chosen via `devzone cluster CTX`. The choice is kept in the state (`cluster=` in `$RACINE/.devzone.modules`) and survives restarts.
-- **devzone context**: the kubectl `devzone` context is set on the services cluster (cluster and user taken from the current context). It is restored on the new cluster when `devzone cluster` moves the services. See `changer_cluster` in `cluster.sh`.
+- **devzone context**: the kubectl `devzone` context is set on the services cluster (cluster and user taken from the current context). It is restored on the new cluster when `devzone cluster` moves the services. The command is implemented in `internal/domain/cluster`.
 - **Cluster move**: `devzone cluster CTX [--yes]` moves PostgreSQL: deletion in the old cluster, installation in the new one. The data is not migrated, hence the required confirmation.
 - **Local vs remote contexts**: a cluster is local when its server listens on a loopback address (`127.0.0.1`, `localhost`, `::1`, `host.docker.internal`), read from the kubeconfig, with no network call. The dedicated kind cluster (`kind-devzone`) is always local. Any other cluster (server on a remote address) is remote. The default choice is first the host's current context (in practice `docker-desktop`), then the dedicated kind cluster `kind-devzone`.
 - **Remote cluster**: choosing a remote cluster requires a confirmation in a terminal, or `--confirm CTX` without a terminal. Without the exact confirmation, the choice is refused. When the devzone cluster is remote, the `devzone` summary shows a warning `⚠ cluster distant : <context>`.
@@ -782,7 +783,7 @@ In the container, the `devzone` summary reads `$RACINE/.devzone.version` and the
 | repowarden | `.devcontainer/versions.env`: `REPOWARDEN_VERSION=x.y.z` | `devzone apply` |
 | Claude Code, opencode | `.devcontainer/devzone`: one line per package, `IA_CLAUDE=@anthropic-ai/claude-code@x.y.z` and `IA_OPENCODE=opencode-ai@x.y.z` | `devzone enable ai` |
 | glab (gitlab platform) | `.devcontainer/devzone`: `GLAB_VERSION` and the checksums `GLAB_SOMME_ARM64` / `GLAB_SOMME_AMD64` | `rm ~/.local/bin/glab` then `devzone platform gitlab --url URL` |
-| metrics-server | `.devcontainer/metrics-server.sh`: `VERSION` | `devzone metrics` on a new cluster |
+| metrics-server | `.devcontainer/versions.env`: `METRICS_SERVER_VERSION=x.y.z` | `devzone metrics` on a new cluster |
 | Java, Node, Python, Docker, kubectl, helm, gh | `.devcontainer/devcontainer.json` (features), pinned versions in `devcontainer-lock.json` | `npx @devcontainers/cli upgrade --workspace-folder .` then rebuild the container |
 
 Fingerprint of an archive: `curl -fsSL <url> | shasum -a 256`.
@@ -900,10 +901,10 @@ The `bats (macos-latest)` job sometimes gets no runner: it stays queued for abou
 
 ## For contributors
 
-The application commands (`devzone repair`, `metrics`, `use`) replace the direct scripts for the user. The internal scripts remain callable during development and by the tests:
+The application commands (`devzone repair`, `metrics`, `use`) run in Go through the pod binary; the shell entry point only delegates to it:
 
 ```bash
-bash .devcontainer/metrics-server.sh
+devzone metrics
 ```
 
-The tests isolate Kubernetes (`kube_isole` of `manage/test/commun.bash`: `HOME`, `KUBECONFIG` and `DEVZONE_KUBE_HOST` under the test's temporary folder). `cluster.sh` accepts `--confirm CTX` and keeps `DEVZONE_CLUSTER_REMOTE=<context>` for the tests and the CI. A direct context change (`kubectl config use-context CTX`) should only be done in an isolated test. The volume isolation uses `DEVZONE_VOLUMES=<prefix>`. `DEVZONE_NO_START=1` makes `devzone <folder>` create the folder without launching the workspace (the command is displayed): this is the mode used by the tests and the CI.
+The tests isolate Kubernetes (`kube_isole` of `manage/test/commun.bash`: `HOME`, `KUBECONFIG` and `DEVZONE_KUBE_HOST` under the test's temporary folder). The Go cluster commands accept `--confirm CTX` and keep `DEVZONE_CLUSTER_REMOTE=<context>` for the tests and the CI. A direct context change (`kubectl config use-context CTX`) should only be done in an isolated test. The volume isolation uses `DEVZONE_VOLUMES=<prefix>`. `DEVZONE_NO_START=1` makes `devzone <folder>` create the folder without launching the workspace (the command is displayed): this is the mode used by the tests and the CI.

@@ -10,7 +10,14 @@ import (
 
 	fexec "github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec"
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec/fake"
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/platform/relay"
 )
+
+// relayCall records one requested port-forward of a test.
+type relayCall struct {
+	name, contextName, ns, target string
+	ports                         []string
+}
 
 type modFixture struct {
 	r       *fake.Runner
@@ -19,6 +26,7 @@ type modFixture struct {
 	out     bytes.Buffer
 	err     bytes.Buffer
 	secrets string
+	relays  []relayCall
 }
 
 func newModFixture(t *testing.T) *modFixture {
@@ -62,20 +70,19 @@ func newModFixture(t *testing.T) *modFixture {
 	r.On("helm", []string{"--kubeconfig", filepath.Join(root, "hote.config"), "--kube-context", "docker-desktop", "upgrade", "--install", "argocd", filepath.Join(root, "charts", "devzone-argocd"), "--namespace", "devzone-argocd", "--create-namespace", "--timeout", "600s", "--wait"}, fexec.Result{})
 	// admin secret
 	r.On("kubectl", []string{"--context", "devzone", "-n", "devzone-argocd", "get", "secret", "argocd-initial-admin-secret", "-o", "jsonpath={.data.password}"}, fexec.Result{Stdout: []byte("c2VjcmV0LWFkbWlu")})
-	// credentials are regenerated in Go from the workspace files
-	// relay via bash cluster.sh
-	f.r.On("bash", []string{"-c", relayCmd(root, filepath.Join(root, ".devzone.modules"), "relay_active argocd")}, fexec.Result{Code: 1})
-	f.r.On("bash", []string{"-c", relayCmd(root, filepath.Join(root, ".devzone.modules"), "relay_stop argocd")}, fexec.Result{})
-	f.r.On("bash", []string{"-c", relayCmd(root, filepath.Join(root, ".devzone.modules"), "relay_start argocd devzone devzone-argocd svc/argocd-server 8443:443")}, fexec.Result{})
+	// credentials are regenerated in Go and the relay uses the Go launcher
 	return f
 }
 
-func relayCmd(root, state, cmd string) string {
-	return "set -euo pipefail; RACINE=\"" + root + "\"; ETAT=\"" + state + "\"; . \"" + filepath.Join(root, ".devcontainer", "cluster.sh") + "\"; " + cmd
+// launcher records the relay request and returns a PID that is not alive.
+func (f *modFixture) launcher(dir, name, contextName, ns, target string, ports []string) (int, error) {
+	f.relays = append(f.relays, relayCall{name: name, contextName: contextName, ns: ns, target: target, ports: ports})
+	return 99999999, nil
 }
 
 func (f *modFixture) opts() Options {
-	return Options{Runner: f.r, Out: &f.out, Err: &f.err, Root: f.root, StatePath: f.state, KubeHost: filepath.Join(f.root, "hote.config"), KubeConfig: filepath.Join(f.root, "config")}
+	return Options{Runner: f.r, Launcher: relay.Launcher(f.launcher), Out: &f.out, Err: &f.err,
+		Root: f.root, StatePath: f.state, KubeHost: filepath.Join(f.root, "hote.config"), KubeConfig: filepath.Join(f.root, "config")}
 }
 
 func (f *modFixture) run(args ...string) int {
@@ -94,8 +101,6 @@ func (f *modFixture) markInstalled(t *testing.T) {
 	if err := os.WriteFile(f.state, []byte("argocd=on\ncluster=docker-desktop\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// relay active check - default false unless set
-	f.r.On("bash", []string{"-c", "set -euo pipefail; RACINE=\"" + f.root + "\"; ETAT=\"" + f.state + "\"; . \"" + filepath.Join(f.root, ".devcontainer", "cluster.sh") + "\"; relay_active argocd"}, fexec.Result{Code: 1})
 }
 
 func TestArgocdStatusDisabled(t *testing.T) {
@@ -108,9 +113,6 @@ func TestArgocdStatusDisabled(t *testing.T) {
 
 func TestArgocdInstall(t *testing.T) {
 	f := newModFixture(t)
-	// relay start
-	f.r.On("bash", []string{"-c", "set -euo pipefail; RACINE=\"" + f.root + "\"; ETAT=\"" + f.state + "\"; . \"" + filepath.Join(f.root, ".devcontainer", "cluster.sh") + "\"; relay_start argocd devzone devzone-argocd svc/argocd-server 8443:443"}, fexec.Result{})
-	f.r.On("bash", []string{"-c", relayCmd(f.root, f.state, "relay_start argocd devzone devzone-argocd svc/argocd-server 8443:443")}, fexec.Result{})
 	code := f.run("install")
 	if code != 0 {
 		t.Fatalf("code=%d out=%q err=%q", code, f.out.String(), f.err.String())

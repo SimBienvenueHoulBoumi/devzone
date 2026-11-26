@@ -24,7 +24,7 @@ func shellApp(t *testing.T) (appDir, actions, state string) {
 	}
 	repo := repoPath(".devcontainer")
 	copyFile(t, filepath.Join(repo, "devzone"), filepath.Join(app, "devzone"), 0o755)
-	for _, name := range []string{"help.sh", "cluster.sh", "kube-account.sh", "host-models.sh", "host-check.sh", "host-check.message"} {
+	for _, name := range []string{"help.sh", "host-models.sh", "host-check.sh", "host-check.message"} {
 		src := filepath.Join(repo, name)
 		if strings.HasPrefix(name, "host-") {
 			src = filepath.Join(repo, "ai", name)
@@ -46,7 +46,6 @@ func shellApp(t *testing.T) (appDir, actions, state string) {
 	}
 	writeTestFile(t, filepath.Join(app, "ports.sh"), "#!/usr/bin/env bash\nprintf 'ports %s\\n' \"$*\" >>\"$BATS_TEST_TMPDIR_ACTIONS\"\n")
 	writeTestFile(t, filepath.Join(app, "password.sh"), "#!/usr/bin/env bash\nprintf 'password %s\\n' \"$*\" >>\"$BATS_TEST_TMPDIR_ACTIONS\"\n[ ! -f \"$TEST_FAILED_PASSWORD\" ] || { echo \"credentials unavailable\"; exit 1; }\n")
-	writeTestFile(t, filepath.Join(app, "metrics-server.sh"), "#!/usr/bin/env bash\nprintf 'metrics %s\\n' \"$*\" >>\"$BATS_TEST_TMPDIR_ACTIONS\"\n")
 	actions = filepath.Join(tmp, "actions.log")
 	writeTestFile(t, actions, "")
 	writeTestFile(t, filepath.Join(bin, "devzone"), "#!/usr/bin/env bash\nprintf 'devzone %s\\n' \"$*\" >>\"$BATS_TEST_TMPDIR_ACTIONS\"\ncase \"$*\" in\n    \"passwords regenerate\") [ ! -f \"$TEST_FAILED_PASSWORD\" ] || { echo \"credentials unavailable\" >&2; exit 1; } ;;\nesac\nexit 0\n")

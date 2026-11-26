@@ -87,8 +87,8 @@ apply_kubernetes() {
     else
         rm -f "$HOME/.kube/hote.config"
         # metrics-server removed from the clusters where devzone installed it
-        # (devzone=installe marker set by metrics-server.sh); via its subcommand
-        bash "$ICI/metrics-server.sh" retirer || true
+        # (devzone=installe marker set by the Go command); via its subcommand
+        devzone metrics remove || true
         echo "devzone : kubernetes disabled"
     fi
 }
@@ -152,19 +152,19 @@ apply_postgres() {
             write_value postgres off
             return 2
         fi
-        actual="$(cluster_saved)"
+        actual="$(devzone kube saved)"
         if [ -n "$wanted" ] && [ -n "$actual" ] && [ "$wanted" != "$actual" ]; then
             echo "devzone : devzone services are on $actual; to change: devzone cluster $wanted" >&2
             write_value postgres off
             return 2
         fi
         if [ -n "$confirm_ctx" ]; then
-            ctx="$(cluster_choose "$wanted" --confirm "$confirm_ctx")" || { write_value postgres off; return 2; }
+            ctx="$(devzone kube choose "$wanted" --confirm "$confirm_ctx")" || { write_value postgres off; return 2; }
         else
-            ctx="$(cluster_choose "$wanted")" || { write_value postgres off; return 2; }
+            ctx="$(devzone kube choose "$wanted")" || { write_value postgres off; return 2; }
         fi
         # Choice kept before the installation: a resume targets the same cluster
-        cluster_save "$ctx"
+        devzone kube save "$ctx"
         current_state="$(devzone postgres status)"
         # "relay stopped" first: this line also starts with "ready on"
         if [[ "$current_state" == *"relay stopped"* ]]; then

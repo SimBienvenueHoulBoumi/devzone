@@ -4,10 +4,9 @@ import (
 	"encoding/base64"
 	"fmt"
 	"os"
-	"path/filepath"
 
-	fexec "github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec"
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/passwords"
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/platform/relay"
 )
 
 // decodeB64 decodes a standard base64 string.
@@ -32,11 +31,6 @@ func (m *module) regenerateCredentials() {
 
 // relayStart starts or restarts the argocd relay in the container.
 func (m *module) relayStart() int {
-	// Relay is managed by cluster relay scripts in container; for pod Go command
-	// we keep behavior by calling the existing relay helper if present.
-	// The shell original calls relay_start argocd devzone devzone-argocd svc/argocd-server 8443:443.
-	script := filepath.Join(m.root, ".devcontainer", "devzone")
-	_ = script
 	return m.relayStartDirect()
 }
 
@@ -53,38 +47,21 @@ func (m *module) relayStopCmd() int {
 	return m.relayStopDirect()
 }
 
-// relayStartDirect starts the port-forward relay loop like cluster.sh relay_start.
+// relayStartDirect starts the detached port-forward with the Go relay package,
+// in the same folder and with the same target as relay_start of cluster.sh.
 func (m *module) relayStartDirect() int {
-	dir := filepath.Join(m.root, "workspace", ".argocd")
-	_ = dir
-	// Use the shell relay library to keep identical behavior.
-	cmd := fmt.Sprintf("set -euo pipefail; RACINE=%q; ETAT=%q; . %q; relay_start argocd devzone %s svc/argocd-server %s:443", m.root, m.state, filepath.Join(m.codeRoot, "cluster.sh"), m.ns, m.port)
-	res, err := m.runner.Run(m.ctx, "bash", []string{"-c", cmd}, fexec.Opts{})
+	err := relay.Start(m.secrets, "argocd", "devzone", m.ns, "svc/argocd-server",
+		[]string{m.port + ":443"}, m.launcher)
 	if err != nil {
 		fmt.Fprintln(m.errOut, err)
 		return 1
-	}
-	if res.Code != 0 {
-		m.errOut.Write(res.Stderr)
-		m.out.Write(res.Stdout)
-		return res.Code
 	}
 	return 0
 }
 
-// relayStopDirect stops the argocd relay.
+// relayStopDirect stops the argocd relay and removes its PID file.
 func (m *module) relayStopDirect() int {
-	cmd := fmt.Sprintf("set -euo pipefail; RACINE=%q; ETAT=%q; . %q; relay_stop argocd", m.root, m.state, filepath.Join(m.codeRoot, "cluster.sh"))
-	res, err := m.runner.Run(m.ctx, "bash", []string{"-c", cmd}, fexec.Opts{})
-	if err != nil {
-		fmt.Fprintln(m.errOut, err)
-		return 1
-	}
-	if res.Code != 0 {
-		m.errOut.Write(res.Stderr)
-		m.out.Write(res.Stdout)
-		return res.Code
-	}
+	relay.Stop(m.secrets, "argocd")
 	return 0
 }
 
@@ -104,9 +81,7 @@ func (m *module) status() int {
 
 // relayActive reports whether the argocd relay process is running.
 func (m *module) relayActive() bool {
-	cmd := fmt.Sprintf("set -euo pipefail; RACINE=%q; ETAT=%q; . %q; relay_active argocd", m.root, m.state, filepath.Join(m.codeRoot, "cluster.sh"))
-	res, err := m.runner.Run(m.ctx, "bash", []string{"-c", cmd}, fexec.Opts{})
-	return err == nil && res.Code == 0
+	return relay.Active(m.secrets, "argocd")
 }
 
 // uninstall removes Argo CD, its namespace, secrets and relay.
