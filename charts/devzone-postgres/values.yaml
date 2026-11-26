@@ -1,5 +1,5 @@
 # The one definition of PostgreSQL: the helm-direct path installs this chart
-# (.devcontainer/chart-direct.sh) as the release postgres. The
+# (internal/platform/helm) as the release postgres. The
 # secret postgres-admin (superuser password) is created apart by devzone,
 # never by the chart (#516: secrets out of Git).
 image: postgres:16.15-alpine
