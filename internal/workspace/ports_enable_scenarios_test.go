@@ -94,19 +94,3 @@ func TestPortsEnableDisableSanitisedInstance(t *testing.T) {
 		t.Fatal("disable left the definition of team/a")
 	}
 }
-
-// TestPortsEnableWindowsRefused keeps the automatic start out of Go on Windows.
-func TestPortsEnableWindowsRefused(t *testing.T) {
-	h := newPortsEnableHarness(t)
-	portsPlatform = "windows"
-	var out, errOut bytes.Buffer
-	if code := PortsEnable(&out, &errOut); code != 1 {
-		t.Fatalf("enable status = %d", code)
-	}
-	if !strings.Contains(errOut.String(), "#883") || len(h.calls) != 0 {
-		t.Fatalf("err = %q, calls = %v", errOut.String(), h.calls)
-	}
-	if code := PortsDisable(&out, &errOut); code != 0 {
-		t.Fatalf("disable status = %d", code)
-	}
-}

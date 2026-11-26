@@ -1,31 +1,18 @@
 package command
 
 import (
-	"runtime"
 	"testing"
 )
 
-// TestWorkstationGateFollowsTheSystem checks that Windows is refused on Windows
-// and that a plain Unix host is accepted, with no development container and no
-// pod environment variable in the way.
-func TestWorkstationGateFollowsTheSystem(t *testing.T) {
+// TestWorkstationGateAcceptsWindows checks that a host outside any container is
+// a workstation on every system, Windows included: the automatic start of the
+// port watcher is installed there as a scheduled task (#903). The container
+// variables are cleared so only the platform decides.
+func TestWorkstationGateAcceptsWindows(t *testing.T) {
 	for _, key := range containerEnvironmentVars {
 		t.Setenv(key, "")
 	}
-	got := portsIsWorkstation()
-	if runtime.GOOS == "windows" && got {
-		t.Fatal("a Windows host must not be treated as a workstation for the watcher")
-	}
-	if runtime.GOOS != "windows" && !got {
-		t.Fatal("a Unix host without a container or pod variable must be a workstation")
-	}
-}
-
-// TestNoServiceManagerOnWindows checks that the Windows gate refuses before
-// looking for a service manager, which does not exist there.
-func TestNoServiceManagerOnWindows(t *testing.T) {
-	got := portsServiceManagerAvailable()
-	if runtime.GOOS == "windows" && got {
-		t.Fatal("Windows has no service manager for the watcher")
+	if !portsIsWorkstation() {
+		t.Fatal("a host without a container or pod variable must be a workstation")
 	}
 }
