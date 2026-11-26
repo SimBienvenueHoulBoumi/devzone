@@ -44,6 +44,8 @@ func TestMetricsApplicationPath(t *testing.T) {
 	}
 	r := fake.New()
 	r.On("kubectl", []string{"--context", "devzone", "get", "namespace", "devzone-argocd"}, fexec.Result{})
+	r.On("kubectl", []string{"--context", "devzone", "-n", "devzone-argocd", "get", "application.argoproj.io", "devzone-metrics-server"},
+		fexec.Result{Code: 1, Stderr: []byte("Error from server (NotFound): applications.argoproj.io \"devzone-metrics-server\" not found")})
 	r.On("kubectl", []string{"--context", "devzone", "-n", "kube-system", "get", "deployment", "metrics-server",
 		"-o", "jsonpath={.metadata.labels.devzone}"}, fexec.Result{Code: 1, Stderr: []byte("Error from server (NotFound)")})
 	r.On("kubectl", []string{"--context", "devzone", "apply", "-f", "-"}, fexec.Result{})

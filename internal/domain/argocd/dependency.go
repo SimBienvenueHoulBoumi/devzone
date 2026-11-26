@@ -42,7 +42,8 @@ func (m *module) metricsServerApply() int {
 		fmt.Fprintln(m.errOut, err)
 		return 1
 	}
-	if err := m.metricsAdopt(); err != nil {
+	removed, err := m.metricsAdopt()
+	if err != nil {
 		fmt.Fprintln(m.errOut, err)
 		return 1
 	}
@@ -59,6 +60,9 @@ func (m *module) metricsServerApply() int {
 			fmt.Fprintln(m.errOut, err)
 		} else {
 			m.errOut.Write(res.Stderr)
+		}
+		if removed {
+			fmt.Fprintln(m.errOut, "metrics-server is removed (legacy copy deleted), the Application was not applied: run the command again")
 		}
 		return 1
 	}
