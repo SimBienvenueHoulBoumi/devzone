@@ -1,5 +1,5 @@
 # The one definition of MySQL: the helm-direct path of the catalogue (#414)
-# installs this chart (.devcontainer/chart-direct.sh). The secret <name>-admin
+# installs this chart (internal/platform/helm). The secret <name>-admin
 # (root password) is created apart by
 # devzone, never by the chart (#538: secrets out of Git).
 # Name of the application (Service, StatefulSet and secret ref): mysql of the

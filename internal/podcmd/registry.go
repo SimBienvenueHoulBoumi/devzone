@@ -48,6 +48,14 @@ func newDefaultRegistry() *cli.Registry {
 		Name: "state",
 		Run:  runState,
 	})
+	r.Register(cli.Command{
+		Name: "catalog",
+		Run:  runCatalog,
+	})
+	r.Register(cli.Command{
+		Name: "catalog-watcher",
+		Run:  runCatalogWatcher,
+	})
 	return r
 }
 

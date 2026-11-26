@@ -87,7 +87,7 @@ show_state() {
     fi
     # Catalog applications (#414)
     if [ -d "$ICI/catalog" ]; then
-        bash "$ICI/catalog.sh" resume
+        DEVZONE_STATE="$ETAT" devzone catalog resume
     fi
     # GitLab Rails secret (#347): warning if the secrets were lost
     if [ "$(value_of gitlab)" = on ] && [ ! -f "$RACINE/workspace/.gitlab/rails-secret.yaml" ]; then

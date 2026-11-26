@@ -233,7 +233,7 @@ apply_mysql() {
     else
         # Removal without deleting the data: volume kept (#441); the databases
         # only leave with a yes (confirm_removal)
-        bash "$ICI/catalog.sh" remove mysql
+        DEVZONE_STATE="$ETAT" devzone catalog remove mysql
         if [ -n "${DELETE_DATA:-}" ]; then
             devzone mysql delete-data --yes
         fi

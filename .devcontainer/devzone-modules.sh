@@ -88,7 +88,7 @@ change_module() {
         # An application of the catalog: the line is written, then applied
         if [ -f "$ICI/catalog/$m/app.conf" ]; then
             write_value "$m" "$1"
-            bash "$ICI/catalog.sh" apply
+            DEVZONE_STATE="$ETAT" devzone catalog apply
             return
         fi
         echo "devzone : unknown module : $m ; modules : ${MODULES[*]}" >&2
