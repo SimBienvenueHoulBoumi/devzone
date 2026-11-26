@@ -55,7 +55,6 @@ func TestBatsArgocdUninstall(t *testing.T) {
 	f.r.On("helm", []string{"--kubeconfig", filepath.Join(f.root, "hote.config"), "--kube-context", "docker-desktop", "uninstall", "argocd", "-n", "devzone-argocd"}, fexec.Result{})
 	f.r.On("kubectl", []string{"--context", "docker-desktop", "-n", "devzone-argocd", "delete", "rolebinding", "devzone-agent", "--ignore-not-found"}, fexec.Result{})
 	f.r.On("kubectl", []string{"--context", "docker-desktop", "delete", "namespace", "devzone-argocd", "--wait=true"}, fexec.Result{})
-	f.r.On("bash", []string{"-c", relayCmd(f.root, f.state, "relay_stop argocd")}, fexec.Result{})
 	code := f.run("uninstall")
 	if code != 0 {
 		t.Fatalf("code=%d out=%q err=%q", code, f.out.String(), f.err.String())

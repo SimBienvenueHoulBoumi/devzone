@@ -61,9 +61,8 @@ pack_value() {
 }
 
 @test "package: the files a devzone needs are shipped" {
-    # isolation.sh is used at run time (not only by the tests)
     for f in manage/devzone manage/workspace.sh .devcontainer/devzone .devcontainer/Dockerfile \
-        .devcontainer/isolation.sh Makefile README.md LICENSE; do
+        .devcontainer/versions.env Makefile README.md LICENSE; do
         grep -qxF -- "$f" "$PACK_FILES" || { echo "missing from the package: $f"; return 1; }
     done
     grep -q '^charts/[^/]*/' "$PACK_FILES" || { echo "no chart in charts/"; return 1; }
