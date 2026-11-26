@@ -1,0 +1,11 @@
+# Frequent French words of the former shell check, one per line.
+# This is data: the check excludes data files by extension.
+les
+des
+une
+pour
+avec
+sans
+dans
+fichier
+dossier

@@ -7,7 +7,7 @@
 
 ## Progressive switch by batch (#502)
 
-The switch of the code to English is done by batches. The `.english` file at the root lists the files already written in English; CI checks them on every run (`bash manage/scripts/ci/check-english.sh`). Every new code file must be added to it.
+All tracked code files are written in English. The Go check `go run ./cmd/devzone-checks english` scans them on every run, including comments and test names; data and documentation are excluded by path.
 
 ## devzone charts
 

@@ -1,0 +1,7 @@
+# Ticket protocol values kept under their historical wording; data, not code.
+validé
+## Besoin
+## Notes de version
+## Terminé quand…
+## Conception proposée
+## Conception retenue

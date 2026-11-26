@@ -1,43 +1,43 @@
 #!/usr/bin/env bash
-# Tests du conteneur exigés pour merger (workflow fonctionnel.yml) :
-#   bash manage/test/ci-container.sh a-tester < fichiers-changés
-#       « true » si la PR touche le conteneur, les tests, la CLI,
-#       .gitattributes ou package.json (fonctionnel, cli, windows et ia-arm64 tournent),
-#       « false » sinon (une PR de docs seule n'attend pas 25 min)
+# CI tests required to merge (fonctionnel.yml workflow):
+#   bash manage/test/ci-container.sh a-tester < changed-files
+#       "true" if the PR touches the pod, the tests, the CLI,
+#       .gitattributes or package.json (fonctionnel, cli, windows and ia-arm64 run),
+#       "false" otherwise (a docs-only PR does not wait 25 min)
 #   bash manage/test/ci-container.sh synthese <tester> <changements> <fonctionnel> <cli> <windows> <ia-arm64> <bats>
-#       vérification tests-conteneur (exigée pour merger) : code 0 si les
-#       tests bats ont réussi et si rien d'autre n'était à tester, ou si les
-#       quatre jobs du conteneur ont réussi ; 1 sinon (échec, annulation, job
-#       sauté alors qu'il devait tourner)
+#       tests-conteneur check (required to merge): exit 0 if the
+#       bats tests passed and nothing else had to be tested, or if the
+#       four CI jobs passed; 1 otherwise (failure, cancellation, job
+#       skipped while it had to run)
 #   bash manage/test/ci-container.sh diagnostic <repo> <run_id>
-#       pour chaque job bats annulé : « never started » si aucun runner ni
-#       étape (relance conseillée), « cancelled while running » si des étapes
-#       ont tourné (#636) ; le verdict de synthese ne change pas ; code 0 toujours
+#       for each cancelled bats job: "never started" if no runner nor
+#       step (rerun advised), "cancelled while running" if some steps
+#       ran (#636); the summary verdict does not change; always exit 0
 #   bash manage/test/ci-container.sh relancer <repo> <run_id> <tentative>
-#       relance automatique, une seule fois (#656) : « gh run rerun --failed »
-#       seulement à la première tentative, quand au moins un job est « jamais
-#       démarré » (annulé, sans runner ni étape) et qu'aucun autre job (hors
-#       tests-conteneur) n'a échoué, expiré ou été annulé en cours d'exécution ;
-#       un vrai échec n'est jamais masqué ; code 0 toujours
-# Arguments de synthese : sortie tester du job changements, puis résultat
-# (needs.<job>.result) de changements, fonctionnel, cli, windows, ia-arm64
-# (assistants IA installés sur arm64, Mac Apple Silicon, #194) et bats
-# (bats manage/test/, ubuntu et macOS, lancé sur chaque PR, #192).
+#       automatic rerun, once only (#656): "gh run rerun --failed"
+#       only at the first attempt, when at least one job is "never
+#       started" (cancelled, no runner nor step) and no other job (except
+#       tests-conteneur) failed, expired or was cancelled during its run;
+#       a real failure is never hidden; always exit 0
+# Summary arguments: the tester output of the changes job, then the result
+# (needs.<job>.result) of changements, fonctionnel, cli, windows, ia-arm64
+# (AI assistants installed on arm64, Apple Silicon Mac, #194) and bats
+# (bats manage/test/, ubuntu and macOS, run on each PR, #192).
 # Compatible bash 3.2 (macOS).
 set -euo pipefail
 
-# Chemins qui lancent les tests du conteneur : mêmes que l'ancien filtre paths
-# (+ code Go du binaire distribué, #856 : cmd/, internal/, go.mod, go.sum)
+# Paths that trigger the CI tests: same as the former paths filter
+# (+ Go code of the distributed binary, #856: cmd/, internal/, go.mod, go.sum)
 CHEMINS='^(\.devcontainer/|manage/(devzone|scripts|test)|Makefile$|\.gitattributes$|package\.json$|\.github/workflows/fonctionnel\.yml$|cmd/|internal/|go\.(mod|sum)$)'
 
-# Lit les fichiers changés sur l'entrée : true si l'un d'eux touche un chemin
-# suivi, false sinon
+# Reads the changed files on stdin: true if one of them touches a tracked
+# path, false otherwise
 a_tester() {
     if grep -qE "$CHEMINS"; then echo true; else echo false; fi
 }
 
-# Affiche le résultat d'un job (✔ ou ✖, avec son nom) ; code 1 s'il n'a pas
-# réussi, pour qu'un échec se lise sans ouvrir les autres jobs
+# Prints the result of a job (✔ or ✖, with its name); exit 1 if it did not
+# succeed, so a failure can be read without opening the other jobs
 job_reussi() {
     if [ "$2" = success ]; then
         echo "✔ $1 : success"
@@ -51,18 +51,18 @@ job_reussi() {
     fi
 }
 
-# Résultat de la synthèse à partir des résultats des jobs : bats compte
-# toujours (lancé sur chaque PR), les quatre jobs du conteneur seulement
-# quand la PR les concerne
+# Result of the summary from the job results: bats always
+# counts (run on each PR), the four CI jobs only
+# when the PR concerns them
 synthese() {
     local tester="$1" changements="$2" ko=0 paire
     if [ "$changements" != success ]; then
-        echo "✖ changements : $changements (détection des fichiers changés)"
+        echo "✖ changes: $changements (changed file detection)"
         return 1
     fi
     job_reussi bats "$7" || ko=1
     if [ "$tester" != true ]; then
-        echo "✔ rien à tester : la PR ne touche ni le conteneur, ni les tests, ni la CLI"
+        echo "✔ nothing to test: the PR touches neither the pod, the tests nor the CLI"
         return "$ko"
     fi
     for paire in "fonctionnel=$3" "cli=$4" "windows=$5" "ia-arm64=$6"; do
@@ -71,12 +71,12 @@ synthese() {
     return "$ko"
 }
 
-# Diagnostic des jobs bats annulés (#636) : affiche une ligne par job bats
-# annulé qui n'a jamais eu de runner (aucune étape), ou qui a été annulé
-# pendant son exécution. N'influe pas sur le verdict de synthese. Sort toujours
-# avec 0 : si gh échoue ou est absent, rien n'est affiché. Le TSV est lu par
-# awk et non par read : IFS traite la tabulation comme un blanc, et une
-# colonne vide (runner_name) serait alors décalée
+# Diagnosis of cancelled bats jobs (#636): prints one line per bats job
+# cancelled that never had a runner (no step), or that was cancelled
+# during its run. Does not change the summary verdict. Always exits
+# 0: if gh fails or is absent, nothing is printed. The TSV is read by
+# awk and not by read: IFS treats the tabulation as a blank, and an
+# empty column (runner_name) would then be shifted
 diagnostic() {
     local repo="$1" run_id="$2" lignes
     lignes="$(gh api "repos/$repo/actions/runs/$run_id/jobs" --jq '.jobs[] | select(.name | startswith("bats")) | [.name, .conclusion, (.runner_name // ""), (.steps | length)] | @tsv' 2>/dev/null)" || return 0
@@ -92,14 +92,14 @@ diagnostic() {
     return 0
 }
 
-# Relance automatique des jobs jamais démarrés (#656), appelée par le workflow
-# relance-ci.yml quand le run fonctionnel est terminé en échec. Une seule
-# relance : seulement à la tentative 1. tests-conteneur (le résumé) est ignoré :
-# il échoue justement à cause du job jamais démarré. Sort toujours avec 0.
+# Automatic rerun of jobs that never started (#656), called by the
+# relance-ci.yml workflow when the functional run ends in failure. One
+# rerun only: at attempt 1. tests-conteneur (the summary) is ignored:
+# it fails precisely because of the job that never started. Always exits 0.
 relancer() {
     local repo="$1" run_id="$2" tentative="$3" lignes verdict
     if [ "$tentative" != 1 ]; then
-        echo "relance : tentative $tentative, une seule relance automatique : rien à faire"
+        echo "rerun: attempt $tentative, a single rerun is allowed: nothing to do"
         return 0
     fi
     lignes="$(gh api "repos/$repo/actions/runs/$run_id/jobs" --jq '.jobs[] | [.name, .conclusion, (.runner_name // ""), (.steps | length)] | @tsv' 2>/dev/null)" || {
@@ -118,11 +118,11 @@ relancer() {
     ')" || verdict=rien
     case "$verdict" in
         relancer)
-            echo "relance : job jamais démarré (aucun runner, aucune étape) : gh run rerun $run_id --failed"
-            gh run rerun "$run_id" --failed || echo "relance : gh run rerun a échoué, rien de plus à faire"
+            echo "rerun: job never started (no runner, no step): gh run rerun $run_id --failed"
+            gh run rerun "$run_id" --failed || echo "rerun: gh run rerun failed, nothing more to do"
             ;;
-        failed-real) echo "relance : un job n'a pas démarré, mais un autre a échoué ou été annulé en cours : pas de relance automatique" ;;
-        *) echo "relance : aucun job jamais démarré : rien à relancer" ;;
+        failed-real) echo "rerun: one job did not start, but another failed or was cancelled during its run: no automatic rerun" ;;
+        *) echo "rerun: no job never started: nothing to rerun" ;;
     esac
     return 0
 }
@@ -140,12 +140,12 @@ case "${1:-}" in
         synthese "$@"
         ;;
     diagnostic)
-        # Toujours code 0 (#636) : un échec ici interromprait la synthèse qui suit
+        # Always exit 0 (#636): a failure here would interrupt the summary that follows
         [ "$#" -eq 3 ] || { echo "usage : bash manage/test/ci-container.sh diagnostic <repo> <run_id>" >&2; exit 0; }
         diagnostic "$2" "$3"
         ;;
     relancer)
-        # Toujours code 0, comme diagnostic : jamais un second échec par-dessus le premier
+        # Always exit 0, as for diagnosis: never a second failure over the first
         [ "$#" -eq 4 ] || { echo "usage : bash manage/test/ci-container.sh relancer <repo> <run_id> <tentative>" >&2; exit 0; }
         relancer "$2" "$3" "$4"
         ;;

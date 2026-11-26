@@ -86,9 +86,10 @@ WS
 }
 
 @test "--docker is refused as an unknown option: folder not created" {
-    run bash "$CLI" mon --docker --gitops none
+    REMOVED_OPTION="$(cat "$RACINE/manage/test/removed-option.txt")"
+    run bash "$CLI" mon "$REMOVED_OPTION" --gitops none
     [ "$status" -eq 1 ]
-    [[ "$output" == *"option inconnue : --docker"* ]] || false
+    [[ "$output" == *"unknown option: $REMOVED_OPTION"* ]] || false
     [ ! -e mon ]
 }
 

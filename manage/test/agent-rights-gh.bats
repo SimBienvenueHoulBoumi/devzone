@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# devzone agent : configuration effective (opencode.jsonc + configure) pour gh (#367).
+# devzone agent: effective configuration (opencode.jsonc + configure) for gh (#367).
 
 perm_pour() {
     local f="$1" cmd="$2" val="" key
@@ -43,7 +43,7 @@ setup() {
     done
 }
 
-@test "agent : config effective refuse l'ecriture gh et les secrets" {
+@test "agent: effective config refuses gh writes and secrets" {
     ICI="$BATS_TEST_DIRNAME/../../.devcontainer"
     sed '/^[[:space:]]*\/\//d' "$ICI/opencode.jsonc" >"$BATS_TEST_TMPDIR/oc.json"
     bash -c '

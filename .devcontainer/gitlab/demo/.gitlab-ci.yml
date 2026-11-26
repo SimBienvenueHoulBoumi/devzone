@@ -1,4 +1,4 @@
-# Configuration CI GitLab pour le projet de démo Python.
+# GitLab CI configuration for the Python demo project.
 # Lance ruff (lint) et pytest (tests) sur chaque push/MR.
 
 image: python:3.12-slim

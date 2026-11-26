@@ -6,7 +6,7 @@
 
 # Marker of the default configuration: first line of opencode.jsonc. The former
 # wording (French, before #722) is still recognised. Byte escapes keep the accent
-# out of the source (check-english).
+# out of the source (English code check).
 OPENCODE_MARKER='// devzone : default opencode configuration'
 
 # True if the file carries the default-configuration marker

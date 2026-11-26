@@ -14,7 +14,7 @@ setup() {
 @test "devzone <folder>: creates a complete devzone in a new folder" {
     run bash "$CLI" mon-devzone --kubernetes
     [ "$status" -eq 0 ]
-    [[ "$output" == *"créé dans"* ]] || false
+    [[ "$output" == *"created in"* ]] || false
     for f in .devcontainer/devcontainer.json .devcontainer/devzone Makefile .gitattributes manage/scripts/uninstall.sh README.md LICENSE workspace/.gitkeep .gitignore .devzone.version; do
         [ -e "mon-devzone/$f" ] || { echo "manquant : $f"; return 1; }
     done
@@ -53,15 +53,15 @@ setup() {
 }
 
 @test "devzone <folder>: non-empty folder refused, nothing overwritten" {
-    mkdir plein && echo important >plein/fichier
+    mkdir plein && echo important >plein/file
     run bash "$CLI" plein
     [ "$status" -eq 1 ]
-    [[ "$output" == *"pas vide"* ]] || false
-    [ "$(cat plein/fichier)" = important ]
+    [[ "$output" == *"not empty"* ]] || false
+    [ "$(cat plein/file)" = important ]
     [ ! -e plein/Makefile ]
 }
 
-@test "devzone <dossier> --gitops none : .argocd.conf note no GitOps" {
+@test "devzone <folder> --gitops none: .argocd.conf notes no GitOps" {
     run bash "$CLI" mon-devzone --gitops none --kubernetes
     [ "$status" -eq 0 ]
     grep -q '^\[argocd\]$' mon-devzone/.argocd.conf
@@ -71,13 +71,13 @@ setup() {
     [ "$(conf_get argocd repo)" = none ]
 }
 
-@test "devzone <dossier> --gitops <url> : .argocd.conf note the URL" {
+@test "devzone <folder> --gitops <url>: .argocd.conf notes the URL" {
     run bash "$CLI" mon-devzone --gitops https://github.com/x/y.git --kubernetes
     [ "$status" -eq 0 ]
     grep -q '^    repo = https://github.com/x/y.git$' mon-devzone/.argocd.conf
 }
 
-@test "devzone <dossier> --gitops github : .argocd.conf note the GitHub repository" {
+@test "devzone <folder> --gitops github: .argocd.conf notes the GitHub repository" {
     mkdir -p "$BATS_TEST_TMPDIR/bin"
     cat >"$BATS_TEST_TMPDIR/bin/gh" <<'GH'
 #!/usr/bin/env bash
@@ -104,7 +104,7 @@ GH
 @test "devzone uninstall: refused outside a devzone folder" {
     run bash "$CLI" uninstall
     [ "$status" -eq 1 ]
-    [[ "$output" == *"dossier devzone"* ]] || false
+    [[ "$output" == *"devzone folder"* ]] || false
 }
 
 @test "devzone uninstall: old devzone (uninstall.sh at the root) accepted" {
@@ -168,17 +168,17 @@ GH
     [ "$status" -eq 0 ]
     # Workstation commands cited in the bash blocks of the README. Inline citations
     # are checked by readme.bats (workstation, container, aliases).
-    citations="$(awk '/^```bash$/ { dans = 1; next } /^```$/ { dans = 0 } dans' "$readme")"
+    citations="$(awk '/^```bash$/ { inside = 1; next } /^```$/ { inside = 0 } inside' "$readme")"
     [ -n "$citations" ]
     # Any word also cited after npx devzone is the folder name (argument
     # <folder>), not a subcommand; the options (--version, --help)
     # neither.
-    dossier="$(grep -oE 'npx devzone [A-Za-z0-9_-]+' "$readme" | awk '{ print $NF }' | sort -u)"
+    folders="$(grep -oE 'npx devzone [A-Za-z0-9_-]+' "$readme" | awk '{ print $NF }' | sort -u)"
     mots="$(grep -oE '(^|[^A-Za-z0-9_-])devzone [A-Za-z0-9_-]+' <<<"$citations" | awk '{ print $NF }' | sort -u)"
     while IFS= read -r mot; do
         [ -n "$mot" ] || continue
         case "$mot" in -*) continue ;; esac
-        grep -qx "$mot" <<<"$dossier" && continue
+        grep -qx "$mot" <<<"$folders" && continue
         grep -q -- "$mot" <<<"$output" || { echo "devzone $mot absent de devzone --help"; return 1; }
     done <<<"$mots"
 }
@@ -217,10 +217,10 @@ fake_docker() {
 }
 
 @test "uninstall.sh: Docker stopped → clear message, once, nothing else started" {
-    bash "$CLI" dz-des --kubernetes
+    bash "$CLI" dz-test --kubernetes
     fake_cli 'exit 1'
     fake_docker arrete
-    run bash dz-des/manage/scripts/uninstall.sh
+    run bash dz-test/manage/scripts/uninstall.sh
     [ "$status" -ne 0 ]
     [[ "$output" == *"Start Docker Desktop"*"make desinstaller"* ]] || false
     [[ "$output" != *"failed to connect"* ]] || false
@@ -230,10 +230,10 @@ fake_docker() {
 }
 
 @test "devzone uninstall: Docker stopped → the command to re-run is devzone desinstaller" {
-    bash "$CLI" dz-des --kubernetes
+    bash "$CLI" dz-test --kubernetes
     fake_cli 'exit 1'
     fake_docker arrete
-    cd dz-des
+    cd dz-test
     run bash "$CLI" uninstall
     [ "$status" -ne 0 ]
 }
@@ -249,7 +249,7 @@ fake_docker() {
         nom="${ligne#*$'\t'}"
         if head -c 2 "$RACINE/$nom" 2>/dev/null | grep -q '^#!'; then
             if [[ "$attrs" != *"eol=lf"* ]]; then
-                echo "sans eol=lf : $nom" >&2
+                echo "without eol=lf: $nom" >&2
                 false
             fi
         fi
@@ -260,7 +260,7 @@ fake_docker() {
     cd "$RACINE"
     # Old root locations: must not come back (everything is under manage/)
     for d in scripts test; do
-        [ ! -e "$d" ] || { echo "ancien dossier revenu à la racine : $d/"; return 1; }
+        [ ! -e "$d" ] || { echo "old folder back at the root: $d/"; return 1; }
     done
     # bin/ at the root holds the Go binaries built by prepack (#773): present only
     # after a build, ignored by git, never tracked
@@ -281,14 +281,14 @@ fake_docker() {
         [ -n "$c" ] || continue
         # bin/ is built by prepack: absent from a checkout
         [ "$c" != "bin/" ] || continue
-        [ -e "${c%/}" ] || { echo "chemin cité mais absent : $c"; return 1; }
+        [ -e "${c%/}" ] || { echo "cited path but missing: $c"; return 1; }
     done <<<"$chemins"
 }
 
 @test "devzone modules: container command refused on the workstation, no folder created" {
     run bash "$CLI" modules
     [ "$status" -eq 2 ]
-    [[ "$output" == *"devzone modules : commande du conteneur"* ]] || false
+    [[ "$output" == *"devzone modules: pod command"* ]] || false
     [ ! -e modules ]
 }
 
@@ -308,11 +308,11 @@ fake_docker() {
     set -f
     for cmd in $noms; do
         case "$cmd" in
-            workspace | uninstall | update | -h | --help | -v | --version | aide | help | '*') continue ;;
+            workspace | uninstall | update | -h | --help | -v | --version | help | '*') continue ;;
         esac
         # The launcher must not create a folder for this name
         run bash "$CLI" "$cmd"
         [ "$status" -eq 2 ] || { echo "absent de la liste du lanceur : $cmd"; return 1; }
-        [ ! -e "$cmd" ] || { echo "dossier créé : $cmd"; return 1; }
+        [ ! -e "$cmd" ] || { echo "folder created: $cmd"; return 1; }
     done
 }

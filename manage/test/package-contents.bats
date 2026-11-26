@@ -51,7 +51,7 @@ pack_value() {
         case "$f" in
             manage/test/* | manage/docs/* | cmd/* | internal/* | .github/* | .claude/* | .opencode/*)
                 interdits="$interdits $f" ;;
-            go.mod | go.sum | .english | .repowarden.conf | CLAUDE.md | AGENTS.md | CONTRIBUTING.md)
+            go.mod | go.sum | .repowarden.conf | CLAUDE.md | AGENTS.md | CONTRIBUTING.md)
                 interdits="$interdits $f" ;;
         esac
     done <"$PACK_FILES"

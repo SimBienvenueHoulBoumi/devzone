@@ -62,7 +62,7 @@ poisoned_manifest() {
     run bash "$MAJ" update --yes --no-rebuild
     [ "$status" -eq 0 ]
     [ "$(cat "$T/dehors/secret")" = secret ]
-    [[ "$output" == *"devzone : manifeste : chemin refusé : $rel"* ]] || false
+    [[ "$output" == *"devzone: manifest: refused path: $rel"* ]] || false
 }
 
 @test "creation: .devzone.version holds the version and one checksum per copied file" {
@@ -81,7 +81,7 @@ poisoned_manifest() {
     cd "$DZ"
     run bash "$MAJ1" update
     [ "$status" -eq 0 ]
-    [[ "$output" == *"déjà à jour"* ]] || false
+    [[ "$output" == *"already up to date"* ]] || false
     [[ "$output" == *"npx devzone@latest update"* ]] || false
     [ "$(cat "$DZ/.devzone.version")" = "$avant" ]
     [ ! -e "$DZ/.devzone.backup" ]
@@ -104,7 +104,7 @@ poisoned_manifest() {
     printf 'nouveau\n' >"$T/v2/.devcontainer/nouveau.txt"
     create_v1
     mkdir -p "$DZ/workspace/projet"
-    printf 'projet\n' >"$DZ/workspace/projet/fichier"
+    printf 'projet\n' >"$DZ/workspace/projet/file"
     printf 'ai=on\n' >"$DZ/.devzone.modules"
     printf 'secret\n' >"$DZ/.password"
     printf 'app\n' >"$DZ/.app"
@@ -120,7 +120,7 @@ poisoned_manifest() {
     [ -n "$backup" ]
     grep -q '# makefile ancien' "$backup/Makefile"
     grep -q 'echo ancien' "$backup/manage/scripts/ancien.sh"
-    [ "$(cat "$DZ/workspace/projet/fichier")" = projet ]
+    [ "$(cat "$DZ/workspace/projet/file")" = projet ]
     [ "$(cat "$DZ/.devzone.modules")" = 'ai=on' ]
     [ "$(cat "$DZ/.password")" = secret ]
     [ "$(cat "$DZ/.app")" = app ]
@@ -235,18 +235,18 @@ echo moi' ]
     rm "$DZ/.devzone.version"
     mkdir -p "$DZ/core/scripts" "$DZ/core/autre" "$DZ/workspace/projet"
     printf 'vieux desinstaller\n' >"$DZ/core/scripts/uninstall.sh"
-    printf 'fichier a moi\n' >"$DZ/core/autre/mon-fichier"
-    printf 'projet\n' >"$DZ/workspace/projet/fichier"
+    printf 'file of mine\n' >"$DZ/core/autre/my-file"
+    printf 'projet\n' >"$DZ/workspace/projet/file"
     cd "$DZ"
     run bash "$MAJ" update --yes --no-rebuild
     [ "$status" -eq 0 ]
     [[ "$output" == *"inconnue"* ]] || false
     [ ! -e "$DZ/core/scripts" ]
-    [ "$(cat "$DZ/core/autre/mon-fichier")" = 'fichier a moi' ]
+    [ "$(cat "$DZ/core/autre/my-file")" = 'file of mine' ]
     backup="$(backup_of)"
     [ "$(cat "$backup/core/scripts/uninstall.sh")" = 'vieux desinstaller' ]
-    [ ! -e "$backup/core/autre/mon-fichier" ]
-    [ "$(cat "$DZ/workspace/projet/fichier")" = projet ]
+    [ ! -e "$backup/core/autre/my-file" ]
+    [ "$(cat "$DZ/workspace/projet/file")" = projet ]
     [ "$(sed -n '1p' "$DZ/.devzone.version")" = "version 0.0.2" ]
 }
 
@@ -313,7 +313,7 @@ echo moi' ]
     cd "$DZ"
     run bash "$MAJ" update --yes --no-rebuild
     [ "$status" -eq 0 ]
-    [[ "$output" == *"Reconstruction non lancée (--no-rebuild)"* ]] || false
+    [[ "$output" == *"Rebuild not started (--no-rebuild)"* ]] || false
     [ ! -e "$T/reconstruction.log" ]
 }
 
@@ -356,7 +356,7 @@ echo moi' ]
     [ "$status" -eq 0 ]
     [ "$(cat "$T/dehors/secret")" = secret ]
     [ "$(cat "$DZ/workspace/x")" = 'a moi' ]
-    [[ "$output" == *"devzone : manifeste : chemin refusé : workspace/x"* ]] || false
+    [[ "$output" == *"devzone: manifest: refused path: workspace/x"* ]] || false
 }
 
 @test "poisoned manifest: outgoing symbolic link refused" {
@@ -369,7 +369,7 @@ echo moi' ]
     run bash "$MAJ" update --yes --no-rebuild
     [ "$status" -eq 0 ]
     [ "$(cat "$T/dehors/secret")" = secret ]
-    [[ "$output" == *"devzone : manifeste : chemin refusé : .devcontainer/lien/secret"* ]] || false
+    [[ "$output" == *"devzone: manifest: refused path: .devcontainer/lien/secret"* ]] || false
 }
 
 @test "symbolic link on the last element: replaced by a real file, target intact" {
@@ -384,7 +384,7 @@ echo moi' ]
     [ "$(cat "$T/dehors/cible")" = intact ]
     [ ! -L "$DZ/.devcontainer/devcontainer.json" ] || false
     [ "$(cat "$DZ/.devcontainer/devcontainer.json")" = '{"marque":"nouveau"}' ]
-    [[ "$output" == *"lien remplacé : .devcontainer/devcontainer.json"* ]] || false
+    [[ "$output" == *"link replaced: .devcontainer/devcontainer.json"* ]] || false
 }
 
 @test "symbolic link: the backup keeps the link, not a copy of the target" {
@@ -405,7 +405,7 @@ echo moi' ]
     cd pas-devzone
     run bash "$MAJ" update
     [ "$status" -eq 1 ]
-    [[ "$output" == *"dossier devzone"* ]] || false
+    [[ "$output" == *"devzone folder"* ]] || false
     create_v1
     cd "$DZ"
     run bash "$MAJ" update --truc

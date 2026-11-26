@@ -134,7 +134,7 @@ pose_manifest() {
     [ "$(jq -e '.provider["devzone-host"]' "$F" >/dev/null 2>&1; echo $?)" -ne 0 ]
 }
 
-@test "premier: la mesure l'emporte, un modèle non détecté est ignoré" {
+@test "first: the measurement wins, an undetected model is ignored" {
     mkdir -p "$HOME/.config/devzone"
     cat >"$HOME/.config/devzone/ai-measures.json" <<'EOF'
 {"qwen3-coder:32k":{"reussite":0.8,"tok_s":500,"date":"2026-11-19"},"deepseek-coder:latest":{"reussite":0.9,"tok_s":100,"date":"2026-11-19"},"inconnu:latest":{"reussite":1.0,"tok_s":999,"date":"2026-11-19"}}
@@ -144,7 +144,7 @@ EOF
     [ "$output" = "deepseek-coder:latest" ]
 }
 
-@test "premier: à reussite égale, la plus grande vitesse tok_s gagne" {
+@test "first: at equal success, the highest tok_s speed wins" {
     mkdir -p "$HOME/.config/devzone"
     cat >"$HOME/.config/devzone/ai-measures.json" <<'EOF'
 {"qwen3-coder:32k":{"reussite":0.9,"tok_s":500,"date":"2026-11-19"},"deepseek-coder:latest":{"reussite":0.9,"tok_s":100,"date":"2026-11-19"}}
@@ -154,60 +154,60 @@ EOF
     [ "$output" = "qwen3-coder:32k" ]
 }
 
-@test "premier: sans mesure, un nom contenant coder d'abord, puis la plus petite taille" {
+@test "first: without a measurement, a name containing coder first, then the smallest size" {
     export FAKE_TAGS='{"models":[{"name":"aaa-small:1","size":1,"details":{"type":"llm"}},{"name":"bbb-coder:1","size":9999,"details":{"type":"llm"}},{"name":"ccc-coder:1","size":5000,"details":{"type":"llm"}}]}'
     run bash "$HM" first
     [ "$status" -eq 0 ]
     [ "$output" = "ccc-coder:1" ]
 }
 
-@test "premier: sans mesure, à taille égale l'ordre du nom décide" {
+@test "first: without a measurement, at equal size the name order decides" {
     export FAKE_TAGS='{"models":[{"name":"zzz-coder:1","size":10,"details":{"type":"llm"}},{"name":"aaa-coder:1","size":10,"details":{"type":"llm"}}]}'
     run bash "$HM" first
     [ "$status" -eq 0 ]
     [ "$output" = "aaa-coder:1" ]
 }
 
-@test "premier: Nemotron n'est plus le premier, la règle choisit le coder" {
+@test "first: Nemotron is no longer first, the rule picks the coder" {
     export FAKE_TAGS='{"models":[{"name":"hf.co/ggml-org/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-GGUF:Q4_0","size":1,"details":{"type":"llm"}},{"name":"qwen3-coder:32k","size":12345,"details":{"type":"llm"}}]}'
     run bash "$HM" first
     [ "$status" -eq 0 ]
     [ "$output" = "qwen3-coder:32k" ]
 }
 
-@test "check: à jour quand le sha256 du manifeste correspond au digest local" {
+@test "check: up to date when the manifest sha256 matches the local digest" {
     h="$(pose_manifest qwen3-coder 32k '{"schemaVersion":2}')"
     export FAKE_TAGS="{\"models\":[{\"name\":\"qwen3-coder:32k\",\"size\":1,\"digest\":\"sha256:$h\",\"details\":{\"type\":\"llm\"}}]}"
     run bash "$HC" check
     [ "$status" -eq 0 ]
-    [[ "$output" == *"qwen3-coder:32k : à jour"* ]] || false
-    [[ "$output" != *"mise à jour"* ]] || false
+    [[ "$output" == *"qwen3-coder:32k : up to date"* ]] || false
+    [[ "$output" != *"update available"* ]] || false
 }
 
-@test "check: mise à jour disponible, la commande ollama pull est affichée" {
+@test "check: update available, the ollama pull command is printed" {
     pose_manifest qwen3-coder 32k '{"schemaVersion":2}' >/dev/null
     export FAKE_TAGS='{"models":[{"name":"qwen3-coder:32k","size":1,"digest":"sha256:deadbeef","details":{"type":"llm"}}]}'
     run bash "$HC" check
     [ "$status" -eq 0 ]
-    [[ "$output" == *"qwen3-coder:32k : mise à jour disponible"* ]] || false
+    [[ "$output" == *"qwen3-coder:32k : update available"* ]] || false
     [[ "$output" == *"ollama pull qwen3-coder:32k"* ]] || false
 }
 
-@test "check: non vérifiable (hf.co, 404, registre injoignable)" {
+@test "check: not verifiable (hf.co, 404, registry unreachable)" {
     h="$(pose_manifest qwen3-coder 32k '{"schemaVersion":2}')"
     export FAKE_TAGS="{\"models\":[{\"name\":\"hf.co/ggml-org/Nemotron:Q4_0\",\"size\":1,\"digest\":\"sha256:$h\",\"details\":{\"type\":\"llm\"}},{\"name\":\"absent:latest\",\"size\":1,\"digest\":\"sha256:$h\",\"details\":{\"type\":\"llm\"}},{\"name\":\"qwen3-coder:32k\",\"size\":1,\"digest\":\"sha256:$h\",\"details\":{\"type\":\"llm\"}}]}"
     run bash "$HC" check
     [ "$status" -eq 0 ]
-    [[ "$output" == *"hf.co/ggml-org/Nemotron:Q4_0 : non vérifiable"* ]] || false
-    [[ "$output" == *"absent:latest : non vérifiable"* ]] || false
-    [[ "$output" == *"qwen3-coder:32k : à jour"* ]] || false
+    [[ "$output" == *"hf.co/ggml-org/Nemotron:Q4_0 : not verifiable"* ]] || false
+    [[ "$output" == *"absent:latest : not verifiable"* ]] || false
+    [[ "$output" == *"qwen3-coder:32k : up to date"* ]] || false
 
     FAKE_REGISTRY=off run bash "$HC" check
     [ "$status" -eq 0 ]
-    [[ "$output" == *"qwen3-coder:32k : non vérifiable"* ]] || false
+    [[ "$output" == *"qwen3-coder:32k : not verifiable"* ]] || false
 }
 
-@test "check: un seul GET de manifeste par modèle, aucun téléchargement" {
+@test "check: a single manifest GET per model, no download" {
     h="$(pose_manifest qwen3-coder 32k '{"schemaVersion":2}')"
     pose_manifest deepseek-coder latest '{"schemaVersion":2}' >/dev/null
     export FAKE_TAGS="{\"models\":[{\"name\":\"qwen3-coder:32k\",\"size\":1,\"digest\":\"sha256:$h\",\"details\":{\"type\":\"llm\"}},{\"name\":\"deepseek-coder:latest\",\"size\":1,\"digest\":\"sha256:$h\",\"details\":{\"type\":\"llm\"}}]}"
@@ -219,30 +219,30 @@ EOF
     ! grep -q '^ollama ' "$FAKE_CURL" || false
 }
 
-@test "check: Ollama injoignable -> message propre" {
+@test "check: Ollama unreachable -> clean message" {
     FAKE_OLLAMA=ko run bash "$HC" check
     [ "$status" -eq 0 ]
-    [[ "$output" == *"aucun modèle Ollama détecté"* ]] || false
+    [[ "$output" == *"no Ollama model detected"* ]] || false
 }
 
-@test "rapport: affiche le modèle retenu et la raison (règle)" {
+@test "report: shows the chosen model and the reason (rule)" {
     h="$(pose_manifest qwen3-coder 32k '{"schemaVersion":2}')"
     export FAKE_TAGS="{\"models\":[{\"name\":\"qwen3-coder:32k\",\"size\":12345,\"digest\":\"sha256:$h\",\"details\":{\"type\":\"llm\"}}]}"
     run bash "$HC" rapport
     [ "$status" -eq 0 ]
-    [[ "$output" == *"qwen3-coder:32k : à jour ; taille 12345"* ]] || false
-    [[ "$output" == *"modèle retenu : qwen3-coder:32k (règle)"* ]] || false
+    [[ "$output" == *"qwen3-coder:32k : up to date ; size 12345"* ]] || false
+    [[ "$output" == *"chosen model: qwen3-coder:32k (rule)"* ]] || false
 }
 
-@test "rapport: la raison est la variable DEVZONE_HOST_MODEL quand elle est posée" {
+@test "report: the reason is the DEVZONE_HOST_MODEL variable when it is set" {
     pose_manifest qwen3-coder 32k '{"schemaVersion":2}' >/dev/null
     export FAKE_TAGS='{"models":[{"name":"qwen3-coder:32k","size":1,"digest":"sha256:aaaaaaaa","details":{"type":"llm"}}]}'
     DEVZONE_HOST_MODEL=deepseek-coder:latest run bash "$HC" rapport
     [ "$status" -eq 0 ]
-    [[ "$output" == *"modèle retenu : deepseek-coder:latest (variable DEVZONE_HOST_MODEL)"* ]] || false
+    [[ "$output" == *"chosen model: deepseek-coder:latest (DEVZONE_HOST_MODEL)"* ]] || false
 }
 
-@test "rapport: la raison est la mesure et les mesures sont affichées" {
+@test "report: the reason is the measurement and the measurements are printed" {
     pose_manifest qwen3-coder 32k '{"schemaVersion":2}' >/dev/null
     pose_manifest deepseek-coder latest '{"schemaVersion":2}' >/dev/null
     export FAKE_TAGS='{"models":[{"name":"qwen3-coder:32k","size":12345,"digest":"sha256:aaaaaaaa","details":{"type":"llm"}},{"name":"deepseek-coder:latest","size":99999,"digest":"sha256:bbbbbbbb","details":{"type":"llm"}}]}'
@@ -252,8 +252,8 @@ EOF
 EOF
     run bash "$HC" rapport
     [ "$status" -eq 0 ]
-    [[ "$output" == *"mesure : reussite 0.9, tok_s 100"* ]] || false
-    [[ "$output" == *"modèle retenu : deepseek-coder:latest (mesure)"* ]] || false
+    [[ "$output" == *"measurement reussite 0.9, tok_s 100"* ]] || false
+    [[ "$output" == *"chosen model: deepseek-coder:latest (measurement)"* ]] || false
 }
 
 @test "agent: host model is the local model, after every online model" {

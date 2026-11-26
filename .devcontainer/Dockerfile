@@ -1,5 +1,5 @@
-# Image de base de devzone : outils sans feature officielle, versions figées.
-# Java, Node, Python, Docker, kubectl, helm et gh sont ajoutés par les features
+# devzone base image: tools without an official feature, pinned versions.
+# Java, Node, Python, kubectl, helm and gh are added by the features
 # de devcontainer.json, par-dessus cette image.
 
 # uv : binaire de l'image officielle (pas de script curl | sh)
@@ -8,7 +8,7 @@ FROM ghcr.io/astral-sh/uv:${UV_VERSION} AS uv
 
 FROM mcr.microsoft.com/devcontainers/base:ubuntu-24.04
 
-# Versions : pour mettre à jour, changer la version ET l'empreinte sha256,
+# Versions: to update, change the version AND the sha256 checksum,
 # puis Rebuild Container
 ARG K9S_VERSION=0.51.0
 ARG ACTIONLINT_VERSION=1.7.12
@@ -17,7 +17,7 @@ ARG KIND_VERSION=0.33.0
 ARG KUBECTX_VERSION=0.11.0
 ARG RUFF_VERSION=0.17.0
 ARG VULTURE_VERSION=2.16
-# pytest : même version que la CI de repowarden (ci/requirements/e2e-python.in)
+# pytest: same version as the repowarden CI (ci/requirements/e2e-python.in)
 ARG PYTEST_VERSION=9.1.1
 # BuildKit client (buildctl) for the Kubernetes workspace pod (#514). Pinned to
 # the buildkitd sidecar version; checksums from the moby/buildkit v0.34.2 release
@@ -34,16 +34,16 @@ ARG GO_SHA256_ARM64=3392582988a273a87ab5043ee1b2c9c17a2c3c00580bf9326c47a2e0aaae
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-# Contrôles shell de repowarden ; jq : lu par son garde-fou des agents IA
-# (repowarden guard, module ai), qui sans lui ne vérifie rien
-# Python 3.12 d Ubuntu 24.04, paquets signés par apt, aucun serveur de clés (#464)
+# Shell checks of repowarden; jq: read by its guard for AI agents
+# (repowarden guard, ai module), which checks nothing without it
+# Python 3.12 of Ubuntu 24.04, packages signed by apt, no key server (#464)
 RUN apt-get -o Acquire::Retries=5 update \
     && apt-get -o Acquire::Retries=5 install -y --no-install-recommends shellcheck bats jq python3 python3-venv python3-pip python-is-python3 \
     && rm -rf /var/lib/apt/lists/*
 
-# k9s, actionlint (mêmes versions que la CI de repowarden), gitleaks, kind :
-# installer <nom> <url> <sha256> : empreinte vérifiée avant d'installer quoi que ce soit dans /usr/local/bin
-# (kind est un binaire seul, sans archive : installé à part, même vérification)
+# k9s, actionlint (same versions as the repowarden CI), gitleaks, kind:
+# install <name> <url> <sha256>: checksum verified before installing anything into /usr/local/bin
+# (kind is a single binary, without an archive: installed separately, same check)
 RUN set -eu; \
     arch="$(dpkg --print-architecture)"; \
     case "$arch" in \
@@ -75,7 +75,7 @@ RUN set -eu; \
     install -m 0755 /tmp/kind /usr/local/bin/kind-reel; \
     rm -f /tmp/kind
 
-# kubectx et kubens : binaires officiels ahmetb/kubectx, versions figees avec
+# kubectx and kubens: official ahmetb/kubectx binaries, versions pinned with
 # empreinte sha256 par architecture (comme k9s)
 RUN set -eu; \
     arch="$(dpkg --print-architecture)"; \
@@ -142,9 +142,9 @@ ENV PATH="/usr/local/go/bin:${PATH}" \
 
 COPY --from=uv /uv /uvx /usr/local/bin/
 
-# ruff, vulture (repowarden code-mort a besoin des deux) et pytest, installés pour
-# tous les utilisateurs, avec un Python géré par uv hors du home
-# (variables limitées au build : uv tool install reste dans ~/.local pour vscode)
+# ruff, vulture (both needed by repowarden dead-code checks) and pytest, installed
+# for every user, with a Python managed by uv outside the home
+# (build-only variables: uv tool install stays in ~/.local for vscode)
 RUN export UV_TOOL_DIR=/opt/uv/tools UV_TOOL_BIN_DIR=/usr/local/bin \
         UV_PYTHON_INSTALL_DIR=/opt/uv/python \
     && uv tool install "ruff==${RUFF_VERSION}" \

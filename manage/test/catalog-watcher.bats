@@ -39,7 +39,7 @@ case "$*" in
     *"get secret mysql-admin"*) [ -f "$T/secret" ]; exit $? ;;
     *"create secret generic mysql-admin"*) touch "$T/secret" ;;
     *"rollout status"*) ;;
-    *"port-forward"*) exec sleep 300 ;;
+    *"port-forward"*) exit 0 ;;
 esac
 exit 0
 KUBE
@@ -55,7 +55,7 @@ SSL
     cat >"$BATS_TEST_TMPDIR/bin/nohup" <<'NOHUP'
 #!/usr/bin/env bash
 echo "nohup $*" >>"$BATS_TEST_TMPDIR/nohup.log"
-exec sleep 300
+exit 0
 NOHUP
     cat >"$BATS_TEST_TMPDIR/bin/npm" <<'NPM'
 #!/usr/bin/env bash

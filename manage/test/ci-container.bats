@@ -1,6 +1,6 @@
 #!/usr/bin/env bats
-# Tests du conteneur exigés pour merger : décision par chemin (lancer ou non
-# fonctionnel, cli, windows) et vérification de synthèse tests-conteneur
+# CI tests required to merge: path decision (run or skip fonctionnel, cli,
+# windows) and the tests-conteneur summary check
 # (manage/test/ci-container.sh, workflow fonctionnel.yml, .repowarden.conf).
 
 setup() {
@@ -15,7 +15,7 @@ setup() {
     [ "$output" = false ]
 }
 
-@test "a-tester : aucun fichier → false" {
+@test "a-tester: no file -> false" {
     run bash "$SCRIPT" a-tester </dev/null
     [ "$status" -eq 0 ]
     [ "$output" = false ]
@@ -25,7 +25,7 @@ setup() {
     for f in .devcontainer/devzone manage/test/cli.bats manage/devzone Makefile .gitattributes package.json .github/workflows/fonctionnel.yml cmd/devzone/main.go internal/framework/cli/cli.go go.mod go.sum; do
         run bash "$SCRIPT" a-tester <<<$'README.md\n'"$f"
         [ "$status" -eq 0 ]
-        [ "$output" = true ] || { echo "non détecté : $f"; false; }
+        [ "$output" = true ] || { echo "not detected: $f"; false; }
     done
 }
 
@@ -35,25 +35,25 @@ setup() {
     [ "$output" = false ]
 }
 
-@test "synthese : rien à tester (jobs sautés) → réussite" {
+@test "synthese: nothing to test (skipped jobs) -> success" {
     run bash "$SCRIPT" synthese false success skipped skipped skipped skipped success
     [ "$status" -eq 0 ]
-    [[ "$output" == *"rien à tester"* ]] || false
+    [[ "$output" == *"nothing to test"* ]] || false
 }
 
-@test "synthese : rien à tester, mais tests bats en échec → échec, avec son nom" {
+@test "synthese: nothing to test but failing bats -> failure with the job name" {
     run bash "$SCRIPT" synthese false success skipped skipped skipped skipped failure
     [ "$status" -ne 0 ]
     [[ "$output" == *"✖ bats : failure"* ]] || false
 }
 
-@test "synthese : tests bats en échec, tout le reste réussi → échec" {
+@test "synthese: failing bats, everything else passed -> failure" {
     run bash "$SCRIPT" synthese true success success success success success failure
     [ "$status" -ne 0 ]
     [[ "$output" == *"✖ bats : failure"* ]] || false
 }
 
-@test "synthese : tests bats annulés ou sautés → échec" {
+@test "synthese: cancelled or skipped bats -> failure" {
     for resultat in cancelled skipped; do
         run bash "$SCRIPT" synthese false success skipped skipped skipped skipped "$resultat"
         [ "$status" -ne 0 ]
@@ -61,46 +61,46 @@ setup() {
     done
 }
 
-@test "synthese : fonctionnel, cli, windows, ia-arm64 et bats réussis → réussite" {
+@test "synthese: fonctionnel, cli, windows, ia-arm64 and bats passed -> success" {
     run bash "$SCRIPT" synthese true success success success success success success
     [ "$status" -eq 0 ]
     [[ "$output" == *"✔ ia-arm64 : success"* ]] || false
     [[ "$output" == *"✔ bats : success"* ]] || false
 }
 
-@test "synthese : un job en échec → échec, avec son nom" {
+@test "synthese: one failed job -> failure with its name" {
     run bash "$SCRIPT" synthese true success success failure success success success
     [ "$status" -ne 0 ]
     [[ "$output" == *"cli"*"failure"* ]] || false
 }
 
-@test "synthese : assistants IA non installables sur arm64 (ia-arm64 en échec) → échec, avec son nom" {
+@test "synthese: AI assistants not installable on arm64 (ia-arm64 failure) -> failure with its name" {
     run bash "$SCRIPT" synthese true success success success success failure success
     [ "$status" -ne 0 ]
     [[ "$output" == *"✖ ia-arm64 : failure"* ]] || false
 }
 
-@test "synthese : un job annulé ou en cours d'abandon → échec" {
+@test "synthese: cancelled or being cancelled job -> failure" {
     run bash "$SCRIPT" synthese true success cancelled success success success success
     [ "$status" -ne 0 ]
     [[ "$output" == *"fonctionnel"*"cancelled"* ]] || false
-    # Un job coupé par son délai finit aussi en cancelled (#522)
+    # A job past its timeout also ends as cancelled (#522)
     [[ "$output" == *"timeout or cancelled"* ]] || false
 }
 
-@test "synthese : job sauté alors qu'il fallait tester → échec" {
+@test "synthese: job skipped while tests were required -> failure" {
     run bash "$SCRIPT" synthese true success success success skipped success success
     [ "$status" -ne 0 ]
     [[ "$output" == *"windows"*"skipped"* ]] || false
 }
 
-@test "synthese : détection des changements en échec → échec" {
+@test "synthese: change detection failed -> failure" {
     run bash "$SCRIPT" synthese "" failure skipped skipped skipped skipped success
     [ "$status" -ne 0 ]
-    [[ "$output" == *"changements"*"failure"* ]] || false
+    [[ "$output" == *"changes"*"failure"* ]] || false
 }
 
-@test "synthese : arguments manquants → usage, échec" {
+@test "synthese: missing arguments -> usage, failure" {
     run bash "$SCRIPT" synthese true success
     [ "$status" -ne 0 ]
     [[ "$output" == *usage* ]] || false
@@ -109,8 +109,8 @@ setup() {
     [[ "$output" == *usage* ]] || false
 }
 
-@test "fonctionnel.yml : job ia-arm64 sur ubuntu-24.04-arm, décision par chemin, claude et opencode vérifiés" {
-    bloc="$(awk '/^  ia-arm64:/ { dans = 1; print; next } dans && /^  [a-z0-9-]+:/ { exit } dans { print }' "$WORKFLOW")"
+@test "fonctionnel.yml: ia-arm64 job on ubuntu-24.04-arm, path decision, claude and opencode checked" {
+    bloc="$(awk '/^  ia-arm64:/ { inside = 1; print; next } inside && /^  [a-z0-9-]+:/ { exit } inside { print }' "$WORKFLOW")"
     [ -n "$bloc" ]
     [[ "$bloc" == *"runs-on: ubuntu-24.04-arm"* ]] || false
     [[ "$bloc" == *"if: needs.changements.outputs.tester == 'true'"* ]] || false
@@ -119,39 +119,39 @@ setup() {
     [[ "$bloc" == *"opencode --version"* ]] || false
 }
 
-@test "fonctionnel.yml : aucun filtre paths, lancé sur chaque PR" {
+@test "fonctionnel.yml: no paths filter, run on each PR" {
     run grep -nE '^[[:space:]]*paths:' "$WORKFLOW"
     [ "$status" -ne 0 ]
     grep -qE '^  pull_request:' "$WORKFLOW"
 }
 
-@test "fonctionnel.yml : job bats sur ubuntu et macOS (bash 3.2), sur chaque PR sans décision par chemin" {
-    bloc="$(awk '/^  bats:/ { dans = 1; print; next } dans && /^  [a-z0-9-]+:/ { exit } dans { print }' "$WORKFLOW")"
+@test "fonctionnel.yml: bats job on ubuntu and macOS (bash 3.2), on each PR without path decision" {
+    bloc="$(awk '/^  bats:/ { inside = 1; print; next } inside && /^  [a-z0-9-]+:/ { exit } inside { print }' "$WORKFLOW")"
     [ -n "$bloc" ]
     [[ "$bloc" == *"os: ubuntu-latest, shard: 1, total: 4"* ]] || false
     [[ "$bloc" == *"os: ubuntu-latest, shard: 4, total: 4"* ]] || false
     [[ "$bloc" == *"os: macos-latest"* ]] || false
     [[ "$bloc" == *'runs-on: ${{ matrix.os }}'* ]] || false
-    [[ "$bloc" != *"needs.changements"* ]] || { echo "bats doit tourner sur chaque PR"; false; }
+    [[ "$bloc" != *"needs.changements"* ]] || { echo "bats must run on each PR"; false; }
     [[ "$bloc" == *"bats@"* ]] || false
-    # ubuntu : toute la suite en quatre lots (#522) ; macOS : /bin/bash (3.2) en tête du PATH, vérifié
+    # ubuntu: the whole suite in four shards (#522); macOS: /bin/bash (3.2) first in PATH, checked
     [[ "$bloc" == *'manage/test/shard.sh "$SHARD" "$TOTAL"'* ]] || false
     [[ "$bloc" == *"ln -s /bin/bash"* ]] || false
     [[ "$bloc" == *'BASH_VERSINFO[0]}" = 3'* ]] || false
     for f in cli.bats versions.bats ci-container.bats agent.bats agent-gaps.bats; do
-        [[ "$bloc" == *"manage/test/$f"* ]] || { echo "non lancé sous macOS : $f"; false; }
+        [[ "$bloc" == *"manage/test/$f"* ]] || { echo "not run on macOS: $f"; false; }
     done
 }
 
-@test "fonctionnel.yml : lancé aussi sur chaque push de develop et main (bats seul)" {
+@test "fonctionnel.yml: also run on each push of develop and main (bats only)" {
     grep -qE '^  push:' "$WORKFLOW"
     grep -qE '^    branches: \[develop, main\]' "$WORKFLOW"
     grep -qE 'push\) tester=false' "$WORKFLOW"
 }
 
-@test "fonctionnel.yml : synthèse tests-conteneur toujours lancée, après fonctionnel, cli, windows, ia-arm64 et bats" {
-    # Bloc du job tests-conteneur : de sa ligne à la fin du fichier ou au job suivant
-    bloc="$(awk '/^  tests-conteneur:/ { dans = 1; print; next } dans && /^  [a-z0-9-]+:/ { exit } dans { print }' "$WORKFLOW")"
+@test "fonctionnel.yml: tests-conteneur summary always run, after fonctionnel, cli, windows, ia-arm64 and bats" {
+    # tests-conteneur job block: from its line to the end of the file or the next job
+    bloc="$(awk '/^  tests-conteneur:/ { inside = 1; print; next } inside && /^  [a-z0-9-]+:/ { exit } inside { print }' "$WORKFLOW")"
     [ -n "$bloc" ]
     [[ "$bloc" == *"if: always()"* ]] || false
     [[ "$bloc" == *"needs: [changements, fonctionnel, cli, windows, ia-arm64, bats]"* ]] || false
@@ -159,35 +159,35 @@ setup() {
     [[ "$bloc" == *'"$WINDOWS" "$IA_ARM64" "$BATS"'* ]] || false
     [[ "$bloc" == *'BATS: ${{ needs.bats.result }}'* ]] || false
     for job in fonctionnel cli windows ia-arm64; do
-        awk -v j="  $job:" '$0 == j { dans = 1; next } dans && /^  [a-z0-9-]+:/ { exit } dans { print }' "$WORKFLOW" |
-            grep -q "if: needs.changements.outputs.tester == 'true'" || { echo "job $job lancé sans la décision par chemin"; false; }
+        awk -v j="  $job:" '$0 == j { inside = 1; next } inside && /^  [a-z0-9-]+:/ { exit } inside { print }' "$WORKFLOW" |
+            grep -q "if: needs.changements.outputs.tester == 'true'" || { echo "job $job run without the path decision"; false; }
     done
 }
 
-# Sous bash 3.2 (macOS), un [[ … ]] en échec au milieu d'un test ne le fait
-# pas échouer (errexit ignoré avant bash 4.1), et « ! commande » jamais, quel
-# que soit bash : chaque condition de ce genre finit par || false
-@test "tests bats : aucune condition [[ … ]] ni ! commande sans || false (bash 3.2)" {
+# Under bash 3.2 (macOS), a failing [[ ... ]] in the middle of a test does not
+# fail it (errexit ignored before bash 4.1), and "! command" never does, on any
+# bash: every condition of that kind ends with || false
+@test "bats tests: no [[ ... ]] condition nor ! command without || false (bash 3.2)" {
     run grep -nE '^[[:space:]]*\[\[.*\]\][[:space:]]*$' "$RACINE"/manage/test/*.bats
     [ "$status" -ne 0 ] || { echo "$output"; false; }
     run grep -nE '^[[:space:]]*! ' "$RACINE"/manage/test/*.bats
     [ -z "$(grep -v '|| false[[:space:]]*$' <<<"$output")" ] || { echo "$output"; false; }
 }
 
-# bash 3.2 lit l'apostrophe d'un commentaire placé dans un $( … ) multiligne
-# comme une chaîne ouverte : le fichier .bats entier ne se charge plus (#210)
-@test "tests bats : aucune apostrophe dans un commentaire à l'intérieur d'un \$( … ) multiligne" {
-    run awk '/\$\($/ { dans = 1; next } dans && /^[[:space:]]*\)/ { dans = 0 } dans && /^[[:space:]]*#.*'\''/ { print FILENAME ":" FNR }' "$RACINE"/manage/test/*.bats
-    [ -z "$output" ] || { echo "apostrophe dans un commentaire de \$( … ) : $output"; false; }
+# bash 3.2 reads the apostrophe of a comment inside a multiline $( ... ) as an
+# open string: the whole .bats file no longer loads (#210)
+@test "bats tests: no apostrophe in a comment inside a multiline \$( ... )" {
+    run awk '/\$\($/ { inside = 1; next } inside && /^[[:space:]]*\)/ { inside = 0 } inside && /^[[:space:]]*#.*'\''/ { print FILENAME ":" FNR }' "$RACINE"/manage/test/*.bats
+    [ -z "$output" ] || { echo "apostrophe in a \$( ... ) comment: $output"; false; }
 }
 
-@test ".repowarden.conf : tests-conteneur exigé pour merger" {
+@test ".repowarden.conf: tests-conteneur required to merge" {
     exigees="$(git config -f "$RACINE/.repowarden.conf" repowarden.requiredChecks)"
     [[ ",$exigees," == *",repowarden,"* ]] || false
     [[ ",$exigees," == *",tests-conteneur,"* ]] || false
 }
 
-@test "bash32.sh : liste passée à docker = job macOS" {
+@test "bash32.sh: list passed to the image runner = macOS job" {
     SCRIPT="$RACINE/manage/test/bash32.sh"
     mkdir -p "$BATS_TEST_TMPDIR/bin"
     cat > "$BATS_TEST_TMPDIR/bin/docker" <<'DOCKER'
@@ -206,7 +206,7 @@ DOCKER
     grep -q "manage/test/cli.bats manage/test/versions.bats manage/test/ci-container.bats manage/test/agent.bats manage/test/agent-gaps.bats" "$BATS_TEST_TMPDIR/docker.log" || false
 }
 
-@test "bash32.sh : sans docker → code 2 et message" {
+@test "bash32.sh: without the engine -> code 2 and message" {
     SCRIPT="$RACINE/manage/test/bash32.sh"
     mkdir -p "$BATS_TEST_TMPDIR/bin"
     for c in bash grep tr head rm; do
@@ -218,7 +218,7 @@ DOCKER
     [[ "$output" == *"Docker requis"* ]] || false
 }
 
-@test "bash32.sh : faux docker en échec → code 1" {
+@test "bash32.sh: failing fake engine -> code 1" {
     SCRIPT="$RACINE/manage/test/bash32.sh"
     mkdir -p "$BATS_TEST_TMPDIR/bin"
     cat > "$BATS_TEST_TMPDIR/bin/docker" <<'DOCKER'
@@ -235,7 +235,7 @@ DOCKER
     [ "$status" -eq 1 ]
 }
 
-@test "bash32.sh : version bats du job macOS dans la liste docker" {
+@test "bash32.sh: macOS job bats version in the runner list" {
     SCRIPT="$RACINE/manage/test/bash32.sh"
     mkdir -p "$BATS_TEST_TMPDIR/bin"
     cat > "$BATS_TEST_TMPDIR/bin/docker" <<'DOCKER'
