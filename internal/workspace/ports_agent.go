@@ -1,8 +1,8 @@
 package workspace
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
+	"fmt"
+	"hash/fnv"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -69,6 +69,15 @@ func portsAgentName() string {
 	return portsAgentNameFor(portsInstance(), portsDevzoneFolder())
 }
 
+// portsNameFingerprint returns an eight-digit hexadecimal fingerprint of s.
+// FNV-1a keeps definition names distinct per folder without linking a
+// cryptographic hash into the binary, which nothing else in cmd/devzone uses.
+func portsNameFingerprint(s string) string {
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(s))
+	return fmt.Sprintf("%08x", h.Sum32())
+}
+
 // portsAgentNameFor returns the definition name of instance in folder, with the
 // same sanitising and hashes as enable, so disable finds the file enable wrote
 // even when the instance name contains characters that had to be replaced.
@@ -81,15 +90,13 @@ func portsAgentNameFor(instance, folder string) string {
 		return '-'
 	}, instance)
 	if safe != instance {
-		sum := sha256.Sum256([]byte(instance))
-		safe += "-" + hex.EncodeToString(sum[:])[:8]
+		safe += "-" + portsNameFingerprint(instance)
 	}
 	absolute, err := filepath.Abs(folder)
 	if err != nil {
 		absolute = folder
 	}
-	sum := sha256.Sum256([]byte(absolute))
-	return portsAgentPrefix + safe + "-" + hex.EncodeToString(sum[:])[:8]
+	return portsAgentPrefix + safe + "-" + portsNameFingerprint(absolute)
 }
 
 // portsAgentExists tells whether the automatic start of the port watcher is
