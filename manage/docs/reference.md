@@ -120,6 +120,7 @@ The internal scripts of `.devcontainer/` are not user commands: `devzone` wraps 
 ```bash
 devzone repair                 # relaunches the module relays, watchers and credentials
 devzone metrics [context…]     # installs metrics-server on a local cluster
+devzone metrics remove [context…]  # removes it where devzone installed it
 devzone use CTX [--confirm CTX]  # switches the kubectl working cluster
 devzone clusters                       # view of the connected clusters (work and services)
 ```
@@ -240,7 +241,7 @@ devzone use <name>       # switches the kubectl working cluster
 
 - **Active cluster**: the host's by default if it answers (in practice `docker-desktop`), otherwise a dedicated kind cluster `kind-devzone`. A choice made with `devzone use` is kept across restarts.
 - **kind clusters**: created from the workstation (#291). Their API listens on 127.0.0.1 **of the workstation**, never on the local network. The name is suffixed by instance when it is not the default instance. They restart with the host engine and are deleted by `kind delete cluster` (or `make uninstall`).
-- **CPU and RAM in k9s** (`kubectl top`): `devzone metrics` installs metrics-server on the **local** clusters that lack it, never on a remote cluster (or `devzone metrics <context>` for a specific cluster).
+- **CPU and RAM in k9s** (`kubectl top`): `devzone metrics` installs metrics-server on the **local** clusters that lack it, never on a remote cluster (or `devzone metrics <context>` for a specific cluster). `devzone metrics remove [context…]` removes it from the clusters where devzone installed it and leaves the other installations untouched (also triggered by `devzone disable kubernetes`).
 - **Host cluster**: the workstation keeps its own kubeconfig; the pod uses the cluster service account. After a cluster change on the host: `devzone workspace stop && devzone workspace start`.
 
 The API certificate includes the names expected by the workstation tools (configured via `networking.apiServerAddress` and `kubeadmConfigPatches` in the kind config).

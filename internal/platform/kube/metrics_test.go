@@ -94,7 +94,7 @@ func TestMetricsRemove(t *testing.T) {
 	withProgrammedMetrics(t, k, markArgs("local"), exec.Result{Stdout: []byte("installe")})
 	withProgrammedMetrics(t, k, markArgs("other"), exec.Result{})
 	withProgrammedMetrics(t, k, []string{"--context", "other", "-n", "kube-system", "get", "deployment", "metrics-server"}, exec.Result{})
-	code := k.Metrics(context.Background(), []string{"retirer", "local", "other"}, out, errOut)
+	code := k.Metrics(context.Background(), []string{"remove", "local", "other"}, out, errOut)
 	if code != 0 {
 		t.Fatalf("code = %d, err = %q", code, errOut.String())
 	}

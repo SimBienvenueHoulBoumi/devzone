@@ -38,13 +38,13 @@ func metricsManifest() string {
 }
 
 // Metrics installs or removes metrics-server, as metrics-server.sh did. The
-// "retirer" argument is the public subcommand name kept as is; the other
+// "remove" argument is the public subcommand name in English; the other
 // arguments are explicit contexts, otherwise only local clusters are used.
 func (k Kube) Metrics(ctx context.Context, args []string, out, errOut io.Writer) int {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	remove := len(args) > 0 && args[0] == "retirer"
+	remove := len(args) > 0 && args[0] == "remove"
 	if remove {
 		args = args[1:]
 	}

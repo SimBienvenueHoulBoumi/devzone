@@ -88,7 +88,7 @@ apply_kubernetes() {
         rm -f "$HOME/.kube/hote.config"
         # metrics-server removed from the clusters where devzone installed it
         # (devzone=installe marker set by the Go command); via its subcommand
-        devzone metrics retirer || true
+        devzone metrics remove || true
         echo "devzone : kubernetes disabled"
     fi
 }

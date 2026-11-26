@@ -121,7 +121,7 @@ func stdinText(t *testing.T, reader io.Reader) string {
 func TestMetricsCallsNeverUseAdminContext(t *testing.T) {
 	k, r, _ := accountSetup(t)
 	r.On("kubectl", []string{"config", "get-contexts", "-o", "name"}, exec.Result{Stdout: []byte("host-context\n")})
-	code := k.Metrics(context.Background(), []string{"retirer", "host-context"}, nil, nil)
+	code := k.Metrics(context.Background(), []string{"remove", "host-context"}, nil, nil)
 	if code != 0 {
 		t.Fatalf("code = %d", code)
 	}

@@ -148,7 +148,7 @@ GH
 #!/usr/bin/env bash
 case "$*" in
     "cluster clean"*) exit 0 ;;
-    "metrics retirer") exec "$DEVZONE" metrics retirer ;;
+    "metrics remove") exec "$DEVZONE" metrics remove ;;
 esac
 exit 0
 DEVZONE
