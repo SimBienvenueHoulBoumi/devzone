@@ -119,7 +119,6 @@ manage/test/workspace-egress.bats
 manage/test/workspace-egress-wait.bats
 manage/test/ci-diagnostic.bats
 manage/test/agent-models.bats
-manage/test/state-gitops.bats
 manage/test/journal-error.sh
 manage/test/journal-error.bats
 .devcontainer/ai/docker-guard.sh
@@ -146,8 +145,6 @@ manage/scripts/devzone-manifest.sh
 .devcontainer/memory.sh
 .devcontainer/metrics-server.sh
 .devcontainer/password.sh
-manage/test/state-json.bats
-manage/test/state.bats
 manage/test/memory.bats
 manage/test/password.bats
 cmd/devzone/main.go
