@@ -72,12 +72,39 @@ jobs:
       - name: Runner Docker DNS
         run: bash manage/scripts/ci/ci-dns.sh
       - name: Install kind, kubectl, helm
+        shell: bash
         run: |
-          curl -fsSL -o /usr/local/bin/kind https://kind.sigs.k8s.io/dl/v0.27.0/kind-linux-amd64
-          chmod +x /usr/local/bin/kind
-          curl -fsSL -o /usr/local/bin/kubectl "https://dl.k8s.io/release/$(curl -fsSL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-          chmod +x /usr/local/bin/kubectl
-          curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+          set -euo pipefail
+          case "$(uname -m)" in
+            x86_64 | amd64) arch=amd64 ;;
+            aarch64 | arm64) arch=arm64 ;;
+            *) echo "unsupported architecture: $(uname -m)" >&2; exit 1 ;;
+          esac
+          bin_dir="${RUNNER_TEMP}/devzone-tools"
+          mkdir -p "$bin_dir"
+          echo "$bin_dir" >>"$GITHUB_PATH"
+          tmp="$(mktemp -d)"
+          kind_version=0.33.0
+          case "$arch" in
+            arm64) kind_sha=20022bee6cfcd5086cb7234d218e3454e6090022f2a8f55d1fa7fcf42c3867a2 ;;
+            amd64) kind_sha=aee6151561422756b764a4ae28e7f44cda5af5a9eead3cc9985112b1de8d8e0d ;;
+          esac
+          curl -fsSL "https://github.com/kubernetes-sigs/kind/releases/download/v${kind_version}/kind-linux-${arch}" -o "$tmp/kind"
+          echo "$kind_sha  $tmp/kind" | sha256sum -c --quiet
+          install -m 0755 "$tmp/kind" "$bin_dir/kind"
+          kubectl_version=v1.37.3
+          curl -fsSL "https://dl.k8s.io/release/${kubectl_version}/bin/linux/${arch}/kubectl" -o "$tmp/kubectl"
+          curl -fsSL "https://dl.k8s.io/release/${kubectl_version}/bin/linux/${arch}/kubectl.sha256" -o "$tmp/kubectl.sha256"
+          echo "$(cat "$tmp/kubectl.sha256")  $tmp/kubectl" | sha256sum -c --quiet
+          install -m 0755 "$tmp/kubectl" "$bin_dir/kubectl"
+          helm_version=v4.3.2
+          helm_tarball="helm-${helm_version}-linux-${arch}.tar.gz"
+          curl -fsSL "https://get.helm.sh/${helm_tarball}" -o "$tmp/$helm_tarball"
+          curl -fsSL "https://get.helm.sh/${helm_tarball}.sha256sum" -o "$tmp/$helm_tarball.sha256sum"
+          (cd "$tmp" && sha256sum -c --quiet "$helm_tarball.sha256sum")
+          tar -xzf "$tmp/$helm_tarball" -C "$tmp" "linux-${arch}/helm"
+          install -m 0755 "$tmp/linux-${arch}/helm" "$bin_dir/helm"
+          rm -rf "$tmp"
       - name: Pod workspace on kind (start/status/stop + module)
         env:
           DEVZONE_KIND_CLUSTER: devzone-ci-fonctionnel
@@ -93,12 +120,39 @@ jobs:
       - name: Runner Docker DNS
         run: bash manage/scripts/ci/ci-dns.sh
       - name: Install kind, kubectl, helm
+        shell: bash
         run: |
-          curl -fsSL -o /usr/local/bin/kind https://kind.sigs.k8s.io/dl/v0.27.0/kind-linux-amd64
-          chmod +x /usr/local/bin/kind
-          curl -fsSL -o /usr/local/bin/kubectl "https://dl.k8s.io/release/$(curl -fsSL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-          chmod +x /usr/local/bin/kubectl
-          curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+          set -euo pipefail
+          case "$(uname -m)" in
+            x86_64 | amd64) arch=amd64 ;;
+            aarch64 | arm64) arch=arm64 ;;
+            *) echo "unsupported architecture: $(uname -m)" >&2; exit 1 ;;
+          esac
+          bin_dir="${RUNNER_TEMP}/devzone-tools"
+          mkdir -p "$bin_dir"
+          echo "$bin_dir" >>"$GITHUB_PATH"
+          tmp="$(mktemp -d)"
+          kind_version=0.33.0
+          case "$arch" in
+            arm64) kind_sha=20022bee6cfcd5086cb7234d218e3454e6090022f2a8f55d1fa7fcf42c3867a2 ;;
+            amd64) kind_sha=aee6151561422756b764a4ae28e7f44cda5af5a9eead3cc9985112b1de8d8e0d ;;
+          esac
+          curl -fsSL "https://github.com/kubernetes-sigs/kind/releases/download/v${kind_version}/kind-linux-${arch}" -o "$tmp/kind"
+          echo "$kind_sha  $tmp/kind" | sha256sum -c --quiet
+          install -m 0755 "$tmp/kind" "$bin_dir/kind"
+          kubectl_version=v1.37.3
+          curl -fsSL "https://dl.k8s.io/release/${kubectl_version}/bin/linux/${arch}/kubectl" -o "$tmp/kubectl"
+          curl -fsSL "https://dl.k8s.io/release/${kubectl_version}/bin/linux/${arch}/kubectl.sha256" -o "$tmp/kubectl.sha256"
+          echo "$(cat "$tmp/kubectl.sha256")  $tmp/kubectl" | sha256sum -c --quiet
+          install -m 0755 "$tmp/kubectl" "$bin_dir/kubectl"
+          helm_version=v4.3.2
+          helm_tarball="helm-${helm_version}-linux-${arch}.tar.gz"
+          curl -fsSL "https://get.helm.sh/${helm_tarball}" -o "$tmp/$helm_tarball"
+          curl -fsSL "https://get.helm.sh/${helm_tarball}.sha256sum" -o "$tmp/$helm_tarball.sha256sum"
+          (cd "$tmp" && sha256sum -c --quiet "$helm_tarball.sha256sum")
+          tar -xzf "$tmp/$helm_tarball" -C "$tmp" "linux-${arch}/helm"
+          install -m 0755 "$tmp/linux-${arch}/helm" "$bin_dir/helm"
+          rm -rf "$tmp"
       - name: CLI terminal checks (no container mode)
         run: bash manage/test/cli-terminal.sh
       - name: Pod workspace on kind (start/status/stop + module)
@@ -197,12 +251,39 @@ jobs:
           claude --version
           opencode --version
       - name: Install kind, kubectl, helm
+        shell: bash
         run: |
-          curl -fsSL -o /usr/local/bin/kind https://kind.sigs.k8s.io/dl/v0.27.0/kind-linux-arm64
-          chmod +x /usr/local/bin/kind
-          curl -fsSL -o /usr/local/bin/kubectl "https://dl.k8s.io/release/$(curl -fsSL https://dl.k8s.io/release/stable.txt)/bin/linux/arm64/kubectl"
-          chmod +x /usr/local/bin/kubectl
-          curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+          set -euo pipefail
+          case "$(uname -m)" in
+            x86_64 | amd64) arch=amd64 ;;
+            aarch64 | arm64) arch=arm64 ;;
+            *) echo "unsupported architecture: $(uname -m)" >&2; exit 1 ;;
+          esac
+          bin_dir="${RUNNER_TEMP}/devzone-tools"
+          mkdir -p "$bin_dir"
+          echo "$bin_dir" >>"$GITHUB_PATH"
+          tmp="$(mktemp -d)"
+          kind_version=0.33.0
+          case "$arch" in
+            arm64) kind_sha=20022bee6cfcd5086cb7234d218e3454e6090022f2a8f55d1fa7fcf42c3867a2 ;;
+            amd64) kind_sha=aee6151561422756b764a4ae28e7f44cda5af5a9eead3cc9985112b1de8d8e0d ;;
+          esac
+          curl -fsSL "https://github.com/kubernetes-sigs/kind/releases/download/v${kind_version}/kind-linux-${arch}" -o "$tmp/kind"
+          echo "$kind_sha  $tmp/kind" | sha256sum -c --quiet
+          install -m 0755 "$tmp/kind" "$bin_dir/kind"
+          kubectl_version=v1.37.3
+          curl -fsSL "https://dl.k8s.io/release/${kubectl_version}/bin/linux/${arch}/kubectl" -o "$tmp/kubectl"
+          curl -fsSL "https://dl.k8s.io/release/${kubectl_version}/bin/linux/${arch}/kubectl.sha256" -o "$tmp/kubectl.sha256"
+          echo "$(cat "$tmp/kubectl.sha256")  $tmp/kubectl" | sha256sum -c --quiet
+          install -m 0755 "$tmp/kubectl" "$bin_dir/kubectl"
+          helm_version=v4.3.2
+          helm_tarball="helm-${helm_version}-linux-${arch}.tar.gz"
+          curl -fsSL "https://get.helm.sh/${helm_tarball}" -o "$tmp/$helm_tarball"
+          curl -fsSL "https://get.helm.sh/${helm_tarball}.sha256sum" -o "$tmp/$helm_tarball.sha256sum"
+          (cd "$tmp" && sha256sum -c --quiet "$helm_tarball.sha256sum")
+          tar -xzf "$tmp/$helm_tarball" -C "$tmp" "linux-${arch}/helm"
+          install -m 0755 "$tmp/linux-${arch}/helm" "$bin_dir/helm"
+          rm -rf "$tmp"
       - name: Pod workspace on kind (start/status/stop + module)
         env:
           DEVZONE_KIND_CLUSTER: devzone-ci-arm64
