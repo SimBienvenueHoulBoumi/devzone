@@ -52,7 +52,7 @@ func copyGuard(r Runner, origin OriginFunc, folder string, errOut io.Writer) boo
 	args := append(contextFlag(r), "exec", "-i", pod, "--namespace", namespace,
 		"-c", container, "--", "bash", "-s", "--", projectsDir+"/"+base, mine)
 	var other bytes.Buffer
-	status, err := r.Kubectl(args, strings.NewReader(copyGuardScript), &other, io.Discard)
+	status, err := r.Kubectl(args, strings.NewReader(lfScript(copyGuardScript)), &other, io.Discard)
 	if err != nil || status != guardRefused {
 		return true
 	}
