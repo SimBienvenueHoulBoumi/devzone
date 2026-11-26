@@ -9,11 +9,14 @@ import (
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/output"
 )
 
-// runCluster handles "cluster clean" in Go and delegates every other cluster
-// command to the shell, exactly as before the migration.
+// runCluster handles the services cluster commands in Go: "clean" and the
+// show/change command. A "use" subcommand still belongs to another command.
 func runCluster(ctx *cli.Context) int {
-	if len(ctx.Args) == 0 || ctx.Args[0] != "clean" {
+	if len(ctx.Args) > 0 && ctx.Args[0] == "use" {
 		return delegate(append([]string{"cluster"}, ctx.Args...), ctx.Out, ctx.Err)
+	}
+	if len(ctx.Args) == 0 || ctx.Args[0] != "clean" {
+		return cluster.Change(context.Background(), manageOptions(ctx), ctx.Args)
 	}
 	errOut := ctx.Err
 	if errOut == nil {

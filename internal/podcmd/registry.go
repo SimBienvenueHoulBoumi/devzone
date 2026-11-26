@@ -60,6 +60,22 @@ func newDefaultRegistry() *cli.Registry {
 		Name: "catalog-watcher",
 		Run:  runCatalogWatcher,
 	})
+	r.Register(cli.Command{
+		Name: "clusters",
+		Run:  runClusters,
+	})
+	r.Register(cli.Command{
+		Name: "metrics",
+		Run:  runMetrics,
+	})
+	r.Register(cli.Command{
+		Name: "use",
+		Run:  runUse,
+	})
+	r.Register(cli.Command{
+		Name: "kube",
+		Run:  runKube,
+	})
 	return r
 }
 
