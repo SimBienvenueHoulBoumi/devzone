@@ -7,6 +7,30 @@
 # no real cluster, no real kubeconfig. Each fake tool logs its arguments in
 # $BATS_TEST_TMPDIR/<tool>.log.
 
+# Fake devzone: the gitlab module is Go (#866), only its calls are logged.
+# Ready once the namespace exists; runner online when FAKE_RUNNERS is set.
+fake_devzone_gitlab() {
+    cat >"$BATS_TEST_TMPDIR/bin/devzone" <<'FAKE'
+#!/usr/bin/env bash
+T="$BATS_TEST_TMPDIR"
+printf 'devzone %s\n' "$*" >>"$T/devzone.log"
+case "$*" in
+    "gitlab status")
+        if [ ! -f "$T/namespace" ]; then
+            echo "disabled"
+        elif [ -n "${FAKE_RUNNERS:-}" ]; then
+            echo "ready, runner online"
+        else
+            echo "ready, no runner"
+        fi
+        ;;
+    "gitlab installe") [ -f "$T/namespace" ] ;;
+    "gitlab hote-poser") echo "127.0.0.1 gitlab.localhost # devzone:gitlab" >>"$DEVZONE_HOSTS" ;;
+esac
+FAKE
+    chmod +x "$BATS_TEST_TMPDIR/bin/devzone"
+}
+
 setup() {
     load commun
     kind_vide
@@ -122,6 +146,7 @@ SETSID
 
     chmod +x "$BATS_TEST_TMPDIR"/bin/*
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
+    fake_devzone_gitlab
 }
 
 # Writes the current context into the fake ~/.kube/config; empty = none
@@ -178,37 +203,6 @@ current_context() {
         kind_create_keep_context --name devzone --wait 120s
     ) || false
     grep -qxF 'kind create cluster --name devzone --wait 120s' "$BATS_TEST_TMPDIR/kind.log" || false
-    [ "$(current_context)" = docker-desktop ] || false
-}
-
-@test "install: services cluster, no kind, current context kept" {
-    echo gitlab >"$KIND_CLUSTERS"
-    set_current_context docker-desktop
-    run bash "$GITLAB" install
-    [ "$status" -eq 0 ] || false
-    ! grep -q 'kind create' "$BATS_TEST_TMPDIR/kind.log" || false
-    ! grep -q 'export kubeconfig' "$BATS_TEST_TMPDIR/kind.log" || false
-    grep -Eq -- "helm --kubeconfig [^ ]+ --kube-context docker-desktop upgrade --install gitlab [^ ]*charts/devzone-gitlab --namespace devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log" || false
-    [ "$(current_context)" = docker-desktop ] || false
-}
-
-@test "migrate without terminal → old cluster kept, context kept" {
-    echo gitlab >"$KIND_CLUSTERS"
-    set_current_context docker-desktop
-    run bash "$GITLAB" migrate
-    [ "$status" -eq 2 ] || false
-    [[ "$output" == *"confirmation impossible without a terminal"* ]] || false
-    [ "$(cat "$KIND_CLUSTERS")" = gitlab ] || false
-    ! grep -q 'delete cluster' "$BATS_TEST_TMPDIR/kind.log" || false
-    [ "$(current_context)" = docker-desktop ] || false
-}
-
-@test "install: insufficient memory in the services cluster → refused, context kept" {
-    set_current_context docker-desktop
-    FAKE_KUBE_MEMORY=4Gi run bash "$GITLAB" install
-    [ "$status" -eq 2 ] || false
-    [[ "$output" == *"at least 8 GiB"* ]] || false
-    [ ! -e "$BATS_TEST_TMPDIR/helm.log" ] || false
     [ "$(current_context)" = docker-desktop ] || false
 }
 

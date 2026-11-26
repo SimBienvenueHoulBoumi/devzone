@@ -23,10 +23,10 @@ devzone account token || echo "startup : kubernetes account token not renewed (d
 # startup, gitlab.localhost must be set again (ssh, glab and getent go through
 # the system resolver); hote-poser never fails (warning only)
 if bash "$ICI/devzone" is-enabled gitlab; then
-    bash "$ICI/gitlab/gitlab.sh" hote-poser || echo "startup : gitlab.localhost name not set (devzone repair)"
+    devzone gitlab hote-poser || echo "startup : gitlab.localhost name not set (devzone repair)"
     # TCP relay 8929/2224: curl and git over HTTP go through the local loop for
     # *.localhost, the relay must be restarted after each startup
-    bash "$ICI/gitlab/gitlab.sh" relay-start || echo "startup : gitlab relay not started (devzone repair)"
+    devzone gitlab relay-start || echo "startup : gitlab relay not started (devzone repair)"
 fi
 # postgres module enabled: the relay (port-forward to 127.0.0.1:5432) does not
 # survive the container stop, restarted here after the clusters
