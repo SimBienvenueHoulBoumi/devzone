@@ -10,7 +10,17 @@
 # Fake devzone: the gitlab module is Go (#866), only its calls are logged.
 # Ready once the namespace exists; runner online when FAKE_RUNNERS is set.
 fake_devzone_gitlab() {
-    cat >"$BATS_TEST_TMPDIR/bin/devzone" <<'FAKE'
+    # The launcher calls itself by its path ("$ICI/devzone", #882): the fake
+    # sits beside a copy of the launcher, the other scripts are linked.
+    local source="$BATS_TEST_DIRNAME/../../.devcontainer" arbre="$BATS_TEST_TMPDIR/arbre" f
+    mkdir -p "$arbre/.devcontainer"
+    ln -sfn "$BATS_TEST_DIRNAME/../../manage" "$arbre/manage"
+    for f in "$source"/*; do
+        [ "$(basename "$f")" = devzone ] || ln -sfn "$f" "$arbre/.devcontainer/"
+    done
+    cp "$source/devzone" "$arbre/.devcontainer/launcher"
+    DEVZONE="$arbre/.devcontainer/launcher"
+    cat >"$arbre/.devcontainer/devzone" <<'FAKE'
 #!/usr/bin/env bash
 T="$BATS_TEST_TMPDIR"
 printf 'devzone %s\n' "$*" >>"$T/devzone.log"
@@ -28,7 +38,7 @@ case "$*" in
     "gitlab host-set") echo "127.0.0.1 gitlab.localhost # devzone:gitlab" >>"$DEVZONE_HOSTS" ;;
 esac
 FAKE
-    chmod +x "$BATS_TEST_TMPDIR/bin/devzone"
+    chmod +x "$arbre/.devcontainer/devzone"
 }
 
 setup() {

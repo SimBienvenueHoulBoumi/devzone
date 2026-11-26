@@ -88,7 +88,7 @@ change_module() {
         # An application of the catalog: the line is written, then applied
         if [ -f "$ICI/catalog/$m/app.conf" ]; then
             write_value "$m" "$1"
-            DEVZONE_STATE="$ETAT" devzone catalog apply
+            DEVZONE_STATE="$ETAT" "$ICI/devzone" catalog apply
             return
         fi
         echo "devzone : unknown module : $m ; modules : ${MODULES[*]}" >&2
@@ -114,11 +114,11 @@ change_module() {
     # the other modules go straight to their installer (hook exit 3).
     if [ "$m" = postgres ] || [ "$m" = mysql ] || { [ "$m" = argocd ] && [ "$1" = off ]; }; then
         # 0 done by Argo CD, 3 helm direct as before, else failed
-        if DEVZONE_STATE="$ETAT" devzone argocd services-hook "$m" "$1" "${@:3}"; then return 0; elif [ $? -ne 3 ]; then return 1; fi
+        if DEVZONE_STATE="$ETAT" "$ICI/devzone" argocd services-hook "$m" "$1" "${@:3}"; then return 0; elif [ $? -ne 3 ]; then return 1; fi
     fi
     # The assistant part of enable/disable ai runs in the Go command (#882).
     if [ "$m" = ai ]; then
-        DEVZONE_STATE="$ETAT" devzone ai apply "$1" "${@:3}"
+        DEVZONE_STATE="$ETAT" "$ICI/devzone" ai apply "$1" "${@:3}"
     else
         "apply_$m" "$1" "${@:3}"
     fi

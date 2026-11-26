@@ -352,6 +352,21 @@ KUBE
     [ "$output" = "devzone ai: Go binary of the pod unavailable (.devcontainer/bin)" ]
 }
 
+@test "enable ai: works without devzone on PATH, the launcher calls itself by its path (#882)" {
+    # The host may have a devzone (the launcher is linked in /usr/local/bin): PATH is cleaned
+    rm -f "$BATS_TEST_TMPDIR/bin/devzone"
+    local dir clean=""
+    while IFS= read -r dir; do
+        [ -x "$dir/devzone" ] || clean="$clean:$dir"
+    done < <(tr ':' '\n' <<<"$PATH")
+    export PATH="${clean#:}"
+    ! command -v devzone || false
+    run timeout 300 bash "$DEVZONE" enable ai
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"command not found"* ]] || false
+    grep -qx 'ai=on' "$DEVZONE_ROOT/.devzone.modules"
+}
+
 @test "fresh state: everything disabled, even with a shared connection" {
     mkdir -p "$HOME/.claude" && echo '{}' >"$HOME/.claude/.credentials.json"
     run bash "$DEVZONE"

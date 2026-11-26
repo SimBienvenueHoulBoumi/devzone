@@ -140,7 +140,7 @@ case "${1:-}" in
         # may uninstall again
         DEVZONE_STATE="$ETAT" bash "$ICI/devzone" state recovery-confirm
         apply_repowarden
-        [ "$(value_of ai)" = off ] || DEVZONE_STATE="$ETAT" devzone ai apply on
+        [ "$(value_of ai)" = off ] || DEVZONE_STATE="$ETAT" "$ICI/devzone" ai apply on
         # gitlab, postgres, argocd: installed from the workstation in the
         # Kubernetes workspace pod (#528), by their installer elsewhere
         [ "$(value_of gitlab)" = off ] || apply_service gitlab

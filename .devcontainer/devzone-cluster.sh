@@ -111,7 +111,7 @@ change_cluster() {
             return 1
         fi
         # Installs PostgreSQL on the new cluster (via --context devzone which now points to it)
-        devzone postgres install
+        "$ICI/devzone" postgres install
     else
         cluster_save "$ctx_new"
         # Sets the devzone context on the new cluster (cluster + user:

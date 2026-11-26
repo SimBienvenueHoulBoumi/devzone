@@ -87,7 +87,7 @@ show_state() {
     fi
     # Catalog applications (#414)
     if [ -d "$ICI/catalog" ]; then
-        DEVZONE_STATE="$ETAT" devzone catalog resume
+        DEVZONE_STATE="$ETAT" "$ICI/devzone" catalog resume
     fi
     # GitLab Rails secret (#347): warning if the secrets were lost
     if [ "$(value_of gitlab)" = on ] && [ ! -f "$RACINE/workspace/.gitlab/rails-secret.yaml" ]; then
@@ -98,7 +98,7 @@ show_state() {
     if [ -n "$current_cluster" ] && ! cluster_is_local "$current_cluster"; then
         printf '  ⚠ cluster        remote: %s — services on a remote cluster\n' "$current_cluster"
     fi
-    devzone cluster clean --quiet || true
+    "$ICI/devzone" cluster clean --quiet || true
     # Old kind-gitlab cluster still present: invite to migrate (#396)
     if kind get clusters 2>/dev/null | grep -qx "gitlab${INSTANCE_SUFFIX}"; then
         printf '  ⚠ old kind-gitlab cluster%s: devzone gitlab migrate\n' "$INSTANCE_SUFFIX"
