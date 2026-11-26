@@ -205,11 +205,10 @@ case "${1:-}" in
     cluster) change_cluster "${@:2}" ;;
     # Go only: reached when the binary did not take the call. Never call
     # "devzone" again from here, it would loop forever, see #864
-    agent | postgres | mysql | gitlab | test-gitlab)
+    agent | postgres | mysql | gitlab | test-gitlab | catalog | catalog-watcher)
         echo "devzone $1: Go binary of the pod unavailable (.devcontainer/bin)" >&2
         exit 1
         ;;
-    catalog) DEVZONE_STATE="$ETAT" bash "$ICI/catalog.sh" list ;;
     argocd)
         echo "devzone argocd: Go binary of the pod unavailable (.devcontainer/bin)" >&2
         exit 1

@@ -14,6 +14,7 @@ devzone_aide() {
   devzone disable <module> [--yes]         disable and apply at once (--yes: also deletes the data)
   devzone apply                            install what is enabled
   devzone repair                           repair gitlab, postgres, ports, passwords
+  devzone catalog [list|apply|sync|resume|json|remove <app>]  applications of the catalog
   devzone metrics [context…]               install metrics-server (kubectl top, k9s)
   devzone use CTX [--confirm CTX]          switch the kubectl working cluster
   devzone clusters                         view of the connected clusters (work and services)

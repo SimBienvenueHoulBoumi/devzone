@@ -1,6 +1,6 @@
 // Package testhygiene provides the shared environment helpers used by tests
-// that run git. It has no dependency on the runner packages, so even those can
-// call it from TestMain.
+// that run git, kubectl or helm. It has no dependency on the runner packages,
+// so even those can call it from TestMain.
 package testhygiene
 
 import (
@@ -13,9 +13,11 @@ import (
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/gitenv"
 )
 
-// Main runs a package's tests with a clean Git environment: the variables that
-// select a repository are removed and HOME plus the global Git config point at
-// a disposable folder. A suite started by a hook then cannot act on its repo.
+// Main runs a package's tests with a clean Git and Kubernetes environment: the
+// variables that select a repository or a kubeconfig are removed, HOME plus the
+// global Git config point at a disposable folder, and the PATH starts with
+// failing stand-ins for kubectl and helm. A suite started by a hook cannot act
+// on its repo or reach a cluster, and any direct tool call fails loudly.
 func Main(m *testing.M) int {
 	dir, err := os.MkdirTemp("", "devzone-test-home-")
 	if err != nil {
@@ -34,6 +36,9 @@ func Main(m *testing.M) int {
 		panic(err)
 	}
 	if err := os.Setenv("GIT_CONFIG_NOSYSTEM", "1"); err != nil {
+		panic(err)
+	}
+	if err := cleanKubeEnvironment(dir); err != nil {
 		panic(err)
 	}
 	return m.Run()

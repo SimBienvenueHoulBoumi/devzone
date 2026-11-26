@@ -175,7 +175,8 @@ use_cluster() {
         fi
         ctx="$current"
     fi
-    if ! kubectl config get-contexts -o name 2>/dev/null | grep -qxF -- "$ctx"; then
+    contexts="$(kubectl config get-contexts -o name 2>/dev/null || true)"
+    if ! printf '%s\n' "$contexts" | grep -qxF -- "$ctx"; then
         echo "devzone : unknown context: $ctx (see kubectl config get-contexts)" >&2
         return 2
     fi

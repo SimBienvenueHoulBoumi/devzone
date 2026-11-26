@@ -78,7 +78,7 @@ repair_workstation() {
     if [ "$(value_of mysql)" = on ]; then
         repair_item "mysql relay" devzone mysql relay-start
     fi
-    repair_item "catalog watcher" env DEVZONE_CATALOG_REAL=yes bash "$ICI/catalog/catalog-watcher.sh" start
+    repair_item "catalog watcher" env DEVZONE_STATE="$ETAT" DEVZONE_CATALOG_REAL=yes devzone catalog-watcher start
     repair_item "credentials" devzone passwords regenerate
     devzone cluster clean || true
     return "$repair_failed"
