@@ -67,7 +67,7 @@ ok "devzone folder prepared"
 
 echo "▶ workspace start/status/stop"
 set +e
-start_out="$(cd "$DEVZONE_DIR" && DEVZONE_ARGOCD_REVISION= bash "$ROOT/manage/workspace.sh" start --image "$IMAGE" 2>&1)"
+start_out="$(cd "$DEVZONE_DIR" && DEVZONE_ARGOCD_REVISION='' bash "$ROOT/manage/workspace.sh" start --image "$IMAGE" 2>&1)"
 start_rc=$?
 set -e
 if [ "$start_rc" -eq 0 ]; then
@@ -86,7 +86,11 @@ else
   ko "workspace status" "$status_out"
 fi
 
-kubectl --context "kind-$CLUSTER" -n "$NAMESPACE" wait --for=condition=Ready "pod/$POD" --timeout=300s >/dev/null 2>&1 && ok "pod ready" || ko "pod ready" "$(kubectl -n "$NAMESPACE" get pods -o wide 2>&1; kubectl -n "$NAMESPACE" describe pod/$POD 2>&1 | tail -60)"
+if kubectl --context "kind-$CLUSTER" -n "$NAMESPACE" wait --for=condition=Ready "pod/$POD" --timeout=300s >/dev/null 2>&1; then
+  ok "pod ready"
+else
+  ko "pod ready" "$(kubectl --context "kind-$CLUSTER" -n "$NAMESPACE" get pods -o wide 2>&1; kubectl --context "kind-$CLUSTER" -n "$NAMESPACE" describe "pod/$POD" 2>&1 | tail -60)"
+fi
 
 echo "▶ module"
 set +e
