@@ -13,15 +13,12 @@
 #   gitlab_application_retirer        the Application removed (namespace kept)
 
 # The catalogue side of Argo CD (module on, chart, revision, Application)
-# shellcheck source=SCRIPTDIR/../argocd/catalog-argocd.sh
-# shellcheck disable=SC1091
-. "$ICI/../argocd/catalog-argocd.sh"
 
 # The module argocd is on, the namespace devzone-argocd is installed, the chart
 # is in the repository and the revision is known: a development clone (version
 # 0.0.0) keeps the helm-direct path, like the catalogue applications
 gitlab_argocd_active() {
-    catalogue_argocd_active gitlab
+    "$ICI/../devzone" argocd catalogue-active gitlab
 }
 
 # Argo CD takes over the objects of a helm release gitlab: the release secrets
@@ -35,12 +32,9 @@ gitlab_release_adopter() {
 # the instance; the internal URL of the webservice follows that namespace
 # (chart value not templated, passed as a helm parameter, as in chart.sh)
 gitlab_application_apply() {
-    catalogue_argocd_load
-    chart_require gitlab || return $?
-    echo "▶ Application devzone-gitlab (Argo CD, charts/devzone-gitlab at $(argocd_revision))…"
-    gitops_apply_application devzone-gitlab service "$GITLAB_NS" \
-        "$DEVZONE_REPO_URL" "$(argocd_revision)" "charts/devzone-gitlab" \
-        "gitlab-runner.gitlabUrl=http://gitlab-webservice-default.$GITLAB_NS.svc:8181" || return 1
+    "$ICI/../devzone" argocd chart-require gitlab || return $?
+    echo "▶ Application devzone-gitlab (Argo CD, charts/devzone-gitlab at $("$ICI/../devzone" argocd revision))…"
+    "$ICI/../devzone" argocd gitops-apply devzone-gitlab service "$GITLAB_NS" "$DEVZONE_REPO_URL" "$("$ICI/../devzone" argocd revision)" "charts/devzone-gitlab" "gitlab-runner.gitlabUrl=http://gitlab-webservice-default.$GITLAB_NS.svc:8181" || return 1
     # Argo CD reads Git every 3 min: an immediate refresh of the Application
     kubectl --context devzone -n devzone-argocd annotate application.argoproj.io \
         devzone-gitlab argocd.argoproj.io/refresh=normal --overwrite >/dev/null 2>&1 || true
@@ -49,6 +43,6 @@ gitlab_application_apply() {
 # The Application removed when GitLab is uninstalled: its resources leave with
 # it; nothing to do when the module argocd is off or the Application is absent
 gitlab_application_retirer() {
-    catalogue_argocd_application_exists gitlab || return 0
-    catalogue_argocd_delete gitlab
+    "$ICI/../devzone" argocd catalogue-application-exists gitlab || return 0
+    "$ICI/../devzone" argocd catalogue-delete gitlab
 }

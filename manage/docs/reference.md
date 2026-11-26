@@ -534,7 +534,7 @@ Each chart is checked by `helm lint` and `helm template` (`manage/test/chart-*.b
 
 ### devzone chart convention
 
-The code assumes that each service has a chart `charts/devzone-<service>` (#554): the calls (`services.sh`, `catalog-argocd.sh`, `argocd-services*.sh`, `argocd-workspace.sh`) build this path from the service name. The convention below is the rule these calls assume.
+The code assumes that each service has a chart `charts/devzone-<service>` (#554): the calls (`services.sh`, `argocd-services*.sh`, `argocd-workspace.sh`) and the Go command `devzone argocd chart-require` build this path from the service name. The convention below is the rule these calls assume.
 
 **Folder and `Chart.yaml`**
 
@@ -719,7 +719,7 @@ With the `argocd` module installed and reachable, `devzone enable postgres|mysql
 - **`devzone disable postgres|mysql`**: the Application goes with its resources; the namespace and the volumes remain, then the usual removal of the service follows.
 - **`devzone disable argocd`**: the Applications of `postgres`, `mysql` and `gitlab` are removed *without* their resources (finalizer removed first, `gitops_delete_application … keep`); `[services]` switches to `off` for postgres and mysql. Argo CD is then uninstalled and the services remain, under direct helm, without being recreated (adoption by `kubectl apply`, see `postgres.sh` and `mysql.sh`).
 - **GitLab** keeps its Application from step 4 (`gitlab/argocd.sh`): its namespace may carry an instance suffix, which the reconciliation (`services_ns_of`) does not know.
-- The hook is `.devcontainer/argocd/services-hook.sh`, called by `change_module` of `devzone`; return code 0 (done by Argo CD), 3 (direct helm path), 1 (failure).
+- The hook is `devzone argocd services-hook`, called by `change_module` of `devzone` for postgres and mysql, or to release the Applications when argocd is turned off; return code 0 (done by Argo CD), 3 (direct helm path), 1 (failure).
 
 ### Account limited to devzone namespaces
 

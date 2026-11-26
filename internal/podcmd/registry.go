@@ -36,6 +36,10 @@ func newDefaultRegistry() *cli.Registry {
 		Name: "mysql",
 		Run:  runMysql,
 	})
+	r.Register(cli.Command{
+		Name: "argocd",
+		Run:  runArgocd,
+	})
 	return r
 }
 

@@ -2,10 +2,12 @@ package mysql
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
-	"strings"
+
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/domain/argocd"
 )
 
 var versionLine = regexp.MustCompile(`"version"\s*:\s*"([^"]*)"`)
@@ -13,19 +15,14 @@ var versionLine = regexp.MustCompile(`"version"\s*:\s*"([^"]*)"`)
 // argocdActive reports whether the Argo CD module holds this application: the
 // module is on, the chart exists, Argo CD is installed and a revision is known.
 func (e *env) argocdActive() bool {
-	if strings.TrimSpace(e.state.Get("argocd")) != "on" {
-		return false
+	opts := argocd.Options{
+		Runner:    e.runner(),
+		Out:       io.Discard,
+		Err:       io.Discard,
+		Root:      e.root,
+		StatePath: e.state.Path(),
 	}
-	if e.codeRoot == "" {
-		return false
-	}
-	if _, err := os.Stat(filepath.Join(e.root, "charts", "devzone-mysql")); err != nil {
-		return false
-	}
-	if !e.namespaceExists(e.activeAdminContext(), "devzone-argocd") {
-		return false
-	}
-	return e.revision() != ""
+	return argocd.Run(e.ctx, []string{"catalogue-active", "mysql"}, io.Discard, io.Discard, opts) == 0
 }
 
 // revision is the Git revision of the Applications: the explicit override, or
@@ -82,46 +79,40 @@ func (e *env) installArgoCD(ctxName string) int {
 	return 0
 }
 
-// shellEnv is the environment of the Argo CD shell library called below.
-func (e *env) shellEnv() []string {
-	return append(os.Environ(),
-		"RACINE="+e.root,
-		"DEVZONE_ROOT="+e.root,
-		"DEVZONE_STATE="+e.state.Path(),
-		"ETAT="+e.state.Path(),
-	)
-}
-
-// argocdApply calls the shared catalogue_argocd_apply function so the
-// Application is built exactly as in the Argo CD module.
+// argocdApply calls the Go Argo CD module so the Application is built exactly
+// as in the pod command.
 func (e *env) argocdApply(namespace, extra string) error {
-	body := `. "$1"; catalogue_argocd_apply mysql "$2" "$3" "$4" "$5" "$6" "$7"`
-	args := []string{"-c", body, "_", filepath.Join(e.codeRoot, "argocd", "catalog-argocd.sh"),
-		namespace, setting("MYSQL_IMAGE", "mysql:8.4"), setting("MYSQL_PORT", "3306"),
-		setting("MYSQL_MEMOIRE", "1Gi"), setting("MYSQL_TAILLE", "5Gi"), extra}
-	res, err := e.execEnv("bash", args, nil, e.shellEnv())
-	if err != nil {
-		return err
+	opts := argocd.Options{
+		Runner:    e.runner(),
+		Out:       e.opts.Out,
+		Err:       e.opts.Err,
+		Root:      e.root,
+		StatePath: e.state.Path(),
 	}
-	if res.Code != 0 {
-		return fmt.Errorf("catalogue_argocd_apply: exit %d", res.Code)
+	args := []string{"catalogue-apply", "mysql", namespace,
+		setting("MYSQL_IMAGE", "mysql:8.4"), setting("MYSQL_PORT", "3306"),
+		setting("MYSQL_MEMOIRE", "1Gi"), setting("MYSQL_TAILLE", "5Gi")}
+	if extra != "" {
+		args = append(args, extra)
 	}
-	e.show(res)
+	if code := argocd.Run(e.ctx, args, e.opts.Out, e.opts.Err, opts); code != 0 {
+		return fmt.Errorf("catalogue-apply: exit %d", code)
+	}
 	return nil
 }
 
-// argocdDelete removes the Application through the shared Argo CD library;
-// the namespace and the volumes stay, as in the shell module.
+// argocdDelete removes the Application through the Go Argo CD module; the
+// namespace and the volumes stay, as in the shell module.
 func (e *env) argocdDelete() error {
-	body := `. "$1"; catalogue_argocd_delete mysql`
-	args := []string{"-c", body, "_", filepath.Join(e.codeRoot, "argocd", "catalog-argocd.sh")}
-	res, err := e.execEnv("bash", args, nil, e.shellEnv())
-	if err != nil {
-		return err
+	opts := argocd.Options{
+		Runner:    e.runner(),
+		Out:       e.opts.Out,
+		Err:       e.opts.Err,
+		Root:      e.root,
+		StatePath: e.state.Path(),
 	}
-	if res.Code != 0 {
-		return fmt.Errorf("catalogue_argocd_delete: exit %d", res.Code)
+	if code := argocd.Run(e.ctx, []string{"catalogue-delete", "mysql"}, e.opts.Out, e.opts.Err, opts); code != 0 {
+		return fmt.Errorf("catalogue-delete: exit %d", code)
 	}
-	e.show(res)
 	return nil
 }

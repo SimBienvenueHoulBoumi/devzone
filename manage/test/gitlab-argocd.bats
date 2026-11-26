@@ -1,8 +1,7 @@
 #!/usr/bin/env bats
-# GitLab held by Argo CD (#538 step 4): with the argocd module on and
-# installed, the installation is the Application devzone-gitlab on the
-# wrapper chart, not a helm pass; the seed writes the runner Secret; the
-# seed command and services-admin.sh seed refuse what is not gitlab's.
+# GitLab seed (#538 step 4): the seed writes the runner Secret; the seed
+# command and services-admin.sh seed refuse what is not gitlab's. The Argo CD
+# Application path is covered by Go tests in internal/domain/argocd.
 # Fake kubectl, helm, curl, git and setsid in $BATS_TEST_TMPDIR/bin.
 
 setup() {
@@ -73,30 +72,6 @@ CURL
     printf '#!/usr/bin/env bash\necho test-password\n' >"$BATS_TEST_TMPDIR/bin/openssl"
     chmod +x "$BATS_TEST_TMPDIR"/bin/*
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
-}
-
-@test "gitlab : argocd module on → Application devzone-gitlab, no helm upgrade of GitLab" {
-    printf 'argocd=on\n' >"$DEVZONE_STATE"
-    touch "$BATS_TEST_TMPDIR/namespace"
-    run bash "$GITLAB" install
-    [ "$status" -eq 0 ] || false
-    grep -q "kind: Application" "$BATS_TEST_TMPDIR/apply.log" || false
-    grep -q "devzone-gitlab" "$BATS_TEST_TMPDIR/apply.log" || false
-    grep -q "charts/devzone-gitlab" "$BATS_TEST_TMPDIR/apply.log" || false
-    grep -q "gitlab-runner.gitlabUrl" "$BATS_TEST_TMPDIR/apply.log" || false
-    ! grep -q "upgrade --install gitlab " "$BATS_TEST_TMPDIR/helm.log" || false
-    # Adoption: the release secrets of a former helm install are removed
-    grep -q "delete secret -l owner=helm,name=gitlab" "$BATS_TEST_TMPDIR/kubectl.log" || false
-}
-
-@test "gitlab : argocd module on but unknown revision (clone 0.0.0) → direct helm" {
-    printf 'argocd=on\n' >"$DEVZONE_STATE"
-    touch "$BATS_TEST_TMPDIR/namespace"
-    printf '{"version": "0.0.0"}\n' >"$DEVZONE_ROOT/package.json"
-    run bash "$GITLAB" install
-    [ "$status" -eq 0 ] || false
-    ! grep -q "kind: Application" "$BATS_TEST_TMPDIR/apply.log" 2>/dev/null || false
-    grep -q "upgrade --install gitlab .*charts/devzone-gitlab" "$BATS_TEST_TMPDIR/helm.log" || false
 }
 
 @test "gitlab : seed → Secret gitlab-runner-secret written (runner token, never on the command line)" {

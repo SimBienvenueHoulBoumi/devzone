@@ -36,7 +36,7 @@ fi
 # argocd module enabled: relay (port-forward to 127.0.0.1:8443), restarted
 # after the clusters like the one of postgres
 if bash "$ICI/devzone" is-enabled argocd; then
-    bash "$ICI/argocd/argocd.sh" relay-start || echo "startup : argocd relay not started (devzone repair)"
+    "$ICI/devzone" argocd relay-start || echo "startup : argocd relay not started (devzone repair)"
 fi
 # mysql module enabled: the relay 127.0.0.1:3306, restarted like the one of
 # postgres after each startup

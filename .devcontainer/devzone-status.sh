@@ -67,7 +67,7 @@ show_state() {
         elif [ "$(value_of "$m")" = on ] && [ "$m" = postgres ]; then
             printf '  ✔ module %-10s %s\n' "$m" "$(devzone postgres status)"
         elif [ "$(value_of "$m")" = on ] && [ "$m" = argocd ]; then
-            printf '  ✔ module %-10s %s\n' "$m" "$(bash "$ICI/argocd/argocd.sh" status)"
+            printf '  ✔ module %-10s %s\n' "$m" "$("$ICI/devzone" argocd status)"
         elif [ "$(value_of "$m")" = on ] && [ "$m" = mysql ]; then
             printf '  ✔ module %-10s %s\n' "$m" "$(devzone mysql status)"
         elif [ "$(value_of "$m")" = on ]; then
