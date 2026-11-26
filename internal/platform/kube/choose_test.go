@@ -21,7 +21,7 @@ func fakeKube(t *testing.T) *Kube {
 	hostFile(t)
 	r.On("kubectl", nil, exec.Result{})
 	r.On("kubectl", []string{"config", "get-contexts", "-o", "name"}, exec.Result{
-		Stdout: []byte("docker-desktop\ncluster-prod\nkind-devzone\n"),
+		Stdout: []byte("rancher-desktop\ncluster-prod\nkind-devzone\n"),
 	})
 	return &Kube{Runner: r}
 }
@@ -33,7 +33,7 @@ func TestCandidatesOrder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "docker-desktop kind-devzone cluster-prod"
+	want := "rancher-desktop kind-devzone cluster-prod"
 	if strings.Join(names, " ") != want {
 		t.Fatalf("candidates = %q, want %q", strings.Join(names, " "), want)
 	}
@@ -99,7 +99,7 @@ func TestMenuSelection(t *testing.T) {
 		want   string
 		code   int
 	}{
-		{"\n", "docker-desktop", 0},
+		{"\n", "rancher-desktop", 0},
 		{"3\n", "kind-devzone", 0},
 		{"9\n", "", 2},
 		{"abc\n", "", 2},
@@ -107,7 +107,7 @@ func TestMenuSelection(t *testing.T) {
 		t.Run(tc.answer, func(t *testing.T) {
 			k := fakeKube(t)
 			var out, errOut bytes.Buffer
-			got, code := k.Menu(context.Background(), []string{"docker-desktop", "cluster-prod", "kind-devzone"},
+			got, code := k.Menu(context.Background(), []string{"rancher-desktop", "cluster-prod", "kind-devzone"},
 				strings.NewReader(tc.answer), &out, &errOut)
 			if code != tc.code || got != tc.want {
 				t.Fatalf("Menu = %q, %d; want %q, %d", got, code, tc.want, tc.code)

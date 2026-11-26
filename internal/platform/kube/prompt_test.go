@@ -30,8 +30,8 @@ func promptSetup(t *testing.T) (*Kube, string, string) {
 	t.Setenv("XDG_CACHE_HOME", cacheDir)
 	r := withRunner(t)
 	r.On("kubectl", nil, exec.Result{})
-	r.On("kubectl", []string{"config", "current-context"}, exec.Result{Stdout: []byte("docker-desktop\n")})
-	r.On("kubectl", []string{"config", "view", "-o", `jsonpath={.contexts[?(@.name=="docker-desktop")].context.namespace}`}, exec.Result{})
+	r.On("kubectl", []string{"config", "current-context"}, exec.Result{Stdout: []byte("rancher-desktop\n")})
+	r.On("kubectl", []string{"config", "view", "-o", `jsonpath={.contexts[?(@.name=="rancher-desktop")].context.namespace}`}, exec.Result{})
 	return &Kube{Runner: r}, conf, filepath.Join(cacheDir, "devzone-kube-prompt")
 }
 
@@ -48,14 +48,14 @@ func TestPromptCachesResult(t *testing.T) {
 	if err := k.Prompt(context.Background(), &second); err != nil {
 		t.Fatal(err)
 	}
-	if first.String() != second.String() || !strings.Contains(first.String(), "docker-desktop/default") {
+	if first.String() != second.String() || !strings.Contains(first.String(), "rancher-desktop/default") {
 		t.Fatalf("first = %q, second = %q", first.String(), second.String())
 	}
 	if len(r.Calls()) != calls {
 		t.Fatalf("cache miss: calls %d then %d", calls, len(r.Calls()))
 	}
 	data, err := os.ReadFile(cache)
-	if err != nil || !strings.Contains(string(data), "docker-desktop/default") {
+	if err != nil || !strings.Contains(string(data), "rancher-desktop/default") {
 		t.Fatalf("cache = %q, err %v", data, err)
 	}
 }

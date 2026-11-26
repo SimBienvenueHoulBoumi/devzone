@@ -71,16 +71,16 @@ func TestChangeShow(t *testing.T) {
 // chosen local cluster.
 func TestChangeToHostCluster(t *testing.T) {
 	opts, r, out, errOut := manageSetup(t, "postgres=off\ncluster=kind-devzone\n")
-	r.On("kubectl", []string{"config", "get-contexts", "-o", "name"}, exec.Result{Stdout: []byte("docker-desktop\n")})
-	programContextSet(r, "docker-desktop")
-	if code := Change(context.Background(), opts, []string{"docker-desktop"}); code != 0 {
+	r.On("kubectl", []string{"config", "get-contexts", "-o", "name"}, exec.Result{Stdout: []byte("rancher-desktop\n")})
+	programContextSet(r, "rancher-desktop")
+	if code := Change(context.Background(), opts, []string{"rancher-desktop"}); code != 0 {
 		t.Fatalf("code = %d, err = %q", code, errOut.String())
 	}
-	if !strings.Contains(out.String(), "devzone : services cluster: docker-desktop") {
+	if !strings.Contains(out.String(), "devzone : services cluster: rancher-desktop") {
 		t.Fatalf("out = %q", out.String())
 	}
 	data, _ := os.ReadFile(opts.StatePath)
-	if !strings.Contains(string(data), "cluster=docker-desktop") {
+	if !strings.Contains(string(data), "cluster=rancher-desktop") {
 		t.Fatalf("state = %q", data)
 	}
 }
@@ -88,8 +88,8 @@ func TestChangeToHostCluster(t *testing.T) {
 // TestChangePostgresRequiresYes checks that a data loss is never implicit.
 func TestChangePostgresRequiresYes(t *testing.T) {
 	opts, r, _, errOut := manageSetup(t, "postgres=on\ncluster=kind-devzone\n")
-	r.On("kubectl", []string{"config", "get-contexts", "-o", "name"}, exec.Result{Stdout: []byte("docker-desktop\n")})
-	if code := Change(context.Background(), opts, []string{"docker-desktop"}); code != 1 ||
+	r.On("kubectl", []string{"config", "get-contexts", "-o", "name"}, exec.Result{Stdout: []byte("rancher-desktop\n")})
+	if code := Change(context.Background(), opts, []string{"rancher-desktop"}); code != 1 ||
 		!strings.Contains(errOut.String(), "databases will be deleted from kind-devzone") {
 		t.Fatalf("code = %d, err = %q", code, errOut.String())
 	}
@@ -98,8 +98,8 @@ func TestChangePostgresRequiresYes(t *testing.T) {
 // TestUseSwitchesWorkingCluster checks the context switch and the namespace.
 func TestUseSwitchesWorkingCluster(t *testing.T) {
 	opts, r, out, errOut := manageSetup(t, "cluster=kind-devzone\n")
-	r.On("kubectl", []string{"config", "get-contexts", "-o", "name"}, exec.Result{Stdout: []byte("docker-desktop\nprod\n")})
-	r.On("kubectl", []string{"config", "current-context"}, exec.Result{Stdout: []byte("docker-desktop\n")})
+	r.On("kubectl", []string{"config", "get-contexts", "-o", "name"}, exec.Result{Stdout: []byte("rancher-desktop\nprod\n")})
+	r.On("kubectl", []string{"config", "current-context"}, exec.Result{Stdout: []byte("rancher-desktop\n")})
 	r.On("kubectl", []string{"config", "use-context", "prod"}, exec.Result{})
 	r.On("kubectl", []string{"config", "set-context", "prod", "--namespace", "gitlab"}, exec.Result{})
 	code := Use(context.Background(), opts, []string{"prod", "--confirm", "prod", "-n", "gitlab"})
@@ -118,8 +118,8 @@ func TestUseSwitchesWorkingCluster(t *testing.T) {
 // TestUseRefusals checks unknown contexts and remote contexts without a confirmation.
 func TestUseRefusals(t *testing.T) {
 	opts, r, _, errOut := manageSetup(t, "")
-	r.On("kubectl", []string{"config", "get-contexts", "-o", "name"}, exec.Result{Stdout: []byte("docker-desktop\nprod\n")})
-	r.On("kubectl", []string{"config", "current-context"}, exec.Result{Stdout: []byte("docker-desktop\n")})
+	r.On("kubectl", []string{"config", "get-contexts", "-o", "name"}, exec.Result{Stdout: []byte("rancher-desktop\nprod\n")})
+	r.On("kubectl", []string{"config", "current-context"}, exec.Result{Stdout: []byte("rancher-desktop\n")})
 	if code := Use(context.Background(), opts, []string{"unknown"}); code != 2 ||
 		!strings.Contains(errOut.String(), "unknown context: unknown") {
 		t.Fatalf("unknown: code %d, err %q", code, errOut.String())

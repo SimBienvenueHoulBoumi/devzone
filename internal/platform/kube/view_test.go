@@ -16,10 +16,10 @@ func programView(t *testing.T) (*Kube, *bytes.Buffer) {
 	r := withRunner(t)
 	r.On("kubectl", nil, exec.Result{})
 	r.On("kubectl", []string{"config", "get-contexts", "-o", "name"}, exec.Result{
-		Stdout: []byte("docker-desktop\nprod\n"),
+		Stdout: []byte("rancher-desktop\nprod\n"),
 	})
-	r.On("kubectl", []string{"config", "current-context"}, exec.Result{Stdout: []byte("docker-desktop\n")})
-	r.On("kubectl", []string{"config", "view", "-o", `jsonpath={.contexts[?(@.name=="docker-desktop")].context.namespace}`}, exec.Result{Stdout: []byte("apps\n")})
+	r.On("kubectl", []string{"config", "current-context"}, exec.Result{Stdout: []byte("rancher-desktop\n")})
+	r.On("kubectl", []string{"config", "view", "-o", `jsonpath={.contexts[?(@.name=="rancher-desktop")].context.namespace}`}, exec.Result{Stdout: []byte("apps\n")})
 	var out bytes.Buffer
 	return &Kube{Runner: r}, &out
 }
@@ -27,11 +27,11 @@ func programView(t *testing.T) (*Kube, *bytes.Buffer) {
 // TestViewTable checks the header, the marks and the remote label.
 func TestViewTable(t *testing.T) {
 	k, out := programView(t)
-	if code := k.View(context.Background(), "docker-desktop", out, nil); code != 0 {
+	if code := k.View(context.Background(), "rancher-desktop", out, nil); code != 0 {
 		t.Fatalf("code = %d", code)
 	}
-	want := []string{"CONTEXT", "TYPE", "STATE", "NAMESPACE", "★● docker-desktop", "  prod",
-		"remote", "working cluster", "devzone → docker-desktop"}
+	want := []string{"CONTEXT", "TYPE", "STATE", "NAMESPACE", "★● rancher-desktop", "  prod",
+		"remote", "working cluster", "devzone → rancher-desktop"}
 	for _, line := range want {
 		if !strings.Contains(out.String(), line) {
 			t.Fatalf("view = %q, misses %q", out.String(), line)
