@@ -74,7 +74,7 @@ DEVZONE
     grep -qxF '/workspaces/projets/*' "$SAFE"
     grep -qF '# >>> devzone prompt >>>' "$HOME/.bashrc"
     grep -qF '# <<< devzone prompt <<<' "$HOME/.bashrc"
-    grep -qF '. /usr/local/share/devzone/.devcontainer/kube-prompt.sh' "$HOME/.bashrc"
+    grep -qF "PS1='\$(devzone kube prompt) '" "$HOME/.bashrc"
     [[ "$output" == *"devzone init: done"* ]] || false
 }
 
@@ -88,7 +88,7 @@ DEVZONE
     grep -qx "devzone apply" "$JOURNAL"
 }
 
-@test "old prompt block (invite-kube.sh): migrated to kube-prompt.sh, not duplicated" {
+@test "old prompt block (invite-kube.sh): migrated to the Go prompt, not duplicated" {
     {
         echo "# >>> devzone prompt >>>"
         echo ". /usr/local/share/devzone/.devcontainer/invite-kube.sh"
@@ -98,11 +98,11 @@ DEVZONE
     run bash "$SCRIPT"
     [ "$status" -eq 0 ]
     ! grep -q "invite" "$HOME/.bashrc" || false
-    grep -qF "kube-prompt.sh" "$HOME/.bashrc"
-    grep -qF "devzone_kube_prompt" "$HOME/.bashrc"
+    grep -qF '$(devzone kube prompt)' "$HOME/.bashrc"
+    ! grep -qF 'kube-prompt.sh' "$HOME/.bashrc" || false
     [ "$(grep -cF '# >>> devzone prompt >>>' "$HOME/.bashrc")" -eq 1 ]
     run bash "$SCRIPT"
-    [ "$(grep -cF 'kube-prompt.sh' "$HOME/.bashrc")" -eq 1 ]
+    [ "$(grep -cF '$(devzone kube prompt)' "$HOME/.bashrc")" -eq 1 ]
 }
 
 @test "devzone apply failing: the following steps run and done is written" {

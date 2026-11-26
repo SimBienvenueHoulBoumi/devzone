@@ -215,12 +215,12 @@ assert_blocked_kube() {
 }
 
 @test "kube context: sed on a project file is allowed (opencode)" {
-    run bash -c 'printf "%s" "$1" | bash "$2"' _ "$(opencode_call bash 'sed -n 1p .devcontainer/cluster.sh')" "$GUARD"
+    run bash -c 'printf "%s" "$1" | bash "$2"' _ "$(opencode_call bash 'sed -n 1p .devcontainer/help.sh')" "$GUARD"
     [ "$status" -eq 0 ]
 }
 
 @test "kube context: sed on a project file is allowed (claude)" {
-    run bash -c 'printf "%s" "$1" | bash "$2" --format claude' _ "$(claude_call 'sed -n 1p .devcontainer/cluster.sh')" "$GUARD"
+    run bash -c 'printf "%s" "$1" | bash "$2" --format claude' _ "$(claude_call 'sed -n 1p .devcontainer/help.sh')" "$GUARD"
     [ "$status" -eq 0 ]
 }
 
