@@ -61,6 +61,8 @@ func TestWatchedServices(t *testing.T) {
 	pgadmin := relayService{5050, "devzone-postgres", "svc/pgadmin", 0}
 	my := relayService{3306, "devzone-mysql", "svc/mysql", 0}
 	argo := relayService{8443, "devzone-argocd", "svc/argocd-server", 443}
+	gitlab := relayService{8929, "devzone-gitlab", "svc/gitlab-webservice-default", 8181}
+	gitlabSSH := relayService{2224, "devzone-gitlab", "svc/gitlab-gitlab-shell", 2224}
 	cases := []struct {
 		name, modules, pgadmin, argocd string
 		want                           []relayService
@@ -81,9 +83,16 @@ func TestWatchedServices(t *testing.T) {
 		{"argocd not numeric", "", "", "<none>", nil},
 		{"argocd port read", "", "", "8080", []relayService{{8443, "devzone-argocd", "svc/argocd-server", 8080}}},
 		{"crlf lines", "postgres=on\r\n", "5050", "", nil},
+		{"gitlab on", "gitlab=on\n", "", "", []relayService{gitlab, gitlabSSH}},
+		{"gitlab true", "gitlab=true\n", "", "", []relayService{gitlab, gitlabSSH}},
+		{"gitlab oui", "gitlab=oui\n", "", "", []relayService{gitlab, gitlabSSH}},
+		{"gitlab off", "gitlab=off\n", "", "", nil},
+		{"gitlab other value", "gitlab=yes\n", "", "", nil},
+		{"gitlab with postgres", "postgres=on\ngitlab=on\n", "5050", "", []relayService{pg, pgadmin, gitlab, gitlabSSH}},
 	}
 	for _, c := range cases {
 		t.Setenv("DEVZONE_ARGOCD_PORT", "")
+		t.Setenv("DEVZONE_INSTANCE", "")
 		got := watchedServices(servicesFake(c.pgadmin, c.argocd), modulesIn(t, c.modules))
 		if !reflect.DeepEqual(got, c.want) {
 			t.Errorf("%s: got %v, want %v", c.name, got, c.want)
@@ -123,6 +132,21 @@ func TestWatchedServicesArgocdPort(t *testing.T) {
 		if len(got) != 1 || got[0].local != want {
 			t.Errorf("DEVZONE_ARGOCD_PORT=%q: got %v, want local %d", value, got, want)
 		}
+	}
+}
+
+// TestWatchedServicesGitlabInstance checks the namespace of the GitLab relays:
+// it carries the instance suffix of the module (DEVZONE_INSTANCE, "mon" naming
+// a non default instance), as the gitlab module of internal/domain/gitlab does.
+func TestWatchedServicesGitlabInstance(t *testing.T) {
+	t.Setenv("DEVZONE_INSTANCE", "mon")
+	got := watchedServices(servicesFake("", ""), modulesIn(t, "gitlab=on\n"))
+	want := []relayService{
+		{8929, "devzone-gitlab-mon", "svc/gitlab-webservice-default", 8181},
+		{2224, "devzone-gitlab-mon", "svc/gitlab-gitlab-shell", 2224},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
 	}
 }
 
