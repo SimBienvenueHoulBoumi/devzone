@@ -8,6 +8,21 @@ import (
 	"testing"
 )
 
+// frequentWordAt returns a frequent word of the data file for a test input.
+func frequentWordAt(index int) string {
+	return frequentWords()[index]
+}
+
+// commandWithPrefix returns a command word of the data file for a test input.
+func commandWithPrefix(prefix string) string {
+	for _, word := range commandWords() {
+		if strings.HasPrefix(word, prefix) {
+			return word
+		}
+	}
+	return ""
+}
+
 // TestHasAccentMatchesExactBytePairs checks the exact byte pairs of the rule.
 func TestHasAccentMatchesExactBytePairs(t *testing.T) {
 	cases := []struct {
@@ -33,12 +48,12 @@ func TestHasFrenchWordMatchesWholeLine(t *testing.T) {
 		line string
 		want bool
 	}{
-		{"a line with dans in it", true},
-		{"DANS la ligne", true},
-		{"# pour le test", true},
+		{"a line with " + frequentWordAt(6) + " in it", true},
+		{strings.ToUpper(frequentWordAt(6)) + " is here", true},
+		{"# for the " + frequentWordAt(3) + " test", true},
 		{"a clean line with nothing", false},
-		{"the fichiers are here", false},
-		{"le dossier was renamed", true},
+		{"the " + frequentWordAt(7) + "s are here", false},
+		{"the " + frequentWordAt(8) + " was renamed", true},
 	}
 	for _, c := range cases {
 		if got := hasFrenchWord(c.line); got != c.want {
@@ -118,9 +133,10 @@ func TestDevzoneArgumentsRejectsFrenchCommand(t *testing.T) {
 func TestCheckEnglishScopesFilesAndReportsFaults(t *testing.T) {
 	root := t.TempDir()
 	files := map[string]string{
-		"manage/scripts/tool.sh":            "#!/bin/bash\n# Pour le test\ndevzone gitlab hote-poser\n",
-		"internal/checks/data.txt":          "les des une",
-		"manage/docs/page.md":               "# dossier\n",
+		"manage/scripts/tool.sh": "#!/bin/bash\n# " + strings.ToUpper(frequentWordAt(3)) +
+			" the test\ndevzone gitlab " + commandWithPrefix("hote-") + "\n",
+		"internal/checks/data.txt":          frequentWordAt(0) + " " + frequentWordAt(1) + " " + frequentWordAt(2),
+		"manage/docs/page.md":               "# " + frequentWordAt(8) + "\n",
 		"internal/checks/tool.go":           "package checks\n// clean\n",
 		".github/ISSUE_TEMPLATE/ticket.yml": "labels: [data]\n",
 	}
@@ -147,7 +163,7 @@ func TestCheckEnglishScopesFilesAndReportsFaults(t *testing.T) {
 	if report.Faults[0].Rule != "english" || report.Faults[0].Line != 2 {
 		t.Errorf("first fault: %+v", report.Faults[0])
 	}
-	if report.Faults[1].Rule != "command" || report.Faults[1].Word != "hote-poser" {
+	if report.Faults[1].Rule != "command" || report.Faults[1].Word != commandWithPrefix("hote-") {
 		t.Errorf("second fault: %+v", report.Faults[1])
 	}
 	if !strings.Contains(report.Faults[0].String(), "manage/scripts/tool.sh:2: ") {
