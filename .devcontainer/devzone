@@ -154,32 +154,6 @@ case "${1:-}" in
         # writing anything
         [ "$(value_of "$2")" = on ]
         ;;
-    ai)
-        case "${2:-}" in
-            check)
-                # Read-only: update state of each detected host model (#668).
-                check
-                ;;
-            rapport)
-                # Read-only: sizes, update state, measurements, chosen model (#668).
-                rapport
-                ;;
-            *)
-                # Read-only: lists the host (Ollama) models detected and the default model.
-                models_list="$(modeles)"
-                default_model="$(premier)"
-                if [ -z "$models_list" ]; then
-                    echo "devzone : no Ollama model detected on ${URL} (answer on /api/tags)"
-                else
-                    echo "devzone : models detected on the host (Ollama):"
-                    while IFS= read -r m; do
-                        [ -n "$m" ] && printf '  %s\n' "$m"
-                    done <<<"$models_list"
-                    echo "default model: ${default_model:-none}"
-                fi
-                ;;
-        esac
-        ;;
     build)
         bash "$ICI/workspace-build.sh" "${@:2}"
         ;;

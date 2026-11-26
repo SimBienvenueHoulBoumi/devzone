@@ -345,6 +345,13 @@ KUBE
     [ "$status" -eq 1 ]
 }
 
+@test "ai: pod binary absent -> Go message, exit 1, no loop (#882)" {
+    # DEVZONE_NO_GO=1 skips the pod binary: the shell reaches the case as if it were absent
+    run timeout 30 env DEVZONE_NO_GO=1 bash "$DEVZONE" ai
+    [ "$status" -eq 1 ]
+    [ "$output" = "devzone ai: Go binary of the pod unavailable (.devcontainer/bin)" ]
+}
+
 @test "fresh state: everything disabled, even with a shared connection" {
     mkdir -p "$HOME/.claude" && echo '{}' >"$HOME/.claude/.credentials.json"
     run bash "$DEVZONE"
