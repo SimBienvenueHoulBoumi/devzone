@@ -101,9 +101,12 @@ func TestPortsDirFromEnvironment(t *testing.T) {
 
 func TestPortsDirFromShellFolder(t *testing.T) {
 	t.Setenv("DEVZONE_PORTS_WORKSPACE_DIR", "")
-	t.Setenv("PWD", "/work/devzone")
-	if got := portsDir(); got != "/work/devzone/.devzone.workspace-ports" {
-		t.Fatalf("portsDir() = %q, want the shell folder state", got)
+	// The shell folder uses the separator of the platform: "/" on Unix and
+	// "\\" on Windows, where filepath.Join then produces a Windows path.
+	folder := filepath.Join(string(os.PathSeparator), "work", "devzone")
+	t.Setenv("PWD", folder)
+	if got, want := portsDir(), filepath.Join(folder, portsStateName); got != want {
+		t.Fatalf("portsDir() = %q, want %q", got, want)
 	}
 }
 
