@@ -34,7 +34,7 @@ func TestRelayStart(t *testing.T) {
 	}
 	for _, want := range []string{
 		"gitlab-web: devzone devzone-gitlab svc/gitlab-webservice-default 8929:8181",
-		"gitlab-ssh: devzone devzone-gitlab svc/gitlab-gitlab-shell 2224:22",
+		"gitlab-ssh: devzone devzone-gitlab svc/gitlab-gitlab-shell 2224:2224",
 	} {
 		found := false
 		for _, relay := range f.relays {
