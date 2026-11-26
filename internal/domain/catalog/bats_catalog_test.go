@@ -228,3 +228,32 @@ func TestApplyFailureShowsInSummary(t *testing.T) {
 		t.Fatalf("resume output = %q", got)
 	}
 }
+
+// TestApplyUnknownRevisionFails checks that a catalog application is not
+// installed directly when Argo CD is on without a usable revision. The exact
+// call list proves that no namespace, secret or chart step was attempted.
+func TestApplyUnknownRevisionFails(t *testing.T) {
+	f := newFixture(t)
+	f.saveState("cluster=kind-devzone", "mysql=on")
+	f.contextReady()
+	f.onAdmin([]string{"get", "namespace", "devzone-mysql"}, fexec.Result{Code: 1})
+	f.on([]string{"get", "statefulset", "mysql"}, fexec.Result{Code: 1})
+	f.r.On(f.script, []string{"mysql", "claim", "devzone-mysql"}, fexec.Result{Stdout: []byte("donnees\n")})
+	f.r.On(f.script, []string{"argocd", "catalog-active", "mysql"}, fexec.Result{
+		Code: 2, Stderr: []byte("no published tag contains charts/devzone-mysql\n"),
+	})
+	if code := f.run("apply"); code == 0 {
+		t.Fatalf("apply: code 0, want a failure (output %q)", f.out.String())
+	}
+	if !strings.Contains(f.errOut.String(), "no published tag") {
+		t.Fatalf("the reason was not reported: %q", f.errOut.String())
+	}
+	for _, call := range f.r.Calls() {
+		if call.Name == "helm" || call.Name == "openssl" {
+			t.Fatalf("installation continued after the revision failure: %v", f.r.Calls())
+		}
+		if call.Name == "kubectl" && strings.Contains(strings.Join(call.Args, " "), "create secret") {
+			t.Fatalf("a secret was created after the revision failure: %v", f.r.Calls())
+		}
+	}
+}
