@@ -30,7 +30,7 @@ func reportLegacyCopies(r Runner, out io.Writer) {
 	args := append(contextFlag(r), "exec", "-i", pod, "--namespace", namespace,
 		"-c", container, "--", "bash", "-s", "--", projectsDir)
 	var found bytes.Buffer
-	status, err := r.Kubectl(args, strings.NewReader(podScript), &found, io.Discard)
+	status, err := r.Kubectl(args, strings.NewReader(lfScript(podScript)), &found, io.Discard)
 	if err != nil || status != 0 {
 		return
 	}

@@ -1,14 +1,40 @@
 package command
 
 import (
+	"fmt"
+
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/cli"
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/workspace"
 )
 
-// startWorkspace delegates the cluster work of "devzone workspace start" to the
-// shell entry point. The automatic start is no longer installed here: the
-// single function of #906 is called by Run for every user command of a devzone
-// folder, so start, creation and update all share one silent, idempotent path.
-// When the Go program is absent, only the cluster work runs.
+// commandKubeReady and commandArgoCDInstalled are injectable so a test can
+// exercise the routing of start without a cluster, a fake kubectl or a shell.
+var (
+	commandKubeReady       = workspace.KubeReady
+	commandArgoCDInstalled = workspace.ArgoCDInstalled
+)
+
+// startWorkspace checks the cluster before anything else, as start_workspace
+// does: an unreachable cluster must not even ask whether Argo CD is installed.
+// It then runs the helm-direct form in Go when Argo CD is off and absent from
+// the cluster; the forms that need Argo CD or its GitOps repository stay
+// delegated to the shell. It does not install the automatic start itself: the
+// single function of #906 is called by Run after a successful command. When the
+// Go program is absent, the shell entry point still does the cluster work.
 func startWorkspace(ctx *cli.Context) int {
-	return delegate(append([]string{"workspace"}, ctx.Args...), ctx.Out, ctx.Err)
+	reason, ready := commandKubeReady(workspace.ExecRunner{}, true)
+	if !ready {
+		fmt.Fprintln(ctx.Err, reason)
+		return 1
+	}
+	args := append([]string{"workspace"}, ctx.Args...)
+	if !workspace.ArgoCDWanted(modulesFile()) && !commandArgoCDInstalled(workspace.ExecRunner{}) {
+		env := workspace.StartEnv{
+			Runner: workspace.ExecRunner{}, Modules: modulesFile(),
+			Out: ctx.Out, ErrOut: ctx.Err,
+			Ready: func() (string, bool) { return "", true },
+		}
+		return env.Run(ctx.Args[1:])
+	}
+	return delegate(args, ctx.Out, ctx.Err)
 }

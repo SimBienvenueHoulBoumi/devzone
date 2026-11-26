@@ -2,6 +2,7 @@ package workspace
 
 import (
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 )
@@ -47,6 +48,8 @@ func portsAgentRemove(dir, label string) error {
 // portsAgentPlistText returns the launch agent of the watcher. RunAtLoad starts
 // it at login, and KeepAlive relaunches it only after an abnormal exit, so a
 // watcher stopped on purpose stays stopped until the next start or session.
+// The state folder uses "/" even when the binary was built on Windows: launchd
+// reads slash paths.
 func portsAgentPlistText(name, watcher, folder string, env portsAgentValues) string {
 	kubeConfig := ""
 	if env.kubeConfig != "" {
@@ -63,7 +66,7 @@ func portsAgentPlistText(name, watcher, folder string, env portsAgentValues) str
 		"\t<key>WorkingDirectory</key>\n\t<string>" + xmlEscape(folder) + "</string>\n" +
 		"\t<key>EnvironmentVariables</key>\n\t<dict>\n" +
 		"\t\t<key>DEVZONE_PORTS_WORKSPACE_DIR</key>\n" +
-		"\t\t<string>" + xmlEscape(filepath.Join(folder, portsStateName)) + "</string>\n" +
+		"\t\t<string>" + xmlEscape(path.Join(folder, portsStateName)) + "</string>\n" +
 		"\t\t<key>PATH</key>\n\t\t<string>" + xmlEscape(env.path) + "</string>\n" +
 		kubeConfig +
 		"\t</dict>\n" +
@@ -73,7 +76,9 @@ func portsAgentPlistText(name, watcher, folder string, env portsAgentValues) str
 }
 
 // portsAgentUnitText returns the systemd user unit of the watcher. It runs in
-// the devzone folder and is relaunched only after an abnormal exit.
+// the devzone folder and is relaunched only after an abnormal exit. The state
+// folder uses "/" even when the binary was built on Windows: systemd reads
+// slash paths.
 func portsAgentUnitText(name, watcher, folder string, env portsAgentValues) string {
 	kubeConfig := ""
 	if env.kubeConfig != "" {
@@ -87,7 +92,7 @@ func portsAgentUnitText(name, watcher, folder string, env portsAgentValues) stri
 		"Type=simple\n" +
 		"ExecStart=" + systemdQuote(watcher) + " workspace ports agent\n" +
 		"WorkingDirectory=" + systemdPercent(folder) + "\n" +
-		"Environment=" + systemdQuote("DEVZONE_PORTS_WORKSPACE_DIR="+filepath.Join(folder, portsStateName)) + "\n" +
+		"Environment=" + systemdQuote("DEVZONE_PORTS_WORKSPACE_DIR="+path.Join(folder, portsStateName)) + "\n" +
 		"Environment=" + systemdQuote("PATH="+env.path) + "\n" +
 		kubeConfig +
 		"Restart=on-failure\n" +
