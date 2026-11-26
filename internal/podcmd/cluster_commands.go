@@ -39,9 +39,9 @@ func runClusters(ctx *cli.Context) int {
 }
 
 // runMetrics installs or removes metrics-server. With Argo CD active and no
-// explicit context, the install is an Application and remove also deletes it;
-// explicit contexts keep the direct Go installer, and the Application is only
-// ever the devzone one.
+// explicit context, the install is an Application and a bare remove also
+// deletes it; explicit contexts keep the direct Go installer and leave the
+// Application alone, since the user targeted another cluster.
 func runMetrics(ctx *cli.Context) int {
 	held := metricsHeldByArgoCD(ctx)
 	if held && len(ctx.Args) == 0 {
@@ -49,7 +49,7 @@ func runMetrics(ctx *cli.Context) int {
 	}
 	remove := len(ctx.Args) > 0 && ctx.Args[0] == "remove"
 	code := kube.Kube{Runner: ctx.Runner}.Metrics(context.Background(), ctx.Args, ctx.Out, ctx.Err)
-	if remove && held {
+	if remove && held && len(ctx.Args) == 1 {
 		if appCode := metricsApplication(ctx, "off"); appCode != 0 {
 			code = appCode
 		}

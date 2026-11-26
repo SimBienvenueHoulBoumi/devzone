@@ -72,10 +72,10 @@ func TestMetricsApplicationPath(t *testing.T) {
 	}
 }
 
-// TestMetricsRemoveDeletesApplication checks that "metrics remove" with Argo CD
-// active deletes only the devzone Application, and keeps the direct removal
-// of the copies devzone marked.
-func TestMetricsRemoveDeletesApplication(t *testing.T) {
+// metricsRemoveCase runs "metrics remove" with the given arguments, Argo CD
+// active, and returns the kubectl calls that delete the devzone Application.
+func metricsRemoveCase(t *testing.T, args []string) (int, int) {
+	t.Helper()
 	root := t.TempDir()
 	t.Setenv("DEVZONE_ROOT", root)
 	t.Setenv("DEVZONE_STATE", filepath.Join(root, ".devzone.modules"))
@@ -98,20 +98,41 @@ func TestMetricsRemoveDeletesApplication(t *testing.T) {
 		fexec.Result{Code: 1, Stderr: []byte("Error from server (NotFound)")})
 	r.On("kubectl", []string{"--context", "devzone", "-n", "devzone-argocd", "delete", "application.argoproj.io",
 		"devzone-metrics-server", "--ignore-not-found", "--wait=true"}, fexec.Result{})
-	ctx := &cli.Context{Out: &bytes.Buffer{}, Err: &bytes.Buffer{}, Runner: r, Args: []string{"remove", "devzone"}}
-	if code := runMetrics(ctx); code != 0 {
-		t.Fatalf("metrics remove: code %d, err = %q", code, ctx.Err.(*bytes.Buffer).String())
+	ctx := &cli.Context{Out: &bytes.Buffer{}, Err: &bytes.Buffer{}, Runner: r, Args: args}
+	code := runMetrics(ctx)
+	if code != 0 {
+		t.Fatalf("metrics %v: code %d, err = %q", args, code, ctx.Err.(*bytes.Buffer).String())
 	}
-	deleted := false
+	deleted, removals := 0, 0
 	for _, call := range r.Calls() {
-		if call.Name == "kubectl" && strings.Contains(strings.Join(call.Args, " "), "delete application.argoproj.io devzone-metrics-server") {
-			deleted = true
-		}
 		if call.Name == "helm" || (call.Name == "kubectl" && strings.Contains(strings.Join(call.Args, " "), "delete -f")) {
-			t.Fatalf("unexpected removal: %v", call.Args)
+			removals++
+		}
+		if call.Name == "kubectl" && strings.Contains(strings.Join(call.Args, " "), "delete application.argoproj.io devzone-metrics-server") {
+			deleted++
 		}
 	}
-	if !deleted {
-		t.Fatal("the devzone Application was not deleted")
+	return deleted, removals
+}
+
+// TestMetricsRemoveDeletesApplication checks that "metrics remove" without a
+// context, with Argo CD active, also deletes the devzone Application.
+func TestMetricsRemoveDeletesApplication(t *testing.T) {
+	deleted, removals := metricsRemoveCase(t, []string{"remove"})
+	if deleted != 1 {
+		t.Fatalf("Application deletions = %d, want 1", deleted)
+	}
+	if removals != 0 {
+		t.Fatalf("unexpected manifest removal: %d", removals)
+	}
+}
+
+// TestMetricsRemoveWithContextKeepsApplication checks that "metrics remove
+// <context>" leaves the devzone Application alone: the user targeted another
+// context, so only the direct removal applies there.
+func TestMetricsRemoveWithContextKeepsApplication(t *testing.T) {
+	deleted, _ := metricsRemoveCase(t, []string{"remove", "devzone"})
+	if deleted != 0 {
+		t.Fatalf("Application deleted by a context-targeted remove: %d calls", deleted)
 	}
 }
