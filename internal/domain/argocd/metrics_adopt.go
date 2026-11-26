@@ -8,7 +8,7 @@ import (
 )
 
 // metricsMark is the label the legacy installer puts on the deployment it
-// installed (metrics-server.sh), so devzone only removes its own copy.
+// installed by the shell installer that was removed, so devzone only removes its own copy.
 const metricsMark = "installe"
 
 // metricsAppName is the Application devzone creates for metrics-server.

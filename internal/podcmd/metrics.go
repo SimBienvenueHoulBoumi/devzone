@@ -12,20 +12,18 @@ import (
 	fexec "github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec"
 )
 
-// runMetrics keeps "devzone metrics" working: with Argo CD active the
-// dependency becomes an Application from its official source at a pinned
-// version; otherwise the existing shell installer runs unchanged.
-func runMetrics(ctx *cli.Context) int {
-	if !metricsHeldByArgoCD(ctx) {
-		return delegate(append([]string{"metrics"}, ctx.Args...), ctx.Out, ctx.Err)
+// metricsApplication installs ("on") or deletes ("off") the metrics-server
+// Application through Argo CD, from its official source at a pinned version.
+func metricsApplication(ctx *cli.Context, mode string) int {
+	if mode == "on" {
+		fmt.Fprintln(ctx.Out, "▶ metrics-server through Argo CD (official chart, pinned version)")
 	}
-	fmt.Fprintln(ctx.Out, "▶ metrics-server through Argo CD (official chart, pinned version)")
 	opts := argocd.Options{
 		Runner: ctx.Runner, Out: ctx.Out, Err: ctx.Err,
 		Root: devzoneRoot(), CodeRoot: codeRoot(),
 	}
 	return argocd.Run(context.Background(),
-		append([]string{"dependency", "metrics-server", "on"}, ctx.Args...), ctx.Out, ctx.Err, opts)
+		[]string{"dependency", "metrics-server", mode}, ctx.Out, ctx.Err, opts)
 }
 
 // metricsHeldByArgoCD reports whether the module is on and Argo CD is

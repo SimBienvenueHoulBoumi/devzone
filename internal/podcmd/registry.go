@@ -81,10 +81,6 @@ func newDefaultRegistry() *cli.Registry {
 		Run:  runClusters,
 	})
 	r.Register(cli.Command{
-		Name: "metrics",
-		Run:  runMetrics,
-	})
-	r.Register(cli.Command{
 		Name: "use",
 		Run:  runUse,
 	})
