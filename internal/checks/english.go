@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/gitenv"
 )
 
 // Patterns of the English check, kept as data so the source never holds the
@@ -82,6 +84,7 @@ var commandSet = func() map[string]bool {
 // RepoRoot returns the top level of the git working tree of the current folder.
 func RepoRoot() (string, error) {
 	cmd := exec.Command("git", "rev-parse", "--show-toplevel")
+	cmd.Env = gitenv.Clean(os.Environ())
 	out, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("git rev-parse: %w", err)
@@ -93,6 +96,7 @@ func RepoRoot() (string, error) {
 func trackedFiles(root string) ([]string, error) {
 	cmd := exec.Command("git", "ls-files", "--cached")
 	cmd.Dir = root
+	cmd.Env = gitenv.Clean(os.Environ())
 	out, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("git ls-files in %s: %w", root, err)
