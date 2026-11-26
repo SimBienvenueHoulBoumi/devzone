@@ -55,9 +55,10 @@ func (r *run) pushDemoProject() int {
 // secret, and no real process is started by a test.
 func (r *run) gitPushDemo(dir string) error {
 	helper := "!f() { echo username=oauth2; printf 'password='; cat \"" + r.rootTokenFile() + "\"; echo; }; f"
-	remote := "http://gitlab.localhost:8929/devzone/demo.git"
+	remote := "http://127.0.0.1:8929/devzone/demo.git"
 	runGit := func(args ...string) error {
-		res, err := r.runner().Run(r.ctx, "git", args, exec.Opts{Dir: dir})
+		res, err := r.runner().Run(r.ctx, "git", args, exec.Opts{Dir: dir,
+			Env: []string{"GIT_CONFIG_PARAMETERS='core.hooksPath=/dev/null'"}})
 		if err != nil {
 			return err
 		}

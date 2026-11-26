@@ -206,11 +206,24 @@ func (r *run) writePipelineFailure(reason string) {
 	_ = os.WriteFile(marker, []byte(reason+"\n"), 0o644)
 }
 
-// httpStatus returns the HTTP status of GET url, 0 on any error
-// (curl -s -o /dev/null -w '%{http_code}' of seed_runner_token).
-func httpStatus(url string) int {
-	client := &http.Client{Timeout: 10 * time.Second}
-	res, err := client.Get(url)
+// apiStatusCode returns the HTTP status of a request to the GitLab API of the
+// module, 0 on any error (curl -s -o /dev/null -w '%{http_code}' with a
+// method and a form body).
+func (r *run) apiStatusCode(token, method, path, form string) int {
+	client := &http.Client{Timeout: 30 * time.Second}
+	var body io.Reader
+	if form != "" {
+		body = strings.NewReader(form)
+	}
+	req, err := http.NewRequest(method, baseURL()+path, body)
+	if err != nil {
+		return 0
+	}
+	req.Header.Set("PRIVATE-TOKEN", token)
+	if form != "" {
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	}
+	res, err := client.Do(req)
 	if err != nil {
 		return 0
 	}
