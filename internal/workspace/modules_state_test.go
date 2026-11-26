@@ -3,6 +3,7 @@ package workspace
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -121,7 +122,13 @@ func TestNoteModulesKeyMode(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := info.Mode().Perm(); got != 0o644 {
-		t.Fatalf("mode is %04o, want 0644", got)
+	// Windows stores no Unix mode bits: Go reports 0666 for a writable file
+	// even after os.Chmod(0644). The 0644 mode is meaningful on Unix only.
+	want := os.FileMode(0o644)
+	if runtime.GOOS == "windows" {
+		want = 0o666
+	}
+	if got := info.Mode().Perm(); got != want {
+		t.Fatalf("mode is %04o, want %04o", got, want)
 	}
 }
