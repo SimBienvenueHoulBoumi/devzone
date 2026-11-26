@@ -116,5 +116,10 @@ change_module() {
         # 0 done by Argo CD, 3 helm direct as before, else failed
         if DEVZONE_STATE="$ETAT" devzone argocd services-hook "$m" "$1" "${@:3}"; then return 0; elif [ $? -ne 3 ]; then return 1; fi
     fi
-    "apply_$m" "$1" "${@:3}"
+    # The assistant part of enable/disable ai runs in the Go command (#882).
+    if [ "$m" = ai ]; then
+        DEVZONE_STATE="$ETAT" devzone ai apply "$1" "${@:3}"
+    else
+        "apply_$m" "$1" "${@:3}"
+    fi
 }

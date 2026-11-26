@@ -138,3 +138,28 @@ func TestDisableRestoresHome(t *testing.T) {
 		t.Fatalf("out = %q", f.out.String())
 	}
 }
+
+// TestLLMMigrationDropsOldState checks that the removed module line is dropped
+// before the assistant is enabled, with the migration message.
+func TestLLMMigrationDropsOldState(t *testing.T) {
+	f := withCode(t, newFixture(t))
+	os.WriteFile(f.o.StateFile, []byte("ai=off\nllm=on\npostgres=off\n"), 0o644)
+	programEnable(f, 0)
+	f.r.On("devzone", []string{"state", "remove", "llm"}, dzexec.Result{})
+	if code := Enable(ctx(), f.o); code != 0 {
+		t.Fatalf("code = %d", code)
+	}
+	if !strings.Contains(f.out.String(), "llm module removed") ||
+		!strings.Contains(f.out.String(), "devzone ai") {
+		t.Fatalf("out = %q", f.out.String())
+	}
+	found := false
+	for _, call := range f.r.Calls() {
+		if call.Name == "devzone" && len(call.Args) >= 2 && call.Args[1] == "remove" && call.Args[2] == "llm" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("llm state line was not removed")
+	}
+}

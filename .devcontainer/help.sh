@@ -23,6 +23,8 @@ devzone_aide() {
   devzone test-gitlab                      end-to-end test of the GitLab module and platform
   devzone agent <folder> <instructions>    drive opencode with the instructions file
   devzone ai                               list the host (Ollama) models detected and the default model
+  devzone ai check|rapport                 update state of each model | sizes, choices and reasons
+  devzone ai guard [--format claude]       check one tool call on standard input (agent guard)
   devzone ticket <n> [--repo devzone|repowarden]  ticket worktree (ticket done <n> removes it)
   devzone build <folder> [--tag <name>]    build an image in the Kubernetes workspace (BuildKit)
   devzone enable postgres [--context CTX] [--confirm CTX]  shared PostgreSQL, cluster of choice

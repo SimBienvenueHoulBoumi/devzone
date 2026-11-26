@@ -9,7 +9,7 @@ import (
 
 // Premier returns the host model to use (Ollama, #586/#665/#668): empty when
 // Ollama does not answer or no model. DEVZONE_OLLAMA_URL, DEVZONE_HOST_MODEL,
-// DEVZONE_AI_MEASURES. Shell `premier` of ai/host-models.sh.
+// DEVZONE_AI_MEASURES. Kept for the agents run by this package.
 func Premier(ctx context.Context, r Runner, home string) string {
 	liste := modeles(ctx, r)
 	if len(liste) == 0 {

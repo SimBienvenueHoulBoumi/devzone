@@ -24,7 +24,7 @@ func shellApp(t *testing.T) (appDir, actions, state string) {
 	}
 	repo := repoPath(".devcontainer")
 	copyFile(t, filepath.Join(repo, "devzone"), filepath.Join(app, "devzone"), 0o755)
-	for _, name := range []string{"help.sh", "cluster.sh", "kube-account.sh", "host-models.sh", "host-check.sh", "host-check.message"} {
+	for _, name := range []string{"help.sh", "cluster.sh", "kube-account.sh", "host-check.message"} {
 		src := filepath.Join(repo, name)
 		if strings.HasPrefix(name, "host-") {
 			src = filepath.Join(repo, "ai", name)

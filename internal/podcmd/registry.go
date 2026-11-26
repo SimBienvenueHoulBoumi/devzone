@@ -21,6 +21,10 @@ func newDefaultRegistry() *cli.Registry {
 		Run:  runAgent,
 	})
 	r.Register(cli.Command{
+		Name: "ai",
+		Run:  runAI,
+	})
+	r.Register(cli.Command{
 		Name: "ticket",
 		Run:  runTicket,
 	})
