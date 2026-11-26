@@ -74,6 +74,26 @@ func TestLauncherRunsPortedCommandInGo(t *testing.T) {
 	}
 }
 
+// TestLauncherRoutesAgentToGo checks that devzone agent reaches the Go binary and never the removed shell script (Ticket #878).
+func TestLauncherRoutesAgentToGo(t *testing.T) {
+	if runtime.GOOS == "windows" || (runtime.GOARCH != "amd64" && runtime.GOARCH != "arm64") {
+		t.Skip()
+	}
+	dir := launcherSetup(t, true)
+	binPath := filepath.Join(dir, "bin", "devzone-pod-linux-"+runtime.GOARCH)
+	binary := "#!/usr/bin/env bash\nif [ \"$1\" = handles ]; then [ \"$2\" = agent ] && exit 0; exit 1; fi\necho \"go:$*\"\nexit 0\n"
+	if err := os.WriteFile(binPath, []byte(binary), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	out, code := runLauncher(t, dir, nil, "agent", "state")
+	if code != 0 || !strings.Contains(out, "go:agent state") {
+		t.Fatalf("code = %d, out = %q, want 0 and go:agent state", code, out)
+	}
+	if strings.Contains(out, "SHELL-PATH-REACHED") {
+		t.Fatalf("out = %q, must not contain %q", out, "SHELL-PATH-REACHED")
+	}
+}
+
 // TestLauncherPassesItsOwnShellToGo checks that the Go binary is told which shell to
 // delegate back to: the launcher of this devzone folder, not the copy installed in the
 // image (#857: a command ported in part, like cluster clean, sends the rest of cluster
