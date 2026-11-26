@@ -68,10 +68,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      # Ceiling of the packed package (bytes): measured 8754981 plus 10 %, rounded up
-      # (raised from 8572000 when the watcher was wired: net is then linked, see
-      # contributing.md)
-      MAX_PACKED: 9631000
+      # Ceiling of the packed package (bytes): measured 10052425 after the merge
+      # plus 10 %, rounded up to the next thousand (measured in .essai with
+      # build-binaries.sh and npm pack --dry-run). The Windows port watcher in Go
+      # is the measured cause: 9379707 -> 9777216 bytes packed when it was
+      # ported; see contributing.md)
+      MAX_PACKED: 11058000
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
