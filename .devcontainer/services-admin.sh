@@ -41,8 +41,8 @@ refuse() {
 action="${1:-}"
 service="${2:-}"
 case "$action" in
-    enable | activer) action=enable ;;
-    disable | desactiver) action=disable ;;
+    enable) action=enable ;;
+    disable) action=disable ;;
     seed) ;;
     *) refuse "usage: services-admin.sh enable|disable|seed gitlab|postgres|argocd [options]" ;;
 esac

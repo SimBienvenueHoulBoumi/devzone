@@ -219,7 +219,7 @@ func (e *env) regenerate() {
 	if e.codeRoot == "" {
 		return
 	}
-	res, err := e.exec("bash", []string{filepath.Join(e.codeRoot, "password.sh"), "regenerer"}, nil)
+	res, err := e.exec("bash", []string{filepath.Join(e.codeRoot, "password.sh"), "regenerate"}, nil)
 	if err != nil || res.Code != 0 {
 		e.showErr(res)
 		if e.opts.Err != nil {

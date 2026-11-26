@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 # Grouped credentials of the accounts created by devzone (#332).
-#   password.sh regenerer   reads the module files, writes $ROOT/.password
-#   password.sh chemin      prints the path of $ROOT/.password
+#   password.sh regenerate   reads the module files, writes $ROOT/.password
+#   password.sh path         prints the path of $ROOT/.password
 # The module files stay the source: .password is a regenerated view.
 # Plain-text secrets: never printed, never committed (.gitignore), mode 600.
-# (regenerer and chemin are public subcommand names, kept as they are.)
 set -euo pipefail
 
 PASSWORD_HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -139,10 +138,10 @@ password_regenerate() (
 
 if [ "${BASH_SOURCE[0]}" = "$0" ]; then
     case "${1:-}" in
-        regenerer) password_regenerate ;;
-        chemin) printf '%s\n' "$PASSWORD_TARGET" ;;
+        regenerate) password_regenerate ;;
+        path) printf '%s\n' "$PASSWORD_TARGET" ;;
         *)
-            echo "devzone : password.sh : regenerer | chemin" >&2
+            echo "devzone : password.sh : regenerate | path" >&2
             exit 1
             ;;
     esac

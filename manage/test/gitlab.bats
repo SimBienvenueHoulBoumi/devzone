@@ -22,8 +22,8 @@ case "$*" in
             echo "ready, no runner"
         fi
         ;;
-    "gitlab installe") [ -f "$T/namespace" ] ;;
-    "gitlab hote-poser") echo "127.0.0.1 gitlab.localhost # devzone:gitlab" >>"$DEVZONE_HOSTS" ;;
+    "gitlab installed") [ -f "$T/namespace" ] ;;
+    "gitlab host-set") echo "127.0.0.1 gitlab.localhost # devzone:gitlab" >>"$DEVZONE_HOSTS" ;;
 esac
 FAKE
     chmod +x "$BATS_TEST_TMPDIR/bin/devzone"

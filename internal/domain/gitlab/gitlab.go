@@ -131,7 +131,7 @@ func Run(ctx context.Context, args []string, opts Options) int {
 		return r.uninstall(rest)
 	case "migrate":
 		return r.migrate(rest)
-	case "installe":
+	case "installed":
 		return r.installed()
 	case "status":
 		return r.status()
@@ -147,9 +147,9 @@ func Run(ctx context.Context, args []string, opts Options) int {
 		return 0
 	case "relay-status":
 		return r.relayStatus()
-	case "hote-poser":
+	case "host-set":
 		return r.hostSet()
-	case "hote-retirer":
+	case "host-remove":
 		return r.hostRemove()
 	default:
 		fmt.Fprintf(r.errOut(), "devzone : unknown command : %s (devzone gitlab --help)\n", cmd)
