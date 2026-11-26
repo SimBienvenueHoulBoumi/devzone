@@ -34,7 +34,7 @@ func (r *run) pushDemoProject() int {
 	}
 	defer os.RemoveAll(tmpdir)
 	if err := copyDir(demoDir, tmpdir); err != nil {
-		fmt.Fprintln(r.errOut(), "devzone : seed GitLab : temporary directory impossible.")
+		fmt.Fprintf(r.errOut(), "devzone : seed GitLab : copy of the demo project failed, seed stopped.\n%v\n", err)
 		return 1
 	}
 	if err := r.gitPushDemo(tmpdir); err != nil {
@@ -55,9 +55,10 @@ func (r *run) pushDemoProject() int {
 // secret, and no real process is started by a test.
 func (r *run) gitPushDemo(dir string) error {
 	helper := "!f() { echo username=oauth2; printf 'password='; cat \"" + r.rootTokenFile() + "\"; echo; }; f"
-	remote := "http://gitlab.localhost:8929/devzone/demo.git"
+	remote := "http://127.0.0.1:8929/devzone/demo.git"
 	runGit := func(args ...string) error {
-		res, err := r.runner().Run(r.ctx, "git", args, exec.Opts{Dir: dir})
+		res, err := r.runner().Run(r.ctx, "git", args, exec.Opts{Dir: dir,
+			Env: []string{"GIT_CONFIG_PARAMETERS='core.hooksPath=/dev/null'"}})
 		if err != nil {
 			return err
 		}
@@ -83,19 +84,20 @@ func (r *run) gitPushDemo(dir string) error {
 		"-c", "http.extraHeader=Host: gitlab.localhost", "push", "-q", "-u", "origin", "main")
 }
 
-// copyDir copies the content of src into the existing dir.
+// copyDir copies the content of src into the existing dir, preserving the
+// mode of the entries and the hidden files, like the cp -r of the seed.
 func copyDir(src, dir string) error {
 	entries, err := os.ReadDir(src)
 	if err != nil {
 		return err
 	}
 	for _, e := range entries {
-		data, err := os.ReadFile(src + "/" + e.Name())
+		info, err := e.Info()
 		if err != nil {
 			return err
 		}
 		if e.IsDir() {
-			if err := os.MkdirAll(dir+"/"+e.Name(), 0o755); err != nil {
+			if err := os.MkdirAll(dir+"/"+e.Name(), info.Mode().Perm()); err != nil {
 				return err
 			}
 			if err := copyDir(src+"/"+e.Name(), dir+"/"+e.Name()); err != nil {
@@ -103,7 +105,11 @@ func copyDir(src, dir string) error {
 			}
 			continue
 		}
-		if err := os.WriteFile(dir+"/"+e.Name(), data, 0o644); err != nil {
+		data, err := os.ReadFile(src + "/" + e.Name())
+		if err != nil {
+			return err
+		}
+		if err := os.WriteFile(dir+"/"+e.Name(), data, info.Mode().Perm()); err != nil {
 			return err
 		}
 	}

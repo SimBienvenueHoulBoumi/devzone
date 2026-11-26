@@ -171,7 +171,7 @@ func (r *run) relayStatus() int {
 // (installation.sh gitlab_relay_start).
 func (r *run) gitlabRelayStart() int {
 	r.relayStart("gitlab-web", "devzone", r.namespace(), "svc/gitlab-webservice-default", "8929:8181")
-	r.relayStart("gitlab-ssh", "devzone", r.namespace(), "svc/gitlab-gitlab-shell", "2224:22")
+	r.relayStart("gitlab-ssh", "devzone", r.namespace(), "svc/gitlab-gitlab-shell", "2224:2224")
 	return 0
 }
 

@@ -71,7 +71,9 @@ func (r *run) install() int {
 		}
 	} else {
 		fmt.Fprintf(r.out(), "▶ Installing the GitLab chart in %s…\n", r.namespace())
-		r.chartDepend()
+		if code := r.chartDepend(); code != 0 {
+			return code
+		}
 		if code := r.helmPass(0); code != 0 {
 			return code
 		}
@@ -82,7 +84,9 @@ func (r *run) install() int {
 	}
 	r.hostSet()
 
-	r.waitReady()
+	if code := r.waitReady(); code != 0 {
+		return code
+	}
 	if code := r.seed(); code != 0 {
 		return code
 	}

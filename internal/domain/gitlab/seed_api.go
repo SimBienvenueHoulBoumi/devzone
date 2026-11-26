@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	neturl "net/url"
 	"os"
 	"strings"
 	"time"
@@ -54,14 +55,17 @@ func (r *run) execStdin(args []string, script string) (exec.Result, error) {
 // createRootToken creates a personal access token of the root user through
 // gitlab-rails runner on the toolbox pod (never on a command line).
 func (r *run) createRootToken(pod string) (string, bool) {
-	script := `u = User.find_by_username("root")
-u.personal_access_tokens.create(name: "devzone", scopes: ["api", "write_repository"], expires_at: 30.days.from_now).token
+	script := `puts User.find_by_username("root").personal_access_tokens.create(name: "devzone", scopes: ["api", "write_repository"], expires_at: 30.days.from_now).token
 `
 	res, err := r.execStdin([]string{"exec", "-i", "-n", r.namespace(), pod, "--", "gitlab-rails", "runner", "-"}, script)
 	if err != nil || res.Code != 0 {
 		return "", false
 	}
-	return lastLine(string(res.Stdout)), true
+	token := strings.TrimSpace(lastLine(string(res.Stdout)))
+	if token == "" {
+		return "", false
+	}
+	return token, true
 }
 
 // lastLine returns the last line of s without its trailing newline
@@ -80,7 +84,11 @@ func lastLine(s string) string {
 // seedGroup creates the devzone group when it does not exist; 0 on failure.
 func (r *run) seedGroup(token string) int {
 	if !r.apiOK(token, "/api/v4/groups/devzone") {
-		if _, err := r.apiPostForm(token, "/api/v4/groups", "name=devzone&path=devzone&visibility=private"); err != nil {
+		form := neturl.Values{}
+		form.Set("name", "devzone")
+		form.Set("path", "devzone")
+		form.Set("visibility", "private")
+		if _, err := r.apiPostForm(token, "/api/v4/groups", form.Encode()); err != nil {
 			fmt.Fprintln(r.errOut(), "devzone : seed GitLab : creation of the devzone group failed, seed stopped.")
 			return 1
 		}
@@ -100,8 +108,10 @@ func (r *run) seedProject(token string) int {
 		return 1
 	}
 	if !r.apiOK(token, "/api/v4/projects/devzone%2Fdemo") {
-		if _, err := r.apiPostForm(token, "/api/v4/projects",
-			fmt.Sprintf("name=demo&namespace_id=%s", groupID)); err != nil {
+		form := neturl.Values{}
+		form.Set("name", "demo")
+		form.Set("namespace_id", groupID)
+		if _, err := r.apiPostForm(token, "/api/v4/projects", form.Encode()); err != nil {
 			fmt.Fprintln(r.errOut(), "devzone : seed GitLab : creation of the devzone/demo project failed, seed stopped.")
 			return 1
 		}
@@ -111,19 +121,24 @@ func (r *run) seedProject(token string) int {
 
 // seedDevUser creates the dev user with a random password when it is missing;
 // the password is returned when the user is created (an existing user keeps
-// its password).
-func (r *run) seedDevUser(token string) string {
+// its password). The second result is false only when the creation fails.
+func (r *run) seedDevUser(token string) (string, bool) {
 	users := r.apiGet(token, "/api/v4/users?username=dev")
 	if jsonLen(users) != 0 {
-		return ""
+		return "", true
 	}
 	devPassword := randomBase64(18)
-	form := fmt.Sprintf("email=dev@gitlab.localhost&username=dev&name=dev&skip_confirmation=true&password=%s", devPassword)
-	if _, err := r.apiPostForm(token, "/api/v4/users", form); err != nil {
+	form := neturl.Values{}
+	form.Set("email", "dev@gitlab.localhost")
+	form.Set("username", "dev")
+	form.Set("name", "dev")
+	form.Set("skip_confirmation", "true")
+	form.Set("password", devPassword)
+	if _, err := r.apiPostForm(token, "/api/v4/users", form.Encode()); err != nil {
 		fmt.Fprintln(r.errOut(), "devzone : seed GitLab : creation of the dev user failed, seed stopped.")
-		return ""
+		return "", false
 	}
-	return devPassword
+	return devPassword, true
 }
 
 // seedRunnerToken keeps the saved runner token when it is still valid,
@@ -132,7 +147,9 @@ func (r *run) seedDevUser(token string) string {
 func (r *run) seedRunnerToken(token string) int {
 	if _, err := os.Stat(r.secretsDir() + "/runner-token"); err == nil {
 		saved, _ := r.readSecret(r.secretsDir() + "/runner-token")
-		code := httpStatus(baseURL() + "/api/v4/runners/verify?token=" + saved)
+		form := neturl.Values{}
+		form.Set("token", saved)
+		code := r.apiStatusCode(token, "POST", "/api/v4/runners/verify", form.Encode())
 		switch code {
 		case 200:
 			fmt.Fprintln(r.out(), "✔ Runner token valid: kept.")
@@ -158,7 +175,9 @@ func (r *run) seedRunnerToken(token string) int {
 // createRunnerToken creates an instance runner token through the API and
 // writes it in the runner-token file (seed.sh, POST /api/v4/user/runners).
 func (r *run) createRunnerToken(token string) bool {
-	body, err := r.apiPostForm(token, "/api/v4/user/runners", "runner_type=instance_type")
+	form := neturl.Values{}
+	form.Set("runner_type", "instance_type")
+	body, err := r.apiPostForm(token, "/api/v4/user/runners", form.Encode())
 	newToken := jsonField(body, "token")
 	if err != nil || newToken == "" {
 		return false
@@ -183,7 +202,8 @@ end
 		fmt.Fprintln(r.errOut(), "devzone : seed GitLab : creation of the ci_job_token_signing_key failed.")
 		return 1
 	}
-	if _, err := r.execStdin([]string{"exec", "-i", "-n", r.namespace(), pod, "--", "gitlab-rails", "runner", "-"}, script); err != nil {
+	res, err := r.execStdin([]string{"exec", "-i", "-n", r.namespace(), pod, "--", "gitlab-rails", "runner", "-"}, script)
+	if err != nil || res.Code != 0 {
 		fmt.Fprintln(r.errOut(), "devzone : seed GitLab : creation of the ci_job_token_signing_key failed.")
 		return 1
 	}
@@ -200,9 +220,10 @@ func (r *run) seedRunnerSecret() int {
 		fmt.Fprintln(r.errOut(), "devzone : seed GitLab : secret gitlab-runner-secret not created, seed stopped.")
 		return 1
 	}
-	if _, err := r.runner().Run(r.ctx, "kubectl",
+	res, err := r.runner().Run(r.ctx, "kubectl",
 		[]string{"--context", "devzone", "-n", r.namespace(), "apply", "-f", "-"},
-		exec.Opts{Stdin: strings.NewReader(yaml)}); err != nil {
+		exec.Opts{Stdin: strings.NewReader(yaml)})
+	if err != nil || res.Code != 0 {
 		fmt.Fprintln(r.errOut(), "devzone : seed GitLab : secret gitlab-runner-secret not created, seed stopped.")
 		return 1
 	}
@@ -215,6 +236,9 @@ func (r *run) kubectlDevzoneOutput(args []string) (string, error) {
 	res, err := r.kubectlDevzone(args)
 	if err != nil {
 		return "", err
+	}
+	if res.Code != 0 {
+		return string(res.Stdout), fmt.Errorf("kubectl: code %d", res.Code)
 	}
 	return string(res.Stdout), nil
 }
