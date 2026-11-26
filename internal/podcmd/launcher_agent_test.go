@@ -75,21 +75,67 @@ func TestDevcontainerCommentNamesGoAgent(t *testing.T) {
 	}
 }
 
+// caseArmAlternatives returns the alternatives of the shell case arm carrying
+// name. Continuation lines are joined first, and the arm stops at its closing
+// parenthesis, so callers can check membership without depending on neighbours.
+func caseArmAlternatives(t *testing.T, data, name string) map[string]bool {
+	t.Helper()
+	lines := strings.Split(data, "\n")
+	for i, line := range lines {
+		if !strings.Contains(line, name) || !strings.Contains(line, "|") {
+			continue
+		}
+		arm := strings.TrimSpace(line)
+		for strings.HasSuffix(arm, "\\") && i+1 < len(lines) {
+			arm = strings.TrimSuffix(arm, "\\") + " " + strings.TrimSpace(lines[i+1])
+			i++
+		}
+		if end := strings.Index(arm, ")"); end >= 0 {
+			arm = arm[:end]
+		}
+		alts := make(map[string]bool)
+		for _, alt := range strings.Split(arm, "|") {
+			alts[strings.TrimSpace(alt)] = true
+		}
+		if alts[name] {
+			return alts
+		}
+	}
+	return nil
+}
+
 // TestAgentCommandListsKeepAgent checks that both launchers and the pod help
-// still declare agent, so a machine without the pod binary cannot reach a
-// removed agent script (#878).
+// still declare the Go commands, whatever their neighbours, so a machine
+// without the pod binary cannot reach a removed script (#878).
 func TestAgentCommandListsKeepAgent(t *testing.T) {
-	for _, tc := range []struct{ file, text string }{
-		{"../../.devcontainer/devzone", "agent | postgres | mysql | gitlab | test-gitlab)"},
-		{"../../manage/devzone", "ai | agent | apply"},
-		{"../../.devcontainer/help.sh", "devzone agent <folder> <instructions>"},
+	for _, tc := range []struct {
+		file  string
+		names []string
+	}{
+		{"../../.devcontainer/devzone", []string{"agent", "postgres", "mysql", "gitlab", "test-gitlab", "catalog", "catalog-watcher"}},
+		{"../../manage/devzone", []string{"agent", "catalog", "catalog-watcher", "ai", "apply"}},
 	} {
 		data, err := os.ReadFile(tc.file)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !strings.Contains(string(data), tc.text) {
-			t.Fatalf("%s misses %q", tc.file, tc.text)
+		alts := caseArmAlternatives(t, string(data), "agent")
+		if alts == nil {
+			t.Fatalf("%s has no case arm for agent", tc.file)
+		}
+		for _, name := range tc.names {
+			if !alts[name] {
+				t.Errorf("%s case arm misses %q: %v", tc.file, name, alts)
+			}
+		}
+	}
+	data, err := os.ReadFile("../../.devcontainer/help.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, text := range []string{"devzone agent <folder> <instructions>", "devzone catalog "} {
+		if !strings.Contains(string(data), text) {
+			t.Errorf(".devcontainer/help.sh misses %q", text)
 		}
 	}
 }
