@@ -15,15 +15,11 @@ import (
 // twice replaces the copy and the definition without ever leaving two watchers:
 // it is the manager, not enable, that owns the process afterwards. On Linux a
 // replaced copy is followed by an explicit restart, because enable --now leaves
-// an already active unit running the old binary. The watcher itself runs in Go
-// on Windows too, but its automatic start is another ticket and is refused here.
+// an already active unit running the old binary. On Windows the task is created
+// for the logon of the user and started at once (#903).
 func PortsEnable(out, errOut io.Writer) int {
 	if portsAutoStartGuard(errOut) {
 		return 0
-	}
-	if portsPlatform == "windows" {
-		fmt.Fprintln(errOut, "✖ devzone workspace ports enable: automatic start is not available on windows (#883)")
-		return 1
 	}
 	env, err := portsAgentEnvironment()
 	if err != nil {
@@ -59,10 +55,9 @@ func PortsEnable(out, errOut io.Writer) int {
 	if status := portsDaemon(tool, false, args...); status != 0 {
 		return portsEnableFailed(errOut, tool, args, status, wasRunning)
 	}
-	if replaced && portsPlatform != "darwin" {
-		restart := portsDaemonRestartArgs()
-		if status := portsDaemon(tool, false, restart...); status != 0 {
-			return portsEnableFailed(errOut, tool, restart, status, wasRunning)
+	if next := portsDaemonAfterEnable(replaced); next != nil {
+		if status := portsDaemon(tool, false, next...); status != 0 {
+			return portsEnableFailed(errOut, tool, next, status, wasRunning)
 		}
 	}
 	fmt.Fprintln(out, "✔ port watcher: automatic start enabled")
@@ -71,14 +66,13 @@ func PortsEnable(out, errOut io.Writer) int {
 
 // PortsDisable removes the automatic start of this devzone folder: the service
 // manager first disables or unloads the definition while it still exists, then
-// the file is deleted and systemd reloads again. The running watcher is stopped
-// without being relaunched until the next start, enable or session. Repeating
-// disable is not an error and says nothing when there is nothing to remove.
+// the file is deleted and systemd reloads again. On Windows the task is deleted
+// first, so the watcher stopped after it is not relaunched by the scheduler. The
+// running watcher is stopped without being relaunched until the next start,
+// enable or session. Repeating disable is not an error and says nothing when
+// there is nothing to remove.
 func PortsDisable(out, errOut io.Writer) int {
 	if portsAutoStartGuard(errOut) {
-		return 0
-	}
-	if portsPlatform == "windows" {
 		return 0
 	}
 	existed := portsAgentExists()
@@ -86,7 +80,9 @@ func PortsDisable(out, errOut io.Writer) int {
 	if existed {
 		args := portsDaemonDisableArgs()
 		status := portsDaemon(tool, portsPlatform == "darwin", args...)
-		if status != 0 && portsPlatform != "darwin" {
+		// A failed unload is an error on Linux only: on macOS and Windows the
+		// job or the task may be absent already, which the removal below handles.
+		if status != 0 && portsPlatform == "linux" {
 			fmt.Fprintf(errOut, "✖ port watcher automatic start not disabled: %s %v failed (status %d)\n", tool, args, status)
 			return status
 		}
@@ -106,9 +102,10 @@ func PortsDisable(out, errOut io.Writer) int {
 
 // portsDaemonReload asks systemd to reread its units, before and after the
 // definition is removed so neither the old nor the new state stays cached.
-// macOS has no daemon-reload equivalent: launchctl reads the agent file at boot.
+// macOS has no daemon-reload equivalent: launchctl reads the agent file at boot,
+// and Task Scheduler reads its tasks on demand.
 func portsDaemonReload(tool string) {
-	if portsPlatform == "darwin" {
+	if portsPlatform != "linux" {
 		return
 	}
 	_ = portsDaemon(tool, false, "--user", "daemon-reload")

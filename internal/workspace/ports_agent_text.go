@@ -16,19 +16,26 @@ const portsAgentPath = "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin"
 // instance in dir, and returns its path. label is the full name of the agent or
 // unit without its extension. Writing the same instance twice replaces the
 // definition, so enable is idempotent.
+//
+// On Windows the file is the XML of the scheduled task, written in UTF-16 as its
+// declaration says; the PATH and KUBECONFIG of env have no place in a task and
+// are not written there.
 func portsAgentWrite(dir, label, watcher, folder string, env portsAgentValues) (string, error) {
 	name := label + "." + portsAgentExt()
-	var text string
-	if portsPlatform == "darwin" {
-		text = portsAgentPlistText(label, watcher, folder, env)
-	} else {
-		text = portsAgentUnitText(label, watcher, folder, env)
+	var data []byte
+	switch portsPlatform {
+	case "darwin":
+		data = []byte(portsAgentPlistText(label, watcher, folder, env))
+	case "windows":
+		data = portsUTF16(portsAgentTaskText(watcher, folder))
+	default:
+		data = []byte(portsAgentUnitText(label, watcher, folder, env))
 	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", err
 	}
 	path := filepath.Join(dir, name)
-	if err := os.WriteFile(path, []byte(text), 0o644); err != nil {
+	if err := os.WriteFile(path, data, 0o644); err != nil {
 		return "", err
 	}
 	return path, os.Chmod(path, 0o644)

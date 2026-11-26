@@ -60,10 +60,19 @@ func PortsStart(out, errOut io.Writer) int {
 
 // portsStartService starts the watcher through the service manager that owns it
 // when the automatic start is installed. On macOS a loaded job is kickstarted;
-// bootstrap is the fallback for one that is not loaded. The manager, not this
-// command, keeps the watcher and relaunches it after an abnormal exit.
+// bootstrap is the fallback for one that is not loaded. On Windows a live
+// watcher is left alone first, so that no run of the task is asked for while a
+// watcher already holds the state folder, as the loop itself would refuse a
+// second one. The manager, not this command, keeps the watcher and relaunches it
+// after an abnormal exit.
 func portsStartService(out, errOut io.Writer) int {
 	tool := portsDaemonTool()
+	if portsPlatform == "windows" {
+		if pid := readPid(filepath.Join(portsDir(), "pid")); alive(pid) {
+			fmt.Fprintf(out, "Workspace ports: watcher already running (pid %d)\n", pid)
+			return 0
+		}
+	}
 	if portsPlatform == "darwin" {
 		if status := portsDaemon(tool, true, "kickstart", "-k", portsDaemonServiceTarget()); status == 0 {
 			fmt.Fprintln(out, "Workspace ports: watcher started by the service manager")

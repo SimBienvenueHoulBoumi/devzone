@@ -30,19 +30,31 @@ const portsAgentDirEnv = "DEVZONE_PORTS_AGENT_DIR"
 const portsAgentPrefix = "devzone-ports-workspace-"
 
 // portsAgentExt returns the extension of the automatic start file: the launch
-// agent of macOS, the user unit of Linux.
+// agent of macOS, the user unit of Linux, the XML task of Windows.
 func portsAgentExt() string {
-	if portsPlatform == "darwin" {
+	switch portsPlatform {
+	case "darwin":
 		return "plist"
+	case "windows":
+		return "xml"
 	}
 	return "service"
 }
 
 // portsAgentDir returns the folder holding the automatic start of this devzone
-// instance: the override, else the personal folder of the platform.
+// instance: the override, else the personal folder of the platform. On Windows
+// the XML of the task is kept under the local application data, where the
+// user can read it; the task itself lives in the Task Scheduler.
 func portsAgentDir() string {
 	if dir := os.Getenv(portsAgentDirEnv); dir != "" {
 		return dir
+	}
+	if portsPlatform == "windows" {
+		base := os.Getenv("LOCALAPPDATA")
+		if base == "" {
+			base = filepath.Join(homeDir(), "AppData", "Local")
+		}
+		return filepath.Join(base, "devzone", "ports")
 	}
 	if portsPlatform == "darwin" {
 		if home := homeDir(); home != "" {
@@ -125,8 +137,12 @@ func portsWatcherBinDir() string {
 }
 
 // portsWatcherCopyPath returns the path of the watcher binary used by the
-// automatic start, in the stable folder of the user.
+// automatic start, in the stable folder of the user. Windows starts only a file
+// that ends in .exe, so its copy carries the extension.
 func portsWatcherCopyPath() string {
+	if portsPlatform == "windows" {
+		return filepath.Join(portsWatcherBinDir(), "devzone.exe")
+	}
 	return filepath.Join(portsWatcherBinDir(), "devzone")
 }
 

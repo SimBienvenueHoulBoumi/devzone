@@ -44,23 +44,47 @@ func runDaemon(tool string, quiet bool, args ...string) int {
 
 // portsDaemonEnableArgs returns the arguments that load and enable the
 // definition of the watcher: launchctl bootstrap of the launch agent on macOS,
-// systemctl --user enable --now of the user unit on Linux.
+// systemctl --user enable --now of the user unit on Linux, schtasks /Create of
+// the task on Windows, which replaces an earlier task of the same name.
 func portsDaemonEnableArgs(definition string) []string {
-	if portsPlatform == "darwin" {
+	switch portsPlatform {
+	case "darwin":
 		return []string{"bootstrap", portsDaemonDomain(), definition}
+	case "windows":
+		return []string{"/Create", "/TN", portsAgentName(), "/XML", definition, "/F"}
 	}
 	return []string{"--user", "enable", "--now", definition}
 }
 
 // portsDaemonStartArgs returns the arguments that start the installed watcher
 // without changing whether it is enabled: systemctl --user start on Linux,
-// launchctl bootstrap on macOS when the job is not loaded.
+// launchctl bootstrap on macOS when the job is not loaded, schtasks /Run on
+// Windows. A logon trigger does not fire for a task created in the session, so
+// Windows needs this explicit run.
 func portsDaemonStartArgs() []string {
-	if portsPlatform == "darwin" {
+	switch portsPlatform {
+	case "darwin":
 		definition := filepath.Join(portsAgentDir(), portsAgentName()+"."+portsAgentExt())
 		return []string{"bootstrap", portsDaemonDomain(), definition}
+	case "windows":
+		return []string{"/Run", "/TN", portsAgentName()}
 	}
 	return []string{"--user", "start", portsAgentName() + "." + portsAgentExt()}
+}
+
+// portsDaemonAfterEnable returns the call that follows a successful enable, or
+// nil when none is needed. Windows starts the task at once, since the logon
+// trigger would wait for the next session. Linux restarts a replaced copy
+// explicitly, because enable --now leaves an active unit on the old binary.
+// macOS needs nothing: its bootout before the bootstrap already reloads the agent.
+func portsDaemonAfterEnable(replaced bool) []string {
+	if portsPlatform == "windows" {
+		return portsDaemonStartArgs()
+	}
+	if replaced && portsPlatform == "linux" {
+		return portsDaemonRestartArgs()
+	}
+	return nil
 }
 
 // portsDaemonRestartArgs returns the arguments that restart the installed
@@ -73,10 +97,15 @@ func portsDaemonRestartArgs() []string {
 
 // portsDaemonDisableArgs returns the arguments that unload and disable the
 // definition of the watcher: launchctl bootout on macOS, systemctl --user
-// disable --now on Linux.
+// disable --now on Linux, schtasks /Delete on Windows. Deleting the task first
+// matters there: a watcher stopped while its task remains would be relaunched
+// by the restart on failure of the task.
 func portsDaemonDisableArgs() []string {
-	if portsPlatform == "darwin" {
+	switch portsPlatform {
+	case "darwin":
 		return []string{"bootout", portsDaemonServiceTarget()}
+	case "windows":
+		return []string{"/Delete", "/TN", portsAgentName(), "/F"}
 	}
 	return []string{"--user", "disable", "--now", portsAgentName() + "." + portsAgentExt()}
 }
@@ -92,10 +121,14 @@ func portsDaemonServiceTarget() string {
 	return portsDaemonDomain() + "/" + portsAgentName()
 }
 
-// portsDaemonTool returns the service manager of the platform.
+// portsDaemonTool returns the service manager of the platform: launchctl,
+// schtasks (the Task Scheduler command line) or systemctl.
 func portsDaemonTool() string {
-	if portsPlatform == "darwin" {
+	switch portsPlatform {
+	case "darwin":
 		return "launchctl"
+	case "windows":
+		return "schtasks"
 	}
 	return "systemctl"
 }
