@@ -34,9 +34,6 @@ refuse() {
     exit 2
 }
 
-# shellcheck source=SCRIPTDIR/state.sh
-# shellcheck disable=SC1091
-. "$HERE/state.sh"
 
 action="${1:-}"
 service="${2:-}"
@@ -73,9 +70,9 @@ cleanup() {
     rm -f "$kubeconfig"
     "$DEVZONE_CMD" "$service" relay-stop >/dev/null 2>&1 || true
     if [ -n "$cluster_before" ]; then
-        state_write cluster "$cluster_before" || true
+        DEVZONE_STATE="$ETAT" bash "$HERE/devzone" state write cluster "$cluster_before" || true
     else
-        state_remove cluster || true
+        DEVZONE_STATE="$ETAT" bash "$HERE/devzone" state remove cluster || true
     fi
 }
 trap cleanup EXIT
@@ -109,7 +106,7 @@ unset token ca_data
 export KUBECONFIG="$kubeconfig"
 export DEVZONE_KUBE_CONFIG="$kubeconfig"
 export DEVZONE_SERVICES_ADMIN=1
-state_write cluster "$ADMIN_CONTEXT" || refuse "cannot write the state: $ETAT"
+DEVZONE_STATE="$ETAT" bash "$HERE/devzone" state write cluster "$ADMIN_CONTEXT" || refuse "cannot write the state: $ETAT"
 echo "devzone services: $action $service in the cluster of the pod (temporary administrator)"
 case "$action" in
     # The seed is a module command: devzone gitlab seed (#538)

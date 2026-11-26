@@ -119,7 +119,6 @@ manage/test/workspace-egress.bats
 manage/test/workspace-egress-wait.bats
 manage/test/ci-diagnostic.bats
 manage/test/agent-models.bats
-.devcontainer/state-gitops.sh
 manage/test/state-gitops.bats
 manage/test/journal-error.sh
 manage/test/journal-error.bats
@@ -144,9 +143,6 @@ manage/test/agent-quota.bats
 manage/test/agent-workspace.bats
 manage/test/agent.bats
 manage/scripts/devzone-manifest.sh
-.devcontainer/state-json.sh
-.devcontainer/state-lock.sh
-.devcontainer/state.sh
 .devcontainer/memory.sh
 .devcontainer/metrics-server.sh
 .devcontainer/password.sh

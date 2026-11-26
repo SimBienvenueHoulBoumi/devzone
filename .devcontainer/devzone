@@ -64,9 +64,6 @@ if [ -f "$ICI/argocd/conf.sh" ]; then
     . "$ICI/argocd/conf.sh"
 fi
 # GitOps repository line in the Kubernetes workspace pod (#639)
-# shellcheck source=SCRIPTDIR/state-gitops.sh
-# shellcheck disable=SC1091
-. "$ICI/state-gitops.sh"
 # Detection of the host (Ollama) models and the devzone-host opencode provider (#665).
 # shellcheck source=SCRIPTDIR/ai/host-models.sh
 # shellcheck disable=SC1091
@@ -131,11 +128,6 @@ GITLAB_URL_MODULE=http://gitlab.localhost:8929
 # shellcheck disable=SC1091
 . "$ICI/devzone-status.sh"
 
-# shellcheck source=state-json.sh
-# shellcheck disable=SC1091
-if [ -f "$ICI/state-json.sh" ]; then
-    . "$ICI/state-json.sh"
-fi
 
 # Renamed names (#695): an old French name is refused with its new name, before
 # anything runs (exit 1). Without the aliases file (copied devzone): no check.
@@ -144,14 +136,38 @@ if command -v reject_renamed >/dev/null 2>&1; then
 fi
 
 case "${1:-}" in
-    "" | status | modules) if [ "${2:-}" = "--json" ]; then state_json; else show_state; fi ;;
+    "" | status | modules) if [ "${2:-}" = "--json" ]; then DEVZONE_STATE="$ETAT" bash "$ICI/devzone" state json; else show_state; fi ;;
+    state)
+        export DEVZONE_STATE="$ETAT"
+        case "${2:-}" in
+            write|remove|replace|init|recovery-mark|recovery-wait|recovery-pending|recovery-confirm|catalog-sync|gitops-line|json)
+                # shellcheck disable=SC2034 # DEVZONE_STATE used by state helpers
+                ETAT="$DEVZONE_STATE"
+                ;;
+            *) echo "devzone state: write|remove|replace|init|recovery-mark|recovery-wait|recovery-pending|recovery-confirm|catalog-sync|gitops-line|json" >&2; exit 1 ;;
+        esac
+        ici_state="$ICI"
+        pod_state=""
+        case "$(uname -m)" in
+            x86_64) pod_state="$ici_state/bin/devzone-pod-linux-amd64" ;;
+            aarch64 | arm64) pod_state="$ici_state/bin/devzone-pod-linux-arm64" ;;
+        esac
+        if [ -n "$pod_state" ] && [ -x "$pod_state" ]; then
+            "$pod_state" "$@"
+        elif command -v go >/dev/null 2>&1 && [ -f "$RACINE/go.mod" ]; then
+            (cd "$RACINE" && DEVZONE_STATE="$ETAT" DEVZONE_POD_SCRIPT="$ICI/devzone" GOTOOLCHAIN="${GOTOOLCHAIN:-local}" go run ./cmd/devzone-pod "$@")
+        else
+            echo "devzone : state: Go pod binary unavailable" >&2
+            exit 127
+        fi
+        ;;
     enable) change_module on "${2:-}" "${@:3}" ;;
     disable) change_module off "${2:-}" "${@:3}" ;;
     apply)
         migrate_llm
         # The user confirms the current state (#417, step 4): the watchers
         # may uninstall again
-        state_recovery_confirm
+        DEVZONE_STATE="$ETAT" bash "$ICI/devzone" state recovery-confirm
         apply_repowarden
         [ "$(value_of ai)" = off ] || apply_ai on
         # gitlab, postgres, argocd: installed from the workstation in the
