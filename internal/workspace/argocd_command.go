@@ -5,8 +5,6 @@ import (
 	"io"
 	"os"
 	"strings"
-
-	"github.com/SimBienvenueHoulBoumi/devzone/internal/domain/argocd"
 )
 
 // argocdStatus writes the installed state, the GitOps repository and the
@@ -27,7 +25,7 @@ func argocdStatus(r Runner, confPath, modules string, out io.Writer) int {
 	} else {
 		fmt.Fprintln(out, "⚠ argocd installed but argocd=off in .devzone.modules: devzone workspace services enable argocd, or disable to remove it")
 	}
-	repo := argocd.Conf{Path: confPath}.Get("argocd", "repo")
+	repo := confValue(confPath, "argocd", "repo")
 	if repo != "" && repo != "none" {
 		fmt.Fprintf(out, "  GitOps repository: %s (apps/, root Application devzone)\n", repo)
 	} else {

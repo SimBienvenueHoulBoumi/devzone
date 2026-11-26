@@ -1,49 +1,34 @@
 package workspace
 
 import (
-	"encoding/json"
-	"io"
-	"net/http"
+	"os/exec"
+	"regexp"
 	"strings"
-	"time"
 )
 
-// registryClient is the HTTP client of the registry check, with a bound so a
-// request to an unreachable registry cannot hang the command.
-var registryClient = &http.Client{Timeout: 10 * time.Second}
+// registryTokenPattern reads the anonymous pull token from the registry
+// answer, as the sed expression of update_image_exists does.
+var registryTokenPattern = regexp.MustCompile(`"token" *: *"([^"]*)"`)
 
 // RegistryImageExists tells whether the image of a release is published at the
-// registry, as update_image_exists does: an anonymous pull token, then a HEAD
-// on the manifest. A failing network counts as absent. The token is only sent
-// in a request and is never printed.
+// registry, as update_image_exists does: an anonymous pull token is asked with
+// curl, then a HEAD on the manifest. A failing network counts as absent. The
+// token is only passed as an argument of a child process and is never printed.
+// curl is used rather than a Go HTTP client so that the workstation binary
+// keeps the same small dependency set as the shell command.
 func RegistryImageExists(tag string) bool {
 	path := strings.TrimPrefix(imageRepo, "ghcr.io/")
-	tokenURL := "https://ghcr.io/token?scope=repository:" + path + ":pull"
-	response, err := registryClient.Get(tokenURL)
+	answer, err := exec.Command("curl", "-fsS", "https://ghcr.io/token?scope=repository:"+path+":pull").Output()
 	if err != nil {
 		return false
 	}
-	body, err := io.ReadAll(io.LimitReader(response.Body, 1<<20))
-	_ = response.Body.Close()
-	if err != nil || response.StatusCode != http.StatusOK {
+	match := registryTokenPattern.FindSubmatch(answer)
+	if len(match) != 2 || len(match[1]) == 0 {
 		return false
 	}
-	var tokenReply struct {
-		Token string `json:"token"`
-	}
-	if err := json.Unmarshal(body, &tokenReply); err != nil || tokenReply.Token == "" {
-		return false
-	}
-	request, err := http.NewRequest(http.MethodHead, "https://ghcr.io/v2/"+path+"/manifests/"+tag, nil)
-	if err != nil {
-		return false
-	}
-	request.Header.Set("Authorization", "Bearer "+tokenReply.Token)
-	request.Header.Set("Accept", "application/vnd.oci.image.index.v1+json,application/vnd.\x64ocker.distribution.manifest.list.v2+json")
-	response, err = registryClient.Do(request)
-	if err != nil {
-		return false
-	}
-	_ = response.Body.Close()
-	return response.StatusCode >= 200 && response.StatusCode < 300
+	command := exec.Command("curl", "-fsSI",
+		"-H", "Authorization: Bearer "+string(match[1]),
+		"-H", "Accept: application/vnd.oci.image.index.v1+json,application/vnd.\x64ocker.distribution.manifest.list.v2+json",
+		"https://ghcr.io/v2/"+path+"/manifests/"+tag)
+	return command.Run() == nil
 }
