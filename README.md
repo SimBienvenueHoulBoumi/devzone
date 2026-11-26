@@ -246,7 +246,7 @@ In the workspace pod, the `devzone` summary reports a more recent published vers
 
 **`postgres` module**: a shared PostgreSQL, one database per project (see [Connecting to PostgreSQL](#connecting-to-postgresql)). To enable it: `devzone enable postgres`.
 
-**`argocd` module**: Argo CD on the devzone cluster, interface at https://127.0.0.1:8443 in the container (see [Argo CD](manage/docs/reference.md#argo-cd)). To enable it: `devzone enable argocd`.
+**`argocd` module**: Argo CD on the devzone cluster, interface at https://127.0.0.1:8443 in the container (see [Argo CD](manage/docs/reference.md#argo-cd)). To enable it: `devzone enable argocd`. With the module on, GitLab, PostgreSQL, MySQL, the workspace and the catalogue applications are Applications, development clones included; an existing installation is adopted without losing data, and without a usable revision the command fails instead of installing directly. Argo CD itself is the only exception.
 
 **`devzone agent --pod` option**: launches an agent session in an isolated disposable pod (ticket #222). The pod is created with limited resources (2 CPU, 4 Gi memory), restricted mounts of the workspace and the state, and a mandatory affinity to the workspace pod. It isolates: the ticket's worktree at the same path as in the workspace, the repository's `.git`, and state subfolders (.config/opencode, .local/share/opencode, .local/state/oc-lancer, .local/npm read-only). It does NOT isolate: the network (unfiltered, that is #220), the host kubeconfig, `~/.config/gh`, `~/.claude`, the other worktrees, and, since the repository's `.git` is mounted, the git references of the other branches remain readable and writable there. Without `--pod`, the current `devzone agent` behavior is strictly unchanged.
 
