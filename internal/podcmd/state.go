@@ -18,7 +18,7 @@ const defaultModules = "ai kubernetes gitlab postgres argocd mysql"
 // state scripts while keeping the same lock, backup and recovery semantics.
 func runState(ctx *cli.Context) int {
 	if len(ctx.Args) == 0 {
-		fmt.Fprintln(ctx.Err, "devzone state: write|remove|replace|init|recovery-mark|recovery-wait|recovery-pending|recovery-confirm|catalog-sync|gitops-line|json")
+		fmt.Fprintln(ctx.Err, "devzone state: write|remove|replace|init|recovery-mark|recovery-wait|recovery-pending|recovery-confirm|catalog-sync|gitops-line|held|json")
 		return 1
 	}
 	st := state.At(statePath())
@@ -86,6 +86,8 @@ func runState(ctx *cli.Context) int {
 		return runStateCatalogSync(ctx, st)
 	case "gitops-line":
 		return runStateGitopsLine(ctx)
+	case "held":
+		return runStateHeld(ctx, st)
 	case "json":
 		return runStateJSON(ctx, st)
 	default:

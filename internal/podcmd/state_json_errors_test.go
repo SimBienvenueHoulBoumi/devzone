@@ -63,7 +63,8 @@ func TestStateJSONFrozenErrors(t *testing.T) {
       "description": "AI assistants: Claude Code, opencode",
       "state": "optional",
       "failed": null,
-      "command": "devzone enable ai"
+      "command": "devzone enable ai",
+      "held-by-argocd": false
     },
     {
       "name": "kubernetes",
@@ -71,7 +72,8 @@ func TestStateJSONFrozenErrors(t *testing.T) {
       "description": "connection to the host cluster and metrics-server at startup",
       "state": "optional",
       "failed": null,
-      "command": "devzone enable kubernetes"
+      "command": "devzone enable kubernetes",
+      "held-by-argocd": false
     },
     {
       "name": "gitlab",
@@ -79,7 +81,8 @@ func TestStateJSONFrozenErrors(t *testing.T) {
       "description": "test GitLab in the services cluster",
       "state": null,
       "failed": null,
-      "command": null
+      "command": null,
+      "held-by-argocd": false
     },
     {
       "name": "postgres",
@@ -87,7 +90,8 @@ func TestStateJSONFrozenErrors(t *testing.T) {
       "description": "shared PostgreSQL, one database per project",
       "state": null,
       "failed": null,
-      "command": null
+      "command": null,
+      "held-by-argocd": false
     },
     {
       "name": "argocd",
@@ -95,7 +99,8 @@ func TestStateJSONFrozenErrors(t *testing.T) {
       "description": "Argo CD, deployment interface of the services cluster",
       "state": "optional",
       "failed": null,
-      "command": "devzone enable argocd"
+      "command": "devzone enable argocd",
+      "held-by-argocd": false
     },
     {
       "name": "mysql",
@@ -103,7 +108,8 @@ func TestStateJSONFrozenErrors(t *testing.T) {
       "description": "shared MySQL, one database per project",
       "state": null,
       "failed": null,
-      "command": null
+      "command": null,
+      "held-by-argocd": false
     }
   ],
   "clusters": {

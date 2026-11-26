@@ -109,11 +109,11 @@ case "${1:-}" in
     state)
         export DEVZONE_STATE="$ETAT"
         case "${2:-}" in
-            write|remove|replace|init|recovery-mark|recovery-wait|recovery-pending|recovery-confirm|catalog-sync|gitops-line|json)
+            write|remove|replace|init|recovery-mark|recovery-wait|recovery-pending|recovery-confirm|catalog-sync|gitops-line|held|json)
                 # shellcheck disable=SC2034 # DEVZONE_STATE used by state helpers
                 ETAT="$DEVZONE_STATE"
                 ;;
-            *) echo "devzone state: write|remove|replace|init|recovery-mark|recovery-wait|recovery-pending|recovery-confirm|catalog-sync|gitops-line|json" >&2; exit 1 ;;
+            *) echo "devzone state: write|remove|replace|init|recovery-mark|recovery-wait|recovery-pending|recovery-confirm|catalog-sync|gitops-line|held|json" >&2; exit 1 ;;
         esac
         ici_state="$ICI"
         pod_state=""

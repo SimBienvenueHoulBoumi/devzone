@@ -11,7 +11,12 @@ import (
 
 // hookOn enables a service through Argo CD.
 func (m *module) hookOn(svc string) int {
-	if !m.catalogArgocdActive(svc) {
+	active, err := m.catalogArgocdActive(svc)
+	if err != nil {
+		fmt.Fprintln(m.errOut, err)
+		return 1
+	}
+	if !active {
 		return 3
 	}
 	if code := m.servicesNote(svc, "on"); code != 0 {
@@ -20,7 +25,12 @@ func (m *module) hookOn(svc string) int {
 	if code := m.servicesReconcile(); code != 0 {
 		return 1
 	}
-	fmt.Fprintf(m.out, "▶ %s as an Argo CD Application (charts/devzone-%s at %s)…\n", svc, svc, m.argocdRevision())
+	revision, err := m.argocdRevision()
+	if err != nil {
+		fmt.Fprintln(m.errOut, err)
+		return 1
+	}
+	fmt.Fprintf(m.out, "▶ %s as an Argo CD Application (charts/devzone-%s at %s)…\n", svc, svc, revision)
 	if code := m.hookWait(svc); code != 0 {
 		return 1
 	}

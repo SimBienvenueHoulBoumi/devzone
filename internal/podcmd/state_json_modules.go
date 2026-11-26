@@ -32,6 +32,16 @@ func serviceModule(name string) bool {
 	return name == "gitlab" || name == "postgres" || name == "argocd"
 }
 
+// heldByArgoCD reports whether a service is driven by an Argo CD Application:
+// both the module and Argo CD must be on. Why: status must say which services
+// a change of the GitOps repository will update, without contacting a cluster.
+func heldByArgoCD(d jsonDeps, name string) bool {
+	if name != "gitlab" && name != "postgres" && name != "mysql" {
+		return false
+	}
+	return d.st.Get(name) == "on" && d.st.Get("argocd") == "on"
+}
+
 // serviceDNS returns the in-cluster DNS name of a service module.
 func serviceDNS(name string) string {
 	suffix := ""
@@ -81,6 +91,7 @@ func modulesJSON(d jsonDeps, errs jsonObject) ([]any, jsonObject) {
 			{key: "state", value: stateValue},
 			{key: "failed", value: failed},
 			{key: "command", value: command},
+			{key: "held-by-argocd", value: heldByArgoCD(d, name)},
 		})
 	}
 	return out, errs
