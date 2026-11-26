@@ -668,7 +668,6 @@ KUBE
     cp "$BATS_TEST_DIRNAME/../../.devcontainer/state-lock.sh" "$BATS_TEST_TMPDIR/app/state-lock.sh"
     cp "$BATS_TEST_DIRNAME/../../.devcontainer/state-gitops.sh" "$BATS_TEST_TMPDIR/app/state-gitops.sh"
     cp "$BATS_TEST_DIRNAME/../../.devcontainer/kube-account.sh" "$BATS_TEST_TMPDIR/app/kube-account.sh"
-    cp "$BATS_TEST_DIRNAME/../../.devcontainer/command-aliases.sh" "$BATS_TEST_TMPDIR/app/command-aliases.sh"
     cp "$BATS_TEST_DIRNAME/../../.devcontainer/ai/host-models.sh" "$BATS_TEST_TMPDIR/app/ai/host-models.sh"
     cp "$BATS_TEST_DIRNAME/../../.devcontainer/ai/host-check.sh" "$BATS_TEST_TMPDIR/app/ai/host-check.sh"
     cp "$BATS_TEST_DIRNAME/../../.devcontainer/ai/host-check.message" "$BATS_TEST_TMPDIR/app/ai/host-check.message"

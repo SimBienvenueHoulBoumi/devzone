@@ -254,7 +254,7 @@ In the workspace pod, the `devzone` summary reports a more recent published vers
 
 These modules are disabled by default, can be enabled on demand from the container (without a rebuild), and their choice is kept from one startup to the next.
 
-The `devzone` command is written in English, subcommands and options included (`enable`, `disable`, `platform`, `packages`, `update`, `uninstall`, `status`, `use`; `postgres create`, `packages add`, `gitlab new-password`, `port --close`, `cluster --yes`). The old French names are refused with the new name; the full table is in [Removed names](manage/docs/reference.md#removed-names).
+The `devzone` command is written in English, subcommands and options included (`enable`, `disable`, `platform`, `packages`, `update`, `uninstall`, `status`, `use`; `postgres create`, `packages add`, `gitlab new-password`, `port --close`, `cluster --yes`).
 
 ## Where are my credentials?
 
@@ -421,16 +421,6 @@ To remove the `devzone` command from your machine:
 ```bash
 npm uninstall -g devzone
 ```
-
-## Removed names
-
-Commands, subcommands and options are written in English. The old French names are removed: devzone refuses them, shows the new name and does nothing.
-
-```
-✖ « activer » was renamed: devzone enable
-```
-
-The full table (commands, subcommands, options) is in [the reference](manage/docs/reference.md#removed-names).
 
 ## Going further
 

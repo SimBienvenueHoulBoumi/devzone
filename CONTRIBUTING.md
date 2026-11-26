@@ -4,7 +4,6 @@
 
 - The **code** is in English: identifiers, file names, comments, tests, messages and CLI commands.
 - The **documentation** is in English too: README, `manage/docs/` and this file.
-- The French names of the CLI are removed (#695): devzone refuses them and shows the new name (table in `manage/docs/reference.md`, "Removed names").
 
 ## Progressive switch by batch (#502)
 

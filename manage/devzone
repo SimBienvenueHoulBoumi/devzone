@@ -173,7 +173,6 @@ devzone $(version): development workspace in a Kubernetes cluster
                            services (gitlab, postgres, argocd) of the Kubernetes workspace
   devzone workspace argocd status|init|apply|app add|list|remove
                            Argo CD of the workspace: GitOps repository, .argocd.conf, projects
-  (old French names: refused with the new name, see the README, « Removed names »)
   devzone --version
 EOT
 }
@@ -191,18 +190,6 @@ container_command() {
 }
 
 go_launch "$@"
-
-# Renamed names (#695): the French names of the host and container commands are
-# refused before anything is created (« devzone mettre-a-jour » must not create a
-# folder; « devzone stop » still creates ./stop). A copied devzone may miss the
-# aliases file: then no check.
-# shellcheck source=SCRIPTDIR/../.devcontainer/command-aliases.sh
-# shellcheck disable=SC1091
-if [ -f "$PAQUET/.devcontainer/command-aliases.sh" ]; then
-    . "$PAQUET/.devcontainer/command-aliases.sh"
-    reject_renamed "$@" || exit 1
-fi
-
 
 case "${1:-}" in
     "" | -h | --help | help) show_help ;;

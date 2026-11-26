@@ -6,8 +6,7 @@
 
 # All the databases disappear: confirmation in the terminal (without a terminal,
 # the command is explicit); a yes or --yes sets DELETE_DATA, read by
-# apply_mysql to run delete-data (#441). The arguments go through reject_renamed:
-# --oui is refused before reaching here, only --yes passes (#695).
+# apply_mysql to run delete-data (#441); only --yes reaches this function.
 confirm_removal() {
     local app="$1" answer arg
     DELETE_DATA=""

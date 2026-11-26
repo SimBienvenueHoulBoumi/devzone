@@ -49,12 +49,6 @@ MODULES=(ai kubernetes gitlab postgres argocd mysql)
 # shellcheck source=SCRIPTDIR/cluster.sh
 # shellcheck disable=SC1091
 . "$ICI/cluster.sh"
-# English command names are accepted (#502); a copied devzone may miss the file
-# shellcheck source=SCRIPTDIR/command-aliases.sh
-# shellcheck disable=SC1091
-if [ -f "$ICI/command-aliases.sh" ]; then
-    . "$ICI/command-aliases.sh"
-fi
 # .argocd.conf of the instance: the GitOps repository designation (#539)
 # shellcheck source=SCRIPTDIR/argocd/conf.sh
 # shellcheck disable=SC1091
@@ -135,12 +129,6 @@ GITLAB_URL_MODULE=http://gitlab.localhost:8929
 # shellcheck disable=SC1091
 if [ -f "$ICI/state-json.sh" ]; then
     . "$ICI/state-json.sh"
-fi
-
-# Renamed names (#695): an old French name is refused with its new name, before
-# anything runs (exit 1). Without the aliases file (copied devzone): no check.
-if command -v reject_renamed >/dev/null 2>&1; then
-    reject_renamed "$@" || exit 1
 fi
 
 case "${1:-}" in
