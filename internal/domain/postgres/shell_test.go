@@ -17,9 +17,9 @@ func shellRun(t *testing.T, script, body, stdin string, args ...string) (string,
 	return shellCommand(t, `. "$1"; `+body, stdin, append([]string{script}, args...))
 }
 
-// shellServices runs a body after sourcing the cluster, module and services
-// libraries; the body arguments start at position six. The removed state.sh
-// slot stays in place to keep those positions stable, and a fake state
+// shellServices runs a body after sourcing the module and services libraries;
+// the body arguments start at position six. The two empty slots keep those
+// positions stable after the cluster scripts moved to Go, and a fake state
 // dispatcher intercepts the `bash .../devzone state` calls of the libraries:
 // writes, removals and initialisation go to ETAT with no real devzone binary,
 // so the orchestration assertions still check the saved state.
@@ -27,13 +27,14 @@ func shellServices(t *testing.T, body, stdin string, args ...string) (string, in
 	t.Helper()
 	root := repoDevcontainer(t)
 	scripts := []string{
-		filepath.Join(root, "cluster.sh"),
+		os.DevNull,
+		os.DevNull,
 		os.DevNull,
 		filepath.Join(root, "devzone-modules.sh"),
-		filepath.Join(root, "devzone-cluster.sh"),
 		filepath.Join(root, "devzone-services.sh"),
 	}
 	program := `MODULES=(ai kubernetes gitlab postgres argocd mysql)
+confirm_removal() { :; }
 __test_state() {
     local action="$1" key="$2" value="$3" tmp
     case "$action" in
