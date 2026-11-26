@@ -51,7 +51,7 @@ func Clone(r Runner, identity IdentityFunc, url, name string, out, errOut io.Wri
 	}
 	args := append(contextFlag(r), "exec", "-i", pod, "--namespace", namespace, "-c", container, "--",
 		"bash", "-s", "--", projectsDir+"/"+name, url, identity("user.name"), identity("user.email"))
-	status, err := r.Kubectl(args, strings.NewReader(cloneScript), out, errOut)
+	status, err := r.Kubectl(args, strings.NewReader(lfScript(cloneScript)), out, errOut)
 	if err != nil {
 		fmt.Fprintf(errOut, "devzone: cannot start kubectl: %v\n", err)
 		return notStarted
