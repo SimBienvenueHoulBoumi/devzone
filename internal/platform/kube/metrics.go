@@ -83,7 +83,7 @@ func (k Kube) Metrics(ctx context.Context, args []string, out, errOut io.Writer)
 			}
 		}
 		if reachable == 0 {
-			fmt.Fprintln(errOutOrDiscard(out), "metrics-server : no reachable local cluster; after kind create cluster: bash .devcontainer/metrics-server.sh")
+			fmt.Fprintln(errOutOrDiscard(out), "metrics-server : no reachable local cluster; after kind create cluster: devzone metrics")
 		}
 	}
 	return code

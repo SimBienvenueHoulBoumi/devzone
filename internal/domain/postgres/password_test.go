@@ -15,13 +15,6 @@ func TestAdminPasswordFollowsInstall(t *testing.T) {
 	f.contextReady("host-cluster", "host-cluster", "host-cluster")
 	f.noSecret()
 	f.programChart("5Gi")
-	library, err := os.ReadFile(filepath.Join(repoDevcontainer(t), "password.sh"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(f.codeRoot, "password.sh"), library, 0o755); err != nil {
-		t.Fatal(err)
-	}
 	f.opts.Runner = &hybridRunner{sequenceRunner: f.r}
 	if code := Run(nil, f.opts, []string{"install"}); code != 0 {
 		t.Fatalf("install: code %d, stderr %q", code, f.errOut.String())

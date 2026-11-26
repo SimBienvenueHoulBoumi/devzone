@@ -36,6 +36,7 @@ func newModFixture(t *testing.T) *modFixture {
 	t.Setenv("DEVZONE_STATE", filepath.Join(root, ".devzone.modules"))
 	t.Setenv("DEVZONE_KUBE_HOST", filepath.Join(root, "hote.config"))
 	t.Setenv("DEVZONE_KUBE_CONFIG", filepath.Join(root, "config"))
+	t.Setenv("DEVZONE_POD_SCRIPT", "")
 	t.Setenv("DEVZONE_WORKSPACE", "")
 	t.Setenv("HOME", t.TempDir())
 	if err := os.MkdirAll(filepath.Join(root, "workspace"), 0o755); err != nil {
@@ -69,8 +70,7 @@ func newModFixture(t *testing.T) *modFixture {
 	r.On("helm", []string{"--kubeconfig", filepath.Join(root, "hote.config"), "--kube-context", "docker-desktop", "upgrade", "--install", "argocd", filepath.Join(root, "charts", "devzone-argocd"), "--namespace", "devzone-argocd", "--create-namespace", "--timeout", "600s", "--wait"}, fexec.Result{})
 	// admin secret
 	r.On("kubectl", []string{"--context", "devzone", "-n", "devzone-argocd", "get", "secret", "argocd-initial-admin-secret", "-o", "jsonpath={.data.password}"}, fexec.Result{Stdout: []byte("c2VjcmV0LWFkbWlu")})
-	// password regenerate
-	r.On("bash", []string{filepath.Join(root, ".devcontainer", "password.sh"), "regenerate"}, fexec.Result{})
+	// credentials are regenerated in Go and the relay uses the Go launcher
 	return f
 }
 

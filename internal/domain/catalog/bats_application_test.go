@@ -48,7 +48,7 @@ func shellApp(t *testing.T) (appDir, actions, state string) {
 	writeTestFile(t, filepath.Join(app, "password.sh"), "#!/usr/bin/env bash\nprintf 'password %s\\n' \"$*\" >>\"$BATS_TEST_TMPDIR_ACTIONS\"\n[ ! -f \"$TEST_FAILED_PASSWORD\" ] || { echo \"credentials unavailable\"; exit 1; }\n")
 	actions = filepath.Join(tmp, "actions.log")
 	writeTestFile(t, actions, "")
-	writeTestFile(t, filepath.Join(bin, "devzone"), "#!/usr/bin/env bash\nprintf 'devzone %s\\n' \"$*\" >>\"$BATS_TEST_TMPDIR_ACTIONS\"\nexit 0\n")
+	writeTestFile(t, filepath.Join(bin, "devzone"), "#!/usr/bin/env bash\nprintf 'devzone %s\\n' \"$*\" >>\"$BATS_TEST_TMPDIR_ACTIONS\"\ncase \"$*\" in\n    \"passwords regenerate\") [ ! -f \"$TEST_FAILED_PASSWORD\" ] || { echo \"credentials unavailable\" >&2; exit 1; } ;;\nesac\nexit 0\n")
 	fakePod := "#!/usr/bin/env bash\n[ \"${1:-}\" = handles ] && exit 1\nexit 0\n"
 	for _, arch := range []string{"amd64", "arm64"} {
 		writeTestFile(t, filepath.Join(app, "bin", "devzone-pod-linux-"+arch), fakePod)
@@ -194,7 +194,7 @@ func TestShellRepair(t *testing.T) {
 	if shellLog(t, actions, "catalog-watcher start") == "" {
 		t.Fatalf("actions = %q, want the watcher start", readLog(t, actions))
 	}
-	if shellLog(t, actions, "password regenerate") == "" {
+	if shellLog(t, actions, "devzone passwords regenerate") == "" {
 		t.Fatalf("actions = %q, want the credentials regeneration", readLog(t, actions))
 	}
 }
@@ -225,7 +225,7 @@ func TestShellRepairFailedCredentials(t *testing.T) {
 	if !strings.Contains(out, "✖ credentials : credentials unavailable") {
 		t.Fatalf("repair output = %q", out)
 	}
-	if shellLog(t, actions, "password regenerate") == "" {
+	if shellLog(t, actions, "devzone passwords regenerate") == "" {
 		t.Fatalf("actions = %q", readLog(t, actions))
 	}
 }

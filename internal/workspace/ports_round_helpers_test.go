@@ -43,7 +43,7 @@ type roundHarness struct {
 func newRoundHarness(t *testing.T) *roundHarness {
 	t.Helper()
 	if runtime.GOOS == "windows" {
-		t.Skip("the port watcher does not run on Windows")
+		t.Skip("the fake kubectl of the round is a shell script")
 	}
 	if _, err := exec.LookPath("bash"); err != nil {
 		t.Skip("bash not found")

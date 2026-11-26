@@ -53,6 +53,18 @@ func newDefaultRegistry() *cli.Registry {
 		Run:  runState,
 	})
 	r.Register(cli.Command{
+		Name: "passwords",
+		Run:  runPasswords,
+	})
+	r.Register(cli.Command{
+		Name: "port",
+		Run:  runPort,
+	})
+	r.Register(cli.Command{
+		Name: "packages",
+		Run:  runPackages,
+	})
+	r.Register(cli.Command{
 		Name: "catalog",
 		Run:  runCatalog,
 	})

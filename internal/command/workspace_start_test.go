@@ -11,6 +11,7 @@ import (
 // nothing, without changing the status of the start.
 func TestWorkspaceStartWithoutServiceManagerSucceeds(t *testing.T) {
 	requireBash(t)
+	fakeClusterReady(t)
 	h := newAutoStartHarness(t)
 	h.available = false
 	t.Setenv("DEVZONE_ROOT", devzoneRootForAutoStart(t))
@@ -29,10 +30,11 @@ func TestWorkspaceStartWithoutServiceManagerSucceeds(t *testing.T) {
 }
 
 // TestWorkspaceStartEnableFailureIsWarning keeps a successful cluster start
-// successful when the automatic start cannot be installed afterwards: the
+// successful when the single automatic-start function fails afterwards: the
 // reason is written on errOut, but the status stays 0.
 func TestWorkspaceStartEnableFailureIsWarning(t *testing.T) {
 	requireBash(t)
+	fakeClusterReady(t)
 	h := newAutoStartHarness(t)
 	h.enableStatus, h.enableError = 1, "✖ port watcher automatic start not enabled"
 	t.Setenv("DEVZONE_ROOT", devzoneRootForAutoStart(t))

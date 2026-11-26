@@ -15,6 +15,7 @@ import (
 
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec"
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/state"
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/passwords"
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/platform/kube"
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/platform/relay"
 )
@@ -214,14 +215,13 @@ func (e *env) sleep(d time.Duration) {
 	time.Sleep(d)
 }
 
-// regenerate rebuilds the grouped credentials view with the shared library.
+// regenerate rebuilds the grouped credentials view with the shared Go library,
+// without invoking a shell or passing a secret to a process (#881).
 func (e *env) regenerate() {
 	if e.codeRoot == "" {
 		return
 	}
-	res, err := e.exec("bash", []string{filepath.Join(e.codeRoot, "password.sh"), "regenerate"}, nil)
-	if err != nil || res.Code != 0 {
-		e.showErr(res)
+	if err := passwords.Regenerate(filepath.Dir(e.codeRoot)); err != nil {
 		if e.opts.Err != nil {
 			fmt.Fprintln(e.opts.Err, "devzone : catalog mysql : grouped credentials not updated (devzone passwords)")
 		}

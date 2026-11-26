@@ -2,7 +2,6 @@ package command
 
 import (
 	"os"
-	"runtime"
 
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/cli"
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/workspace"
@@ -15,11 +14,13 @@ import (
 // with the internal loop and agent: these are the commands of the watcher that
 // "ports start" and the automatic start launch, not listed in the help. "start"
 // delegates the cluster work to bash, then enables the automatic start in Go.
-// On Windows the watcher does not exist in Go: "ports start" stays delegated to
-// bash there, and the automatic start refused by Go. Any other subcommand is delegated to bash
-// unchanged, as the bash entry point handles them (renamed words). When the Argo
-// CD Application holds the workspace, stop is delegated too. shell gets the
-// terminal of the user as its standard input.
+// Any other subcommand is delegated to bash unchanged, as the bash entry point
+// handles them (renamed words). When the Argo CD Application holds the
+// workspace, stop is delegated too. shell gets the terminal of the user as its
+// standard input. The watcher commands start, loop and agent run in Go on
+// Windows too (#883): the relays are real processes there, as on the other
+// systems. Only the automatic start stays out of Go on Windows; it belongs to
+// another ticket.
 func workspaceCommand(ctx *cli.Context) int {
 	args := ctx.Args
 	out := ctx.Out
@@ -68,6 +69,19 @@ func workspaceCommand(ctx *cli.Context) int {
 		if len(args) == 1 || (len(args) == 2 && args[1] == "status") {
 			return workspace.ServicesStatus(workspace.ExecRunner{}, out)
 		}
+		return commandServices(args, out, errOut)
+	}
+	// Every "argocd" form runs in Go (#883, lot 11): status reads the cluster,
+	// init, apply and app use the GitOps library of internal/domain/argocd.
+	if len(args) > 0 && args[0] == "argocd" {
+		if len(args) == 1 || (len(args) == 2 && args[1] == "status") {
+			return workspace.ArgoCDStatus(workspace.ExecRunner{}, modulesFile(), out)
+		}
+		switch args[1] {
+		case "init", "apply", "app":
+			ctx := &cli.Context{Args: args[1:], Out: out, Err: errOut}
+			return runWorkstationArgoCD(ctx, args[1:]...)
+		}
 	}
 	// "ports" alone is status, as ports does in the bash entry point.
 	if len(args) > 0 && args[0] == "ports" {
@@ -83,7 +97,7 @@ func workspaceCommand(ctx *cli.Context) int {
 		if len(args) == 2 && args[1] == "disable" {
 			return portsDisableForUser(out, errOut)
 		}
-		if len(args) == 2 && runtime.GOOS != "windows" {
+		if len(args) == 2 {
 			switch args[1] {
 			case "start":
 				return commandPortsStart(out, errOut)
