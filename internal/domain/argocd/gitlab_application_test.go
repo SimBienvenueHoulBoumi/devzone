@@ -39,16 +39,24 @@ func TestBatsGitlabApplicationThroughArgoCD(t *testing.T) {
 	}
 }
 
-// TestBatsGitlabUnknownRevisionHelmPath mirrors the development-clone bats
-// test: an unknown revision keeps Argo CD from holding GitLab, so the shell
-// caller keeps its direct helm installation.
-func TestBatsGitlabUnknownRevisionHelmPath(t *testing.T) {
+// TestBatsGitlabUnknownRevisionFails mirrors the development-clone bats test:
+// with Argo CD on, an unknown revision is an explicit failure, never a return
+// to the direct helm path.
+func TestBatsGitlabUnknownRevisionFails(t *testing.T) {
 	f := newModFixture(t)
 	f.markInstalled(t)
 	allowKubectl(f)
 	writeChart(t, f.root, "gitlab", "devzone-gitlab")
 	writeTestFile(t, filepath.Join(f.root, "package.json"), "{\"version\": \"0.0.0\"}\n")
-	if code := f.run("catalog-active", "gitlab"); code != 1 {
+	if code := f.run("catalog-active", "gitlab"); code != 2 {
 		t.Fatalf("catalog-active: code=%d out=%q err=%q", code, f.out.String(), f.err.String())
+	}
+	if !strings.Contains(f.err.String(), "DEVZONE_ARGOCD_REVISION") {
+		t.Fatalf("the failure does not say how to set a revision: %q", f.err.String())
+	}
+	for _, call := range f.r.Calls() {
+		if call.Name == "helm" {
+			t.Fatalf("helm was called: %q", joinedArgs(call))
+		}
 	}
 }
