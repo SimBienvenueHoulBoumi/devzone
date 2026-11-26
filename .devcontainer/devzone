@@ -46,9 +46,6 @@ RACINE="${DEVZONE_ROOT:-$(dirname "$ICI")}"
 # Default state of the instance; DEVZONE_STATE takes precedence (tests, CI)
 ETAT="${DEVZONE_STATE:-$RACINE/.devzone.modules}"
 MODULES=(ai kubernetes gitlab postgres argocd mysql)
-# shellcheck source=SCRIPTDIR/cluster.sh
-# shellcheck disable=SC1091
-. "$ICI/cluster.sh"
 # .argocd.conf of the instance: the GitOps repository designation (#539)
 # shellcheck source=SCRIPTDIR/argocd/conf.sh
 # shellcheck disable=SC1091
@@ -106,9 +103,6 @@ GITLAB_URL_MODULE=http://gitlab.localhost:8929
 # shellcheck source=SCRIPTDIR/devzone-services.sh
 # shellcheck disable=SC1091
 . "$ICI/devzone-services.sh"
-# shellcheck source=SCRIPTDIR/devzone-cluster.sh
-# shellcheck disable=SC1091
-. "$ICI/devzone-cluster.sh"
 # shellcheck source=SCRIPTDIR/devzone-repair.sh
 # shellcheck disable=SC1091
 . "$ICI/devzone-repair.sh"
@@ -199,13 +193,9 @@ case "${1:-}" in
         bash "$ICI/workspace-build.sh" "${@:2}"
         ;;
     repair) repair_workstation ;;
-    metrics) bash "$ICI/metrics-server.sh" "${@:2}" ;;
-    use) use_cluster "${@:2}" ;;
-    clusters) DEVZONE_STATE="$ETAT" bash "$ICI/clusters.sh" "${@:2}" ;;
-    cluster) change_cluster "${@:2}" ;;
     # Go only: reached when the binary did not take the call. Never call
     # "devzone" again from here, it would loop forever, see #864
-    agent | postgres | mysql | gitlab | test-gitlab | catalog | catalog-watcher)
+    cluster | clusters | metrics | use | kube | agent | postgres | mysql | gitlab | test-gitlab | catalog | catalog-watcher)
         echo "devzone $1: Go binary of the pod unavailable (.devcontainer/bin)" >&2
         exit 1
         ;;

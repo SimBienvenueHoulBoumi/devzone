@@ -4,14 +4,38 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 )
 
 // MetricsVersion is the pinned release of metrics-server installed by devzone.
 const MetricsVersion = "v0.9.0"
 
-// MetricsManifest is the manifest URL of the pinned metrics-server release.
-const MetricsManifest = "https://github.com/kubernetes-sigs/metrics-server/releases/download/" + MetricsVersion + "/components.yaml"
+// metricsVersion returns the pinned release. The version comes from versions.env
+// of the installed code when that file is present, so the workstation installer
+// and the pod read the same pin.
+func metricsVersion() string {
+	version := MetricsVersion
+	script := os.Getenv("DEVZONE_POD_SCRIPT")
+	if script == "" {
+		script = "/usr/local/share/devzone/.devcontainer/devzone"
+	}
+	data, err := os.ReadFile(filepath.Join(filepath.Dir(script), "versions.env"))
+	if err == nil {
+		for _, line := range strings.Split(string(data), "\n") {
+			if value, ok := strings.CutPrefix(line, "METRICS_SERVER_VERSION="); ok && value != "" {
+				version = strings.TrimSpace(value)
+			}
+		}
+	}
+	return version
+}
+
+// metricsManifest builds the manifest URL of the release in use.
+func metricsManifest() string {
+	return "https://github.com/kubernetes-sigs/metrics-server/releases/download/" + metricsVersion() + "/components.yaml"
+}
 
 // Metrics installs or removes metrics-server, as metrics-server.sh did. The
 // "retirer" argument is the public subcommand name kept as is; the other
@@ -72,9 +96,9 @@ func (k Kube) metricsRemove(ctx context.Context, name string, out, errOut io.Wri
 		"metrics-server", "-o", "jsonpath={.metadata.labels.devzone}")
 	marked := err == nil && markRes.Code == 0 && strings.TrimSpace(string(markRes.Stdout)) == "installe"
 	if marked {
-		res, err := k.raw(ctx, "--context", name, "delete", "-f", MetricsManifest, "--ignore-not-found")
+		res, err := k.raw(ctx, "--context", name, "delete", "-f", metricsManifest(), "--ignore-not-found")
 		if err == nil && res.Code == 0 {
-			fmt.Fprintf(errOutOrDiscard(out), "metrics-server removed (%s) : %s\n", MetricsVersion, name)
+			fmt.Fprintf(errOutOrDiscard(out), "metrics-server removed (%s) : %s\n", metricsVersion(), name)
 		} else {
 			fmt.Fprintf(errOutOrDiscard(errOut), "metrics-server : removal failed: %s\n", name)
 			code = 1
@@ -104,7 +128,7 @@ func (k Kube) metricsInstall(ctx context.Context, name string, requested bool, o
 		fmt.Fprintf(errOutOrDiscard(out), "metrics-server : already present: %s\n", name)
 		return code
 	}
-	applied, err := k.raw(ctx, append(append([]string{}, base...), "apply", "-f", MetricsManifest)...)
+	applied, err := k.raw(ctx, append(append([]string{}, base...), "apply", "-f", metricsManifest())...)
 	if err != nil || applied.Code != 0 {
 		fmt.Fprintf(errOutOrDiscard(errOut), "metrics-server : installation failed: %s\n", name)
 		code = 1
@@ -121,6 +145,6 @@ func (k Kube) metricsInstall(ctx context.Context, name string, requested bool, o
 		code = 1
 		return code
 	}
-	fmt.Fprintf(errOutOrDiscard(out), "metrics-server : installed (%s): %s (metrics within ~1 min)\n", MetricsVersion, name)
+	fmt.Fprintf(errOutOrDiscard(out), "metrics-server : installed (%s): %s (metrics within ~1 min)\n", metricsVersion(), name)
 	return code
 }

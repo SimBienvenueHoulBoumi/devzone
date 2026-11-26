@@ -148,6 +148,7 @@ GH
 #!/usr/bin/env bash
 case "$*" in
     "cluster clean"*) exit 0 ;;
+    "metrics retirer") exec "$DEVZONE" metrics retirer ;;
 esac
 exit 0
 DEVZONE
@@ -662,8 +663,6 @@ KUBE
     cp "$BATS_TEST_DIRNAME/../../.devcontainer/devzone" "$APP"
     cp "$BATS_TEST_DIRNAME"/../../.devcontainer/devzone-*.sh "$BATS_TEST_TMPDIR/app/"
     cp "$BATS_TEST_DIRNAME/../../.devcontainer/help.sh" "$BATS_TEST_TMPDIR/app/help.sh"
-    cp "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh" "$BATS_TEST_TMPDIR/app/cluster.sh"
-    cp "$BATS_TEST_DIRNAME/../../.devcontainer/kube-account.sh" "$BATS_TEST_TMPDIR/app/kube-account.sh"
     cp "$BATS_TEST_DIRNAME/../../.devcontainer/ai/host-models.sh" "$BATS_TEST_TMPDIR/app/ai/host-models.sh"
     cp "$BATS_TEST_DIRNAME/../../.devcontainer/ai/host-check.sh" "$BATS_TEST_TMPDIR/app/ai/host-check.sh"
     cp "$BATS_TEST_DIRNAME/../../.devcontainer/ai/host-check.message" "$BATS_TEST_TMPDIR/app/ai/host-check.message"

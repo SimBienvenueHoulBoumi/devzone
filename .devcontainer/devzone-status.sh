@@ -94,8 +94,8 @@ show_state() {
         echo "  ⚠ gitlab          GitLab reinstalled: if the browser shows 422, delete the site data of gitlab.localhost"
     fi
     # Remote devzone cluster: warning in the summary
-    current_cluster="$(cluster_saved)"
-    if [ -n "$current_cluster" ] && ! cluster_is_local "$current_cluster"; then
+    current_cluster="$(devzone kube saved)"
+    if [ -n "$current_cluster" ] && ! devzone kube local "$current_cluster"; then
         printf '  ⚠ cluster        remote: %s — services on a remote cluster\n' "$current_cluster"
     fi
     devzone cluster clean --quiet || true
@@ -108,7 +108,7 @@ show_state() {
     case "$ctx_work" in
         kind-gitlab* | kind-devzone*)
             ctx_host="$(KUBECONFIG="${DEVZONE_KUBE_HOST:-$HOME/.kube/hote.config}" kubectl config current-context 2>/dev/null || true)"
-            if [ -n "$ctx_host" ] && cluster_reachable "$ctx_host"; then
+            if [ -n "$ctx_host" ] && devzone kube reachable "$ctx_host"; then
                 printf '  ⚠ working cluster: %s (devzone internal cluster); go back: devzone use %s\n' "$ctx_work" "$ctx_host"
             fi
             ;;

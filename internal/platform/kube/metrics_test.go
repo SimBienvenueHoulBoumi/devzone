@@ -53,7 +53,7 @@ func TestMetricsInstall(t *testing.T) {
 	for _, call := range k.Runner.(*fake.Runner).Calls() {
 		joined += strings.Join(call.Args, " ") + "\n"
 	}
-	if !strings.Contains(joined, "apply -f "+MetricsManifest) ||
+	if !strings.Contains(joined, "apply -f "+metricsManifest()) ||
 		!strings.Contains(joined, "--kubelet-insecure-tls") ||
 		!strings.Contains(joined, "devzone=installe") {
 		t.Fatalf("calls = %q", joined)
