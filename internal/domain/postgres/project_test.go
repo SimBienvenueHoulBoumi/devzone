@@ -110,15 +110,12 @@ func TestCreateKeepsPassword(t *testing.T) {
 	}
 }
 
-// hybridRunner uses the real password library while kubectl and openssl stay
-// faked, so the grouped credentials file can be checked end to end.
+// hybridRunner keeps kubectl and openssl faked while the grouped credentials
+// are regenerated in Go by the domain, not by a shell command.
 type hybridRunner struct{ *sequenceRunner }
 
-// Run implements exec.Runner; bash is the only command run for real.
+// Run implements exec.Runner with the programmed fake responses.
 func (h *hybridRunner) Run(ctx context.Context, name string, args []string, opts exec.Opts) (exec.Result, error) {
-	if name == "bash" {
-		return (exec.ExecRunner{}).Run(ctx, name, args, opts)
-	}
 	return h.sequenceRunner.Run(ctx, name, args, opts)
 }
 
@@ -137,7 +134,6 @@ func repoDevcontainer(t *testing.T) string {
 func TestPasswordFollowsAccounts(t *testing.T) {
 	f := newFixture(t)
 	f.activeOn("host-cluster")
-	f.opts.CodeRoot = repoDevcontainer(t)
 	f.opts.Runner = &hybridRunner{sequenceRunner: f.r}
 	passwordFile := filepath.Join(f.root, ".password")
 	for _, tc := range []struct {

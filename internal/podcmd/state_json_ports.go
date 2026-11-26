@@ -7,12 +7,11 @@ import (
 	"strings"
 )
 
-// portsJSON runs the port list command and keeps its JSON object key order.
+// portsJSON runs the Go port list command and keeps its JSON key order.
 func portsJSON(d jsonDeps, errs jsonObject) (any, jsonObject) {
-	script := filepath.Join(d.code, "ports.sh")
-	out, code, err := d.run("bash", script, "list", "--json")
+	out, code, err := d.run("devzone", "port", "list", "--json")
 	if err != nil || code != 0 {
-		errs.set("ports", "ports.sh unavailable")
+		errs.set("ports", "port unavailable")
 		return nil, errs
 	}
 	if !jqTrueJSON(out) {
