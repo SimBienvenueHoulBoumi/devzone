@@ -218,7 +218,10 @@ case "${1:-}" in
         echo "devzone port: Go binary of the pod unavailable (.devcontainer/bin)" >&2
         exit 1
         ;;
-    packages) bash "$ICI/packages.sh" "${@:2}" ;;
+    packages)
+        echo "devzone packages: Go binary of the pod unavailable (.devcontainer/bin)" >&2
+        exit 1
+        ;;
     passwords)
         echo "devzone passwords: Go binary of the pod unavailable (.devcontainer/bin)" >&2
         exit 1
