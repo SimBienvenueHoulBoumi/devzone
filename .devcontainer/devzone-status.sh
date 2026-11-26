@@ -75,6 +75,9 @@ show_state() {
         else
             printf '  ○ module %-10s optional, %s: devzone enable %s\n' "$m" "$(description "$m")" "$m"
         fi
+        # Service held by an Argo CD Application (#916): the line is printed by devzone state held
+        held="$(DEVZONE_STATE="$ETAT" bash "$ICI/devzone" state held "$m")"
+        [ -z "$held" ] || printf '                    %s\n' "$held"
     done
     # GitOps repository of the instance (#539): the designation of .argocd.conf
     argocd_repo="$(conf_get argocd repo)"
