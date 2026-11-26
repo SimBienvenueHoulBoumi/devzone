@@ -2,70 +2,63 @@ package state
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 )
 
-// TestShellLockGoEquivalent checks reentrance, release and stale lock recovery.
+// TestShellLockGoEquivalent checks frozen lock results: reentrance, release
+// leaves no lockdir, and stale lockdir (older than 30 s) recovered, taken from
+// the shell comparison before state.sh was removed.
 func TestShellLockGoEquivalent(t *testing.T) {
-	script := shellScript(t, "state.sh")
-	// Reentrant take/release leaves no lockdir.
-	shellPath, goPath := stateCopies(t, "ai=on\n")
-	_, shellCode := shellState(t, script, shellPath, `state_lock_take; state_lock_take; state_lock_release; state_lock_release`)
-	s := At(goPath)
-	goCode := numericCode(s.lock())
-	if goCode == 0 {
-		goCode = numericCode(s.lock())
-		s.unlock()
-		s.unlock()
+	// Reentrant take/release leaves no lockdir (code 0).
+	path := filepath.Join(t.TempDir(), "state")
+	writeStateFile(t, path, "ai=on\n")
+	s := At(path)
+	if err := s.lock(); err != nil { // state_lock_take
+		t.Fatalf("lock code 1, want frozen code 0: %v", err)
 	}
-	compareCodes(t, "lock", shellCode, goCode)
-	for _, path := range []string{shellPath + ".lockdir", goPath + ".lockdir"} {
-		if _, err := os.Stat(path); !os.IsNotExist(err) {
-			t.Fatalf("lockdir remains: %s (%v)", path, err)
-		}
+	if err := s.lock(); err != nil { // state_lock_take again
+		t.Fatalf("reentrant lock code 1, want frozen code 0: %v", err)
 	}
+	s.unlock() // state_lock_release
+	s.unlock() // state_lock_release
+	if _, err := os.Stat(path + ".lockdir"); !os.IsNotExist(err) {
+		t.Fatalf("lockdir remains (%v)", err)
+	}
+
 	// A stale lockdir (older than 30 s) is recovered, then released.
-	shellPath, goPath = stateCopies(t, "ai=on\n")
+	stalePath := filepath.Join(t.TempDir(), "state")
+	writeStateFile(t, stalePath, "ai=on\n")
 	old := time.Now().Add(-31 * time.Second)
-	for _, path := range []string{shellPath + ".lockdir", goPath + ".lockdir"} {
-		if err := os.Mkdir(path, 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.Chtimes(path, old, old); err != nil {
-			t.Fatal(err)
-		}
+	if err := os.Mkdir(stalePath+".lockdir", 0o755); err != nil {
+		t.Fatal(err)
 	}
-	_, shellCode = shellState(t, script, shellPath, `state_lock_take; state_lock_release`)
-	s = At(goPath)
-	goCode = numericCode(s.lock())
-	if goCode == 0 {
-		s.unlock()
+	if err := os.Chtimes(stalePath+".lockdir", old, old); err != nil {
+		t.Fatal(err)
 	}
-	compareCodes(t, "stale lock", shellCode, goCode)
-	for _, path := range []string{shellPath + ".lockdir", goPath + ".lockdir"} {
-		if _, err := os.Stat(path); !os.IsNotExist(err) {
-			t.Fatalf("lockdir remains: %s (%v)", path, err)
-		}
+	s = At(stalePath)
+	if err := s.lock(); err != nil { // state_lock_take on stale lockdir
+		t.Fatalf("stale lock code 1, want frozen code 0: %v", err)
+	}
+	s.unlock() // state_lock_release
+	if _, err := os.Stat(stalePath + ".lockdir"); !os.IsNotExist(err) {
+		t.Fatalf("lockdir remains (%v)", err)
 	}
 }
 
-// TestShellLockStandaloneGoEquivalent checks state-lock.sh on its own, not
-// sourced by state.sh, against Go lock/unlock.
+// TestShellLockStandaloneGoEquivalent checks frozen standalone lock results
+// (formerly state-lock.sh on its own): take/release leaves no lockdir and code
+// 0, taken from the shell comparison before state-lock.sh was removed.
 func TestShellLockStandaloneGoEquivalent(t *testing.T) {
-	script := shellScript(t, "state-lock.sh")
-	shellPath, goPath := stateCopies(t, "ai=on\n")
-	_, shellCode := shellState(t, script, shellPath, `state_lock_take; state_lock_release`)
-	s := At(goPath)
-	goCode := numericCode(s.lock())
-	if goCode == 0 {
-		s.unlock()
+	path := filepath.Join(t.TempDir(), "state")
+	writeStateFile(t, path, "ai=on\n")
+	s := At(path)
+	if err := s.lock(); err != nil { // state_lock_take
+		t.Fatalf("lock code 1, want frozen code 0: %v", err)
 	}
-	compareCodes(t, "state-lock.sh", shellCode, goCode)
-	if _, err := os.Stat(shellPath + ".lockdir"); !os.IsNotExist(err) {
-		t.Fatalf("shell lockdir remains: %v", err)
-	}
-	if _, err := os.Stat(goPath + ".lockdir"); !os.IsNotExist(err) {
-		t.Fatalf("Go lockdir remains: %v", err)
+	s.unlock() // state_lock_release
+	if _, err := os.Stat(path + ".lockdir"); !os.IsNotExist(err) {
+		t.Fatalf("lockdir remains (%v)", err)
 	}
 }

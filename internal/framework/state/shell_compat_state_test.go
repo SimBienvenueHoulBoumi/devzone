@@ -1,9 +1,8 @@
 package state
 
 import (
-	"bytes"
+	"fmt"
 	"os"
-	osexec "os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -11,213 +10,188 @@ import (
 	"time"
 )
 
-// TestShellRecoveryGoEquivalent compares the recovery marker predicates and
-// their exit codes with the shell functions.
+// TestShellRecoveryGoEquivalent checks frozen recovery marker results: codes,
+// no output, integer marker, recent/old age, pending and confirm, taken from
+// the shell comparison before state.sh was removed.
 func TestShellRecoveryGoEquivalent(t *testing.T) {
-	script := shellScript(t, "state.sh")
-	shellPath, goPath := stateCopies(t, "ai=on\n")
-	shellOut, shellCode := shellState(t, script, shellPath, `state_recovery_mark`)
-	goState, goCode := At(goPath), numericCode(At(goPath).RecoveryMark())
-	compareCodes(t, "mark", shellCode, goCode)
-	if shellOut != "" {
-		t.Fatalf("unexpected shell output: %q", shellOut)
-	}
-	for _, path := range []string{shellPath + ".recouvre", goPath + ".recouvre"} {
-		data, err := os.ReadFile(path)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err := strconv.ParseInt(strings.TrimSpace(string(data)), 10, 64); err != nil {
-			t.Fatalf("marker %s: %q", path, data)
-		}
-	}
-	_, waitCode := shellState(t, script, shellPath, `state_recovery_wait`)
-	compareCodes(t, "wait recent", waitCode, numericCodeFromBool(goState.RecoveryWait()))
-	_, pendingCode := shellState(t, script, shellPath, `state_recovery_pending`)
-	compareCodes(t, "pending", pendingCode, numericCodeFromBool(goState.RecoveryPending()))
+	path := filepath.Join(t.TempDir(), "state")
+	writeStateFile(t, path, "ai=on\n")
+	s := At(path)
 
-	old := strconv.FormatInt(time.Now().Add(-120*time.Second).Unix(), 10)
-	for _, path := range []string{shellPath + ".recouvre", goPath + ".recouvre"} {
-		if err := os.WriteFile(path, []byte(old), 0o644); err != nil {
-			t.Fatal(err)
-		}
+	if err := s.RecoveryMark(); err != nil { // state_recovery_mark: code 0, no output
+		t.Fatalf("code 1, want frozen code 0: %v", err)
 	}
-	_, waitCode = shellState(t, script, shellPath, `state_recovery_wait`)
-	compareCodes(t, "wait old", waitCode, numericCodeFromBool(goState.RecoveryWait()))
-
-	_, shellCode = shellState(t, script, shellPath, `state_recovery_confirm`)
-	compareCodes(t, "confirm", shellCode, numericCode(goState.RecoveryConfirm()))
-	for _, path := range []string{shellPath + ".recouvre", goPath + ".recouvre"} {
-		if _, err := os.Stat(path); !os.IsNotExist(err) {
-			t.Fatalf("marker remains: %s (%v)", path, err)
-		}
-	}
-}
-
-// numericCodeFromBool turns a shell predicate result into an exit code.
-func numericCodeFromBool(ok bool) int {
-	if ok {
-		return 0
-	}
-	return 1
-}
-
-// TestShellInitGoEquivalent compares creation, restore, rebuild and migration
-// with a fake kubectl, never a real cluster.
-func TestShellInitGoEquivalent(t *testing.T) {
-	script := shellScript(t, "state.sh")
-	dir := t.TempDir()
-	bin := filepath.Join(dir, "bin")
-	if err := os.MkdirAll(bin, 0o755); err != nil {
+	marker, err := os.ReadFile(path + ".recouvre")
+	if err != nil {
 		t.Fatal(err)
 	}
-	writeShellFake(t, filepath.Join(bin, "kubectl"), `#!/usr/bin/env bash
-case "$*" in
-    get\ namespaces*) for n in ${FAUX_NS:-}; do printf 'namespace/%s\n' "$n"; done ;;
-    *"config view"*) for c in devzone docker-desktop; do case "$*" in *"$c"*) echo docker-desktop; exit 0 ;; esac; done; exit 1 ;;
-    "config get-contexts -o name") printf 'devzone\ndocker-desktop\n' ;;
-    *) exit 1 ;;
-esac
-exit 0
-`)
-	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
-	t.Setenv("DEVZONE_KUBE_HOST", filepath.Join(dir, "host.config"))
-	home := filepath.Join(dir, "home")
-	t.Setenv("HOME", home)
-	modules := []string{"ai", "kubernetes", "gitlab", "postgres", "argocd", "mysql"}
+	if _, err := strconv.ParseInt(strings.TrimSpace(string(marker)), 10, 64); err != nil {
+		t.Fatalf("marker %q: %v", marker, err)
+	}
+	if !s.RecoveryWait() { // state_recovery_wait recent: code 0
+		t.Fatal("wait recent: want frozen code 0")
+	}
+	if !s.RecoveryPending() { // state_recovery_pending: code 0
+		t.Fatal("pending: want frozen code 0")
+	}
 
+	old := strconv.FormatInt(time.Now().Add(-120*time.Second).Unix(), 10)
+	writeStateFile(t, path+".recouvre", old)
+	if s.RecoveryWait() { // state_recovery_wait old: code 1
+		t.Fatal("wait old: want frozen code 1")
+	}
+
+	if err := s.RecoveryConfirm(); err != nil { // state_recovery_confirm: code 0
+		t.Fatalf("code 1, want frozen code 0: %v", err)
+	}
+	if _, err := os.Stat(path + ".recouvre"); !os.IsNotExist(err) {
+		t.Fatalf("marker remains (%v)", err)
+	}
+}
+
+// TestShellInitGoEquivalent checks frozen creation, restore, rebuild and
+// migration results with a fake kubectl (never a real cluster), taken from the
+// shell comparison before state.sh was removed.
+func TestShellInitGoEquivalent(t *testing.T) {
+	modules := defaultModules()
 	cases := []struct {
-		name string
-		prev string
-		env  string
+		name      string
+		prev      string
+		fauxNS    []string
+		wantState string
+		wantPrev  string
+		hasPrev   bool
+		wantWarns []string
 	}{
-		{name: "first install"},
-		{name: "restore backup", prev: "ai=on\nkubernetes=off\ngitlab=on\npostgres=on\n"},
-		{name: "rebuild namespaces", env: "devzone-postgres devzone-gitlab"},
+		{name: "first install", wantState: "ai=off\nkubernetes=off\ngitlab=off\n"},
+		{name: "restore backup", prev: "ai=on\nkubernetes=off\ngitlab=on\npostgres=on\n",
+			wantState: "ai=on\nkubernetes=off\ngitlab=on\npostgres=on\n", wantPrev: "ai=on\nkubernetes=off\ngitlab=on\npostgres=on\n", hasPrev: true,
+			wantWarns: []string{"devzone : state restored from the backup copy: <STATE> (confirm with devzone apply)"}},
+		{name: "rebuild namespaces", fauxNS: []string{"devzone-postgres", "devzone-gitlab"},
+			wantState: "ai=off\nkubernetes=off\ngitlab=on\npostgres=on\nargocd=off\nmysql=off\ncluster=docker-desktop\n",
+			wantWarns: []string{"devzone : state rebuilt from the namespaces of the services cluster: <STATE> (confirm with devzone apply)"}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			t.Setenv("FAUX_NS", tc.env)
-			shellPath, goPath := stateCopies(t, "")
+			dir := t.TempDir()
+			path := filepath.Join(dir, "state")
+			home := filepath.Join(dir, "home")
+			if err := os.MkdirAll(home, 0o755); err != nil {
+				t.Fatal(err)
+			}
 			if tc.prev != "" {
-				for _, path := range []string{shellPath + ".prev", goPath + ".prev"} {
-					writeShellFake(t, path, tc.prev)
-				}
+				writeStateFile(t, path+".prev", tc.prev)
 			}
-			program := `. "$1"; ETAT="$2"; state_init ` + strings.Join(modules, " ")
-			shellOut, shellCode := shellCommandArgs(t, script, shellPath, program, nil)
+			t.Setenv("DEVZONE_KUBE_HOST", filepath.Join(dir, "host.config"))
 			var warns []string
-			goCode := numericCode(At(goPath).Init(modules, shellRunner(), shellPath+".home", nil, func(m string) { warns = append(warns, m) }))
-			compareCodes(t, tc.name, shellCode, goCode)
-			compareStateBytes(t, shellPath, goPath)
-			wantWarns := strings.ReplaceAll(shellOut, shellPath, "<STATE>")
-			gotWarns := strings.Join(warns, "\n")
-			if len(warns) > 0 {
-				gotWarns += "\n"
+			if err := At(path).Init(modules, fakeKubectlInit(tc.fauxNS), home, nil, func(m string) { warns = append(warns, m) }); err != nil {
+				t.Fatalf("code 1, want frozen code 0: %v", err)
 			}
-			gotWarns = strings.ReplaceAll(gotWarns, goPath, "<STATE>")
-			if wantWarns != gotWarns {
-				t.Fatalf("warnings differ: shell=%q Go=%q", wantWarns, gotWarns)
+			assertFile(t, path, tc.wantState)
+			assertPrev(t, path+".prev", tc.hasPrev, tc.wantPrev)
+			gotWarns := normalizeState(strings.Join(warns, "\n"), path)
+			if strings.Join(tc.wantWarns, "\n") != gotWarns {
+				t.Fatalf("warnings %q, want %q", gotWarns, strings.Join(tc.wantWarns, "\n"))
 			}
 		})
 	}
 }
 
-// shellCommandArgs runs a shell program with the modules as positional arguments.
-func shellCommandArgs(t *testing.T, script, statePath, program string, args []string) (string, int) {
-	t.Helper()
-	cmdArgs := append([]string{"-c", program, "_", script, statePath}, args...)
-	cmd := osexec.Command("bash", cmdArgs...)
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &out
-	err := cmd.Run()
-	if err == nil {
-		return out.String(), 0
-	}
-	if exit, ok := err.(*osexec.ExitError); ok {
-		return out.String(), exit.ExitCode()
-	}
-	t.Fatalf("bash: %v", err)
-	return "", -1
-}
-
-// writeShellFake writes a fake command or data file in a disposable folder.
-func writeShellFake(t *testing.T, path, content string) {
-	t.Helper()
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Chmod(path, 0o755); err != nil {
-		t.Fatal(err)
-	}
-}
-
-// shellRunner adapts the fake kubectl in PATH to the state Runner signature.
-func shellRunner() Runner {
-	return func(name string, args ...string) (string, string, error) {
-		cmd := osexec.Command(name, args...)
-		var stdout, stderr bytes.Buffer
-		cmd.Stdout = &stdout
-		cmd.Stderr = &stderr
-		err := cmd.Run()
-		return stdout.String(), stderr.String(), err
-	}
-}
-
-// TestShellAbortGoEquivalent checks that a failed write leaves the state, no
-// temporary file and no lock, as state_abort does.
+// TestShellAbortGoEquivalent checks frozen abort results: failed write leaves
+// the state unchanged, no temporary file and no lock (code 1), taken from the
+// shell comparison before state.sh was removed.
 func TestShellAbortGoEquivalent(t *testing.T) {
-	script := shellScript(t, "state.sh")
-	shellPath, goPath := stateCopies(t, "ai=on\n")
-	tmp := filepath.Join(filepath.Dir(shellPath), "shell.tmp")
-	_, shellCode := shellState(t, script, shellPath, `state_lock_take; printf x >"$3"; state_abort "$3"`, tmp)
-	if shellCode != 1 {
-		t.Fatalf("shell abort code %d", shellCode)
-	}
-	if _, err := os.Stat(tmp); !os.IsNotExist(err) {
-		t.Fatalf("temp remains: %v", err)
-	}
-	if err := os.Mkdir(goPath+".prev", 0o755); err != nil {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "state")
+	writeStateFile(t, path, "ai=on\n")
+	if err := os.Mkdir(path+".prev", 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := At(goPath).Set("ai", "off"); err == nil {
-		t.Fatal("Go write should fail when the backup path is a directory")
+	if err := At(path).Set("ai", "off"); err == nil {
+		t.Fatal("code 0, want frozen code 1 when the backup path is a directory")
 	}
-	compareStateBytes(t, shellPath, goPath)
-	if _, err := os.Stat(goPath + ".lockdir"); !os.IsNotExist(err) {
-		t.Fatalf("Go lockdir remains: %v", err)
+	assertFile(t, path, "ai=on\n")
+	if _, err := os.Stat(path + ".lockdir"); !os.IsNotExist(err) {
+		t.Fatalf("lockdir remains (%v)", err)
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		if strings.HasPrefix(e.Name(), ".devzone.modules.") {
+			t.Fatalf("temporary file remains: %s", e.Name())
+		}
 	}
 }
 
-// TestShellHostContextGoEquivalent checks the host context selected for a
-// services cluster, using only the fake kubectl script.
+// TestShellHostContextGoEquivalent checks frozen host context output for a
+// services cluster, using only a fake kubectl, taken from the shell comparison
+// before state.sh was removed.
 func TestShellHostContextGoEquivalent(t *testing.T) {
-	script := shellScript(t, "state.sh")
-	dir := t.TempDir()
-	bin := filepath.Join(dir, "bin")
-	if err := os.MkdirAll(bin, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	writeShellFake(t, filepath.Join(bin, "kubectl"), `#!/usr/bin/env bash
-case "$*" in
-    "config get-contexts -o name") printf 'devzone\ndocker-desktop\n' ;;
-    *docker-desktop*) echo docker-desktop ;;
-    *) exit 1 ;;
-esac
-exit 0
-`)
-	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
-	t.Setenv("DEVZONE_KUBE_HOST", filepath.Join(dir, "host.config"))
-	shellPath, _ := stateCopies(t, "ai=on\n")
-	out, code := shellState(t, script, shellPath, `host_context_of_cluster "$3"`, "docker-desktop")
-	if code != 0 {
-		t.Fatalf("shell host context code %d: %q", code, out)
-	}
-	if got := hostContextOfCluster(shellRunner(), "docker-desktop"); got != strings.TrimSpace(out) {
-		t.Fatalf("host context: shell=%q Go=%q", out, got)
+	kube := fakeKubectlFunc(nil, func(joined string) (string, bool) {
+		if strings.Contains(joined, "config get-contexts -o name") {
+			return "devzone\ndocker-desktop\n", true
+		}
+		if strings.Contains(joined, "docker-desktop") {
+			return "docker-desktop\n", true
+		}
+		return "", false
+	})
+	if got := hostContextOfCluster(kube, "docker-desktop"); got != "docker-desktop" {
+		t.Fatalf("host context %q, want frozen %q", got, "docker-desktop")
 	}
 }
+
+// fakeKubectlInit returns a fake kubectl runner like the shell fake used by
+// the former comparison, never a real cluster.
+func fakeKubectlInit(fauxNS []string) Runner {
+	return fakeKubectlFunc(fauxNS, func(joined string) (string, bool) {
+		if strings.Contains(joined, "config view") {
+			for _, c := range []string{"devzone", "docker-desktop"} {
+				if strings.Contains(joined, c) {
+					return "docker-desktop\n", true
+				}
+			}
+			return "", false
+		}
+		if strings.Contains(joined, "config get-contexts -o name") {
+			return "devzone\ndocker-desktop\n", true
+		}
+		return "", false
+	})
+}
+
+// fakeKubectlFunc adapts kubectl calls (including env KUBECONFIG ... kubectl)
+// to a pure Go runner; extra answers kubectl always emits are added first.
+func fakeKubectlFunc(fauxNS []string, extra func(joined string) (string, bool)) Runner {
+	return func(name string, args ...string) (string, string, error) {
+		kargs := args
+		if name == "env" {
+			kargs = nil
+			for _, a := range args {
+				if a == "kubectl" || strings.HasPrefix(a, "KUBECONFIG=") {
+					continue
+				}
+				kargs = append(kargs, a)
+			}
+		} else if name != "kubectl" {
+			return "", "", fmt.Errorf("not kubectl: %s", name)
+		}
+		joined := strings.Join(kargs, " ")
+		if len(kargs) >= 2 && kargs[0] == "get" && kargs[1] == "namespaces" {
+			out := ""
+			for _, n := range fauxNS {
+				out += "namespace/" + n + "\n"
+			}
+			return out, "", nil
+		}
+		if out, ok := extra(joined); ok {
+			return out, "", nil
+		}
+		return "", "", fmt.Errorf("exit 1")
+	}
+}
+
+// normalizeState replaces the temporary state path with <STATE>.
+func normalizeState(s, path string) string { return strings.ReplaceAll(s, path, "<STATE>") }

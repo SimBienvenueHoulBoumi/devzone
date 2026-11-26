@@ -1,40 +1,45 @@
 package state
 
 import (
-	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
-// TestShellRebuildGoEquivalent checks state_rebuild vs State.Rebuild with a fake
-// kubectl, comparing the rebuilt state and exit code.
+// TestShellRebuildGoEquivalent checks frozen state_rebuild results with a
+// fake kubectl (never a real cluster): rebuilt state, .prev, exit code and
+// warnings, taken from the shell comparison before state.sh was removed.
 func TestShellRebuildGoEquivalent(t *testing.T) {
-	script := shellScript(t, "state.sh")
 	dir := t.TempDir()
-	bin := filepath.Join(dir, "bin")
-	if err := os.MkdirAll(bin, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	writeShellFake(t, filepath.Join(bin, "kubectl"), `#!/usr/bin/env bash
-case "$*" in
-    get\ namespaces*) printf 'namespace/devzone-postgres\nnamespace/devzone-gitlab\n' ;;
-    *"config view"*devzone*) echo kind-devzone ;;
-    *"config get-contexts"*) printf 'devzone\ndocker-desktop\n' ;;
-    *docker-desktop*) echo kind-devzone ;;
-    *) exit 1 ;;
-esac
-exit 0
-`)
-	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	path := filepath.Join(dir, "state")
 	t.Setenv("DEVZONE_KUBE_HOST", filepath.Join(dir, "host.config"))
 	t.Setenv("HOME", dir)
-	modules := []string{"ai", "kubernetes", "gitlab", "postgres", "argocd", "mysql"}
-	shellPath, goPath := stateCopies(t, "")
-	_, shellCode := shellState(t, script, shellPath, `state_rebuild "${@:3}"`, modules...)
-	s := At(goPath)
+	modules := defaultModules()
 	var warns []string
-	_, err := s.Rebuild(modules, shellRunner(), func(m string) { warns = append(warns, m) })
-	goCode := numericCode(err)
-	compareCodes(t, "state_rebuild", shellCode, goCode)
-	compareStateBytes(t, shellPath, goPath)
+	rebuilt, err := At(path).Rebuild(modules, fakeKubectlRebuild(), func(m string) { warns = append(warns, m) })
+	if err != nil || !rebuilt { // state_rebuild: code 0, rebuilt
+		t.Fatalf("code/rebuilt rebuilt=%v err=%v, want frozen code 0 rebuilt", rebuilt, err)
+	}
+	assertFile(t, path, "ai=off\nkubernetes=off\ngitlab=on\npostgres=on\nargocd=off\nmysql=off\ncluster=docker-desktop\n")
+	assertPrev(t, path+".prev", false, "")
+	if len(warns) != 1 || !strings.Contains(warns[0], "state rebuilt from the namespaces") {
+		t.Fatalf("warnings %q", warns)
+	}
+}
+
+// fakeKubectlRebuild returns a fake kubectl runner like the shell fake used by
+// the former comparison, never a real cluster.
+func fakeKubectlRebuild() Runner {
+	return fakeKubectlFunc([]string{"devzone-postgres", "devzone-gitlab"}, func(joined string) (string, bool) {
+		if strings.Contains(joined, "config view") && strings.Contains(joined, "devzone") {
+			return "kind-devzone\n", true
+		}
+		if strings.Contains(joined, "config get-contexts") {
+			return "devzone\ndocker-desktop\n", true
+		}
+		if strings.Contains(joined, "docker-desktop") {
+			return "kind-devzone\n", true
+		}
+		return "", false
+	})
 }
