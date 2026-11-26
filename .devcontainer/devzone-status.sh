@@ -63,13 +63,13 @@ show_state() {
             printf '  ✖ module %-10s failed: incomplete install (%s): devzone apply\n' "$m" "$(cat "$(failure_marker_file "$m")")"
         elif [ "$(value_of "$m")" = on ] && [ "$m" = gitlab ]; then
             # gitlab active: its real state (ready, runner, failed)
-            printf '  ✔ module %-10s %s\n' "$m" "$(devzone gitlab status)"
+            printf '  ✔ module %-10s %s\n' "$m" "$("$ICI/devzone" gitlab status)"
         elif [ "$(value_of "$m")" = on ] && [ "$m" = postgres ]; then
-            printf '  ✔ module %-10s %s\n' "$m" "$(devzone postgres status)"
+            printf '  ✔ module %-10s %s\n' "$m" "$("$ICI/devzone" postgres status)"
         elif [ "$(value_of "$m")" = on ] && [ "$m" = argocd ]; then
             printf '  ✔ module %-10s %s\n' "$m" "$("$ICI/devzone" argocd status)"
         elif [ "$(value_of "$m")" = on ] && [ "$m" = mysql ]; then
-            printf '  ✔ module %-10s %s\n' "$m" "$(devzone mysql status)"
+            printf '  ✔ module %-10s %s\n' "$m" "$("$ICI/devzone" mysql status)"
         elif [ "$(value_of "$m")" = on ]; then
             printf '  ✔ module %-10s active: %s\n' "$m" "$(description "$m")"
         else
@@ -90,18 +90,18 @@ show_state() {
     fi
     # Catalog applications (#414)
     if [ -d "$ICI/catalog" ]; then
-        DEVZONE_STATE="$ETAT" devzone catalog resume
+        DEVZONE_STATE="$ETAT" "$ICI/devzone" catalog resume
     fi
     # GitLab Rails secret (#347): warning if the secrets were lost
     if [ "$(value_of gitlab)" = on ] && [ ! -f "$RACINE/workspace/.gitlab/rails-secret.yaml" ]; then
         echo "  ⚠ gitlab          GitLab reinstalled: if the browser shows 422, delete the site data of gitlab.localhost"
     fi
     # Remote devzone cluster: warning in the summary
-    current_cluster="$(devzone kube saved)"
-    if [ -n "$current_cluster" ] && ! devzone kube local "$current_cluster"; then
+    current_cluster="$("$ICI/devzone" kube saved)"
+    if [ -n "$current_cluster" ] && ! "$ICI/devzone" kube local "$current_cluster"; then
         printf '  ⚠ cluster        remote: %s — services on a remote cluster\n' "$current_cluster"
     fi
-    devzone cluster clean --quiet || true
+    "$ICI/devzone" cluster clean --quiet || true
     # Old kind-gitlab cluster still present: invite to migrate (#396)
     if kind get clusters 2>/dev/null | grep -qx "gitlab${INSTANCE_SUFFIX}"; then
         printf '  ⚠ old kind-gitlab cluster%s: devzone gitlab migrate\n' "$INSTANCE_SUFFIX"
@@ -111,7 +111,7 @@ show_state() {
     case "$ctx_work" in
         kind-gitlab* | kind-devzone*)
             ctx_host="$(KUBECONFIG="${DEVZONE_KUBE_HOST:-$HOME/.kube/hote.config}" kubectl config current-context 2>/dev/null || true)"
-            if [ -n "$ctx_host" ] && devzone kube reachable "$ctx_host"; then
+            if [ -n "$ctx_host" ] && "$ICI/devzone" kube reachable "$ctx_host"; then
                 printf '  ⚠ working cluster: %s (devzone internal cluster); go back: devzone use %s\n' "$ctx_work" "$ctx_host"
             fi
             ;;

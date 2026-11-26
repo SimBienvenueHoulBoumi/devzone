@@ -57,14 +57,7 @@ if [ -f "$ICI/argocd/conf.sh" ]; then
     . "$ICI/argocd/conf.sh"
 fi
 # GitOps repository line in the Kubernetes workspace pod (#639)
-# Detection of the host (Ollama) models and the devzone-host opencode provider (#665).
-# shellcheck source=SCRIPTDIR/ai/host-models.sh
-# shellcheck disable=SC1091
-. "$ICI/ai/host-models.sh"
-# Update check and report for the host (Ollama) models (#668).
-# shellcheck source=SCRIPTDIR/ai/host-check.sh
-# shellcheck disable=SC1091
-. "$ICI/ai/host-check.sh"
+# Host models and assistants are handled by the Go command of the pod (#882).
 
 # AI assistants, pinned versions: update here, then devzone apply (or Rebuild
 # Container). One line per package, separated by a line that does not change:
@@ -93,15 +86,7 @@ GITLAB_URL_MODULE=http://gitlab.localhost:8929
 # shellcheck source=SCRIPTDIR/devzone-modules.sh
 # shellcheck disable=SC1091
 . "$ICI/devzone-modules.sh"
-# shellcheck source=SCRIPTDIR/devzone-ai.sh
-# shellcheck disable=SC1091
-. "$ICI/devzone-ai.sh"
-# shellcheck source=SCRIPTDIR/devzone-ai-guard.sh
-# shellcheck disable=SC1091
-. "$ICI/devzone-ai-guard.sh"
-# shellcheck source=SCRIPTDIR/devzone-skill.sh
-# shellcheck disable=SC1091
-. "$ICI/devzone-skill.sh"
+# The AI module and its guard are handled by the Go command of the pod (#882).
 # shellcheck source=SCRIPTDIR/devzone-services.sh
 # shellcheck disable=SC1091
 . "$ICI/devzone-services.sh"
@@ -151,7 +136,7 @@ case "${1:-}" in
         # may uninstall again
         DEVZONE_STATE="$ETAT" bash "$ICI/devzone" state recovery-confirm
         apply_repowarden
-        [ "$(value_of ai)" = off ] || apply_ai on
+        [ "$(value_of ai)" = off ] || DEVZONE_STATE="$ETAT" "$ICI/devzone" ai apply on
         # gitlab, postgres, argocd: installed from the workstation in the
         # Kubernetes workspace pod (#528), by their installer elsewhere
         [ "$(value_of gitlab)" = off ] || apply_service gitlab
@@ -165,39 +150,13 @@ case "${1:-}" in
         # writing anything
         [ "$(value_of "$2")" = on ]
         ;;
-    ai)
-        case "${2:-}" in
-            check)
-                # Read-only: update state of each detected host model (#668).
-                check
-                ;;
-            rapport)
-                # Read-only: sizes, update state, measurements, chosen model (#668).
-                rapport
-                ;;
-            *)
-                # Read-only: lists the host (Ollama) models detected and the default model.
-                models_list="$(modeles)"
-                default_model="$(premier)"
-                if [ -z "$models_list" ]; then
-                    echo "devzone : no Ollama model detected on ${URL} (answer on /api/tags)"
-                else
-                    echo "devzone : models detected on the host (Ollama):"
-                    while IFS= read -r m; do
-                        [ -n "$m" ] && printf '  %s\n' "$m"
-                    done <<<"$models_list"
-                    echo "default model: ${default_model:-none}"
-                fi
-                ;;
-        esac
-        ;;
     build)
         bash "$ICI/workspace-build.sh" "${@:2}"
         ;;
     repair) repair_workstation ;;
     # Go only: reached when the binary did not take the call. Never call
     # "devzone" again from here, it would loop forever, see #864
-    cluster | clusters | metrics | use | kube | agent | postgres | mysql | gitlab | test-gitlab | catalog | catalog-watcher)
+    cluster | clusters | metrics | use | kube | ai | agent | postgres | mysql | gitlab | test-gitlab | catalog | catalog-watcher)
         echo "devzone $1: Go binary of the pod unavailable (.devcontainer/bin)" >&2
         exit 1
         ;;

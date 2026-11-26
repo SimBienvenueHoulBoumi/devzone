@@ -13,20 +13,19 @@ func TestApplyRestartsRelay(t *testing.T) {
 	f := newFixture(t)
 	writeState(t, "postgres=on", "cluster=kind-devzone")
 	calls := filepath.Join(f.root, "calls")
+	writeDevzoneStub(t, `case "$1" in
+    kube) exit 0 ;;
+esac
+printf 'CALL %s\n' "$*" >>"`+calls+`"
+case "$1 $2" in
+    "postgres status") printf 'ready on kind-devzone, relay stopped: devzone apply\n' ;;
+esac
+exit 0
+`)
 	body := `
-CALLS="$6"
-devzone() {
-    case "$1" in
-        kube) return 0 ;;
-    esac
-    printf 'CALL %s\n' "$*" >>"$CALLS"
-    case "$1 $2" in
-        "postgres status") printf 'ready on kind-devzone, relay stopped: devzone apply\n' ;;
-    esac
-}
 apply_postgres on
 `
-	out, code := shellServices(t, body, "", calls)
+	out, code := shellServices(t, body, "")
 	if code != 0 || !strings.Contains(out, "relay restarted") {
 		t.Fatalf("apply: code %d, output %q", code, out)
 	}

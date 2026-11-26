@@ -243,185 +243,12 @@ DEVZONE
     [[ "$output" == *"✔ module ai"*"active"* ]] || false
 }
 
-@test "enable ai: installs pinned versions, state kept" {
-    run bash "$DEVZONE" enable ai
-    [ "$status" -eq 0 ]
-    grep -qE "install -g .* @anthropic-ai/claude-code@[0-9.]+$" "$BATS_TEST_TMPDIR/npm.log"
-    grep -qE "install -g .* opencode-ai@[0-9.]+$" "$BATS_TEST_TMPDIR/npm.log"
-    run bash "$DEVZONE" is-enabled ai
-    [ "$status" -eq 0 ]
-}
-
-@test "enable ai: optional binary dropped by npm (opencode does not answer) -> reinstalled" {
-    NPM_IA_SANS_BINAIRE=1 run bash "$DEVZONE" enable ai
-    [ "$status" -eq 0 ]
-    [ "$(grep -c "^npm install -g .* opencode-ai@" "$BATS_TEST_TMPDIR/npm.log")" -eq 2 ]
-    [[ "$output" == *"retrying"* ]] || false
-    run opencode --version
-    [ "$status" -eq 0 ]
-}
-
-@test "enable ai: npm fails once -> retried, success" {
-    NPM_IA_ECHECS=1 run bash "$DEVZONE" enable ai
-    [ "$status" -eq 0 ]
-    [ "$(grep -c "^npm install -g .* opencode-ai@" "$BATS_TEST_TMPDIR/npm.log")" -eq 2 ]
-    [[ "$output" == *"ai active"* ]] || false
-}
-
-@test "enable ai: every attempt fails -> 3 attempts, non-zero code, packages and npm journal cited" {
-    NPM_IA_ECHECS=9 run bash "$DEVZONE" enable ai
-    [ "$status" -ne 0 ]
-    [ "$(grep -c "^npm install -g .* opencode-ai@" "$BATS_TEST_TMPDIR/npm.log")" -eq 3 ]
-    [[ "$output" == *"opencode-ai@"* ]] || false
-    [[ "$output" == *".npm/_logs"* ]] || false
-    [[ "$output" != *"ai active"* ]] || false
-}
-
-@test "enable ai: slow installation -> announced, progress during, result after" {
-    NPM_DUREE=3 DEVZONE_PROGRESS=1 run bash "$DEVZONE" enable ai
-    [ "$status" -eq 0 ]
-    [[ "$output" == *"installing Claude Code and opencode (a few minutes)"*"still running"*"Claude Code and opencode installed"* ]] || false
-}
-
-@test "enable ai: npm failure -> non-zero code, package and npm journal cited, failed state" {
-    NPM_ECHEC=1 run bash "$DEVZONE" enable ai
-    [ "$status" -ne 0 ]
-    [[ "$output" == *"installation of"*"opencode-ai@"* ]] || false
-    [[ "$output" != *"@anthropic-ai/claude-code@"* ]] || false
-    [[ "$output" == *"$HOME/.npm/_logs/2026-10-24T11_46_18_245Z-debug-0.log"* ]] || false
-    [[ "$output" != *"ai active"* ]] || false
-    run bash "$DEVZONE"
-    [[ "$output" == *"✖ module ai"*"failed"*"devzone apply"* ]] || false
-    [[ "$output" != *"✔ module ai"* ]] || false
-}
-
-@test "enable ai: npm fails for opencode only -> Claude Code installed, failure names opencode" {
-    NPM_ECHEC=1 run bash "$DEVZONE" enable ai
-    [ "$status" -ne 0 ]
-    failure="$output"
-    PATH="$BATS_TEST_TMPDIR/bin:/usr/bin:/bin" run claude --version
-    [ "$status" -eq 0 ]
-    [[ "$failure" == *"opencode-ai@"* ]] || false
-    [[ "$failure" != *"@anthropic-ai/claude-code@"* ]] || false
-}
-
-@test "apply: ai failure -> non-zero code; then success -> active state, no failure" {
-    bash "$DEVZONE" enable ai
-    NPM_ECHEC=1 run bash "$DEVZONE" apply
-    [ "$status" -ne 0 ]
-    run bash "$DEVZONE"
-    [[ "$output" == *"✖ module ai"*"failed"* ]] || false
-    run bash "$DEVZONE" apply
-    [ "$status" -eq 0 ]
-    run bash "$DEVZONE"
-    [[ "$output" == *"✔ module ai"*"active"* ]] || false
-    [[ "$output" != *"failed"* ]] || false
-}
-
-@test "disable ai after a failure: no longer marked as failed" {
-    NPM_ECHEC=1 run bash "$DEVZONE" enable ai
-    run bash "$DEVZONE"
-    [[ "$output" == *"✖ module ai"*"failed"* ]] || false
-    run bash "$DEVZONE" disable ai
-    [ "$status" -eq 0 ]
-    run bash "$DEVZONE"
-    [[ "$output" == *"○ module ai"* ]] || false
-    [[ "$output" != *"failed"* ]] || false
-}
-
-@test "disable ai: uninstalls, state kept" {
-    bash "$DEVZONE" enable ai
-    mkdir -p "${DEVZONE_AGENT_STATE:-$HOME/.local/state/oc-lancer}"
-    run bash "$DEVZONE" disable ai
-    [ "$status" -eq 0 ]
-    grep -qx "npm uninstall -g @anthropic-ai/claude-code opencode-ai" "$BATS_TEST_TMPDIR/npm.log"
-    run bash "$DEVZONE" is-enabled ai
-    [ "$status" -ne 0 ]
-    [ -d "${DEVZONE_AGENT_STATE:-$HOME/.local/state/oc-lancer}" ]
-}
-
 @test "disable kubernetes: removes the host config file, without starting anything" {
     mkdir -p "$HOME/.kube" && touch "$HOME/.kube/hote.config"
     run bash "$DEVZONE" disable kubernetes
     [ "$status" -eq 0 ]
     [ ! -e "$HOME/.kube/hote.config" ]
     [[ "$output" == *"kubernetes disabled"* ]] || false
-}
-
-@test "disable ai: enable + disable cycle -> identical file fingerprint" {
-    install_faux_repowarden
-    empreinte_avant="$(empreinte)"
-    run bash "$DEVZONE" enable ai
-    [ "$status" -eq 0 ]
-    run bash "$DEVZONE" disable ai
-    [ "$status" -eq 0 ]
-    [ "$(empreinte)" = "$empreinte_avant" ]
-}
-
-@test "disable ai: repowarden hook removed, user settings and custom config kept" {
-    install_faux_repowarden
-    mkdir -p "$HOME/.claude" "$HOME/.config/opencode"
-    cat >"$HOME/.claude/settings.json" <<'JSON'
-{
-  "model": "claude-personnel",
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "repowarden garde"
-          }
-        ]
-      }
-    ]
-  }
-}
-JSON
-    printf '{"model":"mon-modele"}' >"$HOME/.config/opencode/opencode.jsonc"
-    run bash "$DEVZONE" disable ai
-    [ "$status" -eq 0 ]
-    [ -f "$HOME/.claude/settings.json" ]
-    grep -q "claude-personnel" "$HOME/.claude/settings.json"
-    ! grep -q "repowarden" "$HOME/.claude/settings.json" || false
-    [ -f "$HOME/.config/opencode/opencode.jsonc" ]
-    [ "$(cat "$HOME/.config/opencode/opencode.jsonc")" = '{"model":"mon-modele"}' ]
-}
-
-@test "disable ai: \"repowarden guard\" hook (repowarden 4.17.3) removed without repowarden, settings kept" {
-    # Without repowarden in PATH: it is the jq removal of devzone that runs
-    install_faux_repowarden
-    rm -f "$BATS_TEST_TMPDIR/bin/repowarden"
-    mkdir -p "$HOME/.claude"
-    cat >"$HOME/.claude/settings.json" <<'JSON'
-{
-  "model": "claude-personnel",
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "repowarden guard --format claude"
-          },
-          {
-            "type": "command",
-            "command": "outil-personnel"
-          }
-        ]
-      }
-    ]
-  }
-}
-JSON
-    PATH="$BATS_TEST_TMPDIR/bin:/usr/bin:/bin" run bash "$DEVZONE" disable ai
-    [ "$status" -eq 0 ]
-    [ -f "$HOME/.claude/settings.json" ]
-    grep -q "claude-personnel" "$HOME/.claude/settings.json"
-    grep -q "outil-personnel" "$HOME/.claude/settings.json"
-    ! grep -q "repowarden" "$HOME/.claude/settings.json" || false
 }
 
 @test "disable kubernetes: metrics-server removed only from the marked context, others left" {
@@ -519,6 +346,28 @@ KUBE
     [ "$status" -eq 1 ]
 }
 
+@test "ai: pod binary absent -> Go message, exit 1, no loop (#882)" {
+    # DEVZONE_NO_GO=1 skips the pod binary: the shell reaches the case as if it were absent
+    run timeout 30 env DEVZONE_NO_GO=1 bash "$DEVZONE" ai
+    [ "$status" -eq 1 ]
+    [ "$output" = "devzone ai: Go binary of the pod unavailable (.devcontainer/bin)" ]
+}
+
+@test "enable ai: works without devzone on PATH, the launcher calls itself by its path (#882)" {
+    # The host may have a devzone (the launcher is linked in /usr/local/bin): PATH is cleaned
+    rm -f "$BATS_TEST_TMPDIR/bin/devzone"
+    local dir clean=""
+    while IFS= read -r dir; do
+        [ -x "$dir/devzone" ] || clean="$clean:$dir"
+    done < <(tr ':' '\n' <<<"$PATH")
+    export PATH="${clean#:}"
+    ! command -v devzone || false
+    run timeout 300 bash "$DEVZONE" enable ai
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"command not found"* ]] || false
+    grep -qx 'ai=on' "$DEVZONE_ROOT/.devzone.modules"
+}
+
 @test "fresh state: everything disabled, even with a shared connection" {
     mkdir -p "$HOME/.claude" && echo '{}' >"$HOME/.claude/.credentials.json"
     run bash "$DEVZONE"
@@ -593,16 +442,6 @@ KUBE
     grep -qx 'kubernetes=off' "$DEVZONE_ROOT/.devzone.modules"
 }
 
-@test "apply: installs ai only when it is active" {
-    run bash "$DEVZONE" apply
-    [ "$status" -eq 0 ]
-    ! grep -q "install -g" "$BATS_TEST_TMPDIR/npm.log" || false
-    bash "$DEVZONE" enable ai
-    rm -f "$BATS_TEST_TMPDIR/npm.log"
-    run bash "$DEVZONE" apply
-    grep -q "install -g" "$BATS_TEST_TMPDIR/npm.log"
-}
-
 @test "apply: outdated repowarden -> installed at the pinned version" {
     printf 'repowarden 4.9.2\n' >"$NPM_INSTALLEES"
     run bash "$DEVZONE" apply
@@ -611,287 +450,6 @@ KUBE
     grep -qx "npm install -g ${RPW}@$REPOWARDEN_FIGE" "$BATS_TEST_TMPDIR/npm.log"
     grep -qx "repowarden install --global --lang fr" "$BATS_TEST_TMPDIR/repowarden.log"
     [[ "$output" == *"repowarden 4.9.2 → $REPOWARDEN_FIGE"* ]] || false
-}
-
-@test "enable ai: repowarden guard connected for Claude Code and opencode" {
-    run bash "$DEVZONE" enable ai
-    [ "$status" -eq 0 ]
-    [[ "$output" == *"repowarden guard active"* ]] || false
-    grep -qx "repowarden agents init --global" "$BATS_TEST_TMPDIR/repowarden.log"
-}
-
-@test "guard: reconnected at each apply with ai active, never with ai disabled" {
-    bash "$DEVZONE" enable ai
-    rm -f "$BATS_TEST_TMPDIR/repowarden.log"
-    bash "$DEVZONE" apply
-    grep -qx "repowarden agents init --global" "$BATS_TEST_TMPDIR/repowarden.log"
-    rm -f "$BATS_TEST_TMPDIR/repowarden.log"
-    bash "$DEVZONE" disable ai
-    grep -qx "repowarden agents retirer --global" "$BATS_TEST_TMPDIR/repowarden.log"
-    rm -f "$BATS_TEST_TMPDIR/repowarden.log"
-    bash "$DEVZONE" apply
-    [ ! -e "$BATS_TEST_TMPDIR/repowarden.log" ]
-}
-
-@test "guard: repowarden absent -> ai still enabled, command to run" {
-    rm "$BATS_TEST_TMPDIR/bin/repowarden"
-    PATH="$BATS_TEST_TMPDIR/bin:/usr/bin:/bin" run bash "$DEVZONE" enable ai
-    [ "$status" -eq 0 ]
-    [[ "$output" == *"repowarden guard not connected"*"repowarden agents init --global"* ]] || false
-    grep -q "install -g" "$BATS_TEST_TMPDIR/npm.log"
-}
-
-@test "guard: enabling ai sets the Claude Code hook and both plugins" {
-    install_faux_repowarden
-    run bash "$DEVZONE" enable ai
-    [ "$status" -eq 0 ]
-    [[ "$output" == *"docker guard active for Claude Code and opencode"* ]] || false
-    [ -f "$HOME/.claude/settings.json" ]
-    [ "$(jq '[.hooks.PreToolUse[] | .hooks[] | select((.command // "") | contains("docker-guard.sh"))] | length' "$HOME/.claude/settings.json")" -eq 1 ]
-    grep -q -- "--format claude" "$HOME/.claude/settings.json"
-    [ "$(jq -r '.env.KUBECONFIG' "$HOME/.claude/settings.json")" = "$HOME/.kube/agent.config" ]
-    [ -f "$HOME/.config/opencode/plugins/devzone-guard.js" ]
-    [ -f "$HOME/.config/opencode/plugins/devzone-guard-v2.js" ]
-    grep -q "docker-guard.sh" "$HOME/.config/opencode/plugins/devzone-guard.js"
-}
-
-@test "guard: installed application layout -> enable ai sets the plugins from ia/plugins" {
-    # Copy of the installed application: only the files the guard needs,
-    # without .opencode or another folder of the repository
-    APP="$BATS_TEST_TMPDIR/app/devzone"
-    mkdir -p "$BATS_TEST_TMPDIR/app/ai/plugins" "$BATS_TEST_TMPDIR/app/skills/devzone" "$BATS_TEST_TMPDIR/app/argocd"
-    cp "$BATS_TEST_DIRNAME/../../.devcontainer/devzone" "$APP"
-    cp "$BATS_TEST_DIRNAME"/../../.devcontainer/devzone-*.sh "$BATS_TEST_TMPDIR/app/"
-    cp "$BATS_TEST_DIRNAME/../../.devcontainer/help.sh" "$BATS_TEST_TMPDIR/app/help.sh"
-    cp "$BATS_TEST_DIRNAME/../../.devcontainer/ai/host-models.sh" "$BATS_TEST_TMPDIR/app/ai/host-models.sh"
-    cp "$BATS_TEST_DIRNAME/../../.devcontainer/ai/host-check.sh" "$BATS_TEST_TMPDIR/app/ai/host-check.sh"
-    cp "$BATS_TEST_DIRNAME/../../.devcontainer/ai/host-check.message" "$BATS_TEST_TMPDIR/app/ai/host-check.message"
-    cp "$BATS_TEST_DIRNAME/../../.devcontainer/ai/docker-guard.sh" "$BATS_TEST_TMPDIR/app/ai/docker-guard.sh"
-    cp "$BATS_TEST_DIRNAME/../../.devcontainer/ai/kube-guard.message" "$BATS_TEST_TMPDIR/app/ai/kube-guard.message"
-    cp "$BATS_TEST_DIRNAME/../../.devcontainer/ai/plugins/devzone-guard.js" "$BATS_TEST_TMPDIR/app/ai/plugins/devzone-guard.js"
-    cp "$BATS_TEST_DIRNAME/../../.devcontainer/ai/plugins/devzone-guard-v2.js" "$BATS_TEST_TMPDIR/app/ai/plugins/devzone-guard-v2.js"
-    cp "$BATS_TEST_DIRNAME/../../.devcontainer/opencode.jsonc" "$BATS_TEST_TMPDIR/app/opencode.jsonc"
-    cp "$BATS_TEST_DIRNAME/../../.devcontainer/skills/devzone/SKILL.md" "$BATS_TEST_TMPDIR/app/skills/devzone/SKILL.md"
-    mkdir -p "$BATS_TEST_TMPDIR/app/bin"
-    cp "$BATS_TEST_DIRNAME"/../../.devcontainer/bin/devzone-pod-* "$BATS_TEST_TMPDIR/app/bin/" 2>/dev/null || true
-    chmod +x "$APP"
-    cat >"$BATS_TEST_TMPDIR/app/argocd/services-hook.sh" <<'HOOK'
-#!/usr/bin/env bash
-# Exit 3: not concerned, devzone goes on as before (contract of services-hook.sh)
-exit 3
-HOOK
-    chmod +x "$BATS_TEST_TMPDIR/app/argocd/services-hook.sh"
-    mkdir -p "$HOME/.claude"
-    printf '{}' >"$HOME/.claude/settings.json"
-    DEVZONE_OLLAMA_URL="http://127.0.0.1:9" run bash "$APP" enable ai
-    [ "$status" -eq 0 ]
-    [[ "$output" == *"docker guard active for Claude Code and opencode"* ]] || false
-    [ -f "$HOME/.config/opencode/plugins/devzone-guard.js" ]
-    [ -f "$HOME/.config/opencode/plugins/devzone-guard-v2.js" ]
-    grep -qF "$BATS_TEST_TMPDIR/app/ai/docker-guard.sh" "$HOME/.config/opencode/plugins/devzone-guard.js"
-    ! grep -q "__DEVZONE_DOCKER_GUARD__" "$HOME/.config/opencode/plugins/devzone-guard.js" || false
-    [ "$(jq '[.hooks.PreToolUse[] | .hooks[] | select((.command // "") | contains("docker-guard.sh"))] | length' "$HOME/.claude/settings.json")" -eq 1 ]
-    run bash "$APP" disable ai
-    [ "$status" -eq 0 ]
-    [ ! -e "$HOME/.config/opencode/plugins/devzone-guard.js" ]
-    [ ! -e "$HOME/.config/opencode/plugins/devzone-guard-v2.js" ]
-}
-
-@test "guard: enabling ai twice leaves a single entry" {
-    install_faux_repowarden
-    bash "$DEVZONE" enable ai >/dev/null
-    bash "$DEVZONE" enable ai >/dev/null
-    [ "$(jq '[.hooks.PreToolUse[] | .hooks[] | select((.command // "") | contains("docker-guard.sh"))] | length' "$HOME/.claude/settings.json")" -eq 1 ]
-}
-
-@test "guard: install sets env.KUBECONFIG once and keeps the other keys" {
-    mkdir -p "$HOME/.claude"
-    ICI="$BATS_TEST_DIRNAME/../../.devcontainer"
-    . "$ICI/devzone-ai-guard.sh"
-    F="$HOME/.claude/settings.json"
-    printf '{"model":"x/y","env":{"AUTRE":"valeur","KUBECONFIG":"/ancien"},"hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"outil-personnel"}]}]}}' >"$F"
-    install_docker_guard
-    [ "$(jq -r '.env.KUBECONFIG' "$F")" = "$HOME/.kube/agent.config" ]
-    [ "$(jq -r '.env.AUTRE' "$F")" = "valeur" ]
-    [ "$(jq -r '.model' "$F")" = "x/y" ]
-    [ "$(jq '[.hooks.PreToolUse[] | .hooks[] | select((.command // "") | contains("guard.sh"))] | length' "$F")" -eq 1 ]
-    avant="$(cat "$F")"
-    install_docker_guard
-    [ "$(cat "$F")" = "$avant" ]
-}
-
-@test "guard: install with missing or invalid settings leaves the file unchanged" {
-    ICI="$BATS_TEST_DIRNAME/../../.devcontainer"
-    . "$ICI/devzone-ai-guard.sh"
-    F="$HOME/.claude/settings.json"
-    run install_docker_guard
-    [ "$status" -eq 0 ]
-    [ ! -e "$F" ]
-    [[ "$output" == *"missing"* ]] || false
-    mkdir -p "$HOME/.claude"
-    printf '{ nope' >"$F"
-    run install_docker_guard
-    [ "$status" -eq 0 ]
-    [ "$(cat "$F")" = '{ nope' ]
-    [[ "$output" == *"invalid JSON"* ]] || false
-}
-
-@test "guard: remove deletes env.KUBECONFIG and keeps the rest" {
-    mkdir -p "$HOME/.claude"
-    ICI="$BATS_TEST_DIRNAME/../../.devcontainer"
-    . "$ICI/devzone-ai-guard.sh"
-    F="$HOME/.claude/settings.json"
-    printf '{"model":"x/y","env":{"AUTRE":"valeur"},"hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"outil-personnel"}]}]}}' >"$F"
-    install_docker_guard
-    remove_docker_guard
-    [ -f "$F" ]
-    [ "$(jq -r '.env.KUBECONFIG' "$F")" = null ]
-    [ "$(jq -r '.env.AUTRE' "$F")" = "valeur" ]
-    [ "$(jq -r '.model' "$F")" = "x/y" ]
-    grep -q "outil-personnel" "$F"
-    [ "$(jq '[.hooks.PreToolUse[] | .hooks[] | select((.command // "") | contains("--format claude"))] | length' "$F")" -eq 0 ]
-}
-
-@test "guard: remove drops an empty env and keeps the other settings" {
-    mkdir -p "$HOME/.claude"
-    ICI="$BATS_TEST_DIRNAME/../../.devcontainer"
-    . "$ICI/devzone-ai-guard.sh"
-    F="$HOME/.claude/settings.json"
-    printf '{"model":"x/y","env":{"KUBECONFIG":"/ancien"}}' >"$F"
-    remove_docker_guard
-    [ -f "$F" ]
-    [ "$(jq -r '.env' "$F")" = null ]
-    [ "$(jq -r '.model' "$F")" = "x/y" ]
-}
-
-@test "guard: disabling ai removes its entries and keeps a user hook" {
-    install_faux_repowarden
-    bash "$DEVZONE" enable ai >/dev/null
-    tmp="$(mktemp)"
-    jq '.hooks.PreToolUse += [{"matcher": "Bash", "hooks": [{"type": "command", "command": "outil-personnel"}]}]' \
-        "$HOME/.claude/settings.json" >"$tmp"
-    mv "$tmp" "$HOME/.claude/settings.json"
-    run bash "$DEVZONE" disable ai
-    [ "$status" -eq 0 ]
-    [ -f "$HOME/.claude/settings.json" ]
-    grep -q "outil-personnel" "$HOME/.claude/settings.json"
-    ! grep -q "docker-guard.sh" "$HOME/.claude/settings.json" || false
-    [ ! -e "$HOME/.config/opencode/plugins/devzone-guard.js" ]
-    [ ! -e "$HOME/.config/opencode/plugins/devzone-guard-v2.js" ]
-}
-
-@test "guard: enable + disable cycle -> identical file fingerprint" {
-    install_faux_repowarden
-    empreinte_avant="$(empreinte)"
-    run bash "$DEVZONE" enable ai
-    [ "$status" -eq 0 ]
-    run bash "$DEVZONE" disable ai
-    [ "$status" -eq 0 ]
-    [ "$(empreinte)" = "$empreinte_avant" ]
-}
-
-@test "enable ai: opencode config absent -> written from the template" {
-    run bash "$DEVZONE" enable ai
-    [ "$status" -eq 0 ]
-    [ -f "$HOME/.config/opencode/opencode.jsonc" ]
-    grep -q '^// devzone : default opencode configuration' "$HOME/.config/opencode/opencode.jsonc"
-    grep -q '"model": "opencode/big-pickle"' "$HOME/.config/opencode/opencode.jsonc"
-    grep -q '"compaction": {' "$HOME/.config/opencode/opencode.jsonc"
-    [[ "$output" == *"opencode : default configuration written"* ]] || false
-}
-
-@test "enable ai: opencode config with the English marker and different -> updated" {
-    mkdir -p "$HOME/.config/opencode"
-    printf '// devzone : default opencode configuration (old)\n{"model":"old"}\n' >"$HOME/.config/opencode/opencode.jsonc"
-    run bash "$DEVZONE" enable ai
-    [ "$status" -eq 0 ]
-    grep -q '"model": "opencode/big-pickle"' "$HOME/.config/opencode/opencode.jsonc"
-    [[ "$output" == *"opencode : default configuration updated"* ]] || false
-}
-
-@test "enable ai: opencode config with only \$schema -> replaced" {
-    mkdir -p "$HOME/.config/opencode"
-    printf '{\n  "$schema": "https://opencode.ai/config.json"\n}\n' >"$HOME/.config/opencode/opencode.jsonc"
-    run bash "$DEVZONE" enable ai
-    [ "$status" -eq 0 ]
-    grep -q '^// devzone : default opencode configuration' "$HOME/.config/opencode/opencode.jsonc"
-    grep -q '"model": "opencode/big-pickle"' "$HOME/.config/opencode/opencode.jsonc"
-    [[ "$output" == *"opencode : default configuration updated"* ]] || false
-}
-
-@test "enable ai: opencode config without the marker -> kept" {
-    mkdir -p "$HOME/.config/opencode"
-    printf '{"model":"my-model"}\n' >"$HOME/.config/opencode/opencode.jsonc"
-    run bash "$DEVZONE" enable ai
-    [ "$status" -eq 0 ]
-    [ "$(cat "$HOME/.config/opencode/opencode.jsonc")" = '{"model":"my-model"}' ]
-    [[ "$output" == *"opencode : custom configuration, kept"* ]] || false
-}
-
-@test "enable ai: devzone skill installed in both folders, with a YAML header" {
-    run bash "$DEVZONE" enable ai
-    [ "$status" -eq 0 ]
-    [ -f "$HOME/.claude/skills/devzone/SKILL.md" ]
-    [ -f "$HOME/.config/opencode/skills/devzone/SKILL.md" ]
-    [ "$(head -n 1 "$HOME/.claude/skills/devzone/SKILL.md")" = '---' ]
-    [ "$(head -n 1 "$HOME/.config/opencode/skills/devzone/SKILL.md")" = '---' ]
-    grep -q '^name: devzone$' "$HOME/.claude/skills/devzone/SKILL.md"
-    grep -q '^name: devzone$' "$HOME/.config/opencode/skills/devzone/SKILL.md"
-    grep -qF '<!-- devzone : skill set by devzone enable ai -->' "$HOME/.claude/skills/devzone/SKILL.md"
-    grep -qF '<!-- devzone : skill set by devzone enable ai -->' "$HOME/.config/opencode/skills/devzone/SKILL.md"
-    [[ "$output" == *"devzone skill installed"* ]] || false
-}
-
-@test "enable ai: skill already present and identical -> no new install nor update" {
-    bash "$DEVZONE" enable ai >/dev/null
-    run bash "$DEVZONE" enable ai
-    [ "$status" -eq 0 ]
-    [[ "$output" != *"devzone skill installed"* ]] || false
-    [[ "$output" != *"devzone skill updated"* ]] || false
-}
-
-@test "enable ai: customised skill -> kept" {
-    mkdir -p "$HOME/.claude/skills/devzone" "$HOME/.config/opencode/skills/devzone"
-    printf '# my personal skill\nmy setting\n' >"$HOME/.claude/skills/devzone/SKILL.md"
-    printf '# my personal skill\nmy setting\n' >"$HOME/.config/opencode/skills/devzone/SKILL.md"
-    run bash "$DEVZONE" enable ai
-    [ "$status" -eq 0 ]
-    [ "$(cat "$HOME/.claude/skills/devzone/SKILL.md")" = '# my personal skill
-my setting' ]
-    [ "$(cat "$HOME/.config/opencode/skills/devzone/SKILL.md")" = '# my personal skill
-my setting' ]
-    [[ "$output" == *"customised devzone skill"* ]] || false
-}
-
-@test "enable ai: modified skill keeping the marker -> kept" {
-    bash "$DEVZONE" enable ai >/dev/null
-    printf '\nmy setting\n' >>"$HOME/.claude/skills/devzone/SKILL.md"
-    printf '\nmy setting\n' >>"$HOME/.config/opencode/skills/devzone/SKILL.md"
-    run bash "$DEVZONE" enable ai
-    [ "$status" -eq 0 ]
-    [[ "$(cat "$HOME/.claude/skills/devzone/SKILL.md")" == *"my setting"* ]] || false
-    [[ "$(cat "$HOME/.config/opencode/skills/devzone/SKILL.md")" == *"my setting"* ]] || false
-    [[ "$output" == *"customised devzone skill"* ]] || false
-}
-
-@test "disable ai: skill removed when unmodified" {
-    bash "$DEVZONE" enable ai >/dev/null
-    run bash "$DEVZONE" disable ai
-    [ "$status" -eq 0 ]
-    [ ! -f "$HOME/.claude/skills/devzone/SKILL.md" ]
-    [ ! -f "$HOME/.config/opencode/skills/devzone/SKILL.md" ]
-    [[ "$output" == *"devzone skill removed"* ]] || false
-}
-
-@test "disable ai: customised skill -> kept" {
-    bash "$DEVZONE" enable ai >/dev/null
-    printf '# customised\n' >"$HOME/.claude/skills/devzone/SKILL.md"
-    printf '# customised\n' >"$HOME/.config/opencode/skills/devzone/SKILL.md"
-    run bash "$DEVZONE" disable ai
-    [ "$status" -eq 0 ]
-    [ -f "$HOME/.claude/skills/devzone/SKILL.md" ]
-    [ -f "$HOME/.config/opencode/skills/devzone/SKILL.md" ]
-    [[ "$output" == *"customised devzone skill"* ]] || false
 }
 
 @test "opencode template: hardened defaults (bash ask, secrets and curl denied)" {
@@ -1038,22 +596,3 @@ KUBE
     [[ "$output" != *"working cluster"* ]] || false
 }
 
-@test "enable ai: reports the absence of Ollama, without failure (#665)" {
-    DEVZONE_OLLAMA_URL="http://127.0.0.1:9" run bash "$DEVZONE" enable ai
-    [ "$status" -eq 0 ]
-    [[ "$output" == *"no Ollama model detected on http://127.0.0.1:9 (host models not connected)"* ]] || false
-}
-
-@test "enable ai: reports the connected host models (#665)" {
-    cat >"$BATS_TEST_TMPDIR/bin/curl" <<'FAKE'
-#!/usr/bin/env bash
-case "$*" in
-    *"/api/tags"*) printf '%s' '{"models":[{"name":"qwen3-coder:32k","details":{"type":"llm"}},{"name":"deepseek-coder:latest","details":{"type":"llm"}}]}' ;;
-    *) exit 0 ;;
-esac
-FAKE
-    chmod +x "$BATS_TEST_TMPDIR/bin/curl"
-    run bash "$DEVZONE" enable ai
-    [ "$status" -eq 0 ]
-    [[ "$output" == *"2 model(s) of the host (Ollama) connected"* ]] || false
-}

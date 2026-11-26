@@ -24,7 +24,7 @@ func shellApp(t *testing.T) (appDir, actions, state string) {
 	}
 	repo := repoPath(".devcontainer")
 	copyFile(t, filepath.Join(repo, "devzone"), filepath.Join(app, "devzone"), 0o755)
-	for _, name := range []string{"help.sh", "host-models.sh", "host-check.sh", "host-check.message"} {
+	for _, name := range []string{"help.sh", "host-check.message"} {
 		src := filepath.Join(repo, name)
 		if strings.HasPrefix(name, "host-") {
 			src = filepath.Join(repo, "ai", name)
@@ -49,7 +49,17 @@ func shellApp(t *testing.T) (appDir, actions, state string) {
 	actions = filepath.Join(tmp, "actions.log")
 	writeTestFile(t, actions, "")
 	writeTestFile(t, filepath.Join(bin, "devzone"), "#!/usr/bin/env bash\nprintf 'devzone %s\\n' \"$*\" >>\"$BATS_TEST_TMPDIR_ACTIONS\"\ncase \"$*\" in\n    \"passwords regenerate\") [ ! -f \"$TEST_FAILED_PASSWORD\" ] || { echo \"credentials unavailable\" >&2; exit 1; } ;;\nesac\nexit 0\n")
-	fakePod := "#!/usr/bin/env bash\n[ \"${1:-}\" = handles ] && exit 1\nexit 0\n"
+	// The repair runs its Go commands through "$ICI/devzone", which reaches this
+	// fake pod: it takes the repair commands and records them like the PATH fake.
+	fakePod := "#!/usr/bin/env bash\n" +
+		"case \"${1:-}\" in\n" +
+		"    handles) case \"${2:-}\" in passwords | catalog-watcher | cluster | gitlab | postgres | argocd | mysql) exit 0 ;; *) exit 1 ;; esac ;;\n" +
+		"esac\n" +
+		"printf 'devzone %s\\n' \"$*\" >>\"$BATS_TEST_TMPDIR_ACTIONS\"\n" +
+		"case \"$*\" in\n" +
+		"    \"passwords regenerate\") [ ! -f \"$TEST_FAILED_PASSWORD\" ] || { echo \"credentials unavailable\" >&2; exit 1; } ;;\n" +
+		"esac\n" +
+		"exit 0\n"
 	for _, arch := range []string{"amd64", "arm64"} {
 		writeTestFile(t, filepath.Join(app, "bin", "devzone-pod-linux-"+arch), fakePod)
 	}
@@ -60,7 +70,6 @@ func shellApp(t *testing.T) (appDir, actions, state string) {
 	t.Setenv("HOME", filepath.Join(tmp, "home"))
 	t.Setenv("DEVZONE_ROOT", root)
 	t.Setenv("DEVZONE_STATE", state)
-	t.Setenv("DEVZONE_NO_GO", "1")
 	t.Setenv("BATS_TEST_TMPDIR", "")
 	t.Setenv("BATS_TEST_TMPDIR_ACTIONS", actions)
 	t.Setenv("TEST_FAILED_PASSWORD", filepath.Join(tmp, "failed-password"))
