@@ -4,7 +4,6 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -61,7 +60,6 @@ func TestCreate(t *testing.T) {
 	f := newFixture(t)
 	f.activeOn("host-cluster")
 	f.rootReady("mdproot")
-	useRealPasswordLibrary(t, f)
 	if code := Run(nil, f.opts, []string{"create", "datayer"}); code != 0 {
 		t.Fatalf("create: code %d, stderr %q", code, f.errOut.String())
 	}
@@ -125,40 +123,13 @@ func TestCreateKeepsPassword(t *testing.T) {
 	}
 }
 
-// hybridRunner uses the real password library while kubectl and openssl stay
-// faked, so the grouped credentials file can be checked end to end.
+// hybridRunner keeps kubectl and openssl faked while the grouped credentials
+// are regenerated in Go by the domain, not by a shell command.
 type hybridRunner struct{ *sequenceRunner }
 
-// Run implements exec.Runner; bash is the only command run for real.
+// Run implements exec.Runner with the programmed fake responses.
 func (h *hybridRunner) Run(ctx context.Context, name string, args []string, opts exec.Opts) (exec.Result, error) {
-	if name == "bash" {
-		return (exec.ExecRunner{}).Run(ctx, name, args, opts)
-	}
 	return h.sequenceRunner.Run(ctx, name, args, opts)
-}
-
-// useRealPasswordLibrary installs the real password.sh in the fake code root,
-// so the grouped credentials file can be checked after a domain command.
-func useRealPasswordLibrary(t *testing.T, f *fixture) {
-	t.Helper()
-	library, err := os.ReadFile(filepath.Join(repoDevcontainer(t), "password.sh"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(f.codeRoot, "password.sh"), library, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	f.opts.Runner = &hybridRunner{sequenceRunner: f.r}
-}
-
-// repoDevcontainer returns the shell library folder of this checkout.
-func repoDevcontainer(t *testing.T) string {
-	t.Helper()
-	_, file, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("cannot locate the test file")
-	}
-	return filepath.Join(filepath.Dir(file), "..", "..", "..", ".devcontainer")
 }
 
 // TestPasswordFollowsAccounts checks that .password mirrors create and delete.
@@ -166,7 +137,6 @@ func TestPasswordFollowsAccounts(t *testing.T) {
 	f := newFixture(t)
 	f.activeOn("host-cluster")
 	f.rootReady("mdproot")
-	f.opts.CodeRoot = repoDevcontainer(t)
 	f.opts.Runner = &hybridRunner{sequenceRunner: f.r}
 	passwordFile := filepath.Join(f.root, ".password")
 	if code := Run(nil, f.opts, []string{"create", "datayer"}); code != 0 {

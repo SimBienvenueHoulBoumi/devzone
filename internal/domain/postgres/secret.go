@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/passwords"
 )
 
 // newPassword generates a password with the same command as the shell module,
@@ -71,15 +73,13 @@ func (e *env) adminSecret() error {
 	return nil
 }
 
-// regenerate rebuilds the grouped credentials view with the shared password
-// library, as the shell module does after each change.
+// regenerate rebuilds the grouped credentials view with the shared Go library,
+// without invoking a shell or passing a secret to a process (#881).
 func (e *env) regenerate() {
 	if e.codeRoot == "" {
 		return
 	}
-	res, err := e.exec("bash", []string{filepath.Join(e.codeRoot, "password.sh"), "regenerate"}, nil)
-	if err != nil || res.Code != 0 {
-		e.showErr(res)
+	if err := passwords.Regenerate(filepath.Dir(e.codeRoot)); err != nil {
 		if e.opts.Err != nil {
 			fmt.Fprintln(e.opts.Err, "devzone : postgres : grouped credentials not updated (devzone passwords)")
 		}

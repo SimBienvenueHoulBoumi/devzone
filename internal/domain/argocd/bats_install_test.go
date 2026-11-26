@@ -62,8 +62,16 @@ func TestBatsEnableArgocdInstallOrder(t *testing.T) {
 			t.Fatalf("upstream chart used: %q", joinedArgs(call))
 		}
 	}
-	if !hasCall(calls, "bash", []string{filepath.Join(f.root, ".devcontainer", "password.sh"), "regenerate"}...) {
-		t.Fatalf("credentials not regenerated: %v", calls)
+	view, err := os.ReadFile(filepath.Join(f.root, ".password"))
+	if err != nil {
+		t.Fatalf("credentials not regenerated in Go: %v", err)
+	}
+	if !strings.Contains(string(view), "argocd\thttps://127.0.0.1:8443\tadmin\tsecret-admin\n") {
+		t.Fatalf("grouped credentials = %q", view)
+	}
+	info, err = os.Stat(filepath.Join(f.root, ".password"))
+	if err != nil || info.Mode().Perm() != 0o600 {
+		t.Fatalf("grouped credentials mode: %v, %v", info, err)
 	}
 }
 

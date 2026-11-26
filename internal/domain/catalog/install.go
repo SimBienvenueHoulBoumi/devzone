@@ -148,12 +148,13 @@ func (e *env) startRelay(app, ctxName, ns string) error {
 		[]string{port + ":" + port}, e.opts.Launcher)
 }
 
-// regenerate rebuilds the grouped credentials view; a failure never blocks.
+// regenerate rebuilds the grouped credentials view through the devzone launcher,
+// replacing the old password.sh call; a failure never blocks the operation.
 func (e *env) regenerate() {
 	if e.codeRoot == "" {
 		return
 	}
-	res, err := e.exec("bash", []string{filepath.Join(e.codeRoot, "password.sh"), "regenerate"})
+	res, err := e.exec(e.script, []string{"passwords", "regenerate"})
 	if err != nil || res.Code != 0 {
 		e.warn("devzone : catalog : grouped credentials not updated (devzone passwords)")
 	}
