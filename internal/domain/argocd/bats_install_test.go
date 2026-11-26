@@ -5,16 +5,12 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
-	fexec "github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec"
 )
 
 // TestBatsEnableArgocdInstallOrder mirrors the enable-install bats test: an
 // isolated namespace, the wrapper chart, a 600 password file and a relay.
 func TestBatsEnableArgocdInstallOrder(t *testing.T) {
 	f := newModFixture(t)
-	relay := "relay_start argocd devzone devzone-argocd svc/argocd-server 8443:443"
-	f.r.On("bash", []string{"-c", relayCmd(f.root, f.state, relay)}, fexec.Result{})
 	if code := f.run("install"); code != 0 {
 		t.Fatalf("code=%d out=%q err=%q", code, f.out.String(), f.err.String())
 	}
@@ -44,14 +40,17 @@ func TestBatsEnableArgocdInstallOrder(t *testing.T) {
 	dep := callIndex(calls, "helm", []string{"dependency", "build", chart}...)
 	upgrade := callIndex(calls, "helm", []string{"--kubeconfig", filepath.Join(f.root, "hote.config"), "--kube-context", mgmtContext(f), "upgrade", "--install", "argocd", chart, "--namespace", "devzone-argocd", "--create-namespace", "--timeout", "600s", "--wait"}...)
 	secret := callIndex(calls, "kubectl", devzoneKubectl("-n", "devzone-argocd", "get", "secret", "argocd-initial-admin-secret", "-o", "jsonpath={.data.password}")...)
-	relayIdx := callIndex(calls, "bash", []string{"-c", relayCmd(f.root, f.state, relay)}...)
-	for name, idx := range map[string]int{"create": create, "apply": apply, "label": label, "dependency": dep, "upgrade": upgrade, "secret": secret, "relay": relayIdx} {
+	for name, idx := range map[string]int{"create": create, "apply": apply, "label": label, "dependency": dep, "upgrade": upgrade, "secret": secret} {
 		if idx < 0 {
 			t.Fatalf("%s call missing: %v", name, calls)
 		}
 	}
-	if !(create < apply && apply < label && label < dep && dep < upgrade && upgrade < secret && secret < relayIdx) {
+	if !(create < apply && apply < label && label < dep && dep < upgrade && upgrade < secret) {
 		t.Fatalf("unexpected install order: %v", calls)
+	}
+	if len(f.relays) != 1 || f.relays[0].target != "svc/argocd-server" ||
+		len(f.relays[0].ports) != 1 || f.relays[0].ports[0] != "8443:443" {
+		t.Fatalf("relay = %+v", f.relays)
 	}
 	policy := stdinFor(t, calls, "kubectl", devzoneKubectl("-n", "devzone-argocd", "apply", "-f", "-")...)
 	if !strings.Contains(policy, "kind: NetworkPolicy") || !strings.Contains(policy, "name: devzone-meme-namespace") {
@@ -75,7 +74,6 @@ func TestBatsArgocdAlreadyInstalled(t *testing.T) {
 		t.Fatalf("status: code=%d out=%q err=%q", code, f.out.String(), f.err.String())
 	}
 	f.out.Reset()
-	relay := "relay_start argocd devzone devzone-argocd svc/argocd-server 8443:443"
 	if code := f.run("relay-start"); code != 0 {
 		t.Fatalf("relay-start: code=%d out=%q err=%q", code, f.out.String(), f.err.String())
 	}
@@ -84,8 +82,8 @@ func TestBatsArgocdAlreadyInstalled(t *testing.T) {
 			t.Fatalf("reinstalled: %q", joinedArgs(call))
 		}
 	}
-	if !hasCall(f.r.Calls(), "bash", []string{"-c", relayCmd(f.root, f.state, relay)}...) {
-		t.Fatalf("relay not restarted: %v", f.r.Calls())
+	if len(f.relays) != 1 || f.relays[0].contextName != "devzone" {
+		t.Fatalf("relay not restarted: %+v", f.relays)
 	}
 }
 

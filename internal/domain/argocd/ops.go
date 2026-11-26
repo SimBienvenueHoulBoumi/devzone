@@ -10,6 +10,7 @@ import (
 
 	fexec "github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec"
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/state"
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/platform/relay"
 )
 
 const (
@@ -25,6 +26,7 @@ const (
 type module struct {
 	ctx      context.Context
 	runner   fexec.Runner
+	launcher relay.Launcher
 	out      io.Writer
 	errOut   io.Writer
 	root     string

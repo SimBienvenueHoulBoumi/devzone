@@ -157,7 +157,7 @@ func newModule(ctx context.Context, opts Options, out, errOut io.Writer) (*modul
 		wait = defaultWait
 	}
 	return &module{
-		ctx: ctx, runner: runner, out: out, errOut: errOut,
+		ctx: ctx, runner: runner, launcher: opts.Launcher, out: out, errOut: errOut,
 		root: root, codeRoot: codeRoot, state: statePath, host: host, config: config,
 		secrets: filepath.Join(root, "workspace", ".argocd"),
 		ns:      defaultNS, version: version, port: port, wait: wait,
