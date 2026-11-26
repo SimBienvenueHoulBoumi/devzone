@@ -70,8 +70,9 @@ func TestInheritedGitDirDivertsGitMinusC(t *testing.T) {
 		t.Fatalf("git dir = %s, want the decoy %s", gotDir, wantDir)
 	}
 
-	commit := osExec.Command("git", append([]string{"-C", target, "-c", "user.name=t",
-		"-c", "user.email=t@t", "commit", "-qm", "pirate", "--allow-empty"})...)
+	commitArgs := []string{"-C", target, "-c", "user.name=t", "-c", "user.email=t@t",
+		"commit", "-qm", "pirate", "--allow-empty"}
+	commit := osExec.Command("git", commitArgs...)
 	commit.Env = hookEnv(decoy)
 	if out, err := commit.CombinedOutput(); err != nil {
 		t.Fatalf("diverted commit: %v\n%s", err, out)
