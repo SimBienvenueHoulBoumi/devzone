@@ -68,6 +68,19 @@ parite() {
     parite --version --oui
 }
 
+# parite_ports <args...>: like parite, but ignores only the automatic-start
+# status line that the Go command prints and the shell original does not (#901).
+parite_ports() {
+    local t="$BATS_TEST_TMPDIR" st_bash=0 st_go=0
+    bash "$CLI" "$@" >"$t/bash.out" 2>"$t/bash.err" || st_bash=$?
+    "$DZ_GO" "$@" >"$t/go.out" 2>"$t/go.err" || st_go=$?
+    [ "$st_go" -eq "$st_bash" ] || { echo "status for [$*]: bash $st_bash, go $st_go"; return 1; }
+    grep -v '^Port watcher automatic start: ' "$t/bash.out" >"$t/bash.filtered" || true
+    grep -v '^Port watcher automatic start: ' "$t/go.out" >"$t/go.filtered" || true
+    cmp "$t/bash.filtered" "$t/go.filtered" || { echo "stdout for [$*] differs"; diff "$t/bash.filtered" "$t/go.filtered"; return 1; }
+    cmp "$t/bash.err" "$t/go.err" || { echo "stderr for [$*] differs"; diff "$t/bash.err" "$t/go.err"; return 1; }
+}
+
 # faux_cluster : fake kubectl and helm first in PATH, no real cluster touched (#712).
 # FAKE_NO_POD=yes: no pod; FAKE_LEGACY=yes: a legacy copy in the pod;
 # FAKE_KUBE_DOWN=yes: the cluster does not answer; FAKE_NO_RELEASE=yes: no helm
@@ -344,8 +357,8 @@ ports_state() {
     state="$BATS_TEST_TMPDIR/state"
     pid="$(ports_state "$state")"
     export DEVZONE_PORTS_WORKSPACE_DIR="$state" DEVZONE_NO_GO=1
-    parite workspace ports
-    parite workspace ports status
+    parite_ports workspace ports
+    parite_ports workspace ports status
     run "$DZ_GO" workspace ports status
     [ "$status" -eq 0 ]
     [[ "$output" == *"Port watcher: running (pid $pid)"* ]] || false

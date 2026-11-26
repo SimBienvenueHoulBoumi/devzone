@@ -58,7 +58,7 @@ func uninstallCommand(ctx *cli.Context) int {
 	printUninstallPlan(ctx.Out, plan)
 	if plan.empty() {
 		fmt.Fprintln(ctx.Out, "✔ Nothing to remove.")
-		return 0
+		return retirePortsAutoStart(ctx.Out, ctx.Err)
 	}
 	for _, ns := range plan.namespaces {
 		if ns == "devzone-workspace" {
@@ -78,7 +78,13 @@ func uninstallCommand(ctx *cli.Context) int {
 			return 0
 		}
 	}
-	return applyUninstallPlan(context.Background(), runner, ctx.Out, ctx.Err, plan)
+	status := applyUninstallPlan(context.Background(), runner, ctx.Out, ctx.Err, plan)
+	// The automatic start of the port watcher is retired with the uninstall, as
+	// the design of the ports commands of #901 says.
+	if disable := retirePortsAutoStart(ctx.Out, ctx.Err); disable != 0 {
+		status = disable
+	}
+	return status
 }
 
 // devzoneInstance returns the instance name for this devzone folder. It prefers
