@@ -341,7 +341,9 @@ jobs:
         run: |
           bash --version | head -1
           bash -c '[ "${BASH_VERSINFO[0]}" = 3 ]'
-          npx --yes bats@1.10.0 manage/test/cli.bats manage/test/versions.bats manage/test/ci-container.bats manage/test/agent.bats manage/test/agent-gaps.bats manage/test/agent-rights.bats manage/test/agent-rights-gh.bats manage/test/agent-quota.bats manage/test/agent-parallel.bats manage/test/agent-paths.bats manage/test/agent-state-json.bats
+          # Agent tests were ported to Go (#878); their behavior is checked by
+          # `go test ./internal/domain/agent/` in the go workflow.
+          npx --yes bats@1.10.0 manage/test/cli.bats manage/test/versions.bats manage/test/ci-container.bats
 
   # Code in English: the Go check scans every tracked code file on every run (#502).
   # The charts convention (#554) is checked here too: manage/scripts/ci/check-charts.sh

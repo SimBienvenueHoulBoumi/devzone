@@ -155,9 +155,6 @@ case "${1:-}" in
         # writing anything
         [ "$(value_of "$2")" = on ]
         ;;
-    agent)
-        bash "$ICI/agent.sh" "${@:2}"
-        ;;
     ai)
         case "${2:-}" in
             check)
@@ -194,7 +191,7 @@ case "${1:-}" in
     cluster) change_cluster "${@:2}" ;;
     # Go only: reached when the binary did not take the call. Never call
     # "devzone" again from here, it would loop forever, see #864
-    postgres | mysql | gitlab | test-gitlab)
+    agent | postgres | mysql | gitlab | test-gitlab)
         echo "devzone $1: Go binary of the pod unavailable (.devcontainer/bin)" >&2
         exit 1
         ;;
