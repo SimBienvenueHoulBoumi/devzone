@@ -27,6 +27,7 @@ func writePins(t *testing.T, root, text string) {
 func TestDependencyApplicationFromOfficialSource(t *testing.T) {
 	f := newModFixture(t)
 	allowKubectl(f)
+	absentMetrics(f)
 	writePins(t, f.root, "METRICS_SERVER_CHART_VERSION=3.14.0\nMETRICS_SERVER_VERSION=v0.9.0\n")
 	if code := f.run("dependency", "metrics-server", "on"); code != 0 {
 		t.Fatalf("code = %d, err = %q", code, f.err.String())

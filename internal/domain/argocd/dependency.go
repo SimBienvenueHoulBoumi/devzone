@@ -42,6 +42,10 @@ func (m *module) metricsServerApply() int {
 		fmt.Fprintln(m.errOut, err)
 		return 1
 	}
+	if err := m.metricsAdopt(); err != nil {
+		fmt.Fprintln(m.errOut, err)
+		return 1
+	}
 	manifest, err := m.renderChartApp("devzone-metrics-server", metricsNS, metricsRepo,
 		metricsChart, chart, []string{"args[0]=--kubelet-insecure-tls"})
 	if err != nil {
