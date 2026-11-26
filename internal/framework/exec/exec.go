@@ -9,6 +9,8 @@ import (
 	"io"
 	"os"
 	"os/exec"
+
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/gitenv"
 )
 
 // Opts carries the optional inputs of a command run: standard input, environment
@@ -48,8 +50,15 @@ func (ExecRunner) Run(ctx context.Context, name string, args []string, opts Opts
 	// Opts.Env is added to the environment of this process, never replaces it:
 	// without HOME, kubectl writes its cache in the current folder (.kube/cache),
 	// and PATH, proxies or locale would be lost (#863)
-	if len(opts.Env) > 0 {
-		cmd.Env = append(os.Environ(), opts.Env...)
+	base, extra := os.Environ(), opts.Env
+	if name == "git" {
+		// A hook's GIT_DIR overrides "git -C folder": drop it on both sides so
+		// git reads and writes the folder this command was given (#878).
+		base, extra = gitenv.Clean(base), gitenv.Clean(extra)
+	}
+	cmd.Env = base
+	if len(extra) > 0 {
+		cmd.Env = append(base, extra...)
 	}
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout

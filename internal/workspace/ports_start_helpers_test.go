@@ -13,6 +13,8 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/testkit"
 )
 
 // The binary of the end-to-end tests is built once for the whole package run,
@@ -23,8 +25,10 @@ var (
 	buildErr  error
 )
 
+// TestMain runs the suite with a clean Git environment and then removes the
+// folder of the binary built once for the end-to-end tests.
 func TestMain(m *testing.M) {
-	code := m.Run()
+	code := testkit.Main(m)
 	if buildDir != "" {
 		_ = os.RemoveAll(buildDir)
 	}
