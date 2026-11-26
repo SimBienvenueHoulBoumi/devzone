@@ -118,7 +118,7 @@ show_state() {
     if [ "$ctx_rbac" = "yes" ]; then
         printf '  ⚠ rbac          : access to devzone-postgres secrets not restricted\n'
     fi
-    ports_state="$(bash "$ICI/ports.sh" resume 2>/dev/null || true)"
+    ports_state="$(DEVZONE_STATE="$ETAT" devzone port resume 2>/dev/null || echo none)"
     case "$ports_state" in
         none*) printf '  ○ ports to the workstation %s\n' "$ports_state" ;;
         *) printf '  ✔ ports to the workstation %s\n' "$ports_state" ;;

@@ -83,6 +83,7 @@ func TestWorkspaceOtherSubcommandIsDelegated(t *testing.T) {
 // triggers the single automatic-start function and that a failed one does not.
 func TestWorkspaceStartEnablesWatcher(t *testing.T) {
 	requireBash(t)
+	fakeClusterReady(t)
 	t.Setenv("DEVZONE_ROOT", devzoneRootForAutoStart(t))
 	calls := 0
 	previous := commandEnsureAutoStart

@@ -82,6 +82,7 @@ func newFixture(t *testing.T) *fixture {
 		t: t, r: r, root: root, home: home, codeRoot: code, statePath: statePath,
 		script: filepath.Join(code, "devzone"), chart: chart,
 	}
+	r.On(f.script, []string{"passwords", "regenerate"}, fexec.Result{})
 	f.opts = Options{
 		Runner:    r,
 		Out:       &f.out,

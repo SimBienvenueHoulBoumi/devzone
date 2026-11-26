@@ -68,9 +68,6 @@ func newFixture(t *testing.T) *fixture {
 	if err := os.WriteFile(filepath.Join(root, "charts", "devzone-postgres", "Chart.yaml"), []byte("name: devzone-postgres\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(codeRoot, "password.sh"), []byte("#!/usr/bin/env bash\nexit 0\n"), 0o755); err != nil {
-		t.Fatal(err)
-	}
 	statePath := filepath.Join(root, ".devzone.modules")
 	t.Setenv("HOME", home)
 	t.Setenv("DEVZONE_ROOT", root)
