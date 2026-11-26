@@ -71,14 +71,20 @@ func portsDaemonRestartArgs() []string {
 // disable --now on Linux.
 func portsDaemonDisableArgs() []string {
 	if portsPlatform == "darwin" {
-		return []string{"bootout", portsDaemonDomain() + "/" + portsAgentName()}
+		return []string{"bootout", portsDaemonServiceTarget()}
 	}
 	return []string{"--user", "disable", "--now", portsAgentName() + "." + portsAgentExt()}
 }
 
-// portsDaemonDomain returns the launchctl domain of the current user.
+// portsDaemonDomain returns the launchctl domain of the current user, gui/<uid>.
 func portsDaemonDomain() string {
-	return "gui:" + strconv.Itoa(os.Getuid())
+	return "gui/" + strconv.Itoa(os.Getuid())
+}
+
+// portsDaemonServiceTarget returns the launchctl service target of the watcher,
+// gui/<uid>/<label>, where the label is the Label of the launch agent.
+func portsDaemonServiceTarget() string {
+	return portsDaemonDomain() + "/" + portsAgentName()
 }
 
 // portsDaemonTool returns the service manager of the platform.

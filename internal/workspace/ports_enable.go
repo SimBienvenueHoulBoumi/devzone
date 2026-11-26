@@ -50,7 +50,7 @@ func PortsEnable(out, errOut io.Writer) int {
 	if portsPlatform == "darwin" {
 		// A loaded agent would make the bootstrap fail; unloading an absent one
 		// fails too and is ignored, which keeps enable repeatable.
-		_ = portsDaemon(portsDaemonTool(), "bootout", portsDaemonDomain()+"/"+portsAgentName())
+		_ = portsDaemon(portsDaemonTool(), "bootout", portsDaemonServiceTarget())
 	}
 	tool := portsDaemonTool()
 	args := portsDaemonEnableArgs(definition)

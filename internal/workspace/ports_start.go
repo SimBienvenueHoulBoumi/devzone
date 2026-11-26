@@ -65,7 +65,7 @@ func PortsStart(out, errOut io.Writer) int {
 func portsStartService(out, errOut io.Writer) int {
 	tool := portsDaemonTool()
 	if portsPlatform == "darwin" {
-		if status := portsDaemon(tool, "kickstart", "-k", portsDaemonDomain()+"/"+portsAgentName()); status == 0 {
+		if status := portsDaemon(tool, "kickstart", "-k", portsDaemonServiceTarget()); status == 0 {
 			fmt.Fprintln(out, "Workspace ports: watcher started by the service manager")
 			return 0
 		}
