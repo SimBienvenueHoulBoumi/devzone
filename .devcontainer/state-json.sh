@@ -126,11 +126,11 @@ state_json() {
                 state_value="failed"
                 command_value="devzone apply"
             elif [ "$m" = gitlab ]; then
-                if out="$(bash "$ICI/gitlab/gitlab.sh" status 2>/dev/null)"; then
+                if out="$(devzone gitlab status 2>/dev/null)"; then
                     state_value="$out"
                 else
                     state_value=""
-                    add_error modules "gitlab.sh status unavailable"
+                    add_error modules "gitlab status unavailable"
                 fi
             elif [ "$m" = postgres ] || [ "$m" = llm ]; then
                 if out="$(bash "$ICI/$m/$m.sh" status 2>/dev/null)"; then

@@ -40,6 +40,14 @@ func newDefaultRegistry() *cli.Registry {
 		Name: "argocd",
 		Run:  runArgocd,
 	})
+	r.Register(cli.Command{
+		Name: "gitlab",
+		Run:  runGitlab,
+	})
+	r.Register(cli.Command{
+		Name: "test-gitlab",
+		Run:  runTestGitlab,
+	})
 	return r
 }
 

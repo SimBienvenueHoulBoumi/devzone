@@ -11,7 +11,7 @@ setup() {
     APP="$T/app/devzone"
     export DEVZONE_ROOT="$T/racine"
     export DEVZONE_STATE="$T/modules"
-    mkdir -p "$T/app/gitlab" "$T/app/postgres" "$T/app/catalog/mysql" "$T/bin" "$DEVZONE_ROOT"
+    mkdir -p "$T/app/postgres" "$T/app/catalog/mysql" "$T/bin" "$DEVZONE_ROOT"
     cp "$RACINE_TEST/.devcontainer/devzone" "$APP"
     cp "$RACINE_TEST"/.devcontainer/devzone-*.sh "$T/app/"
     cp "$RACINE_TEST/.devcontainer/help.sh" "$T/app/help.sh"
@@ -41,10 +41,6 @@ PORTS_AUTO
 printf 'password %s\n' "$*" >>"$BATS_TEST_TMPDIR/actions.log"
 [ ! -f "$BATS_TEST_TMPDIR/failed-password" ] || { echo "credentials unavailable"; exit 1; }
 PASSWORD
-    cat >"$T/app/gitlab/gitlab.sh" <<'GITLAB'
-#!/usr/bin/env bash
-printf 'gitlab %s\n' "$*" >>"$BATS_TEST_TMPDIR/actions.log"
-GITLAB
     cat >"$T/app/catalog/catalog-watcher.sh" <<'VEILLEUR'
 #!/usr/bin/env bash
 printf 'catalog-watcher %s\n' "$*" >>"$BATS_TEST_TMPDIR/actions.log"
@@ -57,7 +53,7 @@ DEMARRAGE
 #!/usr/bin/env bash
 printf 'metrics %s\n' "$*" >>"$BATS_TEST_TMPDIR/actions.log"
 METRICS
-    chmod +x "$T/app"/*.sh "$T/app/gitlab/gitlab.sh" "$T/app/catalog/catalog-watcher.sh"
+    chmod +x "$T/app"/*.sh "$T/app/catalog/catalog-watcher.sh"
     cat >"$T/bin/devzone" <<'DEVZONE'
 #!/usr/bin/env bash
 echo "devzone $*" >>"$BATS_TEST_TMPDIR/devzone.log"
@@ -66,6 +62,7 @@ case "$*" in
     "cluster clean"*) exit 0 ;;
     "account token"*) exit 0 ;;
     "account fresh"*) exit 0 ;;
+    gitlab\ *) exit 0 ;;
     postgres\ *|mysql\ *) exit 0 ;;
 esac
 exit 0
@@ -127,8 +124,8 @@ KUBE
     printf 'gitlab=on\npostgres=on\n' >"$DEVZONE_STATE"
     run bash "$APP" repair
     [ "$status" -eq 0 ]
-    [[ "$(cat "$T/actions.log")" == *"gitlab hote-poser"* ]] || false
-    [[ "$(cat "$T/actions.log")" == *"gitlab relay-start"* ]] || false
+    [[ "$(cat "$T/actions.log")" == *"devzone gitlab hote-poser"* ]] || false
+    [[ "$(cat "$T/actions.log")" == *"devzone gitlab relay-start"* ]] || false
     [[ "$(cat "$T/actions.log")" == *"devzone postgres relay-start"* ]] || false
 }
 
