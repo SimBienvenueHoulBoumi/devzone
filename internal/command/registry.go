@@ -36,6 +36,10 @@ func newDefaultRegistry() *cli.Registry {
 		Name: "workspace",
 		Run:  workspaceCommand,
 	})
+	r.Register(cli.Command{
+		Name: "uninstall",
+		Run:  uninstallCommand,
+	})
 	return r
 }
 

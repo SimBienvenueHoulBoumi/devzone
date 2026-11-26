@@ -161,10 +161,10 @@ devzone $(version): development workspace in a Kubernetes cluster
                            in a devzone folder: replaces the package files with those of
                            the installed package, after backing up the replaced files in
                            .devzone.backup/ (the new image is used at the next workspace start)
-  devzone uninstall        in a devzone folder: lists what devzone installed outside the
-                           folder (leftovers of older versions, kind clusters, services,
-                           metrics-server), asks for confirmation, then removes it;
-                           workspace/ is kept (run before npm uninstall -g devzone)
+  devzone uninstall [--yes]
+                           in a devzone folder: removes Kubernetes objects of this devzone
+                           instance (namespaces, Argo CD Applications, temporary accounts,
+                           .devzone.* files); workspace/ is kept; asks for confirmation
   devzone workspace start|stop|status|shell|update
   devzone workspace vscode|copy-to|copy-from|clone
                            Kubernetes workspace: drives the devzone-workspace chart

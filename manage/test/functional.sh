@@ -1,191 +1,136 @@
 #!/usr/bin/env bash
-# Tests fonctionnels de devzone : construit un devzone isolé, joue les
-# scénarios d'un utilisateur, puis supprime tout, même en cas d'échec.
-#   make test-fonctionnel     (ou bash manage/test/functional.sh)
-# Isolation : copie du dépôt dans un dossier temporaire (autre conteneur,
-# autre image) et volumes propres au test (DEVZONE_VOLUMES). Le conteneur
-# utilise le Docker de l'hôte (#291) : le cluster kind du test porte un nom
-# propre au test et il est supprimé à la fin. Le cluster de l'hôte n'est jamais touché : les commandes
-# Kubernetes lisent DEVZONE_KUBE_SOURCE, orienté vers un fichier absent.
-# Prérequis : Docker, Node (npx). Durée : 5 à 10 min (plus sans cache).
-set -uo pipefail
+# Pod workspace functional test on a kind cluster (#869). The old container-mode
+# scenarios were retired with the pod-only model; this script keeps the historical
+# name used by CI and make. It builds the workspace image, loads it into kind,
+# installs charts/devzone-workspace, then exercises start/status/stop and a module.
+set -euo pipefail
 
-RACINE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-# shellcheck source=SCRIPTDIR/journal-error.sh
-. "$(dirname "${BASH_SOURCE[0]}")/journal-error.sh"
-export DEVZONE_VOLUMES="devzone-test-$$"
-# Cluster kind du test, sur le Docker de l'hôte : nom unique, jamais celui
-# d'un autre devzone
-KIND_TEST="dz-test-$$"
-# Chemin physique : make (CURDIR) voit /private/var/… sous macOS, pas /var/…
-TMP="$(cd "$(mktemp -d)" && pwd -P)"
-# Nommée autrement que « devzone » : le conteneur doit fonctionner quel que soit
-# le nom du dossier (npx devzone <dossier>)
-COPIE="$TMP/mon-devzone"
-DC=(npx -y @devcontainers/cli)
-WS=(--workspace-folder "$COPIE")
-JOURNAL="$TMP/journal.log"
-reussis=0
-failures=0
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+CLUSTER="${DEVZONE_KIND_CLUSTER:-devzone-ci}"
+IMAGE="${DEVZONE_WORKSPACE_IMAGE:-devzone-workspace:ci}"
+NAMESPACE="devzone-workspace"
+POD="devzone-workspace-0"
+TMP="$(mktemp -d)"
+DEVZONE_DIR="$TMP/devzone"
+passed=0
+failed=0
+ENGINE="docker"
 
-nettoyer() {
-    local ids image dind
-    ids="$(docker ps -aq --filter "label=devcontainer.local_folder=$COPIE")"
-    for id in $ids; do
-        image="$(docker inspect "$id" --format '{{.Config.Image}}')"
-        dind="$(docker inspect "$id" --format '{{range .Mounts}}{{if eq .Destination "/var/lib/docker"}}{{.Name}}{{end}}{{end}}')"
-        docker rm -f "$id" >/dev/null
-        [ -z "$dind" ] || docker volume rm "$dind" >/dev/null 2>&1 || true
-        [ -z "$image" ] || docker rmi "$image" >/dev/null 2>&1 || true
-    done
-    local volume
-    for volume in $(docker volume ls -q | grep "^${DEVZONE_VOLUMES}-" || true); do
-        docker volume rm "$volume" >/dev/null 2>&1 || true
-    done
-    # Cluster kind du test : ses conteneurs (étiquette posée par kind)
-    for id in $(docker ps -aq --filter "label=io.x-k8s.kind.cluster=$KIND_TEST"); do
-        docker rm -f "$id" >/dev/null 2>&1 || true
-    done
-    rm -rf "$TMP"
+# cleanup removes the temporary kind cluster and temp dir so CI runners stay clean.
+cleanup() {
+  local code=$?
+  set +e
+  if [ "${CREATED:-0}" = 1 ] && command -v kind >/dev/null 2>&1; then
+    kind delete cluster --name "$CLUSTER" >/dev/null 2>&1 || true
+  fi
+  rm -rf "$TMP"
+  exit "$code"
 }
-trap nettoyer EXIT
+trap cleanup EXIT
 
-# Commande dans le conteneur (shell de connexion, comme un utilisateur)
-dz() {
-    "${DC[@]}" exec "${WS[@]}" env DEVZONE_KUBE_SOURCE=/nexiste/pas bash -lc "$1" 2>&1
-}
+ok() { passed=$((passed + 1)); echo "  ✔ $1"; }
+ko() { failed=$((failed + 1)); echo "  ✖ $1"; [ -n "${2:-}" ] && printf '%s\n' "$2" | tail -20 | sed 's/^/    /'; }
 
-ok() { reussis=$((reussis + 1)); echo "  ✔ $1"; }
-ko() { failures=$((failures + 1)); echo "  ✖ $1"; printf '%s\n' "$2" | tail -5 | sed 's/^/      /'; }
+# need fails early when a required CLI is missing because the kind scenario cannot run.
+need() { command -v "$1" >/dev/null 2>&1 || { echo "✖ missing required command: $1" >&2; exit 1; }; }
 
-# reussit <nom> <commande> [motif attendu dans la sortie]
-reussit() {
-    local sortie
-    if sortie="$(dz "$2")" && { [ -z "${3:-}" ] || grep -qE -- "$3" <<<"$sortie"; }; then ok "$1"; else ko "$1" "$sortie"; fi
-}
-# echoue <nom> <commande> [motif attendu dans la sortie]
-echoue() {
-    local sortie
-    if ! sortie="$(dz "$2")" && { [ -z "${3:-}" ] || grep -qE -- "$3" <<<"$sortie"; }; then ok "$1"; else ko "$1" "$sortie"; fi
-}
+for cmd in "$ENGINE" kind kubectl helm node; do need "$cmd"; done
 
-demarrer() {
-    # One retry when SDKMAN served a corrupt archive (#685); any other failure stops
-    if ! build_with_retry "$JOURNAL" "${DC[@]}" up "${WS[@]}" "$@"; then
-        echo "✖ démarrage du conteneur impossible ; fin du journal :"
-        print_log_errors "$JOURNAL"
-        exit 1
-    fi
-}
+if kind get clusters 2>/dev/null | grep -qx "$CLUSTER"; then
+  echo "✖ kind cluster $CLUSTER already exists" >&2
+  exit 1
+fi
 
-echo "▶ Copie du dépôt et construction (volumes $DEVZONE_VOLUMES-*)"
-mkdir -p "$COPIE/workspace"
-(cd "$RACINE" && git ls-files -co --exclude-standard | grep -v '^workspace/' | tar -cf - -T -) | tar -xf - -C "$COPIE"
-demarrer
+CREATED=0
+echo "▶ kind cluster $CLUSTER"
+kind create cluster --name "$CLUSTER" --wait 120s
+CREATED=1
+kubectl cluster-info --context "kind-$CLUSTER" >/dev/null
+ok "kind cluster ready"
 
-echo "▶ Outils"
-for outil in java mvn gradle node pnpm go python3 uv docker kubectl helm k9s kind gh repowarden shellcheck bats actionlint gitleaks ruff vulture pytest; do
-    reussit "$outil présent" "command -v $outil"
-done
+echo "▶ build workspace image"
+df="$ROOT/.devcontainer/Dockerfile"
+"$ENGINE" image build -f "$df" -t "$IMAGE" "$ROOT/.devcontainer"
+kind load "${ENGINE}-image" "$IMAGE" --name "$CLUSTER"
+ok "image built and loaded: $IMAGE"
 
-# #291 : le conteneur pilote le Docker de l'hôte (même démon, pas de Docker interne)
-ID_HOTE="$(docker info --format '{{.ID}}')"
-reussit "Docker du conteneur = Docker de l'hôte" "docker info --format '{{.ID}}'" "^${ID_HOTE}$"
+echo "▶ devzone folder"
+mkdir -p "$DEVZONE_DIR/workspace"
+cp "$ROOT/.gitignore" "$DEVZONE_DIR/.gitignore" 2>/dev/null || true
+cp -R "$ROOT/.devcontainer" "$DEVZONE_DIR/.devcontainer"
+cp -R "$ROOT/charts" "$DEVZONE_DIR/charts"
+cp -R "$ROOT/manage" "$DEVZONE_DIR/manage"
+cp "$ROOT/package.json" "$DEVZONE_DIR/package.json"
+cp "$ROOT/Makefile" "$DEVZONE_DIR/Makefile" 2>/dev/null || true
+printf 'argocd=off\n' > "$DEVZONE_DIR/.devzone.modules"
+ok "devzone folder prepared"
 
-echo "▶ Premier démarrage (récapitulatif affiché au démarrage)"
-reussit "modules désactivés par défaut" "devzone" "○ module ai"
-reussit "kubernetes disabled par défaut" "devzone" "○ module kubernetes"
-echoue "assistants IA absents" "command -v claude"
-for message in "✖ git identity" "○ GitHub          optional" "○ module ai"; do
-    if grep -q "$message" "$JOURNAL"; then ok "message : $message"; else ko "message : $message" "$(tail -5 "$JOURNAL")"; fi
-done
-
-echo "▶ Module ai"
-reussit "enable ai" "devzone enable ai && claude --version && opencode --version" "Claude Code"
-reussit "ai : garde-fou repowarden branché (Claude Code, opencode)" "grep -qE 'repowarden (garde|guard)' ~/.claude/settings.json && test -f ~/.config/opencode/plugins/repowarden-garde.js"
-reussit "ai : configuration opencode par défaut en place" "grep -q '^// devzone : default opencode configuration' ~/.config/opencode/opencode.jsonc && grep -q '\"model\": \"opencode/big-pickle\"' ~/.config/opencode/opencode.jsonc"
-# Chaque modèle de la configuration doit être proposé par la version installée
-modeles="$(dz "grep -oE '\"opencode/[^\"]+\"' ~/.config/opencode/opencode.jsonc | tr -d '\"' | sort -u")"
-modeles_dispo="$(dz "timeout 60 opencode models opencode")"
-for modele in $modeles; do
-    if grep -qxF "$modele" <<<"$modeles_dispo"; then
-        ok "ai : modèle disponible : $modele"
-    else
-        ko "ai : modèle absent d'opencode models : $modele" "$modele"
-    fi
-done
-# Modèle gratuit : répond si le réseau le permet ; sinon test sauté (pas un échec)
-code_opencode=0
-sortie_opencode="$(dz "timeout 120 opencode run --model opencode/big-pickle 'Réponds OK' < /dev/null")" || code_opencode=$?
-# Code 124 = délai dépassé : lu sur le vrai code de sortie de dz, pas déduit d'une sortie vide
-if [ "$code_opencode" = 124 ]; then
-    echo "  ↷ ai : opencode sans réponse en 120 s (délai dépassé)"
-elif grep -q 'OK' <<<"$sortie_opencode"; then
-    ok "ai : opencode répond avec le modèle par défaut"
+echo "▶ workspace start/status/stop"
+set +e
+start_out="$(cd "$DEVZONE_DIR" && DEVZONE_ARGOCD_REVISION='' bash "$ROOT/manage/workspace.sh" start --image "$IMAGE" 2>&1)"
+start_rc=$?
+set -e
+if [ "$start_rc" -eq 0 ]; then
+  ok "workspace start"
 else
-    echo "  ↷ ai : opencode sans réponse (réseau ou fournisseur indisponible) : $(printf '%s' "$sortie_opencode" | tail -1)"
+  ko "workspace start" "$start_out"
 fi
-# Action d'agent sur main dans un dépôt neuf (hooks repowarden globaux) : refusée (code 2)
-# shellcheck disable=SC2016 # commande développée dans le conteneur
-echoue "ai : garde-fou : modification sur main refusée" 'd="$(mktemp -d)" && cd "$d" && git init -q -b main && printf "{\"tool_name\":\"Write\",\"tool_input\":{\"file_path\":\"%s/a.txt\"},\"cwd\":\"%s\"}" "$d" "$d" | repowarden guard --format claude' "branche protégée"
-reussit "disable ai" "devzone disable ai && ! command -v claude"
-echoue "unknown module refusé" "devzone enable nexistepas" "unknown module"
 
-echo "▶ Module kubernetes (cluster kind du test, jamais un cluster de l'hôte)"
-# #230 : avant de tenter le cluster kind, le daemon docker du conteneur doit répondre
-if ! dz "docker info" >/dev/null 2>&1; then
-    echo "↳ #230 : docker info échoué ; diagnostic du conteneur"
-    dz "uname -r; iptables --version; if command -v update-alternatives >/dev/null 2>&1; then update-alternatives --display iptables; fi; cat /proc/self/cgroup; if [ -f /tmp/dockerd.log ]; then tail -n 80 /tmp/dockerd.log; else echo 'dockerd.log introuvable'; fi" 2>&1 | sed "s/^/      /"
+# A CI node has too few CPUs for the chart defaults (a limit without request
+# reserves the whole limit): lower the requests of this test release only. A
+# never-ready StatefulSet pod does not roll by itself, hence the deletion.
+set +e
+fit_out="$(helm --kube-context "kind-$CLUSTER" -n "$NAMESPACE" upgrade devzone-workspace "$ROOT/charts/devzone-workspace" --reuse-values \
+  --set resources.requests.cpu=100m --set resources.requests.memory=256Mi \
+  --set kubedock.resources.requests.cpu=100m --set kubedock.resources.requests.memory=128Mi \
+  --set buildkit.resources.requests.cpu=100m --set buildkit.resources.requests.memory=256Mi 2>&1 &&
+  kubectl --context "kind-$CLUSTER" -n "$NAMESPACE" delete "pod/$POD" --ignore-not-found 2>&1 &&
+  kubectl --context "kind-$CLUSTER" -n "$NAMESPACE" wait --for=create "pod/$POD" --timeout=60s 2>&1)"
+fit_rc=$?
+set -e
+if [ "$fit_rc" -eq 0 ]; then
+  ok "resource requests fitted to the node"
+else
+  ko "resource requests fitted to the node" "$fit_out"
 fi
-reussit "Docker répond dans le conteneur" "docker info"
-# Une seconde tentative si l'API du nœud redémarre pendant l'initialisation
-# (Docker de l'hôte chargé), comme cluster_prepare ; --retain garde le nœud
-# pour le diagnostic en cas de second échec
-reussit "kind create cluster (sur le Docker de l'hôte)" "kind create cluster --name $KIND_TEST --wait 120s || { kind delete cluster --name $KIND_TEST; kind create cluster --name $KIND_TEST --wait 120s --retain; }"
-# Échec : journaux du nœud (gardé par --retain, supprimé par nettoyer) pour le diagnostic
-if ! dz "kind get clusters" | grep -qx "$KIND_TEST" || ! dz "kubectl --context kind-$KIND_TEST get nodes" >/dev/null 2>&1; then
-    noeud="$KIND_TEST-control-plane"
-    echo "↳ diagnostic du nœud $noeud"
-    docker exec "$noeud" sh -c 'crictl ps -a 2>&1 | head -20; echo "--- kubelet"; journalctl -u kubelet --no-pager 2>&1 | tail -25; echo "--- apiserver"; for c in $(crictl ps -a --name kube-apiserver -q 2>/dev/null | head -1); do crictl logs "$c" 2>&1 | tail -25; done; echo "--- etcd"; for c in $(crictl ps -a --name etcd -q 2>/dev/null | head -1); do crictl logs "$c" 2>&1 | tail -15; done; echo "--- limites"; cat /proc/sys/fs/inotify/max_user_instances /proc/sys/fs/inotify/max_user_watches; free -m' 2>&1 | sed 's/^/      /'
+
+set +e
+status_out="$(cd "$DEVZONE_DIR" && bash "$ROOT/manage/workspace.sh" status 2>&1)"
+status_rc=$?
+set -e
+if [ "$status_rc" -eq 0 ] && printf '%s' "$status_out" | grep -q "$POD"; then
+  ok "workspace status"
+else
+  ko "workspace status" "$status_out"
 fi
-# Enveloppe kind (#291) : l'adresse de l'API est rendue joignable du conteneur
-reussit "cluster créé à la main : adresse joignable du conteneur" "kubectl config view -o jsonpath='{.clusters[?(@.name==\"kind-$KIND_TEST\")].cluster.server}'" "$KIND_TEST-control-plane:6443|host.docker.internal"
-reussit "cluster créé à la main : kubectl lui parle" "kubectl --context kind-$KIND_TEST get nodes" "Ready"
-reussit "enable kubernetes : metrics-server sur kind" "devzone enable kubernetes" "metrics-server : installed .*kind-$KIND_TEST"
-reussit "métriques disponibles" "for i in \$(seq 1 36); do kubectl --context kind-$KIND_TEST top nodes >/dev/null 2>&1 && exit 0; sleep 5; done; exit 1"
-reussit "metrics-server marqué comme installé par devzone" "kubectl --context kind-$KIND_TEST -n kube-system get deployment metrics-server -o jsonpath='{.metadata.labels.devzone}'" "^installe$"
-# Désinstallation lancée dans le conteneur : seul le cluster kind-$KIND_TEST est vu
-reussit "désinstaller : retire le metrics-server de devzone" "CONFIRMER=yes bash manage/scripts/uninstall.sh" "metrics-server removed: kind-$KIND_TEST"
-echoue "metrics-server absent après désinstallation" "kubectl --context kind-$KIND_TEST -n kube-system get deployment metrics-server"
-echoue "metrics-server.sh : unknown context" "bash .devcontainer/metrics-server.sh nexistepas" "unknown context"
-reussit "disable kubernetes" "devzone disable kubernetes" "kubernetes disabled"
-reussit "cluster kind toujours utilisable" "kubectl --context kind-$KIND_TEST get nodes" "Ready"
 
-echo "▶ Git et hooks repowarden"
-echoue "commit sans identité refusé" "cd /tmp && rm -rf t1 && git init -q t1 && cd t1 && echo x >f && git add f && git commit -qm 'feat: x'" "tell me who you are|unable to auto-detect"
-G="cd /tmp && rm -rf t2 && git init -q -b develop t2 && cd t2 && git config user.name Test && git config user.email test@example.invalid"
-echoue "message non conventionnel refusé" "$G && echo a >a && git add a && git commit -m 'truc'"
-reussit "message conventionnel accepté" "$G && echo a >a && git add a && git commit -m 'feat: premier fichier'"
-echoue "jeton GitHub refusé (gitleaks)" "$G && echo \"T='ghp_\$(head -c 300 /dev/urandom | tr -dc A-Za-z0-9 | head -c 36)'\" >c.py && git add c.py && git commit -m 'feat: config'" "Secret"
+if kubectl --context "kind-$CLUSTER" -n "$NAMESPACE" wait --for=condition=Ready "pod/$POD" --timeout=300s >/dev/null 2>&1; then
+  ok "pod ready"
+else
+  ko "pod ready" "$(kubectl --context "kind-$CLUSTER" -n "$NAMESPACE" get pods -o wide 2>&1; kubectl --context "kind-$CLUSTER" -n "$NAMESPACE" describe "pod/$POD" 2>&1 | tail -60)"
+fi
 
-echo "▶ Persistance"
-dz "devzone enable ai >/dev/null; echo témoin >~/.config/git/temoin" >/dev/null
-# Identité dans le volume, et volume « pollué » comme par une version
-# antérieure (réglages machine en double) : le rebuild doit réussir et le nettoyer
-dz "V=~/.config/git/config; git config --file \$V user.name Test; git config --file \$V user.email test@example.invalid; git config --file \$V --add credential.https://github.com.helper ''; git config --file \$V --add credential.https://github.com.helper '!gh auth git-credential'; git config --file \$V --add safe.directory /workspaces/devzone" >/dev/null
-docker stop "$(docker ps -q --filter "label=devcontainer.local_folder=$COPIE")" >/dev/null
-demarrer
-reussit "redémarrage : modules gardés" "devzone" "✔ module ai"
-reussit "redémarrage : volume gardé" "cat ~/.config/git/temoin" "témoin"
-demarrer --remove-existing-container
-reussit "rebuild : modules gardés" "devzone" "✔ module ai"
-reussit "rebuild : ai réinstallé" "claude --version" "Claude Code"
-reussit "rebuild : volume gardé" "cat ~/.config/git/temoin" "témoin"
-reussit "rebuild : cluster kind conservé" "kind get clusters" "^${KIND_TEST}$"
-reussit "rebuild : identité conservée dans le volume" "git config --file ~/.config/git/config user.name" "^Test$"
-echoue "rebuild : volume sans réglages machine" "git config --file ~/.config/git/config --get-all credential.https://github.com.helper"
-reussit "rebuild : réglages machine dans ~/.gitconfig" "git config --file ~/.gitconfig --get-all credential.https://github.com.helper" "gh auth git-credential"
+echo "▶ module"
+set +e
+module_out="$(cd "$DEVZONE_DIR" && bash "$ROOT/manage/workspace.sh" services status 2>&1)"
+module_rc=$?
+set -e
+if [ "$module_rc" -eq 0 ]; then
+  ok "workspace services status (module command)"
+else
+  ko "workspace services status" "$module_out"
+fi
+
+set +e
+stop_out="$(cd "$DEVZONE_DIR" && bash "$ROOT/manage/workspace.sh" stop 2>&1)"
+stop_rc=$?
+set -e
+if [ "$stop_rc" -eq 0 ]; then
+  ok "workspace stop"
+else
+  ko "workspace stop" "$stop_out"
+fi
 
 echo
-echo "Résultat : $reussis réussi(s), $failures échec(s)"
-[ "$failures" -eq 0 ]
+echo "Result: $passed passed, $failed failed"
+[ "$failed" -eq 0 ]

@@ -82,7 +82,8 @@ apply_service() {
 
 apply_kubernetes() {
     if [ "$1" = on ]; then
-        bash "$ICI/kube-config.sh"
+        # Clusters are connected from the workstation; no script to run here.
+        return 0
     else
         rm -f "$HOME/.kube/hote.config"
         # metrics-server removed from the clusters where devzone installed it

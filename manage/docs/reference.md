@@ -6,11 +6,7 @@
 - **`workflow` permission**: without it, GitHub refuses any push that modifies `.github/workflows/` (common with repowarden). Account already logged in: `gh auth refresh -h github.com -s workflow`.
 - **From `devzone workspace shell`**, no browser opens from the container: copy the code shown by `gh` and open https://github.com/login/device by hand. The warning “No clipboard utilities available” is harmless.
 
-**Git identity** (required to commit): without GitHub, set by hand (`git config --file ~/.config/git/config user.name "<name>"` and `user.email "<email>"`); with GitHub, deduced from the `gh` account at each startup as long as it is missing (`git-identity.sh`):
-- name of the GitHub profile (otherwise the login);
-- noreply email `<id>+<login>@users.noreply.github.com`: commits are attached to the account, the personal email is not exposed.
-
-An identity already set is never replaced. For another email: `git config --file ~/.config/git/config user.email "<email>"`. After a `gh auth login` during a session: `devzone start`.
+**Git identity** (required to commit): set by hand in the identity volume (`git config --file ~/.config/git/config user.name "<name>"` and `user.email "<email>"`); the file is shared by the instances of the machine, so an identity already set is never replaced. With GitHub, the noreply address `<id>+<login>@users.noreply.github.com` attaches the commits to the account without exposing the personal email. For another email: `git config --file ~/.config/git/config user.email "<email>"`.
 
 **AI assistants** (`ai` module, see [Modules](#modules)): `devzone enable ai`, then `claude` (then `/login`), `opencode auth login`.
 
@@ -70,13 +66,13 @@ repowarden            # check
 
 **Why**: the workspace is mounted from the host (`/Users/…/devzone` on a Mac → `/workspaces/devzone`). git records the **absolute** path of each worktree in `.git/worktrees/<name>/gitdir`: `/workspaces/…` for a worktree created in the container, `/Users/…` for a worktree created on the Mac. Seen from the other side, this path does not exist: the worktree looks “prunable”, and a `git worktree prune` erases its metadata, which breaks the worktree where it was created.
 
-**Reporting**: the state shown at startup (and by `devzone`) lists, without deleting anything, the worktrees of the devzone repository and of the workspace repositories whose path does not exist in the container: `⚠ worktree        /Users/…/wt-42 absent ici (créé hors du conteneur ?) : …`. Manage it from the side that created it (remove it there with `git worktree remove`, then recreate it in the container if needed).
+**Reporting**: the state shown at startup (and by `devzone`) lists, without deleting anything, the worktrees of the devzone repository and of the workspace repositories whose path does not exist in the workspace pod: `⚠ worktree        /Users/…/wt-42 absent ici (créé hors du conteneur ?) : …`. Manage it from the side that created it (remove it there with `git worktree remove`, then recreate it in the container if needed).
 
 
 
 ## Modules
 
-Optional features are modules, **disabled by default**, enabled on demand from the container, without a rebuild:
+Optional features are modules, **disabled by default**, enabled on demand in the workspace pod, without a rebuild:
 
 ```bash
 devzone                        # state: git identity, GitHub, tools, modules
@@ -119,11 +115,10 @@ In the [Kubernetes workspace](#devzone-services-in-the-kubernetes-workspace), `g
 
 ### Application commands
 
-The internal scripts of `.devcontainer/` are not user commands: `devzone` wraps them.
+The internal scripts of `.devcontainer/` are not user commands: `devzone` wraps them in the workspace pod.
 
 ```bash
-devzone repair                 # relaunches gitlab, postgres, ports and credentials
-devzone start                # full startup (git identity, clusters, relays, summary)
+devzone repair                 # relaunches the module relays, watchers and credentials
 devzone metrics [context…]     # installs metrics-server on a local cluster
 devzone use CTX [--confirm CTX]  # switches the kubectl working cluster
 devzone clusters                       # view of the connected clusters (work and services)
@@ -209,7 +204,7 @@ devzone passwords          # regenerates the file and only shows its path
 
 - **Format**: comment header, then one line per account, columns separated by tabs: `service`, `address`, `user`, `password`. Stable sort by service then user; no empty line.
 - **Source**: the module files remain the reference (`workspace/.gitlab/root-password`, `workspace/.gitlab/dev-password`, `workspace/.postgres/admin-password`, `workspace/.postgres/<project>.env`, `workspace/.argocd/admin.env`). `.password` is a regenerated view, never a second copy to keep up to date.
-- **Update**: `password_regenerate` (`.devcontainer/password.sh`) is called at the end of each creation, deletion or account change: installation, `create`, `delete` and `--new-password` of postgres; seed and uninstall of gitlab; installation and uninstall of argocd; devzone startup. A failure never prevents the operation; it shows a warning.
+- **Update**: `password_regenerate` (`.devcontainer/password.sh`) is called at the end of each creation, deletion or account change: installation, `create`, `delete` and `--new-password` of postgres; seed and uninstall of gitlab; installation and uninstall of argocd; `devzone repair`. A failure never prevents the operation; it shows a warning.
 - **Protection**: file ignored by git (`.gitignore`) and rights **600** set before writing (`umask 077`, temporary file in the same folder, then `mv`). No command reads or displays its content; the summary and `devzone passwords` only cite the path. Without any account, the file is deleted.
 
 
@@ -235,25 +230,24 @@ Several devzone instances can coexist on one machine (one per project, one per u
 
 ## Kubernetes
 
-devzone provides the tools, not the cluster, and never creates one on its own. With the `kubernetes` module active (`devzone enable kubernetes`), it connects at each startup to the host's cluster if it exists and answers (in practice `docker-desktop`); otherwise, or in addition, create a cluster in the container:
+devzone provides the tools, not the cluster, and never creates one on its own. The `kubernetes` module (`devzone enable kubernetes`) records the cluster chosen from the workstation; the workspace pod reaches the services through its service account.
 
 ```bash
 kind create cluster          # ~2 min the first time
-kubectl config get-contexts  # host clusters + kind clusters
+kubectl config get-contexts  # clusters connected from the workstation
 devzone use <name>       # switches the kubectl working cluster
 ```
 
 - **Active cluster**: the host's by default if it answers (in practice `docker-desktop`), otherwise a dedicated kind cluster `kind-devzone`. A choice made with `devzone use` is kept across restarts.
-- **kind clusters**: run on the host's Docker (shared socket, #291). Their API listens on 127.0.0.1 **of the workstation**, never on the local network; `kind` (devzone wrapper) rewrites the address to `host.docker.internal` in the container's kubeconfig, keeping TLS verification: a cluster created by hand with `kind create cluster` is reachable straight away. The name is suffixed by instance when it is not the default instance. They restart with Docker Desktop and are deleted by `kind delete cluster` (or `make uninstall`).
-- **CPU and RAM in k9s** (`kubectl top`): with the `kubernetes` module active, metrics-server is installed at startup on the **local** clusters that lack it (Docker Desktop, kind…), never on a remote cluster. After a `kind create cluster`: `devzone metrics` (or `devzone metrics <context>` for a specific cluster).
-- **Host cluster**: `~/.kube` is mounted read-only, never modified; its adapted copy is `~/.kube/hote.config` (`127.0.0.1` replaced by `host.docker.internal`). After a cluster change on the host: `devzone workspace stop && devzone workspace start`.
-- **Startup messages** (`kube-config : …`, `metrics-server : …`, summary): in the creation terminal, or by rerunning `devzone start`.
+- **kind clusters**: created from the workstation (#291). Their API listens on 127.0.0.1 **of the workstation**, never on the local network. The name is suffixed by instance when it is not the default instance. They restart with the host engine and are deleted by `kind delete cluster` (or `make uninstall`).
+- **CPU and RAM in k9s** (`kubectl top`): `devzone metrics` installs metrics-server on the **local** clusters that lack it, never on a remote cluster (or `devzone metrics <context>` for a specific cluster).
+- **Host cluster**: the workstation keeps its own kubeconfig; the pod uses the cluster service account. After a cluster change on the host: `devzone workspace stop && devzone workspace start`.
 
-The `127.0.0.1` address of the host cluster is rewritten to `host.docker.internal` by `kube-config.sh` at startup, making the cluster reachable from the container. The API certificate includes `host.docker.internal` in its SANs (configured via `networking.apiServerAddress` and `kubeadmConfigPatches` in the kind config).
+The API certificate includes the names expected by the workstation tools (configured via `networking.apiServerAddress` and `kubeadmConfigPatches` in the kind config).
 
 The host cluster is not reachable in two cases (kind still works):
 - **Codespaces, remote machine**: no local `~/.kube`;
-- **Linux with Docker Engine**: a kind or minikube cluster of the host listens on `127.0.0.1`, invisible from the container without the `kube-config.sh` rewrite. A cluster listening on all interfaces (k3s, kubeadm) is reachable.
+- **Linux with an engine on the host**: a kind or minikube cluster listens on `127.0.0.1`, reachable from the workstation; a cluster listening on all interfaces (k3s, kubeadm) is reachable as well.
 
 ## Kubernetes workspace
 
@@ -656,28 +650,18 @@ The declarations do not stay in the cluster: they live in a **GitOps repository 
 
 ## Ports to the workstation
 
-`devzone port` makes the applications that listen **inside** the devzone container accessible from the workstation: one `alpine/socat` relay per port, on the host's Docker (#290).
+`devzone port` lists and closes the relays of `127.0.0.1:<n>` on the workstation that are kept in the state of a workstation instance (#290). In the Kubernetes workspace, the applications and services of the pod use `devzone workspace ports` instead.
 
 ```bash
-devzone port <n>              # opens 127.0.0.1:<n> of the workstation → <n> of the container
 devzone port                  # list: port, ● active or ○ stopped, application behind it
 devzone port --close <n>     # removes the relay and the port from the state
-devzone port auto on|off     # enables or stops the automatic watcher
-devzone port exclure <n>      # removes a port from the automatic list
-devzone port inclure <n>      # puts a port back into the automatic list
 ```
 
-- **Relay**: container `devzone-<instance>-port-<n>`, labelled `devzone.instance=<instance>` and `devzone.port=<n>`, pinned image `SOCAT_IMAGE=alpine/socat:1.8.0.3` (`.devcontainer/ports.sh`). It publishes `-p 127.0.0.1:<n>:<n>` only, with `--restart unless-stopped`.
-- **Automatic watcher (#394)**: `.devcontainer/ports-auto.sh` watches the ports listening in the container every 2 s (`ss -ltnH`). A port not already relayed, not excluded, not a devzone service (5432, 8929, 2224) and not a bridge of the watcher is relayed: an internal bridge on the container's IP if the application only listens on `127.0.0.1`/`::1`, then the workstation relay `devzone-<instance>-auto-<n>`. A port gone for more than 10 s removes the bridge and the relay. A port already taken on the workstation is marked busy and is no longer retried. Only one watcher runs (`mkdir` lock in `/tmp/devzone-ports-auto/`, refreshed at each round; a dead instance is replaced). The watcher stops by itself if the state folder disappears. It only runs on the request of the startup scripts: any other call is refused (code 2), and shows the command to run (`devzone repair`). In the Kubernetes workspace (`DEVZONE_WORKSPACE` set to `kubernetes`), it does not start (#517): the ports go through `devzone workspace ports`.
-- **Deactivation**: `devzone port auto off` stops the watcher and removes the automatic relays; `devzone port auto on` reactivates it: the watcher restarts at the next container startup or through `devzone repair`. At startup, the automatic relays of a previous session are removed.
-- **Network and IP**: read by `docker inspect "$(hostname)"` on the host's Docker; the relay joins the container by its IP on its Docker network. devzone container not found (host Docker absent): clear refusal, code 1.
-- **State**: line `ports=8080,3000` in `$RACINE/.devzone.modules`, sorted and without duplicates; `--close` removes the port. An already open relay is idempotent (message, code 0).
-- **Startup**: `devzone start` relaunches each relay of the state toward the container's current IP (it changes at each restart). A failure shows a warning without blocking startup; `devzone repair` takes it up again without restarting.
-- **Refusal, code 1**: non-numeric port or outside 1-65535; host Docker unreachable; port already taken on the workstation (failure of `docker run`, “port is already allocated” or “address already in use”), the state remaining unchanged.
-- **Several instances**: the relay name and the label carry `DEVZONE_INSTANCE`; two instances that want the same workstation port: the second one receives the refusal `déjà utilisé` (*already used*).
-- **Summary**: line `ports to the workstation` with `8080 ●, 3000 ○`, or `none (devzone port <n>)`.
-- **Uninstalling**: `make uninstall` removes the containers labelled `devzone.instance` (see the README, “Uninstalling”).
-- **Spring Boot**: the application must listen on `0.0.0.0` (default). A `server.address=127.0.0.1` makes it unreachable from the relay.
+- **Relay**: name `devzone-<instance>-port-<n>`, labelled `devzone.instance=<instance>` and `devzone.port=<n>` (`.devcontainer/ports.sh`). The state names relays published on `127.0.0.1` of the workstation; devzone lists and closes them.
+- **State**: line `ports=8080,3000` in `$RACINE/.devzone.modules`, sorted and without duplicates; `--close` removes the port.
+- **Refusal, code 1**: non-numeric port or outside 1-65535.
+- **Summary**: line `ports to the workstation` with `8080 ●, 3000 ○`, or `none`.
+- **Uninstalling**: `make uninstall` removes the relays labelled `devzone.instance` (see the README, “Uninstalling”).
 
 ## devzone cluster
 
@@ -723,15 +707,11 @@ With the `argocd` module installed and reachable, `devzone enable postgres|mysql
 
 ### Account limited to devzone namespaces
 
-In pod mode (default), the terminal in the pod has no rights on the cluster; the workstation acts as administrator for the time of an operation ([#528](https://github.com/SimBienvenueHoulBoumi/devzone/issues/528)). In container mode, the terminal keeps the cluster administrator, while the agents (opencode and Claude Code) only have the limited account on the `devzone-*` namespaces ([#430](https://github.com/SimBienvenueHoulBoumi/devzone/issues/430), [#844](https://github.com/SimBienvenueHoulBoumi/devzone/issues/844)).
+In pod mode (default), the terminal in the pod has no rights on the cluster; the workstation acts as administrator for the time of an operation ([#528](https://github.com/SimBienvenueHoulBoumi/devzone/issues/528)). The installers of the modules use the limited account of the `devzone-*` namespaces ([#430](https://github.com/SimBienvenueHoulBoumi/devzone/issues/430), [#844](https://github.com/SimBienvenueHoulBoumi/devzone/issues/844)).
 
-- **Limited account**: the `devzone` context, the relays and the agents never hold the cluster administrator role.
-- **Kubeconfig of the agents**: `~/.kube/agent.config` (mode 600) holds only the `devzone` context, minified from `~/.kube/config` by `devzone account token` at each token renewal, with that context as the current one. Claude Code receives this file as its `KUBECONFIG` in `~/.claude/settings.json` (`devzone enable ai`), so its kubectl never sees the other contexts of `~/.kube/config`; opencode gets the same reduction per session (`agent-workspace.sh`).
-
+- **Limited account**: the module installers and the agents never hold the cluster administrator role.
 - **Account**: ServiceAccount `devzone-agent` of the namespace `devzone-system`, bound to the ClusterRole `edit` in each `devzone-*` namespace by a RoleBinding. `edit` covers reading, writing, secrets and NetworkPolicies of the namespace; neither RBAC nor quotas, and nothing outside the `devzone-*` namespaces (deleting a namespace and reading the nodes remain administrator operations).
-- **Token**: a 24 h TokenRequest written into the `devzone` context of `~/.kube/config` (user `devzone-agent`, cluster entry copied from the host context: server and tls-server-name by `set-cluster`, certificate authority data read with `kubectl config view --raw` then set by `kubectl config set`, which kubectl 1.37 accepts where `set-cluster` refuses the flag). Its expiry (epoch seconds) is kept in `~/.kube/devzone-token.expiry` (mode 600), taken from the TokenRequest response or, if unreadable, now + 24 h. The file is written only after a real call through the devzone context (`kubectl --context devzone auth can-i get pods -n devzone-system`) succeeds: on failure, the previous file is removed and the renewal fails. Renewed at each container startup, by `devzone repair`, and by the `devzone` summary and `devzone status --json` as soon as less than an hour remains (no message on success). If the renewal fails, the summary shows `⚠ limited account token expired: devzone repair` and the JSON carries an alert with the `devzone repair` command.
-- **Administrator reserved for the installers**: creating the namespace, the label, the RoleBinding and the deletion go through the administrator context (`~/.kube/hote.config` for host clusters, `~/.kube/config` for kind clusters). The account is set up by the installers on a still-blank cluster, and is usable at the next token renewal.
-- **Without a chosen services cluster**: `devzone repair` does not renew any token and the rest of the application continues on kubectl's current context.
+- **Administrator reserved for the installers**: creating the namespace, the label, the RoleBinding and the deletion go through the administrator context (`~/.kube/hote.config` for host clusters, `~/.kube/config` for kind clusters). The account is set up by the installers on a still-blank cluster.
 
 ### Isolation
 
@@ -826,7 +806,7 @@ A package installed by hand (`sudo apt install tree`) is lost at the next rebuil
 | Remove | `devzone packages remove <name>`: removes it from the list and uninstalls |
 | Apply | `devzone packages apply`: installs the missing packages |
 
-The list is re-read at post-create, and the state of the packages not yet installed is shown in the summary (`⚠ paquets : …`). `devzone packages apply` can be run again.
+The list is read by `devzone packages apply`, and the state of the packages not yet installed is shown in the summary (`⚠ paquets : …`). `devzone packages apply` can be run again.
 
 ## Machine output
 
@@ -888,7 +868,7 @@ The possible alerts are: `packages`, `worktree`, `cluster_distant` (services on 
 | Delivery PR left open | a red check (see the PR), `delivery-auto: false`, or the GitHub App absent or uninstalled (warning in the `release` run) | fix the check; install the App (`repowarden app init` on your machine) |
 | `repowarden app init` from `devzone workspace shell`: the page `http://127.0.0.1:…` does not open, or GitHub does not come back | the page is served in the container, unreachable from your machine's browser | run the command **on your machine**: `npx -y repowarden app init --repo <account>/<repo>` |
 | `repowarden app init`: `nom déjà utilisé` (*name already used*) | a previous attempt created the App without retrieving its credentials | delete the orphan App (*GitHub → Settings → Developer settings → GitHub Apps*), or use `--nom <other-name>` |
-| `git commit`: “Please tell me who you are” | git identity missing | with GitHub: `gh auth login -s workflow` then `devzone start`; without GitHub: `git config --file ~/.config/git/config user.name "<name>"` and `user.email "<email>"` |
+| `git commit`: “Please tell me who you are” | git identity missing | set it in the shared identity volume: `git config --file ~/.config/git/config user.name "<name>"` and `user.email "<email>"` |
 | `gh auth login`: “Press Enter to open … in your browser”, nothing opens | no browser in the container (`devzone workspace shell`) | open https://github.com/login/device by hand and enter the code |
 | `k9s`: `Error: exit status 1` then its help; `kubectl`: `localhost:8080` … `connection refused` | no active cluster (`kubernetes` module disabled, or no cluster on your machine) | `devzone enable kubernetes` (your machine's cluster), `kind create cluster`, or `devzone use <name>` |
 | `claude` or `opencode`: “command not found” | `ai` module disabled | `devzone enable ai` |
@@ -982,10 +962,9 @@ The following environment variables are not commands: they are not covered by th
 
 ## For contributors
 
-The application commands (`devzone repair`, `start`, `metrics`, `use`) replace the direct scripts for the user. The internal scripts remain callable during development and by the tests:
+The application commands (`devzone repair`, `metrics`, `use`) replace the direct scripts for the user. The internal scripts remain callable during development and by the tests:
 
 ```bash
-bash .devcontainer/startup.sh
 bash .devcontainer/metrics-server.sh
 ```
 

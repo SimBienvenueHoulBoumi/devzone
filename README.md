@@ -159,7 +159,7 @@ git clone https://github.com/ton-compte/ton-projet.git
 mkdir mon-projet && cd mon-projet && git init -b main
 ```
 
-To learn more: [Starting a project](https://github.com/SimBienvenueHoulBoumi/devzone/blob/main/manage/docs/reference.md#starting-a-project).
+To learn more: [Starting a project](https://github.com/SimBienvenueHoulBoumi/devzone/blob/main/manage/docs/reference.md#starting-a-project). Develop devzone in the pod with `devzone workspace start|shell|vscode`.
 
 ## What devzone contains
 
@@ -172,7 +172,7 @@ To learn more: [Starting a project](https://github.com/SimBienvenueHoulBoumi/dev
 
 ## Installing a tool that stays
 
-A tool installed by hand (`sudo apt install tree`) does not survive a rebuild: the image is rebuilt from scratch. For a tool that must stay, `devzone packages` keeps the list of packages to reinstall:
+A tool installed by hand in the workspace pod does not survive a pod recreation: the image is rebuilt from scratch. For a tool that must stay, `devzone packages` keeps the list of packages to reinstall:
 
 ```sh
 devzone packages
@@ -196,7 +196,7 @@ The list lives in `.devzone.packages` at the root of the devzone folder, outside
 | Open a shell | VS Code terminal | `devzone workspace shell` |
 | Stop | *Remote: Close Remote Connection* (the container stops with the window) | `devzone workspace stop` |
 | Status | — | `devzone workspace status` |
-| **Uninstall** (everything devzone created, after confirmation) | — | `make uninstall` or `npx devzone uninstall` |
+| **Uninstall** (Kubernetes objects of this devzone instance, after confirmation) | — | `devzone uninstall` (in a devzone folder) |
 
 In Kubernetes mode, the same commands apply to the pod `devzone-workspace-0`. The GitLab, PostgreSQL and Argo CD services are installed from the workstation: `devzone workspace services enable postgres` (see [the reference](manage/docs/reference.md#devzone-services-in-the-kubernetes-workspace)). You can also develop there: `devzone workspace clone <url>` makes a working clone in the pod, `devzone ticket <n>` creates the worktree of a ticket there and `devzone agent` launches opencode there without a copy ([developing in the pod](manage/docs/reference.md#developing-devzone-and-repowarden-in-the-pod)). Argo CD is installed by default there and keeps the deployments: interface at https://localhost:8443 (password `admin` in `.password`), GitOps repository `<login>/devzone-argocd` created on your GitHub, projects declared in `.argocd.conf` (`devzone workspace argocd app add <repo>`); see [Argo CD in the Kubernetes workspace](manage/docs/reference.md#argo-cd-in-the-kubernetes-workspace).
 
@@ -205,7 +205,7 @@ In the container, `devzone --version` shows the version of the workspace image, 
 ```text
   devzone enable <module>                  enable and apply at once
   devzone use CTX [--confirm CTX]          switch the kubectl working cluster
-  devzone port [<n>|--close <n>]           relay of a container port to the workstation
+  devzone port [--close <n>]              list or remove a relay of the workstation
 ```
 
 ### Updating devzone
@@ -232,7 +232,7 @@ The old names of files and folders (`.devzone.paquets`, `.devzone.sauvegarde`, `
 
 The Kubernetes workspace is updated separately: `devzone workspace update` moves it to the latest stable release (or `--version X.Y.Z`), image, charts and Argo CD at the same tag. **The pod `devzone-workspace-0` is recreated**: the VS Code windows attached to the pod are disconnected. The image is checked on ghcr.io before any write, and nothing changes if it does not exist yet. Details in the [reference](manage/docs/reference.md#updating-the-workspace).
 
-In the container, the `devzone` summary reports a more recent published version (npm check at most once a day, without blocking offline): `○ devzone X.Y.Z disponible : sur le poste, devzone update`.
+In the workspace pod, the `devzone` summary reports a more recent published version (npm check at most once a day, without blocking offline): `○ devzone X.Y.Z disponible : sur le poste, devzone update`.
 
 ## Options
 
@@ -361,15 +361,14 @@ A project's user owns **its** database (it creates tables, indexes, data in it) 
 
 On the Kubernetes workstation, `devzone workspace start` starts a port watcher: each TCP port ≥ 1024 that listens in the pod is relayed to `127.0.0.1` of the workstation, at the same number, by `kubectl port-forward`. A server started in the pod (`npm run dev`, port 5173) therefore answers at `http://localhost:5173`, without a command. The enabled services (PostgreSQL, MySQL, Argo CD) are relayed too, on their usual port. The Services of applications deployed in the cluster are relayed the same way, each on a local port (80 → 8080; a port already taken elsewhere becomes another port): `devzone workspace ports status` shows their URL `http://127.0.0.1:<port>`. A Service can be excluded with the annotation `devzone.io/relay: "false"`. The watcher is driven with `devzone workspace ports start|stop|status`; details in the [reference](manage/docs/reference.md#applications-and-services-on-the-workstations-localhost).
 
-On the Docker workstation, an application launched **inside** the container (for example a Spring Boot with `./gradlew bootRun` on port 8080) is not reachable from the workstation: the devzone container publishes no port. As soon as it listens in the container, the **automatic port watcher** (`.devcontainer/ports-auto.sh`) sets up an `alpine/socat` relay (pinned version) on the host's Docker, from `127.0.0.1:<port>` of the workstation to the container's port: `http://localhost:<port>` **without a command**. The relay disappears when the application stops.
+The relays kept in the state of a workstation instance are listed and closed with `devzone port`:
 
 ```sh
-devzone port             # list: manual and automatic relays, ● active or ○ stopped
-devzone port auto off    # stops the watcher: no more automatic relay
-devzone port --close <n> # removes a manual relay and its port from the state
+devzone port             # list: relay, ● active or ○ stopped, application behind it
+devzone port --close <n> # removes the relay and its port from the state
 ```
 
-`devzone port <n>` also opens a manual relay: same mechanism on the workstation side, `alpine/socat` container, name `devzone-<instance>-port-<n>`.
+In the Kubernetes workspace, the applications and services of the pod use `devzone workspace ports` instead: their relays are driven from the workstation by `kubectl port-forward`.
 
 From the workstation: `http://localhost:8080`. The manual relay is recreated automatically at container startup, toward the container's current address; it is removed by `make uninstall` (label `devzone.instance`). The automatic relay disappears with the application.
 
@@ -409,25 +408,19 @@ The shell prompt shows `⎈ ctx/ns` (cyan if local, bold red if remote otherwise
 
 ## Uninstalling
 
-```bash
-make uninstall
-```
-
-This command removes the container, the image `vsc-devzone-…`, the `devzone-*` volumes, the events of the host's Docker and the kind clusters created on the host, the `devzone-postgres` namespaces and the `app.kubernetes.io/managed-by=devzone` labels on the host's clusters, as well as any metrics-server installed by devzone. Resources are filtered by the `devzone.instance` label to target only the current instance. It **never touches** `workspace/` (your projects). To keep your logins (GitHub, git, Claude Code, opencode and modules): `make uninstall KEEP=logins` (old `GARDER=connexions` still accepted).
-
-With the command installed globally (`npm install -g devzone`), you can also run, in the devzone folder:
+From a devzone folder, remove the Kubernetes objects created by this devzone instance:
 
 ```bash
 devzone uninstall
 ```
 
-Same effect as `make uninstall`. Then only, to remove the command from your machine:
+The command lists the namespaces, Argo CD Applications, temporary accounts and `.devzone.*` files targeted by this instance, asks for confirmation, then removes them. `workspace/` is kept. Without a terminal, use `devzone uninstall --yes`.
+
+To remove the `devzone` command from your machine:
 
 ```bash
 npm uninstall -g devzone
 ```
-
-This command only removes the `devzone` command from your machine; it deletes neither the container, nor the volumes, nor the folder.
 
 ## Removed names
 

@@ -69,58 +69,11 @@ CURL
 #!/usr/bin/env bash
 case "$*" in
     "cluster clean"*) exit 0 ;;
-    "account token")
-        if [ -f "$BATS_TEST_TMPDIR/token.fail" ]; then exit 1; fi
-        printf '%s\n' 1893456000 >"$BATS_TEST_TMPDIR/expiry"
-        echo "kubectl create token devzone-agent -n devzone-system --duration=24h" >>"$BATS_TEST_TMPDIR/kubectl.log"
-        ;;
-    "account fresh")
-        expiry="$(cat "$BATS_TEST_TMPDIR/expiry" 2>/dev/null || echo 0)"
-        case "$expiry" in
-            ""|*[!0-9]*) exit 1 ;;
-        esac
-        if [ "$expiry" -gt "$(date +%s)" ]; then exit 0; fi
-        exit 1
-        ;;
 esac
 exit 0
 DEVZONE
     chmod +x "$BATS_TEST_TMPDIR/bin/"*
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
-}
-
-# Fake kubectl for the limited token (#845): a working renewal unless the
-# token.fail marker exists; it replaces the default failing fake of setup.
-kubectl_jeton() {
-    cat >"$BATS_TEST_TMPDIR/bin/kubectl" <<'KUBE'
-#!/usr/bin/env bash
-echo "kubectl $*" >>"$BATS_TEST_TMPDIR/kubectl.log"
-case "$*" in
-    *"config get-contexts -o name"*) echo "kind-devzone" ;;
-    *"config current-context"*) echo "kind-devzone" ;;
-    *"config view"*)
-        case "$*" in
-            *'.context.cluster'*) echo cluster-hote ;;
-            *'.cluster.server'*) echo "https://127.0.0.1:6443" ;;
-        esac
-        ;;
-    *"config use-context"*) ;;
-    *"config set-cluster"* | *"config set "* | *"config set-credentials"* | *"config set-context"*) ;;
-    *"auth can-i"*) echo yes ;;
-    *"create token"*)
-        [ -f "$BATS_TEST_TMPDIR/token.fail" ] && exit 1
-        printf 'token-test\n2030-01-01T00:00:00Z\n'
-        ;;
-    *"create namespace"*) printf 'kind: Namespace\nmetadata:\n  name: devzone-system\n' ;;
-    *"create serviceaccount"*) printf 'kind: ServiceAccount\nmetadata:\n  name: devzone-agent\n' ;;
-    *"create rolebinding"*) printf 'kind: RoleBinding\nmetadata:\n  name: devzone-agent\n' ;;
-    *"get namespaces -l"*) ;;
-    *"apply -f -"*) cat >/dev/null ;;
-    *) exit 1 ;;
-esac
-exit 0
-KUBE
-    chmod +x "$BATS_TEST_TMPDIR/bin/kubectl"
 }
 
 @test "state-json: schema 2 and valid JSON" {
@@ -155,29 +108,6 @@ KUBE
     [ "$status" -eq 0 ]
     [ "$(printf '%s\n' "$output" | jq -r '.modules[] | select(.name=="ai") | .failed')" = "failed npm" ]
     [ "$(printf '%s\n' "$output" | jq -r '.modules[] | select(.name=="ai") | .command')" = "devzone apply" ]
-}
-
-@test "state-json: expired limited account token renewed without an alert" {
-    printf 'cluster=kind-devzone\n' >"$DEVZONE_STATE"
-    export DEVZONE_KUBE_TOKEN_EXPIRY="$BATS_TEST_TMPDIR/expiry"
-    printf '%s\n' "$(( $(date +%s) - 10 ))" >"$DEVZONE_KUBE_TOKEN_EXPIRY"
-    kubectl_jeton
-    run bash "$DEVZONE" status --json
-    [ "$status" -eq 0 ]
-    printf '%s\n' "$output" | jq -e '.alerts | map(select(.command == "devzone repair")) | length == 0' >/dev/null
-    grep -q 'create token' "$BATS_TEST_TMPDIR/kubectl.log"
-    [ "$(cat "$DEVZONE_KUBE_TOKEN_EXPIRY")" = 1893456000 ]
-}
-
-@test "state-json: failed limited account token renewal → alert with devzone repair" {
-    printf 'cluster=kind-devzone\n' >"$DEVZONE_STATE"
-    export DEVZONE_KUBE_TOKEN_EXPIRY="$BATS_TEST_TMPDIR/expiry"
-    printf '%s\n' "$(( $(date +%s) - 10 ))" >"$DEVZONE_KUBE_TOKEN_EXPIRY"
-    kubectl_jeton
-    : >"$BATS_TEST_TMPDIR/token.fail"
-    run bash "$DEVZONE" status --json
-    [ "$status" -eq 0 ]
-    printf '%s\n' "$output" | jq -e '.alerts[] | select(.code == "limited_account_token" and .message == "limited account token expired" and .command == "devzone repair")' >/dev/null
 }
 
 @test "state-json: gh failing → github null and errors.github" {

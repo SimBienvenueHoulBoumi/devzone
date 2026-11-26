@@ -25,10 +25,6 @@ func newDefaultRegistry() *cli.Registry {
 		Run:  runCluster,
 	})
 	r.Register(cli.Command{
-		Name: "account",
-		Run:  runAccount,
-	})
-	r.Register(cli.Command{
 		Name: "postgres",
 		Run:  runPostgres,
 	})

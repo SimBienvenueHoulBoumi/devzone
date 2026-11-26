@@ -140,12 +140,6 @@ ENV PATH="/usr/local/go/bin:${PATH}" \
     GOCACHE=/home/vscode/.cache/go-build \
     GOPATH=/home/vscode/go
 
-# kind passe par une enveloppe (#291) : avec le Docker de l'hôte, un cluster
-# créé à la main doit être rendu joignable depuis le conteneur (kube-reachable.sh)
-COPY kube-reachable.sh /usr/local/lib/devzone/kube-reachable.sh
-COPY kind-wrapper.sh /usr/local/bin/kind
-RUN chmod 0644 /usr/local/lib/devzone/kube-reachable.sh && chmod 0755 /usr/local/bin/kind
-
 COPY --from=uv /uv /uvx /usr/local/bin/
 
 # ruff, vulture (repowarden code-mort a besoin des deux) et pytest, installés pour
@@ -166,7 +160,6 @@ RUN export UV_TOOL_DIR=/opt/uv/tools UV_TOOL_BIN_DIR=/usr/local/bin \
 RUN install -d -o 1000 -g 1000 /home/vscode/.local /home/vscode/.local/bin /home/vscode/.local/state /home/vscode/.local/share /home/vscode/.config
 
 # devzone scripts inside the image: the Kubernetes workspace pod has no
-# /workspaces/devzone checkout (#503). The Docker devcontainer relinks
-# /usr/local/bin/devzone to the mounted repository in post-create.sh.
+# /workspaces/devzone checkout (#503).
 COPY . /usr/local/share/devzone/.devcontainer
 RUN ln -sf /usr/local/share/devzone/.devcontainer/devzone /usr/local/bin/devzone

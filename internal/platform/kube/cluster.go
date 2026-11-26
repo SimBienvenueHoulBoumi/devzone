@@ -52,7 +52,7 @@ func (k Kube) ClusterReachable(ctx context.Context, name string) bool {
 
 // ClusterPrepare creates the dedicated kind cluster when needed and checks a
 // chosen host cluster. It prints the same lines as cluster_prepare of cluster.sh.
-func (k Kube) ClusterPrepare(ctx context.Context, name, codeRoot string, out, errOut io.Writer) error {
+func (k Kube) ClusterPrepare(ctx context.Context, name string, out, errOut io.Writer) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -69,7 +69,6 @@ func (k Kube) ClusterPrepare(ctx context.Context, name, codeRoot string, out, er
 					return err
 				}
 			}
-			_ = k.makeReachable(ctx, codeRoot)
 		}
 	} else if !k.ClusterReachable(ctx, name) {
 		fmt.Fprintf(errOut, "devzone : cluster %s unreachable (kubernetes module enabled? cluster started?)\n", name)
@@ -100,17 +99,6 @@ func (k Kube) kindCreate(ctx context.Context) (int, error) {
 		return 0, err
 	}
 	return res.Code, nil
-}
-
-// makeReachable rewrites loopback servers of a fresh kubeconfig through the
-// shared kube-reachable.sh library, which knows the container network.
-func (k Kube) makeReachable(ctx context.Context, codeRoot string) error {
-	if codeRoot == "" || os.Getenv("DEVZONE_WORKSPACE") == "kubernetes" {
-		return nil
-	}
-	script := filepath.Join(codeRoot, "kube-reachable.sh")
-	_, err := k.runner().Run(ctx, "bash", []string{script, filepath.Join(home(), ".kube", "config")}, exec.Opts{})
-	return err
 }
 
 // ClusterRelease deletes the dedicated kind cluster when no devzone namespace

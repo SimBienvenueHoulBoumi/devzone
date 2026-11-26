@@ -18,7 +18,7 @@ func Install(ctx context.Context, opts Options, args []string) int {
 	if !ok {
 		return 2
 	}
-	if err := e.kube.ClusterPrepare(e.ctx, ctxName, e.codeRoot, e.opts.Out, e.opts.Err); err != nil {
+	if err := e.kube.ClusterPrepare(e.ctx, ctxName, e.opts.Out, e.opts.Err); err != nil {
 		return 1
 	}
 	if !e.kube.DevzoneContextSet(e.ctx, ctxName) {

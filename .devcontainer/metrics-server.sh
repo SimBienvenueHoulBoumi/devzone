@@ -7,7 +7,7 @@
 # --kubelet-insecure-tls: the kubelet of Docker Desktop and kind has a
 # self-signed certificate, without this option the pod never becomes Ready.
 # Exits in error if a requested context is unknown or unreachable, or if an
-# installation fails (kube-config.sh calls it with || true).
+# installation fails.
 set -euo pipefail
 
 # shellcheck source=SCRIPTDIR/cluster.sh

@@ -21,7 +21,6 @@
       "version": "lts",
       "pnpmVersion": "latest"
     },
-    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {},
     "ghcr.io/devcontainers/features/kubectl-helm-minikube:1": {
       "minikube": "none"
     },
@@ -57,19 +56,11 @@
   ],
 
   "runArgs": [
-    // Cluster Kubernetes de l'hôte : sa config en lecture seule, adaptée au
-    // conteneur par kube-config.sh. HOME (Mac, Linux) ou USERPROFILE (Windows) ;
-    // -v plutôt que mounts : crée ~/.kube s'il manque au lieu d'échouer
-    "-v", "${localEnv:HOME}${localEnv:USERPROFILE}/.kube:/home/vscode/.kube-host:ro",
     // host.docker.internal existe d'office avec Docker Desktop, pas sous Linux
     "--add-host=host.docker.internal:host-gateway"
   ],
 
-  "postCreateCommand": "bash .devcontainer/post-create.sh",
-  // Identité git, clusters, puis récapitulatif de ce qui reste à faire
-  "postStartCommand": "bash .devcontainer/startup.sh",
-  // Clusters kind du conteneur (config) + cluster de l'hôte (hote.config,
-  // refait à chaque démarrage par kube-config.sh)
+  // Clusters kind du conteneur (config)
   "remoteEnv": {
     // Chemin du projet SUR L'HÔTE : nécessaire pour `docker run -v`, car les
     // chemins du conteneur n'existent pas pour le Docker de l'hôte
@@ -82,7 +73,6 @@
     // clusters kind. Permet à desinstalleur.sh de cibler uniquement les
     // ressources de l'instance courante.
     "DEVZONE_INSTANCE": "${localEnv:DEVZONE_VOLUMES:devzone}",
-    "KUBECONFIG": "/home/vscode/.kube/config:/home/vscode/.kube/hote.config",
     // Claude Code range aussi .claude.json (connexion, réglages) dans ce
     // dossier, donc dans son volume, au lieu de ~/.claude.json
     "CLAUDE_CONFIG_DIR": "/home/vscode/.claude"

@@ -1,6 +1,6 @@
 #!/usr/bin/env bats
 # gitlab module (#239, #273): install, uninstall, status, seed, host
-# gitlab.localhost in /etc/hosts (DEVZONE_HOSTS) and startup. Fake kind,
+# gitlab.localhost in /etc/hosts (DEVZONE_HOSTS) and module activation. Fake kind,
 # kubectl, helm, curl, git, docker and gh in the PATH: no cluster is
 # created. Each fake binary logs its arguments in
 # $BATS_TEST_TMPDIR/<tool>.log.
@@ -35,7 +35,6 @@ setup() {
     kind_vide
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
     GITLAB="$BATS_TEST_DIRNAME/../../.devcontainer/gitlab/gitlab.sh"
-    DEMARRAGE="$BATS_TEST_DIRNAME/../../.devcontainer/startup.sh"
     kube_isole
     export HOME="$BATS_TEST_TMPDIR/home"
     export DEVZONE_ROOT="$BATS_TEST_TMPDIR/racine"
@@ -43,8 +42,6 @@ setup() {
     export DEVZONE_MEMINFO="$BATS_TEST_TMPDIR/meminfo"
     export DEVZONE_HOSTS="$BATS_TEST_TMPDIR/hosts"
     export KIND_CLUSTERS="$BATS_TEST_TMPDIR/clusters"
-    # startup.sh starts the auto port watcher: its folder stays under the test (#394)
-    export DEVZONE_PORTS_AUTO_DIR="$BATS_TEST_TMPDIR/ports-auto"
     SECRETS="$DEVZONE_ROOT/workspace/.gitlab"
     mkdir -p "$HOME" "$DEVZONE_ROOT/workspace" "$BATS_TEST_TMPDIR/bin"
     printf 'MemAvailable: 16000000 kB\n' >"$DEVZONE_MEMINFO"
@@ -187,7 +184,7 @@ GIT
 #!/usr/bin/env bash
 if [ "${1:-}" = ls ]; then printf '{"dependencies":{}}\n'; fi
 NPM
-    # gh: never logged in (git-identity, devzone state): no network call
+    # gh: never logged in: no network call
     cat >"$BATS_TEST_TMPDIR/bin/gh" <<'GH'
 #!/usr/bin/env bash
 echo "gh $*" >>"$BATS_TEST_TMPDIR/gh.log"
