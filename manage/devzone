@@ -138,6 +138,8 @@ go_launch() {
     fi
     # The Go binary finds the bash command (and the package.json) from here, even
     # copied into the cache; Git Bash gives it a Windows path
+    # The shell scripts still run here call the Go program for their checks (#884)
+    export DEVZONE_HOST_BIN="$target"
     DEVZONE_BASH_ENTRY="$PAQUET/manage/devzone"
     case "$platform" in
         windows-*) DEVZONE_BASH_ENTRY="$(cygpath -m "$DEVZONE_BASH_ENTRY" 2>/dev/null || echo "$DEVZONE_BASH_ENTRY")" ;;
