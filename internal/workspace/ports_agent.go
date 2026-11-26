@@ -14,6 +14,13 @@ import (
 // machine. No test calls the real launchctl or systemctl.
 var portsPlatform = runtime.GOOS
 
+// PortsPlatform returns the platform used to choose the automatic start of the
+// port watcher, so a caller on the workstation uses the same injectable value
+// as the watcher itself instead of reading the build platform again.
+func PortsPlatform() string {
+	return portsPlatform
+}
+
 // portsAgentDirEnv names the environment variable that overrides the folder of
 // the automatic start of the port watcher, so that tests use a temporary folder.
 const portsAgentDirEnv = "DEVZONE_PORTS_AGENT_DIR"
