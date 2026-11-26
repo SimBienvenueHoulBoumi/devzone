@@ -6,9 +6,6 @@
 
 WAIT_SECONDS="${DEVZONE_CATALOG_WAIT:-300}"
 
-# shellcheck source=SCRIPTDIR/argocd/catalog-argocd.sh
-# shellcheck disable=SC1091
-. "$ICI/argocd/catalog-argocd.sh"
 # shellcheck source=SCRIPTDIR/chart-direct.sh
 # shellcheck disable=SC1091
 . "$ICI/chart-direct.sh"
@@ -92,11 +89,10 @@ app_install() {
         claim="$(devzone mysql claim "$ns")" || return 2
         [ "$claim" = donnees ] || extra="claim=$claim"
     fi
-    if catalogue_argocd_active "$app"; then
+    if "$ICI/devzone" argocd catalog-active "$app"; then
         argo=1
         echo "▶ Application $app through Argo CD (chart charts/devzone-$app)…"
-        catalogue_argocd_apply "$app" "$ns" "$image" "$port" \
-            "$(app_read "$app" memoire)" "$(app_read "$app" taille)" "$extra" || return 1
+        "$ICI/devzone" argocd catalog-apply "$app" "$ns" "$image" "$port" "$(app_read "$app" memoire)" "$(app_read "$app" taille)" "$extra" || return 1
     else
         # Direct helm: the chart charts/devzone-<app>, the one definition (#559)
         chart_install "$app" "$ns" "image=$image" "port=$port" \
@@ -124,8 +120,8 @@ app_remove() {
     fi
     claim="$(kubectl --context devzone -n "$ns" get statefulset "$app" \
         -o jsonpath='{.spec.volumeClaimTemplates[0].metadata.name}' 2>/dev/null || true)"
-    if catalogue_argocd_application_exists "$app"; then
-        catalogue_argocd_delete "$app" >/dev/null 2>&1 || true
+    if "$ICI/devzone" argocd catalog-application-exists "$app"; then
+        "$ICI/devzone" argocd catalog-delete "$app" >/dev/null 2>&1 || true
         kubectl --context devzone -n "$ns" delete "secret/$app-admin" >/dev/null 2>&1 || true
         pvc="${claim:-donnees}-$app-0"
         echo "✔ $app removed: Application deleted; volume $pvc and databases kept: devzone $app volume"
