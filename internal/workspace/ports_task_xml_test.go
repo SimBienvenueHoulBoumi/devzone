@@ -74,7 +74,7 @@ func TestPortsTaskUser(t *testing.T) {
 // TestPortsUTF16RoundTrip checks that the task file decodes to the text it was
 // built from, accents included, behind a little endian byte order mark.
 func TestPortsUTF16RoundTrip(t *testing.T) {
-	text := "<Task>Dev Zone é</Task>\n"
+	text := "<Task>Dev Zone \u00e9</Task>\n"
 	if got := decodeTaskFile(t, portsUTF16(text)); got != text {
 		t.Fatalf("round trip = %q, want %q", got, text)
 	}
