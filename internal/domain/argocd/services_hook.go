@@ -4,11 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 )
-
-var versionLine = regexp.MustCompile(`"version"\s*:\s*"([^"]*)"`)
 
 // servicesHook handles "services-hook <svc> <on|off>". It returns 0 when done
 // through Argo CD, 3 when not concerned (helm direct should continue), 1 on failure.
@@ -89,28 +86,23 @@ func (m *module) servicesNote(svc, state string) int {
 	return 0
 }
 
-// argocdRevision returns the revision for devzone charts.
-func (m *module) argocdRevision() string {
-	if v := os.Getenv("DEVZONE_ARGOCD_REVISION"); v != "" {
-		return v
-	}
-	data, err := os.ReadFile(filepath.Join(filepath.Dir(m.codeRoot), "package.json"))
-	if err != nil {
-		return ""
-	}
-	match := versionLine.FindSubmatch(data)
-	if len(match) < 2 {
-		return ""
-	}
-	version := string(match[1])
-	if version == "" || version == "0.0.0" {
-		return ""
-	}
-	return "v" + version
+// argocdRevision returns the revision of the devzone charts through the shared
+// rule. An unresolved revision is an error, so no caller can fall back to a
+// silent direct installation.
+func (m *module) argocdRevision() (string, error) {
+	return ResolveRevision(m.ctx, RevisionInputs{
+		Runner:   m.runner,
+		Root:     m.root,
+		CodeRoot: m.codeRoot,
+		ConfPath: m.confPath(),
+		Repo:     os.Getenv("DEVZONE_REPO_URL"),
+		Chart:    "devzone",
+	})
 }
 
-// catalogArgocdActive reports whether Argo CD can hold the given app.
-func (m *module) catalogArgocdActive(app string) bool {
+// catalogArgocdActive reports whether Argo CD holds the app. A module that is
+// on but has no usable revision is an error, not a reason to install directly.
+func (m *module) catalogArgocdActive(app string) (bool, error) {
 	data, _ := os.ReadFile(m.state)
 	on := false
 	for _, line := range strings.Split(string(data), "\n") {
@@ -119,13 +111,16 @@ func (m *module) catalogArgocdActive(app string) bool {
 		}
 	}
 	if !on {
-		return false
+		return false, nil
 	}
 	if _, err := os.Stat(m.chartPath(app)); err != nil {
-		return false
+		return false, nil
 	}
 	if !m.isInstalled() {
-		return false
+		return false, nil
 	}
-	return m.argocdRevision() != ""
+	if _, err := m.argocdRevision(); err != nil {
+		return false, err
+	}
+	return true, nil
 }

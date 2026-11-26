@@ -53,6 +53,17 @@ func (r *run) install() int {
 	if code := r.checkModuleMemory("gitlab", 8, ""); code != 0 {
 		return code
 	}
+	parArgocd := r.argocdActive()
+	revision := ""
+	if parArgocd {
+		var err error
+		revision, err = r.argocdRevision()
+		if err != nil {
+			fmt.Fprintln(r.errOut(), err)
+			fmt.Fprintln(r.errOut(), "nothing was installed: set DEVZONE_ARGOCD_REVISION=<tag or branch> (devzone argocd init), then: devzone enable gitlab")
+			return 1
+		}
+	}
 	if err := os.MkdirAll(r.secretsDir(), 0o755); err != nil {
 		fmt.Fprintf(r.errOut(), "devzone : gitlab : %v\n", err)
 		return 1
@@ -62,11 +73,8 @@ func (r *run) install() int {
 	r.secretsApply()
 	r.runnerAncienRetirer()
 
-	parArgocd := false
-	if r.argocdActive() {
-		parArgocd = true
-		r.releaseAdopter()
-		if code := r.applicationApply(); code != 0 {
+	if parArgocd {
+		if code := r.applicationApply(revision); code != 0 {
 			return code
 		}
 	} else {

@@ -30,6 +30,22 @@ func (e *env) install(app string) int {
 		return 1
 	}
 	e.out("▶ Application %s on cluster %s (namespace %s)…", app, ctxName, ns)
+	claim := "donnees"
+	extra := ""
+	if app == "mysql" {
+		claim, err = e.mysqlClaim(ns)
+		if err != nil {
+			return e.refuse("%s", err.Error())
+		}
+		if claim != "donnees" {
+			extra = "claim=" + claim
+		}
+	}
+	argo, err := e.argocdState(app)
+	if err != nil {
+		e.warn("devzone : catalog : %v", err)
+		return 1
+	}
 	if err := e.kube.NamespaceCreate(e.ctx, ctxName, ns, e.opts.Err); err != nil {
 		e.warn("devzone : catalog : %v", err)
 		return 1
@@ -42,18 +58,6 @@ func (e *env) install(app string) int {
 		e.warn("devzone : catalog : %v", err)
 		return 1
 	}
-	claim := "donnees"
-	extra := ""
-	if app == "mysql" {
-		claim, err = e.mysqlClaim(ns)
-		if err != nil {
-			return e.refuse("%s", err.Error())
-		}
-		if claim != "donnees" {
-			extra = "claim=" + claim
-		}
-	}
-	argo := e.argocdActive(app)
 	if argo {
 		e.out("▶ Application %s through Argo CD (chart charts/devzone-%s)…", app, app)
 		args := []string{"argocd", "catalog-apply", app, ns, image, port,
@@ -135,10 +139,21 @@ func (e *env) mysqlClaim(ns string) (string, error) {
 	return strings.TrimSpace(string(res.Stdout)), nil
 }
 
-// argocdActive reports whether Argo CD holds this application.
-func (e *env) argocdActive(app string) bool {
+// argocdState reports whether Argo CD holds the application. Exit status 2
+// means that the module is on but the revision cannot be resolved: installing
+// directly would be a silent fallback, so it is reported as an error.
+func (e *env) argocdState(app string) (bool, error) {
 	res, err := e.exec(e.script, []string{"argocd", "catalog-active", app})
-	return err == nil && res.Code == 0
+	if err != nil {
+		return false, err
+	}
+	if res.Code == 0 {
+		return true, nil
+	}
+	if res.Code == 2 {
+		return false, errors.New(strings.TrimSpace(string(res.Stdout) + string(res.Stderr)))
+	}
+	return false, nil
 }
 
 // startRelay keeps the port-forward of an application alive on 127.0.0.1.

@@ -28,6 +28,9 @@ func workspaceCommand(ctx *cli.Context) int {
 	if len(args) >= 1 && args[0] == "start" {
 		return startWorkspace(ctx)
 	}
+	if len(args) >= 1 && args[0] == "deploy" {
+		return workspaceDeploy(ctx)
+	}
 	if len(args) >= 1 && args[0] == "clone" {
 		url, name := "", ""
 		if len(args) == 2 || len(args) == 3 {

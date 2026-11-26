@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/domain/argocd"
 )
 
 // repoURL is the default GitOps repository URL of the Applications
@@ -31,41 +33,22 @@ func (r *run) stateValue(key string) string {
 	return value
 }
 
-// argocdRevision returns DEVZONE_ARGOCD_REVISION or the v-tag of package.json
-// (empty on a development clone, version 0.0.0) (argocd_revision of
-// catalog-argocd.sh).
-func (r *run) argocdRevision() string {
-	if v := os.Getenv("DEVZONE_ARGOCD_REVISION"); v != "" {
-		return v
-	}
-	data, err := os.ReadFile(r.root + "/package.json")
-	if err != nil {
-		return ""
-	}
-	for _, line := range strings.Split(string(data), "\n") {
-		i := strings.Index(strings.TrimSpace(line), `"version":`)
-		if i < 0 {
-			continue
-		}
-		v := strings.TrimSpace(strings.TrimSpace(line)[i+len(`"version":`):])
-		if !strings.HasPrefix(v, `"`) {
-			continue
-		}
-		if end := strings.IndexByte(v[1:], '"'); end >= 0 {
-			version := v[1 : 1+end]
-			if version == "" || version == "0.0.0" {
-				return ""
-			}
-			return "v" + version
-		}
-	}
-	return ""
+// argocdRevision returns the revision of the devzone charts through the shared
+// rule: explicit setting, package version, or newest published tag containing
+// the chart. It fails instead of returning an empty revision.
+func (r *run) argocdRevision() (string, error) {
+	return argocd.ResolveRevision(r.ctx, argocd.RevisionInputs{
+		Runner:   r.runner(),
+		Root:     r.root,
+		ConfPath: r.root + "/.argocd.conf",
+		Repo:     r.repoURL(),
+		Chart:    "devzone-gitlab",
+	})
 }
 
-// argocdActive reports whether the Application devzone-gitlab can be used:
-// the module argocd is on, the chart is in the repository, the namespace
-// devzone-argocd answers kubectl and the revision is known (argocd.sh
-// gitlab_argocd_active → catalogue_argocd_active gitlab).
+// argocdActive reports whether the Application devzone-gitlab must be used:
+// the module argocd is on, the chart is present and Argo CD is installed. The
+// revision is resolved separately and its failure stops the installation.
 func (r *run) argocdActive() bool {
 	if r.stateValue("argocd") != "on" {
 		return false
@@ -74,27 +57,16 @@ func (r *run) argocdActive() bool {
 		return false
 	}
 	res, err := r.kubectlAdmin([]string{"get", "namespace", "devzone-argocd"})
-	if err != nil || res.Code != 0 {
-		return false
-	}
-	return r.argocdRevision() != ""
-}
-
-// releaseAdopter deletes the release secrets of a former helm install so that
-// helm no longer owns the objects (argocd.sh gitlab_release_adopter).
-func (r *run) releaseAdopter() {
-	_, _ = r.kubectlDevzone([]string{"-n", r.namespace(), "delete", "secret",
-		"-l", "owner=helm,name=gitlab", "--ignore-not-found"})
+	return err == nil && res.Code == 0
 }
 
 // applicationApply applies the Application devzone-gitlab on the wrapper
 // chart at the revision, the internal URL of the webservice following the
-// namespace of the instance (argocd.sh gitlab_application_apply). When a
-// GitOps repository is designated in .argocd.conf, the Application is written
-// into it as apps/devzone-gitlab.yaml (gitops.sh gitops_apply_application);
-// without a repository it is applied directly.
-func (r *run) applicationApply() int {
-	revision := r.argocdRevision()
+// namespace of the instance. Existing helm objects are adopted as they are:
+// no volume, no secret and no namespace is deleted. When a GitOps repository
+// is designated in .argocd.conf, the Application is written into it as
+// apps/devzone-gitlab.yaml; without a repository it is applied directly.
+func (r *run) applicationApply(revision string) int {
 	fmt.Fprintf(r.out(), "▶ Application devzone-gitlab (Argo CD, charts/devzone-gitlab at %s)…\n", revision)
 	manifest := applicationManifest(r.namespace(), r.repoURL(), revision,
 		"gitlab-runner.gitlabUrl=http://gitlab-webservice-default."+r.namespace()+".svc:8181")

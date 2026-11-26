@@ -23,7 +23,12 @@ func Install(ctx context.Context, opts Options, args []string) int {
 		return 1
 	}
 	e.line("▶ MySQL on cluster %s (namespace %s)…", ctxName, ns)
-	if e.argocdActive() {
+	held, err := e.argocdState()
+	if err != nil {
+		e.fail("%v", err)
+		return 1
+	}
+	if held {
 		return e.installArgoCD(ctxName)
 	}
 	return e.installDirect(ctxName)

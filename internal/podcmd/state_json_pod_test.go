@@ -68,7 +68,8 @@ func TestStateJSONFrozenPod(t *testing.T) {
       "description": "AI assistants: Claude Code, opencode",
       "state": "optional",
       "failed": null,
-      "command": "devzone enable ai"
+      "command": "devzone enable ai",
+      "held-by-argocd": false
     },
     {
       "name": "kubernetes",
@@ -76,7 +77,8 @@ func TestStateJSONFrozenPod(t *testing.T) {
       "description": "connection to the host cluster and metrics-server at startup",
       "state": "optional",
       "failed": null,
-      "command": "devzone enable kubernetes"
+      "command": "devzone enable kubernetes",
+      "held-by-argocd": false
     },
     {
       "name": "gitlab",
@@ -84,7 +86,8 @@ func TestStateJSONFrozenPod(t *testing.T) {
       "description": "test GitLab in the services cluster",
       "state": "active: gitlab-webservice-default.devzone-gitlab-test.svc",
       "failed": null,
-      "command": null
+      "command": null,
+      "held-by-argocd": true
     },
     {
       "name": "postgres",
@@ -92,7 +95,8 @@ func TestStateJSONFrozenPod(t *testing.T) {
       "description": "shared PostgreSQL, one database per project",
       "state": "optional",
       "failed": null,
-      "command": "devzone workspace services enable postgres"
+      "command": "devzone workspace services enable postgres",
+      "held-by-argocd": false
     },
     {
       "name": "argocd",
@@ -100,7 +104,8 @@ func TestStateJSONFrozenPod(t *testing.T) {
       "description": "Argo CD, deployment interface of the services cluster",
       "state": "not in the cluster",
       "failed": null,
-      "command": "devzone workspace services enable argocd"
+      "command": "devzone workspace services enable argocd",
+      "held-by-argocd": false
     },
     {
       "name": "mysql",
@@ -108,7 +113,8 @@ func TestStateJSONFrozenPod(t *testing.T) {
       "description": "shared MySQL, one database per project",
       "state": "optional",
       "failed": null,
-      "command": "devzone enable mysql"
+      "command": "devzone enable mysql",
+      "held-by-argocd": false
     }
   ],
   "clusters": {
