@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	fexec "github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec"
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/passwords"
 )
 
 // decodeB64 decodes a standard base64 string.
@@ -21,10 +22,10 @@ func decodeB64(s string) (string, bool) {
 	return string(b), true
 }
 
-// regenerateCredentials refreshes the grouped .password view; failure is non-fatal.
+// regenerateCredentials refreshes the grouped .password view in Go; a failure
+// is reported but never blocks the module operation.
 func (m *module) regenerateCredentials() {
-	res, err := m.runner.Run(m.ctx, "bash", []string{filepath.Join(m.codeRoot, "password.sh"), "regenerate"}, fexec.Opts{})
-	if err != nil || res.Code != 0 {
+	if err := passwords.Regenerate(m.root); err != nil {
 		fmt.Fprintln(m.errOut, "devzone : argocd : grouped credentials not updated (devzone passwords)")
 	}
 }

@@ -27,7 +27,7 @@ func TestStateJSONFrozenPod(t *testing.T) {
 	r.program(nil, 1, "", "getent", "hosts", "argocd-server.devzone-argocd.svc")
 	r.program(nil, 0, "docker-desktop\n", "kubectl", "config", "current-context")
 	r.program(nil, 0, "", "devzone", "cluster", "clean", "--quiet")
-	r.program(nil, 0, "[]\n", "bash", filepath.Join(code, "ports.sh"), "list", "--json")
+	r.program(nil, 0, "[]\n", "devzone", "port", "list", "--json")
 	r.program(nil, 0, "[]\n", "bash", filepath.Join(code, "catalog.sh"), "json")
 	r.program(nil, 0, "", "git", "-C", filepath.Join(root, "workspace", "repo"), "worktree", "list", "--porcelain")
 

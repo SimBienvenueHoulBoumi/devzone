@@ -88,7 +88,8 @@ func (f *fixture) programInstall(claim string) {
 }
 
 // TestApplyInstalls checks the direct path: chart values, secret, relay and
-// address, with the password never written on the output.
+// address, the grouped credentials regenerated through the devzone launcher,
+// with the password never written on the output.
 func TestApplyInstalls(t *testing.T) {
 	f := newFixture(t)
 	f.saveState("cluster=kind-devzone", "mysql=on")
@@ -100,6 +101,7 @@ func TestApplyInstalls(t *testing.T) {
 		t.Fatalf("apply output = %q", got)
 	}
 	calls := f.r.Calls()
+	assertCall(t, calls, f.script, "passwords", "regenerate")
 	assertCall(t, calls, "kubectl", append([]string{"--context", "devzone", "-n", "devzone-mysql"},
 		"create", "secret", "generic", "mysql-admin", "--from-file=password="+filepath.Join(f.root, "workspace", ".mysql", "admin-password"))...)
 	assertCall(t, calls, "helm", append([]string{"template", "mysql", f.chart, "-n", "devzone-mysql"},
