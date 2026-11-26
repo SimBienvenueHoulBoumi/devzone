@@ -85,7 +85,7 @@ start_workspace() {
     image="$repo:$tag"
     # Argo CD first when wanted (#516): the workspace is then an Application
     argocd_ensure
-    workspace_deploy "$repo" "$tag" "$with_image"
+    if [ -n "${DEVZONE_FROM_GO:-}" ]; then devzone workspace deploy "$repo" "$tag" "$with_image"; else workspace_deploy "$repo" "$tag" "$with_image"; fi
     # Projects of .argocd.conf held too (#516)
     argocd_reconcile || true
     wait_for_pod "$image" || return 1

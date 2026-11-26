@@ -47,6 +47,8 @@ func Run(ctx context.Context, args []string, out, errOut io.Writer, opts Options
 		return m.applyCmd()
 	case "services-hook":
 		return m.servicesHook(args[1:])
+	case "dependency":
+		return m.dependencyCmd(args[1:])
 	case "catalog-active":
 		return m.catalogActiveCmd(args[1:])
 	case "catalog-apply":
