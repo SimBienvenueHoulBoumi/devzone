@@ -6,8 +6,8 @@
 PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.devcontainer" && pwd):$PATH"
 export PATH
 
-# Aide commune de Kubernetes (#341) : le kubeconfig, le HOME et la copie du
-# kubeconfig de l'hôte restent sous $BATS_TEST_TMPDIR, jamais ceux du poste.
+# Common Kubernetes helper (#341): the kubeconfig, the HOME and the copy of the
+# host kubeconfig stay under $BATS_TEST_TMPDIR, never the workstation ones.
 kube_isole() {
     export HOME="$BATS_TEST_TMPDIR/home"
     export KUBECONFIG="$BATS_TEST_TMPDIR/kubeconfig"
@@ -15,22 +15,22 @@ kube_isole() {
     mkdir -p "$HOME" "$BATS_TEST_TMPDIR" "$HOME/.kube"
 }
 
-# Aide des tests qui simulent un outil absent (#497) : crée <dossier> avec des
-# liens vers les seuls outils que les scripts et les tests appellent. À appeler
-# dans setup, avant de réduire PATH à <dossier> : jamais /usr/bin ni /bin entiers,
-# donc un kubectl ou un helm installé sur le poste ou le runner n'est pas joignable.
+# Helper for tests that simulate a missing tool (#497): creates <folder> with
+# links to the only tools called by the scripts and tests. Call it in setup,
+# before reducing PATH to <folder>: never all of /usr/bin or /bin, so a kubectl
+# or helm installed on the workstation or the runner is not reachable.
 outils_isoles() {
-    local dossier="$1" outil chemin
-    mkdir -p "$dossier"
+    local folder="$1" outil chemin
+    mkdir -p "$folder"
     for outil in bash env grep dirname mv cat rm mkdir; do
         chemin="$(command -v "$outil")" || return 1
-        ln -s "$chemin" "$dossier/$outil"
+        ln -s "$chemin" "$folder/$outil"
     done
 }
 
-# Aide de devzone <dossier> en mode Kubernetes (#735, le poste Docker est retiré) :
-# faux kubectl et helm sous $BATS_TEST_TMPDIR/bin-cluster, cluster « devzone »
-# joignable, aucun workspace installé. Le cluster réel du poste n'est jamais touché.
+# Helper for devzone <folder> in Kubernetes mode (#735, the host mode is gone):
+# fake kubectl and helm under $BATS_TEST_TMPDIR/bin-cluster, reachable "devzone"
+# cluster, no workspace installed. The real workstation cluster is never touched.
 cluster_pret() {
     mkdir -p "$BATS_TEST_TMPDIR/bin-cluster"
     cat >"$BATS_TEST_TMPDIR/bin-cluster/kubectl" <<'KUBECTL'
@@ -48,9 +48,9 @@ HELM
     export PATH="$BATS_TEST_TMPDIR/bin-cluster:$PATH"
 }
 
-# Aide du récapitulatif devzone (#396) : faux kind sous $BATS_TEST_TMPDIR/bin qui
-# ne liste aucun cluster, pour qu'un vrai cluster kind-gitlab du poste ne fasse
-# pas apparaître l'avertissement d'ancien cluster dans les tests.
+# Helper for the devzone summary (#396): fake kind under $BATS_TEST_TMPDIR/bin
+# that lists no cluster, so a real kind-gitlab cluster of the workstation does
+# not make the old-cluster warning appear in the tests.
 kind_vide() {
     mkdir -p "$BATS_TEST_TMPDIR/bin"
     cat >"$BATS_TEST_TMPDIR/bin/kind" <<'KIND'
@@ -62,9 +62,9 @@ KIND
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
 }
 
-# Aide de devzone agent (#328, tests agent.bats et agent-gaps.bats) : faux
-# npm, getent, curl et opencode sous $BATS_TEST_TMPDIR/bin, état et réseau
-# isolés, délais réduits. Le faux opencode se pilote par FAKE_OP_* (voir ci-dessous).
+# Helper for devzone agent (#328, agent.bats and agent-gaps.bats): fake npm,
+# getent, curl and opencode under $BATS_TEST_TMPDIR/bin, isolated state and
+# network, short delays. The fake opencode is driven by FAKE_OP_* (see below).
 agent_isole() {
     kube_isole
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
@@ -90,7 +90,7 @@ agent_isole() {
     export FAKE_OP_TEXTE_MODELS="" FAKE_OP_ANCIEN_ERREUR_MODELS="" FAKE_OP_DUREE=30
     : >"$FAKE_OP_LOG"
     : >"$FAKE_OP_CONSIGNE_LOG"
-    # npm simulé : l'activation du module ai installe de faux claude et opencode
+    # Fake npm: enabling the ai module installs fake claude and opencode
     export NPM_LOG="$BATS_TEST_TMPDIR/npm.log"
     : >"$NPM_LOG"
     cat >"$BATS_TEST_TMPDIR/bin/npm" <<'NPM'
@@ -102,7 +102,7 @@ if [ "${1:-}" = install ]; then
     chmod +x "$BATS_TEST_TMPDIR/bin/claude" "$BATS_TEST_TMPDIR/bin/opencode"
 fi
 NPM
-    # Faux getent : échoue tant que $RESEAU_COUPE existe ; son nombre compte les essais ratés
+    # Fake getent: fails while $RESEAU_COUPE exists; its number counts failed attempts
     cat >"$BATS_TEST_TMPDIR/bin/getent" <<'GETENT'
 #!/usr/bin/env bash
 f="${RESEAU_COUPE:?}"
@@ -117,9 +117,9 @@ GETENT
     bash "$DEVZONE" enable ai >/dev/null 2>&1 || true
     cat >"$BATS_TEST_TMPDIR/bin/opencode" <<'OPCODEFAKE'
 #!/usr/bin/env bash
-# Faux opencode. FAKE_OP_ECHEC_MODELS : erreur $FAKE_OP_MESSAGE ; FAKE_OP_RESEAU_MODELS :
-# ENOTFOUND tant que $RESEAU_COUPE existe ; FAKE_OP_RESEAU_CHAQUE : ENOTFOUND et réseau
-# coupé à chaque lancement ; FAKE_OP_MUET_MODELS, FAKE_OP_FIGEE_MODELS : silence, figée.
+# Fake opencode. FAKE_OP_ECHEC_MODELS: error $FAKE_OP_MESSAGE; FAKE_OP_RESEAU_MODELS:
+# ENOTFOUND while $RESEAU_COUPE exists; FAKE_OP_RESEAU_CHAQUE: ENOTFOUND and the
+# network cut at each launch; FAKE_OP_MUET_MODELS, FAKE_OP_FIGEE_MODELS: silence, frozen.
 case "${1:-}" in
     models)
         printf '%s\n' \
@@ -146,7 +146,7 @@ case "${1:-}" in
         case " ${FAKE_OP_ANCIEN_ERREUR_MODELS:-} " in
             *" $modele "*)
                 echo "Free usage limit"
-                for _ in $(seq 1 40); do echo "ligne de sortie sans erreur"; done
+                for _ in $(seq 1 40); do echo "output line without error"; done
                 exit 1
                 ;;
         esac
@@ -178,11 +178,11 @@ case "${1:-}" in
                 ;;
         esac
         case " ${FAKE_OP_TEXTE_MODELS:-} " in
-            *" $modele "*) echo "extrait de code : Free usage limit et not available in your country" ;;
+            *" $modele "*) echo "code excerpt: Free usage limit and not available in your country" ;;
         esac
-        echo "session $modele : consigne lue, travail commence"
-        echo "le modele $modele a traite la consigne, les tests correspondants passent"
-        echo "fin de session $modele : aucune erreur, aucun refus de permission"
+        echo "session $modele: instruction read, work starting"
+        echo "the model $modele handled the instruction, the matching tests pass"
+        echo "end of session $modele: no error, no permission refusal"
         case " ${FAKE_OP_FIGEE_MODELS:-} " in
             *" $modele "*) sleep "${FAKE_OP_DUREE:-30}" ;;
         esac
@@ -194,18 +194,18 @@ OPCODEFAKE
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
 }
 
-# Consigne et dossier de test, lancement de devzone agent et journal du projet.
+# Test instruction and folder, devzone agent launch and project journal.
 agent_consigne() {
     printf 'construis la feature\n' >"$DEVZONE_ROOT/workspace/consigne.txt"
     mkdir -p "$DEVZONE_ROOT/workspace/projet"
 }
 
-# Lance devzone agent sur la consigne de test ; le résultat est dans $status et $output (run).
+# Runs devzone agent on the test instruction; the result is in $status and $output (run).
 agent_lance() {
     run bash "$DEVZONE" agent "$DEVZONE_ROOT/workspace/projet" "$DEVZONE_ROOT/workspace/consigne.txt"
 }
 
-# Chemin du journal du projet de test, où devzone agent écrit ses lignes.
+# Path of the test project journal, where devzone agent writes its lines.
 agent_journal() {
     echo "$DEVZONE_ROOT/workspace/.agents/projet.log"
 }

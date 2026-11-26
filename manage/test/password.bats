@@ -22,7 +22,7 @@ setup() {
 }
 
 @test "password: contents, header, tabs and sort by service then user" {
-    run bash "$PASSWORD" regenerer
+    run bash "$PASSWORD" regenerate
     [ "$status" -eq 0 ]
     [ "$output" = "" ]
 
@@ -43,30 +43,30 @@ setup() {
 }
 
 @test "password: mode 600" {
-    bash "$PASSWORD" regenerer
+    bash "$PASSWORD" regenerate
     [ "$(stat -c %a "$ROOT/.password" 2>/dev/null || stat -f %Lp "$ROOT/.password")" = 600 ]
 }
 
 @test "password: line removed when an account disappears" {
-    bash "$PASSWORD" regenerer
+    bash "$PASSWORD" regenerate
     rm -f "$GL/dev-password"
-    run bash "$PASSWORD" regenerer
+    run bash "$PASSWORD" regenerate
     [ "$status" -eq 0 ]
     ! grep -q $'^gitlab\t.*\tdev\t' "$ROOT/.password" || false
     grep -q $'^gitlab\thttp://gitlab.localhost:8929\troot\tmdp-test-root$' "$ROOT/.password"
 }
 
 @test "password: file removed when no account is left" {
-    bash "$PASSWORD" regenerer
+    bash "$PASSWORD" regenerate
     [ -f "$ROOT/.password" ]
     rm -rf "$GL" "$PG"
-    run bash "$PASSWORD" regenerer
+    run bash "$PASSWORD" regenerate
     [ "$status" -eq 0 ]
     [ ! -e "$ROOT/.password" ]
 }
 
-@test "password chemin: prints the path, even without file" {
-    run bash "$PASSWORD" chemin
+@test "password path: prints the path, even without file" {
+    run bash "$PASSWORD" path
     [ "$status" -eq 0 ]
     [ "$output" = "$ROOT/.password" ]
     [ ! -e "$ROOT/.password" ]
@@ -90,7 +90,7 @@ setup() {
     mkdir -p "$ROOT/workspace/.mysql"
     printf 'MYSQL_HOST=127.0.0.1\nMYSQL_PORT=3306\nMYSQL_USER=datayer\nMYSQL_PASSWORD=mdp-datayer\n' >"$ROOT/workspace/.mysql/datayer.env"
     printf 'MYSQL_HOST=127.0.0.1\nMYSQL_PORT=3306\nMYSQL_USER=root\nMYSQL_PASSWORD=mdproot\n' >"$ROOT/workspace/.mysql/root.env"
-    run bash "$PASSWORD" regenerer
+    run bash "$PASSWORD" regenerate
     [ "$status" -eq 0 ] || false
     [ "$output" = "" ] || false
     grep -q $'^mysql:datayer\t127.0.0.1:3306\tdatayer\tmdp-datayer$' "$ROOT/.password" || false

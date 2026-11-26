@@ -9,7 +9,7 @@
 # printed for the host). The registry is DEVZONE_OLLAMA_REGISTRY, else
 # https://registry.ollama.ai.
 # bash 3.2 (macOS). Code and comments in English; the user messages are French
-# and live in host-check.message (not listed in .english).
+# and live in host-check.message, a data file outside the code check.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

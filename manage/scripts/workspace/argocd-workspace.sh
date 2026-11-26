@@ -131,8 +131,8 @@ argocd_save_admin_password() {
 
 # .password of the workstation regenerated from workspace/.*/ (password.sh of the package)
 argocd_passwords_refresh() {
-    DEVZONE_ROOT="$PWD" bash "$RACINE/.devcontainer/password.sh" regenerer 2>/dev/null ||
-        echo "⚠ .password not updated (bash .devcontainer/password.sh regenerer)" >&2
+    DEVZONE_ROOT="$PWD" bash "$RACINE/.devcontainer/password.sh" regenerate 2>/dev/null ||
+        echo "⚠ .password not updated (bash .devcontainer/password.sh regenerate)" >&2
 }
 
 # Installs Argo CD (pinned chart and values), idempotent (upgrade --install)

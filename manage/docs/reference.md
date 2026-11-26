@@ -469,7 +469,7 @@ devzone test-gitlab --complet    # disables, checks that nothing remains, then r
 devzone test-gitlab --statut     # also publishes the gitlab-integration status on HEAD
 ```
 
-- **Steps**, each timed: 1 module active (otherwise activated); 2 state “ready” and runner online; 3 `gitlab.localhost` resolved to `127.0.0.1` and TCP relays active on 8929 and 2224 (`devzone gitlab hote-poser` and `devzone gitlab relay-start`), otherwise ✖ with the missing address or port; 4 pipeline of `devzone/demo` re-run on `main` and awaited until `success`; 5 SSH clone (disposable ed25519 key) and HTTP clone authenticated by a credential helper (Basic `oauth2` + token read from the file, never in process arguments, the URL nor `.git/config`); 6 `gitlab` platform with `glab repo clone`, then back to the previous platform; 7 integration suite `test/gitlab/` of repowarden ([#533](https://github.com/simdevWarden/repowarden/issues/533)): folder absent at the ref → step skipped with the reason; failure → output kept in `${TMPDIR:-/tmp}/devzone-test-gitlab-repowarden.log` (token masked) and cited in the reason. With `--complet`, a step 8 comes before the others: `devzone disable gitlab`, then a check that there remains neither namespace `devzone-gitlab<instance>` (name computed as `gitlab.sh` does), nor pod labelled `devzone.instance=<instance>` of the module, nor `workspace/.gitlab/`, nor the `# devzone:gitlab` line in `/etc/hosts`.
+- **Steps**, each timed: 1 module active (otherwise activated); 2 state “ready” and runner online; 3 `gitlab.localhost` resolved to `127.0.0.1` and TCP relays active on 8929 and 2224 (`devzone gitlab host-set` and `devzone gitlab relay-start`), otherwise ✖ with the missing address or port; 4 pipeline of `devzone/demo` re-run on `main` and awaited until `success`; 5 SSH clone (disposable ed25519 key) and HTTP clone authenticated by a credential helper (Basic `oauth2` + token read from the file, never in process arguments, the URL nor `.git/config`); 6 `gitlab` platform with `glab repo clone`, then back to the previous platform; 7 integration suite `test/gitlab/` of repowarden ([#533](https://github.com/simdevWarden/repowarden/issues/533)): folder absent at the ref → step skipped with the reason; failure → output kept in `${TMPDIR:-/tmp}/devzone-test-gitlab-repowarden.log` (token masked) and cited in the reason. With `--complet`, a step 8 comes before the others: `devzone disable gitlab`, then a check that there remains neither namespace `devzone-gitlab<instance>` (name computed as `gitlab.sh` does), nor pod labelled `devzone.instance=<instance>` of the module, nor `workspace/.gitlab/`, nor the `# devzone:gitlab` line in `/etc/hosts`.
 - **Summary**: one line per step (✔/✖/skipped, duration, reason) and a total; the exit code is 0 only without ✖ (a skipped step does not fail). A token is never displayed.
 - **Guaranteed cleanup** by `trap … EXIT`: SSH key removed from GitLab, temporary folders deleted, previous platform restored, even if a step fails.
 - **Variables**: `GITLAB_TEST_PIPELINE` (pipeline timeout, 600 s by default), `GITLAB_TEST_INTERVALLE` (pipeline polling interval, 5 s by default), `REPOWARDEN_TEST_REF` (ref of the integration suite, `develop` by default), `DEVZONE_ROOT` (repository root, as for `gitlab.sh`).
@@ -763,9 +763,6 @@ npx devzone@latest update   # latest published version
 - **Replacement**: the package files are copied again, the files of the old manifest that no longer exist are deleted, as well as the old `core/` and `scripts/` trees at the root. `.gitignore` is completed with the missing lines, never overwritten.
 - **Never touched**: `workspace/`, `.devzone.modules`, `.devzone.packages`, `.password`, `.app`, `.devzone.log`, the Docker volumes.
 - **Rebuild**: the new `.devzone.version` is written, then the rebuild is proposed with confirmation in a terminal. `--no-rebuild` skips this step; without a terminal, the rebuild is indicated but never launched.
-- **State key (#733, batch 4)**: `plateforme=` of `.devzone.modules` becomes `platform=`. `.devcontainer/rename-legacy-files.sh` rewrites it once, with its value (if `platform=` already exists, only the old line is removed), at each run that launches the script; the other lines do not move.
-- **Old names (#733)**: `.devzone.paquets`, `.devzone.sauvegarde`, `.devzone.ports-workspace`, `.devzone.etat`, `.devzone.catalogue-veilleur`, `.devzone-empreinte` (skills) and the `-echec-` markers become `.devzone.packages`, `.devzone.backup`, `.devzone.workspace-ports`, `.devzone.state`, `.devzone.catalog-watcher`, `.devzone-fingerprint` and `-failed-`. `.devcontainer/rename-legacy-files.sh` renames them once, with their contents, at container startup, at `devzone update`, at `devzone workspace update` and at `devzone workspace migrate`. A new name already present is never overwritten; a second run does nothing.
-
 A folder created before this manifest has an “unknown” version: all files that differ from the package are treated as modified (backup, then confirmation).
 
 In the container, the `devzone` summary reads `$RACINE/.devzone.version` and the latest published version (`npm view devzone version`, at most once a day, cache under `~/.cache/devzone/`, 5 s timeout, silent offline). If it is more recent: `○ devzone X.Y.Z disponible : sur le poste, devzone update`.
@@ -895,70 +892,6 @@ The `bats (macos-latest)` job sometimes gets no runner: it stays queued for abou
 - **Minimal rights**: `actions: write` on this workflow alone. It fetches the default branch (never the PR's code) and only uses the run identifier.
 - **Limit**: a `workflow_run` workflow only runs from the default branch: it acts only after the first delivery that contains it in `main`. The repowarden repository has the same default, to be handled there.
 - **Disabling**: delete the file, or “Disable workflow” in the GitHub Actions tab. The diagnosis of `tests-conteneur` (#636) keeps indicating the manual rerun command.
-
-## Removed names
-
-The commands, subcommands and options of devzone are written in English (#502, #557, #695). The old French names are no longer accepted, neither as aliases nor with a warning: devzone refuses the old name, shows the new one on the error output, exits with code 1 and does nothing (no folder is created):
-
-```
-✖ « activer » was renamed: devzone enable
-✖ « liste » was renamed: devzone port list
-✖ « --oui » was renamed: --yes
-```
-
-### Commands
-
-| Old name | New name |
-|---|---|
-| `devzone actif` | `devzone is-enabled` |
-| `devzone activer` / `desactiver` | `devzone enable` / `disable` |
-| `devzone appliquer` | `devzone apply` |
-| `devzone aide` | `devzone help` |
-| `devzone catalogue` | `devzone catalog` |
-| `devzone demarrer` / `arreter` / `etat` | `devzone start` / `stop` / `status` |
-| `devzone ia` | `devzone ai` |
-| `devzone mots-de-passe` | `devzone passwords` |
-| `devzone paquets` | `devzone packages` |
-| `devzone plateforme` | `devzone platform` |
-| `devzone reparer` | `devzone repair` |
-| `devzone utiliser` | `devzone use` |
-| `devzone mettre-a-jour` / `desinstaller` | `devzone update` / `uninstall` |
-| `devzone workspace demarrer` / `arreter` / `etat` | `devzone workspace start` / `stop` / `status` |
-| `devzone workspace copier-vers` / `copier-depuis` | `devzone workspace copy-to` / `copy-from` |
-| `devzone workspace aide` | `devzone workspace help` |
-| `devzone workspace ports demarrer` / `arreter` / `etat` | `devzone workspace ports start` / `stop` / `status` |
-
-### Subcommands
-
-| Command | Old name | New name |
-|---|---|---|
-| `postgres`, `mysql` | `creer`, `liste`, `supprimer`, `supprimer-donnees`, `etat`, `installer`, `desinstaller` | `create`, `list`, `delete`, `delete-data`, `status`, `install`, `uninstall` |
-| `postgres`, `mysql` | `autoriser`, `interdire` | `authorize`, `forbid` |
-| `gitlab` | `migrer`, `nouveau-mdp`, `etat`, `installer`, `desinstaller`, `relais-etat` | `migrate`, `new-password`, `status`, `install`, `uninstall`, `relay-status` |
-| `argocd` | `etat`, `installer`, `desinstaller` | `status`, `install`, `uninstall` |
-| `postgres`, `mysql`, `gitlab`, `argocd` | `relais-lancer`, `relais-arreter` | `relay-start`, `relay-stop` |
-| `packages` | `ajouter`, `retirer`, `appliquer`, `lister` | `add`, `remove`, `apply`, `list` |
-| `catalog` | `lister`, `synchroniser`, `appliquer`, `desinstaller` | `list`, `sync`, `apply`, `remove` |
-| `port` | `ouvrir`, `fermer`, `liste`, `relancer`, `exclure`, `inclure` | `open`, `close`, `list`, `restart`, `exclude`, `include` |
-
-### Options
-
-| Old | New |
-|---|---|
-| `--oui` | `--yes` (everywhere: `disable <module> --yes` confirms the deletion of the data) |
-| `--contexte` | `--context` |
-| `--confirmer` | `--confirm` |
-| `--nouveau-mdp` | `--new-password` |
-| `--fermer` | `--close` |
-| `--supprimer` (`mysql volume`) | `--delete` |
-
-The following environment variables are not commands: they are not covered by this refusal.
-
-| Old | New |
-|---|---|
-| `conseil` | `advice` |
-| `GARDER=connexions` | `KEEP=logins` |
-| `CONFIRMER=oui` | `CONFIRM=yes` |
 
 ## For contributors
 

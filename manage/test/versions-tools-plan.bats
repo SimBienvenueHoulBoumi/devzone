@@ -85,7 +85,7 @@ open_tickets() {
     tools "k9s 0.51.0 0.52.0"
     plan
     [ "$status" -eq 0 ]
-    [ "$(field 5)" = "k9s 0.51.0 → 0.52.0 dans l'image" ]
+    [ "$(field 5)" = "k9s 0.51.0 → 0.52.0 in the image" ]
 }
 
 @test "GitHub tool notes point to its release tag" {
@@ -137,7 +137,7 @@ open_tickets() {
 }
 
 @test "open ticket of the App with the same title: not planned again" {
-    open_tickets 50 "go 1.27.1 → 1.28.0 dans l'image" "app/repowarden-devzone"
+    open_tickets 50 "go 1.27.1 → 1.28.0 in the image" "app/repowarden-devzone"
     tools "go 1.27.1 1.28.0"
     plan
     [ "$status" -eq 0 ]
@@ -145,18 +145,18 @@ open_tickets() {
 }
 
 @test "open ticket of the App with another title: existant, with its number" {
-    open_tickets 51 "go 1.26.0 → 1.27.1 dans l'image" "app/repowarden-devzone"
+    open_tickets 51 "go 1.26.0 → 1.27.1 in the image" "app/repowarden-devzone"
     tools "go 1.27.1 1.28.0"
     plan
     [ "$status" -eq 0 ]
     [ "$(count_kind plan)" = 0 ]
     [ "$(field 1)" = existant ]
     [ "$(field 7)" = 51 ]
-    [ "$(field 5)" = "go 1.27.1 → 1.28.0 dans l'image" ]
+    [ "$(field 5)" = "go 1.27.1 → 1.28.0 in the image" ]
 }
 
 @test "same title opened by another author: ignored, planned" {
-    open_tickets 52 "go 1.27.1 → 1.28.0 dans l'image" "intruder"
+    open_tickets 52 "go 1.27.1 → 1.28.0 in the image" "intruder"
     tools "go 1.27.1 1.28.0"
     plan
     [ "$status" -eq 0 ]

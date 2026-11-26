@@ -223,6 +223,6 @@ case "${1:-}" in
     add) add_packages "${@:2}" ;;
     remove) remove_packages "${@:2}" ;;
     apply) apply_packages ;;
-    -h | --help | aide) awk 'NR==1{next} /^#$/{exit} /^#/{sub(/^# ?/,""); print; next} {exit}' "${BASH_SOURCE[0]}" ;;
+    -h | --help) awk 'NR==1{next} /^#$/{exit} /^#/{sub(/^# ?/,""); print; next} {exit}' "${BASH_SOURCE[0]}" ;;
     *) refuse "unknown command: ${1:-(none)} (devzone packages --help)" ;;
 esac

@@ -45,7 +45,7 @@ notes_of() {
 
 # Title of the ticket and of the commit for the bump of tool $1 from $2 to $3
 title_of() {
-    echo "$1 $2 → $3 dans l'image"
+    echo "$1 $2 → $3 in the image"
 }
 
 # "number<TAB>title" of the open ticket of AUTHOR for tool $1, nothing otherwise

@@ -284,7 +284,9 @@ open_tickets() {
 
 @test "versions workflow: proposed design, never retained (maintainer rewrites)" {
     workflow="$ROOT/.github/workflows/versions.yml"
-    grep -q 'Conception propos' "$workflow"
+    protocol="$ROOT/manage/scripts/ci/ticket-protocol.txt"
+    grep -q '^## Conception propos' "$protocol"
+    grep -q '\$design_heading' "$workflow"
     ! grep -q '^ *## Conception retenue' "$workflow" || false
 }
 

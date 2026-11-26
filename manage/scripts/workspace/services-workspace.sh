@@ -173,8 +173,8 @@ services_status() {
 services() {
     local sub="${1:-}"
     case "$sub" in
-        enable | activer) services_run enable "${2:-}" "${@:3}" ;;
-        disable | desactiver) services_run disable "${2:-}" "${@:3}" ;;
+        enable) services_run enable "${2:-}" "${@:3}" ;;
+        disable) services_run disable "${2:-}" "${@:3}" ;;
         # The data of gitlab (group, demo project, dev user, runner) seeded
         # again, in the pod (#538): the only seed of the services
         seed)
@@ -184,7 +184,7 @@ services() {
             fi
             services_run seed gitlab
             ;;
-        status | etat | '') services_status ;;
+        status | '') services_status ;;
         *)
             echo "✖ unknown subcommand: $sub ($(services_usage))" >&2
             return 1
