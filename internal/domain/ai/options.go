@@ -10,14 +10,46 @@ import (
 
 // Options carries the dependencies and the environment of the AI commands.
 type Options struct {
-	Runner    dzexec.Runner
-	Out       io.Writer
-	Err       io.Writer
-	Home      string
-	URL       string
-	Registry  string
-	Measures  string
-	HostModel string
+	Runner          dzexec.Runner
+	Out             io.Writer
+	Err             io.Writer
+	Home            string
+	URL             string
+	Registry        string
+	Measures        string
+	HostModel       string
+	DevcontainerDir string
+	StateFile       string
+	Packages        []string
+	Names           []string
+}
+
+// devcontainerDir returns the installed code folder holding the templates.
+func (o Options) devcontainerDir() string {
+	if o.DevcontainerDir != "" {
+		return o.DevcontainerDir
+	}
+	if exe, err := os.Executable(); err == nil {
+		return filepath.Dir(exe)
+	}
+	wd, _ := os.Getwd()
+	return filepath.Join(wd, ".devcontainer")
+}
+
+// assistants returns the pinned packages and their binary names.
+func (o Options) assistants() ([]string, []string) {
+	if len(o.Packages) > 0 {
+		return o.Packages, o.Names
+	}
+	return []string{claudePackage, opencodePackage}, []string{"claude", "opencode"}
+}
+
+// failureMarker returns the path of the marker of a failed module.
+func (o Options) failureMarker(module string) string {
+	if o.StateFile != "" {
+		return o.StateFile + "-failed-" + module
+	}
+	return filepath.Join(os.TempDir(), "devzone-failed-"+module)
 }
 
 // runner returns the injected runner or the process backed one.

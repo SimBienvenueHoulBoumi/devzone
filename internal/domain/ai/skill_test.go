@@ -8,7 +8,7 @@ import (
 )
 
 // skillModel writes a versioned skill model in a temporary folder.
-func skillModel(t *testing.T, body string) string {
+func writeSkillModel(t *testing.T, body string) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "SKILL.md")
 	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
@@ -20,7 +20,7 @@ func skillModel(t *testing.T, body string) string {
 // TestInstallSkillWritesBothFolders checks the install of a missing skill.
 func TestInstallSkillWritesBothFolders(t *testing.T) {
 	f := newFixture(t)
-	model := skillModel(t, skillMarker+"\n# devzone\n")
+	model := writeSkillModel(t, skillMarker+"\n# devzone\n")
 	if err := InstallSkill(f.o, model); err != nil {
 		t.Fatal(err)
 	}
@@ -41,11 +41,11 @@ func TestInstallSkillWritesBothFolders(t *testing.T) {
 // TestInstallSkillUpdatesOnlyUnchanged checks the marker and fingerprint rules.
 func TestInstallSkillUpdatesOnlyUnchanged(t *testing.T) {
 	f := newFixture(t)
-	model := skillModel(t, skillMarker+"\n# devzone version 1\n")
+	model := writeSkillModel(t, skillMarker+"\n# devzone version 1\n")
 	if err := InstallSkill(f.o, model); err != nil {
 		t.Fatal(err)
 	}
-	newModel := skillModel(t, skillMarker+"\n# devzone version 2\n")
+	newModel := writeSkillModel(t, skillMarker+"\n# devzone version 2\n")
 	f.out.Reset()
 	if err := InstallSkill(f.o, newModel); err != nil {
 		t.Fatal(err)
@@ -70,7 +70,7 @@ func TestInstallSkillUpdatesOnlyUnchanged(t *testing.T) {
 // TestRemoveSkillKeepsCustomised checks the symmetrical removal rules.
 func TestRemoveSkillKeepsCustomised(t *testing.T) {
 	f := newFixture(t)
-	model := skillModel(t, skillMarker+"\n# devzone\n")
+	model := writeSkillModel(t, skillMarker+"\n# devzone\n")
 	if err := InstallSkill(f.o, model); err != nil {
 		t.Fatal(err)
 	}
