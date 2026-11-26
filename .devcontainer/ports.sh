@@ -127,6 +127,6 @@ case "${1:-}" in
         ;;
     close | --close) close_port "${2:-}" ;;
     resume) summary ;;
-    -h | --help | aide) sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//' ;;
+    -h | --help) sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//' ;;
 esac
 fi

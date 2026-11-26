@@ -112,7 +112,11 @@ func (r *run) seed() int {
 	if code := r.seedProject(token); code != 0 {
 		return code
 	}
-	if devPassword := r.seedDevUser(token); devPassword != "" {
+	devPassword, ok := r.seedDevUser(token)
+	if !ok {
+		return 1
+	}
+	if devPassword != "" {
 		r.writeFileMode(r.secretsDir()+"/dev-password", devPassword)
 	}
 	if code := r.seedRunnerToken(token); code != 0 {
@@ -156,7 +160,7 @@ func (r *run) seedCommand() int {
 func (r *run) readInitialRootPassword() (string, bool) {
 	res, err := r.kubectlDevzone([]string{"get", "secret", "-n", r.namespace(),
 		"gitlab-gitlab-initial-root-password", "-o", "jsonpath={.data.password}"})
-	if err != nil {
+	if err != nil || res.Code != 0 {
 		return "", false
 	}
 	raw, err := base64.StdEncoding.DecodeString(strings.TrimSpace(string(res.Stdout)))
@@ -170,7 +174,7 @@ func (r *run) readInitialRootPassword() (string, bool) {
 func (r *run) readToolboxPod() (string, bool) {
 	res, err := r.kubectlDevzone([]string{"get", "pod", "-n", r.namespace(), "-l", "app=toolbox",
 		"-o", "jsonpath={.items[0].metadata.name}"})
-	if err != nil {
+	if err != nil || res.Code != 0 {
 		return "", false
 	}
 	pod := strings.TrimSpace(string(res.Stdout))

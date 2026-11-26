@@ -4,7 +4,7 @@
 
 setup() {
     GUARD="$BATS_TEST_DIRNAME/../../.devcontainer/ai/docker-guard.sh"
-    # The messages live in text files next to the script (not listed in .english)
+    # The messages live in text files next to the script (data, not code)
     MSG="$(cat "$BATS_TEST_DIRNAME/../../.devcontainer/ai/docker-guard.message")"
     KMSG="$(cat "$BATS_TEST_DIRNAME/../../.devcontainer/ai/kube-guard.message")"
     export MSG KMSG

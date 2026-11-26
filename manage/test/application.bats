@@ -98,15 +98,15 @@ KUBE
     [ "$status" -eq 0 ]
     [[ "$output" == *"✔ catalog watcher"* ]] || false
     [[ "$output" == *"✔ credentials"* ]] || false
-    [[ "$(cat "$T/actions.log")" == *"catalog-watcher demarrer"* ]] || false
-    [[ "$(cat "$T/actions.log")" == *"password regenerer"* ]] || false
+    [[ "$(cat "$T/actions.log")" == *"catalog-watcher start"* ]] || false
+    [[ "$(cat "$T/actions.log")" == *"password regenerate"* ]] || false
 }
 
 @test "repair: active gitlab and postgres are repaired too" {
     printf 'gitlab=on\npostgres=on\n' >"$DEVZONE_STATE"
     run bash "$APP" repair
     [ "$status" -eq 0 ]
-    [[ "$(cat "$T/actions.log")" == *"devzone gitlab hote-poser"* ]] || false
+    [[ "$(cat "$T/actions.log")" == *"devzone gitlab host-set"* ]] || false
     [[ "$(cat "$T/actions.log")" == *"devzone gitlab relay-start"* ]] || false
     [[ "$(cat "$T/actions.log")" == *"devzone postgres relay-start"* ]] || false
 }
@@ -115,7 +115,7 @@ KUBE
     run bash "$APP" repair
     [ "$status" -eq 0 ]
     [[ "$output" == *"✔ catalog watcher"* ]] || false
-    [[ "$(cat "$T/actions.log")" == *"catalog-watcher demarrer"* ]] || false
+    [[ "$(cat "$T/actions.log")" == *"catalog-watcher start"* ]] || false
 }
 
 @test "repair: a failed element shows its reason and code 1" {
@@ -123,7 +123,7 @@ KUBE
     run bash "$APP" repair
     [ "$status" -eq 1 ]
     [[ "$output" == *"✖ credentials : credentials unavailable"* ]] || false
-    [[ "$(cat "$T/actions.log")" == *"password regenerer"* ]] || false
+    [[ "$(cat "$T/actions.log")" == *"password regenerate"* ]] || false
 }
 
 @test "metrics: passes the context and the options" {

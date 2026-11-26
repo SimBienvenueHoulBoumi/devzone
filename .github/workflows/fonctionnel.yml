@@ -343,7 +343,7 @@ jobs:
           bash -c '[ "${BASH_VERSINFO[0]}" = 3 ]'
           npx --yes bats@1.10.0 manage/test/cli.bats manage/test/versions.bats manage/test/ci-container.bats manage/test/agent.bats manage/test/agent-gaps.bats manage/test/agent-rights.bats manage/test/agent-rights-gh.bats manage/test/agent-quota.bats manage/test/agent-parallel.bats manage/test/agent-paths.bats manage/test/agent-state-json.bats
 
-  # Code in English: files listed in .english are checked on every run (#502).
+  # Code in English: the Go check scans every tracked code file on every run (#502).
   # The charts convention (#554) is checked here too: manage/scripts/ci/check-charts.sh
   # and $NAME before a non-ASCII byte in the shell scripts (#591): check-utf8-vars.sh
   english:
@@ -353,8 +353,8 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - name: english check
-        run: bash manage/scripts/ci/check-english.sh
+      - name: english check (Go)
+        run: go run ./cmd/devzone-checks english
       - name: names check (files and folders in English, #716)
         run: bash manage/scripts/ci/check-names.sh
       # helm is installed on the runner: lint and render of each chart, wrapper

@@ -33,16 +33,16 @@ create_workstation() {
             --gitops) expect=gitops ;;
             --gitops=*) gitops="${arg#--gitops=}" ;;
             --kubernetes) option=kubernetes ;;
-            *) echo "✖ option inconnue : $arg (devzone <dossier> [--gitops github|none|<url>] [--kubernetes])" >&2; exit 1 ;;
+            *) echo "✖ unknown option: $arg (devzone <folder> [--gitops github|none|<url>] [--kubernetes])" >&2; exit 1 ;;
         esac
     done
     if [ -n "$expect" ]; then
-        echo "✖ --gitops attend une valeur (github, none or a URL)" >&2
+        echo "✖ --gitops expects a value (github, none or a URL)" >&2
         exit 1
     fi
 
     if [ -e "$target" ] && [ -n "$(ls -A "$target" 2>/dev/null)" ]; then
-        echo "✖ $target existe et n'est pas vide : rien n'est écrasé. Choisis un autre dossier." >&2
+        echo "✖ $target exists and is not empty: nothing is overwritten. Choose another folder." >&2
         exit 1
     fi
 
@@ -104,7 +104,7 @@ create_workstation() {
     esac
     target="$(cd "$target" && pwd)"
     write_manifest "$target"
-    echo "✔ devzone $(version) créé dans $target"
+    echo "✔ devzone $(version) created in $target"
     # The workspace goes to the cluster (kube check done by create_mode_choose)
     create_mode_start "$target" "$PAQUET/manage/workspace.sh"
 }

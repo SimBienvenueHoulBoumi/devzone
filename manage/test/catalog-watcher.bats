@@ -39,7 +39,7 @@ case "$*" in
     *"get secret mysql-admin"*) [ -f "$T/secret" ]; exit $? ;;
     *"create secret generic mysql-admin"*) touch "$T/secret" ;;
     *"rollout status"*) ;;
-    *"port-forward"*) exec sleep 300 ;;
+    *"port-forward"*) exit 0 ;;
 esac
 exit 0
 KUBE
@@ -55,7 +55,7 @@ SSL
     cat >"$BATS_TEST_TMPDIR/bin/nohup" <<'NOHUP'
 #!/usr/bin/env bash
 echo "nohup $*" >>"$BATS_TEST_TMPDIR/nohup.log"
-exec sleep 300
+exit 0
 NOHUP
     cat >"$BATS_TEST_TMPDIR/bin/npm" <<'NPM'
 #!/usr/bin/env bash
@@ -72,13 +72,13 @@ teardown() {
 }
 
 @test "watcher: refused without DEVZONE_CATALOG_REAL" {
-    run bash "$VEILLEUR" demarrer
+    run bash "$VEILLEUR" start
     [ "$status" -eq 2 ] || false
     [[ "$output" == *"refused here"* ]] || false
 }
 
 @test "watcher: refused under bats even with DEVZONE_CATALOG_REAL=yes" {
-    DEVZONE_CATALOG_REAL=yes run bash "$VEILLEUR" demarrer
+    DEVZONE_CATALOG_REAL=yes run bash "$VEILLEUR" start
     [ "$status" -eq 2 ] || false
     [[ "$output" == *"refused under bats"* ]] || false
 }
@@ -93,7 +93,7 @@ teardown() {
 printf '%s\n' "$*" >>"$BATS_TEST_TMPDIR/catalogue.log"
 CATALOGUE
     : >"$depot/.devzone.modules"
-    run bash "$depot/.devcontainer/catalog/catalog-watcher.sh" tour
+    run bash "$depot/.devcontainer/catalog/catalog-watcher.sh" tick
     [ "$status" -eq 0 ] || false
     [ -f "$depot/.devzone.catalog-watcher/dernier" ] || false
     [ "$(cat "$BATS_TEST_TMPDIR/catalogue.log")" = "apply" ] || false
@@ -112,7 +112,7 @@ NOHUP
     run env -u BATS_TEST_TMPDIR \
         DEVZONE_CATALOG_REAL=yes \
         DEVZONE_CATALOG_WATCHER_DIR="$base" \
-        bash "$VEILLEUR" demarrer
+        bash "$VEILLEUR" start
     [ "$status" -ne 0 ] || false
     [[ "$output" == *"cannot start"* ]] || false
 }
@@ -120,12 +120,12 @@ NOHUP
 @test "watcher: a tick applies when .devzone.modules changes" {
     touch "$BATS_TEST_TMPDIR/ns" "$BATS_TEST_TMPDIR/sts" "$BATS_TEST_TMPDIR/ready"
     printf 'cluster=kind-devzone\nmysql=on\n' >"$DEVZONE_STATE"
-    run bash "$VEILLEUR" tour
+    run bash "$VEILLEUR" tick
     [ "$status" -eq 0 ] || false
     premier="$(wc -l <"$BATS_TEST_TMPDIR/kubectl.log")"
     sleep 1.1
     touch "$DEVZONE_STATE"
-    run bash "$VEILLEUR" tour
+    run bash "$VEILLEUR" tick
     [ "$status" -eq 0 ] || false
     second="$(wc -l <"$BATS_TEST_TMPDIR/kubectl.log")"
     [ "$second" -gt "$premier" ] || false

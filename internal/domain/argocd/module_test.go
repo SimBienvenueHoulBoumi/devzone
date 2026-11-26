@@ -62,7 +62,7 @@ func newModFixture(t *testing.T) *modFixture {
 	// admin secret
 	r.On("kubectl", []string{"--context", "devzone", "-n", "devzone-argocd", "get", "secret", "argocd-initial-admin-secret", "-o", "jsonpath={.data.password}"}, fexec.Result{Stdout: []byte("c2VjcmV0LWFkbWlu")})
 	// password regenerate
-	r.On("bash", []string{filepath.Join(root, ".devcontainer", "password.sh"), "regenerer"}, fexec.Result{})
+	r.On("bash", []string{filepath.Join(root, ".devcontainer", "password.sh"), "regenerate"}, fexec.Result{})
 	// relay via bash cluster.sh
 	f.r.On("bash", []string{"-c", relayCmd(root, filepath.Join(root, ".devzone.modules"), "relay_active argocd")}, fexec.Result{Code: 1})
 	f.r.On("bash", []string{"-c", relayCmd(root, filepath.Join(root, ".devzone.modules"), "relay_stop argocd")}, fexec.Result{})

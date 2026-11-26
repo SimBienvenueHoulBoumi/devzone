@@ -1,6 +1,6 @@
 #!/usr/bin/env bats
-# devzone agent : fichiers de droits des agents protégés pendant la session (#361).
-# Faux opencode piloté par FAKE_OP_ACTION (commande lancée dans le dossier du projet).
+# devzone agent: agent rights files protected during the session (#361).
+# Fake opencode driven by FAKE_OP_ACTION (command run in the project folder).
 
 setup() {
     load commun
@@ -15,7 +15,7 @@ setup() {
     git -C "$P" add -A
     git -C "$P" -c user.name=t -c user.email=t@t commit -qm depart
     # Le faux opencode d'agent_isole devient .reel ; le nouveau note l'environnement
-    # et exécute FAKE_OP_ACTION avant de lui déléguer.
+    # and runs FAKE_OP_ACTION before delegating to it.
     mv "$BATS_TEST_TMPDIR/bin/opencode" "$BATS_TEST_TMPDIR/bin/opencode.reel"
     cat >"$BATS_TEST_TMPDIR/bin/opencode" <<'FAKE'
 #!/usr/bin/env bash
@@ -28,7 +28,7 @@ FAKE
     chmod +x "$BATS_TEST_TMPDIR/bin/opencode"
 }
 
-@test "droits : agent.json modifie sans commit -> remis, alerte au journal et dans etat" {
+@test "rights: agent.json changed without a commit -> restored, alert in the journal and state" {
     export FAKE_OP_ACTION='echo pirate >>.devcontainer/opencode/agent.json'
     agent_lance
     [ "$status" -eq 0 ]
@@ -48,7 +48,7 @@ FAKE
     grep -q "rights changed: .repowarden.conf : change reverted" "$(agent_journal)" || false
 }
 
-@test "droits : fichier de droits supprime par l'agent -> restaure" {
+@test "rights: rights file removed by the agent -> restored" {
     export FAKE_OP_ACTION='rm .devcontainer/opencode.jsonc'
     agent_lance
     [ "$status" -eq 0 ]
@@ -56,7 +56,7 @@ FAKE
     grep -q "rights changed: .devcontainer/opencode.jsonc" "$(agent_journal)" || false
 }
 
-@test "droits : modification commitee -> contenu remis dans l'arbre, historique intact, commit nomme" {
+@test "rights: committed change -> content restored in the tree, history intact, named commit" {
     export FAKE_OP_ACTION='echo pirate >>.devcontainer/opencode/agent.json; git add -A; git -c user.name=t -c user.email=t@t commit -qm modif'
     agent_lance
     [ "$status" -eq 0 ]
@@ -76,7 +76,7 @@ FAKE
     [[ "$output" != *"rights changed"* ]] || false
 }
 
-@test "droits : verification aussi apres une session figee" {
+@test "rights: check also after a frozen session" {
     export FAKE_OP_ACTION='echo pirate >>.devcontainer/opencode.jsonc'
     export FAKE_OP_FIGEE_MODELS="big-pickle"
     agent_lance
@@ -95,7 +95,7 @@ FAKE
     [ ! -f "$DEVZONE_AGENT_STATE/droits-projet.alerte" ]
 }
 
-@test "droits : permission.edit a les deny en dernier, meme si l'env pose edit allow" {
+@test "rights: permission.edit keeps deny last, even when the env sets edit allow" {
     export OPENCODE_CONFIG_CONTENT='{"permission":{"edit":"allow"}}'
     agent_lance
     [ "$status" -eq 0 ]
@@ -103,14 +103,14 @@ FAKE
     jq -e '.permission.edit | has(".repowarden.conf") and has("**/.devcontainer/agent-rights.sh") and has(".devcontainer/opencode/agent.json") and has(".devcontainer/opencode.jsonc")' "$FAKE_OP_CONFIG_LOG" >/dev/null
 }
 
-@test "droits : un allow de l'env sur un fichier de droits est repasse en deny, en dernier" {
+@test "rights: an env allow on a rights file is moved back to deny, last" {
     export OPENCODE_CONFIG_CONTENT='{"permission":{"edit":{".repowarden.conf":"allow","src/*":"allow"}}}'
     agent_lance
     [ "$status" -eq 0 ]
     jq -e '.permission.edit | .[".repowarden.conf"] == "deny" and .["src/*"] == "allow" and (to_entries | .[-8:] | all(.value == "deny"))' "$FAKE_OP_CONFIG_LOG" >/dev/null
 }
 
-@test "droits : sans OPENCODE_CONFIG_CONTENT, edit garde son allow general et les deny" {
+@test "rights: without OPENCODE_CONFIG_CONTENT, edit keeps its general allow and the deny rules" {
     unset OPENCODE_CONFIG_CONTENT
     agent_lance
     [ "$status" -eq 0 ]

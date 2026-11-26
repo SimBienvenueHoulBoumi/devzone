@@ -59,6 +59,13 @@ func (s scenario) env() []string {
 	}
 }
 
+// isGitlabRelay tells whether the service is a relay of the GitLab module, put
+// in the watcher by this port since #897: the bash original does not relay it
+// yet (it will from #883), so the comparisons with it exclude this relay only.
+func isGitlabRelay(svc relayService) bool {
+	return svc.target == "svc/gitlab-webservice-default" || svc.target == "svc/gitlab-gitlab-shell"
+}
+
 // goText runs the Go functions and prints what the bash body of
 // TestServicesMatchBash prints: services, pod ports, ready Services (sorted)
 // and the status of pa_ready, then the discovery call
@@ -67,6 +74,9 @@ func (s scenario) goText(file string) (string, []string) {
 	var b strings.Builder
 	b.WriteString("services\n")
 	for _, svc := range watchedServices(f, file) {
+		if isGitlabRelay(svc) {
+			continue // the bash original relays GitLab from #883, not before
+		}
 		line := strconv.Itoa(svc.local) + "|" + svc.namespace + "|" + svc.target
 		if svc.remote != 0 {
 			line += "|" + strconv.Itoa(svc.remote)
@@ -131,6 +141,8 @@ func TestServicesMatchBash(t *testing.T) {
 		with("ready fails", func(s *scenario) { s.readyFail = true }),
 		with("ss fails", func(s *scenario) { s.ssFail = true; s.contexts = "devzone" }),
 		with("nothing ready", func(s *scenario) { s.ready = "shop|db|false,\n" }),
+		with("gitlab on", func(s *scenario) { s.modules = "gitlab=on\n" }),
+		with("gitlab off", func(s *scenario) { s.modules = "gitlab=off\n" }),
 	}
 	h := newBashHarness(t)
 	body := `echo services; pw_services; echo pods; pw_pod_ports; echo ready

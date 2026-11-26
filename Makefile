@@ -8,8 +8,8 @@
 # to the first, without fixing anything. In the container: /.dockerenv, or folder /workspaces/devzone
 hors-conteneur:
 	@if [ -f /.dockerenv ] || [ "$(CURDIR)" = /workspaces/devzone ]; then \
-		echo "✖ make $(MAKECMDGOALS) : à lancer sur ta machine (terminal du Mac ou du PC), pas dans le conteneur devzone." >&2; \
-		echo "  Ici, dans le conteneur : devzone (état, modules), et les outils directement." >&2; \
+		echo "✖ make $(MAKECMDGOALS): run it on your machine (Mac or PC terminal), not in the devzone pod." >&2; \
+		echo "  Here in the pod: devzone (state, modules), and the tools directly." >&2; \
 		exit 1; fi
 
 help: ## Lists the commands
@@ -27,5 +27,5 @@ test-cli: hors-conteneur ## CLI tests in a real terminal: isolated devzone, then
 desinstaller: hors-conteneur ## Removes Kubernetes objects of this devzone instance, after confirmation
 	@bash manage/devzone uninstall
 
-uninstall: hors-conteneur ## Removes Kubernetes objects of this devzone instance, after confirmation (alias of desinstaller)
+uninstall: hors-conteneur ## Removes Kubernetes objects of this devzone instance, after confirmation (alias of the remove target)
 	@bash manage/devzone uninstall

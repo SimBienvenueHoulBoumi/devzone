@@ -62,7 +62,7 @@ func TestBatsEnableArgocdInstallOrder(t *testing.T) {
 			t.Fatalf("upstream chart used: %q", joinedArgs(call))
 		}
 	}
-	if !hasCall(calls, "bash", []string{filepath.Join(f.root, ".devcontainer", "password.sh"), "regenerer"}...) {
+	if !hasCall(calls, "bash", []string{filepath.Join(f.root, ".devcontainer", "password.sh"), "regenerate"}...) {
 		t.Fatalf("credentials not regenerated: %v", calls)
 	}
 }

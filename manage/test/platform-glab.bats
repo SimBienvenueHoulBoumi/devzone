@@ -1,10 +1,10 @@
 #!/usr/bin/env bats
-# Assistant git de glab (#278) : devzone platform gitlab pose, pour l'hôte de
-# l'instance seulement, credential.<URL>.helper = !glab auth git-credential ;
-# devzone platform github le retire ; le récapitulatif dit « ✔ git via glab ».
-# Faux glab (auth status, auth git-credential ok) et faux kind ; HOME et
-# GIT_CONFIG_GLOBAL sous $BATS_TEST_TMPDIR : git config --global n'écrit jamais
-# dans le vrai ~/.gitconfig.
+# glab git helper (#278): devzone platform gitlab sets, for the instance host
+# only, credential.<URL>.helper = !glab auth git-credential;
+# devzone platform github removes it; the summary says "✔ git via glab".
+# Fake glab (auth status, auth git-credential ok) and fake kind; HOME and
+# GIT_CONFIG_GLOBAL under $BATS_TEST_TMPDIR: git config --global never writes
+# to the real ~/.gitconfig.
 
 setup() {
     load commun
@@ -24,8 +24,8 @@ setup() {
     INSTANCE="http://example.gitlab:8443"
     AUTRE="https://git.autre.exemple"
 
-    # glab simulé dans ~/.local/bin (chemin absolu, comme le vrai binaire) :
-    # version, connexion et contrôle d'auth réussis, git-credential factice
+    # Fake glab in ~/.local/bin (absolute path, like the real binary):
+    # version, login and auth check succeed, fake git-credential
     cat >"$HOME/.local/bin/glab" <<'GLAB'
 #!/usr/bin/env bash
 echo "glab $*" >>"$GLAB_LOG"
@@ -37,17 +37,17 @@ GLAB
     chmod +x "$HOME/.local/bin/glab"
 }
 
-# Valeur du réglage credential de l'hôte donné, vide s'il n'existe pas
+# Value of the credential setting of the given host, empty if absent
 reglage() {
     git config --global --get "credential.$1.helper" 2>/dev/null || true
 }
 
-# Nombre de réglages credential.* présents dans le HOME de test
+# Number of credential.* settings present in the test HOME
 nombre_reglages_credential() {
     git config --global --get-regexp '^credential\.' 2>/dev/null | wc -l
 }
 
-@test "plateforme gitlab pose le réglage credential pour l'hôte de l'instance seulement" {
+@test "gitlab platform sets the credential setting for the instance host only" {
     run bash "$DEVZONE" platform gitlab --url "$INSTANCE"
     [ "$status" -eq 0 ]
     [ "$(reglage "$INSTANCE")" = "!$HOME/.local/bin/glab auth git-credential" ]
@@ -55,7 +55,7 @@ nombre_reglages_credential() {
     [ -f "$GIT_CONFIG_GLOBAL" ]
 }
 
-@test "plateforme gitlab : un autre réglage credential (autre hôte) reste intact" {
+@test "gitlab platform: another credential setting (other host) stays intact" {
     git config --global "credential.$AUTRE.helper" store
     git config --global "credential.$AUTRE.username" bob
     avant="$(git config --global --get-regexp '^credential\.' | sort)"
@@ -64,13 +64,13 @@ nombre_reglages_credential() {
     [ "$(reglage "$AUTRE")" = "store" ]
     [ "$(git config --global "credential.$AUTRE.username")" = "bob" ]
     [ "$(reglage "$INSTANCE")" = "!$HOME/.local/bin/glab auth git-credential" ]
-    # les réglages d'avant sont tous encore là, à l'identique
+    # the earlier settings are all still there, unchanged
     apres="$(git config --global --get-regexp '^credential\.' | sort)"
     [[ "$apres" == *"$avant"* ]] || false
     [ "$(nombre_reglages_credential)" -eq 3 ]
 }
 
-@test "plateforme gitlab répétée : un seul réglage, pas de doublon" {
+@test "gitlab platform repeated: a single setting, no duplicate" {
     run bash "$DEVZONE" platform gitlab --url "$INSTANCE"
     [ "$status" -eq 0 ]
     run bash "$DEVZONE" platform gitlab --url "$INSTANCE"
@@ -78,7 +78,7 @@ nombre_reglages_credential() {
     [ "$(git config --global --get-all "credential.$INSTANCE.helper" | wc -l)" -eq 1 ]
 }
 
-@test "retour à github : plus aucun réglage pour l'instance, les autres intacts" {
+@test "back to github: no setting left for the instance, the others intact" {
     git config --global "credential.$AUTRE.helper" store
     run bash "$DEVZONE" platform gitlab --url "$INSTANCE"
     [ "$status" -eq 0 ]
@@ -91,7 +91,7 @@ nombre_reglages_credential() {
     [ ! -e "$HOME/.local/bin/glab" ]
 }
 
-@test "retour à github sans réglage posé : aucune erreur, rien ajouté" {
+@test "back to github without a setting: no error, nothing added" {
     run bash "$DEVZONE" platform gitlab --url "$INSTANCE"
     [ "$status" -eq 0 ]
     git config --global --unset-all "credential.$INSTANCE.helper"
@@ -100,7 +100,7 @@ nombre_reglages_credential() {
     [ "$(nombre_reglages_credential)" -eq 0 ]
 }
 
-@test "récapitulatif : « ✔ git via glab » une fois le réglage posé" {
+@test "summary: \"✔ git via glab\" once the setting is in place" {
     run bash "$DEVZONE" platform gitlab --url "$INSTANCE"
     [ "$status" -eq 0 ]
     run bash "$DEVZONE"
@@ -109,7 +109,7 @@ nombre_reglages_credential() {
     [[ "$output" != *"to set: devzone platform gitlab"* ]] || false
 }
 
-@test "récapitulatif : « à poser » si le réglage a disparu, plateforme gitlab gardée" {
+@test "summary: \"to set\" if the setting disappeared, gitlab platform kept" {
     run bash "$DEVZONE" platform gitlab --url "$INSTANCE"
     [ "$status" -eq 0 ]
     git config --global --unset-all "credential.$INSTANCE.helper"
@@ -119,7 +119,7 @@ nombre_reglages_credential() {
     [[ "$output" != *"✔ git via glab"* ]] || false
 }
 
-@test "récapitulatif : pas de ligne « git via glab » sur github" {
+@test "summary: no \"git via glab\" line on github" {
     run bash "$DEVZONE" platform gitlab --url "$INSTANCE"
     [ "$status" -eq 0 ]
     run bash "$DEVZONE" platform github
@@ -129,8 +129,8 @@ nombre_reglages_credential() {
     [[ "$output" != *"git via glab"* ]] || false
 }
 
-@test "réglage credential impossible (config globale non inscriptible) → échec, plateforme non retenue" {
-    # git config échoue si le fichier de config global n'est pas inscriptible
+@test "credential setting impossible (global config not writable) -> failure, platform not chosen" {
+    # git config fails if the global config file is not writable
     mkdir -p "$GIT_CONFIG_GLOBAL"
     run bash "$DEVZONE" platform gitlab --url "$INSTANCE"
     [ "$status" -ne 0 ]

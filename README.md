@@ -228,8 +228,6 @@ The command shows the folder's version and the package's, and does nothing if th
 
 `workspace/`, `.devzone.modules`, `.devzone.packages`, `.password`, `.app`, `.devzone.log` and the Docker volumes are never touched.
 
-The old names of files and folders (`.devzone.paquets`, `.devzone.sauvegarde`, `.devzone.ports-workspace`, `.devzone.etat`, `.devzone.catalogue-veilleur`) are renamed once only, with their contents, by `.devcontainer/rename-legacy-files.sh`: at container startup and at update. A new name already present is never overwritten.
-
 The Kubernetes workspace is updated separately: `devzone workspace update` moves it to the latest stable release (or `--version X.Y.Z`), image, charts and Argo CD at the same tag. **The pod `devzone-workspace-0` is recreated**: the VS Code windows attached to the pod are disconnected. The image is checked on ghcr.io before any write, and nothing changes if it does not exist yet. Details in the [reference](manage/docs/reference.md#updating-the-workspace).
 
 In the workspace pod, the `devzone` summary reports a more recent published version (npm check at most once a day, without blocking offline): `○ devzone X.Y.Z disponible : sur le poste, devzone update`.
@@ -254,7 +252,7 @@ In the workspace pod, the `devzone` summary reports a more recent published vers
 
 These modules are disabled by default, can be enabled on demand from the container (without a rebuild), and their choice is kept from one startup to the next.
 
-The `devzone` command is written in English, subcommands and options included (`enable`, `disable`, `platform`, `packages`, `update`, `uninstall`, `status`, `use`; `postgres create`, `packages add`, `gitlab new-password`, `port --close`, `cluster --yes`). The old French names are refused with the new name; the full table is in [Removed names](manage/docs/reference.md#removed-names).
+The `devzone` command is written in English, subcommands and options included (`enable`, `disable`, `platform`, `packages`, `update`, `uninstall`, `status`, `use`; `postgres create`, `packages add`, `gitlab new-password`, `port --close`, `cluster --yes`).
 
 ## Where are my credentials?
 
@@ -421,16 +419,6 @@ To remove the `devzone` command from your machine:
 ```bash
 npm uninstall -g devzone
 ```
-
-## Removed names
-
-Commands, subcommands and options are written in English. The old French names are removed: devzone refuses them, shows the new name and does nothing.
-
-```
-✖ « activer » was renamed: devzone enable
-```
-
-The full table (commands, subcommands, options) is in [the reference](manage/docs/reference.md#removed-names).
 
 ## Going further
 

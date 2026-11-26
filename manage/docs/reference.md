@@ -342,7 +342,7 @@ To have Docker Desktop start at each login: Settings → General → Start Docke
 `devzone workspace start` starts a watcher on the workstation (`manage/scripts/workspace/ports-workspace.sh`), and `devzone workspace stop` stops it along with all its `kubectl port-forward` processes. `devzone workspace ports [start|stop|status]` drives it on its own.
 
 - **Pod**: every 3 s, `kubectl exec` into the pod reads `ss -ltnH`. Each listening TCP port ≥ 1024 (except kubedock 2475 and BuildKit 1234) is relayed to `127.0.0.1:<same port>` of the workstation, never on the local network (`--address 127.0.0.1`). A server started in the pod (`npm run dev`) is therefore reachable at http://localhost:5173 without a command; a port that disappears has its relay stopped.
-- **devzone services**: with the `postgres` module active in `.devzone.modules`, `svc/postgres` of the `devzone-postgres` namespace is relayed to `127.0.0.1:5432`, and pgAdmin (`svc/pgadmin`) if it exists, by the same mechanism. With the `mysql` module active, `svc/mysql` of the `devzone-mysql` namespace is relayed to `127.0.0.1:3306`. When Argo CD is installed (and `argocd` is not `off`), the https port of `svc/argocd-server` is relayed to `127.0.0.1:8443` (#516).
+- **devzone services**: with the `postgres` module active in `.devzone.modules`, `svc/postgres` of the `devzone-postgres` namespace is relayed to `127.0.0.1:5432`, and pgAdmin (`svc/pgadmin`) if it exists, by the same mechanism. With the `mysql` module active, `svc/mysql` of the `devzone-mysql` namespace is relayed to `127.0.0.1:3306`. With the `gitlab` module active, the two relays of the GitLab instance are relayed: `svc/gitlab-webservice-default` on `127.0.0.1:8929` (to its port 8181) and `svc/gitlab-gitlab-shell` on `127.0.0.1:2224`, in the instance's namespace (`devzone-gitlab` plus its instance suffix). When Argo CD is installed (and `argocd` is not `off`), the https port of `svc/argocd-server` is relayed to `127.0.0.1:8443` (#516).
 - **Cluster applications (#611)**: at each round, a single `kubectl get svc -A` lists the Services; each TCP port of a Service is relayed, except: headless Services (without a cluster IP), ExternalName, the `kubernetes` Service of the `default` namespace, the `kube-system`, `kube-public`, `kube-node-lease`, `local-path-storage` namespaces and those of the devzone modules (`devzone-system`, `devzone-workspace`, `devzone-postgres`, `devzone-mysql`, `devzone-argocd`, `devzone-gitlab`, `devzone-llm`), the Services annotated `devzone.io/relay: "false"`, and the ports of `excluded_ports=` in `.devzone.modules`. `devzone-app-demo` and the other application namespaces remain relayed. Local port: the Service's port if it is ≥ 1024 and free; otherwise the first free port starting from `port + 8000` (80 → 8080), incrementing (beyond 65000, starting from 20000). A port already relayed (devzone services, pod) or taken on the workstation is never assigned. The assignment is kept in `.devzone.workspace-ports/apps/<namespace>.<service>.<port>`: it stays the same as long as the Service exists, and disappears with it (and its relay too). When the Service comes back with the same name and port, it takes the same local port again if it is still free. Cap of 30 application relays: beyond that, a warning once per port, without relay. `devzone workspace ports status` shows one line per relayed application: `http://127.0.0.1:<local port>  <namespace>/<service>:<port>`.
 - **Port already taken on the workstation** (`lsof`, otherwise `nc -z`): a single line `⚠ port <n> déjà pris sur le poste, non relayé` in `.devzone.workspace-ports/journal.log` and in `ports etat`, without retry loops.
 - **Single watcher**: `mkdir` lock and pid in `.devzone.workspace-ports/` in the devzone folder; a second `start` answers "already running".
@@ -450,8 +450,8 @@ devzone is-enabled gitlab           # code 0 if GitLab is active
 - **Runner secret**: the seed writes the Secret `gitlab-runner-secret` (key `runner-token`, read from `workspace/.gitlab/runner-token`, never on a command line); the chart reads it through `runners.secret`.
 - **Seed outside the installation**: `devzone gitlab seed` reruns the seed alone (relay, waiting for GitLab, data). In the workspace pod, `devzone workspace services seed gitlab` does it through `services-admin.sh seed gitlab`; it is the only seed action (the other services have none).
 - **Test data**: group `devzone`, project `devzone/demo` (Python, ruff and pytest pipeline), user `dev`, registered runner. On a rerun, nothing is recreated.
-- **Access in the container**: http://gitlab.localhost:8929, user `root`. The name `gitlab.localhost` points to `127.0.0.1` in `/etc/hosts` (entry `127.0.0.1	gitlab.localhost # devzone:gitlab`, set at activation and at each startup, replaced if its address differs, removed at deactivation). Two `kubectl port-forward` relays listen on `127.0.0.1:8929` and `127.0.0.1:2224`: `svc/gitlab-webservice-default` (8929→8181) and `svc/gitlab-gitlab-shell` (2224→22), in the instance's namespace (PID and log in `workspace/.gitlab-web/` and `workspace/.gitlab-ssh/`). They are essential for curl and git over HTTP: libcurl resolves any `*.localhost` name to the loopback without reading `/etc/hosts` (RFC 6761). ssh and glab read `/etc/hosts` and go through the same relay.
-- **Access from the workstation**: GitLab is not published directly on the network; the port-forward listens in the container. From the workstation, use `devzone port 8929` (and `devzone port 2224` for SSH) if needed.
+- **Access in the container**: http://gitlab.localhost:8929, user `root`. The name `gitlab.localhost` points to `127.0.0.1` in `/etc/hosts` (entry `127.0.0.1	gitlab.localhost # devzone:gitlab`, set at activation and at each startup, replaced if its address differs, removed at deactivation). Two `kubectl port-forward` relays listen on `127.0.0.1:8929` and `127.0.0.1:2224`: `svc/gitlab-webservice-default` (8929→8181) and `svc/gitlab-gitlab-shell` (2224→2224), in the instance's namespace (PID and log in `workspace/.gitlab-web/` and `workspace/.gitlab-ssh/`). They are essential for curl and git over HTTP: libcurl resolves any `*.localhost` name to the loopback without reading `/etc/hosts` (RFC 6761). ssh and glab read `/etc/hosts` and go through the same relay.
+- **Access from the workstation**: GitLab is not published directly on the network; the port-forwards of the workstation, started by `devzone workspace ports start` when the `gitlab` module is active in `.devzone.modules`, listen on `127.0.0.1:8929` (web) and `127.0.0.1:2224` (SSH). From the workstation, use `http://gitlab.localhost:8929` and SSH on 2224; under Windows, not yet (#883).
 - **Old cluster**: a kind cluster `gitlab<instance>` created before #396 is no longer used. The `devzone` summary displays `⚠ old kind-gitlab cluster<instance>: devzone gitlab migrate` as long as it exists. `devzone gitlab migrate` installs GitLab in the services cluster, then deletes the old cluster after confirmation (`--yes` without a terminal); without a terminal and without `--yes`, the installation is done and the old cluster is kept (code 2). The test data of the old cluster is not migrated.
 - **Secrets**: root password, root token, password of `dev` and runner token in `workspace/.gitlab/` (rights 600, ignored by git, never displayed). Root password: `cat workspace/.gitlab/root-password`.
 - **Rails secrets**: the `gitlab-rails-secret` secret of the `devzone-gitlab` namespace is kept in `workspace/.gitlab/rails-secret.yaml` (600, ignored by git) at the first installation, then reapplied before `helm upgrade --install` on a reinstallation: the chart reuses it and browser sessions remain valid, without 422.
@@ -469,7 +469,7 @@ devzone test-gitlab --complet    # disables, checks that nothing remains, then r
 devzone test-gitlab --statut     # also publishes the gitlab-integration status on HEAD
 ```
 
-- **Steps**, each timed: 1 module active (otherwise activated); 2 state “ready” and runner online; 3 `gitlab.localhost` resolved to `127.0.0.1` and TCP relays active on 8929 and 2224 (`devzone gitlab hote-poser` and `devzone gitlab relay-start`), otherwise ✖ with the missing address or port; 4 pipeline of `devzone/demo` re-run on `main` and awaited until `success`; 5 SSH clone (disposable ed25519 key) and HTTP clone authenticated by a credential helper (Basic `oauth2` + token read from the file, never in process arguments, the URL nor `.git/config`); 6 `gitlab` platform with `glab repo clone`, then back to the previous platform; 7 integration suite `test/gitlab/` of repowarden ([#533](https://github.com/simdevWarden/repowarden/issues/533)): folder absent at the ref → step skipped with the reason; failure → output kept in `${TMPDIR:-/tmp}/devzone-test-gitlab-repowarden.log` (token masked) and cited in the reason. With `--complet`, a step 8 comes before the others: `devzone disable gitlab`, then a check that there remains neither namespace `devzone-gitlab<instance>` (name computed as `gitlab.sh` does), nor pod labelled `devzone.instance=<instance>` of the module, nor `workspace/.gitlab/`, nor the `# devzone:gitlab` line in `/etc/hosts`.
+- **Steps**, each timed: 1 module active (otherwise activated); 2 state “ready” and runner online; 3 `gitlab.localhost` resolved to `127.0.0.1` and TCP relays active on 8929 and 2224 (`devzone gitlab host-set` and `devzone gitlab relay-start`), otherwise ✖ with the missing address or port; 4 pipeline of `devzone/demo` re-run on `main` and awaited until `success`; 5 SSH clone (disposable ed25519 key) and HTTP clone authenticated by a credential helper (Basic `oauth2` + token read from the file, never in process arguments, the URL nor `.git/config`); 6 `gitlab` platform with `glab repo clone`, then back to the previous platform; 7 integration suite `test/gitlab/` of repowarden ([#533](https://github.com/simdevWarden/repowarden/issues/533)): folder absent at the ref → step skipped with the reason; failure → output kept in `${TMPDIR:-/tmp}/devzone-test-gitlab-repowarden.log` (token masked) and cited in the reason. With `--complet`, a step 8 comes before the others: `devzone disable gitlab`, then a check that there remains neither namespace `devzone-gitlab<instance>` (name computed as `gitlab.sh` does), nor pod labelled `devzone.instance=<instance>` of the module, nor `workspace/.gitlab/`, nor the `# devzone:gitlab` line in `/etc/hosts`.
 - **Summary**: one line per step (✔/✖/skipped, duration, reason) and a total; the exit code is 0 only without ✖ (a skipped step does not fail). A token is never displayed.
 - **Guaranteed cleanup** by `trap … EXIT`: SSH key removed from GitLab, temporary folders deleted, previous platform restored, even if a step fails.
 - **Variables**: `GITLAB_TEST_PIPELINE` (pipeline timeout, 600 s by default), `GITLAB_TEST_INTERVALLE` (pipeline polling interval, 5 s by default), `REPOWARDEN_TEST_REF` (ref of the integration suite, `develop` by default), `DEVZONE_ROOT` (repository root, as for `gitlab.sh`).
@@ -763,9 +763,6 @@ npx devzone@latest update   # latest published version
 - **Replacement**: the package files are copied again, the files of the old manifest that no longer exist are deleted, as well as the old `core/` and `scripts/` trees at the root. `.gitignore` is completed with the missing lines, never overwritten.
 - **Never touched**: `workspace/`, `.devzone.modules`, `.devzone.packages`, `.password`, `.app`, `.devzone.log`, the Docker volumes.
 - **Rebuild**: the new `.devzone.version` is written, then the rebuild is proposed with confirmation in a terminal. `--no-rebuild` skips this step; without a terminal, the rebuild is indicated but never launched.
-- **State key (#733, batch 4)**: `plateforme=` of `.devzone.modules` becomes `platform=`. `.devcontainer/rename-legacy-files.sh` rewrites it once, with its value (if `platform=` already exists, only the old line is removed), at each run that launches the script; the other lines do not move.
-- **Old names (#733)**: `.devzone.paquets`, `.devzone.sauvegarde`, `.devzone.ports-workspace`, `.devzone.etat`, `.devzone.catalogue-veilleur`, `.devzone-empreinte` (skills) and the `-echec-` markers become `.devzone.packages`, `.devzone.backup`, `.devzone.workspace-ports`, `.devzone.state`, `.devzone.catalog-watcher`, `.devzone-fingerprint` and `-failed-`. `.devcontainer/rename-legacy-files.sh` renames them once, with their contents, at container startup, at `devzone update`, at `devzone workspace update` and at `devzone workspace migrate`. A new name already present is never overwritten; a second run does nothing.
-
 A folder created before this manifest has an “unknown” version: all files that differ from the package are treated as modified (backup, then confirmation).
 
 In the container, the `devzone` summary reads `$RACINE/.devzone.version` and the latest published version (`npm view devzone version`, at most once a day, cache under `~/.cache/devzone/`, 5 s timeout, silent offline). If it is more recent: `○ devzone X.Y.Z disponible : sur le poste, devzone update`.
@@ -895,70 +892,6 @@ The `bats (macos-latest)` job sometimes gets no runner: it stays queued for abou
 - **Minimal rights**: `actions: write` on this workflow alone. It fetches the default branch (never the PR's code) and only uses the run identifier.
 - **Limit**: a `workflow_run` workflow only runs from the default branch: it acts only after the first delivery that contains it in `main`. The repowarden repository has the same default, to be handled there.
 - **Disabling**: delete the file, or “Disable workflow” in the GitHub Actions tab. The diagnosis of `tests-conteneur` (#636) keeps indicating the manual rerun command.
-
-## Removed names
-
-The commands, subcommands and options of devzone are written in English (#502, #557, #695). The old French names are no longer accepted, neither as aliases nor with a warning: devzone refuses the old name, shows the new one on the error output, exits with code 1 and does nothing (no folder is created):
-
-```
-✖ « activer » was renamed: devzone enable
-✖ « liste » was renamed: devzone port list
-✖ « --oui » was renamed: --yes
-```
-
-### Commands
-
-| Old name | New name |
-|---|---|
-| `devzone actif` | `devzone is-enabled` |
-| `devzone activer` / `desactiver` | `devzone enable` / `disable` |
-| `devzone appliquer` | `devzone apply` |
-| `devzone aide` | `devzone help` |
-| `devzone catalogue` | `devzone catalog` |
-| `devzone demarrer` / `arreter` / `etat` | `devzone start` / `stop` / `status` |
-| `devzone ia` | `devzone ai` |
-| `devzone mots-de-passe` | `devzone passwords` |
-| `devzone paquets` | `devzone packages` |
-| `devzone plateforme` | `devzone platform` |
-| `devzone reparer` | `devzone repair` |
-| `devzone utiliser` | `devzone use` |
-| `devzone mettre-a-jour` / `desinstaller` | `devzone update` / `uninstall` |
-| `devzone workspace demarrer` / `arreter` / `etat` | `devzone workspace start` / `stop` / `status` |
-| `devzone workspace copier-vers` / `copier-depuis` | `devzone workspace copy-to` / `copy-from` |
-| `devzone workspace aide` | `devzone workspace help` |
-| `devzone workspace ports demarrer` / `arreter` / `etat` | `devzone workspace ports start` / `stop` / `status` |
-
-### Subcommands
-
-| Command | Old name | New name |
-|---|---|---|
-| `postgres`, `mysql` | `creer`, `liste`, `supprimer`, `supprimer-donnees`, `etat`, `installer`, `desinstaller` | `create`, `list`, `delete`, `delete-data`, `status`, `install`, `uninstall` |
-| `postgres`, `mysql` | `autoriser`, `interdire` | `authorize`, `forbid` |
-| `gitlab` | `migrer`, `nouveau-mdp`, `etat`, `installer`, `desinstaller`, `relais-etat` | `migrate`, `new-password`, `status`, `install`, `uninstall`, `relay-status` |
-| `argocd` | `etat`, `installer`, `desinstaller` | `status`, `install`, `uninstall` |
-| `postgres`, `mysql`, `gitlab`, `argocd` | `relais-lancer`, `relais-arreter` | `relay-start`, `relay-stop` |
-| `packages` | `ajouter`, `retirer`, `appliquer`, `lister` | `add`, `remove`, `apply`, `list` |
-| `catalog` | `lister`, `synchroniser`, `appliquer`, `desinstaller` | `list`, `sync`, `apply`, `remove` |
-| `port` | `ouvrir`, `fermer`, `liste`, `relancer`, `exclure`, `inclure` | `open`, `close`, `list`, `restart`, `exclude`, `include` |
-
-### Options
-
-| Old | New |
-|---|---|
-| `--oui` | `--yes` (everywhere: `disable <module> --yes` confirms the deletion of the data) |
-| `--contexte` | `--context` |
-| `--confirmer` | `--confirm` |
-| `--nouveau-mdp` | `--new-password` |
-| `--fermer` | `--close` |
-| `--supprimer` (`mysql volume`) | `--delete` |
-
-The following environment variables are not commands: they are not covered by this refusal.
-
-| Old | New |
-|---|---|
-| `conseil` | `advice` |
-| `GARDER=connexions` | `KEEP=logins` |
-| `CONFIRMER=oui` | `CONFIRM=yes` |
 
 ## For contributors
 

@@ -73,7 +73,7 @@ func TestOtherCommandsUseBash(t *testing.T) {
 		args []string
 	}{
 		{"update", []string{"update"}},
-		{"workspace ports demarrer", []string{"workspace", "ports", "demarrer"}},
+		{"workspace ports restart", []string{"workspace", "ports", "restart"}},
 		{"workspace ports status extra", []string{"workspace", "ports", "status", "extra"}},
 		{"workspace services enable", []string{"workspace", "services", "enable"}},
 		{"workspace services status extra", []string{"workspace", "services", "status", "extra"}},

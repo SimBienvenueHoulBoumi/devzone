@@ -141,20 +141,6 @@ shell_workspace() {
 # shellcheck source=manage/scripts/workspace/workspace-egress.sh
 . "$HERE/scripts/workspace/workspace-egress.sh"
 
-# Renamed names (#695): an old French name is refused before anything runs, with
-# its English name (« devzone workspace start »). A copied devzone may miss the
-# aliases file: then no check.
-# shellcheck source=../.devcontainer/command-aliases.sh
-# shellcheck disable=SC1091
-if [ -f "$ROOT/.devcontainer/command-aliases.sh" ]; then
-    . "$ROOT/.devcontainer/command-aliases.sh"
-    reject_renamed workspace "$@" || exit 1
-    if [ "${1:-}" = ports ] && [ "$#" -gt 1 ]; then
-        reject_renamed "workspace ports" "${@:2}" || exit 1
-    fi
-fi
-
-
 case "${1:-}" in
     start) start_workspace "${@:2}" ;;
     update) update_workspace "${@:2}" ;;

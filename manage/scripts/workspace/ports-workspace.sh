@@ -213,9 +213,9 @@ ports_status() {
 # Subcommand "devzone workspace ports [start|stop|status]" (default: status).
 ports() {
     case "${1:-status}" in
-        start | demarrer) ports_start ;;
-        stop | arreter) ports_stop ;;
-        status | etat) ports_status ;;
+        start) ports_start ;;
+        stop) ports_stop ;;
+        status) ports_status ;;
         *) echo "✖ devzone workspace ports start|stop|status" >&2; return 1 ;;
     esac
 }
@@ -229,7 +229,7 @@ ports_etat() { ports_status "$@"; }
 if [ "${BASH_SOURCE[0]}" = "$0" ]; then
     pw_guard quiet || exit 2
     case "${1:-}" in
-        loop | boucle) pw_loop ;;
-        round | tour) pw_round ;;
+        loop) pw_loop ;;
+        round) pw_round ;;
     esac
 fi

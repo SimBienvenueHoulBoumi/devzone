@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Catalog hot detection (#414): when .devzone.modules changes, catalog.sh apply
 # runs. A single instance (lock, as #394).
-#   catalog-watcher.sh demarrer | arreter | tour
+#   catalog-watcher.sh loop | start | stop | tick
 set -euo pipefail
 
 ICI="$(cd "$(dirname "$0")" && pwd)"
@@ -83,7 +83,7 @@ start_detached() {
     mkdir -p "$BASE"
     # Same detachment as relay_start: setsid when present, else nohup.
     command -v setsid >/dev/null 2>&1 && detache=(setsid)
-    ${detache[@]+"${detache[@]}"} nohup env DEVZONE_CATALOG_REAL=yes bash "$0" boucle >"$BASE/veilleur.log" 2>&1 &
+    ${detache[@]+"${detache[@]}"} nohup env DEVZONE_CATALOG_REAL=yes bash "$0" loop >"$BASE/veilleur.log" 2>&1 &
     i=0
     while [ "$i" -lt 20 ]; do
         pid="$(cat "$LOCK_DIR/pid" 2>/dev/null || true)"
@@ -109,8 +109,8 @@ stop_watcher() {
 }
 
 case "${1:-}" in
-    boucle | loop) if ! guard_watcher; then exit 2; fi; loop ;;
-    demarrer | start | lancer)
+    loop) if ! guard_watcher; then exit 2; fi; loop ;;
+    start)
         if ! guard_watcher; then exit 2; fi
         if [ -f "$LOCK_DIR/pid" ] && kill -0 "$(cat "$LOCK_DIR/pid")" 2>/dev/null; then
             echo "already running"
@@ -118,10 +118,10 @@ case "${1:-}" in
             start_detached || exit 1
         fi
         ;;
-    arreter | stop) stop_watcher ; echo "stopped" ;;
-    tour | un-tour) tick ;;
+    stop) stop_watcher ; echo "stopped" ;;
+    tick) tick ;;
     *)
-        echo "devzone : catalog-watcher : demarrer | arreter | tour" >&2
+        echo "devzone : catalog-watcher : loop | start | stop | tick" >&2
         exit 2
         ;;
 esac
