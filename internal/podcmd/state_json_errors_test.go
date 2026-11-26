@@ -26,7 +26,7 @@ func TestStateJSONFrozenErrors(t *testing.T) {
 	r.program(nil, 0, "https://remote.example:6443\n", "kubectl", "config", "view", "-o", `jsonpath={.clusters[?(@.name=="docker-desktop")].cluster.server}`)
 	r.program(nil, 0, "docker-desktop\n", "kubectl", "config", "current-context")
 	r.program(nil, 0, "", "devzone", "cluster", "clean", "--quiet")
-	r.program(nil, 0, "not-json\n", "bash", filepath.Join(root, ".devcontainer", "ports.sh"), "list", "--json")
+	r.program(nil, 0, "not-json\n", "devzone", "port", "list", "--json")
 	r.program(nil, 0, "{bad}\n", "bash", filepath.Join(root, ".devcontainer", "catalog.sh"), "json")
 	r.program(nil, 0, "", "git", "-C", filepath.Join(root, "workspace", "repo"), "worktree", "list", "--porcelain")
 

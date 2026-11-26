@@ -34,7 +34,7 @@ func TestStateJSONFrozenFull(t *testing.T) {
 	r.program([]string{"KUBECONFIG=" + filepath.Join(root, "host.config")}, 0, "docker-desktop\n", "kubectl", "config", "current-context")
 	r.program(nil, 0, "", "kubectl", "--context", "docker-desktop", "--request-timeout=3s", "get", "--raw", "/readyz")
 	r.program(nil, 3, "", "devzone", "cluster", "clean", "--quiet")
-	r.program(nil, 0, `[{"port":8080,"active":true,"application":"application responds","auto":false}]`, "bash", filepath.Join(code, "ports.sh"), "list", "--json")
+	r.program(nil, 0, `[{"port":8080,"active":true,"application":"application responds","auto":false}]`, "devzone", "port", "list", "--json")
 	r.program(nil, 0, `[{"name":"demo","available":true}]`, "bash", filepath.Join(code, "catalog.sh"), "json")
 	r.program(nil, 0, "worktree <ROOT>/gone\ncommit abc\n", "git", "-C", filepath.Join(root, "workspace", "repo"), "worktree", "list", "--porcelain")
 

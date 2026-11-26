@@ -56,6 +56,10 @@ func newDefaultRegistry() *cli.Registry {
 		Name: "passwords",
 		Run:  runPasswords,
 	})
+	r.Register(cli.Command{
+		Name: "port",
+		Run:  runPort,
+	})
 	return r
 }
 
