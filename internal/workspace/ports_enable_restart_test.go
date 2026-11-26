@@ -99,8 +99,8 @@ func TestPortsEnableDarwinReloadsInsteadOfRestarting(t *testing.T) {
 	}
 }
 
-// TestPortsEnableReportsRestartFailure checks that a failed explicit restart is
-// reported instead of announcing that the new watcher is enabled.
+// TestPortsEnableReportsRestartFailure checks that a failed restart is reported
+// as one warning, and never announced as an enabled watcher.
 func TestPortsEnableReportsRestartFailure(t *testing.T) {
 	h := newPortsEnableHarness(t)
 	var out, errOut bytes.Buffer
@@ -114,8 +114,12 @@ func TestPortsEnableReportsRestartFailure(t *testing.T) {
 	if code := PortsEnable(&out, &errOut); code != 1 {
 		t.Fatalf("status = %d, err = %q", code, errOut.String())
 	}
-	if !strings.Contains(errOut.String(), "not restarted") || !strings.Contains(errOut.String(), "status 9") {
-		t.Fatalf("error = %q", errOut.String())
+	warning := errOut.String()
+	if strings.Count(warning, "\n") != 1 || !strings.HasPrefix(warning, "⚠ ") || !strings.Contains(warning, "status 9") {
+		t.Fatalf("warning = %q, want one warning line with the status", warning)
+	}
+	if portsAgentExists() {
+		t.Fatal("a failed restart kept the definition")
 	}
 	if strings.Contains(out.String(), "enabled") {
 		t.Fatalf("success on failure: %q", out.String())

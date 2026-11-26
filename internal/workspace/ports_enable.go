@@ -30,6 +30,8 @@ func PortsEnable(out, errOut io.Writer) int {
 		fmt.Fprintf(errOut, "✖ port watcher: %v\n", err)
 		return 1
 	}
+	forgetPortsAutoStartFailure()
+	wasRunning := portsWatcherRunning()
 	stopPorts()
 	exe, err := watcherExecutable()
 	if err != nil {
@@ -55,14 +57,12 @@ func PortsEnable(out, errOut io.Writer) int {
 	tool := portsDaemonTool()
 	args := portsDaemonEnableArgs(definition)
 	if status := portsDaemon(tool, false, args...); status != 0 {
-		fmt.Fprintf(errOut, "✖ port watcher automatic start not enabled: %s %v failed (status %d)\n", tool, args, status)
-		return 1
+		return portsEnableFailed(errOut, tool, args, status, wasRunning)
 	}
 	if replaced && portsPlatform != "darwin" {
 		restart := portsDaemonRestartArgs()
 		if status := portsDaemon(tool, false, restart...); status != 0 {
-			fmt.Fprintf(errOut, "✖ port watcher automatic start not restarted: %s %v failed (status %d)\n", tool, restart, status)
-			return 1
+			return portsEnableFailed(errOut, tool, restart, status, wasRunning)
 		}
 	}
 	fmt.Fprintln(out, "✔ port watcher: automatic start enabled")

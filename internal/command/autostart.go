@@ -20,6 +20,10 @@ var commandEnsureAutoStart = EnsurePortsAutoStart
 // path of an installation that is already current.
 var commandPortsWatcherUpToDate = workspace.PortsWatcherUpToDate
 
+// commandPortsAutoStartFailed tells whether the service manager refused the
+// automatic start with this program: no automatic attempt is made then.
+var commandPortsAutoStartFailed = workspace.PortsAutoStartFailed
+
 // commandPortsRefusalIsSet, commandMemorizePortsRefusal and
 // commandForgetPortsRefusal are injectable so uninstall and the ports commands
 // can be tested without touching a folder.
@@ -91,13 +95,14 @@ var portsIsTest = func() bool {
 // EnsurePortsAutoStart installs or repairs the automatic start of the watcher
 // of this devzone folder, silently once everything is current. It does nothing
 // in the pod, in a development container, in CI, under tests, on Windows,
-// without a service manager, or after a refusal the user memorised. It never
-// changes the status of the command that triggered it: an installation problem
-// is reported on errOut but stays a warning. Only the first installation says
+// without a service manager, after a refusal the user memorised, or after a
+// failure of the service manager with this program. It never changes the
+// status of the command that triggered it: an installation problem is reported
+// on errOut but stays a warning. Only the first installation says
 // one line, with the command that removes the automatic start.
 func EnsurePortsAutoStart(out, errOut io.Writer) {
 	if !portsIsWorkstation() || portsIsCI() || portsIsTest() ||
-		!portsServiceManagerAvailable() || commandPortsRefusalIsSet() {
+		!portsServiceManagerAvailable() || commandPortsRefusalIsSet() || commandPortsAutoStartFailed() {
 		return
 	}
 	installed := commandPortsAutoStartExists()
