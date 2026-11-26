@@ -21,6 +21,9 @@ func writeFileT(t *testing.T, p, content string) {
 
 func gitInit(t *testing.T, dir string) {
 	t.Helper()
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
 	testkit.Git(t, dir, "init", "-q")
 	testkit.Git(t, dir, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "depart", "--allow-empty")
 	testkit.Git(t, dir, "add", "-A")

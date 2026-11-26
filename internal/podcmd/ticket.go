@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/cli"
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/gitenv"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -41,6 +42,7 @@ func runTicket(ctx *cli.Context) int {
 func gitCmd(dir string, errOut io.Writer, args ...string) (string, int) {
 	cmdArgs := append([]string{"-C", dir}, args...)
 	cmd := exec.Command("git", cmdArgs...)
+	cmd.Env = gitenv.Clean(os.Environ())
 	var buf bytes.Buffer
 	cmd.Stdout = &buf
 	cmd.Stderr = errOut
