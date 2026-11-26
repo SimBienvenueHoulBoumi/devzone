@@ -61,8 +61,7 @@ func newModFixture(t *testing.T) *modFixture {
 	r.On("helm", []string{"--kubeconfig", filepath.Join(root, "hote.config"), "--kube-context", "docker-desktop", "upgrade", "--install", "argocd", filepath.Join(root, "charts", "devzone-argocd"), "--namespace", "devzone-argocd", "--create-namespace", "--timeout", "600s", "--wait"}, fexec.Result{})
 	// admin secret
 	r.On("kubectl", []string{"--context", "devzone", "-n", "devzone-argocd", "get", "secret", "argocd-initial-admin-secret", "-o", "jsonpath={.data.password}"}, fexec.Result{Stdout: []byte("c2VjcmV0LWFkbWlu")})
-	// password regenerate
-	r.On("bash", []string{filepath.Join(root, ".devcontainer", "password.sh"), "regenerate"}, fexec.Result{})
+	// credentials are regenerated in Go from the workspace files
 	// relay via bash cluster.sh
 	f.r.On("bash", []string{"-c", relayCmd(root, filepath.Join(root, ".devzone.modules"), "relay_active argocd")}, fexec.Result{Code: 1})
 	f.r.On("bash", []string{"-c", relayCmd(root, filepath.Join(root, ".devzone.modules"), "relay_stop argocd")}, fexec.Result{})

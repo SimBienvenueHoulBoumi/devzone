@@ -12,9 +12,6 @@ ETAT="${DEVZONE_STATE:-$RACINE/.devzone.modules}"
 # shellcheck source=SCRIPTDIR/cluster.sh
 # shellcheck disable=SC1091
 . "$ICI/cluster.sh"
-# shellcheck source=SCRIPTDIR/password.sh
-# shellcheck disable=SC1091
-. "$ICI/password.sh"
 # shellcheck source=SCRIPTDIR/isolation.sh
 # shellcheck disable=SC1091
 . "$ICI/isolation.sh"

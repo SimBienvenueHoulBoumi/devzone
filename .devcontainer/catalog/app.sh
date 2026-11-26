@@ -56,7 +56,7 @@ app_secret() {
 
 # Grouped view of the credentials: a failure never blocks the operation
 regenerer_identifiants() {
-    password_regenerate ||
+    devzone passwords regenerate ||
         echo "devzone : catalog : grouped credentials not updated (devzone passwords)" >&2
 }
 

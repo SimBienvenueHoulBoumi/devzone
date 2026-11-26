@@ -52,6 +52,10 @@ func newDefaultRegistry() *cli.Registry {
 		Name: "state",
 		Run:  runState,
 	})
+	r.Register(cli.Command{
+		Name: "passwords",
+		Run:  runPasswords,
+	})
 	return r
 }
 

@@ -217,9 +217,8 @@ case "${1:-}" in
     port) DEVZONE_STATE="$ETAT" bash "$ICI/ports.sh" "${@:2}" ;;
     packages) bash "$ICI/packages.sh" "${@:2}" ;;
     passwords)
-        bash "$ICI/password.sh" regenerate ||
-            echo "devzone : grouped credentials not updated" >&2
-        bash "$ICI/password.sh" path
+        echo "devzone passwords: Go binary of the pod unavailable (.devcontainer/bin)" >&2
+        exit 1
         ;;
     -h | --help | help) devzone_aide ;;
     test-bash32) bash "$RACINE/manage/test/bash32.sh" ;;
