@@ -104,3 +104,18 @@ func runOutEnv(run Runner, env []string, name string, args ...string) (string, e
 	stdout, _, err := run("env", cmdArgs...)
 	return strings.TrimSpace(stdout), err
 }
+
+// Rebuild rebuilds the state from devzone-labelled namespaces under lock, like
+// shell state_rebuild, returning whether the state was replaced.
+func (s *State) Rebuild(modules []string, run Runner, warn func(string)) (bool, error) {
+	s.op.Lock()
+	defer s.op.Unlock()
+	if err := s.lock(); err != nil {
+		return false, err
+	}
+	defer s.unlock()
+	if warn == nil {
+		warn = func(string) {}
+	}
+	return s.rebuildLocked(modules, run, warn)
+}

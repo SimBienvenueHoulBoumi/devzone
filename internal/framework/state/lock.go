@@ -12,6 +12,8 @@ import (
 // lock takes the write lock: mkdir lockdir, then flock when available. It is
 // reentrant within the same State value so init/replace can nest like the shell.
 func (s *State) lock() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.depth > 0 {
 		s.depth++
 		return nil
@@ -75,6 +77,8 @@ func (s *State) flockTake(lockDir string) error {
 
 // unlock releases one depth level; the last level drops flock then the lockdir.
 func (s *State) unlock() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.depth <= 0 {
 		return
 	}

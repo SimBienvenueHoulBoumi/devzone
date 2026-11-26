@@ -96,3 +96,15 @@ func (s *State) restoreBackupLocked(warn func(string)) (bool, error) {
 func (s *State) writeDefaultLocked() error {
 	return s.replaceBytesLocked([]byte("ai=off\nkubernetes=off\ngitlab=off\n"))
 }
+
+// StateDefault writes the first-installation default state under lock, like
+// shell state_default.
+func (s *State) StateDefault() error {
+	s.op.Lock()
+	defer s.op.Unlock()
+	if err := s.lock(); err != nil {
+		return err
+	}
+	defer s.unlock()
+	return s.writeDefaultLocked()
+}

@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 )
 
 // State is a handle on a .devzone.modules file.
@@ -13,6 +14,8 @@ type State struct {
 	path    string
 	depth   int
 	flockFd *os.File
+	op      sync.Mutex
+	mu      sync.Mutex
 }
 
 // New opens (or creates on write) the state file located in dir, or at path when
@@ -73,6 +76,8 @@ func (s *State) GetOK(key string) (string, bool) {
 // Set writes key=value, removing any previous line for key and keeping the other
 // lines (including unknown ones) in their original order.
 func (s *State) Set(key, value string) error {
+	s.op.Lock()
+	defer s.op.Unlock()
 	if err := s.lock(); err != nil {
 		return err
 	}
@@ -82,6 +87,8 @@ func (s *State) Set(key, value string) error {
 
 // Delete removes every line for key, keeping the other lines in order.
 func (s *State) Delete(key string) error {
+	s.op.Lock()
+	defer s.op.Unlock()
 	if err := s.lock(); err != nil {
 		return err
 	}

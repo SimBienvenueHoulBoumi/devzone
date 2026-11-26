@@ -154,8 +154,6 @@ case "${1:-}" in
         esac
         if [ -n "$pod_state" ] && [ -x "$pod_state" ]; then
             "$pod_state" "$@"
-        elif command -v go >/dev/null 2>&1 && [ -f "$RACINE/go.mod" ]; then
-            (cd "$RACINE" && DEVZONE_STATE="$ETAT" DEVZONE_POD_SCRIPT="$ICI/devzone" GOTOOLCHAIN="${GOTOOLCHAIN:-local}" go run ./cmd/devzone-pod "$@")
         else
             echo "devzone : state: Go pod binary unavailable" >&2
             exit 127

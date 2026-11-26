@@ -25,7 +25,7 @@ is_known() {
 # state taken over, backup copy restored, state rebuilt from the services
 # cluster, otherwise first installation
 init_state() {
-    DEVZONE_STATE="$ETAT" bash "${ICI}/devzone" state init "${MODULES[@]}"
+    DEVZONE_STATE="$ETAT" bash "${ICI:-$(dirname "${BASH_SOURCE[0]}")}/devzone" state init "${MODULES[@]}"
 }
 
 value_of() {
@@ -38,14 +38,14 @@ value_of() {
 # State-file write delegated to Go (#879): lock, backup and atomic replace.
 write_value() {
     init_state || return 1
-    DEVZONE_STATE="$ETAT" bash "${ICI}/devzone" state write "$1" "$2"
+    DEVZONE_STATE="$ETAT" bash "${ICI:-$(dirname "${BASH_SOURCE[0]}")}/devzone" state write "$1" "$2"
 }
 
 # Removes a key from the state file: the configuration of a service only exists
 # while it is chosen (#242)
 remove_key() {
     init_state || return 1
-    DEVZONE_STATE="$ETAT" bash "${ICI}/devzone" state remove "$1"
+    DEVZONE_STATE="$ETAT" bash "${ICI:-$(dirname "${BASH_SOURCE[0]}")}/devzone" state remove "$1"
 }
 
 # True if the file only holds the $schema key (created by opencode by default)
@@ -64,7 +64,7 @@ llm_removed_msg() {
 migrate_llm() {
     [ -f "$ETAT" ] || return 0
     grep -qE '^llm=' "$ETAT" 2>/dev/null || return 0
-    DEVZONE_STATE="$ETAT" bash "${ICI}/devzone" state remove llm
+    DEVZONE_STATE="$ETAT" bash "${ICI:-$(dirname "${BASH_SOURCE[0]}")}/devzone" state remove llm
     llm_removed_msg
 }
 
@@ -78,7 +78,7 @@ change_module() {
     if [ "$m" = llm ]; then
         init_state 2>/dev/null || true
         if [ -f "$ETAT" ] && grep -qE '^llm=' "$ETAT" 2>/dev/null; then
-            DEVZONE_STATE="$ETAT" bash "${ICI}/devzone" state remove llm
+            DEVZONE_STATE="$ETAT" bash "${ICI:-$(dirname "${BASH_SOURCE[0]}")}/devzone" state remove llm
         fi
         llm_removed_msg
         return 1
