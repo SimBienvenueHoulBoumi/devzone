@@ -58,11 +58,11 @@ func TestClusterCleanFlags(t *testing.T) {
 	}
 }
 
-// TestClusterDelegation checks that bare cluster and cluster CTX keep the shell
-// behaviour of the other commands that are not ported.
+// TestClusterDelegation checks that the "use" form is still delegated to the
+// shell command that owns it.
 func TestClusterDelegation(t *testing.T) {
 	podScriptForTest(t)
-	for _, args := range [][]string{{"cluster"}, {"cluster", "docker-desktop"}, {"cluster", "use", "kind-devzone"}} {
+	for _, args := range [][]string{{"cluster", "use", "kind-devzone"}} {
 		var out strings.Builder
 		if rc := Run(args, &out, io.Discard); rc != 7 {
 			t.Fatalf("%v: got %d, want 7", args, rc)

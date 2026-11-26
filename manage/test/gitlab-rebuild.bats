@@ -1,8 +1,7 @@
 #!/usr/bin/env bats
-# Rebuild and gitlab (#366, #396): kind_keep_context and
-# kind_create_keep_context (cluster.sh), installation in the services cluster
-# without kind nor context switch, migration from kind-gitlab, failure cleared
-# when gitlab is ready (devzone apply).
+# Rebuild and gitlab (#366, #396): installation in the services cluster without
+# kind nor context switch, migration from kind-gitlab, failure cleared when
+# gitlab is ready (devzone apply).
 # Fake kind, kubectl, helm, docker, curl, setsid and git in $BATS_TEST_TMPDIR/bin:
 # no real cluster, no real kubeconfig. Each fake tool logs its arguments in
 # $BATS_TEST_TMPDIR/<tool>.log.
@@ -47,7 +46,6 @@ setup() {
     kube_isole
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
     GITLAB="$BATS_TEST_DIRNAME/../../.devcontainer/gitlab/gitlab.sh"
-    CLUSTER="$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh"
     export DEVZONE_ROOT="$BATS_TEST_TMPDIR/racine"
     export DEVZONE_STATE="$BATS_TEST_TMPDIR/modules"
     export DEVZONE_MEMINFO="$BATS_TEST_TMPDIR/meminfo"
@@ -157,63 +155,6 @@ SETSID
     chmod +x "$BATS_TEST_TMPDIR"/bin/*
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
     fake_devzone_gitlab
-}
-
-# Writes the current context into the fake ~/.kube/config; empty = none
-set_current_context() {
-    printf 'current-context: %s\n' "$1" >"$HOME/.kube/config"
-}
-
-# Reads the current context of the fake ~/.kube/config
-current_context() {
-    sed -n 's/^current-context:[[:space:]]*//p' "$HOME/.kube/config" 2>/dev/null | head -1
-}
-
-@test "kind_keep_context: export without switching, current context kept" {
-    set_current_context docker-desktop
-    (
-        set -e
-        source "$CLUSTER"
-        kind_keep_context export kubeconfig --name gitlab --kubeconfig "$HOME/.kube/config"
-    ) || false
-    grep -qxF "kind export kubeconfig --name gitlab --kubeconfig $HOME/.kube/config" "$BATS_TEST_TMPDIR/kind.log" || false
-    grep -qxF 'ctx: kind-gitlab' "$HOME/.kube/config" || false
-    [ "$(current_context)" = docker-desktop ] || false
-}
-
-@test "kind_keep_context: no context at start, none set at the end" {
-    set_current_context ""
-    (
-        set -e
-        source "$CLUSTER"
-        kind_keep_context export kubeconfig --name gitlab --kubeconfig "$HOME/.kube/config"
-    ) || false
-    grep -qxF 'ctx: kind-gitlab' "$HOME/.kube/config" || false
-    [ -z "$(current_context)" ] || false
-    grep -qxF 'kubectl config unset current-context' "$BATS_TEST_TMPDIR/kubectl.log" || false
-    ! grep -q 'config use-context' "$BATS_TEST_TMPDIR/kubectl.log" || false
-}
-
-@test "kind_keep_context: kind failure, code 1 returned under set -e, context restored" {
-    set_current_context docker-desktop
-    FAKE_KIND_FAIL=1 run bash -c '
-        set -e
-        source "$1"
-        kind_keep_context create cluster --name gitlab
-    ' _ "$CLUSTER"
-    [ "$status" -eq 1 ] || false
-    [ "$(current_context)" = docker-desktop ] || false
-}
-
-@test "kind_create_keep_context: calls kind create cluster, context kept" {
-    set_current_context docker-desktop
-    (
-        set -e
-        source "$CLUSTER"
-        kind_create_keep_context --name devzone --wait 120s
-    ) || false
-    grep -qxF 'kind create cluster --name devzone --wait 120s' "$BATS_TEST_TMPDIR/kind.log" || false
-    [ "$(current_context)" = docker-desktop ] || false
 }
 
 @test "apply: gitlab ready, runner online → failure mark cleared, summary at ✔" {

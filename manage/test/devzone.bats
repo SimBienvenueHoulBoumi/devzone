@@ -65,7 +65,7 @@ setup() {
     load commun
     kube_isole
     kind_vide
-    DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
+    export DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
     # Pinned versions read from the files: an automatic bump (versions
     # workflow) does not break these tests
     REPOWARDEN_FIGE="$(sed -nE 's/^REPOWARDEN_VERSION=([^[:space:]]+)$/\1/p' "$BATS_TEST_DIRNAME/../../.devcontainer/versions.env" | head -1)"
@@ -148,6 +148,7 @@ GH
 #!/usr/bin/env bash
 case "$*" in
     "cluster clean"*) exit 0 ;;
+    "metrics remove") exec "$DEVZONE" metrics remove ;;
 esac
 exit 0
 DEVZONE

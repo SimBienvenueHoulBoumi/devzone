@@ -15,9 +15,10 @@ devzone_aide() {
   devzone apply                            install what is enabled
   devzone repair                           repair gitlab, postgres, ports, passwords
   devzone catalog [list|apply|sync|resume|json|remove <app>]  applications of the catalog
-  devzone metrics [context…]               install metrics-server (kubectl top, k9s)
+  devzone metrics [context…] | remove [context…]  install or remove metrics-server (kubectl top, k9s)
   devzone use CTX [--confirm CTX]          switch the kubectl working cluster
   devzone clusters                         view of the connected clusters (work and services)
+  devzone kube saved|choose|save|local|reachable|prompt  cluster helpers, in Go
   devzone is-enabled <module>              code 0 if enabled
   devzone test-bash32                      run the bats tests under bash 3.2 (Docker container)
   devzone test-gitlab                      end-to-end test of the GitLab module and platform

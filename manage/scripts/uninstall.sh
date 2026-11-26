@@ -185,7 +185,7 @@ else
     for i in ${images[@]+"${images[@]}"}; do docker rmi "$i" >/dev/null && echo "✔ image removed: $i"; done
     for v in ${dind[@]+"${dind[@]}"} ${volumes[@]+"${volumes[@]}"}; do docker volume rm "$v" >/dev/null && echo "✔ volume removed: $v"; done
     if [ "${#metrics[@]}" -gt 0 ]; then
-        version="$(sed -n 's/^VERSION=//p' "$HERE/.devcontainer/metrics-server.sh")"
+        version="$(sed -n 's/^METRICS_SERVER_VERSION=//p' "$HERE/.devcontainer/versions.env" | head -1)"
         manifest="https://github.com/kubernetes-sigs/metrics-server/releases/download/${version}/components.yaml"
         for ctx in "${metrics[@]}"; do
             kubectl --context "$ctx" delete -f "$manifest" --ignore-not-found >/dev/null &&
