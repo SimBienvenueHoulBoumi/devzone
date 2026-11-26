@@ -2,10 +2,11 @@ package podcmd
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/testkit"
 )
 
 // TestTicketDoneRemovesWorktreeAndBranch checks that done removes a clean worktree and its merged local branch.
@@ -68,10 +69,7 @@ func TestTicketDoneRefusedWhileBranchOnOrigin(t *testing.T) {
 	if _, _, code := runTicketArgs("558"); code != 0 {
 		t.Fatalf("ticket 558 status = %d, want 0", code)
 	}
-	push := exec.Command("git", "-C", wt, "push", "-q", "origin", "feat/558-test")
-	if output, err := push.CombinedOutput(); err != nil {
-		t.Fatalf("git push: %v\n%s", err, output)
-	}
+	testkit.Git(t, wt, "push", "-q", "origin", "feat/558-test")
 
 	_, errOut, code := runTicketArgs("done", "558")
 	if code != 2 {
@@ -107,10 +105,7 @@ func TestTicketDoneNoneBranchShown(t *testing.T) {
 	clone := filepath.Join(f.projects, "devzone")
 	f.clone(t, clone)
 	wt := filepath.Join(f.projects, "devzone-wt", "dz-77")
-	add := exec.Command("git", "-C", clone, "worktree", "add", "-q", "--detach", wt, "origin/develop")
-	if output, err := add.CombinedOutput(); err != nil {
-		t.Fatalf("git worktree add: %v\n%s", err, output)
-	}
+	testkit.Git(t, clone, "worktree", "add", "-q", "--detach", wt, "origin/develop")
 
 	out, _, code := runTicketArgs("done", "77")
 	if code != 0 {
@@ -175,10 +170,7 @@ func TestTicketDoneRemoveFailureKeepsStatus(t *testing.T) {
 	if _, _, code := runTicketArgs("558"); code != 0 {
 		t.Fatalf("ticket 558 status = %d, want 0", code)
 	}
-	lock := exec.Command("git", "-C", clone, "worktree", "lock", wt)
-	if output, err := lock.CombinedOutput(); err != nil {
-		t.Fatalf("git worktree lock: %v\n%s", err, output)
-	}
+	testkit.Git(t, clone, "worktree", "lock", wt)
 
 	_, _, code := runTicketArgs("done", "558")
 	if code != 128 {

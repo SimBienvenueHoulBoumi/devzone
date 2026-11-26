@@ -3,11 +3,12 @@ package agent
 import (
 	"context"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/testkit"
 )
 
 func writeFileT(t *testing.T, p, content string) {
@@ -20,17 +21,10 @@ func writeFileT(t *testing.T, p, content string) {
 
 func gitInit(t *testing.T, dir string) {
 	t.Helper()
-	run := func(args ...string) {
-		cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
-		cmd.Env = append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "HOME="+t.TempDir())
-		if out, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("git %v: %v %s", args, err, out)
-		}
-	}
-	run("init", "-q")
-	run("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "depart", "--allow-empty")
-	run("add", "-A")
-	run("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "add", "--allow-empty")
+	testkit.Git(t, dir, "init", "-q")
+	testkit.Git(t, dir, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "depart", "--allow-empty")
+	testkit.Git(t, dir, "add", "-A")
+	testkit.Git(t, dir, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "add", "--allow-empty")
 }
 
 func TestRightsFilesList(t *testing.T) {
@@ -91,9 +85,6 @@ func TestRightsSnapshotRestore(t *testing.T) {
 }
 
 func TestRightsVerifyCommittedChange(t *testing.T) {
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("no git")
-	}
 	dir := t.TempDir()
 	state := t.TempDir()
 	proj := filepath.Join(dir, "projet")
@@ -104,15 +95,7 @@ func TestRightsVerifyCommittedChange(t *testing.T) {
 	RightsSnapshot(ctx, ExecRunner{}, state, proj)
 	// agent modifies + commits
 	writeFileT(t, filepath.Join(proj, ".devcontainer", "opencode", "agent.json"), `{"permission":{}}`+"\npirate")
-	git := func(args ...string) string {
-		cmd := exec.Command("git", append([]string{"-C", proj}, args...)...)
-		cmd.Env = append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "HOME="+t.TempDir())
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			t.Fatalf("git %v %v %s", args, err, out)
-		}
-		return string(out)
-	}
+	git := func(args ...string) string { return testkit.Git(t, proj, args...) }
 	git("add", "-A")
 	git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "modif")
 	before, err := strconv.Atoi(strings.TrimSpace(git("rev-list", "--count", "HEAD")))
