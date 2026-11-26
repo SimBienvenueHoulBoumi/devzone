@@ -32,7 +32,7 @@ if [ -z "${DEVZONE_NO_GO:-}" ] && [ -z "$FROM_GO" ]; then
         aarch64 | arm64) POD_GO_ARCH=arm64 ;;
         *) POD_GO_ARCH="" ;;
     esac
-    POD_GO="$ICI/bin/devzone-pod-linux-$POD_GO_ARCH"
+    POD_GO="$ICI/bin/devzone-pod-$(uname -s | tr '[:upper:]' '[:lower:]')-$POD_GO_ARCH"
     if [ -n "$POD_GO_ARCH" ] && [ -x "$POD_GO" ] && "$POD_GO" handles "${1:-}" >/dev/null 2>&1; then
         DEVZONE_POD_SCRIPT="$ICI/devzone" exec "$POD_GO" "$@"
     fi

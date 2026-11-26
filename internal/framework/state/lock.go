@@ -5,7 +5,6 @@ package state
 import (
 	"fmt"
 	"os"
-	"syscall"
 	"time"
 )
 
@@ -39,40 +38,13 @@ func (s *State) lock() error {
 		}
 		time.Sleep(1 * time.Second)
 	}
-	if err := s.flockTake(lockDir); err != nil {
+	f, err := takeFlock(s.flockFile(), lockDir)
+	if err != nil {
 		return err
 	}
+	s.flockFd = f
 	s.depth = 1
 	return nil
-}
-
-// flockTake acquires the flock companion file. The mkdir lockdir stays the guard
-// on systems without flock; on Linux it serializes writes like the shell.
-func (s *State) flockTake(lockDir string) error {
-	f, err := os.OpenFile(s.flockFile(), os.O_CREATE|os.O_RDWR, 0o644)
-	if err != nil {
-		_ = os.RemoveAll(lockDir)
-		return fmt.Errorf("devzone : state locked elsewhere (flock): %s", s.flockFile())
-	}
-	deadline := time.Now().Add(10 * time.Second)
-	for {
-		err = syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
-		if err == nil {
-			s.flockFd = f
-			return nil
-		}
-		if err != syscall.EAGAIN && err != syscall.EWOULDBLOCK {
-			_ = f.Close()
-			_ = os.RemoveAll(lockDir)
-			return fmt.Errorf("devzone : state locked elsewhere (flock): %s", s.flockFile())
-		}
-		if time.Now().After(deadline) {
-			_ = f.Close()
-			_ = os.RemoveAll(lockDir)
-			return fmt.Errorf("devzone : state locked elsewhere (flock): %s", s.flockFile())
-		}
-		time.Sleep(50 * time.Millisecond)
-	}
 }
 
 // unlock releases one depth level; the last level drops flock then the lockdir.
@@ -88,7 +60,7 @@ func (s *State) unlock() {
 	}
 	s.depth = 0
 	if s.flockFd != nil {
-		_ = syscall.Flock(int(s.flockFd.Fd()), syscall.LOCK_UN)
+		_ = releaseFlock(s.flockFd)
 		_ = s.flockFd.Close()
 		s.flockFd = nil
 	}
@@ -98,7 +70,7 @@ func (s *State) unlock() {
 // lockDir returns the mkdir lock directory used by shell and Go writers.
 func (s *State) lockDir() string { return s.path + ".lockdir" }
 
-// flockFile returns the flock companion file used on Linux.
+// flockFile returns the companion file of the OS file lock, on every platform.
 func (s *State) flockFile() string { return s.path + ".lock" }
 
 // stale reports whether a lockdir is older than maxAge.

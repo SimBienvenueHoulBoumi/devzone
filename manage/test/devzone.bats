@@ -673,6 +673,8 @@ KUBE
     cp "$BATS_TEST_DIRNAME/../../.devcontainer/ai/plugins/devzone-guard-v2.js" "$BATS_TEST_TMPDIR/app/ai/plugins/devzone-guard-v2.js"
     cp "$BATS_TEST_DIRNAME/../../.devcontainer/opencode.jsonc" "$BATS_TEST_TMPDIR/app/opencode.jsonc"
     cp "$BATS_TEST_DIRNAME/../../.devcontainer/skills/devzone/SKILL.md" "$BATS_TEST_TMPDIR/app/skills/devzone/SKILL.md"
+    mkdir -p "$BATS_TEST_TMPDIR/app/bin"
+    cp "$BATS_TEST_DIRNAME"/../../.devcontainer/bin/devzone-pod-* "$BATS_TEST_TMPDIR/app/bin/" 2>/dev/null || true
     chmod +x "$APP"
     cat >"$BATS_TEST_TMPDIR/app/argocd/services-hook.sh" <<'HOOK'
 #!/usr/bin/env bash
