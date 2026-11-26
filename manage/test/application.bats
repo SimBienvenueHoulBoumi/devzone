@@ -16,14 +16,13 @@ setup() {
     cp "$RACINE_TEST"/.devcontainer/devzone-*.sh "$T/app/"
     cp "$RACINE_TEST/.devcontainer/help.sh" "$T/app/help.sh"
     cp "$RACINE_TEST/.devcontainer/cluster.sh" "$T/app/cluster.sh"
-    cp "$RACINE_TEST/.devcontainer/state.sh" "$T/app/state.sh"
-    cp "$RACINE_TEST/.devcontainer/state-lock.sh" "$T/app/state-lock.sh"
-    cp "$RACINE_TEST/.devcontainer/state-gitops.sh" "$T/app/state-gitops.sh"
     cp "$RACINE_TEST/.devcontainer/kube-account.sh" "$T/app/kube-account.sh"
     mkdir -p "$T/app/ai"
     cp "$RACINE_TEST/.devcontainer/ai/host-models.sh" "$T/app/ai/host-models.sh"
     cp "$RACINE_TEST/.devcontainer/ai/host-check.sh" "$T/app/ai/host-check.sh"
     cp "$RACINE_TEST/.devcontainer/ai/host-check.message" "$T/app/ai/host-check.message"
+    mkdir -p "$T/app/bin"
+    cp "$RACINE_TEST"/.devcontainer/bin/devzone-pod-linux-* "$T/app/bin/" 2>/dev/null || true
     chmod +x "$APP"
     export PATH="$T/bin:$PATH"
 

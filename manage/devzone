@@ -171,6 +171,8 @@ devzone $(version): development workspace in a Kubernetes cluster
                            (start installs it, stop removes it from the cluster)
   devzone workspace services enable|disable <service>|status
                            services (gitlab, postgres, argocd) of the Kubernetes workspace
+  devzone workspace ports enable|disable
+                           automatic start of the port watcher on the workstation
   devzone workspace argocd status|init|apply|app add|list|remove
                            Argo CD of the workspace: GitOps repository, .argocd.conf, projects
   devzone --version
@@ -183,7 +185,7 @@ container_command() {
     case "$1" in
         ai | agent | apply | argocd | build | catalog | cluster | clusters | disable | \
             enable | gitlab | is-enabled | llm | metrics | modules | mysql | packages | \
-            passwords | platform | port | postgres | repair | start | status | \
+            passwords | platform | port | postgres | repair | start | state | status | \
             test-bash32 | test-gitlab | ticket | use) return 0 ;;
         *) return 1 ;;
     esac

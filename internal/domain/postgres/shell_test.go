@@ -17,19 +17,50 @@ func shellRun(t *testing.T, script, body, stdin string, args ...string) (string,
 	return shellCommand(t, `. "$1"; `+body, stdin, append([]string{script}, args...))
 }
 
-// shellServices runs a body after sourcing the cluster, state and services
-// libraries; the body arguments start at position four.
+// shellServices runs a body after sourcing the cluster, module and services
+// libraries; the body arguments start at position six. The removed state.sh
+// slot stays in place to keep those positions stable, and a fake state
+// dispatcher intercepts the `bash .../devzone state` calls of the libraries:
+// writes, removals and initialisation go to ETAT with no real devzone binary,
+// so the orchestration assertions still check the saved state.
 func shellServices(t *testing.T, body, stdin string, args ...string) (string, int) {
 	t.Helper()
 	root := repoDevcontainer(t)
 	scripts := []string{
 		filepath.Join(root, "cluster.sh"),
-		filepath.Join(root, "state.sh"),
+		os.DevNull,
 		filepath.Join(root, "devzone-modules.sh"),
 		filepath.Join(root, "devzone-cluster.sh"),
 		filepath.Join(root, "devzone-services.sh"),
 	}
-	program := `MODULES=(ai kubernetes gitlab postgres argocd mysql); . "$1"; . "$2"; . "$3"; . "$4"; . "$5"; ` + body
+	program := `MODULES=(ai kubernetes gitlab postgres argocd mysql)
+__test_state() {
+    local action="$1" key="$2" value="$3" tmp
+    case "$action" in
+        init)
+            [ -f "$ETAT" ] && return 0
+            for key in "${@:2}"; do printf '%s=off\n' "$key"; done >"$ETAT"
+            ;;
+        write)
+            [ -f "$ETAT" ] && cp "$ETAT" "$ETAT.prev"
+            tmp="$ETAT.tmp.$$"
+            { grep -vE "^${key}=" "$ETAT" 2>/dev/null || true; printf '%s=%s\n' "$key" "$value"; } >"$tmp"
+            mv "$tmp" "$ETAT"
+            ;;
+        remove)
+            [ -f "$ETAT" ] || return 0
+            cp "$ETAT" "$ETAT.prev"
+            tmp="$ETAT.tmp.$$"
+            grep -vE "^${key}=" "$ETAT" >"$tmp" || true
+            mv "$tmp" "$ETAT"
+            ;;
+        *) return 1 ;;
+    esac
+}
+bash() {
+    if [ "${2:-}" = state ]; then __test_state "${@:3}"; else command bash "$@"; fi
+}
+. "$1"; . "$2"; . "$3"; . "$4"; . "$5"; ` + body
 	return shellCommand(t, program, stdin, append(scripts, args...))
 }
 

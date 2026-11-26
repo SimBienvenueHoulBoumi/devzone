@@ -3,6 +3,7 @@ package workspace
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strconv"
 	"testing"
@@ -10,6 +11,9 @@ import (
 
 // stoppedWatcher is the first line of every status without a live watcher.
 const stoppedWatcher = "Port watcher: stopped\n"
+
+// disabledWatcher is the automatic-start line when no definition is installed.
+const disabledWatcher = "Port watcher automatic start: disabled\n"
 
 // portsState creates a state folder holding files (slash-separated relative
 // paths) and returns its path.
@@ -27,6 +31,9 @@ func portsState(t *testing.T, files map[string]string) string {
 func portsOut(t *testing.T, dir string) string {
 	t.Helper()
 	t.Setenv("DEVZONE_PORTS_WORKSPACE_DIR", dir)
+	if os.Getenv("DEVZONE_PORTS_AGENT_DIR") == "" {
+		t.Setenv("DEVZONE_PORTS_AGENT_DIR", filepath.Join(t.TempDir(), "agents"))
+	}
 	var out bytes.Buffer
 	if status := PortsStatus(&out); status != 0 {
 		t.Fatalf("PortsStatus status = %d, want 0", status)
@@ -36,23 +43,23 @@ func portsOut(t *testing.T, dir string) string {
 
 func TestPortsStatusWithoutStateFolder(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "absent")
-	if got := portsOut(t, dir); got != stoppedWatcher {
-		t.Fatalf("output = %q, want %q", got, stoppedWatcher)
+	if got := portsOut(t, dir); got != stoppedWatcher+disabledWatcher {
+		t.Fatalf("output = %q, want %q", got, stoppedWatcher+disabledWatcher)
 	}
 }
 
 func TestPortsStatusStaleWatcher(t *testing.T) {
 	dir := portsState(t, map[string]string{"pid": "999999\n"})
-	if got := portsOut(t, dir); got != stoppedWatcher {
-		t.Fatalf("output = %q, want %q", got, stoppedWatcher)
+	if got := portsOut(t, dir); got != stoppedWatcher+disabledWatcher {
+		t.Fatalf("output = %q, want %q", got, stoppedWatcher+disabledWatcher)
 	}
 }
 
 func TestPortsStatusEmptyOrNonNumericPidIsStopped(t *testing.T) {
 	for _, content := range []string{"", "\n", "not-a-pid"} {
 		dir := portsState(t, map[string]string{"pid": content})
-		if got := portsOut(t, dir); got != stoppedWatcher {
-			t.Fatalf("pid %q: output = %q, want %q", content, got, stoppedWatcher)
+		if got := portsOut(t, dir); got != stoppedWatcher+disabledWatcher {
+			t.Fatalf("pid %q: output = %q, want %q", content, got, stoppedWatcher+disabledWatcher)
 		}
 	}
 }
@@ -60,7 +67,7 @@ func TestPortsStatusEmptyOrNonNumericPidIsStopped(t *testing.T) {
 func TestPortsStatusRunningWatcher(t *testing.T) {
 	pid, _ := startSleep(t)
 	dir := portsState(t, map[string]string{"pid": strconv.Itoa(pid) + "\n"})
-	want := fmt.Sprintf("Port watcher: running (pid %d)\n", pid)
+	want := fmt.Sprintf("Port watcher: running (pid %d)\n", pid) + disabledWatcher
 	if got := portsOut(t, dir); got != want {
 		t.Fatalf("output = %q, want %q", got, want)
 	}
@@ -75,7 +82,7 @@ func TestPortsStatusListsOnlyLiveRelays(t *testing.T) {
 		"relays/abc":   "not-a-pid\n",
 		"relays/.6000": strconv.Itoa(live) + "\n",
 	})
-	want := stoppedWatcher + "  127.0.0.1:5432 relayed\n"
+	want := stoppedWatcher + disabledWatcher + "  127.0.0.1:5432 relayed\n"
 	if got := portsOut(t, dir); got != want {
 		t.Fatalf("output = %q, want %q", got, want)
 	}
@@ -83,7 +90,7 @@ func TestPortsStatusListsOnlyLiveRelays(t *testing.T) {
 
 func TestPortsStatusReportsTakenPortsInOrder(t *testing.T) {
 	dir := portsState(t, map[string]string{"taken/3000": "", "taken/1000": ""})
-	want := stoppedWatcher +
+	want := stoppedWatcher + disabledWatcher +
 		"  ⚠ port 1000 already in use on the workstation, not relayed\n" +
 		"  ⚠ port 3000 already in use on the workstation, not relayed\n"
 	if got := portsOut(t, dir); got != want {
@@ -97,7 +104,7 @@ func TestPortsStatusRelayedApplication(t *testing.T) {
 		"apps/default.web.3000": "3000",
 		"relays/3000":           strconv.Itoa(live) + "\n",
 	})
-	want := stoppedWatcher + "  127.0.0.1:3000 relayed\n" +
+	want := stoppedWatcher + disabledWatcher + "  127.0.0.1:3000 relayed\n" +
 		"  http://127.0.0.1:3000  default/web:3000\n"
 	if got := portsOut(t, dir); got != want {
 		t.Fatalf("output = %q, want %q", got, want)
@@ -110,7 +117,7 @@ func TestPortsStatusApplicationWithoutReadyPod(t *testing.T) {
 		"no-ready-pod/team.api.9000": "",
 		"no-ready-pod/gone.8000":     "",
 	})
-	want := stoppedWatcher + "  http://127.0.0.1:9000  team/api:9000  no ready pod\n"
+	want := stoppedWatcher + disabledWatcher + "  http://127.0.0.1:9000  team/api:9000  no ready pod\n"
 	if got := portsOut(t, dir); got != want {
 		t.Fatalf("output = %q, want %q", got, want)
 	}
@@ -122,7 +129,7 @@ func TestPortsStatusApplicationNameWithSeveralDots(t *testing.T) {
 		"apps/team.guestbook.ui.80": "8080",
 		"relays/8080":               strconv.Itoa(live) + "\n",
 	})
-	want := stoppedWatcher + "  127.0.0.1:8080 relayed\n" +
+	want := stoppedWatcher + disabledWatcher + "  127.0.0.1:8080 relayed\n" +
 		"  http://127.0.0.1:8080  team/guestbook:ui.80\n"
 	if got := portsOut(t, dir); got != want {
 		t.Fatalf("output = %q, want %q", got, want)
@@ -137,7 +144,7 @@ func TestPortsStatusSortsRelayNamesLexicographically(t *testing.T) {
 		"relays/200":  pid,
 		"relays/30":   pid,
 	})
-	want := stoppedWatcher +
+	want := stoppedWatcher + disabledWatcher +
 		"  127.0.0.1:1000 relayed\n" +
 		"  127.0.0.1:200 relayed\n" +
 		"  127.0.0.1:30 relayed\n"
@@ -156,7 +163,7 @@ func TestPortsStatusIgnoresHiddenNames(t *testing.T) {
 		"apps/.default.web.3000":  "3000",
 		"no-ready-pod/.team.9000": "",
 	})
-	want := stoppedWatcher + "  127.0.0.1:3000 relayed\n"
+	want := stoppedWatcher + disabledWatcher + "  127.0.0.1:3000 relayed\n"
 	if got := portsOut(t, dir); got != want {
 		t.Fatalf("output = %q, want %q", got, want)
 	}

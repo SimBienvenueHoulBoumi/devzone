@@ -88,8 +88,6 @@ teardown() {
     depot="$BATS_TEST_TMPDIR/depot"
     mkdir -p "$depot/.devcontainer/catalog"
     cp "$VEILLEUR" "$depot/.devcontainer/catalog/catalog-watcher.sh"
-    cp "$BATS_TEST_DIRNAME/../../.devcontainer/state.sh" "$depot/.devcontainer/state.sh"
-    cp "$BATS_TEST_DIRNAME/../../.devcontainer/state-lock.sh" "$depot/.devcontainer/state-lock.sh"
     cat >"$depot/.devcontainer/catalog.sh" <<'CATALOGUE'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >>"$BATS_TEST_TMPDIR/catalogue.log"

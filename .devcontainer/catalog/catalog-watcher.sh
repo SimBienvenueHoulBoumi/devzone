@@ -7,9 +7,6 @@ set -euo pipefail
 ICI="$(cd "$(dirname "$0")" && pwd)"
 RACINE="${DEVZONE_ROOT:-$(cd "$ICI/../.." && pwd)}"
 ETAT="${DEVZONE_STATE:-$RACINE/.devzone.modules}"
-# shellcheck source=SCRIPTDIR/state.sh
-# shellcheck disable=SC1091
-. "$(dirname "$ICI")/state.sh"
 BASE="${DEVZONE_CATALOG_WATCHER_DIR:-$RACINE/.devzone.catalog-watcher}"
 LOCK_DIR="$BASE/lock"
 LAST_FILE="$BASE/dernier"
@@ -54,8 +51,8 @@ tick() {
     [ -f "$ETAT" ] || return 0
     # Restored or rebuilt state: the watcher does not follow a doubtful state,
     # and never uninstalls until devzone apply has confirmed it
-    state_recovery_wait && return 0
-    state_recovery_pending && return 0
+    DEVZONE_STATE="$ETAT" bash "${ICI:-$(dirname "$ICI")}/devzone" state recovery-wait && return 0
+    DEVZONE_STATE="$ETAT" bash "${ICI:-$(dirname "$ICI")}/devzone" state recovery-pending && return 0
     mkdir -p "$BASE"
     now="$(stat -c %Y "$ETAT" 2>/dev/null || stat -f %m "$ETAT" 2>/dev/null || true)"
     [ -n "$now" ] || return 0
