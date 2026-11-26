@@ -1,6 +1,6 @@
 #!/usr/bin/env bats
 # System packages kept after a rebuild (#351): list <root>/.devzone.packages,
-# reinstalled at container creation (post-create.sh). Fake apt-get, apt-cache,
+# reinstalled at workspace creation. Fake apt-get, apt-cache,
 # dpkg-query, kubectl and gh in the PATH: no package really installed.
 
 # Stored mark « already present », byte for byte as packages.sh writes it

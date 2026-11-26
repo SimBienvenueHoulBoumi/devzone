@@ -163,8 +163,8 @@ case "${1:-}" in
         ;;
     is-enabled)
         is_known "${2:-}" || { echo "devzone : unknown module : ${2:-(none)}" >&2; exit 2; }
-        # Silent test, called by the startup scripts: code 0 if the module is
-        # active, 1 otherwise, without writing anything (kube-config.sh:16)
+        # Silent test: code 0 if the module is active, 1 otherwise, without
+        # writing anything
         [ "$(value_of "$2")" = on ]
         ;;
     agent)
@@ -200,7 +200,6 @@ case "${1:-}" in
         bash "$ICI/workspace-build.sh" "${@:2}"
         ;;
     repair) repair_workstation ;;
-    start) bash "$ICI/startup.sh" ;;
     metrics) bash "$ICI/metrics-server.sh" "${@:2}" ;;
     use) use_cluster "${@:2}" ;;
     clusters) DEVZONE_STATE="$ETAT" bash "$ICI/clusters.sh" "${@:2}" ;;

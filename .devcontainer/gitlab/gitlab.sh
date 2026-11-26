@@ -66,11 +66,10 @@ GITLAB_HOST_MARK="# devzone:gitlab"
 # *.localhost names (RFC 6761) and go through the TCP relay above, which
 # listens on 127.0.0.1. The name therefore points to 127.0.0.1 so that ssh and
 # glab take the same path. /etc/hosts is a Docker mount that Docker regenerates
-# when the container starts, hence the set again at each start (startup.sh) and
-# at each activation. Never sed -i nor mv: the mount cannot be renamed (in-place
-# write only); direct if the file is writable, otherwise sudo -n. A failure never
-# fails: a warning on stderr and exit code 0, so that the installation does not
-# fail for a host name.
+# when the container starts, hence the set again at each activation. Never sed -i
+# nor mv: the mount cannot be renamed (in-place write only); direct if the file
+# is writable, otherwise sudo -n. A failure never fails: a warning on stderr
+# and exit code 0, so that the installation does not fail for a host name.
 gitlab_host_set() {
     local line tmp
     line="$(printf '127.0.0.1\tgitlab.localhost %s' "$GITLAB_HOST_MARK")"

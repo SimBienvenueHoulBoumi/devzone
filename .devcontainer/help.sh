@@ -12,13 +12,12 @@ devzone_aide() {
   devzone platform gitlab                  GitLab, [--url URL] (default: gitlab module)
   devzone enable <module>                  enable and apply at once
   devzone disable <module> [--yes]         disable and apply at once (--yes: also deletes the data)
-  devzone apply                            install what is enabled (post-create.sh)
+  devzone apply                            install what is enabled
   devzone repair                           repair gitlab, postgres, ports, passwords
-  devzone start                            full start (startup scripts and summary)
   devzone metrics [context…]               install metrics-server (kubectl top, k9s)
   devzone use CTX [--confirm CTX]          switch the kubectl working cluster
   devzone clusters                         view of the connected clusters (work and services)
-  devzone is-enabled <module>              code 0 if enabled (startup scripts)
+  devzone is-enabled <module>              code 0 if enabled
   devzone test-bash32                      run the bats tests under bash 3.2 (Docker container)
   devzone test-gitlab                      end-to-end test of the GitLab module and platform
   devzone agent <folder> <instructions>    drive opencode with the instructions file
@@ -36,8 +35,7 @@ devzone_aide() {
   devzone argocd status|relay-start|relay-stop  Argo CD (argocd module)
   devzone argocd app add <repo url> [path]|list|remove <N>  projects deployed by Argo CD (#516)
   devzone cluster [CTX] [--yes] [--confirm CTX]  services cluster of devzone, or change it
-  devzone account token|fresh              limited Kubernetes account: renew its token, or check it is fresh
-  devzone port [<n>|--close <n>]           relay of a container port to the workstation
+  devzone port [--close <n>]              list or remove a relay of the workstation
   devzone passwords                        regenerate .password and print its path
   devzone packages [add|remove|apply] …    system packages kept after a rebuild
   Old French names are refused and print the new name (see the reference).

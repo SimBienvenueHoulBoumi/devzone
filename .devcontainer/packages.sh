@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # System packages kept after a rebuild (#351): a list in the devzone folder
 # (<root>/.devzone.packages, a comment header + one package name per line, sorted,
-# without duplicates), reinstalled at each container creation (post-create.sh).
+# without duplicates), reinstalled at each container creation.
 # A package installed by hand is lost by a rebuild, unless it is in this list.
 #   packages.sh or packages.sh list        list with the state of each package
 #   packages.sh add <name>…                validates, installs, adds to the list
 #   packages.sh remove <name>…             removes from the list and uninstalls (except image packages)
-#   packages.sh apply                      installs everything missing (post-create.sh)
+#   packages.sh apply                      installs everything missing
 # The state of a package comes from dpkg-query -W -f='${Status}'; the system
 # commands go through overridable variables for the tests (sudo, apt-get,
 # apt-cache, dpkg-query, mark, timestamp). Compatible with bash 3.2 (macOS).

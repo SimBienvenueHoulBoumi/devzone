@@ -14,7 +14,6 @@
 #                                    (terminal only), otherwise local default
 #   cluster_prepare CTX              creates the dedicated kind cluster if missing
 #   cluster_release CTX              deletes the dedicated kind cluster once empty
-#   kube_reachable_from_container FILE   rewrites 127.0.0.1/localhost
 #   relay_start NAME CTX NS TARGET PORTS…   port-forward kept alive
 #   relay_active NAME / relay_stop NAME
 #   account_* (kube-account.sh #430)   limited account and admin context
@@ -29,7 +28,7 @@ export KUBECONFIG
 : "${ETAT:=${DEVZONE_STATE:-$HOME/.devzone.modules}}"
 
 # Safe state write (#417): lock, temporary file in the state folder, backup copy
-# .prev — shared by devzone, ports and ports-auto
+# .prev — shared by devzone, ports
 # shellcheck source=SCRIPTDIR/state.sh
 # shellcheck disable=SC1091
 . "$(dirname "${BASH_SOURCE[0]}")/state.sh"
@@ -46,11 +45,6 @@ CLUSTER_DEDICATED=kind-devzone${INSTANCE_SUFFIX}
 # Label set on every namespace created by devzone : a dedicated kind without a
 # labelled namespace has no use left and can be deleted
 CLUSTER_LABEL=app.kubernetes.io/managed-by=devzone
-
-# Rewrite 127.0.0.1 → host.docker.internal (#291): shared with the kind wrapper,
-# which applies it too to clusters created by hand
-# shellcheck source=SCRIPTDIR/kube-reachable.sh
-. "$(dirname "${BASH_SOURCE[0]}")/kube-reachable.sh"
 
 # Limited Kubernetes account (#430): account_setup, account_allow,
 # account_remove, account_token, account_admin (admin context); the installers
@@ -294,9 +288,6 @@ cluster_prepare() {
     if [ "$ctx" = "$CLUSTER_DEDICATED" ]; then
         if ! kind get clusters 2>/dev/null | grep -qx "devzone${INSTANCE_SUFFIX}"; then
             echo "▶ Creating the kind devzone cluster (about 1 min)…"
-            # On the host Docker, the API listens on the workstation's 127.0.0.1:
-            # kube_reachable_from_container makes it reachable from the container
-            # (host.docker.internal), without exposing it on the local network.
             # Busy host Docker (its Kubernetes, other clusters): the node API can
             # restart during initialization and kind gives up within seconds. A
             # second attempt, on a fresh cluster.
@@ -305,7 +296,6 @@ cluster_prepare() {
                 kind delete cluster --name "devzone${INSTANCE_SUFFIX}" >/dev/null 2>&1 || true
                 kind_create_keep_context --name "devzone${INSTANCE_SUFFIX}" --wait 120s || return 1
             fi
-            kube_reachable_from_container "$HOME/.kube/config"
         fi
     elif ! cluster_reachable "$ctx"; then
         echo "devzone : cluster $ctx unreachable (kubernetes module enabled? cluster started?)" >&2

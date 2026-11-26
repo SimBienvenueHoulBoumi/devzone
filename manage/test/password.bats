@@ -10,8 +10,6 @@ setup() {
     kube_isole
     export HOME="$BATS_TEST_TMPDIR/home"
     export DEVZONE_ROOT="$BATS_TEST_TMPDIR/racine"
-    # startup.sh starts the automatic port watcher: its folder stays under the test (#394)
-    export DEVZONE_PORTS_AUTO_DIR="$BATS_TEST_TMPDIR/ports-auto"
     ROOT="$DEVZONE_ROOT"
     GL="$ROOT/workspace/.gitlab"
     PG="$ROOT/workspace/.postgres"
@@ -97,14 +95,4 @@ setup() {
     [ "$output" = "" ] || false
     grep -q $'^mysql:datayer\t127.0.0.1:3306\tdatayer\tmdp-datayer$' "$ROOT/.password" || false
     grep -q $'^mysql:root\t127.0.0.1:3306\troot\tmdproot$' "$ROOT/.password" || false
-}
-
-@test "startup: calls password.sh regenerer before the summary" {
-    local startup="$BATS_TEST_DIRNAME/../../.devcontainer/startup.sh"
-    local line_password line_summary
-    line_password="$(grep -n 'bash "$ICI/password.sh" regenerer' "$startup" | cut -d: -f1)"
-    line_summary="$(grep -n '^bash "$ICI/devzone"$' "$startup" | cut -d: -f1)"
-    [ -n "$line_password" ]
-    [ -n "$line_summary" ]
-    [ "$line_password" -lt "$line_summary" ]
 }

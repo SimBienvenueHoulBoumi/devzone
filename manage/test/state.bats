@@ -1,8 +1,7 @@
 #!/usr/bin/env bats
 # Safe write of the module state (#417): lock, temporary file in the state
-# folder (never missing for a reader), backup copy, restore, rebuild from the
-# namespaces, watcher that does not follow a doubtful state. State, root and
-# tools under $BATS_TEST_TMPDIR.
+# folder (never missing for a reader), backup copy, restore and rebuild from
+# the namespaces. State, root and tools under $BATS_TEST_TMPDIR.
 
 setup() {
     load commun
@@ -12,11 +11,9 @@ setup() {
     unset DEVZONE_WORKSPACE
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
     ETAT_SH="$BATS_TEST_DIRNAME/../../.devcontainer/state.sh"
-    PORTS_AUTO="$BATS_TEST_DIRNAME/../../.devcontainer/ports-auto.sh"
     export DEVZONE_ROOT="$BATS_TEST_TMPDIR/racine"
     export DEVZONE_STATE="$BATS_TEST_TMPDIR/racine/.devzone.modules"
     export DEVZONE_INSTANCE=devzone
-    export DEVZONE_PORTS_AUTO_DIR="$BATS_TEST_TMPDIR/ports-auto"
     export GIT_CONFIG_NOSYSTEM=1
     mkdir -p "$BATS_TEST_TMPDIR/bin" "$BATS_TEST_TMPDIR/relais" "$DEVZONE_ROOT/workspace"
     cd "$BATS_TEST_TMPDIR" || return 1
@@ -64,17 +61,6 @@ case "${1:-}" in
 esac
 exit 0
 DOCKER
-    # fake ss and socat: the watcher sees a listening port, nothing is started
-    cat >"$BATS_TEST_TMPDIR/bin/ss" <<'SS'
-#!/usr/bin/env bash
-cat "$BATS_TEST_TMPDIR/ss.listen" 2>/dev/null
-exit 0
-SS
-    cat >"$BATS_TEST_TMPDIR/bin/socat" <<'SOCAT'
-#!/usr/bin/env bash
-echo "socat $*" >>"$BATS_TEST_TMPDIR/socat.log"
-exit 0
-SOCAT
     # fake npm: versions.sh --installees answers without any installed tool
     cat >"$BATS_TEST_TMPDIR/bin/npm" <<'NPM'
 #!/usr/bin/env bash
@@ -85,7 +71,6 @@ NPM
     chmod +x "$BATS_TEST_TMPDIR/bin/"*
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
     : >"$BATS_TEST_TMPDIR/docker.log"
-    : >"$BATS_TEST_TMPDIR/ss.listen"
 }
 
 # Concurrent writer: $1 = key prefix, $2 = number of keys (#417)
@@ -222,44 +207,12 @@ KUBE
     [[ "$output" == *"  ○ argocd          no GitOps repository: devzone argocd init"* ]] || false
 }
 
-@test "fresh restore: the port watcher does nothing for 60 s" {
-    printf 'ai=on\nports_auto=on\n' >"$DEVZONE_STATE.prev"
-    rm -f "$DEVZONE_STATE"
-    run bash "$DEVZONE" is-enabled ai
-    [ "$status" -eq 0 ]
-    [ -f "$DEVZONE_STATE.recouvre" ]
-    # Port that the watcher would normally relay (0.0.0.0, not the container IP)
-    echo 'LISTEN 0 128 0.0.0.0:8080 0.0.0.0:*' >"$BATS_TEST_TMPDIR/ss.listen"
-    run bash "$PORTS_AUTO" tour
-    [ "$status" -eq 0 ]
-    ! grep -q "docker run" "$BATS_TEST_TMPDIR/docker.log" || false
-}
-
-@test "restored state not confirmed: the watcher does not uninstall" {
-    printf 'ai=on\nports_auto=off\n' >"$DEVZONE_STATE"
-    # Mark older than 60 s: the delay has passed, nothing is confirmed
+@test "devzone apply confirms the restored state: recovery marker removed" {
+    printf 'ai=off\ngitlab=off\npostgres=off\nkubernetes=off\n' >"$DEVZONE_STATE"
     echo $(( $(date +%s) - 120 )) >"$DEVZONE_STATE.recouvre"
-    mkdir -p "$DEVZONE_PORTS_AUTO_DIR/devzone"
-    printf '8080\n' >"$DEVZONE_PORTS_AUTO_DIR/devzone/active"
-    : >"$BATS_TEST_TMPDIR/relais/devzone-devzone-auto-8080"
-    run bash "$PORTS_AUTO" tour
-    [ "$status" -eq 0 ]
-    [ -e "$BATS_TEST_TMPDIR/relais/devzone-devzone-auto-8080" ]
-}
-
-@test "devzone apply confirms the state: uninstall resumes" {
-    printf 'ai=off\ngitlab=off\npostgres=off\nkubernetes=off\nports_auto=off\n' >"$DEVZONE_STATE"
-    echo $(( $(date +%s) - 120 )) >"$DEVZONE_STATE.recouvre"
-    mkdir -p "$DEVZONE_PORTS_AUTO_DIR/devzone"
-    printf '8080\n' >"$DEVZONE_PORTS_AUTO_DIR/devzone/active"
-    : >"$BATS_TEST_TMPDIR/relais/devzone-devzone-auto-8080"
     run bash "$DEVZONE" apply
     [ "$status" -eq 0 ]
     run test -e "$DEVZONE_STATE.recouvre"
-    [ "$status" -ne 0 ]
-    run bash "$PORTS_AUTO" tour
-    [ "$status" -eq 0 ]
-    run test -e "$BATS_TEST_TMPDIR/relais/devzone-devzone-auto-8080"
     [ "$status" -ne 0 ]
 }
 

@@ -68,14 +68,10 @@ The npm package (what `npm pack` produces and `devzone <folder>` copies) is chec
 devzone/
 ├── .devcontainer/
 │   ├── Dockerfile              # base image + pinned tools (versions and sha256)
-│   ├── devcontainer.json       # features (languages, Docker, Kubernetes, gh), volumes, VS Code extensions
+│   ├── devcontainer.json       # recipe of the pod image: features, volumes, VS Code extensions
 │   ├── devcontainer-lock.json  # pinned versions of the features
 │   ├── devzone                 # devzone command: modules (ai, kubernetes), AI assistant versions
-│   ├── post-create.sh          # first startup: volume rights, git, repowarden, active modules (without questions)
-│   ├── startup.sh            # each startup: git identity, clusters, then summary (devzone)
-│   ├── kube-config.sh          # kind contexts; kubernetes module: host cluster, metrics-server
-│   ├── metrics-server.sh       # metrics-server on local clusters (CPU and RAM in k9s)
-│   └── git-identity.sh         # git identity deduced from the gh account if missing
+│   └── metrics-server.sh       # metrics-server on local clusters (CPU and RAM in k9s)
 ├── .github/workflows/
 │   ├── fonctionnel.yml         # container tests (functional, CLI, Windows, ia-arm64), bats job on each PR/push to develop/main, tests-conteneur summary required to merge
 │   ├── repowarden.yml          # repowarden checks of each PR (PR targeted wrongly is retargeted to develop)

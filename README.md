@@ -205,7 +205,7 @@ In the container, `devzone --version` shows the version of the workspace image, 
 ```text
   devzone enable <module>                  enable and apply at once
   devzone use CTX [--confirm CTX]          switch the kubectl working cluster
-  devzone port [<n>|--close <n>]           relay of a container port to the workstation
+  devzone port [--close <n>]              list or remove a relay of the workstation
 ```
 
 ### Updating devzone
@@ -361,15 +361,14 @@ A project's user owns **its** database (it creates tables, indexes, data in it) 
 
 On the Kubernetes workstation, `devzone workspace start` starts a port watcher: each TCP port ≥ 1024 that listens in the pod is relayed to `127.0.0.1` of the workstation, at the same number, by `kubectl port-forward`. A server started in the pod (`npm run dev`, port 5173) therefore answers at `http://localhost:5173`, without a command. The enabled services (PostgreSQL, MySQL, Argo CD) are relayed too, on their usual port. The Services of applications deployed in the cluster are relayed the same way, each on a local port (80 → 8080; a port already taken elsewhere becomes another port): `devzone workspace ports status` shows their URL `http://127.0.0.1:<port>`. A Service can be excluded with the annotation `devzone.io/relay: "false"`. The watcher is driven with `devzone workspace ports start|stop|status`; details in the [reference](manage/docs/reference.md#applications-and-services-on-the-workstations-localhost).
 
-On the Docker workstation, an application launched **inside** the container (for example a Spring Boot with `./gradlew bootRun` on port 8080) is not reachable from the workstation: the devzone container publishes no port. As soon as it listens in the container, the **automatic port watcher** (`.devcontainer/ports-auto.sh`) sets up an `alpine/socat` relay (pinned version) on the host's Docker, from `127.0.0.1:<port>` of the workstation to the container's port: `http://localhost:<port>` **without a command**. The relay disappears when the application stops.
+The relays kept in the state of a workstation instance are listed and closed with `devzone port`:
 
 ```sh
-devzone port             # list: manual and automatic relays, ● active or ○ stopped
-devzone port auto off    # stops the watcher: no more automatic relay
-devzone port --close <n> # removes a manual relay and its port from the state
+devzone port             # list: relay, ● active or ○ stopped, application behind it
+devzone port --close <n> # removes the relay and its port from the state
 ```
 
-`devzone port <n>` also opens a manual relay: same mechanism on the workstation side, `alpine/socat` container, name `devzone-<instance>-port-<n>`.
+In the Kubernetes workspace, the applications and services of the pod use `devzone workspace ports` instead: their relays are driven from the workstation by `kubectl port-forward`.
 
 From the workstation: `http://localhost:8080`. The manual relay is recreated automatically at container startup, toward the container's current address; it is removed by `make uninstall` (label `devzone.instance`). The automatic relay disappears with the application.
 

@@ -11,8 +11,8 @@ outdated_tools() {
     bash "$VERSIONS" --installees 2>/dev/null
 }
 
-# Sets repowarden back to the pinned version if it differs, like post-create.sh
-# (it installs the global git hooks)
+# Sets repowarden back to the pinned version if it differs (it installs the
+# global git hooks)
 apply_repowarden() {
     local line pinned installed package=repowarden
     [ -f "$VERSIONS" ] || return 0
@@ -45,8 +45,8 @@ missing_worktrees() {
     done || true
 }
 
-# Repair (#341): resumes the startup.sh sequence without the git identity nor
-# the clusters. Each item is really repaired; ✔ or ✖ with the reason.
+# Repair (#341): repairs the workstation: relays, watchers, credentials.
+# Each item is really repaired; ✔ or ✖ with the reason.
 repair_item() {
     local name="$1" output code reason
     shift
@@ -65,11 +65,6 @@ repair_item() {
 # does not stop the following ones.
 repair_workstation() {
     repair_failed=0
-    # Limited Kubernetes account token (#430): 24 h, renewed here; without the
-    # kubernetes module and without a services cluster, nothing to do
-    if [ "$(value_of kubernetes)" = on ] || [ -n "$(cluster_saved)" ]; then
-        repair_item "kubernetes account" devzone account token
-    fi
     if [ "$(value_of gitlab)" = on ]; then
         repair_item "gitlab name" bash "$ICI/gitlab/gitlab.sh" hote-poser
         repair_item "gitlab relay" bash "$ICI/gitlab/gitlab.sh" relay-start
@@ -82,11 +77,6 @@ repair_workstation() {
     fi
     if [ "$(value_of mysql)" = on ]; then
         repair_item "mysql relay" devzone mysql relay-start
-    fi
-    repair_item "ports relay" bash "$ICI/ports.sh" restart
-    # Kubernetes workspace (#517): no automatic port watcher
-    if ! in_pod; then
-        repair_item "ports auto watcher" env DEVZONE_PORTS_AUTO_REAL=yes bash "$ICI/ports-auto.sh" demarrer
     fi
     repair_item "catalog watcher" env DEVZONE_CATALOG_REAL=yes bash "$ICI/catalog/catalog-watcher.sh" demarrer
     repair_item "credentials" bash "$ICI/password.sh" regenerer

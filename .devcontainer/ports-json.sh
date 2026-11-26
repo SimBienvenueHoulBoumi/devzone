@@ -27,9 +27,5 @@ list_json() {
         json="$(jq -c --argjson port "$port" --argjson active "$active" --arg app "$app" \
             '. + [{port:$port,active:$active,application:$app,auto:false}]' <<<"$json")"
     done
-    auto_json="$(bash "$HERE/ports-auto.sh" list_json_auto 2>/dev/null || echo '[]')"
-    if [ -n "$auto_json" ] && [ "$auto_json" != "[]" ]; then
-        json="$(jq -s 'add' <<<"$json"$'\n'"$auto_json")"
-    fi
     printf '%s\n' "$json"
 }

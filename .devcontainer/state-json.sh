@@ -190,15 +190,6 @@ state_json() {
         clusters_command="devzone use $host_ctx"
     fi
 
-    # Limited account token (#845): renewed as soon as it is close to expiry,
-    # only outside the pod and with a services cluster chosen; a failed renewal
-    # becomes an alert with the repair command.
-    if ! in_pod && [ -n "$services_cluster" ] && ! devzone account fresh; then
-        if ! devzone account token >/dev/null 2>&1; then
-            append_alert limited_account_token "limited account token expired" "devzone repair"
-        fi
-    fi
-
     devzone cluster clean --quiet >/dev/null 2>&1 || [ $? -ne 3 ] || append_alert cluster_disk "cluster disk almost full" "devzone repair"
     if ports_out="$(bash "$ICI/ports.sh" list --json 2>/dev/null)"; then
         if printf '%s' "$ports_out" | jq -e . >/dev/null 2>&1; then

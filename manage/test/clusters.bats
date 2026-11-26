@@ -201,10 +201,3 @@ KUBE
     [ -z "${CLUSTER_DEDIE+x}" ] || false
     ! declare -F cluster_est_local || false
 }
-
-@test "post-create : prompt block only once" {
-    script="$BATS_TEST_DIRNAME/../../.devcontainer/post-create.sh"
-    [ "$(grep -c '# >>> devzone invite >>>' "$script")" -eq 1 ] || false
-    grep -q "kube-prompt.sh" "$script" || false
-    grep -q 'PS1=.*devzone_kube_prompt' "$script" || false
-}

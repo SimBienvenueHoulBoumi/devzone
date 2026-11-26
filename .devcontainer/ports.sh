@@ -1,16 +1,12 @@
 #!/usr/bin/env bash
-# Port relays (#290): applications of the devzone container reachable from
-# 127.0.0.1 of the workstation, one alpine/socat container per port.
-#   ports.sh open <n>       opens the relay of port <n>
+# Port relays of the workstation (#290): applications reachable from
+# 127.0.0.1 of the workstation, kept in the state of devzone.
 #   ports.sh list            relays of the state: port, active, application
 #   ports.sh close <n>       removes the relay and the port from the state
-#   ports.sh restart         recreates the relays of the state toward the current IP
 #   ports.sh resume          one-line summary for the devzone recap
 # The state is the line "ports=8080,3000" of DEVZONE_STATE (sorted, no duplicate).
 # ROOT: a single dirname from HERE (.devcontainer) = root of the devzone repository.
 if [ "${BASH_SOURCE[0]}" = "$0" ]; then set -euo pipefail; fi
-
-SOCAT_IMAGE=alpine/socat:1.8.0.3
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="${DEVZONE_ROOT:-$(dirname "$HERE")}"
@@ -28,9 +24,9 @@ refuse() { echo "devzone : port : $*" >&2; exit 1; }
 # French values (read by the tools, #557): a contract, UTF-8 written as byte escapes.
 APP_RESPONDS="application responds"
 APP_NONE="no application"
-# shellcheck disable=SC2034 # read by ports-json.sh and ports-auto.sh (sourced)
+# shellcheck disable=SC2034 # read by ports-json.sh (sourced)
 JSON_APP_RESPONDS=$'application r\303\251pond'
-# shellcheck disable=SC2034 # read by ports-json.sh and ports-auto.sh (sourced)
+# shellcheck disable=SC2034 # read by ports-json.sh (sourced)
 JSON_APP_NONE="aucune application"
 
 relay_name() { echo "devzone-$INSTANCE-port-$1"; }
@@ -64,75 +60,12 @@ remove_port() {
     write_ports "$(sort_ports "$rest")"
 }
 
-# Network and address of the devzone container, read on the host's Docker: the
-# relay runs there and must reach the container by its IP.
-network_ip() {
-    local line
-    command -v docker >/dev/null 2>&1 || return 1
-    line="$(docker inspect "$(hostname)" \
-        --format '{{range $nom, $r := .NetworkSettings.Networks}}{{$nom}} {{$r.IPAddress}}{{"\n"}}{{end}}' 2>/dev/null |
-        awk 'NF >= 2 && $2 != "" { print; exit }')" || return 1
-    [ -n "$line" ] || return 1
-    NETWORK="${line%% *}"
-    IP="${line#* }"
-    [ -n "$NETWORK" ] && [ -n "$IP" ]
-}
-
-relay_exists() {
-    local name
-    name="$(relay_name "$1")"
-    command -v docker >/dev/null 2>&1 || return 1
-    [ -n "$(docker ps -a --filter "name=^$name$" --format '{{.Names}}' 2>/dev/null |
-        grep -Fx "$name" || true)" ]
-}
-
 relay_active() {
     local name
     name="$(relay_name "$1")"
     command -v docker >/dev/null 2>&1 || return 1
     [ -n "$(docker ps --filter "name=^$name$" --format '{{.Names}}' 2>/dev/null |
         grep -Fx "$name" || true)" ]
-}
-
-# Launches the relay; on failure, a clear message and code 1 (this function does
-# not change the state)
-launch() {
-    local port="$1" network="$2" ip="$3" name output
-    name="$(relay_name "$port")"
-    if output="$(docker run -d --restart unless-stopped \
-        --name "$name" \
-        --label "devzone.instance=$INSTANCE" \
-        --label "devzone.port=$port" \
-        --network "$network" \
-        -p "127.0.0.1:$port:$port" \
-        "$SOCAT_IMAGE" \
-        "tcp-listen:$port,fork,reuseaddr" "tcp-connect:$ip:$port" 2>&1)"; then
-        return 0
-    fi
-    case "$output" in
-        *"port is already allocated"* | *"address already in use"*)
-            echo "devzone : port : port already in use on the workstation : $port" >&2
-            ;;
-        *)
-            echo "devzone : port : relay on port $port failed : $output" >&2
-            ;;
-    esac
-    return 1
-}
-
-open_port() {
-    local port="${1:-}"
-    validate_port "$port"
-    if relay_active "$port"; then
-        add_port "$port"
-        echo "✔ relay already open: 127.0.0.1:$port on the workstation → $port in the container"
-        return 0
-    fi
-    network_ip || refuse "devzone container not found: host Docker unreachable?"
-    docker rm -f "$(relay_name "$port")" >/dev/null 2>&1 || true
-    launch "$port" "$NETWORK" "$IP" || exit 1
-    add_port "$port"
-    echo "✔ 127.0.0.1:$port on the workstation → $port in the container (relay $(relay_name "$port"))"
 }
 
 close_port() {
@@ -149,7 +82,7 @@ list_ports() {
     local ports port mark app
     ports="$(sort_ports "$(read_ports)")"
     if [ -z "$ports" ]; then
-        echo "no relay (devzone port <n>)"
+        echo "no relay"
         return 0
     fi
     # shellcheck disable=SC2046 # list of ports separated by commas
@@ -166,14 +99,13 @@ list_ports() {
         fi
         printf '  %-5s %s  %s\n' "$port" "$mark" "$app"
     done
-    bash "$HERE/ports-auto.sh" list_auto 2>/dev/null || true
 }
 
 summary() {
     local ports port output=""
     ports="$(sort_ports "$(read_ports)")"
     if [ -z "$ports" ]; then
-        echo "none (devzone port <n>)"
+        echo "none"
         return 0
     fi
     # shellcheck disable=SC2046 # list of ports separated by commas
@@ -187,28 +119,6 @@ summary() {
     echo "$output"
 }
 
-restart_relays() {
-    local ports port rc=0
-    ports="$(sort_ports "$(read_ports)")"
-    [ -n "$ports" ] || return 0
-    if ! network_ip; then
-        echo "devzone : port : relays not restarted: devzone container not found (host Docker unreachable?)" >&2
-        return 1
-    fi
-    # shellcheck disable=SC2046 # list of ports separated by commas
-    for port in $(printf '%s' "$ports" | tr ',' ' '); do
-        if ! port_valid "$port"; then
-            echo "devzone : port : invalid port in the state, ignored: $port" >&2
-            rc=1
-            continue
-        fi
-        # The container IP changes at each start: the relay is recreated
-        docker rm -f "$(relay_name "$port")" >/dev/null 2>&1 || true
-        launch "$port" "$NETWORK" "$IP" || rc=1
-    done
-    return "$rc"
-}
-
 # Machine-readable output of list: a JSON array [{port,active,application,auto}], jq only.
 # shellcheck source=SCRIPTDIR/ports-json.sh
 # shellcheck disable=SC1091
@@ -218,14 +128,8 @@ case "${1:-}" in
     '' | list)
         if [ "${2:-}" = "--json" ]; then list_json; else list_ports; fi
         ;;
-    open) open_port "${2:-}" ;;
     close | --close) close_port "${2:-}" ;;
-    restart) restart_relays ;;
     resume) summary ;;
-    auto) bash "$HERE/ports-auto.sh" auto "${2:-}" "${3:-}" ;;
-    exclude) bash "$HERE/ports-auto.sh" exclude "${2:-}" ;;
-    include) bash "$HERE/ports-auto.sh" include "${2:-}" ;;
     -h | --help | aide) sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//' ;;
-    *) open_port "$1" ;;
 esac
 fi

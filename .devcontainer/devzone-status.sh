@@ -98,14 +98,6 @@ show_state() {
     if [ -n "$current_cluster" ] && ! cluster_is_local "$current_cluster"; then
         printf '  ⚠ cluster        remote: %s — services on a remote cluster\n' "$current_cluster"
     fi
-    # Limited account token (#845): renewed as soon as it is close to expiry,
-    # only outside the pod and with a services cluster chosen (the cases where
-    # kube-account.sh is used); a failed renewal is reported for devzone repair
-    if ! in_pod && [ -n "$current_cluster" ] && ! devzone account fresh; then
-        if ! devzone account token >/dev/null 2>&1; then
-            echo "  ⚠ limited account token expired: devzone repair"
-        fi
-    fi
     devzone cluster clean --quiet || true
     # Old kind-gitlab cluster still present: invite to migrate (#396)
     if kind get clusters 2>/dev/null | grep -qx "gitlab${INSTANCE_SUFFIX}"; then

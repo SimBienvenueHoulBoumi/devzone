@@ -107,7 +107,6 @@ manage/scripts/workspace/workspace-clone.sh
 manage/test/workspace-clone.bats
 manage/scripts/workspace/workspace-copies.sh
 manage/test/workspace-copies.bats
-manage/test/kube-reachable.bats
 manage/test/test-gitlab-restes.bats
 .devcontainer/gitlab/test-gitlab-restes.sh
 .devcontainer/gitlab/chart.sh
@@ -182,14 +181,8 @@ internal/command/routing_test.go
 .devcontainer/cluster.sh
 .devcontainer/clusters.sh
 .devcontainer/kube-account.sh
-.devcontainer/kube-config.sh
-.devcontainer/kube-reachable.sh
 .devcontainer/isolation.sh
-.devcontainer/startup.sh
-.devcontainer/post-create.sh
 .devcontainer/workspace-init.sh
-.devcontainer/kind-wrapper.sh
-.devcontainer/git-identity.sh
 .devcontainer/kube-prompt.sh
 manage/test/cluster.bats
 manage/test/clusters.bats
@@ -197,14 +190,10 @@ manage/test/docker-host.bats
 manage/test/gitlab-cluster.bats
 manage/test/isolation.bats
 manage/test/kube-account.bats
-manage/test/post-create.bats
-manage/test/startup.bats
 manage/test/workspace-init.bats
 .devcontainer/ports.sh
-.devcontainer/ports-auto.sh
 .devcontainer/packages.sh
 manage/test/ports.bats
-manage/test/ports-auto.bats
 manage/test/packages.bats
 .devcontainer/catalog/app.sh
 .devcontainer/catalog/catalog-watcher.sh
@@ -336,7 +325,6 @@ internal/domain/postgres/status_test.go
 internal/platform/helm/chart.go
 internal/platform/relay/relay.go
 internal/platform/relay/script.go
-internal/platform/kube/account.go
 internal/platform/kube/cluster.go
 internal/platform/kube/namespace.go
 internal/podcmd/modules_test.go

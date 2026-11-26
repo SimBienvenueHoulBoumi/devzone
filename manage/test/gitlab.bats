@@ -1,6 +1,6 @@
 #!/usr/bin/env bats
 # gitlab module (#239, #273): install, uninstall, status, seed, host
-# gitlab.localhost in /etc/hosts (DEVZONE_HOSTS) and startup. Fake kind,
+# gitlab.localhost in /etc/hosts (DEVZONE_HOSTS) and module activation. Fake kind,
 # kubectl, helm, curl, git, docker and gh in the PATH: no cluster is
 # created. Each fake binary logs its arguments in
 # $BATS_TEST_TMPDIR/<tool>.log.
@@ -11,7 +11,6 @@ setup() {
     kind_vide
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
     GITLAB="$BATS_TEST_DIRNAME/../../.devcontainer/gitlab/gitlab.sh"
-    DEMARRAGE="$BATS_TEST_DIRNAME/../../.devcontainer/startup.sh"
     kube_isole
     export HOME="$BATS_TEST_TMPDIR/home"
     export DEVZONE_ROOT="$BATS_TEST_TMPDIR/racine"
@@ -19,8 +18,6 @@ setup() {
     export DEVZONE_MEMINFO="$BATS_TEST_TMPDIR/meminfo"
     export DEVZONE_HOSTS="$BATS_TEST_TMPDIR/hosts"
     export KIND_CLUSTERS="$BATS_TEST_TMPDIR/clusters"
-    # startup.sh starts the auto port watcher: its folder stays under the test (#394)
-    export DEVZONE_PORTS_AUTO_DIR="$BATS_TEST_TMPDIR/ports-auto"
     SECRETS="$DEVZONE_ROOT/workspace/.gitlab"
     mkdir -p "$HOME" "$DEVZONE_ROOT/workspace" "$BATS_TEST_TMPDIR/bin"
     printf 'MemAvailable: 16000000 kB\n' >"$DEVZONE_MEMINFO"
@@ -163,7 +160,7 @@ GIT
 #!/usr/bin/env bash
 if [ "${1:-}" = ls ]; then printf '{"dependencies":{}}\n'; fi
 NPM
-    # gh: never logged in (git-identity, devzone state): no network call
+    # gh: never logged in: no network call
     cat >"$BATS_TEST_TMPDIR/bin/gh" <<'GH'
 #!/usr/bin/env bash
 echo "gh $*" >>"$BATS_TEST_TMPDIR/gh.log"
@@ -642,24 +639,6 @@ SUDO
     [ "$status" -eq 0 ]
     [[ "$output" == *"already active, nothing to do"* ]] || false
     grep -q 'devzone:gitlab' "$DEVZONE_HOSTS"
-}
-
-@test "startup: gitlab active → line set, inactive → nothing" {
-    # Module inactive: nothing is set
-    printf 'gitlab=off\n' >"$DEVZONE_STATE"
-    run bash "$DEMARRAGE"
-    [ "$status" -eq 0 ]
-    ! grep -q 'devzone:gitlab' "$DEVZONE_HOSTS" || false
-    # Module active: the name is set at startup
-    printf 'gitlab=on\n' >"$DEVZONE_STATE"
-    run bash "$DEMARRAGE"
-    [ "$status" -eq 0 ]
-    grep -q 'devzone:gitlab' "$DEVZONE_HOSTS"
-    grep -q $'^127\.0\.0\.1\tgitlab\.localhost # devzone:gitlab$' "$DEVZONE_HOSTS"
-    wait_log "$BATS_TEST_TMPDIR/setsid.log" 'devzone devzone-gitlab svc/gitlab-webservice-default 8929:8181'
-    grep -q 'devzone devzone-gitlab svc/gitlab-webservice-default 8929:8181' "$BATS_TEST_TMPDIR/setsid.log"
-    wait_log "$BATS_TEST_TMPDIR/setsid.log" 'devzone devzone-gitlab svc/gitlab-gitlab-shell 2224:22'
-    grep -q 'devzone devzone-gitlab svc/gitlab-gitlab-shell 2224:22' "$BATS_TEST_TMPDIR/setsid.log"
 }
 
 @test "gitlab : values — host without port, external port via GITLAB_PORT" {

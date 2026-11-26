@@ -38,8 +38,8 @@ INTERVAL="${GITLAB_TEST_INTERVALLE:-5}"
 # Ref of the repowarden integration suite (#533)
 REPOWARDEN_REF="${REPOWARDEN_TEST_REF:-develop}"
 
-# devzone itself: the command of the PATH (link set by post-create.sh), otherwise
-# the script of the repository. DEVZONE_TEST_DEVZONE allows a test double.
+# devzone itself: the command of the PATH, otherwise the script of the
+# repository. DEVZONE_TEST_DEVZONE allows a test double.
 DEVZONE_BIN="${DEVZONE_TEST_DEVZONE:-}"
 if [ -z "$DEVZONE_BIN" ]; then
     if command -v devzone >/dev/null 2>&1; then
