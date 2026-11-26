@@ -78,7 +78,7 @@ repair_workstation() {
         repair_item "postgres relay" devzone postgres relay-start
     fi
     if [ "$(value_of argocd)" = on ]; then
-        repair_item "argocd relay" bash "$ICI/argocd/argocd.sh" relay-start
+        repair_item "argocd relay" "$ICI/devzone" argocd relay-start
     fi
     if [ "$(value_of mysql)" = on ]; then
         repair_item "mysql relay" devzone mysql relay-start

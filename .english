@@ -20,7 +20,6 @@ manage/scripts/workspace/ports-workspace.sh
 manage/workspace.sh
 manage/test/check-english.bats
 manage/test/readme.bats
-manage/test/services-hook.bats
 manage/test/gitops-gitlab.bats
 manage/test/go-layout.bats
 manage/test/chart-direct.bats
@@ -55,11 +54,6 @@ manage/test/workspace-build.bats
 manage/scripts/workspace/services-workspace.sh
 manage/test/services-pod.bats
 manage/test/workspace-services.bats
-.devcontainer/argocd/application.sh
-.devcontainer/argocd/apps.sh
-.devcontainer/argocd/services.sh
-.devcontainer/argocd/gitops.sh
-.devcontainer/argocd/conf.sh
 manage/test/argocd-conf.bats
 manage/scripts/workspace/argocd-workspace.sh
 manage/scripts/workspace/argocd-services.sh
@@ -94,15 +88,11 @@ charts/devzone-workspace/templates/statefulset.yaml
 .github/workflows/release.yml
 .github/workflows/repowarden.yml
 .github/workflows/tickets.yml
-.devcontainer/argocd/catalog-argocd.sh
-.devcontainer/argocd/services-hook.sh
-.devcontainer/argocd/gitops-gitlab.sh
 .devcontainer/chart-direct.sh
 .devcontainer/ports-json.sh
 .devcontainer/help.sh
 manage/scripts/ci/check-charts.sh
 manage/test/charts-convention.bats
-manage/test/chart-require.bats
 manage/scripts/workspace/workspace-clone.sh
 manage/test/workspace-clone.bats
 manage/scripts/workspace/workspace-copies.sh
@@ -216,7 +206,6 @@ manage/test/chart-gitlab.bats
 .devcontainer/devzone-ai.sh
 .devcontainer/devzone-skill.sh
 .devcontainer/devzone-services.sh
-.devcontainer/argocd/argocd.sh
 manage/test/go-parity.bats
 internal/command/version.go
 internal/command/version_test.go

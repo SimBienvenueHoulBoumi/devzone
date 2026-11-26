@@ -212,7 +212,10 @@ case "${1:-}" in
         exit 1
         ;;
     catalog) DEVZONE_STATE="$ETAT" bash "$ICI/catalog.sh" list ;;
-    argocd) DEVZONE_STATE="$ETAT" bash "$ICI/argocd/argocd.sh" "${@:2}" ;;
+    argocd)
+        echo "devzone argocd: Go binary of the pod unavailable (.devcontainer/bin)" >&2
+        exit 1
+        ;;
     port) DEVZONE_STATE="$ETAT" bash "$ICI/ports.sh" "${@:2}" ;;
     packages) bash "$ICI/packages.sh" "${@:2}" ;;
     passwords)

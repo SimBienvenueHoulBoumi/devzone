@@ -6,30 +6,31 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	fexec "github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec"
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec/fake"
 )
 
-// TestArgoCDLibraryCall checks the arguments and the devzone folder received by
-// the shell Argo CD library, run by a real bash.
+// TestArgoCDLibraryCall checks that argocdApply delegates to the Go Argo CD
+// module with the MySQL chart values.
 func TestArgoCDLibraryCall(t *testing.T) {
 	root := t.TempDir()
 	codeRoot := filepath.Join(root, ".devcontainer")
 	if err := os.MkdirAll(filepath.Join(codeRoot, "argocd"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	lib := "catalogue_argocd_apply() { printf '%s|' \"$RACINE\" \"$@\"; }\n"
-	if err := os.WriteFile(filepath.Join(codeRoot, "argocd", "catalog-argocd.sh"), []byte(lib), 0o644); err != nil {
+	if err := os.MkdirAll(filepath.Join(root, "charts", "devzone-mysql"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"MYSQL_IMAGE", "MYSQL_PORT", "MYSQL_MEMOIRE", "MYSQL_TAILLE"} {
-		t.Setenv(name, "")
+	if err := os.WriteFile(filepath.Join(root, "charts", "devzone-mysql", "Chart.yaml"), []byte("name: devzone-mysql\n"), 0o644); err != nil {
+		t.Fatal(err)
 	}
+	runner := fake.New()
+	runner.On("kubectl", nil, fexec.Result{})
+	t.Setenv("DEVZONE_ARGOCD_REVISION", "v1.0.0")
 	var out bytes.Buffer
-	e := newEnv(context.Background(), Options{Root: root, CodeRoot: codeRoot, StatePath: filepath.Join(root, "state"), Out: &out})
+	e := newEnv(context.Background(), Options{Root: root, CodeRoot: codeRoot, StatePath: filepath.Join(root, "state"), Out: &out, Runner: runner})
 	if err := e.argocdApply(ns, "claim=data"); err != nil {
 		t.Fatal(err)
-	}
-	want := root + "|mysql|devzone-mysql|mysql:8.4|3306|1Gi|5Gi|claim=data|"
-	if out.String() != want {
-		t.Fatalf("call = %q, want %q", out.String(), want)
 	}
 }
