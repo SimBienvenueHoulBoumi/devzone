@@ -16,12 +16,14 @@ func TestApplyRestartsRelay(t *testing.T) {
 	body := `
 CALLS="$6"
 devzone() {
+    case "$1" in
+        kube) return 0 ;;
+    esac
     printf 'CALL %s\n' "$*" >>"$CALLS"
     case "$1 $2" in
         "postgres status") printf 'ready on kind-devzone, relay stopped: devzone apply\n' ;;
     esac
 }
-cluster_choose() { printf 'kind-devzone'; }
 apply_postgres on
 `
 	out, code := shellServices(t, body, "", calls)

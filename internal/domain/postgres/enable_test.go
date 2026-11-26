@@ -43,7 +43,7 @@ func TestEnableContextMismatch(t *testing.T) {
 	f := newFixture(t)
 	writeState(t, "cluster=kind-devzone")
 	body := `
-cluster_saved() { printf 'kind-devzone'; }
+devzone() { [ "$1 $2" = "kube saved" ] && printf 'kind-devzone'; }
 apply_postgres on --context host-cluster
 `
 	out, code := shellServices(t, body, "")

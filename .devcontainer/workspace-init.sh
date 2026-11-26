@@ -66,7 +66,8 @@ init_prompt() {
     # Blocks written before the Go prompt sourced a shell library that no longer
     # exists: drop them, the new block below takes over (migration, idempotent)
     if grep -qE 'invite-kube\.sh|kube-prompt\.sh' "$bashrc" 2>/dev/null; then
-        sed -i -e '/invite-kube\.sh/d' -e '/kube-prompt\.sh/d' \
+        sed -i -e '/devzone prompt >>>/d' -e '/devzone prompt <</d' \
+            -e '/invite-kube\.sh/d' -e '/kube-prompt\.sh/d' \
             -e '/devzone_invite_kube/d' -e '/devzone_kube_prompt/d' "$bashrc"
         log "prompt block migrated to the Go command"
     fi

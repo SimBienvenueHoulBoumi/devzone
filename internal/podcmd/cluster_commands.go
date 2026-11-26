@@ -76,6 +76,39 @@ func runKube(ctx *cli.Context) int {
 			return 0
 		}
 		return 1
+	case "choose":
+		wanted, confirm := "", ""
+		for i := 0; i < len(ctx.Args); i++ {
+			if ctx.Args[i] == "--confirm" {
+				if i+1 >= len(ctx.Args) {
+					fmt.Fprintln(ctx.Err, "devzone : --confirm needs a context")
+					return 2
+				}
+				i++
+				confirm = ctx.Args[i]
+			} else {
+				wanted = ctx.Args[i]
+			}
+		}
+		choice := kube.ChooseOptions{Wanted: wanted, Confirm: confirm,
+			Saved: kube.SavedContext(statePath()), Remote: kubeRemoteConfirmation(),
+			Interactive: os.Getenv("DEVZONE_INTERACTIVE") == "1", Stdin: ctx.Stdin,
+			Out: ctx.Out, Err: ctx.Err}
+		name, code := k.Choose(context.Background(), choice)
+		if code != 0 {
+			return code
+		}
+		fmt.Fprintln(ctx.Out, name)
+		return 0
+	case "save":
+		if len(ctx.Args) != 2 {
+			return 2
+		}
+		if err := kube.SaveContext(statePath(), ctx.Args[1]); err != nil {
+			fmt.Fprintln(ctx.Err, err)
+			return 1
+		}
+		return 0
 	case "prompt":
 		if err := k.Prompt(context.Background(), ctx.Out); err != nil {
 			fmt.Fprintln(ctx.Err, err)

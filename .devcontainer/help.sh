@@ -18,7 +18,7 @@ devzone_aide() {
   devzone metrics [context…]               install metrics-server (kubectl top, k9s)
   devzone use CTX [--confirm CTX]          switch the kubectl working cluster
   devzone clusters                         view of the connected clusters (work and services)
-  devzone kube saved|local|reachable|prompt  cluster checks and shell prompt, in Go
+  devzone kube saved|choose|save|local|reachable|prompt  cluster helpers, in Go
   devzone is-enabled <module>              code 0 if enabled
   devzone test-bash32                      run the bats tests under bash 3.2 (Docker container)
   devzone test-gitlab                      end-to-end test of the GitLab module and platform

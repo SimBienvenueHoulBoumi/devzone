@@ -46,6 +46,8 @@ RACINE="${DEVZONE_ROOT:-$(dirname "$ICI")}"
 # Default state of the instance; DEVZONE_STATE takes precedence (tests, CI)
 ETAT="${DEVZONE_STATE:-$RACINE/.devzone.modules}"
 MODULES=(ai kubernetes gitlab postgres argocd mysql)
+INSTANCE_SUFFIX=""
+[ "${DEVZONE_INSTANCE:-devzone}" = devzone ] || INSTANCE_SUFFIX="-${DEVZONE_INSTANCE}"
 # .argocd.conf of the instance: the GitOps repository designation (#539)
 # shellcheck source=SCRIPTDIR/argocd/conf.sh
 # shellcheck disable=SC1091
