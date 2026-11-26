@@ -71,6 +71,14 @@ func workspaceCommand(ctx *cli.Context) int {
 		}
 		return commandServices(args, out, errOut)
 	}
+	// "argocd" alone and "argocd status" run in Go (#883, lot 6); the other
+	// forms still need the GitOps libraries of the workstation and stay
+	// delegated to bash.
+	if len(args) > 0 && args[0] == "argocd" {
+		if len(args) == 1 || (len(args) == 2 && args[1] == "status") {
+			return workspace.ArgoCDStatus(workspace.ExecRunner{}, modulesFile(), out)
+		}
+	}
 	// "ports" alone is status, as ports does in the bash entry point.
 	if len(args) > 0 && args[0] == "ports" {
 		if len(args) == 1 || (len(args) == 2 && args[1] == "status") {
