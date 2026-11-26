@@ -168,5 +168,6 @@ SETSID
     [ ! -e "$DEVZONE_STATE-failed-gitlab" ] || false
     FAKE_RUNNERS='[{"id":1}]' run bash "$DEVZONE"
     [[ "$output" == *"✔ module gitlab"* ]] || false
-    [[ "$output" != *"failed"* ]] || false
+    # the summary is printed on failure, to read the cause in the CI log
+    [[ "$output" != *"failed"* ]] || { echo "$output"; false; }
 }
