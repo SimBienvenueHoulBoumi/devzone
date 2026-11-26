@@ -89,10 +89,10 @@ app_install() {
         claim="$(devzone mysql claim "$ns")" || return 2
         [ "$claim" = donnees ] || extra="claim=$claim"
     fi
-    if "$ICI/devzone" argocd catalogue-active "$app"; then
+    if "$ICI/devzone" argocd catalog-active "$app"; then
         argo=1
         echo "▶ Application $app through Argo CD (chart charts/devzone-$app)…"
-        "$ICI/devzone" argocd catalogue-apply "$app" "$ns" "$image" "$port" "$(app_read "$app" memoire)" "$(app_read "$app" taille)" "$extra" || return 1
+        "$ICI/devzone" argocd catalog-apply "$app" "$ns" "$image" "$port" "$(app_read "$app" memoire)" "$(app_read "$app" taille)" "$extra" || return 1
     else
         # Direct helm: the chart charts/devzone-<app>, the one definition (#559)
         chart_install "$app" "$ns" "image=$image" "port=$port" \
@@ -120,8 +120,8 @@ app_remove() {
     fi
     claim="$(kubectl --context devzone -n "$ns" get statefulset "$app" \
         -o jsonpath='{.spec.volumeClaimTemplates[0].metadata.name}' 2>/dev/null || true)"
-    if "$ICI/devzone" argocd catalogue-application-exists "$app"; then
-        "$ICI/devzone" argocd catalogue-delete "$app" >/dev/null 2>&1 || true
+    if "$ICI/devzone" argocd catalog-application-exists "$app"; then
+        "$ICI/devzone" argocd catalog-delete "$app" >/dev/null 2>&1 || true
         kubectl --context devzone -n "$ns" delete "secret/$app-admin" >/dev/null 2>&1 || true
         pvc="${claim:-donnees}-$app-0"
         echo "✔ $app removed: Application deleted; volume $pvc and databases kept: devzone $app volume"

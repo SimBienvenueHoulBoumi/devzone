@@ -5,44 +5,44 @@ import (
 	"os"
 )
 
-// catalogueActiveCmd reports whether Argo CD can hold an app (exit 0/1).
-func (m *module) catalogueActiveCmd(args []string) int {
+// catalogActiveCmd reports whether Argo CD can hold an app (exit 0/1).
+func (m *module) catalogActiveCmd(args []string) int {
 	if len(args) != 1 {
 		return 2
 	}
-	if m.catalogueArgocdActive(args[0]) {
+	if m.catalogArgocdActive(args[0]) {
 		return 0
 	}
 	return 1
 }
 
-// catalogueApplicationExistsCmd reports whether an Application exists (exit 0/1).
-func (m *module) catalogueApplicationExistsCmd(args []string) int {
+// catalogApplicationExistsCmd reports whether an Application exists (exit 0/1).
+func (m *module) catalogApplicationExistsCmd(args []string) int {
 	if len(args) != 1 {
 		return 2
 	}
-	if m.catalogueArgocdApplicationExists(args[0]) {
+	if m.catalogArgocdApplicationExists(args[0]) {
 		return 0
 	}
 	return 1
 }
 
-// catalogueDeleteCmd deletes devzone-<app> Application (no-op when absent).
-func (m *module) catalogueDeleteCmd(args []string) int {
+// catalogDeleteCmd deletes devzone-<app> Application (no-op when absent).
+func (m *module) catalogDeleteCmd(args []string) int {
 	if len(args) != 1 {
 		return 2
 	}
 	app := args[0]
-	if !m.catalogueArgocdApplicationExists(app) {
+	if !m.catalogArgocdApplicationExists(app) {
 		return 0
 	}
 	return m.gitopsDeleteApplication("devzone-"+app, "cascade")
 }
 
-// catalogueApplyCmd applies the service Application for a catalog app.
-func (m *module) catalogueApplyCmd(args []string) int {
+// catalogApplyCmd applies the service Application for a catalog app.
+func (m *module) catalogApplyCmd(args []string) int {
 	if len(args) < 6 {
-		fmt.Fprintln(m.errOut, "usage: devzone argocd catalogue-apply <app> <ns> <image> <port> <memory> <size> [extra...]")
+		fmt.Fprintln(m.errOut, "usage: devzone argocd catalog-apply <app> <ns> <image> <port> <memory> <size> [extra...]")
 		return 2
 	}
 	app, ns, image, port, memory, size := args[0], args[1], args[2], args[3], args[4], args[5]
@@ -66,8 +66,8 @@ func (m *module) catalogueApplyCmd(args []string) int {
 	return 0
 }
 
-// catalogueStatus prints argocd revision; helper for shell callers.
-func (m *module) catalogueRevisionCmd(args []string) int {
+// catalogStatus prints argocd revision; helper for shell callers.
+func (m *module) catalogRevisionCmd(args []string) int {
 	fmt.Fprintln(m.out, m.argocdRevision())
 	return 0
 }

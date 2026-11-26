@@ -11,7 +11,7 @@ import (
 
 // hookOn enables a service through Argo CD.
 func (m *module) hookOn(svc string) int {
-	if !m.catalogueArgocdActive(svc) {
+	if !m.catalogArgocdActive(svc) {
 		return 3
 	}
 	if code := m.servicesNote(svc, "on"); code != 0 {
@@ -33,7 +33,7 @@ func (m *module) hookOn(svc string) int {
 
 // hookOff removes a service Application through Argo CD.
 func (m *module) hookOff(svc string) int {
-	if !m.catalogueArgocdApplicationExists(svc) {
+	if !m.catalogArgocdApplicationExists(svc) {
 		return 3
 	}
 	if code := m.servicesNote(svc, "off"); code != 0 {
@@ -68,8 +68,8 @@ func (m *module) hookRelease() int {
 	return 3
 }
 
-// catalogueArgocdApplicationExists reports whether devzone-<app> Application exists.
-func (m *module) catalogueArgocdApplicationExists(app string) bool {
+// catalogArgocdApplicationExists reports whether devzone-<app> Application exists.
+func (m *module) catalogArgocdApplicationExists(app string) bool {
 	data, _ := os.ReadFile(m.state)
 	on := false
 	for _, line := range strings.Split(string(data), "\n") {

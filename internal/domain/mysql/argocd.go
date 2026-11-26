@@ -22,7 +22,7 @@ func (e *env) argocdActive() bool {
 		Root:      e.root,
 		StatePath: e.state.Path(),
 	}
-	return argocd.Run(e.ctx, []string{"catalogue-active", "mysql"}, io.Discard, io.Discard, opts) == 0
+	return argocd.Run(e.ctx, []string{"catalog-active", "mysql"}, io.Discard, io.Discard, opts) == 0
 }
 
 // revision is the Git revision of the Applications: the explicit override, or
@@ -89,14 +89,14 @@ func (e *env) argocdApply(namespace, extra string) error {
 		Root:      e.root,
 		StatePath: e.state.Path(),
 	}
-	args := []string{"catalogue-apply", "mysql", namespace,
+	args := []string{"catalog-apply", "mysql", namespace,
 		setting("MYSQL_IMAGE", "mysql:8.4"), setting("MYSQL_PORT", "3306"),
 		setting("MYSQL_MEMOIRE", "1Gi"), setting("MYSQL_TAILLE", "5Gi")}
 	if extra != "" {
 		args = append(args, extra)
 	}
 	if code := argocd.Run(e.ctx, args, e.opts.Out, e.opts.Err, opts); code != 0 {
-		return fmt.Errorf("catalogue-apply: exit %d", code)
+		return fmt.Errorf("catalog-apply: exit %d", code)
 	}
 	return nil
 }
@@ -111,8 +111,8 @@ func (e *env) argocdDelete() error {
 		Root:      e.root,
 		StatePath: e.state.Path(),
 	}
-	if code := argocd.Run(e.ctx, []string{"catalogue-delete", "mysql"}, e.opts.Out, e.opts.Err, opts); code != 0 {
-		return fmt.Errorf("catalogue-delete: exit %d", code)
+	if code := argocd.Run(e.ctx, []string{"catalog-delete", "mysql"}, e.opts.Out, e.opts.Err, opts); code != 0 {
+		return fmt.Errorf("catalog-delete: exit %d", code)
 	}
 	return nil
 }

@@ -13,8 +13,8 @@ func TestBatsGitlabApplicationThroughArgoCD(t *testing.T) {
 	f := heldFixture(t, "gitlab")
 	allowKubectl(f)
 	t.Setenv("DEVZONE_INSTANCE", "")
-	if code := f.run("catalogue-active", "gitlab"); code != 0 {
-		t.Fatalf("catalogue-active: code=%d err=%q", code, f.err.String())
+	if code := f.run("catalog-active", "gitlab"); code != 0 {
+		t.Fatalf("catalog-active: code=%d err=%q", code, f.err.String())
 	}
 	if code := f.run("chart-require", "gitlab"); code != 0 {
 		t.Fatalf("chart-require: code=%d err=%q", code, f.err.String())
@@ -48,7 +48,7 @@ func TestBatsGitlabUnknownRevisionHelmPath(t *testing.T) {
 	allowKubectl(f)
 	writeChart(t, f.root, "gitlab", "devzone-gitlab")
 	writeTestFile(t, filepath.Join(f.root, "package.json"), "{\"version\": \"0.0.0\"}\n")
-	if code := f.run("catalogue-active", "gitlab"); code != 1 {
-		t.Fatalf("catalogue-active: code=%d out=%q err=%q", code, f.out.String(), f.err.String())
+	if code := f.run("catalog-active", "gitlab"); code != 1 {
+		t.Fatalf("catalog-active: code=%d out=%q err=%q", code, f.out.String(), f.err.String())
 	}
 }

@@ -85,12 +85,12 @@ func TestBatsServicesReconcileCorrectCharts(t *testing.T) {
 	}
 }
 
-// TestBatsCatalogueApplyMisnamedChart mirrors the catalogue-apply bats test:
+// TestBatsCatalogApplyMisnamedChart mirrors the catalog-apply bats test:
 // the chart check refuses before any Application is applied.
-func TestBatsCatalogueApplyMisnamedChart(t *testing.T) {
+func TestBatsCatalogApplyMisnamedChart(t *testing.T) {
 	f := newModFixture(t)
 	writeChart(t, f.root, "postgres", "pg")
-	code := f.run("catalogue-apply", "postgres", "devzone-postgres", "postgres:16", "5432", "256Mi", "5Gi")
+	code := f.run("catalog-apply", "postgres", "devzone-postgres", "postgres:16", "5432", "256Mi", "5Gi")
 	if code != 2 || !strings.Contains(f.err.String(), "✖ postgres : chart charts/devzone-postgres missing or misnamed") {
 		t.Fatalf("code=%d err=%q", code, f.err.String())
 	}

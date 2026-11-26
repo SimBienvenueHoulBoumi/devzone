@@ -109,8 +109,8 @@ func (m *module) argocdRevision() string {
 	return "v" + version
 }
 
-// catalogueArgocdActive reports whether Argo CD can hold the given app.
-func (m *module) catalogueArgocdActive(app string) bool {
+// catalogArgocdActive reports whether Argo CD can hold the given app.
+func (m *module) catalogArgocdActive(app string) bool {
 	data, _ := os.ReadFile(m.state)
 	on := false
 	for _, line := range strings.Split(string(data), "\n") {

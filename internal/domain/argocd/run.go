@@ -47,18 +47,18 @@ func Run(ctx context.Context, args []string, out, errOut io.Writer, opts Options
 		return m.applyCmd()
 	case "services-hook":
 		return m.servicesHook(args[1:])
-	case "catalogue-active":
-		return m.catalogueActiveCmd(args[1:])
-	case "catalogue-apply":
-		return m.catalogueApplyCmd(args[1:])
-	case "catalogue-application-exists":
-		return m.catalogueApplicationExistsCmd(args[1:])
-	case "catalogue-delete":
-		return m.catalogueDeleteCmd(args[1:])
-	case "catalogue-load":
+	case "catalog-active":
+		return m.catalogActiveCmd(args[1:])
+	case "catalog-apply":
+		return m.catalogApplyCmd(args[1:])
+	case "catalog-application-exists":
+		return m.catalogApplicationExistsCmd(args[1:])
+	case "catalog-delete":
+		return m.catalogDeleteCmd(args[1:])
+	case "catalog-load":
 		return 0
 	case "revision":
-		return m.catalogueRevisionCmd(args[1:])
+		return m.catalogRevisionCmd(args[1:])
 	case "chart-require":
 		if len(args) != 2 {
 			return 2

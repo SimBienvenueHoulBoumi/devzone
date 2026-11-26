@@ -52,9 +52,9 @@ func TestRunArgocdUsesResolvedRoot(t *testing.T) {
 	r.On("kubectl", nil, fexec.Result{})
 	r.On("bash", nil, fexec.Result{})
 	var out, errOut bytes.Buffer
-	ctx := &cli.Context{Args: []string{"catalogue-active", "postgres"}, Out: &out, Err: &errOut, Runner: r}
+	ctx := &cli.Context{Args: []string{"catalog-active", "postgres"}, Out: &out, Err: &errOut, Runner: r}
 	if code := runArgocd(ctx); code != 1 {
-		t.Fatalf("catalogue-active: code=%d out=%q err=%q", code, out.String(), errOut.String())
+		t.Fatalf("catalog-active: code=%d out=%q err=%q", code, out.String(), errOut.String())
 	}
 	out.Reset()
 	ctx.Args = []string{"chart-require", "postgres"}

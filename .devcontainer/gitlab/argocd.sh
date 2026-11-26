@@ -12,13 +12,13 @@
 #   gitlab_application_apply          the Application devzone-gitlab
 #   gitlab_application_retirer        the Application removed (namespace kept)
 
-# The catalogue side of Argo CD (module on, chart, revision, Application)
+# The catalog side of Argo CD (module on, chart, revision, Application)
 
 # The module argocd is on, the namespace devzone-argocd is installed, the chart
 # is in the repository and the revision is known: a development clone (version
-# 0.0.0) keeps the helm-direct path, like the catalogue applications
+# 0.0.0) keeps the helm-direct path, like the catalog applications
 gitlab_argocd_active() {
-    "$ICI/../devzone" argocd catalogue-active gitlab
+    "$ICI/../devzone" argocd catalog-active gitlab
 }
 
 # Argo CD takes over the objects of a helm release gitlab: the release secrets
@@ -43,6 +43,6 @@ gitlab_application_apply() {
 # The Application removed when GitLab is uninstalled: its resources leave with
 # it; nothing to do when the module argocd is off or the Application is absent
 gitlab_application_retirer() {
-    "$ICI/../devzone" argocd catalogue-application-exists gitlab || return 0
-    "$ICI/../devzone" argocd catalogue-delete gitlab
+    "$ICI/../devzone" argocd catalog-application-exists gitlab || return 0
+    "$ICI/../devzone" argocd catalog-delete gitlab
 }
