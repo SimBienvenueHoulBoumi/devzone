@@ -52,6 +52,9 @@ case "$*" in
     "cluster clean"*) exit 0 ;;
     "account token"*) exit 0 ;;
     "account fresh"*) exit 0 ;;
+    "passwords regenerate")
+        [ ! -f "$BATS_TEST_TMPDIR/failed-password" ] || { echo "credentials unavailable" >&2; exit 1; }
+        ;;
     gitlab\ *) exit 0 ;;
     postgres\ *|mysql\ *) exit 0 ;;
 esac
@@ -99,7 +102,7 @@ KUBE
     [[ "$output" == *"✔ catalog watcher"* ]] || false
     [[ "$output" == *"✔ credentials"* ]] || false
     [[ "$(cat "$T/actions.log")" == *"catalog-watcher start"* ]] || false
-    [[ "$(cat "$T/actions.log")" == *"password regenerate"* ]] || false
+    [[ "$(cat "$T/actions.log")" == *"devzone passwords regenerate"* ]] || false
 }
 
 @test "repair: active gitlab and postgres are repaired too" {
@@ -123,7 +126,7 @@ KUBE
     run bash "$APP" repair
     [ "$status" -eq 1 ]
     [[ "$output" == *"✖ credentials : credentials unavailable"* ]] || false
-    [[ "$(cat "$T/actions.log")" == *"password regenerate"* ]] || false
+    [[ "$(cat "$T/actions.log")" == *"devzone passwords regenerate"* ]] || false
 }
 
 @test "metrics: passes the context and the options" {
