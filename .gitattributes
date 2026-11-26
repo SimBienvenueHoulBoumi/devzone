@@ -14,3 +14,11 @@ manage/devzone            text eol=lf
 *.yml               text eol=lf
 *.md                text eol=lf
 charts/**           text eol=lf
+# Reference files keep LF bytes on every workstation: with core.autocrlf a
+# CRLF reference no longer matches the LF text from the program, and embedded
+# CRLF data is baked into binaries built on Windows.
+**/testdata/**      text eol=lf
+**/golden/**        text eol=lf
+**/goldens/**       text eol=lf
+*.golden            text eol=lf
+*.txt               text eol=lf
