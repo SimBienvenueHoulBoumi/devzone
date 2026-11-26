@@ -12,8 +12,10 @@ set -euo pipefail
 
 # shellcheck source=SCRIPTDIR/cluster.sh
 . "$(dirname "$0")/cluster.sh"
+# shellcheck source=SCRIPTDIR/versions.env
+. "$(dirname "$0")/versions.env"
 
-VERSION=v0.9.0
+VERSION="$METRICS_SERVER_VERSION"
 MANIFEST="https://github.com/kubernetes-sigs/metrics-server/releases/download/${VERSION}/components.yaml"
 
 mapfile -t known < <(kubectl config get-contexts -o name 2>/dev/null || true)

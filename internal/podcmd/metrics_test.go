@@ -31,6 +31,17 @@ func TestMetricsApplicationPath(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, ".devzone.modules"), []byte("argocd=on\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.MkdirAll(filepath.Join(root, ".devcontainer"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	pins := "METRICS_SERVER_CHART_VERSION=3.14.0\nMETRICS_SERVER_VERSION=v0.9.0\n"
+	if err := os.WriteFile(filepath.Join(root, ".devcontainer", "versions.env"), []byte(pins), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// The code folder is the one of DEVZONE_POD_SCRIPT, which must exist to be used
+	if err := os.WriteFile(filepath.Join(root, ".devcontainer", "devzone"), []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	r := fake.New()
 	r.On("kubectl", []string{"--context", "devzone", "get", "namespace", "devzone-argocd"}, fexec.Result{})
 	r.On("kubectl", []string{"--context", "devzone", "apply", "-f", "-"}, fexec.Result{})
@@ -52,7 +63,7 @@ func TestMetricsApplicationPath(t *testing.T) {
 			applied = string(data)
 		}
 	}
-	if !strings.Contains(applied, "name: devzone-metrics-server") || !strings.Contains(applied, "targetRevision: 3.12.1") {
+	if !strings.Contains(applied, "name: devzone-metrics-server") || !strings.Contains(applied, "targetRevision: 3.14.0") {
 		t.Fatalf("no pinned dependency Application: %q", applied)
 	}
 }

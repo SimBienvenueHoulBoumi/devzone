@@ -10,9 +10,6 @@ const (
 	metricsRepo = "https://kubernetes-sigs.github.io/metrics-server"
 	// metricsChart is the chart published in that repository.
 	metricsChart = "metrics-server"
-	// metricsVersion pins the chart: no dependency is followed from a moving
-	// branch, so the same cluster state is reproduced from the declaration.
-	metricsVersion = "3.12.1"
 	// metricsNS is the namespace of the Metrics API deployment.
 	metricsNS = "kube-system"
 )
@@ -37,10 +34,16 @@ func (m *module) dependencyCmd(args []string) int {
 }
 
 // metricsServerApply applies metrics-server from its official chart with the
-// kubelet flag the local clusters need, without changing a devzone chart.
+// kubelet flag the local clusters need, without changing a devzone chart. The
+// chart version comes from versions.env: no dependency follows a moving branch.
 func (m *module) metricsServerApply() int {
+	chart, app, err := m.metricsPins()
+	if err != nil {
+		fmt.Fprintln(m.errOut, err)
+		return 1
+	}
 	manifest, err := m.renderChartApp("devzone-metrics-server", metricsNS, metricsRepo,
-		metricsChart, metricsVersion, []string{"args[0]=--kubelet-insecure-tls"})
+		metricsChart, chart, []string{"args[0]=--kubelet-insecure-tls"})
 	if err != nil {
 		fmt.Fprintln(m.errOut, err)
 		return 1
@@ -55,7 +58,7 @@ func (m *module) metricsServerApply() int {
 		}
 		return 1
 	}
-	fmt.Fprintf(m.out, "✔ Application devzone-metrics-server: %s %s → %s\n", metricsRepo, metricsVersion, metricsNS)
+	fmt.Fprintf(m.out, "✔ Application devzone-metrics-server: %s chart %s (app %s) → %s\n", metricsRepo, chart, app, metricsNS)
 	return 0
 }
 
