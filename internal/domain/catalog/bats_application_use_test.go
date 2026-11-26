@@ -9,10 +9,10 @@ import (
 // TestShellMetrics checks that options are passed to the metrics installer.
 func TestShellMetrics(t *testing.T) {
 	app, actions, _ := shellApp(t)
-	if _, code := runShellApp(t, app, "metrics", "rancher-desktop", "--force"); code != 0 {
+	if _, code := runShellApp(t, app, "metrics", "fake-local", "--force"); code != 0 {
 		t.Fatalf("metrics: code %d", code)
 	}
-	if got := strings.TrimSpace(readLog(t, actions)); got != "metrics rancher-desktop --force" {
+	if got := strings.TrimSpace(readLog(t, actions)); got != "metrics fake-local --force" {
 		t.Fatalf("actions = %q", got)
 	}
 }
@@ -21,15 +21,15 @@ func TestShellMetrics(t *testing.T) {
 func TestShellUse(t *testing.T) {
 	app, _, state := shellApp(t)
 	writeTestFile(t, state, "cluster=kind-devzone\n")
-	out, code := runShellApp(t, app, "use", "rancher-desktop")
+	out, code := runShellApp(t, app, "use", "fake-local")
 	if code != 0 {
 		t.Fatalf("use: code %d, output %q", code, out)
 	}
-	if !strings.Contains(out, "working cluster: rancher-desktop") {
+	if !strings.Contains(out, "working cluster: fake-local") {
 		t.Fatalf("use output = %q", out)
 	}
 	kubectl := os.Getenv("BATS_TEST_TMPDIR_ACTIONS") + ".kubectl"
-	if !strings.Contains(readLog(t, kubectl), "config use-context rancher-desktop") {
+	if !strings.Contains(readLog(t, kubectl), "config use-context fake-local") {
 		t.Fatalf("kubectl = %q", readLog(t, kubectl))
 	}
 	if got := strings.TrimSpace(readLog(t, state)); got != "cluster=kind-devzone" {

@@ -72,14 +72,17 @@ func shellApp(t *testing.T) (appDir, actions, state string) {
 	return app, actions, state
 }
 
-// kubectlFake answers the read-only config queries of "devzone use" without a
-// cluster. Its expectations are fixed here, never read from the removed bats.
+// kubectlFake answers every config query of "devzone use" with data defined
+// here: the local context is known only by this fake, so no test can lean on a
+// real context of the machine. Its expectations are fixed, never read from the
+// removed bats.
 const kubectlFake = `#!/usr/bin/env bash
 T="${BATS_TEST_TMPDIR_ACTIONS}"
 printf 'kubectl %s\n' "$*" >>"${T}.kubectl"
 case "$*" in
-    "config get-contexts -o name") printf '%s\n' rancher-desktop prod ;;
-    *"config view"*) echo x ;;
+    "config get-contexts -o name") printf '%s\n' fake-local prod ;;
+    *'config view'*'"fake-local"'*) printf '%s\n' cluster-fake ;;
+    *'config view'*'"cluster-fake"'*) printf '%s\n' https://127.0.0.1:6443 ;;
 esac
 exit 0
 `
