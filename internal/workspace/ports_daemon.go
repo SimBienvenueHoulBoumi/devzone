@@ -11,8 +11,9 @@ import (
 // portsDaemonCall records one call to a service manager, for the tests: no
 // test reaches the real launchctl or systemctl.
 type portsDaemonCall struct {
-	tool string
-	args []string
+	tool  string
+	quiet bool
+	args  []string
 }
 
 // portsDaemon runs the service manager of the platform. It is a variable so
@@ -21,11 +22,15 @@ type portsDaemonCall struct {
 var portsDaemon = runDaemon
 
 // runDaemon runs tool with args and returns its exit status, or 1 when the
-// program cannot start, as a shell does.
-func runDaemon(tool string, args ...string) int {
+// program cannot start, as a shell does. A quiet call discards the output of
+// the service manager: a call whose failure is expected, such as the unload of
+// a job that is not loaded, must not print the usage text of launchctl.
+func runDaemon(tool string, quiet bool, args ...string) int {
 	cmd := exec.Command(tool, args...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	if !quiet {
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+	}
 	err := cmd.Run()
 	if err == nil {
 		return 0
@@ -71,14 +76,20 @@ func portsDaemonRestartArgs() []string {
 // disable --now on Linux.
 func portsDaemonDisableArgs() []string {
 	if portsPlatform == "darwin" {
-		return []string{"bootout", portsDaemonDomain() + "/" + portsAgentName()}
+		return []string{"bootout", portsDaemonServiceTarget()}
 	}
 	return []string{"--user", "disable", "--now", portsAgentName() + "." + portsAgentExt()}
 }
 
-// portsDaemonDomain returns the launchctl domain of the current user.
+// portsDaemonDomain returns the launchctl domain of the current user, gui/<uid>.
 func portsDaemonDomain() string {
-	return "gui:" + strconv.Itoa(os.Getuid())
+	return "gui/" + strconv.Itoa(os.Getuid())
+}
+
+// portsDaemonServiceTarget returns the launchctl service target of the watcher,
+// gui/<uid>/<label>, where the label is the Label of the launch agent.
+func portsDaemonServiceTarget() string {
+	return portsDaemonDomain() + "/" + portsAgentName()
 }
 
 // portsDaemonTool returns the service manager of the platform.

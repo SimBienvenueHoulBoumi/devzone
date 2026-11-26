@@ -102,7 +102,7 @@ func TestPortsDisableUnloadsBeforeRemovingDefinition(t *testing.T) {
 			portsPlatform = tc.platform
 			h.installAgent()
 			var seen []bool
-			portsDaemon = func(tool string, args ...string) int {
+			portsDaemon = func(tool string, quiet bool, args ...string) int {
 				seen = append(seen, portsAgentExists())
 				return 0
 			}

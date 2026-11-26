@@ -62,8 +62,8 @@ func newPortsEnableHarness(t *testing.T) *portsEnableHarness {
 		}
 		return h.kubectl, nil
 	}
-	portsDaemon = func(tool string, args ...string) int {
-		h.calls = append(h.calls, portsDaemonCall{tool: tool, args: append([]string(nil), args...)})
+	portsDaemon = func(tool string, quiet bool, args ...string) int {
+		h.calls = append(h.calls, portsDaemonCall{tool: tool, quiet: quiet, args: append([]string(nil), args...)})
 		if h.daemonCode != 0 {
 			return h.daemonCode
 		}

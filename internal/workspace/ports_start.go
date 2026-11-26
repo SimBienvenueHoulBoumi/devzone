@@ -65,13 +65,13 @@ func PortsStart(out, errOut io.Writer) int {
 func portsStartService(out, errOut io.Writer) int {
 	tool := portsDaemonTool()
 	if portsPlatform == "darwin" {
-		if status := portsDaemon(tool, "kickstart", "-k", portsDaemonDomain()+"/"+portsAgentName()); status == 0 {
+		if status := portsDaemon(tool, true, "kickstart", "-k", portsDaemonServiceTarget()); status == 0 {
 			fmt.Fprintln(out, "Workspace ports: watcher started by the service manager")
 			return 0
 		}
 	}
 	args := portsDaemonStartArgs()
-	if status := portsDaemon(tool, args...); status != 0 {
+	if status := portsDaemon(tool, false, args...); status != 0 {
 		fmt.Fprintf(errOut, "✖ port watcher not started: %s %v failed (status %d)\n", tool, args, status)
 		return 1
 	}
