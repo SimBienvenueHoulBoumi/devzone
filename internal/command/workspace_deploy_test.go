@@ -109,25 +109,18 @@ func TestWorkspaceDeployUnknownRevisionFails(t *testing.T) {
 	}
 }
 
-// TestWorkspaceDeployDirectUnchanged checks that with Argo CD off the helm
-// path still adopts the chart and its volumes, as before the port.
-func TestWorkspaceDeployDirectUnchanged(t *testing.T) {
-	r, root, out, errOut := deployFixture(t, "off")
-	chart := filepath.Join(root, "charts", "devzone-workspace")
-	r.On("kubectl", []string{"--context", "devzone", "create", "namespace", "devzone-workspace", "--dry-run=client", "-o", "yaml"}, fexec.Result{})
-	r.On("helm", []string{"template", "workspace", chart, "-n", "devzone-workspace", "--set", "image.tag=2.0.0"}, fexec.Result{})
-	r.On("helm", []string{"--kube-context", "devzone", "upgrade", "--install", "workspace", chart, "-n", "devzone-workspace", "--set", "image.tag=2.0.0"}, fexec.Result{})
-	r.On("kubectl", nil, fexec.Result{})
-	if code := deployRun(r, out, errOut, "registry/example", "2.0.0", "no"); code != 0 {
-		t.Fatalf("code = %d, err = %q", code, errOut.String())
+// TestWorkspaceDeployHandsOffWithoutArgoCD checks that the Go command does
+// nothing when Argo CD is off: the shell entry point keeps the historical
+// helm path, with the same adoption of volumes and secrets.
+func TestWorkspaceDeployHandsOffWithoutArgoCD(t *testing.T) {
+	r, _, out, errOut := deployFixture(t, "off")
+	r.On("kubectl", []string{"--context", "devzone", "get", "namespace", "devzone-argocd"}, fexec.Result{Code: 1})
+	if code := deployRun(r, out, errOut, "registry/example", "2.0.0", "no"); code != 3 {
+		t.Fatalf("code = %d, want 3 (shell path)", code)
 	}
-	var helmCalls int
 	for _, call := range r.Calls() {
 		if call.Name == "helm" {
-			helmCalls++
+			t.Fatalf("helm was called by Go: %v", call.Args)
 		}
-	}
-	if helmCalls != 2 {
-		t.Fatalf("helm calls = %d, want 2: %v", helmCalls, r.Calls())
 	}
 }

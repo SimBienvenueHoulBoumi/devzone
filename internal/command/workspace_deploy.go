@@ -7,10 +7,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/SimBienvenueHoulBoumi/devzone/internal/domain/argocd"
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/cli"
 	fexec "github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec"
-	"github.com/SimBienvenueHoulBoumi/devzone/internal/platform/helm"
+	rule "github.com/SimBienvenueHoulBoumi/devzone/internal/platform/argocd"
 )
 
 // workspaceDeploy runs the cluster part of "devzone workspace start" for the
@@ -36,10 +35,10 @@ func workspaceDeploy(ctx *cli.Context) int {
 	if state == "" {
 		state = filepath.Join(root, ".devzone.modules")
 	}
-	if argoCDHoldsWorkspace(ctx.Runner, state) {
-		return workspaceDeployArgo(ctx, root, repo, tag, withImage)
+	if !argoCDHoldsWorkspace(ctx.Runner, state) {
+		return 3
 	}
-	return workspaceDeployDirect(ctx, root, repo, tag, withImage)
+	return workspaceDeployArgo(ctx, root, repo, tag, withImage)
 }
 
 // argoCDHoldsWorkspace reports whether Argo CD is wanted and installed: this
@@ -57,13 +56,12 @@ func argoCDHoldsWorkspace(runner fexec.Runner, state string) bool {
 // release is adopted as it is: no release secret, volume or namespace is
 // deleted, and a missing revision stops the start before any change.
 func workspaceDeployArgo(ctx *cli.Context, root, repo, tag string, withImage bool) int {
-	codeRoot := filepath.Join(root, ".devcontainer")
-	opts := argocd.Options{Runner: ctx.Runner, Out: ctx.Out, Err: ctx.Err, Root: root, CodeRoot: codeRoot}
-	if code := argocd.Run(context.Background(), []string{"chart-require", "workspace"}, ctx.Out, ctx.Err, opts); code != 0 {
+	if code := workspaceChartRequire(root); code != 0 {
+		fmt.Fprintln(ctx.Err, "devzone : workspace : chart charts/devzone-workspace missing or misnamed")
 		return code
 	}
-	revision, err := argocd.ResolveRevision(context.Background(), argocd.RevisionInputs{
-		Runner: ctx.Runner, Root: root, CodeRoot: codeRoot,
+	revision, err := rule.ResolveRevision(context.Background(), rule.RevisionInputs{
+		Runner: ctx.Runner, Root: root, CodeRoot: filepath.Join(root, ".devcontainer"),
 		ConfPath: filepath.Join(root, ".argocd.conf"), Repo: os.Getenv("DEVZONE_REPO_URL"),
 		Chart: "devzone-workspace",
 	})
@@ -85,30 +83,7 @@ func workspaceDeployArgo(ctx *cli.Context, root, repo, tag string, withImage boo
 	}
 	params = append(params, egressParams(statePath(root))...)
 	fmt.Fprintf(ctx.Out, "▶ Application devzone-workspace (Argo CD, charts/devzone-workspace at %s)…\n", revision)
-	args := append([]string{"gitops-apply", "devzone-workspace", "workspace", "devzone-workspace", chartRepo,
-		revision, "charts/devzone-workspace"}, params...)
-	return argocd.Run(context.Background(), args, ctx.Out, ctx.Err, opts)
-}
-
-// workspaceDeployDirect keeps the helm path when Argo CD is not active: the
-// namespace is created before the chart, as the shell entry point did.
-func workspaceDeployDirect(ctx *cli.Context, root, repo, tag string, withImage bool) int {
-	_, err := ctx.Runner.Run(context.Background(), "kubectl", []string{
-		"--context", "devzone", "create", "namespace", "devzone-workspace", "--dry-run=client", "-o", "yaml"}, fexec.Opts{})
-	if err != nil {
-		return 1
-	}
-	sets := []string{"image.tag=" + tag}
-	if withImage {
-		sets = append(sets, "image.repository="+repo)
-	}
-	if tag == "latest" {
-		sets = append(sets, "image.pullPolicy=Always")
-	}
-	sets = append(sets, egressParams(statePath(root))...)
-	_, code := helm.Install(context.Background(), ctx.Runner, filepath.Join(root, ".devcontainer"),
-		"workspace", "devzone-workspace", sets, ctx.Err)
-	return code
+	return workspaceApplyApplication(ctx, root, chartRepo, revision, params)
 }
 
 // statePath returns the state file of the devzone folder of the workstation.

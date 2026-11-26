@@ -43,6 +43,7 @@ var allowedDirectInstalls = map[string]string{
 	"internal/domain/argocd/install_ns.go":           "namespace and account needed before Argo CD",
 	"internal/domain/argocd/gitops_root.go":          "repository secret and root Application",
 	"internal/domain/argocd/dependency.go":           "external dependency Application, applied directly",
+	"internal/command/workspace_deploy_apply.go":     "workspace Application applied directly",
 	"internal/domain/argocd/apps_apply.go":           "repository secret and Application when no GitOps repository",
 	"internal/domain/argocd/services_reconcile.go":   "service namespace and secret, kept with the data",
 	"internal/domain/gitlab/account.go":              "namespace and administrator account",
