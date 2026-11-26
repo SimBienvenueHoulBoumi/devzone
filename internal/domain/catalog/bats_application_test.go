@@ -78,7 +78,7 @@ const kubectlFake = `#!/usr/bin/env bash
 T="${BATS_TEST_TMPDIR_ACTIONS}"
 printf 'kubectl %s\n' "$*" >>"${T}.kubectl"
 case "$*" in
-    "config get-contexts -o name") printf '%s\n' docker-desktop prod ;;
+    "config get-contexts -o name") printf '%s\n' rancher-desktop prod ;;
     *"config view"*) echo x ;;
 esac
 exit 0
