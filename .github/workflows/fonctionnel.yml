@@ -241,6 +241,13 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: lts/*
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version: '1.27'
+      # State writes (enable ai) are a Go pod command: provide the binary as in
+      # the bats jobs, so this real arm64 host run does not need a shell fallback
+      - name: Go binary of the pod for the arm64 host
+        run: go build -o ".devcontainer/bin/devzone-pod-linux-$(go env GOARCH)" ./cmd/devzone-pod
       - name: devzone enable ai, then claude --version and opencode --version
         env:
           DEVZONE_STATE: ${{ runner.temp }}/devzone-modules
@@ -321,12 +328,16 @@ jobs:
       # mysql, cluster clean…): the pod binary of this commit, in the place where
       # the launcher looks for it (#864)
       - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
-        if: runner.os == 'Linux'
         with:
           go-version: '1.27'
-      - name: Go binary of the pod for the bats
+      - name: Go binary of the pod for the bats (Linux)
         if: runner.os == 'Linux'
         run: go build -o ".devcontainer/bin/devzone-pod-linux-$(go env GOARCH)" ./cmd/devzone-pod
+      # The macOS job runs the host scripts under bash 3.2: a Linux binary would
+      # not run there, so the launcher gets a binary of this host (state writes)
+      - name: Go binary of the pod for the bats (macOS)
+        if: runner.os == 'macOS'
+        run: go build -o ".devcontainer/bin/devzone-pod-darwin-$(go env GOARCH)" ./cmd/devzone-pod
       - name: bats manage/test/ (ubuntu, shard)
         if: runner.os == 'Linux'
         env:

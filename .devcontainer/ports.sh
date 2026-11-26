@@ -14,9 +14,6 @@ ETAT="${DEVZONE_STATE:-$ROOT/.devzone.modules}"
 INSTANCE="${DEVZONE_INSTANCE:-devzone}"
 
 # Safe state write (#417): lock, temporary file in the state folder, backup copy
-# shellcheck source=SCRIPTDIR/state.sh
-# shellcheck disable=SC1091
-. "$HERE/state.sh"
 
 refuse() { echo "devzone : port : $*" >&2; exit 1; }
 
@@ -41,9 +38,9 @@ sort_ports() {
     printf '%s\n' "${1:-}" | tr ',' '\n' | awk 'NF && $0 ~ /^[0-9]+$/ { print }' | sort -n -u | paste -sd, -
 }
 
-# Writes the ports= line of the state (#417: never mv outside state.sh)
+# Writes the ports= line of the state (#417: never mv outside Go state command)
 write_ports() {
-    state_write ports "${1:-}" || { echo "devzone : port : state not saved : $ETAT" >&2; exit 1; }
+    DEVZONE_STATE="$ETAT" bash "$HERE/devzone" state write ports "${1:-}" || { echo "devzone : port : state not saved : $ETAT" >&2; exit 1; }
 }
 
 add_port() {

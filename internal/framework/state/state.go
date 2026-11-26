@@ -3,16 +3,19 @@
 package state
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
+	"sync"
 )
 
 // State is a handle on a .devzone.modules file.
 type State struct {
-	path string
+	path    string
+	depth   int
+	flockFd *os.File
+	op      sync.Mutex
+	mu      sync.Mutex
 }
 
 // New opens (or creates on write) the state file located in dir, or at path when
@@ -73,93 +76,24 @@ func (s *State) GetOK(key string) (string, bool) {
 // Set writes key=value, removing any previous line for key and keeping the other
 // lines (including unknown ones) in their original order.
 func (s *State) Set(key, value string) error {
+	s.op.Lock()
+	defer s.op.Unlock()
 	if err := s.lock(); err != nil {
 		return err
 	}
 	defer s.unlock()
-	return s.writeLocked(key, value, false)
+	return s.setLocked(key, value)
 }
 
 // Delete removes every line for key, keeping the other lines in order.
 func (s *State) Delete(key string) error {
+	s.op.Lock()
+	defer s.op.Unlock()
 	if err := s.lock(); err != nil {
 		return err
 	}
 	defer s.unlock()
-	return s.writeLocked(key, "", true)
-}
-
-func (s *State) writeLocked(key, value string, delete bool) error {
-	prefix := key + "="
-	var lines []string
-	if data, err := os.ReadFile(s.path); err == nil {
-		text := strings.TrimSuffix(string(data), "\n")
-		if len(text) > 0 || len(data) > 0 {
-			lines = strings.Split(text, "\n")
-		}
-	} else if !os.IsNotExist(err) {
-		return err
-	}
-	var out strings.Builder
-	for _, line := range lines {
-		if strings.HasPrefix(line, prefix) {
-			continue
-		}
-		out.WriteString(line)
-		out.WriteByte('\n')
-	}
-	if !delete {
-		out.WriteString(key)
-		out.WriteByte('=')
-		out.WriteString(value)
-		out.WriteByte('\n')
-	}
-	tmp := s.path + ".tmp"
-	if err := os.WriteFile(tmp, []byte(out.String()), 0o644); err != nil {
-		return err
-	}
-	if err := os.Chmod(tmp, 0o644); err != nil {
-		_ = os.Remove(tmp)
-		return err
-	}
-	if err := os.Rename(tmp, s.path); err != nil {
-		_ = os.Remove(tmp)
-		return err
-	}
-	return nil
-}
-
-// lock takes the directory lock, waiting briefly for a stale holder.
-func (s *State) lock() error {
-	dir := s.Dir()
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return err
-	}
-	lock := dir + string(os.PathSeparator) + ".devzone.modules.lock"
-	start := time.Now()
-	for {
-		if err := os.Mkdir(lock, 0o755); err == nil {
-			return nil
-		} else if !os.IsExist(err) {
-			return err
-		}
-		// stale lock handling
-		if info, err := os.Stat(lock); err == nil {
-			if time.Since(info.ModTime()) > 30*time.Second {
-				_ = os.RemoveAll(lock)
-				continue
-			}
-		}
-		if time.Since(start) >= 10*time.Second {
-			return fmt.Errorf("state locked: %s", lock)
-		}
-		time.Sleep(50 * time.Millisecond)
-	}
-}
-
-func (s *State) unlock() {
-	lock := s.Dir() + string(os.PathSeparator) + ".devzone.modules.lock"
-	_ = os.RemoveAll(lock)
+	return s.deleteLocked(key)
 }
 
 // Package-level helpers for callers that prefer a path argument.

@@ -183,7 +183,7 @@ container_command() {
     case "$1" in
         ai | agent | apply | argocd | build | catalog | cluster | clusters | disable | \
             enable | gitlab | is-enabled | llm | metrics | modules | mysql | packages | \
-            passwords | platform | port | postgres | repair | start | status | \
+            passwords | platform | port | postgres | repair | start | state | status | \
             test-bash32 | test-gitlab | ticket | use) return 0 ;;
         *) return 1 ;;
     esac

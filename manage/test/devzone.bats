@@ -663,9 +663,6 @@ KUBE
     cp "$BATS_TEST_DIRNAME"/../../.devcontainer/devzone-*.sh "$BATS_TEST_TMPDIR/app/"
     cp "$BATS_TEST_DIRNAME/../../.devcontainer/help.sh" "$BATS_TEST_TMPDIR/app/help.sh"
     cp "$BATS_TEST_DIRNAME/../../.devcontainer/cluster.sh" "$BATS_TEST_TMPDIR/app/cluster.sh"
-    cp "$BATS_TEST_DIRNAME/../../.devcontainer/state.sh" "$BATS_TEST_TMPDIR/app/state.sh"
-    cp "$BATS_TEST_DIRNAME/../../.devcontainer/state-lock.sh" "$BATS_TEST_TMPDIR/app/state-lock.sh"
-    cp "$BATS_TEST_DIRNAME/../../.devcontainer/state-gitops.sh" "$BATS_TEST_TMPDIR/app/state-gitops.sh"
     cp "$BATS_TEST_DIRNAME/../../.devcontainer/kube-account.sh" "$BATS_TEST_TMPDIR/app/kube-account.sh"
     cp "$BATS_TEST_DIRNAME/../../.devcontainer/ai/host-models.sh" "$BATS_TEST_TMPDIR/app/ai/host-models.sh"
     cp "$BATS_TEST_DIRNAME/../../.devcontainer/ai/host-check.sh" "$BATS_TEST_TMPDIR/app/ai/host-check.sh"
@@ -676,6 +673,8 @@ KUBE
     cp "$BATS_TEST_DIRNAME/../../.devcontainer/ai/plugins/devzone-guard-v2.js" "$BATS_TEST_TMPDIR/app/ai/plugins/devzone-guard-v2.js"
     cp "$BATS_TEST_DIRNAME/../../.devcontainer/opencode.jsonc" "$BATS_TEST_TMPDIR/app/opencode.jsonc"
     cp "$BATS_TEST_DIRNAME/../../.devcontainer/skills/devzone/SKILL.md" "$BATS_TEST_TMPDIR/app/skills/devzone/SKILL.md"
+    mkdir -p "$BATS_TEST_TMPDIR/app/bin"
+    cp "$BATS_TEST_DIRNAME"/../../.devcontainer/bin/devzone-pod-* "$BATS_TEST_TMPDIR/app/bin/" 2>/dev/null || true
     chmod +x "$APP"
     cat >"$BATS_TEST_TMPDIR/app/argocd/services-hook.sh" <<'HOOK'
 #!/usr/bin/env bash

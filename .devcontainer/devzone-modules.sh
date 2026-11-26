@@ -21,11 +21,11 @@ is_known() {
     return 1
 }
 
-# First start (no state): the state is created by state.sh (#417): old global
+# First start (no state): the state is created by Go state command (#879): old global
 # state taken over, backup copy restored, state rebuilt from the services
 # cluster, otherwise first installation
 init_state() {
-    state_init "${MODULES[@]}"
+    DEVZONE_STATE="$ETAT" bash "${ICI:-$(dirname "${BASH_SOURCE[0]}")}/devzone" state init "${MODULES[@]}"
 }
 
 value_of() {
@@ -35,28 +35,17 @@ value_of() {
     [ "$v" = on ] && echo on || echo off
 }
 
-# State-file lock held from initialisation to write (#417): the state is never
-# recreated empty between the two
+# State-file write delegated to Go (#879): lock, backup and atomic replace.
 write_value() {
-    state_lock_take || return 1
-    if ! init_state || ! state_write "$1" "$2"; then
-        state_lock_release
-        return 1
-    fi
-    state_lock_release
-    return 0
+    init_state || return 1
+    DEVZONE_STATE="$ETAT" bash "${ICI:-$(dirname "${BASH_SOURCE[0]}")}/devzone" state write "$1" "$2"
 }
 
 # Removes a key from the state file: the configuration of a service only exists
 # while it is chosen (#242)
 remove_key() {
-    state_lock_take || return 1
-    if ! init_state || ! state_remove "$1"; then
-        state_lock_release
-        return 1
-    fi
-    state_lock_release
-    return 0
+    init_state || return 1
+    DEVZONE_STATE="$ETAT" bash "${ICI:-$(dirname "${BASH_SOURCE[0]}")}/devzone" state remove "$1"
 }
 
 # True if the file only holds the $schema key (created by opencode by default)
@@ -75,7 +64,7 @@ llm_removed_msg() {
 migrate_llm() {
     [ -f "$ETAT" ] || return 0
     grep -qE '^llm=' "$ETAT" 2>/dev/null || return 0
-    state_remove llm
+    DEVZONE_STATE="$ETAT" bash "${ICI:-$(dirname "${BASH_SOURCE[0]}")}/devzone" state remove llm
     llm_removed_msg
 }
 
@@ -89,7 +78,7 @@ change_module() {
     if [ "$m" = llm ]; then
         init_state 2>/dev/null || true
         if [ -f "$ETAT" ] && grep -qE '^llm=' "$ETAT" 2>/dev/null; then
-            state_remove llm
+            DEVZONE_STATE="$ETAT" bash "${ICI:-$(dirname "${BASH_SOURCE[0]}")}/devzone" state remove llm
         fi
         llm_removed_msg
         return 1

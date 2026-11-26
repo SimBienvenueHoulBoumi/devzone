@@ -29,9 +29,6 @@ export KUBECONFIG
 
 # Safe state write (#417): lock, temporary file in the state folder, backup copy
 # .prev — shared by devzone, ports
-# shellcheck source=SCRIPTDIR/state.sh
-# shellcheck disable=SC1091
-. "$(dirname "${BASH_SOURCE[0]}")/state.sh"
 
 # Instance name: empty or « devzone » = default instance (no suffix)
 : "${DEVZONE_INSTANCE:=}"
@@ -57,7 +54,7 @@ cluster_saved() {
 }
 
 cluster_save() {
-    state_write cluster "$1"
+    DEVZONE_STATE="$ETAT" bash "${ICI:-$(dirname "${BASH_SOURCE[0]}")}/devzone" state write cluster "$1"
 }
 
 cluster_is_dedicated() {
