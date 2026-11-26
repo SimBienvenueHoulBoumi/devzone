@@ -91,7 +91,7 @@ reussit "fichier existant préservé" "[ \"\$(cat '$TMP/plein/fichier')\" = impo
 reussit "Makefile non créé" "[ ! -e '$TMP/plein/Makefile' ]"
 
 echo "▶ devzone uninstall hors d'un dossier devzone"
-echoue "uninstall refusé hors devzone" "cd '$TMP' && devzone uninstall" "dossier devzone"
+echoue "uninstall refusé hors devzone" "cd '$TMP' && devzone uninstall" "Not a devzone folder"
 
 echo
 echo "Résultat : $reussis réussi(s), $failures échec(s)"

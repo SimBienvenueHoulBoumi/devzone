@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
-# Limited Kubernetes account (#430): the token cycle moved to Go (devzone
-# account token, #863); the library of the modules and the removal of the
-# account stay in kube-account.sh. Fake kubectl in $BATS_TEST_TMPDIR/bin, which
+# Limited Kubernetes account (#430): the library of the modules and the
+# removal of the account stay in kube-account.sh. Fake kubectl in
+# $BATS_TEST_TMPDIR/bin, which
 # logs and keeps the state of the `config set-*` commands in $HOME/.kube/config:
 # no cluster touched, never the workstation's kubeconfig.
 
@@ -123,17 +123,4 @@ KUBE
     ) || false
     grep -qF -- "--context docker-desktop -n devzone-postgres delete rolebinding devzone-agent --ignore-not-found" \
         "$BATS_TEST_TMPDIR/kubectl.log" || false
-}
-
-@test "kube-account.sh jeton : renamed to devzone account token" {
-    cat >"$BATS_TEST_TMPDIR/bin/devzone" <<'DEVZONE'
-#!/usr/bin/env bash
-echo "devzone $*" >>"$BATS_TEST_TMPDIR/devzone.log"
-exit 0
-DEVZONE
-    chmod +x "$BATS_TEST_TMPDIR/bin/devzone"
-    run bash "$KUBE_ACCOUNT" jeton
-    [ "$status" -eq 0 ] || false
-    [[ "$output" == *"devzone : « kube-account.sh jeton » was renamed: devzone account token"* ]] || false
-    grep -q "account token" "$BATS_TEST_TMPDIR/devzone.log" || false
 }

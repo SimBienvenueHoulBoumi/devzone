@@ -134,7 +134,7 @@ fi
 NPM
     # repowarden simulé : journalise ses arguments (garde-fou du module ai)
     printf '#!/usr/bin/env bash\necho "repowarden $*" >>"%s/repowarden.log"\n' "$BATS_TEST_TMPDIR" >"$BATS_TEST_TMPDIR/bin/repowarden"
-    # kube-config.sh n'est pas lancé : kubernetes testé par l'état seul
+    # kubectl is faked: kubernetes is tested from the state only
     printf '#!/usr/bin/env bash\nexit 1\n' >"$BATS_TEST_TMPDIR/bin/kubectl"
     # gh simulé : GH_ETAT = absent (défaut), sans (connecté sans workflow), avec
     cat >"$BATS_TEST_TMPDIR/bin/gh" <<'GH'
@@ -149,58 +149,11 @@ GH
 #!/usr/bin/env bash
 case "$*" in
     "cluster clean"*) exit 0 ;;
-    "account token")
-        if [ -f "$BATS_TEST_TMPDIR/token.fail" ]; then exit 1; fi
-        printf '%s\n' 1893456000 >"$BATS_TEST_TMPDIR/expiry"
-        echo "kubectl create token devzone-agent -n devzone-system --duration=24h" >>"$BATS_TEST_TMPDIR/kubectl.log"
-        ;;
-    "account fresh")
-        expiry="$(cat "$BATS_TEST_TMPDIR/expiry" 2>/dev/null || echo 0)"
-        case "$expiry" in
-            ""|*[!0-9]*) exit 1 ;;
-        esac
-        if [ "$expiry" -gt "$(date +%s)" ]; then exit 0; fi
-        exit 1
-        ;;
 esac
 exit 0
 DEVZONE
     chmod +x "$BATS_TEST_TMPDIR/bin/"*
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
-}
-
-# Fake kubectl for the limited token (#845): a working renewal unless the
-# token.fail marker exists; it replaces the default failing fake of setup.
-kubectl_jeton() {
-    cat >"$BATS_TEST_TMPDIR/bin/kubectl" <<'KUBE'
-#!/usr/bin/env bash
-echo "kubectl $*" >>"$BATS_TEST_TMPDIR/kubectl.log"
-case "$*" in
-    *"config get-contexts -o name"*) echo "kind-devzone" ;;
-    *"config current-context"*) echo "kind-devzone" ;;
-    *"config view"*)
-        case "$*" in
-            *'.context.cluster'*) echo cluster-hote ;;
-            *'.cluster.server'*) echo "https://127.0.0.1:6443" ;;
-        esac
-        ;;
-    *"config use-context"*) ;;
-    *"config set-cluster"* | *"config set "* | *"config set-credentials"* | *"config set-context"*) ;;
-    *"auth can-i"*) echo yes ;;
-    *"create token"*)
-        [ -f "$BATS_TEST_TMPDIR/token.fail" ] && exit 1
-        printf 'token-test\n2030-01-01T00:00:00Z\n'
-        ;;
-    *"create namespace"*) printf 'kind: Namespace\nmetadata:\n  name: devzone-system\n' ;;
-    *"create serviceaccount"*) printf 'kind: ServiceAccount\nmetadata:\n  name: devzone-agent\n' ;;
-    *"create rolebinding"*) printf 'kind: RoleBinding\nmetadata:\n  name: devzone-agent\n' ;;
-    *"get namespaces -l"*) ;;
-    *"apply -f -"*) cat >/dev/null ;;
-    *) exit 1 ;;
-esac
-exit 0
-KUBE
-    chmod +x "$BATS_TEST_TMPDIR/bin/kubectl"
 }
 
 @test "par défaut : tous les modules désactivés, avec la commande pour les activer" {
@@ -288,31 +241,6 @@ KUBE
     bash "$DEVZONE" enable ai
     run bash "$DEVZONE"
     [[ "$output" == *"✔ module ai"*"active"* ]] || false
-}
-
-@test "état : limited account token renewed without a message" {
-    export DEVZONE_STATE="$BATS_TEST_TMPDIR/modules"
-    printf 'cluster=kind-devzone\n' >"$DEVZONE_STATE"
-    export DEVZONE_KUBE_TOKEN_EXPIRY="$BATS_TEST_TMPDIR/expiry"
-    printf '%s\n' "$(( $(date +%s) - 10 ))" >"$DEVZONE_KUBE_TOKEN_EXPIRY"
-    kubectl_jeton
-    run bash "$DEVZONE"
-    [ "$status" -eq 0 ] || false
-    [[ "$output" != *"limited account token"* ]] || false
-    grep -q 'create token' "$BATS_TEST_TMPDIR/kubectl.log" || false
-    [ "$(cat "$DEVZONE_KUBE_TOKEN_EXPIRY")" = 1893456000 ] || false
-}
-
-@test "état : failed limited account token renewal → ⚠ with devzone repair" {
-    export DEVZONE_STATE="$BATS_TEST_TMPDIR/modules"
-    printf 'cluster=kind-devzone\n' >"$DEVZONE_STATE"
-    export DEVZONE_KUBE_TOKEN_EXPIRY="$BATS_TEST_TMPDIR/expiry"
-    printf '%s\n' "$(( $(date +%s) - 10 ))" >"$DEVZONE_KUBE_TOKEN_EXPIRY"
-    kubectl_jeton
-    : >"$BATS_TEST_TMPDIR/token.fail"
-    run bash "$DEVZONE"
-    [ "$status" -eq 0 ] || false
-    [[ "$output" == *"⚠ limited account token expired: devzone repair"* ]] || false
 }
 
 @test "activer ia : installe les versions figées, état gardé" {
@@ -739,7 +667,6 @@ KUBE
     cp "$BATS_TEST_DIRNAME/../../.devcontainer/state.sh" "$BATS_TEST_TMPDIR/app/state.sh"
     cp "$BATS_TEST_DIRNAME/../../.devcontainer/state-lock.sh" "$BATS_TEST_TMPDIR/app/state-lock.sh"
     cp "$BATS_TEST_DIRNAME/../../.devcontainer/state-gitops.sh" "$BATS_TEST_TMPDIR/app/state-gitops.sh"
-    cp "$BATS_TEST_DIRNAME/../../.devcontainer/kube-reachable.sh" "$BATS_TEST_TMPDIR/app/kube-reachable.sh"
     cp "$BATS_TEST_DIRNAME/../../.devcontainer/kube-account.sh" "$BATS_TEST_TMPDIR/app/kube-account.sh"
     cp "$BATS_TEST_DIRNAME/../../.devcontainer/command-aliases.sh" "$BATS_TEST_TMPDIR/app/command-aliases.sh"
     cp "$BATS_TEST_DIRNAME/../../.devcontainer/ai/host-models.sh" "$BATS_TEST_TMPDIR/app/ai/host-models.sh"

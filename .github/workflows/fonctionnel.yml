@@ -1,13 +1,11 @@
-# Functional tests: builds an isolated devzone and plays the scenarios of a
-# user (tools, modules, Kubernetes with kind, hooks, restart, rebuild); same
-# script as locally (make test-fonctionnel). Job cli: the CLI typed in a real
-# terminal, each command with a maximum time (make test-cli). Job windows: line
-# endings, npm package (installed in an isolated prefix, never the global one of
-# the machine) and devzone command on windows-latest (manage/test/windows.sh,
-# runnable locally), then the same path through cmd with a really global install
-# (npm .cmd shim, the case of a Windows user). Job ia-arm64: AI assistants
-# installed at the pinned versions on arm64 (Apple Silicon Mac), claude and
-# opencode checked.
+# Pod-workspace tests on kind (#869). Job fonctionnel: builds the workspace
+# image, loads it into kind, installs charts/devzone-workspace and exercises
+# devzone workspace start|status|stop plus a module command. Job cli: keeps the
+# host CLI checks and runs the same kind pod scenario. Job windows: keeps line
+# endings and npm shim checks; pod-on-kind is not runnable on windows-latest
+# GitHub runners cannot run the Linux kind pod scenario, so the job records this limit and Linux
+# jobs provide the pod coverage. Job ia-arm64: keeps AI assistant checks and
+# runs the same pod-on-kind scenario on Linux arm64.
 #
 # Required to merge, in develop as in main (livraison), through the
 # tests-conteneur summary check (requiredChecks, .repowarden.conf). The workflow
@@ -68,13 +66,49 @@ jobs:
     needs: changements
     if: needs.changements.outputs.tester == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
-      # Public DNS for the runner Docker: its DNS sometimes fails on archive.ubuntu.com (#468)
       - name: Runner Docker DNS
         run: bash manage/scripts/ci/ci-dns.sh
-      - run: bash manage/test/functional.sh
+      - name: Install kind, kubectl, helm
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$(uname -m)" in
+            x86_64 | amd64) arch=amd64 ;;
+            aarch64 | arm64) arch=arm64 ;;
+            *) echo "unsupported architecture: $(uname -m)" >&2; exit 1 ;;
+          esac
+          bin_dir="${RUNNER_TEMP}/devzone-tools"
+          mkdir -p "$bin_dir"
+          echo "$bin_dir" >>"$GITHUB_PATH"
+          tmp="$(mktemp -d)"
+          kind_version=0.33.0
+          case "$arch" in
+            arm64) kind_sha=20022bee6cfcd5086cb7234d218e3454e6090022f2a8f55d1fa7fcf42c3867a2 ;;
+            amd64) kind_sha=aee6151561422756b764a4ae28e7f44cda5af5a9eead3cc9985112b1de8d8e0d ;;
+          esac
+          curl -fsSL "https://github.com/kubernetes-sigs/kind/releases/download/v${kind_version}/kind-linux-${arch}" -o "$tmp/kind"
+          echo "$kind_sha  $tmp/kind" | sha256sum -c --quiet
+          install -m 0755 "$tmp/kind" "$bin_dir/kind"
+          kubectl_version=v1.37.3
+          curl -fsSL "https://dl.k8s.io/release/${kubectl_version}/bin/linux/${arch}/kubectl" -o "$tmp/kubectl"
+          curl -fsSL "https://dl.k8s.io/release/${kubectl_version}/bin/linux/${arch}/kubectl.sha256" -o "$tmp/kubectl.sha256"
+          echo "$(cat "$tmp/kubectl.sha256")  $tmp/kubectl" | sha256sum -c --quiet
+          install -m 0755 "$tmp/kubectl" "$bin_dir/kubectl"
+          helm_version=v4.3.2
+          helm_tarball="helm-${helm_version}-linux-${arch}.tar.gz"
+          curl -fsSL "https://get.helm.sh/${helm_tarball}" -o "$tmp/$helm_tarball"
+          curl -fsSL "https://get.helm.sh/${helm_tarball}.sha256sum" -o "$tmp/$helm_tarball.sha256sum"
+          (cd "$tmp" && sha256sum -c --quiet "$helm_tarball.sha256sum")
+          tar -xzf "$tmp/$helm_tarball" -C "$tmp" "linux-${arch}/helm"
+          install -m 0755 "$tmp/linux-${arch}/helm" "$bin_dir/helm"
+          rm -rf "$tmp"
+      - name: Pod workspace on kind (start/status/stop + module)
+        env:
+          DEVZONE_KIND_CLUSTER: devzone-ci-fonctionnel
+        run: bash manage/test/functional.sh
 
   cli:
     needs: changements
@@ -83,16 +117,54 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
-      # Public DNS for the runner Docker: its DNS sometimes fails on archive.ubuntu.com (#468)
       - name: Runner Docker DNS
         run: bash manage/scripts/ci/ci-dns.sh
-      - run: bash manage/test/cli-terminal.sh
+      - name: Install kind, kubectl, helm
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$(uname -m)" in
+            x86_64 | amd64) arch=amd64 ;;
+            aarch64 | arm64) arch=arm64 ;;
+            *) echo "unsupported architecture: $(uname -m)" >&2; exit 1 ;;
+          esac
+          bin_dir="${RUNNER_TEMP}/devzone-tools"
+          mkdir -p "$bin_dir"
+          echo "$bin_dir" >>"$GITHUB_PATH"
+          tmp="$(mktemp -d)"
+          kind_version=0.33.0
+          case "$arch" in
+            arm64) kind_sha=20022bee6cfcd5086cb7234d218e3454e6090022f2a8f55d1fa7fcf42c3867a2 ;;
+            amd64) kind_sha=aee6151561422756b764a4ae28e7f44cda5af5a9eead3cc9985112b1de8d8e0d ;;
+          esac
+          curl -fsSL "https://github.com/kubernetes-sigs/kind/releases/download/v${kind_version}/kind-linux-${arch}" -o "$tmp/kind"
+          echo "$kind_sha  $tmp/kind" | sha256sum -c --quiet
+          install -m 0755 "$tmp/kind" "$bin_dir/kind"
+          kubectl_version=v1.37.3
+          curl -fsSL "https://dl.k8s.io/release/${kubectl_version}/bin/linux/${arch}/kubectl" -o "$tmp/kubectl"
+          curl -fsSL "https://dl.k8s.io/release/${kubectl_version}/bin/linux/${arch}/kubectl.sha256" -o "$tmp/kubectl.sha256"
+          echo "$(cat "$tmp/kubectl.sha256")  $tmp/kubectl" | sha256sum -c --quiet
+          install -m 0755 "$tmp/kubectl" "$bin_dir/kubectl"
+          helm_version=v4.3.2
+          helm_tarball="helm-${helm_version}-linux-${arch}.tar.gz"
+          curl -fsSL "https://get.helm.sh/${helm_tarball}" -o "$tmp/$helm_tarball"
+          curl -fsSL "https://get.helm.sh/${helm_tarball}.sha256sum" -o "$tmp/$helm_tarball.sha256sum"
+          (cd "$tmp" && sha256sum -c --quiet "$helm_tarball.sha256sum")
+          tar -xzf "$tmp/$helm_tarball" -C "$tmp" "linux-${arch}/helm"
+          install -m 0755 "$tmp/linux-${arch}/helm" "$bin_dir/helm"
+          rm -rf "$tmp"
+      - name: CLI terminal checks (no container mode)
+        run: bash manage/test/cli-terminal.sh
+      - name: Pod workspace on kind (start/status/stop + module)
+        env:
+          DEVZONE_KIND_CLUSTER: devzone-ci-cli
+        run: bash manage/test/functional.sh
 
   windows:
     needs: changements
     if: needs.changements.outputs.tester == 'true'
     runs-on: windows-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       # Windows workstation settings; before the checkout, otherwise the copy is already made
       - name: Checkout with core.autocrlf true (like a Windows workstation)
@@ -106,16 +178,15 @@ jobs:
       - name: Windows tests under Git Bash (manage/test/windows.sh)
         shell: bash
         run: bash manage/test/windows.sh
+      - name: Pod-on-kind not runnable on Windows runners
+        shell: bash
+        run: |
+          echo "windows-latest GitHub runners cannot run the Linux kind pod scenario."
+          echo "Pod-on-kind coverage is provided by fonctionnel/cli/ia-arm64 Linux jobs."
       # Under shell: cmd, a failing command does not stop the script: each command
       # that must succeed is followed by || exit /b 1, and the end of the script
       # is explicit (without it, the step takes the code of the last command,
       # here an uninstall that rightly fails)
-      # Version read by node with the path as argument (%CD%\package.json, so
-      # never a nested quote: in a cmd for /f, an unescaped quote ends the
-      # string), written to a file then read back by set /p
-      # Each devzone output is written to sortie.txt then shown (type): a
-      # failure shows what the command answered. The return code is read into
-      # %SORTIE% before type, which would reset it
       - name: The devzone command through the npm .cmd shim (like a user)
         shell: cmd
         run: |
@@ -158,15 +229,13 @@ jobs:
           exit /b 0
 
   # AI assistants on arm64 (Apple Silicon Mac), which the x86_64 jobs do not see
-  # (#194): the devzone script of the container installs the pinned versions
-  # (Ubuntu 24.04, glibc, Node LTS like the image and its node feature), then
-  # claude and opencode must answer. A version bump of an assistant touches
-  # .devcontainer/devzone: this job validates it before the merge
+  # (#194): keep the original assistant check, and also run the pod-on-kind
+  # workspace scenario on this Linux arm64 runner.
   ia-arm64:
     needs: changements
     if: needs.changements.outputs.tester == 'true'
     runs-on: ubuntu-24.04-arm
-    timeout-minutes: 20
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -181,6 +250,44 @@ jobs:
           bash .devcontainer/devzone enable ai
           claude --version
           opencode --version
+      - name: Install kind, kubectl, helm
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$(uname -m)" in
+            x86_64 | amd64) arch=amd64 ;;
+            aarch64 | arm64) arch=arm64 ;;
+            *) echo "unsupported architecture: $(uname -m)" >&2; exit 1 ;;
+          esac
+          bin_dir="${RUNNER_TEMP}/devzone-tools"
+          mkdir -p "$bin_dir"
+          echo "$bin_dir" >>"$GITHUB_PATH"
+          tmp="$(mktemp -d)"
+          kind_version=0.33.0
+          case "$arch" in
+            arm64) kind_sha=20022bee6cfcd5086cb7234d218e3454e6090022f2a8f55d1fa7fcf42c3867a2 ;;
+            amd64) kind_sha=aee6151561422756b764a4ae28e7f44cda5af5a9eead3cc9985112b1de8d8e0d ;;
+          esac
+          curl -fsSL "https://github.com/kubernetes-sigs/kind/releases/download/v${kind_version}/kind-linux-${arch}" -o "$tmp/kind"
+          echo "$kind_sha  $tmp/kind" | sha256sum -c --quiet
+          install -m 0755 "$tmp/kind" "$bin_dir/kind"
+          kubectl_version=v1.37.3
+          curl -fsSL "https://dl.k8s.io/release/${kubectl_version}/bin/linux/${arch}/kubectl" -o "$tmp/kubectl"
+          curl -fsSL "https://dl.k8s.io/release/${kubectl_version}/bin/linux/${arch}/kubectl.sha256" -o "$tmp/kubectl.sha256"
+          echo "$(cat "$tmp/kubectl.sha256")  $tmp/kubectl" | sha256sum -c --quiet
+          install -m 0755 "$tmp/kubectl" "$bin_dir/kubectl"
+          helm_version=v4.3.2
+          helm_tarball="helm-${helm_version}-linux-${arch}.tar.gz"
+          curl -fsSL "https://get.helm.sh/${helm_tarball}" -o "$tmp/$helm_tarball"
+          curl -fsSL "https://get.helm.sh/${helm_tarball}.sha256sum" -o "$tmp/$helm_tarball.sha256sum"
+          (cd "$tmp" && sha256sum -c --quiet "$helm_tarball.sha256sum")
+          tar -xzf "$tmp/$helm_tarball" -C "$tmp" "linux-${arch}/helm"
+          install -m 0755 "$tmp/linux-${arch}/helm" "$bin_dir/helm"
+          rm -rf "$tmp"
+      - name: Pod workspace on kind (start/status/stop + module)
+        env:
+          DEVZONE_KIND_CLUSTER: devzone-ci-arm64
+        run: bash manage/test/functional.sh
 
   # Unit tests (bats manage/test/) on every PR and every push of develop and
   # main (#192). ubuntu: the whole suite. macOS: /bin/bash (3.2, the system one)

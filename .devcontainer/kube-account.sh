@@ -3,13 +3,11 @@
 # agents) can only act in the devzone-* namespaces. The account is the
 # ServiceAccount devzone-agent of the devzone-system namespace, bound to the
 # edit ClusterRole (no RBAC, no quotas) in each devzone namespace by a
-# RoleBinding, with a 24 h TokenRequest token renewed at startup (startup.sh),
-# by « devzone repair » and by the summary before expiry. The installers alone
-# use the admin context (host context in ~/.kube/hote.config, kind cluster in
-# ~/.kube/config); the shells use ~/.kube/config and the agents the limited
-# ~/.kube/agent.config (devzone context only, #844).
-# Library sourced by cluster.sh; the token cycle itself is ported to Go
-# (devzone account token / devzone account fresh, #863).
+# RoleBinding. The installers alone use the admin context (host context in
+# ~/.kube/hote.config, kind cluster in ~/.kube/config); the shells use
+# ~/.kube/config and the agents the limited ~/.kube/agent.config (devzone
+# context only, #844).
+# Library sourced by cluster.sh.
 
 ACCOUNT_NS=devzone-system
 ACCOUNT_SA=devzone-agent
@@ -107,15 +105,3 @@ account_namespace() {
     account_admin "$ctx" label namespace "$ns" "$CLUSTER_LABEL" --overwrite >/dev/null || return 1
     account_allow "$ctx" "$ns" || return 1
 }
-
-# Direct execution: the token cycle moved to the devzone command of the pod
-# (#863): « kube-account.sh jeton » is renamed to « devzone account token ».
-# When the file is sourced, $0 differs from BASH_SOURCE: nothing runs.
-if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
-    if [ "${1:-}" != jeton ]; then
-        echo "devzone : kube-account : jeton" >&2
-        exit 1
-    fi
-    echo 'devzone : « kube-account.sh jeton » was renamed: devzone account token' >&2
-    exec devzone account token
-fi

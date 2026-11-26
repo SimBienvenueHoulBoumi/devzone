@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# Why: post-create.sh and startup.sh never run in the Kubernetes workspace
-# pod (#503). This script installs the devzone tools when the container starts.
+# Why: this script installs the devzone tools in the workspace pod (#503).
 # Each step logs one "devzone init:" line, and a failure never stops the next
 # step. No Docker socket is used and no kubeconfig is fabricated.
 set -uo pipefail

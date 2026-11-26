@@ -24,8 +24,8 @@ test-fonctionnel: hors-conteneur ## Functional tests: isolated devzone, built th
 test-cli: hors-conteneur ## CLI tests in a real terminal: isolated devzone, then removed (10 to 15 min)
 	@bash manage/test/cli-terminal.sh
 
-desinstaller: hors-conteneur ## Removes everything devzone created, after confirmation (GARDER=connexions: keeps the connections)
-	@GARDER="$(GARDER)" bash manage/scripts/uninstall.sh
+desinstaller: hors-conteneur ## Removes Kubernetes objects of this devzone instance, after confirmation
+	@bash manage/devzone uninstall
 
-uninstall: hors-conteneur ## Removes everything devzone created, after confirmation (alias of desinstaller)
-	@GARDER="$(GARDER)" bash manage/scripts/uninstall.sh
+uninstall: hors-conteneur ## Removes Kubernetes objects of this devzone instance, after confirmation (alias of desinstaller)
+	@bash manage/devzone uninstall
