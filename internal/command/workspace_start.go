@@ -6,6 +6,7 @@ import (
 	"runtime"
 
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/cli"
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/workspace"
 )
 
 // portsServiceManagerAvailable tells whether this host can run the automatic
@@ -24,16 +25,25 @@ var portsServiceManagerAvailable = func() bool {
 	return err == nil
 }
 
-// startWorkspace delegates the cluster work of "devzone workspace start" to the
-// shell entry point, then installs the automatic start of the port watcher in
-// Go. A successful start stays successful when there is no service manager: Go
-// says so in one line. An enable that fails afterwards is only a warning, since
-// the workspace is already running. This is why the shell workspace command
-// does not grow a new step: when the Go program is absent, only the cluster
-// work runs.
+// startWorkspace runs the helm-direct form of "devzone workspace start" in Go
+// when Argo CD is off and absent from the cluster; the forms that need Argo CD
+// or its GitOps repository stay delegated to the shell. It then installs the
+// automatic start of the port watcher in Go. A successful start stays
+// successful when there is no service manager: Go says so in one line. An
+// enable that fails afterwards is only a warning, since the workspace is
+// already running. When the Go program is absent, the shell entry point still
+// does the cluster work.
 func startWorkspace(ctx *cli.Context) int {
 	args := append([]string{"workspace"}, ctx.Args...)
-	if status := delegate(args, ctx.Out, ctx.Err); status != 0 {
+	if !workspace.ArgoCDWanted(modulesFile()) && !workspace.ArgoCDInstalled(workspace.ExecRunner{}) {
+		env := workspace.StartEnv{
+			Runner: workspace.ExecRunner{}, Modules: modulesFile(),
+			Out: ctx.Out, ErrOut: ctx.Err,
+		}
+		if status := env.Run(ctx.Args); status != 0 {
+			return status
+		}
+	} else if status := delegate(args, ctx.Out, ctx.Err); status != 0 {
 		return status
 	}
 	if !portsServiceManagerAvailable() {

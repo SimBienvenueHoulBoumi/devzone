@@ -44,6 +44,8 @@ func TestPortedCommandsDoNotUseBash(t *testing.T) {
 		{"workspace ports status", []string{"workspace", "ports", "status"}},
 		{"workspace services", []string{"workspace", "services"}},
 		{"workspace services status", []string{"workspace", "services", "status"}},
+		{"workspace services enable", []string{"workspace", "services", "enable"}},
+		{"workspace services status extra", []string{"workspace", "services", "status", "extra"}},
 		{"workspace vscode", []string{"workspace", "vscode"}},
 	}
 	for _, tc := range cases {
@@ -75,8 +77,6 @@ func TestOtherCommandsUseBash(t *testing.T) {
 		{"update", []string{"update"}},
 		{"workspace ports restart", []string{"workspace", "ports", "restart"}},
 		{"workspace ports status extra", []string{"workspace", "ports", "status", "extra"}},
-		{"workspace services enable", []string{"workspace", "services", "enable"}},
-		{"workspace services status extra", []string{"workspace", "services", "status", "extra"}},
 		{"workspace nope", []string{"workspace", "nope"}},
 		{"version extra", []string{"--version", "extra"}},
 	}

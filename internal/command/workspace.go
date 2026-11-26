@@ -69,6 +69,7 @@ func workspaceCommand(ctx *cli.Context) int {
 		if len(args) == 1 || (len(args) == 2 && args[1] == "status") {
 			return workspace.ServicesStatus(workspace.ExecRunner{}, out)
 		}
+		return commandServices(args, out, errOut)
 	}
 	// "ports" alone is status, as ports does in the bash entry point.
 	if len(args) > 0 && args[0] == "ports" {
