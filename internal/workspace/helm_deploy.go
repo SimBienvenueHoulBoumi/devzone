@@ -8,6 +8,10 @@ import (
 	"strings"
 )
 
+// PackageRoot returns the folder holding charts/ and package.json, so a caller
+// outside this package can resolve the same code tree as the shell entry point.
+func PackageRoot() string { return packageRoot() }
+
 // packageRoot returns the folder holding charts/ and package.json, searched
 // from the binary like the bash entry point does for its chart_path.
 func packageRoot() string {
