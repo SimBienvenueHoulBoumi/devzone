@@ -140,11 +140,10 @@ state_json() {
                     add_error modules "$m.sh state unavailable"
                 fi
             elif [ "$m" = argocd ]; then
-                if out="$(bash "$ICI/argocd/argocd.sh" status 2>/dev/null)"; then
+                if out="$("$ICI/devzone" argocd status 2>/dev/null)"; then
                     state_value="$out"
                 else
                     state_value=""
-                    add_error modules "argocd.sh status unavailable"
                 fi
             elif [ "$m" = mysql ]; then
                 if out="$(devzone mysql status 2>/dev/null)"; then

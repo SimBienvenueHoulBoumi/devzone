@@ -188,20 +188,20 @@ apply_postgres() {
 apply_argocd() {
     local current_state
     if [ "$1" = on ]; then
-        current_state="$(bash "$ICI/argocd/argocd.sh" status)"
+        current_state="$("$ICI/devzone" argocd status)"
         # "relay stopped" first: this line also starts with "ready"
         if [[ "$current_state" == *"relay stopped"* ]]; then
-            bash "$ICI/argocd/argocd.sh" relay-start
+            "$ICI/devzone" argocd relay-start
             echo "devzone : argocd : relay restarted"
         elif [[ "$current_state" == "ready"* ]]; then
             echo "devzone : argocd already active, nothing to do."
-        elif ! bash "$ICI/argocd/argocd.sh" install; then
+        elif ! "$ICI/devzone" argocd install; then
             echo "argocd" >"$(failure_marker_file argocd)"
             return 1
         fi
         rm -f "$(failure_marker_file argocd)"
     else
-        bash "$ICI/argocd/argocd.sh" uninstall
+        "$ICI/devzone" argocd uninstall
         rm -f "$(failure_marker_file argocd)"
     fi
 }
