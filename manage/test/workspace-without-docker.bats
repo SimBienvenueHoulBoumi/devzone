@@ -320,3 +320,79 @@ sidecar_block() {
     ! grep -q -- "\.kube/" <<<"$output" || false
     ! grep -q -- "name: kubeconfig" <<<"$output" || false
 }
+
+# Bash script of the liveness probe, as rendered: the lines between "- |" and
+# "- liveness", without the indentation of the YAML block (#982).
+probe_script() {
+    awk '/- \|$/{s=1; next} /^ +- liveness$/{s=0} s' <<<"$1" | sed 's/^                  //'
+}
+
+# Runs the probe script of the rendered chart on fake cgroup files (#982):
+# probe_run CURRENT MAX; "none" removes the file. The threshold is 85 (the
+# default of values.yaml), so the script is run with the same argument.
+probe_run() {
+    local dir="$BATS_TEST_TMPDIR/cgroup" rendered script
+    rm -rf "$dir"
+    mkdir -p "$dir"
+    [ "$1" = none ] || printf '%s\n' "$1" >"$dir/pids.current"
+    [ "$2" = none ] || printf '%s\n' "$2" >"$dir/pids.max"
+    rendered="$(render_of templates/statefulset.yaml)"
+    script="$(probe_script "$rendered")"
+    run env CGROUP_DIR="$dir" bash -c "$script" liveness 85
+}
+
+@test "liveness: probe on the workspace container only, values as set (#982)" {
+    run render_of templates/statefulset.yaml
+    [ "$status" -eq 0 ]
+    grep -q -- "livenessProbe:" <<<"$(containers_block "$output")" || false
+    ! grep -q -- "livenessProbe:" <<<"$(init_block "$output")" || false
+    local lp
+    lp="$(awk '/^          livenessProbe:/{p=1} /^          volumeMounts:/{p=0} p' <<<"$output")"
+    grep -q -- '- "85"' <<<"$lp" || false
+    grep -q -- "initialDelaySeconds: 120" <<<"$lp" || false
+    grep -q -- "periodSeconds: 60" <<<"$lp" || false
+    grep -q -- "timeoutSeconds: 10" <<<"$lp" || false
+    grep -q -- "failureThreshold: 5" <<<"$lp" || false
+}
+
+@test "liveness: thresholdPercent from values (passed to the script as \$1)" {
+    run render_of templates/statefulset.yaml --set livenessProbe.thresholdPercent=70
+    [ "$status" -eq 0 ]
+    local lp
+    lp="$(awk '/^          livenessProbe:/{p=1} /^          volumeMounts:/{p=0} p' <<<"$output")"
+    grep -q -- '- "70"' <<<"$lp" || false
+    ! grep -q -- '- "85"' <<<"$lp" || false
+}
+
+@test "liveness: enabled=false renders no livenessProbe" {
+    run render_of templates/statefulset.yaml --set livenessProbe.enabled=false
+    [ "$status" -eq 0 ]
+    ! grep -q -- "livenessProbe" <<<"$output" || false
+}
+
+@test "liveness: script exits 0 under the threshold (84 %)" {
+    probe_run 84 100
+    [ "$status" -eq 0 ]
+}
+
+@test "liveness: script exits 0 exactly at the threshold (85 %)" {
+    probe_run 85 100
+    [ "$status" -eq 0 ]
+}
+
+@test "liveness: script exits 1 above the threshold (90 %)" {
+    probe_run 90 100
+    [ "$status" -eq 1 ]
+}
+
+@test "liveness: script exits 0 when pids.max is max (no limit)" {
+    probe_run 5000 max
+    [ "$status" -eq 0 ]
+}
+
+@test "liveness: script exits 0 when a cgroup file is missing" {
+    probe_run 90 none
+    [ "$status" -eq 0 ]
+    probe_run none 100
+    [ "$status" -eq 0 ]
+}
