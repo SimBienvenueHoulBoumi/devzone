@@ -13,10 +13,9 @@ import (
 // starting a workspace, and touch no program.
 func TestStartOnlyPrinted(t *testing.T) {
 	t.Setenv("DEVZONE_NO_START", "1")
-	t.Setenv("DEVZONE_WORKSPACE_SH", "")
 	folder := filepath.Join(t.TempDir(), "new")
 	s, r, out, _ := modeSession(t, nil, nil)
-	if err := s.Start(folder, filepath.Join(t.TempDir(), "workspace.sh")); err != nil {
+	if err := s.Start(folder, filepath.Join(t.TempDir(), "devzone")); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
 	if !strings.Contains(out.String(), "To start the workspace: cd "+folder+" && devzone workspace start") {
@@ -27,23 +26,22 @@ func TestStartOnlyPrinted(t *testing.T) {
 	}
 }
 
-// TestStartRunsFromFolder checks that the package script is run from the new
-// folder and that its output is forwarded.
+// TestStartRunsFromFolder checks that the Go program's workspace start is run
+// from the new folder and that its output is forwarded.
 func TestStartRunsFromFolder(t *testing.T) {
 	t.Setenv("DEVZONE_NO_START", "")
-	script := filepath.Join(t.TempDir(), "ws.sh")
-	t.Setenv("DEVZONE_WORKSPACE_SH", script)
+	program := filepath.Join(t.TempDir(), "devzone")
 	setup := func(r *fake.Runner) {
-		r.On("bash", []string{script, "start"}, exec.Result{Stdout: []byte("workspace start in folder\n")})
+		r.On(program, []string{"workspace", "start"}, exec.Result{Stdout: []byte("workspace start in folder\n")})
 	}
 	s, r, out, errOut := modeSession(t, nil, setup)
 	folder := t.TempDir()
-	if err := s.Start(folder, filepath.Join(t.TempDir(), "workspace.sh")); err != nil {
+	if err := s.Start(folder, program); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
 	calls := r.Calls()
-	if len(calls) != 1 || calls[0].Name != "bash" || calls[0].Opts.Dir != folder {
-		t.Fatalf("calls = %+v; want one bash call in %s", calls, folder)
+	if len(calls) != 1 || calls[0].Name != program || calls[0].Opts.Dir != folder {
+		t.Fatalf("calls = %+v; want one %s call in %s", calls, program, folder)
 	}
 	if !strings.Contains(out.String(), "workspace start in folder") || !strings.Contains(out.String(), "Next: cd "+folder+" && devzone workspace shell (the pod)") {
 		t.Fatalf("out = %q", out.String())
@@ -57,14 +55,13 @@ func TestStartRunsFromFolder(t *testing.T) {
 // keeps the folder by returning an error.
 func TestStartFailure(t *testing.T) {
 	t.Setenv("DEVZONE_NO_START", "")
-	script := filepath.Join(t.TempDir(), "ws.sh")
-	t.Setenv("DEVZONE_WORKSPACE_SH", script)
+	program := filepath.Join(t.TempDir(), "devzone")
 	setup := func(r *fake.Runner) {
-		r.On("bash", []string{script, "start"}, exec.Result{Code: 1})
+		r.On(program, []string{"workspace", "start"}, exec.Result{Code: 1})
 	}
 	folder := filepath.Join(t.TempDir(), "new")
 	s, _, _, errOut := modeSession(t, nil, setup)
-	if err := s.Start(folder, filepath.Join(t.TempDir(), "workspace.sh")); err == nil {
+	if err := s.Start(folder, program); err == nil {
 		t.Fatal("Start must fail")
 	}
 	want := "✖ Workspace not started. The folder is ready: only the start remains (cd " + folder + " && devzone workspace start)"

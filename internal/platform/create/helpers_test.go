@@ -40,7 +40,6 @@ func fakePackage(t *testing.T) string {
 	files := map[string]string{
 		".devcontainer/devzone":       "#!/usr/bin/env bash\n",
 		"manage/scripts/uninstall.sh": "#!/usr/bin/env bash\n",
-		"manage/workspace.sh":         "#!/usr/bin/env bash\n",
 		"Makefile":                    "all:\n",
 		".gitattributes":              "*.sh text eol=lf\n",
 		"README.md":                   "# readme\n",

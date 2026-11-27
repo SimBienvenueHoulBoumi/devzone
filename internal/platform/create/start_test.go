@@ -9,16 +9,24 @@ import (
 	fexec "github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec"
 )
 
-// workspaceScript returns the script the start session runs for a package.
-func workspaceScript(pkg string) string { return filepath.Join(pkg, "manage", "workspace.sh") }
+// workspaceProgram returns the Go program the start session runs, which is the
+// test binary itself, with the "workspace start" arguments.
+func workspaceProgram(t *testing.T) string {
+	t.Helper()
+	program, err := os.Executable()
+	if err != nil {
+		t.Fatalf("os.Executable: %v", err)
+	}
+	return program
+}
 
 // TestCreateStartFailsKeepsFolder checks a failed workspace start exits 1, the
 // folder stays, the start to redo is named.
 func TestCreateStartFailsKeepsFolder(t *testing.T) {
 	runner := readyRunner()
 	opts, target, _, errOut := createOptions(t, runner)
-	script := workspaceScript(opts.Package)
-	runner.On("bash", []string{script, "start"}, fexec.Result{Code: 1})
+	program := workspaceProgram(t)
+	runner.On(program, []string{"workspace", "start"}, fexec.Result{Code: 1})
 	if err := Create(opts); err != ErrSilent {
 		t.Fatalf("err=%v", err)
 	}
@@ -31,24 +39,24 @@ func TestCreateStartFailsKeepsFolder(t *testing.T) {
 	}
 }
 
-// TestCreateStartRunsWorkspace checks the workspace script runs in the new
-// folder unless DEVZONE_NO_START is set; DEVZONE_WORKSPACE_SH replaces it.
+// TestCreateStartRunsWorkspace checks the Go workspace start runs in the new
+// folder unless DEVZONE_NO_START is set.
 func TestCreateStartRunsWorkspace(t *testing.T) {
 	runner := readyRunner()
 	opts, target, out, _ := createOptions(t, runner)
-	script := workspaceScript(opts.Package)
-	runner.On("bash", []string{script, "start"}, fexec.Result{})
+	program := workspaceProgram(t)
+	runner.On(program, []string{"workspace", "start"}, fexec.Result{})
 	if err := Create(opts); err != nil {
 		t.Fatalf("Create: %v", err)
 	}
 	var dirs []string
 	for _, c := range runner.Calls() {
-		if c.Name == "bash" {
+		if c.Name == program {
 			dirs = append(dirs, c.Opts.Dir)
 		}
 	}
 	if len(dirs) != 1 || dirs[0] != target {
-		t.Fatalf("bash calls dirs=%v target=%s", dirs, target)
+		t.Fatalf("start calls dirs=%v target=%s", dirs, target)
 	}
 	if !strings.Contains(out.String(), "Next: cd ") || !strings.Contains(out.String(), "devzone workspace shell (the pod)") {
 		t.Fatalf("stdout:\n%s", out.String())

@@ -51,7 +51,6 @@ var allowedDirectInstalls = map[string]string{
 	"internal/platform/kube/namespace.go":          "namespace helper of the modules",
 	"internal/workspace/helm_deploy.go":            "workspace chart by helm, only when Argo CD is neither wanted nor installed",
 	"internal/workspace/services_command.go":       "temporary administrator account of the services installer, removed at the end",
-	"manage/workspace.sh":                          "workspace pod, when Argo CD is off",
 }
 
 // TestNoNewDirectInstallPath fails when a source file gains a direct helm or
