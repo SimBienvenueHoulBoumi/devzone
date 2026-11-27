@@ -3,6 +3,7 @@ package workspace
 import (
 	"bytes"
 	"errors"
+	"os"
 	"strings"
 	"testing"
 )
@@ -131,5 +132,118 @@ func TestServicesStatusKubectlNotStarted(t *testing.T) {
 	status, out := servicesStatusRun(r)
 	if status != 0 || out != noneInstalledOut {
 		t.Fatalf("status %d, stdout %q, want %q", status, out, noneInstalledOut)
+	}
+}
+
+// TestServicesModulesFile checks the .devzone.modules effects of disable and
+// enable (#605): postgres=off is written, other lines are kept, an absent
+// file is created, a failing installer leaves the file intact.
+func TestServicesModulesFile(t *testing.T) {
+	write := func(t *testing.T, h *servicesHarness, content string) {
+		t.Helper()
+		if err := os.WriteFile(h.modules, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Run("gitlab=on written", func(t *testing.T) {
+		h := newServicesHarness(t)
+		write(t, h, "workspace=kubernetes\nargocd=off\n")
+		if status := h.env.Run([]string{"enable", "gitlab"}); status != 0 {
+			t.Fatalf("status = %d", status)
+		}
+		data, err := os.ReadFile(h.modules)
+		if err != nil || !strings.Contains(string(data), "gitlab=on\n") {
+			t.Fatalf("state = %q, err = %v", data, err)
+		}
+	})
+	t.Run("postgres=off written", func(t *testing.T) {
+		h := newServicesHarness(t)
+		write(t, h, "workspace=kubernetes\nargocd=off\n")
+		if status := h.env.Run([]string{"disable", "postgres"}); status != 0 {
+			t.Fatalf("status = %d", status)
+		}
+		data, err := os.ReadFile(h.modules)
+		if err != nil || !strings.Contains(string(data), "postgres=off\n") {
+			t.Fatalf("state = %q, err = %v", data, err)
+		}
+	})
+	t.Run("installer failure leaves file intact", func(t *testing.T) {
+		h := newServicesHarness(t)
+		original := "workspace=kubernetes\nargocd=off\n"
+		write(t, h, original)
+		h.env.Runner.(*fakeRunner).replies[4] = reply{match: "exec -i", status: 3}
+		if status := h.env.Run([]string{"enable", "gitlab"}); status != 3 {
+			t.Fatalf("status = %d", status)
+		}
+		data, err := os.ReadFile(h.modules)
+		if err != nil || string(data) != original {
+			t.Fatalf("state = %q, err = %v, want %q intact", data, err, original)
+		}
+	})
+	t.Run("other lines kept", func(t *testing.T) {
+		h := newServicesHarness(t)
+		write(t, h, "workspace=kubernetes\nfoo=bar\nargocd=off\n")
+		if status := h.env.Run([]string{"enable", "postgres"}); status != 0 {
+			t.Fatalf("status = %d", status)
+		}
+		data, _ := os.ReadFile(h.modules)
+		for _, line := range []string{"postgres=on", "foo=bar", "workspace=kubernetes", "argocd=off"} {
+			if !strings.Contains(string(data), line+"\n") {
+				t.Fatalf("state = %q, missing line %q", data, line)
+			}
+		}
+	})
+	t.Run("absent file created", func(t *testing.T) {
+		h := newServicesHarness(t)
+		if err := os.Remove(h.modules); err != nil && !os.IsNotExist(err) {
+			t.Fatal(err)
+		}
+		if status := h.env.Run([]string{"disable", "mysql"}); status != 0 {
+			t.Fatalf("status = %d", status)
+		}
+		data, err := os.ReadFile(h.modules)
+		if err != nil || string(data) != "mysql=off\n" {
+			t.Fatalf("state = %q, err = %v", data, err)
+		}
+	})
+}
+
+// TestServicesSeedAndStatusLeaveModulesFile checks seed and status never
+// touch .devzone.modules (#605).
+func TestServicesSeedAndStatusLeaveModulesFile(t *testing.T) {
+	h := newServicesHarness(t)
+	original := "workspace=kubernetes\nargocd=off\n"
+	if err := os.WriteFile(h.modules, []byte(original), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if status := h.env.Run([]string{"seed", "gitlab"}); status != 0 {
+		t.Fatalf("seed status = %d", status)
+	}
+	var out bytes.Buffer
+	if status := ServicesStatus(h.env.Runner, &out); status != 0 {
+		t.Fatalf("status = %d", status)
+	}
+	data, err := os.ReadFile(h.modules)
+	if err != nil || string(data) != original {
+		t.Fatalf("state = %q, err = %v, want %q intact", data, err, original)
+	}
+}
+
+// TestServicesStatusPostgresInstalled checks postgres alone is installed, by
+// its namespace, the other services are not.
+func TestServicesStatusPostgresInstalled(t *testing.T) {
+	r := &fakeRunner{replies: []reply{
+		{match: contextsCall, stdout: devzoneContexts},
+		{match: "get namespace devzone-postgres", status: 0},
+		{match: "get namespace", status: 1},
+	}}
+	status, out := servicesStatusRun(r)
+	if status != 0 {
+		t.Fatalf("status %d, want 0", status)
+	}
+	for _, want := range []string{"✔ postgres installed (namespace devzone-postgres)", "○ gitlab not installed", "○ mysql not installed", "○ argocd not installed"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("output %q does not contain %q", out, want)
+		}
 	}
 }

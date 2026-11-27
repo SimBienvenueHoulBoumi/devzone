@@ -12,7 +12,7 @@ import (
 // enable s" otherwise (also when kubectl cannot start: all the lines are then
 // "not installed"). It exists to show at once which services of the cluster
 // are installed, as services_status in
-// manage/scripts/workspace/services-workspace.sh. The kubectl calls print
+// manage/scripts/workspace/workspace services (Go). The kubectl calls print
 // nothing: the lines carry the answer; the status is 0.
 func ServicesStatus(r Runner, out io.Writer) int {
 	for _, s := range []struct {

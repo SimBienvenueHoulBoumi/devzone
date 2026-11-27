@@ -200,11 +200,9 @@ case "${1:-}" in
     "" | -h | --help | help) show_help ;;
     -v | --version) version ;;
     update)
-        # shellcheck source=SCRIPTDIR/scripts/devzone-manifest.sh
-        . "$PAQUET/manage/scripts/devzone-manifest.sh"
-        # shellcheck source=SCRIPTDIR/scripts/devzone-update.sh
-        . "$PAQUET/manage/scripts/devzone-update.sh"
-        update_workstation "${@:2}"
+        # The update is the Go program's (#884); the package folder is passed through
+        # DEVZONE_BASH_ENTRY, as the launcher exports it when it runs the binary
+        DEVZONE_BASH_ENTRY="$PAQUET/manage/devzone" "${DEVZONE_HOST_BIN:?devzone: Go program not found (DEVZONE_HOST_BIN), run it through manage/devzone}" update "${@:2}"
         ;;
     uninstall)
         # Devzone folder (.devcontainer/); an older devzone has its uninstall.sh
