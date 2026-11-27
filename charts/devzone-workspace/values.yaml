@@ -62,13 +62,17 @@ workspace:
   size: 20Gi
   storageClass: ""
 
+# Resources of the workspace container (#967). The memory limit is 8Gi, not 4Gi:
+# the zombie processes of PID 1 filled the 4Gi limit for good (fixed by the
+# reaper of the command). It is adjustable: change this value, or pass
+# helm --set resources.limits.memory=<N>Gi on a release.
 resources:
   limits:
     cpu: "2"
-    memory: "4Gi"
+    memory: "8Gi"
   requests:
     cpu: "500m"
-    memory: "1Gi"
+    memory: "4Gi"
 
 persistence:
   # Identities, logins and caches, kept from one restart to the next. Each path
