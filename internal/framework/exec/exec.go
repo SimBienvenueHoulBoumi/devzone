@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"time"
 
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/gitenv"
 )
@@ -41,6 +42,9 @@ type ExecRunner struct{}
 // Run starts name with args and waits for it to finish.
 func (ExecRunner) Run(ctx context.Context, name string, args []string, opts Opts) (Result, error) {
 	cmd := exec.CommandContext(ctx, name, args...)
+	// When the context kills the command, return after a short grace instead
+	// of blocking on output pipes still held by orphaned children.
+	cmd.WaitDelay = time.Second
 	if opts.Stdin != nil {
 		cmd.Stdin = opts.Stdin
 	}

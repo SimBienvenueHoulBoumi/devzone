@@ -1,11 +1,14 @@
 package podcmd
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 	"unicode"
+
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec"
 )
 
 // folderVersion reads the version written in the instance manifest.
@@ -43,13 +46,17 @@ func publishedVersion(d jsonDeps) string {
 		npm = "npm"
 	}
 	v := ""
-	if out, _, err := d.run(npm, "view", "devzone", "version"); err == nil {
+	// A slow registry must not block the summary: five seconds at most, as the
+	// shell published_version waited before killing npm.
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if res, err := d.ctx.Runner.Run(ctx, npm, []string{"view", "devzone", "version"}, exec.Opts{}); err == nil {
 		v = strings.Map(func(r rune) rune {
 			if unicode.IsSpace(r) {
 				return -1
 			}
 			return r
-		}, out)
+		}, string(res.Stdout))
 	}
 	_ = os.MkdirAll(filepath.Dir(cache), 0o755)
 	_ = os.WriteFile(cache, []byte(day+"\n"+v+"\n"), 0o644)

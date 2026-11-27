@@ -39,6 +39,10 @@ func newDefaultRegistry() *cli.Registry {
 		Run:  runRepair,
 	})
 	r.Register(cli.Command{
+		Name: "version-available-line",
+		Run:  versionAvailableLine,
+	})
+	r.Register(cli.Command{
 		Name: "apply-repowarden",
 		Run:  runApplyRepowarden,
 	})

@@ -100,9 +100,6 @@ GITLAB_URL_MODULE=http://gitlab.localhost:8929
 # shellcheck source=SCRIPTDIR/devzone-platform.sh
 # shellcheck disable=SC1091
 . "$ICI/devzone-platform.sh"
-# shellcheck source=SCRIPTDIR/devzone-version.sh
-# shellcheck disable=SC1091
-. "$ICI/devzone-version.sh"
 # shellcheck source=SCRIPTDIR/devzone-status.sh
 # shellcheck disable=SC1091
 . "$ICI/devzone-status.sh"

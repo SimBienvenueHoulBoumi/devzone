@@ -9,7 +9,7 @@
 show_state() {
     local name email status m late path ports_state ctx_work ctx_host packages_mark packages_names argocd_repo
     echo "devzone: state (devzone to show it again)"
-    version_available_line
+    "${DEVZONE_HOST_BIN:?devzone: Go pod binary unavailable}" version-available-line
     name="$(git config --get user.name || true)"
     email="$(git config --get user.email || true)"
     if [ -n "$name" ] && [ -n "$email" ]; then
