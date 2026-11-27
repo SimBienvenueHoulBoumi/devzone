@@ -3,8 +3,6 @@ package workspace
 import (
 	"fmt"
 	"io"
-	"os/exec"
-	"strings"
 )
 
 // Names of the workspace release and of its Argo CD namespace and Application,
@@ -15,28 +13,23 @@ const (
 	argocdApp   = "devzone-workspace"
 )
 
+// AppRemover takes the Application name out of the GitOps repository and
+// refreshes the root Application, as gitops_delete_application does before its
+// cluster delete. A non-zero status means the repository refused the removal.
+type AppRemover func(name string) int
+
 // Stop removes the workspace from the cluster, as stop_workspace does in
 // manage/workspace.sh. When Argo CD holds the workspace (its Application
-// exists), the Application is deleted, which removes the pod while the
-// volumes stay. Otherwise the port watcher is stopped, then the helm release
-// is uninstalled, and the status of helm is returned.
-func Stop(r Runner, out, errOut io.Writer) int {
+// exists), the Application file leaves the GitOps repository first (remove),
+// then the Application is deleted, which removes the pod while the volumes stay.
+// A refused removal stops here with status 1 and the Application is kept, so
+// the root Application never recreates it. Otherwise the port watcher is
+// stopped, then the helm release is uninstalled, and the status of helm is returned.
+func Stop(r Runner, remove AppRemover, out, errOut io.Writer) int {
 	if argocdHoldsWorkspace(r) {
 		fmt.Fprintln(out, "▶ Application devzone-workspace deleted (Argo CD removes the pod, the volumes stay)…")
-		// When a GitOps repository is designated, its file is removed first so
-		// the root Application never recreates the child.
-		repo := confValue(".argocd.conf", "argocd", "repo")
-		if repo != "" && repo != "none" {
-			slug := strings.TrimSuffix(strings.TrimPrefix(repo, "https://github.com/"), ".git")
-			path := "repos/" + slug + "/contents/apps/devzone-workspace.yaml"
-			shaCmd := exec.Command("gh", "api", path, "--jq", ".sha")
-			shaOut, _ := shaCmd.Output()
-			sha := strings.TrimSpace(string(shaOut))
-			args := []string{"api", "-X", "DELETE", path, "-f", "message=devzone: application devzone-workspace removed"}
-			if sha != "" {
-				args = append(args, "-f", "sha="+sha)
-			}
-			_ = exec.Command("gh", args...).Run()
+		if code := remove(argocdApp); code != 0 {
+			return code
 		}
 		status, err := r.Kubectl(append(contextFlag(r), "-n", argocdNS, "delete", "application.argoproj.io", argocdApp, "--ignore-not-found", "--wait=true"), nil, out, errOut)
 		if err != nil {
