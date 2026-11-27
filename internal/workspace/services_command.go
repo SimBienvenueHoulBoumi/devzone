@@ -115,7 +115,7 @@ func (e ServicesEnv) run(action, service string, options []string) int {
 	}
 	fmt.Fprintf(e.Out, "▶ %s %s in the pod %s…\n", action, service, pod)
 	args := append(flag, "exec", "-i", pod, "--namespace", namespace, "-c", container, "--",
-		"bash", e.script(), action, service)
+		"devzone", "services-admin", action, service)
 	args = append(args, options...)
 	status, err := e.Runner.Kubectl(args, strings.NewReader(token+"\n"), e.Out, e.ErrOut)
 	e.removeAdmin(flag)

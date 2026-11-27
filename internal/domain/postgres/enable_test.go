@@ -49,10 +49,10 @@ func launcherCopy(t *testing.T) string {
 	if err := os.MkdirAll(bin, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	// The summary (no command, status, modules) stays in the shell, as in the image.
+	// The summary is now handled by the Go pod, like every other command.
 	fakePod := "#!/usr/bin/env bash\n" +
 		"case \"${1:-}\" in\n" +
-		"    handles) case \"${2:-}\" in '' | status | modules) exit 1 ;; *) exit 0 ;; esac ;;\n" +
+		"    handles) exit 0 ;;\n" +
 		"esac\n" +
 		"exit 0\n"
 	for _, arch := range []string{"amd64", "arm64"} {
@@ -77,21 +77,6 @@ func runDevzone(t *testing.T, args ...string) (string, int) {
 	}
 	t.Fatalf("devzone: %v", err)
 	return "", 1
-}
-
-// TestPostgresModuleKnownDisabled checks that the plain devzone summary lists
-// postgres as optional with the enable command, as postgres.bats did.
-func TestPostgresModuleKnownDisabled(t *testing.T) {
-	newFixture(t)
-	// The state every module off, as the Go pod writes it on the first start.
-	writeState(t, "ai=off", "kubernetes=off", "gitlab=off", "postgres=off", "argocd=off", "mysql=off")
-	out, code := runDevzone(t)
-	if code != 0 {
-		t.Fatalf("devzone: code %d, output %q", code, out)
-	}
-	if !strings.Contains(out, "○ module postgres") || !strings.Contains(out, "devzone enable postgres") {
-		t.Fatalf("summary %q misses postgres", out)
-	}
 }
 
 // TestEnableContextMismatch checks that a --context different from the saved

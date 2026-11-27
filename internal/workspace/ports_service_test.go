@@ -41,8 +41,8 @@ func TestPortsStartUsesTheServiceWhenInstalled(t *testing.T) {
 	if code := PortsStart(&out, &errOut); code != 0 {
 		t.Fatalf("start = %d, err = %q", code, errOut.String())
 	}
-	if len(h.calls) != 1 || !hasArg(h.calls[0].args, "start") {
-		t.Fatalf("daemon calls = %v, want one service start", h.calls)
+	if len(h.calls) != 2 || !hasArg(h.calls[0].args, "is-active") || !hasArg(h.calls[1].args, "start") {
+		t.Fatalf("daemon calls = %v, want a load check then one service start", h.calls)
 	}
 	if h.loopCalls != 1 {
 		t.Fatalf("service loop calls = %d, want 1", h.loopCalls)

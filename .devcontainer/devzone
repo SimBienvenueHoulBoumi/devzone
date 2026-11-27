@@ -100,13 +100,12 @@ GITLAB_URL_MODULE=http://gitlab.localhost:8929
 # shellcheck source=SCRIPTDIR/devzone-platform.sh
 # shellcheck disable=SC1091
 . "$ICI/devzone-platform.sh"
-# shellcheck source=SCRIPTDIR/devzone-status.sh
-# shellcheck disable=SC1091
-. "$ICI/devzone-status.sh"
-
 
 case "${1:-}" in
-    "" | status | modules) if [ "${2:-}" = "--json" ]; then DEVZONE_STATE="$ETAT" bash "$ICI/devzone" state json; else show_state; fi ;;
+    "" | status | modules)
+        echo "devzone status: Go binary of the pod unavailable (.devcontainer/bin)" >&2
+        exit 1
+        ;;
     state)
         export DEVZONE_STATE="$ETAT"
         case "${2:-}" in

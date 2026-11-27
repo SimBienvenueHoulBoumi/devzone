@@ -6,6 +6,7 @@
 
 setup() {
     load commun
+    devzone_pod_pret
     kind_vide
     kube_isole
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
@@ -192,7 +193,7 @@ empreinte_etat() {
 }
 
 @test "different SHA-256 sum -> failure, no glab, platform not chosen" {
-    bash "$DEVZONE" >/dev/null
+    : >"$DEVZONE_STATE"
     rm -f "$HOME/.local/bin/glab"
     GLAB_SOMME_FAUX=0000000000000000000000000000000000000000000000000000000000000000 \
         run bash "$DEVZONE" platform gitlab --url "$INSTANCE"
@@ -235,7 +236,7 @@ empreinte_etat() {
 }
 
 @test "back to github: glab and its configuration removed, state unchanged" {
-    bash "$DEVZONE" >/dev/null
+    : >"$DEVZONE_STATE"
     avant="$(empreinte_etat)"
     run bash "$DEVZONE" platform gitlab --url "$INSTANCE"
     [ "$status" -eq 0 ]

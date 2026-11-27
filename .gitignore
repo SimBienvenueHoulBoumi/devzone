@@ -17,3 +17,9 @@ charts/devzone-gitlab/charts/
 /bin/
 /.devcontainer/bin/
 /dist/
+
+# Core dumps written at the root of a worktree by a crashed process; a future
+# core/ folder of the repository stays trackable.
+/core
+/core.[0-9]*
+!/core/

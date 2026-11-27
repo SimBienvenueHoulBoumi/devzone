@@ -42,6 +42,7 @@ FAKE
 setup() {
     bats_require_minimum_version 1.5.0
     load commun
+    devzone_pod_pret
     kind_vide
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
     GITLAB="$BATS_TEST_DIRNAME/../../.devcontainer/gitlab/gitlab.sh"

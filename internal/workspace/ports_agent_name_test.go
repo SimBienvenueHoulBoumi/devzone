@@ -42,6 +42,7 @@ func TestPortsEnableKeepsOneDefinitionPerFolder(t *testing.T) {
 	}
 	first := portsAgentName()
 	secondRoot := filepath.Join(t.TempDir(), "other folder")
+	writeFile(t, filepath.Join(secondRoot, ".devzone.modules"), "")
 	t.Setenv("DEVZONE_ROOT", secondRoot)
 	if code := PortsEnable(&out, &errOut); code != 0 {
 		t.Fatal(errOut.String())

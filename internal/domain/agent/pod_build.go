@@ -156,7 +156,7 @@ func BuildManifest(ctx context.Context, r Runner, folder, podName string, st Pod
 	w("      mountPath: /workspaces/projets/workspace")
 	w(`    command: ["/bin/bash", "-lc"]`)
 	w("    args:")
-	w("    - 'devzone agent --local " + folder + ` /agent-consigne/consigne.md; code=\$?; cat \"\$DEVZONE_ROOT/workspace/.agents/` + st.SessionLabel + `.log\" 2>/dev/null; exit \$code'`)
+	w("    - 'ulimit -c 0; devzone agent --local " + folder + ` /agent-consigne/consigne.md; code=\$?; cat \"\$DEVZONE_ROOT/workspace/.agents/` + st.SessionLabel + `.log\" 2>/dev/null; exit \$code'`)
 	w("  volumes:")
 	w("  - name: workspace")
 	w("    persistentVolumeClaim:")

@@ -41,9 +41,17 @@ func TestPortsDarwinTargetsFollowLaunchctlSyntax(t *testing.T) {
 	if code := PortsStart(&out, &errOut); code != 0 {
 		t.Fatalf("start = %d, err = %q", code, errOut.String())
 	}
-	want := []string{"kickstart", "-k", "gui/" + uid + "/" + label}
-	if len(h.calls) != 1 || !reflect.DeepEqual(h.calls[0].args, want) {
-		t.Fatalf("daemon calls = %v, want one call %v", h.calls, want)
+	want := [][]string{
+		{"print", "gui/" + uid + "/" + label},
+		{"kickstart", "-k", "gui/" + uid + "/" + label},
+	}
+	if len(h.calls) != len(want) {
+		t.Fatalf("daemon calls = %v, want %d calls", h.calls, len(want))
+	}
+	for i := range want {
+		if !reflect.DeepEqual(h.calls[i].args, want[i]) {
+			t.Fatalf("daemon call %d = %v, want %v", i, h.calls[i].args, want[i])
+		}
 	}
 }
 
