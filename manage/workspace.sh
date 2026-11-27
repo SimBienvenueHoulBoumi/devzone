@@ -53,7 +53,7 @@ default_image_tag() {
 # Installs or upgrades the workspace in the cluster; the cluster is checked first (#565): no Argo CD, helm or pod wait for a stopped one.
 start_workspace() {
     local repo tag image with_image="" args=()
-    kube_ready_reason --hint >&2 || return 1
+    "${DEVZONE_HOST_BIN:?devzone: Go program not found (DEVZONE_HOST_BIN), run it through manage/devzone}" kube-ready --hint >&2 || return 1
     repo="$IMAGE_REPO"
     tag="$(default_image_tag)"
     while [ $# -gt 0 ]; do
@@ -120,8 +120,6 @@ shell_workspace() {
     kubectl $(kubectl_flag) exec -it devzone-workspace-0 --namespace devzone-workspace -c workspace -- bash
 }
 
-# shellcheck source=manage/scripts/kube-ready.sh
-. "$HERE/scripts/kube-ready.sh"
 # shellcheck source=manage/scripts/workspace/argocd-workspace.sh
 . "$HERE/scripts/workspace/argocd-workspace.sh"
 # shellcheck source=manage/scripts/workspace/argocd-services.sh

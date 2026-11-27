@@ -179,6 +179,10 @@ jobs:
           git config --global core.autocrlf true
           git config --global core.safecrlf false
       - uses: actions/checkout@v7
+      # Go builds the packaged binary (prepack) and resolves the Go program (#884)
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version: '1.27'
       # Line endings are checked by manage/test/windows.sh (same rule as the guard of
       # manage/test/cli.bats: every tracked file starting with #!, Makefile)
       - name: Windows tests under Git Bash (manage/test/windows.sh)

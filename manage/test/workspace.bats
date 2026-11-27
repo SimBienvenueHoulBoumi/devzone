@@ -4,17 +4,9 @@
 # for the file: the shell start path calls it for the wait and the guard, and the
 # status branch calls it for a command already ported.
 
-setup_file() {
-    if ! command -v go >/dev/null 2>&1; then
-        skip "go is not installed"
-    fi
-    ROOT="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
-    export DEVZONE_HOST_BIN="$BATS_FILE_TMPDIR/devzone-go"
-    (cd "$ROOT" && go build -o "$DEVZONE_HOST_BIN" ./cmd/devzone) || { echo "go build failed"; return 1; }
-}
-
 setup() {
     load commun
+    devzone_go_pret
     kube_isole
     ROOT="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
     CLI="$ROOT/manage/devzone"
@@ -114,7 +106,8 @@ DOCKER
     : >"$T/kubectl.log"
     run bash "$CLI" workspace start
     [ "$status" -eq 1 ]
-    [[ "$output" == *"✖ Docker Desktop is stopped: the Kubernetes cluster of this machine runs inside it. Start Docker Desktop, then: devzone workspace start"* ]] || false
+    [[ "$output" == *"✖ Kubernetes cluster"*"unreachable"* ]] || false
+    [[ "$output" == *"Check the contexts: kubectl config get-contexts"* ]] || false
     [ "$(grep -c '^✖' <<<"$output")" -eq 1 ]
     [[ "$output" != *"helm directly"* ]] || false
     [ ! -s "$T/helm.log" ]

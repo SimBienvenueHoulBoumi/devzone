@@ -52,6 +52,18 @@ func newDefaultRegistry() *cli.Registry {
 		Name: "host-check",
 		Run:  hostCheckCommand,
 	})
+	r.Register(cli.Command{
+		Name: "kube-ready",
+		Run:  kubeReadyCommand,
+	})
+	r.Register(cli.Command{
+		Name: "create-mode",
+		Run:  createModeCommand,
+	})
+	r.Register(cli.Command{
+		Name: "create-workstation",
+		Run:  createWorkstationCommand,
+	})
 	return r
 }
 

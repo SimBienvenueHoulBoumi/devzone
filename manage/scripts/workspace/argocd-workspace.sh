@@ -159,7 +159,7 @@ argocd_install() {
 argocd_ensure() {
     argocd_wanted || return 0
     argocd_installed && return 0
-    if ! kube_ready_reason >/dev/null; then
+    if ! "${DEVZONE_HOST_BIN:?devzone: Go program not found (DEVZONE_HOST_BIN), run it through manage/devzone}" kube-ready >/dev/null; then
         echo "⚠ Argo CD not checked: the cluster does not answer (devzone workspace services enable argocd once it does)" >&2
         return 0
     fi
