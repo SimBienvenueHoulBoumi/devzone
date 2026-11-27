@@ -57,7 +57,7 @@ func belongsToInstance(name, instance string) (ours, doubt bool) {
 		// A devzone name no base knows: in doubt, keep and report.
 		// Previously the default instance would claim it, but that could delete
 		// objects belonging to other instances. See INSTANCE_SUFFIX convention
-		// in manage/scripts/uninstall.sh and .devcontainer/ files.
+		// in the former shell uninstaller and in .devcontainer/ files.
 		return false, true
 	}
 	// Labeled but not a devzone name: doubt, keep and report.
@@ -121,6 +121,3 @@ func filterTempAccounts(accounts []string, instance string) (owned, doubtful []s
 	}
 	return owned, doubtful
 }
-
-// listDevzoneFiles returns .devzone.* files/dirs at the devzone root, except
-// workspace/ which is always kept.

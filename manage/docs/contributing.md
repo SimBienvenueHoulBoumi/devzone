@@ -85,8 +85,6 @@ devzone/
 ├── package.json, LICENSE       # devzone npm package (GPL-3.0-only license); package.json stays at the root (required by npm)
 ├── manage/                       # the devzone tool (at the root: only what must be there)
 │   ├── devzone                 # npm command: npx devzone <folder>, devzone uninstall
-│   ├── scripts/
-│   │   └── uninstall.sh     # make desinstaller: removes everything devzone created
 │   └── test/
 │       ├── devzone.bats        # tests of the devzone command (bats manage/test/)
 │       ├── cli.bats            # npm command and package contents

@@ -17,6 +17,7 @@ import (
 func TestUninstallWithoutAutostartSaysNothing(t *testing.T) {
 	root := devzoneDir(t, "cluster=kind-devzone-ci")
 	runner := fake.New()
+	registerHostProbe(t, runner, root)
 	registerLists(t, runner, "kind-devzone-ci", "", "", "")
 	chdir(t, root)
 	previousExists := commandPortsAutoStartExists

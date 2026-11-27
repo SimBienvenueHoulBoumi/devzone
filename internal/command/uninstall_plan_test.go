@@ -15,6 +15,7 @@ import (
 func TestUninstallIgnoresMissingArgoCRD(t *testing.T) {
 	root := devzoneDir(t, "cluster=kind-devzone-ci")
 	runner := fake.New()
+	registerHostProbe(t, runner, root)
 	runner.On("kubectl", nsArgs("kind-devzone-ci"), exec.Result{})
 	runner.On("kubectl", appsArgs("kind-devzone-ci"), exec.Result{
 		Code:   1,
@@ -35,6 +36,7 @@ func TestUninstallIgnoresMissingArgoCRD(t *testing.T) {
 func TestUninstallKeepsFilesWhenClusterDeleteFails(t *testing.T) {
 	root := devzoneDir(t, "cluster=kind-devzone-ci")
 	runner := fake.New()
+	registerHostProbe(t, runner, root)
 	registerLists(t, runner, "kind-devzone-ci", "devzone-workspace\n", "", "")
 	runner.On("kubectl", []string{"--context", "kind-devzone-ci", "delete", "namespace", "devzone-workspace", "--ignore-not-found"}, exec.Result{
 		Code:   1,
@@ -57,6 +59,7 @@ func TestUninstallKeepsFilesWhenClusterDeleteFails(t *testing.T) {
 func TestUninstallWarnsAboutPodVolumes(t *testing.T) {
 	root := devzoneDir(t, "cluster=kind-devzone-ci")
 	runner := fake.New()
+	registerHostProbe(t, runner, root)
 	registerLists(t, runner, "kind-devzone-ci", "devzone-workspace\n", "", "")
 	runner.On("kubectl", []string{"--context", "kind-devzone-ci", "delete", "namespace", "devzone-workspace", "--ignore-not-found"}, exec.Result{})
 	chdir(t, root)
@@ -73,6 +76,7 @@ func TestUninstallWarnsAboutPodVolumes(t *testing.T) {
 func TestUninstallRefusesWithoutConfirmation(t *testing.T) {
 	root := devzoneDir(t, "cluster=kind-devzone-ci")
 	runner := fake.New()
+	registerHostProbe(t, runner, root)
 	registerLists(t, runner, "kind-devzone-ci", "devzone-workspace\n", "", "")
 	chdir(t, root)
 	var out, errOut bytes.Buffer
@@ -80,7 +84,7 @@ func TestUninstallRefusesWithoutConfirmation(t *testing.T) {
 	if code != 1 {
 		t.Fatalf("code = %d, want 1; err=%s", code, errOut.String())
 	}
-	if !strings.Contains(errOut.String(), "devzone uninstall --yes") {
+	if !strings.Contains(errOut.String(), "CONFIRM=yes make desinstaller") {
 		t.Fatalf("stderr = %q", errOut.String())
 	}
 	if _, err := os.Stat(filepath.Join(root, ".devzone.modules")); err != nil {
@@ -107,6 +111,7 @@ func TestUninstallKeepsWorkspace(t *testing.T) {
 		t.Fatal(err)
 	}
 	runner := fake.New()
+	registerHostProbe(t, runner, root)
 	registerLists(t, runner, "kind-devzone-ci", "", "", "")
 	chdir(t, root)
 	var out, errOut bytes.Buffer
@@ -127,6 +132,7 @@ func TestUninstallKeepsOtherInstance(t *testing.T) {
 	root := devzoneDir(t, "cluster=kind-devzone-ci")
 	t.Setenv("DEVZONE_INSTANCE", "mon-devzone")
 	runner := fake.New()
+	registerHostProbe(t, runner, root)
 	registerLists(t, runner, "kind-devzone-ci", "devzone-workspace-mon-devzone\ndevzone-workspace-other\n", "", "")
 	runner.On("kubectl", []string{"--context", "kind-devzone-ci", "delete", "namespace", "devzone-workspace-mon-devzone", "--ignore-not-found"}, exec.Result{})
 	chdir(t, root)
