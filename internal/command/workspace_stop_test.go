@@ -59,7 +59,9 @@ func useStopTools(t *testing.T, r workspace.Runner, gitops fexec.Runner) {
 
 // TestWorkspaceStopRunsInGo checks that the stop without argument is answered by
 // Go: the helm release is uninstalled through the injected runner.
+
 func TestWorkspaceStopRunsInGo(t *testing.T) {
+	hostMode(t)
 	r := &stopRunner{}
 	useStopTools(t, r, fake.New())
 	var out, errOut bytes.Buffer
@@ -90,6 +92,7 @@ func TestWorkspaceStopWithExtraWordsIsIgnored(t *testing.T) {
 // TestWorkspaceStopWithArgocdDeletesApplication checks that an Argo CD that holds
 // the workspace gets the Application deleted in Go, with no GitOps repository.
 func TestWorkspaceStopWithArgocdDeletesApplication(t *testing.T) {
+	hostMode(t)
 	r := &stopRunner{argocd: true}
 	useStopTools(t, r, fake.New())
 	var out, errOut bytes.Buffer
@@ -111,6 +114,7 @@ func TestWorkspaceStopWithArgocdDeletesApplication(t *testing.T) {
 // Application file, so the command fails with 1 and the cluster keeps the
 // Application (the bash stop returned 1 here, and ignored no failure of gh).
 func TestWorkspaceStopRefusedGitHubRemovalKeepsApplication(t *testing.T) {
+	hostMode(t)
 	r := &stopRunner{argocd: true}
 	gitops := fake.New()
 	useStopTools(t, r, gitops)

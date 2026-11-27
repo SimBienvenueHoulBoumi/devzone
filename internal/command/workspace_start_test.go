@@ -13,6 +13,7 @@ import (
 // TestWorkspaceStartWithoutServiceManagerSucceeds keeps a successful cluster
 // start on a host without a service manager: Go installs nothing and says
 // nothing, without changing the status of the start.
+
 func TestWorkspaceStartWithoutServiceManagerSucceeds(t *testing.T) {
 	h := newAutoStartHarness(t)
 	h.available = false

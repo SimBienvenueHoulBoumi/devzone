@@ -35,7 +35,9 @@ func createModeReady(r *fake.Runner) {
 
 // TestCreateModeChooseReady checks that the shell caller captures only the mode
 // on stdout while the notice goes to stderr.
+
 func TestCreateModeChooseReady(t *testing.T) {
+	hostMode(t)
 	code, out, errOut := createModeRun(t, []string{"choose", "kubernetes"}, []string{"kubectl", "helm"}, createModeReady)
 	if code != 0 || out != "kubernetes\n" {
 		t.Fatalf("code = %d, stdout = %q; want 0 and kubernetes", code, out)
@@ -48,6 +50,7 @@ func TestCreateModeChooseReady(t *testing.T) {
 // TestCreateModeChooseNoCluster checks that no mode is captured when the
 // cluster does not answer.
 func TestCreateModeChooseNoCluster(t *testing.T) {
+	hostMode(t)
 	setup := func(r *fake.Runner) {
 		createModeReady(r)
 		r.On("kubectl", []string{"cluster-info", "--request-timeout=5s", "--context", "devzone"}, exec.Result{Code: 1})
@@ -60,6 +63,7 @@ func TestCreateModeChooseNoCluster(t *testing.T) {
 
 // TestCreateModeWrite checks that the write form records the mode in the folder.
 func TestCreateModeWrite(t *testing.T) {
+	hostMode(t)
 	folder := t.TempDir()
 	code, out, errOut := createModeRun(t, []string{"write", folder, "kubernetes"}, nil, nil)
 	if code != 0 || out != "" || errOut != "" {
@@ -77,6 +81,7 @@ func TestCreateModeWrite(t *testing.T) {
 // TestCreateModeStartPrinted checks that the start form prints the command
 // when DEVZONE_NO_START is set.
 func TestCreateModeStartPrinted(t *testing.T) {
+	hostMode(t)
 	t.Setenv("DEVZONE_NO_START", "1")
 	folder := filepath.Join(t.TempDir(), "new")
 	script := filepath.Join(t.TempDir(), "workspace.sh")
@@ -88,6 +93,7 @@ func TestCreateModeStartPrinted(t *testing.T) {
 
 // TestCreateModeUsage checks that an unknown form is refused with status 2.
 func TestCreateModeUsage(t *testing.T) {
+	hostMode(t)
 	code, out, errOut := createModeRun(t, []string{"unknown"}, nil, nil)
 	if code != 2 || out != "" || !strings.Contains(errOut, "usage: devzone create-mode") {
 		t.Fatalf("code = %d, stdout = %q, stderr = %q", code, out, errOut)

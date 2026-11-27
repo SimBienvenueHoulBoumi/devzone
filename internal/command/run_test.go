@@ -54,6 +54,7 @@ func devzoneRootForAutoStart(t *testing.T) string {
 // DEVZONE_BASH_ENTRY at it
 func entry(t *testing.T, body string) {
 	t.Helper()
+	hostMode(t)
 	path := filepath.Join(t.TempDir(), "devzone")
 	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
 		t.Fatal(err)
@@ -77,6 +78,7 @@ func TestRunDelegatesUnknownCommand(t *testing.T) {
 }
 
 func TestRunWithoutArgumentsShowsHelp(t *testing.T) {
+	hostMode(t)
 	// The entry point of the fake package would print nothing: the help must
 	// come from Go, not from a delegation
 	setupPackage(t, "1.4.2")
@@ -90,6 +92,7 @@ func TestRunWithoutArgumentsShowsHelp(t *testing.T) {
 }
 
 func TestRunMissingEntryPoint(t *testing.T) {
+	hostMode(t)
 	t.Setenv(bashbridge.EnvVar, filepath.Join(t.TempDir(), "absent"))
 	var errOut bytes.Buffer
 	if got := Run([]string{"unknown"}, &bytes.Buffer{}, &errOut); got != 1 {
@@ -101,6 +104,7 @@ func TestRunMissingEntryPoint(t *testing.T) {
 }
 
 func TestRunPortedCommand(t *testing.T) {
+	hostMode(t)
 	var gotArgs []string
 	Registry.Register(cli.Command{Name: "fake", Run: func(ctx *cli.Context) int {
 		gotArgs = ctx.Args

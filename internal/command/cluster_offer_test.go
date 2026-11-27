@@ -21,7 +21,9 @@ func offerRun(t *testing.T, answers string) (int, string) {
 }
 
 // TestClusterOfferNoTerminal: without a terminal nothing is asked, status 1, silent
+
 func TestClusterOfferNoTerminal(t *testing.T) {
+	hostMode(t)
 	t.Setenv("DEVZONE_TERMINAL", "")
 	code, errOut := offerRun(t, "2\ny\n")
 	if code != 1 || errOut != "" {
@@ -31,6 +33,7 @@ func TestClusterOfferNoTerminal(t *testing.T) {
 
 // TestClusterOfferForcedTerminalEmptyCancels: DEVZONE_TERMINAL forces the menu; an empty answer cancels
 func TestClusterOfferForcedTerminalEmptyCancels(t *testing.T) {
+	hostMode(t)
 	t.Setenv("DEVZONE_TERMINAL", "1")
 	code, errOut := offerRun(t, "\n")
 	if code != 1 || errOut != "✖ cancelled\n" {

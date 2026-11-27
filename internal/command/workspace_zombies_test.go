@@ -10,6 +10,7 @@ import (
 // workstation, with a clear message and status 1, and that it does not read any
 // /proc: the variable the pod sets is the only test. Routed through Run, as the
 // user reaches it.
+
 func TestZombiesRefusedOutsidePod(t *testing.T) {
 	t.Setenv("DEVZONE_WORKSPACE", "")
 	var out, errOut bytes.Buffer

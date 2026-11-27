@@ -12,6 +12,8 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/testkit"
 )
 
 // TestPortsStartEndToEnd runs the real binary against a fake cluster: start,
@@ -77,6 +79,7 @@ func (le *liveEnv) runLoop(dir string) (*exec.Cmd, chan error) {
 	le.t.Cleanup(func() { _ = journal.Close() })
 	cmd := exec.Command(le.bin, "workspace", "ports", "loop")
 	cmd.Dir, cmd.Stdout, cmd.Stderr = le.h.dir, journal, journal
+	cmd.Env = testkit.CommandEnv()
 	if err := cmd.Start(); err != nil {
 		le.t.Fatal(err)
 	}

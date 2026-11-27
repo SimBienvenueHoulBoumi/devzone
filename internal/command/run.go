@@ -17,6 +17,9 @@ import (
 // the exit status. Without argument, the help is shown, as manage/devzone does.
 // Standard input is passed on to the delegated bash command.
 func Run(args []string, out, errOut io.Writer) int {
+	if refuseInPod(errOut) {
+		return 1
+	}
 	if len(args) == 0 {
 		args = []string{"help"}
 	}
