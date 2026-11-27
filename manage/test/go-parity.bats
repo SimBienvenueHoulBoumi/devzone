@@ -189,12 +189,12 @@ KUBE
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
 }
 
-@test "go-parity: workspace status with extra words is delegated, same output" {
+@test "go-parity: workspace status with extra words: same output and status" {
     faux_cluster
     parite workspace status extra
 }
 
-@test "go-parity: workspace alone is delegated, same help" {
+@test "go-parity: workspace alone: same help" {
     faux_cluster
     parite workspace
 }
@@ -237,7 +237,7 @@ KUBE
     parite workspace stop
 }
 
-@test "go-parity: workspace stop with extra words is delegated, same output" {
+@test "go-parity: workspace stop with extra words: same output and status" {
     faux_cluster
     parite workspace stop extra
 }
@@ -285,7 +285,7 @@ KUBE
     [ "$status" -eq 130 ]
 }
 
-@test "go-parity: workspace shell with extra words is delegated, same output" {
+@test "go-parity: workspace shell with extra words: same output and status" {
     faux_cluster
     parite workspace shell extra
 }

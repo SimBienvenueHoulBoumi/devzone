@@ -25,7 +25,6 @@
     "manage/scripts/",
     "README.md",
     "LICENSE",
-    "manage/workspace.sh",
     "charts/"
   ]
 }

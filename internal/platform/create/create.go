@@ -190,8 +190,12 @@ func Create(opts Options) error {
 		return err
 	}
 	fmt.Fprintf(opts.Out, "✔ devzone %s created in %s\n", opts.Version, absolute)
-	// The workspace goes to the cluster (kube check done by the choice above)
-	script := filepath.Join(opts.Package, "manage", "workspace.sh")
+	// The workspace goes to the cluster (kube check done by the choice above).
+	// Since #934 the start is the Go program itself, not a shell script.
+	program, err := os.Executable()
+	if err != nil {
+		return err
+	}
 	start := &createmode.Session{
 		Ctx:      opts.Ctx,
 		Runner:   opts.Runner,
@@ -200,7 +204,7 @@ func Create(opts Options) error {
 		Out:      opts.Out,
 		Err:      opts.Err,
 	}
-	if err := start.Start(absolute, script); err != nil {
+	if err := start.Start(absolute, program); err != nil {
 		return ErrSilent
 	}
 	return nil

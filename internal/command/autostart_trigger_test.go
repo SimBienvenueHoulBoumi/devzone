@@ -54,6 +54,9 @@ func TestAutoStartTriggersOnCreateUpdateAndCommand(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(current, ".devcontainer"), 0o755); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.WriteFile(filepath.Join(current, ".devzone.version"), []byte("0.0.0\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	created := filepath.Join(root, "created")
 	creationScript := "mkdir -p \"$1/.devcontainer\"\n"
 	cases := []struct {
@@ -63,7 +66,7 @@ func TestAutoStartTriggersOnCreateUpdateAndCommand(t *testing.T) {
 		wantFolder string
 	}{
 		{"update", []string{"update"}, "exit 0\n", current},
-		{"command", []string{"workspace", "ports", "restart"}, "exit 0\n", current},
+		{"command", []string{"workspace", "ports", "status"}, "exit 0\n", current},
 		{"creation", []string{created}, creationScript, created},
 	}
 	for _, tc := range cases {

@@ -71,7 +71,7 @@ DEVZONE_HOST_BIN="$TMP/devzone-go"
 export DEVZONE_HOST_BIN
 echo "▶ workspace start/status/stop"
 set +e
-start_out="$(cd "$DEVZONE_DIR" && DEVZONE_ARGOCD_REVISION='' bash "$ROOT/manage/workspace.sh" start --image "$IMAGE" 2>&1)"
+start_out="$(cd "$DEVZONE_DIR" && DEVZONE_ARGOCD_REVISION='' bash "$ROOT/manage/devzone" workspace start --image "$IMAGE" 2>&1)"
 start_rc=$?
 set -e
 if [ "$start_rc" -eq 0 ]; then
@@ -99,7 +99,7 @@ else
 fi
 
 set +e
-status_out="$(cd "$DEVZONE_DIR" && bash "$ROOT/manage/workspace.sh" status 2>&1)"
+status_out="$(cd "$DEVZONE_DIR" && bash "$ROOT/manage/devzone" workspace status 2>&1)"
 status_rc=$?
 set -e
 if [ "$status_rc" -eq 0 ] && printf '%s' "$status_out" | grep -q "$POD"; then
@@ -116,7 +116,7 @@ fi
 
 echo "▶ module"
 set +e
-module_out="$(cd "$DEVZONE_DIR" && bash "$ROOT/manage/workspace.sh" services status 2>&1)"
+module_out="$(cd "$DEVZONE_DIR" && bash "$ROOT/manage/devzone" workspace services status 2>&1)"
 module_rc=$?
 set -e
 if [ "$module_rc" -eq 0 ]; then
@@ -126,7 +126,7 @@ else
 fi
 
 set +e
-stop_out="$(cd "$DEVZONE_DIR" && bash "$ROOT/manage/workspace.sh" stop 2>&1)"
+stop_out="$(cd "$DEVZONE_DIR" && bash "$ROOT/manage/devzone" workspace stop 2>&1)"
 stop_rc=$?
 set -e
 if [ "$stop_rc" -eq 0 ]; then
