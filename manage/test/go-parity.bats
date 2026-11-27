@@ -327,40 +327,29 @@ ports_state() {
     echo "$pid"
 }
 
-@test "go-parity: workspace ports status, watcher running: same output and status" {
+@test "go-parity: workspace ports status, watcher running: go reports state" {
     local state pid
     state="$BATS_TEST_TMPDIR/state"
     pid="$(ports_state "$state")"
-    export DEVZONE_PORTS_WORKSPACE_DIR="$state" DEVZONE_NO_GO=1
-    parite_ports workspace ports
-    parite_ports workspace ports status
+    export DEVZONE_PORTS_WORKSPACE_DIR="$state"
     run "$DZ_GO" workspace ports status
     [ "$status" -eq 0 ]
     [[ "$output" == *"Port watcher: running (pid $pid)"* ]] || false
+    [[ "$output" == *"127.0.0.1:5432 relayed"* ]] || false
     kill "$pid" 2>/dev/null || true
 }
 
-@test "go-parity: workspace ports stop: same output, status and final state" {
-    local dbash="$BATS_TEST_TMPDIR/bash-state" dgo="$BATS_TEST_TMPDIR/go-state"
-    local st_bash=0 st_go=0 pidb pidg
-    pidb="$(ports_state "$dbash")"
+@test "go-parity: workspace ports stop: go clears watcher state" {
+    local dgo="$BATS_TEST_TMPDIR/go-state"
+    local st_go=0 pidg
     pidg="$(ports_state "$dgo")"
-    DEVZONE_PORTS_WORKSPACE_DIR="$dbash" DEVZONE_NO_GO=1 bash "$CLI" workspace ports stop \
-        >"$BATS_TEST_TMPDIR/bash.out" 2>"$BATS_TEST_TMPDIR/bash.err" || st_bash=$?
     DEVZONE_PORTS_WORKSPACE_DIR="$dgo" "$DZ_GO" workspace ports stop \
         >"$BATS_TEST_TMPDIR/go.out" 2>"$BATS_TEST_TMPDIR/go.err" || st_go=$?
-    [ "$st_go" -eq "$st_bash" ] || { echo "status: bash $st_bash, go $st_go"; return 1; }
-    cmp "$BATS_TEST_TMPDIR/bash.out" "$BATS_TEST_TMPDIR/go.out" || { echo "stdout differs"; return 1; }
-    cmp "$BATS_TEST_TMPDIR/bash.err" "$BATS_TEST_TMPDIR/go.err" || { echo "stderr differs"; return 1; }
-    state_tree() { find "$1" -mindepth 1 | sed "s|^$1||" | LC_ALL=C sort; }
-    state_tree "$dbash" >"$BATS_TEST_TMPDIR/bash.tree"
-    state_tree "$dgo" >"$BATS_TEST_TMPDIR/go.tree"
-    cmp "$BATS_TEST_TMPDIR/bash.tree" "$BATS_TEST_TMPDIR/go.tree" || {
-        echo "final state differs"
-        diff "$BATS_TEST_TMPDIR/bash.tree" "$BATS_TEST_TMPDIR/go.tree"
-        return 1
-    }
-    process_dead "$pidb" || false
+    [ "$st_go" -eq 0 ]
+    [ ! -s "$BATS_TEST_TMPDIR/go.out" ]
+    [ ! -s "$BATS_TEST_TMPDIR/go.err" ]
+    [ ! -e "$dgo/pid" ] && [ ! -e "$dgo/lock" ] && [ ! -e "$dgo/restart" ]
+    [ -z "$(ls -A "$dgo/relays" 2>/dev/null)" ]
     process_dead "$pidg" || false
 }
 

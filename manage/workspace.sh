@@ -90,7 +90,7 @@ start_workspace() {
     argocd_reconcile || true
     "${DEVZONE_HOST_BIN:?devzone: Go program not found (DEVZONE_HOST_BIN), run it through manage/devzone}" workspace wait "$image" || return 1
     "${DEVZONE_HOST_BIN:-false}" workspace agents-guard || true
-    ports_start silence
+    "${DEVZONE_HOST_BIN:?devzone: Go program not found (DEVZONE_HOST_BIN), run it through manage/devzone}" workspace ports start
 }
 
 # helm direct: the chart of the package, image set by the options
@@ -110,7 +110,7 @@ workspace_helm_deploy() {
 
 # Uninstalls the workspace from the cluster (Argo CD Application or helm release).
 stop_workspace() {
-    ports_stop
+    "${DEVZONE_HOST_BIN:?devzone: Go program not found (DEVZONE_HOST_BIN), run it through manage/devzone}" workspace ports stop || true
     workspace_undeploy
 }
 
@@ -137,7 +137,7 @@ case "${1:-}" in
     stop) stop_workspace ;;
     status) "${DEVZONE_HOST_BIN:?devzone: Go program not found (DEVZONE_HOST_BIN), run it through manage/devzone}" workspace status ;;
     shell) shell_workspace ;;
-    ports) ports "${@:2}" ;;
+    ports) "${DEVZONE_HOST_BIN:?devzone: Go program not found (DEVZONE_HOST_BIN), run it through manage/devzone}" workspace ports "${@:2}" ;;
     services) services "${@:2}" ;;
     argocd) argocd_cmd "${@:2}" ;;
     egress) "${DEVZONE_HOST_BIN:?devzone: Go program not found (DEVZONE_HOST_BIN), run it through manage/devzone}" workspace egress "${@:2}" ;;
