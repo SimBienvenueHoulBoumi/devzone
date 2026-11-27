@@ -65,6 +65,10 @@ cp "$ROOT/Makefile" "$DEVZONE_DIR/Makefile" 2>/dev/null || true
 printf 'argocd=off\n' > "$DEVZONE_DIR/.devzone.modules"
 ok "devzone folder prepared"
 
+echo "▶ Go program of the workspace commands"
+DEVZONE_HOST_BIN="$TMP/devzone"
+(cd "$ROOT" && go build -o "$DEVZONE_HOST_BIN" ./cmd/devzone) || exit 1
+export DEVZONE_HOST_BIN
 echo "▶ workspace start/status/stop"
 set +e
 start_out="$(cd "$DEVZONE_DIR" && DEVZONE_ARGOCD_REVISION='' bash "$ROOT/manage/workspace.sh" start --image "$IMAGE" 2>&1)"
