@@ -88,8 +88,8 @@ start_workspace() {
     if [ -n "${DEVZONE_FROM_GO:-}" ] && argocd_active; then devzone workspace deploy "$repo" "$tag" "$with_image"; else workspace_deploy "$repo" "$tag" "$with_image"; fi
     # Projects of .argocd.conf held too (#516)
     argocd_reconcile || true
-    wait_for_pod "$image" || return 1
-    workspace_agents_guard || true
+    "${DEVZONE_HOST_BIN:?devzone: Go program not found (DEVZONE_HOST_BIN), run it through manage/devzone}" workspace wait "$image" || return 1
+    "${DEVZONE_HOST_BIN:-false}" workspace agents-guard || true
     ports_start silence
 }
 
@@ -103,7 +103,7 @@ workspace_helm_deploy() {
     # the old one with IfNotPresent (#515)
     [ "$tag" != latest ] || args+=(--set "image.pullPolicy=Always")
     # egress proxy settings (#633), replayed at each start: commas escaped for helm
-    for p in $(egress_params | sed 's/,/\\,/g'); do args+=(--set "$p"); done
+    for p in $("${DEVZONE_HOST_BIN:?devzone: Go program not found (DEVZONE_HOST_BIN), run it through manage/devzone}" workspace egress params | sed 's/,/\\,/g'); do args+=(--set "$p"); done
     # shellcheck disable=SC2046
     helm $(helm_flag) upgrade --install devzone-workspace "$(chart_path)" "${args[@]}"
 }
@@ -122,12 +122,6 @@ shell_workspace() {
 
 # shellcheck source=manage/scripts/kube-ready.sh
 . "$HERE/scripts/kube-ready.sh"
-# shellcheck source=manage/scripts/workspace/workspace-wait.sh
-. "$HERE/scripts/workspace/workspace-wait.sh"
-# shellcheck source=manage/scripts/workspace/workspace-clone.sh
-. "$HERE/scripts/workspace/workspace-clone.sh"
-# shellcheck source=manage/scripts/workspace/workspace-copies.sh
-. "$HERE/scripts/workspace/workspace-copies.sh"
 # shellcheck source=manage/scripts/workspace/ports-workspace.sh
 . "$HERE/scripts/workspace/ports-workspace.sh"
 # shellcheck source=manage/scripts/workspace/services-workspace.sh
@@ -136,21 +130,17 @@ shell_workspace() {
 . "$HERE/scripts/workspace/argocd-workspace.sh"
 # shellcheck source=manage/scripts/workspace/argocd-services.sh
 . "$HERE/scripts/workspace/argocd-services.sh"
-# shellcheck source=manage/scripts/workspace/workspace-update.sh
-. "$HERE/scripts/workspace/workspace-update.sh"
-# shellcheck source=manage/scripts/workspace/workspace-egress.sh
-. "$HERE/scripts/workspace/workspace-egress.sh"
 
 case "${1:-}" in
     start) start_workspace "${@:2}" ;;
-    update) update_workspace "${@:2}" ;;
+    update) "${DEVZONE_HOST_BIN:?devzone: Go program not found (DEVZONE_HOST_BIN), run it through manage/devzone}" workspace update "${@:2}" ;;
     stop) stop_workspace ;;
-    status) status_workspace ;;
+    status) "${DEVZONE_HOST_BIN:?devzone: Go program not found (DEVZONE_HOST_BIN), run it through manage/devzone}" workspace status ;;
     shell) shell_workspace ;;
     ports) ports "${@:2}" ;;
     services) services "${@:2}" ;;
     argocd) argocd_cmd "${@:2}" ;;
-    egress) egress_workspace "${@:2}" ;;
+    egress) "${DEVZONE_HOST_BIN:?devzone: Go program not found (DEVZONE_HOST_BIN), run it through manage/devzone}" workspace egress "${@:2}" ;;
     '' | -h | --help | help)
         echo "devzone workspace start|stop|status|shell|ports|services|argocd|update|egress"
         echo "  start [--image repository:tag]  install workspace (image for devzone version by default)"

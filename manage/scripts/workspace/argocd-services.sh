@@ -110,7 +110,7 @@ workspace_deploy() {
     [ -z "$with_image" ] || params="$params image.repository=$repository"
     [ "$tag" != latest ] || params="$params image.pullPolicy=Always"
     # egress proxy settings of .devzone.modules (#633): replayed at each start and update
-    params="$params $(egress_params)"
+    params="$params $("${DEVZONE_HOST_BIN:?devzone: Go program not found (DEVZONE_HOST_BIN), run it through manage/devzone}" workspace egress params)"
     chart_require workspace || return $?
     # GitOps repository created or designated first, with its root Application
     gitops_init || return 1
