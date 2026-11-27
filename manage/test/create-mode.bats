@@ -8,6 +8,9 @@ setup() {
     load commun
     kube_isole
     RACINE="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
+    command -v go >/dev/null 2>&1 || skip "go is not installed"
+    export DEVZONE_HOST_BIN="$BATS_TEST_TMPDIR/devzone-go"
+    (cd "$RACINE" && go build -o "$DEVZONE_HOST_BIN" ./cmd/devzone) || { echo "go build failed"; return 1; }
     CM="$RACINE/manage/scripts/create-mode.sh"
     T="$BATS_TEST_TMPDIR"
     FAKE_LOG="$T/tools.log"

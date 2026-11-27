@@ -48,6 +48,10 @@ func newDefaultRegistry() *cli.Registry {
 		Name: "host-check",
 		Run:  hostCheckCommand,
 	})
+	r.Register(cli.Command{
+		Name: "kube-ready",
+		Run:  kubeReadyCommand,
+	})
 	return r
 }
 
