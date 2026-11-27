@@ -76,6 +76,8 @@ func TestAutoStartTriggersOnCreateUpdateAndCommand(t *testing.T) {
 			}
 			t.Cleanup(func() { commandEnsureAutoStart = previous })
 			entry(t, tc.body)
+			// update is ported to Go: it works on the folder of the working directory
+			t.Chdir(current)
 			t.Setenv("DEVZONE_ROOT", current)
 			var out, errOut bytes.Buffer
 			if code := Run(tc.args, &out, &errOut); code != 0 {
@@ -101,7 +103,7 @@ func TestAutoStartNotTriggeredByFailedCommand(t *testing.T) {
 	t.Cleanup(func() { commandEnsureAutoStart = previous })
 	entry(t, "exit 4\n")
 	t.Setenv("DEVZONE_ROOT", t.TempDir())
-	if code := Run([]string{"update"}, &bytes.Buffer{}, &bytes.Buffer{}); code != 4 {
+	if code := Run([]string{"ai"}, &bytes.Buffer{}, &bytes.Buffer{}); code != 4 {
 		t.Fatalf("status = %d, want 4", code)
 	}
 	if calls != 0 {
