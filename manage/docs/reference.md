@@ -287,6 +287,10 @@ The commands use the workstation's helm and kubectl, with the devzone context if
 
 The image comes from ghcr.io, tagged with the devzone version (`latest` from a clone of the repository); if missing, start reports it and uninstalls the workspace.
 
+### Host and pod devzone programs
+
+`devzone` is two different programs: the npm package on the workstation creates a devzone and drives the workspace (`devzone workspace …`, `update`, `uninstall`), while the image in the pod provides `agent`, `status`, `apply`, `enable` and the other module commands. The pod PATH puts `~/.local/npm/bin` before `/usr/local/bin` for the assistants, so an `npm install -g devzone` run inside the pod masks the image program. The host program then refuses every command with `npm uninstall -g devzone` instead of the misleading "pod command" reply, and `devzone status` warns when the first `devzone` of PATH is not the image one. Install the npm package only on the workstation.
+
 ### Updating the workspace
 
 `devzone workspace update` moves the workspace to the latest stable release of the devzone repository (tags `vX.Y.Z`; pre-releases such as `v0.48.0-next.1` are ignored), or to the version given with `--version X.Y.Z`. It sets the image, the charts and the `devzone-workspace` Argo CD Application to the same tag (without Argo CD, the local chart is redeployed with the new image), then reconciles the services managed by Argo CD (postgres, mysql).
