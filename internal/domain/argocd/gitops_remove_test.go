@@ -69,6 +69,21 @@ func TestRemoveApplicationFileGitHubRefusalStops(t *testing.T) {
 	}
 }
 
+// TestRemoveApplicationFileGitHubSHAReadFailureStops checks that a gh api
+// failure that is not "file absent" stops the removal with 1, as the old shell
+// did with "sha=$(... || return 1)": the Application must stay in the cluster.
+func TestRemoveApplicationFileGitHubSHAReadFailureStops(t *testing.T) {
+	f := gitopsFixture(t, "[argocd]\nrepo = https://github.com/tester/devzone-argocd.git\n")
+	f.r.On("gh", []string{"api", "repos/tester/devzone-argocd/contents/apps/devzone-workspace.yaml", "--jq", ".sha"},
+		fexec.Result{Code: 1, Stderr: []byte("HTTP 500\n")})
+	if code := RemoveApplicationFile(context.Background(), f.opts(), "devzone-workspace"); code != 1 {
+		t.Fatalf("code=%d, want 1 when gh api cannot read the sha", code)
+	}
+	if fixtureSawCall(f, "gh", "-X", "DELETE") || fixtureSawCall(f, "kubectl", "annotate") {
+		t.Fatalf("removal continued after a sha read failure: %v", f.r.Calls())
+	}
+}
+
 // TestRemoveApplicationFileWithoutRepositoryDoesNothing checks that without a
 // designated GitOps repository no command runs: the Application is applied
 // directly, so there is no file to remove.
