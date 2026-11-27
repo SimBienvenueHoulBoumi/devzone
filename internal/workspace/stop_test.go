@@ -126,3 +126,29 @@ func TestStopKubectlNotStartedUninstalls(t *testing.T) {
 		t.Fatalf("status %d, stdout %q", status, out)
 	}
 }
+
+// Replaces the parity case of manage/test/go-parity.bats (Argo CD holds the
+// workspace): the bash entry point only delegates now, so the behaviour is
+// pinned here. The folder is empty: no GitOps repository (.argocd.conf) is read.
+func TestStopArgocdHoldsWorkspaceExactCallsAndOutput(t *testing.T) {
+	t.Chdir(t.TempDir())
+	t.Setenv("DEVZONE_PORTS_WORKSPACE_DIR", t.TempDir())
+	r := &fakeRunner{replies: []reply{
+		{match: contextsCall, stdout: devzoneContexts},
+		{match: "get namespace", stdout: "namespace/devzone-argocd\n"},
+		{match: "get application", stdout: "application\n"},
+		{match: "delete", stdout: "application.argoproj.io \"devzone-workspace\" deleted\n"},
+	}}
+	status, out, errOut := runStop(r)
+	if status != 0 || errOut != "" {
+		t.Fatalf("status %d, stderr %q", status, errOut)
+	}
+	wantOut := "▶ Application devzone-workspace deleted (Argo CD removes the pod, the volumes stay)…\n" +
+		"application.argoproj.io \"devzone-workspace\" deleted\n"
+	if out != wantOut {
+		t.Fatalf("stdout = %q, want %q", out, wantOut)
+	}
+	wantCalls(t, r.calls, contextsCall, "--context devzone "+argocdNamespaceCall,
+		contextsCall, "--context devzone "+argocdApplicationCall,
+		contextsCall, "--context devzone -n devzone-argocd delete application.argoproj.io devzone-workspace --ignore-not-found --wait=true")
+}
