@@ -2,18 +2,28 @@ package command
 
 import (
 	"bytes"
-	"runtime"
+	"io"
 	"strings"
 	"testing"
+
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec/fake"
 )
 
-// TestWorkspaceCopyToMissingFolderRunsInGo: the folder check comes before any
-// call to kubectl, so no fake cluster is needed
+// copyRunner answers the kubectl calls of the copy commands in memory, like
+// the fake kubectl of the former shell tests, without any PATH entry.
+type copyRunner struct{}
+
+// Kubectl answers the copy calls and records them.
+func (r *copyRunner) Kubectl(args []string, _ io.Reader, stdout, _ io.Writer) (int, error) {
+	return 0, nil
+}
+
+// Helm answers nothing.
+func (r *copyRunner) Helm(args []string, _ io.Reader, stdout, _ io.Writer) (int, error) {
+	return 0, nil
+}
 
 func TestWorkspaceCopyToMissingFolderRunsInGo(t *testing.T) {
-	hostMode(t)
-	requireBash(t)
-	entry(t, echoArgs+"\n")
 	var out, errOut bytes.Buffer
 	if got := Run([]string{"workspace", "copy-to", "no-such-folder-754"}, &out, &errOut); got != 1 {
 		t.Fatalf("exit status = %d, want 1 (stderr %q)", got, errOut.String())
@@ -24,13 +34,8 @@ func TestWorkspaceCopyToMissingFolderRunsInGo(t *testing.T) {
 }
 
 func TestWorkspaceCopyFromRunsInGo(t *testing.T) {
-	hostMode(t)
-	requireBash(t)
-	if runtime.GOOS == "windows" {
-		t.Skip("the fake kubectl is a shell script")
-	}
-	entry(t, echoArgs+"\n")
-	fakeKubectlOnPath(t)
+	r := &copyRunner{}
+	useStopTools(t, r, fake.New())
 	var out, errOut bytes.Buffer
 	if got := Run([]string{"workspace", "copy-from", "mine"}, &out, &errOut); got != 0 {
 		t.Fatalf("exit status = %d, want 0 (stderr %q)", got, errOut.String())

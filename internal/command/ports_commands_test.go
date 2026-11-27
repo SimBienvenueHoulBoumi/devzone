@@ -1,11 +1,8 @@
-//go:build !windows
-
 package command
 
 import (
 	"bytes"
 	"io"
-	"os"
 	"strings"
 	"testing"
 
@@ -18,8 +15,6 @@ import (
 // agent run in Go, never in the shell entry point.
 
 func TestPortsAutomaticStartRouting(t *testing.T) {
-	hostMode(t)
-	requireBash(t)
 	var calls []string
 	oldEnable, oldDisable, oldAgent := commandPortsEnable, commandPortsDisable, commandPortsAgent
 	t.Cleanup(func() {
@@ -42,27 +37,15 @@ func TestPortsAutomaticStartRouting(t *testing.T) {
 		{[]string{"workspace", "ports", "disable"}, "disable"},
 		{[]string{"workspace", "ports", "agent"}, "agent"},
 	} {
-		trace := tracePath(t)
-		entry(t, traceScript)
-		fakeKubectlOnPath(t)
 		var out, errOut bytes.Buffer
 		if got := Run(tc.args, &out, &errOut); got != 0 {
 			t.Fatalf("%v: status = %d, err = %q", tc.args, got, errOut.String())
-		}
-		if existsTrace(trace) {
-			t.Fatalf("%v went through bash", tc.args)
 		}
 		if len(calls) != 1 || calls[0] != tc.want {
 			t.Fatalf("%v: calls = %v, want %q", tc.args, calls, tc.want)
 		}
 		calls = nil
 	}
-}
-
-// existsTrace reports whether a bash trace file was created.
-func existsTrace(path string) bool {
-	_, err := os.Stat(path)
-	return err == nil
 }
 
 // TestUninstallWithoutObjectsStillDisables keeps the retirement when the

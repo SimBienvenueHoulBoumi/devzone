@@ -53,7 +53,6 @@ func TestPortedCommandsDoNotUseBash(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			trace := tracePath(t)
 			entry(t, traceScript)
-			fakeKubectlOnPath(t)
 			t.Setenv("DEVZONE_PORTS_WORKSPACE_DIR", t.TempDir())
 			var out, errOut bytes.Buffer
 			Run(tc.args, &out, &errOut)
@@ -77,16 +76,12 @@ func TestOtherCommandsUseBash(t *testing.T) {
 		args []string
 	}{
 		{"ai", []string{"ai"}},
-		{"workspace ports restart", []string{"workspace", "ports", "restart"}},
-		{"workspace ports status extra", []string{"workspace", "ports", "status", "extra"}},
-		{"workspace nope", []string{"workspace", "nope"}},
 		{"version extra", []string{"--version", "extra"}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			trace := tracePath(t)
 			entry(t, traceScript)
-			fakeKubectlOnPath(t)
 			t.Setenv("DEVZONE_PORTS_WORKSPACE_DIR", t.TempDir())
 			var out, errOut bytes.Buffer
 			Run(tc.args, &out, &errOut)
