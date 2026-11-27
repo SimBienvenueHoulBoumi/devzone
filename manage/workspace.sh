@@ -84,10 +84,23 @@ start_workspace() {
     done
     image="$repo:$tag"
     # Argo CD first when wanted (#516): the workspace is then an Application
-    argocd_ensure
-    if [ -n "${DEVZONE_FROM_GO:-}" ] && argocd_active; then devzone workspace deploy "$repo" "$tag" "$with_image"; else workspace_deploy "$repo" "$tag" "$with_image"; fi
+    if [ "$(grep '^argocd=' .devzone.modules 2>/dev/null | tail -1 | cut -d= -f2-)" != off ]; then
+        "${DEVZONE_HOST_BIN:?devzone: Go program not found (DEVZONE_HOST_BIN), run it through manage/devzone}" workspace services enable argocd || echo "⚠ Argo CD not installed: the workspace is deployed with helm directly (devzone workspace services enable argocd to retry)" >&2
+    fi
+    if [ -n "${DEVZONE_FROM_GO:-}" ]; then
+        if ! "${DEVZONE_HOST_BIN:?devzone: Go program not found (DEVZONE_HOST_BIN), run it through manage/devzone}" workspace deploy "$repo" "$tag" "$with_image"; then
+            rc=$?
+            if [ "$rc" -eq 3 ]; then
+                workspace_helm_deploy "$repo" "$tag" "$with_image"
+            else
+                return "$rc"
+            fi
+        fi
+    else
+        workspace_deploy "$repo" "$tag" "$with_image"
+    fi
     # Projects of .argocd.conf held too (#516)
-    argocd_reconcile || true
+    "${DEVZONE_HOST_BIN:?devzone: Go program not found (DEVZONE_HOST_BIN), run it through manage/devzone}" workspace argocd reconcile || true
     "${DEVZONE_HOST_BIN:?devzone: Go program not found (DEVZONE_HOST_BIN), run it through manage/devzone}" workspace wait "$image" || return 1
     "${DEVZONE_HOST_BIN:-false}" workspace agents-guard || true
     "${DEVZONE_HOST_BIN:?devzone: Go program not found (DEVZONE_HOST_BIN), run it through manage/devzone}" workspace ports start
@@ -111,7 +124,7 @@ workspace_helm_deploy() {
 # Uninstalls the workspace from the cluster (Argo CD Application or helm release).
 stop_workspace() {
     "${DEVZONE_HOST_BIN:?devzone: Go program not found (DEVZONE_HOST_BIN), run it through manage/devzone}" workspace ports stop || true
-    workspace_undeploy
+    "${DEVZONE_HOST_BIN:?devzone: Go program not found (DEVZONE_HOST_BIN), run it through manage/devzone}" workspace stop
 }
 
 # Opens a shell in the workspace container.
@@ -122,10 +135,7 @@ shell_workspace() {
 
 # shellcheck source=manage/scripts/kube-ready.sh
 . "$HERE/scripts/kube-ready.sh"
-# shellcheck source=manage/scripts/workspace/argocd-workspace.sh
-. "$HERE/scripts/workspace/argocd-workspace.sh"
-# shellcheck source=manage/scripts/workspace/argocd-services.sh
-. "$HERE/scripts/workspace/argocd-services.sh"
+
 
 case "${1:-}" in
     start) start_workspace "${@:2}" ;;
@@ -135,7 +145,19 @@ case "${1:-}" in
     shell) shell_workspace ;;
     ports) "${DEVZONE_HOST_BIN:?devzone: Go program not found (DEVZONE_HOST_BIN), run it through manage/devzone}" workspace ports "${@:2}" ;;
     services) "${DEVZONE_HOST_BIN:?devzone: Go program not found (DEVZONE_HOST_BIN), run it through manage/devzone}" workspace services "${@:2}" ;;
-    argocd) argocd_cmd "${@:2}" ;;
+    argocd)
+        sub="${2:-status}"
+        case "$sub" in
+            status) "${DEVZONE_HOST_BIN:?devzone: Go program not found (DEVZONE_HOST_BIN), run it through manage/devzone}" workspace argocd status ;;
+            init) "${DEVZONE_HOST_BIN:?devzone: Go program not found (DEVZONE_HOST_BIN), run it through manage/devzone}" workspace argocd init "${@:3}" ;;
+            apply) "${DEVZONE_HOST_BIN:?devzone: Go program not found (DEVZONE_HOST_BIN), run it through manage/devzone}" workspace argocd apply ;;
+            app) "${DEVZONE_HOST_BIN:?devzone: Go program not found (DEVZONE_HOST_BIN), run it through manage/devzone}" workspace argocd app "${@:3}" ;;
+            *)
+                echo "✖ devzone workspace argocd status | init [--repo <url>|--none] | apply | app add <repo url> [path] [--name N] [--revision R] | app list | app remove <N>" >&2
+                exit 1
+                ;;
+        esac
+        ;;
     egress) "${DEVZONE_HOST_BIN:?devzone: Go program not found (DEVZONE_HOST_BIN), run it through manage/devzone}" workspace egress "${@:2}" ;;
     '' | -h | --help | help)
         echo "devzone workspace start|stop|status|shell|ports|services|argocd|update|egress"

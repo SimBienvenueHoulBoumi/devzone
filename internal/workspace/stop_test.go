@@ -17,13 +17,10 @@ const (
 
 // runStop runs Stop on r with a fallback that records its call and returns fallbackStatus,
 // and returns the status, the standard output, the standard error and whether the fallback ran
-func runStop(r Runner, fallbackStatus int) (status int, out, errOut string, fellBack bool) {
+func runStop(r Runner) (status int, out, errOut string) {
 	var o, e bytes.Buffer
-	status = Stop(r, &o, &e, func() int {
-		fellBack = true
-		return fallbackStatus
-	})
-	return status, o.String(), e.String(), fellBack
+	status = Stop(r, &o, &e)
+	return status, o.String(), e.String()
 }
 
 func TestStopUninstallsReleaseWhenArgocdAbsent(t *testing.T) {
@@ -32,9 +29,9 @@ func TestStopUninstallsReleaseWhenArgocdAbsent(t *testing.T) {
 		{match: argocdNamespaceCall, stderr: "Error from server (NotFound)\n", status: 1},
 		{match: "uninstall", stdout: "release \"devzone-workspace\" uninstalled\n"},
 	}}
-	status, out, errOut, fellBack := runStop(r, 9)
-	if status != 0 || out != "release \"devzone-workspace\" uninstalled\n" || errOut != "" || fellBack {
-		t.Fatalf("status %d, stdout %q, stderr %q, fallback %v", status, out, errOut, fellBack)
+	status, out, errOut := runStop(r)
+	if status != 0 || out != "release \"devzone-workspace\" uninstalled\n" || errOut != "" {
+		t.Fatalf("status %d, stdout %q, stderr %q", status, out, errOut)
 	}
 	wantCalls(t, r.calls, contextsCall, "--context devzone "+argocdNamespaceCall,
 		contextsCall, helmUninstallCall)
@@ -46,7 +43,7 @@ func TestStopUninstallsWithCurrentContextWhenDevzoneMissing(t *testing.T) {
 		{match: argocdNamespaceCall, status: 1},
 		{match: "uninstall", stdout: "uninstalled\n"},
 	}}
-	status, out, _, _ := runStop(r, 9)
+	status, out, _ := runStop(r)
 	if status != 0 || out != "uninstalled\n" {
 		t.Fatalf("status %d, stdout %q", status, out)
 	}
@@ -61,16 +58,16 @@ func TestStopNamespaceWithoutApplicationUninstalls(t *testing.T) {
 		{match: "get application", stderr: "NotFound\n", status: 1},
 		{match: "uninstall", stdout: "uninstalled\n"},
 	}}
-	status, _, _, fellBack := runStop(r, 9)
-	if status != 0 || fellBack {
-		t.Fatalf("status %d, fallback %v: want the helm release removed", status, fellBack)
+	status, _, _ := runStop(r)
+	if status != 0 {
+		t.Fatalf("status %d: want the helm release removed", status)
 	}
 	wantCalls(t, r.calls, contextsCall, "--context devzone "+argocdNamespaceCall,
 		contextsCall, "--context devzone "+argocdApplicationCall,
 		contextsCall, helmUninstallCall)
 }
 
-func TestStopArgocdHoldsWorkspaceFallsBackBeforeAnyChange(t *testing.T) {
+func TestStopArgocdHoldsWorkspaceDeletesApplication(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("DEVZONE_PORTS_WORKSPACE_DIR", dir)
 	writeFile(t, dir+"/relays/5432", "999999\n")
@@ -78,10 +75,11 @@ func TestStopArgocdHoldsWorkspaceFallsBackBeforeAnyChange(t *testing.T) {
 		{match: contextsCall, stdout: devzoneContexts},
 		{match: "get namespace", stdout: "namespace/devzone-argocd\n"},
 		{match: "get application", stdout: "application\n"},
+		{match: "delete", stdout: "application deleted\n"},
 	}}
-	status, out, _, fellBack := runStop(r, 7)
-	if status != 7 || out != "" || !fellBack {
-		t.Fatalf("status %d, stdout %q, fallback %v: want the bash status", status, out, fellBack)
+	status, out, _ := runStop(r)
+	if status != 0 || !strings.Contains(out, "Application devzone-workspace deleted") {
+		t.Fatalf("status %d, stdout %q: want the Application deleted", status, out)
 	}
 	for _, c := range r.calls {
 		if strings.Contains(c, "uninstall") {
@@ -89,7 +87,7 @@ func TestStopArgocdHoldsWorkspaceFallsBackBeforeAnyChange(t *testing.T) {
 		}
 	}
 	if !exists(dir + "/relays/5432") {
-		t.Fatal("the port state changed before the fallback")
+		t.Fatal("the port state changed")
 	}
 }
 
@@ -99,7 +97,7 @@ func TestStopHelmFailureKeepsStatusAndOutput(t *testing.T) {
 		{match: argocdNamespaceCall, status: 1},
 		{match: "uninstall", stderr: "Error: uninstall: release not loaded\n", status: 1},
 	}}
-	status, out, errOut, _ := runStop(r, 9)
+	status, out, errOut := runStop(r)
 	if status != 1 || out != "" || errOut != "Error: uninstall: release not loaded\n" {
 		t.Fatalf("status %d, stdout %q, stderr %q", status, out, errOut)
 	}
@@ -111,7 +109,7 @@ func TestStopHelmNotStarted(t *testing.T) {
 		{match: argocdNamespaceCall, status: 1},
 		{match: "uninstall", err: errors.New("exec: helm not found")},
 	}}
-	status, _, errOut, _ := runStop(r, 9)
+	status, _, errOut := runStop(r)
 	if status != 127 || !strings.Contains(errOut, "cannot start helm") {
 		t.Fatalf("status %d, stderr %q: want 127 and a message", status, errOut)
 	}
@@ -123,8 +121,8 @@ func TestStopKubectlNotStartedUninstalls(t *testing.T) {
 		{match: contextsCall, err: errors.New("exec: kubectl not found")},
 		{match: "uninstall", stdout: "uninstalled\n"},
 	}}
-	status, out, _, fellBack := runStop(r, 9)
-	if status != 0 || out != "uninstalled\n" || fellBack {
-		t.Fatalf("status %d, stdout %q, fallback %v", status, out, fellBack)
+	status, out, _ := runStop(r)
+	if status != 0 || out != "uninstalled\n" {
+		t.Fatalf("status %d, stdout %q", status, out)
 	}
 }
