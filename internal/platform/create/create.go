@@ -116,13 +116,14 @@ func Create(opts Options) error {
 	if opts.Kubernetes {
 		option = "kubernetes"
 	}
-	// Mode before any copy: --kubernetes without a cluster creates nothing (#497)
+	// Mode before any copy: --kubernetes without a cluster creates nothing (#497).
+	// The notices of the choice go to stdout, as the shell script printed them.
 	session := &createmode.Session{
 		Ctx:      opts.Ctx,
 		Runner:   opts.Runner,
 		LookPath: opts.LookPath,
 		In:       opts.In,
-		Out:      opts.Err,
+		Out:      opts.Out,
 		Err:      opts.Err,
 		Terminal: option == "" && opts.Terminal,
 	}
@@ -196,8 +197,7 @@ func Create(opts Options) error {
 		return err
 	}
 	fmt.Fprintf(opts.Out, "✔ devzone %s created in %s\n", opts.Version, absolute)
-	// The workspace goes to the cluster (kube check done by create-mode choose);
-	// a start session reports on stdout, unlike the captured choose
+	// The workspace goes to the cluster (kube check done by the choice above)
 	script := filepath.Join(opts.Package, "manage", "workspace.sh")
 	start := &createmode.Session{
 		Ctx:      opts.Ctx,

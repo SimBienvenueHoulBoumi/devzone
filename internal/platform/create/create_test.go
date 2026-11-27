@@ -46,21 +46,48 @@ func TestCreateKubernetesRecordedNoStart(t *testing.T) {
 	}
 }
 
-// TestCreateNotices checks the cluster-ready notice on stderr and the
-// no-GitOps notice on stderr when no repository is named and no terminal.
+// TestCreateNotices checks the cluster-ready notice on stdout (as the shell
+// script printed it) and the no-GitOps notice on stderr when no repository is
+// named and no terminal.
 func TestCreateNotices(t *testing.T) {
 	t.Setenv("DEVZONE_NO_START", "1")
-	opts, _, _, errOut := createOptions(t, readyRunner())
+	opts, _, out, errOut := createOptions(t, readyRunner())
 	opts.Gitops = ""
 	if err := Create(opts); err != nil {
 		t.Fatalf("Create: %v", err)
 	}
-	s := errOut.String()
-	if !strings.Contains(s, "✔ Kubernetes ready (devzone): workspace in the cluster") {
-		t.Fatalf("stderr:\n%s", s)
+	if !strings.Contains(out.String(), "✔ Kubernetes ready (devzone): workspace in the cluster") {
+		t.Fatalf("stdout:\n%s", out.String())
 	}
-	if !strings.Contains(s, "no GitOps repository for Argo CD") {
-		t.Fatalf("stderr:\n%s", s)
+	if strings.Contains(errOut.String(), "Kubernetes ready") {
+		t.Fatalf("ready notice on stderr:\n%s", errOut.String())
+	}
+	if !strings.Contains(errOut.String(), "no GitOps repository for Argo CD") {
+		t.Fatalf("stderr:\n%s", errOut.String())
+	}
+}
+
+// TestCreateNoTerminalNoticeText checks the notice printed when no GitOps
+// repository is named and stdin is not a terminal: the exact line of the shell
+// script, which names --gitops, and the repo = none it leads to.
+func TestCreateNoTerminalNoticeText(t *testing.T) {
+	t.Setenv("DEVZONE_NO_START", "1")
+	opts, target, _, errOut := createOptions(t, readyRunner())
+	opts.Gitops = ""
+	opts.StdinTTY = false
+	if err := Create(opts); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	want := "⚠ no GitOps repository for Argo CD: pass --gitops <github|none|https://github.com/<login>/<name>.git> to create a devzone without a terminal; using none\n"
+	if !strings.Contains(errOut.String(), want) {
+		t.Fatalf("stderr:\n%s\nwant line:\n%s", errOut.String(), want)
+	}
+	conf, err := os.ReadFile(filepath.Join(target, ".argocd.conf"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(conf), "repo = none") {
+		t.Fatalf(".argocd.conf:\n%s", conf)
 	}
 }
 

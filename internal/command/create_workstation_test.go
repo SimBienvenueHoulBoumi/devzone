@@ -63,6 +63,52 @@ func TestCreateWorkstationGitopsNeedsValue(t *testing.T) {
 	}
 }
 
+// TestCreateWorkstationNoTerminalNotice checks that without a terminal and
+// without --gitops, the command prints the notice of the shell script, which
+// names --gitops, then creates the devzone with repo = none (exit 0).
+func TestCreateWorkstationNoTerminalNotice(t *testing.T) {
+	t.Setenv("DEVZONE_NO_START", "1")
+	t.Setenv("DEVZONE_TERMINAL", "")
+	pkg := t.TempDir()
+	for _, d := range []string{".devcontainer", "manage/scripts"} {
+		if err := os.MkdirAll(filepath.Join(pkg, d), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	files := map[string]string{
+		"manage/scripts/uninstall.sh": "#!/usr/bin/env bash\n",
+		"Makefile":                    "all:\n",
+		".gitattributes":              "*\n",
+		"README.md":                   "#\n",
+		"LICENSE":                     "l\n",
+		"package.json":                `{"version":"1.2.3"}`,
+	}
+	for name, body := range files {
+		if err := os.WriteFile(filepath.Join(pkg, filepath.FromSlash(name)), []byte(body), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("DEVZONE_PAQUET", pkg)
+	target := filepath.Join(t.TempDir(), "mon")
+	runner := fake.New()
+	readyKube(runner)
+	ctx, out, errOut := ctxWith([]string{target, "--kubernetes"}, runner)
+	if code := createWorkstationCommand(ctx); code != 0 {
+		t.Fatalf("code=%d stderr=%s", code, errOut.String())
+	}
+	want := "⚠ no GitOps repository for Argo CD: pass --gitops <github|none|https://github.com/<login>/<name>.git> to create a devzone without a terminal; using none\n"
+	if !strings.Contains(errOut.String(), want) {
+		t.Fatalf("stderr %q; want %q", errOut.String(), want)
+	}
+	if !strings.Contains(out.String(), "✔ Kubernetes ready (devzone): workspace in the cluster") {
+		t.Fatalf("stdout %q", out.String())
+	}
+	conf, _ := os.ReadFile(filepath.Join(target, ".argocd.conf"))
+	if !strings.Contains(string(conf), "repo = none") {
+		t.Fatalf(".argocd.conf %q", conf)
+	}
+}
+
 // TestCreateWorkstationCreates checks the Go command creates the folder in
 // kubernetes mode against a ready cluster, silently when nothing fails.
 func TestCreateWorkstationCreates(t *testing.T) {

@@ -60,13 +60,13 @@ func TestCreateStartRunsWorkspace(t *testing.T) {
 func TestCreateWorkspaceAlreadyInCluster(t *testing.T) {
 	t.Setenv("DEVZONE_NO_START", "1")
 	runner := readyRunner()
-	opts, target, _, errOut := createOptions(t, runner)
+	opts, target, out, errOut := createOptions(t, runner)
 	runner.On("helm", []string{"status", "devzone-workspace", "--namespace", "devzone-workspace", "--kube-context", "devzone"}, fexec.Result{})
 	if err := Create(opts); err != nil {
 		t.Fatalf("Create: %v", err)
 	}
-	if !strings.Contains(errOut.String(), "a devzone workspace already runs in this cluster") {
-		t.Fatalf("stderr:\n%s", errOut.String())
+	if !strings.Contains(out.String(), "a devzone workspace already runs in this cluster") {
+		t.Fatalf("stdout:\n%s\nstderr:\n%s", out.String(), errOut.String())
 	}
 	modules, _ := os.ReadFile(filepath.Join(target, ".devzone.modules"))
 	if string(modules) != "workspace=kubernetes\n" {
