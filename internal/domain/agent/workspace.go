@@ -104,7 +104,7 @@ func AgentWorkspace(ctx context.Context, r Runner, out io.Writer, errOut io.Writ
 	}
 	fmt.Fprintln(out, "devzone agent: Kubernetes workspace (pod devzone-workspace-0, "+inPod+"); --local for the container")
 	AgentKC(ctx, r, "cp", brief, "devzone-workspace-0:/tmp/devzone-agent-"+name+".md", "-c", "workspace")
-	res := AgentKC(ctx, r, "exec", "devzone-workspace-0", "-c", "workspace", "--", "env", "DEVZONE_ROOT="+podRoot, "MODEL_OPT="+modelList, "bash", "-lc", "devzone agent ${MODEL_OPT:+--model \"$MODEL_OPT\"} \"$1\" \"$2\"", "_", inPod, "/tmp/devzone-agent-"+name+".md")
+	res := AgentKC(ctx, r, "exec", "devzone-workspace-0", "-c", "workspace", "--", "env", "DEVZONE_ROOT="+podRoot, "MODEL_OPT="+modelList, "bash", "-lc", "ulimit -c 0; devzone agent ${MODEL_OPT:+--model \"$MODEL_OPT\"} \"$1\" \"$2\"", "_", inPod, "/tmp/devzone-agent-"+name+".md")
 	code := res.Code
 	journal := JournalOf(racine, name)
 	os.MkdirAll(filepath.Dir(journal), 0o755)
