@@ -87,17 +87,12 @@ start_workspace() {
     if [ "$(grep '^argocd=' .devzone.modules 2>/dev/null | tail -1 | cut -d= -f2-)" != off ]; then
         "${DEVZONE_HOST_BIN:?devzone: Go program not found (DEVZONE_HOST_BIN), run it through manage/devzone}" workspace services enable argocd || echo "⚠ Argo CD not installed: the workspace is deployed with helm directly (devzone workspace services enable argocd to retry)" >&2
     fi
-    if [ -n "${DEVZONE_FROM_GO:-}" ]; then
-        if ! "${DEVZONE_HOST_BIN:?devzone: Go program not found (DEVZONE_HOST_BIN), run it through manage/devzone}" workspace deploy "$repo" "$tag" "$with_image"; then
-            rc=$?
-            if [ "$rc" -eq 3 ]; then
-                workspace_helm_deploy "$repo" "$tag" "$with_image"
-            else
-                return "$rc"
-            fi
-        fi
-    else
-        workspace_deploy "$repo" "$tag" "$with_image"
+    rc=0
+    "${DEVZONE_HOST_BIN:?devzone: Go program not found (DEVZONE_HOST_BIN), run it through manage/devzone}" workspace deploy "$repo" "$tag" "$with_image" || rc=$?
+    if [ "$rc" -eq 3 ]; then
+        workspace_helm_deploy "$repo" "$tag" "$with_image"
+    elif [ "$rc" -ne 0 ]; then
+        return "$rc"
     fi
     # Projects of .argocd.conf held too (#516)
     "${DEVZONE_HOST_BIN:?devzone: Go program not found (DEVZONE_HOST_BIN), run it through manage/devzone}" workspace argocd reconcile || true
