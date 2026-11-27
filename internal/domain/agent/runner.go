@@ -66,12 +66,19 @@ type SessionStarter interface {
 }
 
 // ExecSessionStarter starts real processes with os/exec.
-type ExecSessionStarter struct{}
+type ExecSessionStarter struct {
+	// ReaperPath, when set, is the devzone binary whose `subreaper` word runs
+	// the session as the child of a process that reaps its orphans (#973). Empty
+	// starts the session directly, as before.
+	ReaperPath string
+}
 
 // Start launches the command in its own process group so kill can stop
-// children too (the shell used pkill -P then kill).
-func (ExecSessionStarter) Start(cmd SessionCmd) (SessionProcess, error) {
-	c := exec.Command(cmd.Name, cmd.Args...)
+// children too (the shell used pkill -P then kill). The group is that of the
+// wrapper when a reaper is set: the wrapper forwards signals to the session.
+func (s ExecSessionStarter) Start(cmd SessionCmd) (SessionProcess, error) {
+	name, args := reaperArgs(s.ReaperPath, cmd.Name, cmd.Args)
+	c := exec.Command(name, args...)
 	c.Dir = cmd.Dir
 	c.Stdin = cmd.Stdin
 	c.Stdout = cmd.Stdout

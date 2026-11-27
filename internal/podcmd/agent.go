@@ -19,6 +19,7 @@ func runAgent(ctx *cli.Context) int {
 		DevcontainerDir: codeRoot(),
 		Racine:          root,
 		StateDir:        agentStateDir(),
+		Starter:         agent.ExecSessionStarter{ReaperPath: reaperExecutable()},
 	}
 	if opts.DevcontainerDir == "" {
 		opts.DevcontainerDir = root + "/.devcontainer"
