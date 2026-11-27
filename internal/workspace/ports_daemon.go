@@ -21,16 +21,18 @@ type portsDaemonCall struct {
 // codes, instead of loading a real launch agent or user unit.
 var portsDaemon = runDaemon
 
-// runDaemon runs tool with args and returns its exit status, or 1 when the
-// program cannot start, as a shell does. A quiet call discards the output of
-// the service manager: a call whose failure is expected, such as the unload of
-// a job that is not loaded, must not print the usage text of launchctl.
-func runDaemon(tool string, quiet bool, args ...string) int {
-	cmd := exec.Command(tool, args...)
-	if !quiet {
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-	}
+// portsLookPath resolves the service manager, and portsRunner executes it. Both
+// are variables so a test can inject a fake launchctl, systemctl or schtasks
+// without putting a program in the PATH or starting a real service manager.
+var (
+	portsLookPath = exec.LookPath
+	portsRunner   = runDaemonCommand
+)
+
+// runDaemonCommand returns the exit status of a command, or 1 when it cannot
+// start, as a shell does. Keeping the status in the runner lets a test simulate
+// a loaded or absent service without spawning a process.
+func runDaemonCommand(cmd *exec.Cmd) int {
 	err := cmd.Run()
 	if err == nil {
 		return 0
@@ -40,6 +42,36 @@ func runDaemon(tool string, quiet bool, args ...string) int {
 		return exitErr.ExitCode()
 	}
 	return 1
+}
+
+// runDaemon runs tool with args and returns its exit status. A quiet call
+// discards the output of the service manager: a call whose failure is expected,
+// such as the unload of a job that is not loaded, must not print the usage text
+// of launchctl.
+func runDaemon(tool string, quiet bool, args ...string) int {
+	path, err := portsLookPath(tool)
+	if err != nil {
+		return 1
+	}
+	cmd := exec.Command(path, args...)
+	if !quiet {
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+	}
+	return portsRunner(cmd)
+}
+
+// portsDaemonLoadedArgs returns the arguments that ask the service manager
+// whether the watcher is loaded: launchctl print, systemctl is-active or
+// schtasks /Query. A quiet call turns the answer into a status code only.
+func portsDaemonLoadedArgs() []string {
+	switch portsPlatform {
+	case "darwin":
+		return []string{"print", portsDaemonServiceTarget()}
+	case "windows":
+		return []string{"/Query", "/TN", portsAgentName()}
+	}
+	return []string{"--user", "is-active", portsAgentName() + "." + portsAgentExt()}
 }
 
 // portsDaemonEnableArgs returns the arguments that load and enable the
