@@ -19,10 +19,11 @@ setup() {
     export GLAB_CURL_LOG="$BATS_TEST_TMPDIR/curl.log"
     export GLAB_LOG="$BATS_TEST_TMPDIR/glab.log"
     export GLAB_HOSTS="$BATS_TEST_TMPDIR/glab-hosts"
-    # Expected SHA-256 sum: read from the devzone script (pinned versions),
-    # based on the pod architecture; a wrong sum makes it fail
-    ARM64="$(sed -nE 's/^GLAB_SOMME_ARM64=([0-9a-f]+)$/\1/p' "$DEVZONE")"
-    AMD64="$(sed -nE 's/^GLAB_SOMME_AMD64=([0-9a-f]+)$/\1/p' "$DEVZONE")"
+    # Expected SHA-256 sum: read from the Go source of the platform (pinned
+    # versions), based on the pod architecture; a wrong sum makes it fail
+    PLATEFORME="$BATS_TEST_DIRNAME/../../internal/podcmd/platform.go"
+    ARM64="$(sed -nE 's/^[[:space:]]*glabSumARM64 = "([0-9a-f]+)"$/\1/p' "$PLATEFORME")"
+    AMD64="$(sed -nE 's/^[[:space:]]*glabSumAMD64 = "([0-9a-f]+)"$/\1/p' "$PLATEFORME")"
     [ "$(wc -c <<<"$ARM64")" -eq 65 ] && [ "$(wc -c <<<"$AMD64")" -eq 65 ] || false
     case "$(uname -m)" in
         arm64 | aarch64) export GLAB_SOMME_LOCALE="$ARM64" ;;

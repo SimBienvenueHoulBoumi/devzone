@@ -27,6 +27,10 @@ func newDefaultRegistry() *cli.Registry {
 		Run:  runAgent,
 	})
 	r.Register(cli.Command{
+		Name: "subreaper",
+		Run:  runSubreaper,
+	})
+	r.Register(cli.Command{
 		Name: "ai",
 		Run:  runAI,
 	})
@@ -118,6 +122,26 @@ func newDefaultRegistry() *cli.Registry {
 	r.Register(cli.Command{
 		Name: "kube",
 		Run:  runKube,
+	})
+	r.Register(cli.Command{
+		Name: "enable",
+		Run:  runEnable,
+	})
+	r.Register(cli.Command{
+		Name: "disable",
+		Run:  runDisable,
+	})
+	r.Register(cli.Command{
+		Name: "is-enabled",
+		Run:  runIsEnabled,
+	})
+	r.Register(cli.Command{
+		Name: "apply",
+		Run:  runApply,
+	})
+	r.Register(cli.Command{
+		Name: "platform",
+		Run:  runPlatform,
 	})
 	return r
 }
