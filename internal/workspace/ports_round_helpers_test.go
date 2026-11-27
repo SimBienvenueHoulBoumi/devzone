@@ -188,3 +188,18 @@ func readAll(file string) string {
 	data, _ := os.ReadFile(file)
 	return string(data)
 }
+
+// relayedLine is the output of a successful relay, as the round prints it.
+func relayedLine(port int) string {
+	return "→ port " + strconv.Itoa(port) + " relayed on 127.0.0.1\n"
+}
+
+// hasAll reports whether s holds all parts.
+func hasAll(s string, parts ...string) bool {
+	for _, part := range parts {
+		if !strings.Contains(s, part) {
+			return false
+		}
+	}
+	return true
+}

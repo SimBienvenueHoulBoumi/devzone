@@ -171,3 +171,44 @@ func TestServicesSeedAndRefusals(t *testing.T) {
 		}
 	})
 }
+
+// TestServicesDisablePostgresYes checks --yes reaches the installer and no
+// deprecation is printed (#557).
+func TestServicesDisablePostgresYes(t *testing.T) {
+	h := newServicesHarness(t)
+	if status := h.env.Run([]string{"disable", "postgres", "--yes"}); status != 0 {
+		t.Fatalf("status = %d, errOut = %q", status, h.errOut.String())
+	}
+	calls := strings.Join(h.env.Runner.(*fakeRunner).calls, "\n")
+	if !strings.Contains(calls, "services-admin.sh disable postgres --yes") {
+		t.Fatalf("calls = %q", calls)
+	}
+	if strings.Contains(h.errOut.String(), "deprecated") {
+		t.Fatalf("deprecated printed: %q", h.errOut.String())
+	}
+}
+
+// TestServicesSeedRunsInPod checks seed gitlab runs services-admin.sh seed
+// gitlab in the pod (#538).
+func TestServicesSeedRunsInPod(t *testing.T) {
+	h := newServicesHarness(t)
+	if status := h.env.Run([]string{"seed", "gitlab"}); status != 0 {
+		t.Fatalf("status = %d, errOut = %q", status, h.errOut.String())
+	}
+	calls := strings.Join(h.env.Runner.(*fakeRunner).calls, "\n")
+	if !strings.Contains(calls, "services-admin.sh seed gitlab") {
+		t.Fatalf("calls = %q", calls)
+	}
+}
+
+// TestServicesUnknownService checks an unknown service is refused before any
+// cluster call.
+func TestServicesUnknownService(t *testing.T) {
+	h := newServicesHarness(t)
+	if status := h.env.Run([]string{"enable", "redis"}); status != 1 || !strings.Contains(h.errOut.String(), "unknown service: redis") {
+		t.Fatalf("status = %d, errOut = %q", status, h.errOut.String())
+	}
+	if len(h.env.Runner.(*fakeRunner).calls) != 0 {
+		t.Fatalf("cluster called: %q", h.env.Runner.(*fakeRunner).calls)
+	}
+}
