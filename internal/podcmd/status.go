@@ -19,6 +19,7 @@ func runStatus(ctx *cli.Context) int {
 	st := state.At(statePath())
 	d := jsonDeps{ctx: ctx, st: st, root: devzoneRoot(), code: codeRoot()}
 	fmt.Fprintln(ctx.Out, "devzone: state (devzone to show it again)")
+	printProgramLine(ctx)
 	versionAvailableLine(ctx)
 	printGitIdentity(ctx, d)
 	printPlatform(ctx, d)
