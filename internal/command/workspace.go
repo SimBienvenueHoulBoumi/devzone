@@ -30,6 +30,11 @@ func workspaceCommand(ctx *cli.Context) int {
 	if len(args) >= 1 && args[0] == "deploy" {
 		return workspaceDeploy(ctx)
 	}
+	// "update" moves the workspace to a release in Go (#934): the deploy and
+	// the service reconciliation reuse the Argo CD and helm libraries.
+	if len(args) >= 1 && args[0] == "update" {
+		return updateWorkspace(ctx)
+	}
 	// The internal guard and wait commands are called by the shell start path;
 	// they have no user-facing help.
 	if len(args) == 1 && args[0] == "agents-guard" {

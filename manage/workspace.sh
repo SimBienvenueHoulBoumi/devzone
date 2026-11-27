@@ -130,14 +130,12 @@ shell_workspace() {
 . "$HERE/scripts/workspace/argocd-workspace.sh"
 # shellcheck source=manage/scripts/workspace/argocd-services.sh
 . "$HERE/scripts/workspace/argocd-services.sh"
-# shellcheck source=manage/scripts/workspace/workspace-update.sh
-. "$HERE/scripts/workspace/workspace-update.sh"
 # shellcheck source=manage/scripts/workspace/workspace-egress.sh
 . "$HERE/scripts/workspace/workspace-egress.sh"
 
 case "${1:-}" in
     start) start_workspace "${@:2}" ;;
-    update) update_workspace "${@:2}" ;;
+    update) "${DEVZONE_HOST_BIN:?devzone: Go program not found (DEVZONE_HOST_BIN), run it through manage/devzone}" workspace update "${@:2}" ;;
     stop) stop_workspace ;;
     status) "${DEVZONE_HOST_BIN:?devzone: Go program not found (DEVZONE_HOST_BIN), run it through manage/devzone}" workspace status ;;
     shell) shell_workspace ;;
