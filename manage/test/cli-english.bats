@@ -9,6 +9,9 @@
 # add « devzone agent » to this file once that batch is merged.
 
 setup() {
+    load commun
+    # manage/workspace.sh calls the Go program through DEVZONE_HOST_BIN (#884)
+    devzone_go_pret
     RACINE="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
     unset DEVZONE_WORKSPACE
 }
@@ -51,6 +54,8 @@ french_found() {
 }
 
 @test "cli-english: devzone --help of the pod is in English" {
+    # The pod launcher takes DEVZONE_HOST_BIN as its Go binary: the pod one here
+    devzone_go_pret ./cmd/devzone-pod
     run bash "$RACINE/.devcontainer/devzone" --help
     [ "$status" -eq 0 ]
     [ -n "$output" ]
