@@ -25,21 +25,40 @@ func (m *module) gitopsPutText(path, content, message string) int {
 }
 
 // gitopsSHA returns the blob sha of a file in the repo, or empty when absent.
-func (m *module) gitopsSHA(path string) string {
+// The second return is false when the host refused the read for a reason other
+// than the file being missing: a caller must then stop, as the old shell did
+// with "|| return 1", instead of treating the failure as "not found".
+func (m *module) gitopsSHA(path string) (string, bool) {
 	if m.gitopsIsGitLab() {
 		return m.gitlabGitopsSHA(path)
 	}
 	res, err := m.runner.Run(m.ctx, "gh", []string{"api", "repos/" + m.gitopsSlug() + "/contents/" + path, "--jq", ".sha"}, fexec.Opts{})
-	if err != nil || res.Code != 0 {
-		return ""
+	if err != nil {
+		fmt.Fprintln(m.errOut, err)
+		return "", false
+	}
+	if res.Code != 0 {
+		if gitopsNotFound(res) {
+			return "", true
+		}
+		m.errOut.Write(res.Stderr)
+		m.errOut.Write(res.Stdout)
+		return "", false
 	}
 	out := strings.TrimSpace(string(res.Stdout))
 	for _, c := range out {
 		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
-			return ""
+			return "", true
 		}
 	}
-	return out
+	return out, true
+}
+
+// gitopsNotFound reports whether a failed GitHub contents read means the file
+// is absent (HTTP 404), which is the only failure a delete may ignore.
+func gitopsNotFound(res fexec.Result) bool {
+	msg := strings.ToLower(string(res.Stdout) + string(res.Stderr))
+	return strings.Contains(msg, "404") || strings.Contains(msg, "not found")
 }
 
 // gitopsPut writes file at path in the repo, skipping when the blob sha matches.
@@ -48,7 +67,10 @@ func (m *module) gitopsPut(path, file, message string) int {
 		return m.gitlabGitopsPut(path, file, message)
 	}
 	slug := m.gitopsSlug()
-	sha := m.gitopsSHA(path)
+	sha, ok := m.gitopsSHA(path)
+	if !ok {
+		return 1
+	}
 	if sha != "" {
 		if blob, err := gitHashObject(file); err == nil && blob == sha {
 			return 0
@@ -87,12 +109,17 @@ func gitHashObject(path string) (string, error) {
 	return gitBlobSHA(data), nil
 }
 
-// gitopsDelete removes a file from the repo when it exists.
+// gitopsDelete removes a file from the repo when it exists. A read failure
+// that is not "file absent" is returned to the caller: the old shell did
+// "sha=$(... || return 1)", so a refused GitHub API must stop the stop.
 func (m *module) gitopsDelete(path, message string) int {
 	if m.gitopsIsGitLab() {
 		return m.gitlabGitopsDelete(path, message)
 	}
-	sha := m.gitopsSHA(path)
+	sha, ok := m.gitopsSHA(path)
+	if !ok {
+		return 1
+	}
 	if sha == "" {
 		return 0
 	}
@@ -100,6 +127,9 @@ func (m *module) gitopsDelete(path, message string) int {
 	if err != nil || res.Code != 0 {
 		if err != nil {
 			fmt.Fprintln(m.errOut, err)
+		} else {
+			m.errOut.Write(res.Stderr)
+			m.errOut.Write(res.Stdout)
 		}
 		return 1
 	}

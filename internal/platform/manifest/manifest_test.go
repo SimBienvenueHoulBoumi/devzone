@@ -26,7 +26,7 @@ func fakePackage(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
 	writeFile(t, root, ".devcontainer/devzone", "a")
-	writeFile(t, root, ".devcontainer/argocd/gitops-gitlab.sh", "b")
+	writeFile(t, root, ".devcontainer/argocd/gitops.sh", "b")
 	writeFile(t, root, "Makefile", "c")
 	writeFile(t, root, "README.md", "d")
 	writeFile(t, root, "LICENSE", "e")
@@ -63,7 +63,7 @@ func TestPackageFilesListsOnlyCopiedFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []string{
-		".devcontainer/argocd/gitops-gitlab.sh",
+		".devcontainer/argocd/gitops.sh",
 		".devcontainer/devzone",
 		".gitattributes",
 		"LICENSE",

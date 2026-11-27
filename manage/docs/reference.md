@@ -700,7 +700,7 @@ The modules that deploy a service (`postgres`, `gitlab`) are installed on **a si
 
 - The root token comes from `workspace/.gitlab/root-token`, passed to `curl` through a configuration file with mode 600 (never as an argument, never displayed).
 - The files `apps/<name>.yaml` are written by `PUT` (existing) or `POST` (new) on `/projects/:id/repository/files/:path`, and removed by `DELETE`; a file with identical content is not rewritten.
-- The backend is `.devcontainer/argocd/gitops-gitlab.sh`; `gitops.sh` selects it when `provider = gitlab`.
+- The backend is the Go GitOps implementation in `internal/domain/argocd`; it selects GitLab when `provider = gitlab`.
 - Not done: the workstation command (`devzone workspace argocd init --gitlab`, through `kubectl exec` in the pod) remains to be wired.
 
 ### Services held by Argo CD in the container
