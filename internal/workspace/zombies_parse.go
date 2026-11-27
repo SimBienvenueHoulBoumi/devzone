@@ -46,6 +46,8 @@ func parseStat(pid int, stat string) (z Zombie, ok bool) {
 // the old workspace pod ran "sleep infinity", the new one runs a loop that
 // calls wait (#967). The test is on the text, as the chart writes it.
 // Why: this is the only thing this command can know about PID 1 from /proc.
+// Known limit: a wrapper around "sleep infinity" that does reap is reported as
+// blind too, so the remedy is then offered for a pod that could be fixed otherwise.
 func pid1Blind(cmdline string) bool {
 	return strings.Contains(cmdline, "sleep infinity") && !strings.Contains(cmdline, "wait")
 }
