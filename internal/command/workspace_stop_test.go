@@ -73,14 +73,14 @@ func TestWorkspaceStopWithWordsIsDelegated(t *testing.T) {
 	}
 }
 
-func TestWorkspaceStopWithArgocdIsDelegated(t *testing.T) {
-	requireBash(t)
+func TestWorkspaceStopWithArgocdDeletesApplication(t *testing.T) {
 	skipWithoutUnix(t)
-	entry(t, echoArgs+"\n")
 	fakeStopTools(t, true)
 	var out, errOut bytes.Buffer
-	Run([]string{"workspace", "stop"}, &out, &errOut)
-	if out.String() != "args:[workspace][stop]\n" {
-		t.Fatalf("stdout = %q: want the Argo CD removal delegated to bash", out.String())
+	if got := Run([]string{"workspace", "stop"}, &out, &errOut); got != 0 {
+		t.Fatalf("exit status = %d, want 0 (stderr %q)", got, errOut.String())
+	}
+	if !strings.Contains(out.String(), "Application devzone-workspace deleted") {
+		t.Fatalf("stdout = %q: want the Argo CD removal in Go", out.String())
 	}
 }

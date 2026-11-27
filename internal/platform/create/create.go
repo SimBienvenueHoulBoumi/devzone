@@ -18,12 +18,13 @@ import (
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/platform/createmode"
 )
 
-// PackageItems are the entries of the package copied into a new devzone, the
-// same list as PACKAGE_ITEMS in manage/devzone; manage/scripts is copied apart.
+// PackageItems are the entries of the package copied into a new devzone: the
+// « files » of package.json, without bin/, manage/ and charts/ (manage/scripts is
+// copied apart).
 var PackageItems = []string{".devcontainer", "Makefile", ".gitattributes", "README.md", "LICENSE"}
 
 // GitignoreLines are always present in the .gitignore of a devzone, added to,
-// never overwritten; the same list as GITIGNORE_LINES in manage/devzone.
+// never overwritten.
 var GitignoreLines = []string{
 	"# Each workspace project has its own git repository",
 	"workspace/*",

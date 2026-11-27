@@ -24,6 +24,7 @@ func runStatus(ctx *cli.Context) int {
 	printPlatform(ctx, d)
 	printOutdatedTools(ctx)
 	printMissingWorktrees(ctx)
+	printPressureLine(ctx)
 	printModules(ctx, d)
 	printStatusDetails(ctx, d)
 	return 0
