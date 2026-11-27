@@ -2,6 +2,7 @@ package command
 
 import (
 	"bytes"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -41,9 +42,11 @@ func TestUpdateUnknownOptionRefusedFirst(t *testing.T) {
 // TestPackageRootFromBashEntry checks that the package root is the folder two
 // levels above the bash entry point, and that a missing entry point is an error.
 func TestPackageRootFromBashEntry(t *testing.T) {
-	t.Setenv(bashbridge.EnvVar, "/paquet/manage/devzone")
+	// Why: filepath.Dir gives the OS separator, so the input and the expected root
+	// are both written with filepath.FromSlash to hold on Windows too.
+	t.Setenv(bashbridge.EnvVar, filepath.FromSlash("/paquet/manage/devzone"))
 	root, err := packageRoot()
-	if err != nil || root != "/paquet" {
+	if err != nil || root != filepath.FromSlash("/paquet") {
 		t.Fatalf("packageRoot() = %q, %v", root, err)
 	}
 	t.Setenv(bashbridge.EnvVar, "")
