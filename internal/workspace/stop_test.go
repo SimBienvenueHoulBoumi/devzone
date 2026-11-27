@@ -15,12 +15,24 @@ const (
 	helmUninstallCurrent  = "helm uninstall devzone-workspace --namespace devzone-workspace"
 )
 
-// runStop runs Stop on r with a fallback that records its call and returns fallbackStatus,
-// and returns the status, the standard output, the standard error and whether the fallback ran
+// noRemove is an AppRemover of a repository that is not designated: nothing to remove.
+func noRemove(string) int { return 0 }
+
+// runStop runs Stop on r with a remover that succeeds, and returns the status,
+// the standard output and the standard error
 func runStop(r Runner) (status int, out, errOut string) {
 	var o, e bytes.Buffer
-	status = Stop(r, &o, &e)
+	status = Stop(r, noRemove, &o, &e)
 	return status, o.String(), e.String()
+}
+
+// recordingRemover returns an AppRemover that records its call in r.calls and
+// answers status, as the GitOps removal of the command layer does.
+func recordingRemover(r *fakeRunner, status int) AppRemover {
+	return func(name string) int {
+		r.calls = append(r.calls, "remove "+name)
+		return status
+	}
 }
 
 func TestStopUninstallsReleaseWhenArgocdAbsent(t *testing.T) {
@@ -150,5 +162,46 @@ func TestStopArgocdHoldsWorkspaceExactCallsAndOutput(t *testing.T) {
 	}
 	wantCalls(t, r.calls, contextsCall, "--context devzone "+argocdNamespaceCall,
 		contextsCall, "--context devzone "+argocdApplicationCall,
+		contextsCall, "--context devzone -n devzone-argocd delete application.argoproj.io devzone-workspace --ignore-not-found --wait=true")
+}
+
+// A GitOps repository that refuses the removal of the Application file keeps the
+// Application in the cluster: the status is 1 and no delete is sent (the bash
+// gitops_delete_application returned 1 before the cluster delete).
+func TestStopRefusedRemovalKeepsApplication(t *testing.T) {
+	r := &fakeRunner{replies: []reply{
+		{match: contextsCall, stdout: devzoneContexts},
+		{match: "get namespace", stdout: "namespace/devzone-argocd\n"},
+		{match: "get application", stdout: "application\n"},
+		{match: "delete", stdout: "application deleted\n"},
+	}}
+	var o, e bytes.Buffer
+	status := Stop(r, recordingRemover(r, 1), &o, &e)
+	if status != 1 {
+		t.Fatalf("status %d, want 1 when the repository refuses the removal", status)
+	}
+	for _, c := range r.calls {
+		if strings.Contains(c, "delete") {
+			t.Fatalf("Application deleted although its file was kept: %q", c)
+		}
+	}
+}
+
+// The Application file leaves the repository before the Application is deleted
+// from the cluster, so that the root Application does not recreate it.
+func TestStopRemovesFileBeforeDelete(t *testing.T) {
+	r := &fakeRunner{replies: []reply{
+		{match: contextsCall, stdout: devzoneContexts},
+		{match: "get namespace", stdout: "namespace/devzone-argocd\n"},
+		{match: "get application", stdout: "application\n"},
+		{match: "delete", stdout: "application deleted\n"},
+	}}
+	var o, e bytes.Buffer
+	if status := Stop(r, recordingRemover(r, 0), &o, &e); status != 0 {
+		t.Fatalf("status %d, stderr %q", status, e.String())
+	}
+	wantCalls(t, r.calls, contextsCall, "--context devzone "+argocdNamespaceCall,
+		contextsCall, "--context devzone "+argocdApplicationCall,
+		"remove devzone-workspace",
 		contextsCall, "--context devzone -n devzone-argocd delete application.argoproj.io devzone-workspace --ignore-not-found --wait=true")
 }
