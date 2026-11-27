@@ -98,11 +98,14 @@ func TestPortsManagerLeavesLoadedDefinitionAlone(t *testing.T) {
 }
 
 // TestPortsManagerRefusesOutsideDevzone checks that all three commands refuse a
-// stray folder with status 1, with no service call and no file created.
+// stray folder with status 1, with no service call and no file created. The
+// explicit state folder of the harness is cleared: it would accept the command.
 func TestPortsManagerRefusesOutsideDevzone(t *testing.T) {
 	for _, command := range []string{"enable", "start", "status"} {
 		t.Run(command, func(t *testing.T) {
 			m := newPortsFakeManager(t, "linux")
+			stateDir := os.Getenv("DEVZONE_PORTS_WORKSPACE_DIR")
+			t.Setenv("DEVZONE_PORTS_WORKSPACE_DIR", "")
 			outside := filepath.Join(t.TempDir(), "elsewhere")
 			t.Setenv("DEVZONE_ROOT", outside)
 			var out, errOut bytes.Buffer
@@ -114,7 +117,7 @@ func TestPortsManagerRefusesOutsideDevzone(t *testing.T) {
 				t.Fatalf("message = %q", message)
 			}
 			if len(m.calls) != 0 || exists(filepath.Dir(m.definition())) ||
-				exists(filepath.Join(os.Getenv("DEVZONE_PORTS_WORKSPACE_DIR"), portsAutoStartWantedName)) {
+				exists(filepath.Join(stateDir, portsAutoStartWantedName)) {
 				t.Fatalf("refusal left traces: calls = %v", m.calls)
 			}
 		})

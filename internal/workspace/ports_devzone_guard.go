@@ -41,7 +41,12 @@ func portsInsideDevzone(folder string) bool {
 // portsDevzoneGuard refuses a watcher command outside a devzone folder, before
 // any definition, marker, state folder or service manager call is touched. Why:
 // the refusal must leave no trace in the folder the command was launched from.
+// An explicit DEVZONE_PORTS_WORKSPACE_DIR accepts the command: the caller names
+// its state folder itself (the service, the scripts and the tests do).
 func portsDevzoneGuard(out io.Writer) bool {
+	if os.Getenv("DEVZONE_PORTS_WORKSPACE_DIR") != "" {
+		return false
+	}
 	folder := portsDevzoneFolder()
 	if portsInsideDevzone(folder) {
 		return false
