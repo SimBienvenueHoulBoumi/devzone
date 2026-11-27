@@ -10,10 +10,10 @@ import (
 )
 
 // WaitForPod waits for the StatefulSet revision of the workspace pod and for a
-// Running phase, as wait_for_pod in manage/scripts/workspace/workspace-wait.sh.
-// The reason of a failed image pull is told to the user, and the workspace is
-// undeployed so that selfHeal cannot recreate a bad pod. A pod that is still
-// starting when the timeout expires is only reported, never an error.
+// Running phase, as the former shell wait did. The reason of a failed image
+// pull is told to the user, and the workspace is undeployed so that selfHeal
+// cannot recreate a bad pod. A pod that is still starting when the timeout
+// expires is only reported, never an error.
 func WaitForPod(r Runner, image string, out, errOut io.Writer, undeploy func() int) int {
 	env := waitEnv{
 		runner: r, out: out, errOut: errOut, undeploy: undeploy,

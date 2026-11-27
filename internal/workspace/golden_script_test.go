@@ -72,3 +72,9 @@ func TestCopyGuardScriptGolden(t *testing.T) {
 func TestCloneScriptGolden(t *testing.T) {
 	goldenCheck(t, "clone_script.txt", cloneScript)
 }
+
+// TestLegacyScriptGolden checks that podScript still matches the pod script of
+// the removed shell helper, kept as testdata/legacy_script.txt.
+func TestLegacyScriptGolden(t *testing.T) {
+	goldenCheck(t, "legacy_script.txt", podScript)
+}

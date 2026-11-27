@@ -1,0 +1,11 @@
+broken() {
+    local g
+    [ -f "$1/.git" ] || return 1
+    g="$(sed -n 's/^gitdir: *//p' "$1/.git" | head -1)"
+    [ -n "$g" ] && [ ! -e "$g" ]
+}
+cd "$1" || exit 0
+if broken repogarde; then echo repogarde; fi
+for d in wt/*; do
+    if broken "$d"; then echo wt; break; fi
+done

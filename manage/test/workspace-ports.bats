@@ -3,6 +3,15 @@
 # (ss, port-forward) and fake lsof under $BATS_TEST_TMPDIR/bin: no cluster or
 # workstation port is touched. The watcher runs only under DEVZONE_PORTS_WORKSPACE_REAL=yes.
 
+setup_file() {
+    if ! command -v go >/dev/null 2>&1; then
+        skip "go is not installed"
+    fi
+    ROOT="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
+    export DEVZONE_HOST_BIN="$BATS_FILE_TMPDIR/devzone-go"
+    (cd "$ROOT" && go build -o "$DEVZONE_HOST_BIN" ./cmd/devzone) || { echo "go build failed"; return 1; }
+}
+
 setup() {
     load commun
     kube_isole
