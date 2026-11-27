@@ -1,6 +1,17 @@
 #!/usr/bin/env bats
 # Workstation commands for the Kubernetes workspace (#398). Fake helm and kubectl
-# in $BATS_TEST_TMPDIR/bin: no cluster is touched.
+# in $BATS_TEST_TMPDIR/bin: no cluster is touched. The Go binary is built once
+# for the file: the shell start path calls it for the wait and the guard, and the
+# status branch calls it for a command already ported.
+
+setup_file() {
+    if ! command -v go >/dev/null 2>&1; then
+        skip "go is not installed"
+    fi
+    ROOT="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
+    export DEVZONE_HOST_BIN="$BATS_FILE_TMPDIR/devzone-go"
+    (cd "$ROOT" && go build -o "$DEVZONE_HOST_BIN" ./cmd/devzone) || { echo "go build failed"; return 1; }
+}
 
 setup() {
     load commun
