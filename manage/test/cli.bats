@@ -66,9 +66,6 @@ setup() {
     [ "$status" -eq 0 ]
     grep -q '^\[argocd\]$' mon-devzone/.argocd.conf
     grep -q '^    repo = none$' mon-devzone/.argocd.conf
-    export ARGOCD_CONF="$BATS_TEST_TMPDIR/mon-devzone/.argocd.conf"
-    . "$RACINE/.devcontainer/argocd/conf.sh"
-    [ "$(conf_get argocd repo)" = none ]
 }
 
 @test "devzone <folder> --gitops <url>: .argocd.conf notes the URL" {

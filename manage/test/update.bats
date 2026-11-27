@@ -19,10 +19,9 @@ setup() {
 
 build_package() {
     local name="$1" version="$2" mark="$3" folder="$T/$1"
-    mkdir -p "$folder/.devcontainer/argocd" "$folder/.devcontainer" "$folder/manage/scripts"
+    mkdir -p "$folder/.devcontainer" "$folder/manage/scripts"
     cp "$CLI" "$folder/manage/devzone"
     chmod +x "$folder/manage/devzone"
-    cp "$RACINE/.devcontainer/argocd/conf.sh" "$folder/.devcontainer/argocd/conf.sh"
     # Creation and update live in Go (#884): no manifest script is copied
     printf '{"name":"devzone","version":"%s"}\n' "$version" >"$folder/package.json"
     printf '# makefile %s\n' "$mark" >"$folder/Makefile"
