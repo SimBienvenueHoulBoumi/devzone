@@ -184,6 +184,35 @@ spec:
               value: tcp://127.0.0.1:1234
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+          {{- /*
+            Liveness probe (#982): exit 1 when pids.current is above thresholdPercent
+            of pids.max, so that the kubelet restarts the container. The script is
+            bash, passed as an argument; the threshold is its $1. Missing files or
+            pids.max "max" give exit 0. CGROUP_DIR overrides the cgroup directory
+            (the bats test uses fake files). Settings and reason: values.yaml.
+            Helm comment: not in the rendering.
+          */}}
+          {{- if .Values.livenessProbe.enabled }}
+          livenessProbe:
+            exec:
+              command:
+                - bash
+                - -c
+                - |
+                  dir="${CGROUP_DIR:-/sys/fs/cgroup}"
+                  cur="$(cat "$dir/pids.current" 2>/dev/null)" || exit 0
+                  max="$(cat "$dir/pids.max" 2>/dev/null)" || exit 0
+                  [[ "$cur" =~ ^[0-9]+$ && "$max" =~ ^[0-9]+$ ]] || exit 0
+                  (( max > 0 )) || exit 0
+                  (( cur * 100 > max * $1 )) && exit 1
+                  exit 0
+                - liveness
+                - {{ .Values.livenessProbe.thresholdPercent | quote }}
+            initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.livenessProbe.failureThreshold }}
+          {{- end }}
           volumeMounts:
             - name: workspace
               mountPath: /workspaces/projets
