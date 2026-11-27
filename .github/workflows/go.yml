@@ -50,7 +50,7 @@ jobs:
       - name: line limit of the Go files
         run: bash manage/scripts/ci/check-go-layout.sh
 
-  windows:
+  go-windows:
     runs-on: windows-latest
     timeout-minutes: 15
     steps:
