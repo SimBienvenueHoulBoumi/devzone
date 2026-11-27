@@ -15,6 +15,17 @@ const (
 	gitopsRepoName = "devzone-argocd"
 )
 
+// gitopsRepoNameValue returns the name of the GitOps repository and of its
+// Secret: DEVZONE_GITOPS_REPO_NAME when set, devzone-argocd otherwise. Both
+// places must agree, or the Secret would point at another name than the one
+// created on GitHub.
+func gitopsRepoNameValue() string {
+	if name := os.Getenv("DEVZONE_GITOPS_REPO_NAME"); name != "" {
+		return name
+	}
+	return gitopsRepoName
+}
+
 // conf returns the .argocd.conf handle for this module.
 func (m *module) conf() Conf { return Conf{Path: m.confPath()} }
 
@@ -91,11 +102,7 @@ func (m *module) gitopsInit(args []string) int {
 		fmt.Fprintln(m.errOut, "⚠ GitHub login unreadable (gh api user): Applications applied directly")
 		return 0
 	}
-	name := os.Getenv("DEVZONE_GITOPS_REPO_NAME")
-	if name == "" {
-		name = gitopsRepoName
-	}
-	slug := login + "/" + name
+	slug := login + "/" + gitopsRepoNameValue()
 	if !m.ghRepoExists(slug) {
 		if !m.ghRepoCreate(slug) {
 			fmt.Fprintf(m.errOut, "✖ cannot create the GitOps repository %s\n", slug)

@@ -2,9 +2,7 @@ package create
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 )
@@ -58,63 +56,40 @@ func TestConfSetReplacesOnlySection(t *testing.T) {
 	}
 }
 
-// TestConfSetParityWithConfSh compares byte for byte with the real
-// conf_set in .devcontainer/argocd/conf.sh sourced in bash (#884 rule).
-func TestConfSetParityWithConfSh(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("bash tests run on Unix only")
-	}
-	if _, err := exec.LookPath("bash"); err != nil {
-		t.Skip("bash is not installed")
-	}
-	script, err := filepath.Abs(filepath.Join("..", "..", ".devcontainer", "argocd", "conf.sh"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := os.Stat(script); err != nil {
-		t.Skip("conf.sh not found")
-	}
+// TestConfSetGolden checks the exact bytes confSet writes for the edge cases
+// of the shared format: comments inside the replaced section, a section name
+// with spaces, a file without a trailing newline. The expectations are literal
+// so the test stays hermetic (no shell is run) and pins the format the
+// workstation and the pod read back.
+func TestConfSetGolden(t *testing.T) {
 	cases := []struct {
 		name     string
 		original string
 		value    string
+		want     string
 	}{
-		{"fresh", "", "none"},
-		{"url", "", "https://github.com/login/devzone-argocd.git"},
-		{"existing argocd", "[argocd]\n    repo = old\n", "none"},
-		{"existing other", "[argocd]\n    repo = old\n\n[app demo]\n    repo = x\n", "https://example.com/y.git"},
-		{"comments", "# hi\n\n[argocd]\n# c\n    repo = old\n", "none"},
-		{"no trailing newline", "[app demo]\n    repo = x", "none"},
-		{"section name with spaces", "[ argocd ]\n    repo = old\n", "none"},
+		{"fresh", "", "none", confHeader + "\n[argocd]\n    repo = none\n"},
+		{"url", "", "https://github.com/login/devzone-argocd.git", confHeader + "\n[argocd]\n    repo = https://github.com/login/devzone-argocd.git\n"},
+		{"existing argocd", "[argocd]\n    repo = old\n", "none", "\n[argocd]\n    repo = none\n"},
+		{"existing other", "[argocd]\n    repo = old\n\n[app demo]\n    repo = x\n", "https://example.com/y.git", "[app demo]\n    repo = x\n\n[argocd]\n    repo = https://example.com/y.git\n"},
+		{"comments", "# hi\n\n[argocd]\n# c\n    repo = old\n", "none", "# hi\n\n[argocd]\n    repo = none\n"},
+		{"no trailing newline", "[app demo]\n    repo = x", "none", "[app demo]\n    repo = x\n\n[argocd]\n    repo = none\n"},
+		{"section name with spaces", "[ argocd ]\n    repo = old\n", "none", "\n[argocd]\n    repo = none\n"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			bashDir := t.TempDir()
-			bashPath := filepath.Join(bashDir, ".argocd.conf")
+			path := filepath.Join(t.TempDir(), ".argocd.conf")
 			if c.original != "" {
-				if err := os.WriteFile(bashPath, []byte(c.original), 0o644); err != nil {
+				if err := os.WriteFile(path, []byte(c.original), 0o644); err != nil {
 					t.Fatal(err)
 				}
 			}
-			cmd := exec.Command("bash", "-c", `. "$1"; conf_set argocd "repo=$2"`, "_", script, c.value)
-			cmd.Env = append(os.Environ(), "ARGOCD_CONF="+bashPath, "LC_ALL=C")
-			if out, err := cmd.CombinedOutput(); err != nil {
-				t.Fatalf("conf_set: %v\n%s", err, out)
-			}
-			goDir := t.TempDir()
-			goPath := filepath.Join(goDir, ".argocd.conf")
-			if c.original != "" {
-				if err := os.WriteFile(goPath, []byte(c.original), 0o644); err != nil {
-					t.Fatal(err)
-				}
-			}
-			if err := confSet(goPath, "argocd", "repo", c.value); err != nil {
+			if err := confSet(path, "argocd", "repo", c.value); err != nil {
 				t.Fatal(err)
 			}
-			want, _ := os.ReadFile(bashPath)
-			got, _ := os.ReadFile(goPath)
-			if string(want) != string(got) {
-				t.Fatalf("bash:\n%q\ngo:\n%q", want, got)
+			got, _ := os.ReadFile(path)
+			if string(got) != c.want {
+				t.Fatalf("got:\n%q\nwant:\n%q", got, c.want)
 			}
 		})
 	}

@@ -79,7 +79,7 @@ func workspaceCommand(ctx *cli.Context) int {
 		case "status":
 			return workspace.Status(workspace.ExecRunner{}, out, errOut)
 		case "stop":
-			return workspace.Stop(workspace.ExecRunner{}, out, errOut)
+			return workspaceStopCommand(ctx)
 		case "vscode":
 			return workspace.VSCode(out)
 		case "shell":

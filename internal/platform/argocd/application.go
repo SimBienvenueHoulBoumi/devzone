@@ -7,7 +7,7 @@ import (
 )
 
 // RenderApplication writes an Argo CD Application manifest to w. It mirrors
-// .devcontainer/argocd/application.sh byte for byte in its meaningful output:
+// the former application.sh shell generator byte for byte in its meaningful output:
 // automated sync with prune and selfHeal, the destination namespace created,
 // resources deleted with the Application, and the Application in devzone-argocd.
 func RenderApplication(w io.Writer, name, kind, namespace, repo, revision, path string, params []string) error {
@@ -64,7 +64,7 @@ func RenderChartApplication(w io.Writer, name, namespace, repo, chart, version s
 }
 
 // validAppName reports whether name is a valid Argo CD Application name fragment
-// used by the shell generator: lowercase letters, digits and dashes, no leading dash.
+// used by the former shell generator: lowercase letters, digits and dashes, no leading dash.
 func validAppName(name string) bool {
 	if name == "" || strings.HasPrefix(name, "-") {
 		return false
