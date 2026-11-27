@@ -141,8 +141,7 @@ change_platform() {
                 git config --global --unset-all "credential.$(gitlab_url_read).helper" 2>/dev/null || true
             fi
             remove_glab
-            remove_key platform
-            remove_key gitlab_url
+            "${DEVZONE_HOST_BIN:?devzone: Go pod binary unavailable}" state init && "$DEVZONE_HOST_BIN" state remove platform && "$DEVZONE_HOST_BIN" state remove gitlab_url
             echo "devzone : github platform (default): gh checks; glab and its configuration removed if they were installed"
             ;;
         gitlab)
@@ -158,7 +157,7 @@ change_platform() {
                 return 1
             fi
             if [ -z "$url" ]; then
-                if [ "$(value_of gitlab)" = on ]; then
+                if "${DEVZONE_HOST_BIN:?devzone: Go pod binary unavailable}" is-enabled gitlab; then
                     url="$GITLAB_URL_MODULE"
                 else
                     echo "devzone : missing URL: devzone platform gitlab --url URL (or an active gitlab module for the local instance)" >&2
@@ -177,8 +176,7 @@ change_platform() {
                 echo "devzone : cannot set the git credential" >&2
                 return 1
             fi
-            write_value platform gitlab
-            write_value gitlab_url "$url"
+            "${DEVZONE_HOST_BIN:?devzone: Go pod binary unavailable}" state init && "$DEVZONE_HOST_BIN" state write platform gitlab && "$DEVZONE_HOST_BIN" state write gitlab_url "$url"
             echo "devzone : gitlab platform: $url, glab connected"
             ;;
         *)

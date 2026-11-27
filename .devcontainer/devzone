@@ -90,13 +90,8 @@ GLAB_SOMME_AMD64=f386519ba83e9482979992ee7f60eeebee4d95b950f95f4fe7289e0a1b1ea74
 GITLAB_URL_MODULE=http://gitlab.localhost:8929
 
 # Functions of devzone, by topic (sourced here, defined before any command runs)
-# shellcheck source=SCRIPTDIR/devzone-modules.sh
-# shellcheck disable=SC1091
-. "$ICI/devzone-modules.sh"
-# The AI module and its guard are handled by the Go command of the pod (#882).
-# shellcheck source=SCRIPTDIR/devzone-services.sh
-# shellcheck disable=SC1091
-. "$ICI/devzone-services.sh"
+# The modules (enable, disable, is-enabled, apply) and their services are handled
+# by the Go command of the pod (#882, #885).
 # shellcheck source=SCRIPTDIR/devzone-platform.sh
 # shellcheck disable=SC1091
 . "$ICI/devzone-platform.sh"
@@ -128,34 +123,12 @@ case "${1:-}" in
             exit 127
         fi
         ;;
-    enable) change_module on "${2:-}" "${@:3}" ;;
-    disable) change_module off "${2:-}" "${@:3}" ;;
-    apply)
-        migrate_llm
-        # The user confirms the current state (#417, step 4): the watchers
-        # may uninstall again
-        DEVZONE_STATE="$ETAT" bash "$ICI/devzone" state recovery-confirm
-        "${DEVZONE_HOST_BIN:?devzone: Go pod binary unavailable}" apply-repowarden
-        [ "$(value_of ai)" = off ] || DEVZONE_STATE="$ETAT" "$ICI/devzone" ai apply on
-        # gitlab, postgres, argocd: installed from the workstation in the
-        # Kubernetes workspace pod (#528), by their installer elsewhere
-        [ "$(value_of gitlab)" = off ] || apply_service gitlab
-        [ "$(value_of postgres)" = off ] || apply_service postgres
-        [ "$(value_of mysql)" = off ] || apply_mysql on
-        [ "$(value_of argocd)" = off ] || apply_service argocd
-        ;;
-    is-enabled)
-        is_known "${2:-}" || { echo "devzone : unknown module : ${2:-(none)}" >&2; exit 2; }
-        # Silent test: code 0 if the module is active, 1 otherwise, without
-        # writing anything
-        [ "$(value_of "$2")" = on ]
-        ;;
     build)
         bash "$ICI/workspace-build.sh" "${@:2}"
         ;;
     # Go only: reached when the binary did not take the call. Never call
     # "devzone" again from here, it would loop forever, see #864
-    -h | --help | help | repair | apply-repowarden | cluster | clusters | metrics | use | kube | ai | agent | postgres | mysql | gitlab | test-gitlab | catalog | catalog-watcher)
+    -h | --help | help | repair | apply-repowarden | cluster | clusters | metrics | use | kube | ai | agent | postgres | mysql | gitlab | test-gitlab | catalog | catalog-watcher | enable | disable | is-enabled | apply)
         echo "devzone $1: Go binary of the pod unavailable (.devcontainer/bin)" >&2
         exit 1
         ;;

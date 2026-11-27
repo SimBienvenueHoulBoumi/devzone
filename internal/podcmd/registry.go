@@ -119,6 +119,22 @@ func newDefaultRegistry() *cli.Registry {
 		Name: "kube",
 		Run:  runKube,
 	})
+	r.Register(cli.Command{
+		Name: "enable",
+		Run:  runEnable,
+	})
+	r.Register(cli.Command{
+		Name: "disable",
+		Run:  runDisable,
+	})
+	r.Register(cli.Command{
+		Name: "is-enabled",
+		Run:  runIsEnabled,
+	})
+	r.Register(cli.Command{
+		Name: "apply",
+		Run:  runApply,
+	})
 	return r
 }
 
