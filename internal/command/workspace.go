@@ -1,6 +1,7 @@
 package command
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/cli"
@@ -74,8 +75,7 @@ func workspaceCommand(ctx *cli.Context) int {
 		case "status":
 			return workspace.Status(workspace.ExecRunner{}, out, errOut)
 		case "stop":
-			fallback := func() int { return delegate([]string{"workspace", "stop"}, out, errOut) }
-			return workspace.Stop(workspace.ExecRunner{}, out, errOut, fallback)
+			return workspace.Stop(workspace.ExecRunner{}, out, errOut)
 		case "vscode":
 			return workspace.VSCode(out)
 		case "shell":
@@ -93,15 +93,26 @@ func workspaceCommand(ctx *cli.Context) int {
 		return commandServices(args, out, errOut)
 	}
 	// Every "argocd" form runs in Go (#883, lot 11): status reads the cluster,
-	// init, apply and app use the GitOps library of internal/domain/argocd.
+	// init, apply and app use the GitOps library of internal/domain/argocd, and
+	// reconcile follows the declarations of the workstation.
 	if len(args) > 0 && args[0] == "argocd" {
-		if len(args) == 1 || (len(args) == 2 && args[1] == "status") {
-			return workspace.ArgoCDStatus(workspace.ExecRunner{}, modulesFile(), out)
+		ctx := &cli.Context{Args: args[1:], Out: out, Err: errOut, Runner: ctx.Runner}
+		if len(args) == 1 {
+			return workspace.ArgoCDStatus(argoCDRunner(ctx), modulesFile(), out)
 		}
 		switch args[1] {
-		case "init", "apply", "app":
-			ctx := &cli.Context{Args: args[1:], Out: out, Err: errOut}
+		case "status":
+			return workspace.ArgoCDStatus(argoCDRunner(ctx), modulesFile(), out)
+		case "reconcile":
+			return argoCDReconcileCommand(ctx)
+		case "init", "app":
 			return runWorkstationArgoCD(ctx, args[1:]...)
+		case "apply":
+			if !commandArgoCDInstalled(argoCDRunner(ctx)) {
+				fmt.Fprintln(errOut, "✖ Argo CD not installed: devzone workspace services enable argocd")
+				return 1
+			}
+			return argoCDReconcileCommand(ctx)
 		}
 	}
 	// "ports" alone is status, as ports does in the bash entry point.

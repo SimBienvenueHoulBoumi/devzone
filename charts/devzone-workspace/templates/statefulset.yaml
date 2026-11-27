@@ -144,9 +144,10 @@ spec:
           {{- /*
             Without command, the container runs the entrypoint of the image (bash
             for a devcontainer), which ends at once without a terminal: the pod
-            loops on restarts. sleep infinity keeps it alive, like VS Code for a
-            devcontainer; the workstation then enters through kubectl exec. Helm
-            comment: not in the rendering.
+            loops on restarts. The command keeps it alive as PID 1 (a wait loop
+            that reaps the orphans, #967), like VS Code for a devcontainer; the
+            workstation then enters through kubectl exec. Helm comment: not in
+            the rendering.
           */}}
           {{- with .Values.workspace.command }}
           command: {{ toJson . }}

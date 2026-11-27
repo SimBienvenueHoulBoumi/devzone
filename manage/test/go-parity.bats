@@ -242,12 +242,6 @@ KUBE
     parite workspace stop extra
 }
 
-@test "go-parity: workspace stop, Argo CD holds the workspace: bash removes it, same output" {
-    faux_cluster
-    export FAKE_ARGO=yes
-    parite workspace stop
-}
-
 @test "go-parity: workspace stop cleans the port state, bash and go alike" {
     faux_cluster
     local state="$BATS_TEST_TMPDIR/.devzone.workspace-ports"

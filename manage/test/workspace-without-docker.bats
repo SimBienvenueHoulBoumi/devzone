@@ -201,13 +201,15 @@ sidecar_block() {
     grep -q -- "value: tcp://127.0.0.1:1234" <<<"$main" || false
 }
 
-@test "workspace: command runs workspace-init.sh then never exits (#503)" {
+@test "workspace: command runs workspace-init.sh then stays as PID 1 reaping orphans (#503, #967)" {
     run render_of templates/statefulset.yaml
     [ "$status" -eq 0 ]
     local main
     main="$(awk '/^        - name: workspace$/{p=1} /^          resources:/{p=0} p' <<<"$output")"
     [[ "$main" == *"workspace-init.sh"* ]] || false
-    [[ "$main" == *"sleep infinity"* ]] || false
+    [[ "$main" != *"sleep infinity"* ]] || false
+    [[ "$main" == *"wait -n"* ]] || false
+    [[ "$main" == *"trap 'exit 0' TERM INT"* ]] || false
 }
 
 @test "variables: workspace DEVZONE_ROOT and NPM_CONFIG_PREFIX (#503)" {

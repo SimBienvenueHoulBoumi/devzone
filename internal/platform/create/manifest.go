@@ -13,7 +13,7 @@ import (
 
 // writeManifest writes .devzone.version in folder: `version <version>`, then
 // one `<sha256>  <relative path>` per package file, sorted, as write_manifest
-// in devzone-manifest.sh does; the checksums are of the copied files in folder.
+// the former devzone-manifest.sh did; the checksums are of the copied files in folder.
 func writeManifest(pkg, folder, version string) error {
 	var b strings.Builder
 	b.WriteString("version ")
@@ -82,7 +82,7 @@ func filesUnder(root string) []string {
 }
 
 // checksum returns the SHA-256 hex digest of a file, as the node checksum in
-// devzone-manifest.sh does.
+// the former devzone-manifest.sh did.
 func checksum(path string) (string, error) {
 	f, err := os.Open(path)
 	if err != nil {
