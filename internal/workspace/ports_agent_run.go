@@ -9,16 +9,13 @@ import (
 )
 
 // PortsAgentRun is the foreground command used by the launch agent or the user
-// unit. It runs the watcher only when no live watcher already holds the state
-// folder: a manual watcher at the moment of enable is never doubled. On
-// Windows the automatic start does not exist (#883).
+// unit, or the scheduled task on Windows. It runs the watcher only when no live
+// watcher already holds the state folder: a manual watcher at the moment of
+// enable is never doubled, and a task relaunched by the scheduler exits at once
+// when the watcher is running.
 func PortsAgentRun(out, errOut io.Writer) int {
 	if portsAutoStartGuard(errOut) {
 		return 0
-	}
-	if portsPlatform == "windows" {
-		fmt.Fprintln(errOut, "✖ devzone workspace ports agent: not available on windows (#883)")
-		return 1
 	}
 	dir := portsDir()
 	if pid := readPid(filepath.Join(dir, "pid")); alive(pid) {
