@@ -39,6 +39,15 @@ func newDefaultRegistry() *cli.Registry {
 		Run:  runRepair,
 	})
 	r.Register(cli.Command{
+		Name: "services-admin",
+		Run:  runServicesAdmin,
+	})
+	r.Register(cli.Command{
+		Name:    "status",
+		Aliases: []string{"", "modules"},
+		Run:     runStatus,
+	})
+	r.Register(cli.Command{
 		Name: "version-available-line",
 		Run:  versionAvailableLine,
 	})

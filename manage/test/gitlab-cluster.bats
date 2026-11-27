@@ -7,6 +7,7 @@
 
 setup() {
     load commun
+    devzone_pod_pret
     kind_vide
     kube_isole
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"

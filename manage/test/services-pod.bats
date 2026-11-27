@@ -6,6 +6,7 @@
 
 setup() {
     load commun
+    devzone_pod_pret
     kube_isole
     RACINE="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
     DEVZONE="$RACINE/.devcontainer/devzone"
@@ -132,113 +133,4 @@ GETENT
     [[ "$output" != *"devzone workspace services enable"* ]] || false
     # The installer itself was reached: the unknown cluster is refused by it
     [[ "$output" == *"unknown or unreachable cluster"* ]] || false
-}
-
-# ---- services-admin.sh: temporary administrator inside the pod ----
-
-admin_setup() {
-    export DEVZONE_SA_DIR="$T/sa"
-    export DEVZONE_API_SERVER="https://kubernetes.default.svc:443"
-    mkdir -p "$DEVZONE_SA_DIR"
-    printf -- '-----BEGIN CERTIFICATE-----\nCA\n-----END CERTIFICATE-----\n' >"$DEVZONE_SA_DIR/ca.crt"
-    : >"$T/devzone.log"
-    # services-admin.sh runs the devzone beside it (#591): a copy of the script
-    # and of its state helpers in $T/pod, with a fake devzone next to them
-    mkdir -p "$T/pod"
-    cp "$RACINE/.devcontainer/services-admin.sh" "$T/pod/"
-    ADMIN="$T/pod/services-admin.sh"
-    # Fake devzone beside the script: logs its arguments, keeps a copy of the
-    # kubeconfig and of the state as seen during the run
-    cat >"$T/pod/devzone" <<'DZ'
-#!/usr/bin/env bash
-T="$BATS_TEST_TMPDIR"
-echo "devzone $*" >>"$T/devzone.log"
-if [ "${1:-}" = state ]; then
-    case "${2:-}" in
-        write) key="${3:-}"; val="${4:-}"; grep -vE "^${key}=" "$DEVZONE_STATE" >"$T/etat.tmp" 2>/dev/null || true; printf '%s=%s\n' "$key" "$val" >>"$T/etat.tmp"; mv "$T/etat.tmp" "$DEVZONE_STATE" ;;
-        remove) key="${3:-}"; grep -vE "^${key}=" "$DEVZONE_STATE" >"$T/etat.tmp" 2>/dev/null || true; mv "$T/etat.tmp" "$DEVZONE_STATE" ;;
-    esac
-    exit 0
-fi
-if [ "${1:-}" != relay-stop ] && [ "${2:-}" != relay-stop ]; then
-    [ -n "${KUBECONFIG:-}" ] && [ -f "$KUBECONFIG" ] && cp "$KUBECONFIG" "$T/kubeconfig.copy"
-    cp "$DEVZONE_STATE" "$T/etat.during" 2>/dev/null || true
-    printf 'admin=%s kube=%s\n' "${DEVZONE_SERVICES_ADMIN:-}" "${DEVZONE_KUBE_CONFIG:-}" >"$T/devzone.env"
-    [ "${FAKE_DEVZONE_FAIL:-0}" = 1 ] && exit 1
-fi
-exit 0
-DZ
-    chmod +x "$T/pod/devzone"
-    # Another fake devzone on the PATH: must never be called
-    cat >"$T/bin/devzone" <<'DZPATH'
-#!/usr/bin/env bash
-echo "PATH devzone $*" >>"$BATS_TEST_TMPDIR/path-devzone.log"
-exit 0
-DZPATH
-    chmod +x "$T/bin/devzone"
-}
-
-@test "services-admin.sh: the devzone beside the script is called, never the one of the PATH" {
-    admin_setup
-    printf 'cluster=kind-devzone\n' >"$DEVZONE_STATE"
-    run bash -c 'printf "tok\n" | bash "$0" seed gitlab' "$ADMIN"
-    [ "$status" -eq 0 ]
-    grep -q '^devzone gitlab seed$' "$T/devzone.log"
-    grep -q '^devzone gitlab relay-stop$' "$T/devzone.log"
-    [ ! -e "$T/path-devzone.log" ]
-}
-
-@test "services-admin.sh enable: kubeconfig with the token, two contexts, installer run, everything cleaned" {
-    admin_setup
-    printf 'cluster=docker-desktop\npostgres=off\n' >"$DEVZONE_STATE"
-    run bash -c 'printf "SECRET-TOKEN\n" | bash "$0" enable postgres --context x' "$ADMIN"
-    [ "$status" -eq 0 ]
-    [[ "$output" != *"SECRET-TOKEN"* ]] || false
-    grep -q '^devzone enable postgres --context x$' "$T/devzone.log"
-    grep -q '^devzone postgres relay-stop$' "$T/devzone.log"
-    [ ! -e "$T/path-devzone.log" ]
-    grep -q 'token: SECRET-TOKEN' "$T/kubeconfig.copy"
-    grep -q 'name: devzone-admin' "$T/kubeconfig.copy"
-    grep -q 'name: devzone$' "$T/kubeconfig.copy"
-    grep -q 'current-context: devzone-admin' "$T/kubeconfig.copy"
-    grep -q 'server: https://kubernetes.default.svc:443' "$T/kubeconfig.copy"
-    grep -q 'admin=1 kube=' "$T/devzone.env"
-    grep -qx 'cluster=devzone-admin' "$T/etat.during"
-    # Afterwards: cluster line as before, kubeconfig removed
-    grep -qx 'cluster=docker-desktop' "$DEVZONE_STATE"
-    [ -z "$(ls "${TMPDIR:-/tmp}"/devzone-services-admin.* 2>/dev/null)" ]
-}
-
-@test "services-admin.sh: no cluster line before, none after; disable passes --yes" {
-    admin_setup
-    printf 'argocd=on\n' >"$DEVZONE_STATE"
-    run bash -c 'printf "tok\n" | bash "$0" disable argocd --yes' "$ADMIN"
-    [ "$status" -eq 0 ]
-    grep -q '^devzone disable argocd --yes$' "$T/devzone.log"
-    ! grep -q '^cluster=' "$DEVZONE_STATE" || false
-}
-
-@test "services-admin.sh: installer failure, code kept and cleanup done" {
-    admin_setup
-    printf 'cluster=kind-devzone\n' >"$DEVZONE_STATE"
-    export FAKE_DEVZONE_FAIL=1
-    run bash -c 'printf "tok\n" | bash "$0" enable gitlab' "$ADMIN"
-    [ "$status" -eq 1 ]
-    grep -q '^devzone gitlab relay-stop$' "$T/devzone.log"
-    grep -qx 'cluster=kind-devzone' "$DEVZONE_STATE"
-    [ -z "$(ls "${TMPDIR:-/tmp}"/devzone-services-admin.* 2>/dev/null)" ]
-}
-
-@test "services-admin.sh: refused outside the pod, for an unknown service, with an empty token" {
-    admin_setup
-    run bash -c 'printf "tok\n" | DEVZONE_WORKSPACE= bash "$0" enable postgres' "$ADMIN"
-    [ "$status" -eq 2 ]
-    [[ "$output" == *"only in the Kubernetes workspace pod"* ]] || false
-    run bash -c 'printf "tok\n" | bash "$0" enable mysql' "$ADMIN"
-    [ "$status" -eq 2 ]
-    [[ "$output" == *"unknown service: mysql"* ]] || false
-    run bash -c 'printf "" | bash "$0" enable postgres' "$ADMIN"
-    [ "$status" -eq 2 ]
-    [[ "$output" == *"empty token"* ]] || false
-    [ ! -s "$T/devzone.log" ]
 }

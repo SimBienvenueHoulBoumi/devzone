@@ -33,6 +33,15 @@ devzone_go_pret() {
     export DEVZONE_HOST_BIN="$bin"
 }
 
+# Go program of the pod (#885): the pod launcher now runs `devzone status` (and
+# the modules summary) in Go, so any bats file that invokes .devcontainer/devzone
+# needs the pod binary. Built once per bats file, into BATS_FILE_TMPDIR, and
+# exported through DEVZONE_HOST_BIN, like devzone_go_pret above; the repository
+# checkout stays clean.
+devzone_pod_pret() {
+    devzone_go_pret ./cmd/devzone-pod
+}
+
 # Helper for tests that simulate a missing tool (#497): creates <folder> with
 # links to the only tools called by the scripts and tests. Call it in setup,
 # before reducing PATH to <folder>: never all of /usr/bin or /bin, so a kubectl

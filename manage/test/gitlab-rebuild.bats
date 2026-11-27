@@ -42,6 +42,7 @@ FAKE
 
 setup() {
     load commun
+    devzone_pod_pret
     kind_vide
     kube_isole
     DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
@@ -169,5 +170,6 @@ SETSID
     FAKE_RUNNERS='[{"id":1}]' run bash "$DEVZONE"
     [[ "$output" == *"✔ module gitlab"* ]] || false
     # the summary is printed on failure, to read the cause in the CI log
-    [[ "$output" != *"failed"* ]] || { echo "$output"; false; }
+    case "$output" in *failed*) echo "$output" ;; esac
+    [[ "$output" != *"failed"* ]] || false
 }
