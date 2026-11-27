@@ -52,6 +52,7 @@ func devzoneBinary(t *testing.T) string {
 		buildDir = dir
 		cmd := exec.Command("go", "build", "-buildvcs=false", "-o", filepath.Join(dir, "devzone"), "./cmd/devzone")
 		cmd.Dir = "../.."
+		cmd.Env = testkit.CommandEnv()
 		if out, err := cmd.CombinedOutput(); err != nil {
 			buildErr = fmt.Errorf("%v: %s", err, out)
 		}
@@ -151,6 +152,7 @@ func (le *liveEnv) run(args ...string) string {
 	le.t.Helper()
 	cmd := exec.Command(le.bin, args...)
 	cmd.Dir = le.h.dir
+	cmd.Env = testkit.CommandEnv()
 	out, err := cmd.Output()
 	if err != nil {
 		le.t.Fatalf("devzone %v: %v", args, err)
@@ -159,10 +161,13 @@ func (le *liveEnv) run(args ...string) string {
 }
 
 // useBinary makes PortsStart launch the built binary instead of the test one.
+// The watcher environment is filtered so the host binary is not refused in pod.
 func (le *liveEnv) useBinary() {
-	old := watcherExecutable
+	oldExe := watcherExecutable
+	oldEnv := watcherEnv
 	watcherExecutable = func() (string, error) { return le.bin, nil }
-	le.t.Cleanup(func() { watcherExecutable = old })
+	watcherEnv = testkit.CommandEnv
+	le.t.Cleanup(func() { watcherExecutable = oldExe; watcherEnv = oldEnv })
 }
 
 // relayPid waits for the relay of the port in dir and returns its live pid.

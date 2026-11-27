@@ -27,6 +27,7 @@ func fakeShellKubectl(t *testing.T, status int) {
 }
 
 func TestWorkspaceShellRunsInGo(t *testing.T) {
+	hostMode(t)
 	requireBash(t)
 	if runtime.GOOS == "windows" {
 		t.Skip("the fake kubectl is a shell script")
@@ -45,6 +46,7 @@ func TestWorkspaceShellRunsInGo(t *testing.T) {
 }
 
 func TestWorkspaceShellKeepsKubectlStatus(t *testing.T) {
+	hostMode(t)
 	requireBash(t)
 	if runtime.GOOS == "windows" {
 		t.Skip("the fake kubectl is a shell script")
@@ -57,6 +59,7 @@ func TestWorkspaceShellKeepsKubectlStatus(t *testing.T) {
 }
 
 func TestWorkspaceShellWithWordsIsDelegated(t *testing.T) {
+	hostMode(t)
 	requireBash(t)
 	entry(t, echoArgs+"\nexit 4\n")
 	var out, errOut bytes.Buffer
@@ -69,6 +72,7 @@ func TestWorkspaceShellWithWordsIsDelegated(t *testing.T) {
 }
 
 func TestWorkspaceVSCodeRunsInGo(t *testing.T) {
+	hostMode(t)
 	requireBash(t)
 	entry(t, echoArgs+"\n")
 	var out, errOut bytes.Buffer
@@ -81,6 +85,7 @@ func TestWorkspaceVSCodeRunsInGo(t *testing.T) {
 }
 
 func TestWorkspaceVSCodeWithWordsIsDelegated(t *testing.T) {
+	hostMode(t)
 	requireBash(t)
 	entry(t, echoArgs+"\n")
 	var out, errOut bytes.Buffer

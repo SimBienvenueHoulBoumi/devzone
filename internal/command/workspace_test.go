@@ -29,6 +29,7 @@ func fakeKubectlOnPath(t *testing.T) {
 }
 
 func TestWorkspaceStatusRunsInGo(t *testing.T) {
+	hostMode(t)
 	requireBash(t)
 	if runtime.GOOS == "windows" {
 		t.Skip("the fake kubectl is a shell script")
@@ -46,6 +47,7 @@ func TestWorkspaceStatusRunsInGo(t *testing.T) {
 }
 
 func TestWorkspaceStatusWithWordsIsDelegated(t *testing.T) {
+	hostMode(t)
 	requireBash(t)
 	entry(t, echoArgs+"\nexit 4\n")
 	var out, errOut bytes.Buffer
@@ -58,6 +60,7 @@ func TestWorkspaceStatusWithWordsIsDelegated(t *testing.T) {
 }
 
 func TestWorkspaceAloneIsDelegated(t *testing.T) {
+	hostMode(t)
 	requireBash(t)
 	entry(t, echoArgs+"\n")
 	var out, errOut bytes.Buffer
@@ -70,6 +73,7 @@ func TestWorkspaceAloneIsDelegated(t *testing.T) {
 }
 
 func TestWorkspaceOtherSubcommandIsDelegated(t *testing.T) {
+	hostMode(t)
 	requireBash(t)
 	entry(t, echoArgs+"\n")
 	var out, errOut bytes.Buffer
@@ -82,6 +86,7 @@ func TestWorkspaceOtherSubcommandIsDelegated(t *testing.T) {
 // TestWorkspaceStartEnablesWatcher checks that a successful cluster start
 // triggers the single automatic-start function and that a failed one does not.
 func TestWorkspaceStartEnablesWatcher(t *testing.T) {
+	hostMode(t)
 	requireBash(t)
 	fakeClusterReady(t)
 	t.Setenv("DEVZONE_ROOT", devzoneRootForAutoStart(t))

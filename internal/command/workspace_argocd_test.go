@@ -35,7 +35,9 @@ func stubArgoCDReconcile(t *testing.T, installed, holds bool, status int) *[]str
 // TestArgoCDReconcileFollowsTheState checks that the workstation reconciliation
 // reaches the shared library only when Argo CD is installed, and that services
 // are reconciled only when the charts are held by it.
+
 func TestArgoCDReconcileFollowsTheState(t *testing.T) {
+	hostMode(t)
 	for _, tc := range []struct {
 		name      string
 		installed bool

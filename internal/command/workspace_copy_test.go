@@ -9,7 +9,9 @@ import (
 
 // TestWorkspaceCopyToMissingFolderRunsInGo: the folder check comes before any
 // call to kubectl, so no fake cluster is needed
+
 func TestWorkspaceCopyToMissingFolderRunsInGo(t *testing.T) {
+	hostMode(t)
 	requireBash(t)
 	entry(t, echoArgs+"\n")
 	var out, errOut bytes.Buffer
@@ -22,6 +24,7 @@ func TestWorkspaceCopyToMissingFolderRunsInGo(t *testing.T) {
 }
 
 func TestWorkspaceCopyFromRunsInGo(t *testing.T) {
+	hostMode(t)
 	requireBash(t)
 	if runtime.GOOS == "windows" {
 		t.Skip("the fake kubectl is a shell script")

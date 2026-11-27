@@ -20,6 +20,7 @@ func TestHelpTextInsertsVersion(t *testing.T) {
 }
 
 func TestHelpAliases(t *testing.T) {
+	hostMode(t)
 	setupPackage(t, "1.4.2")
 	want := helpText("1.4.2")
 	for _, args := range [][]string{nil, {"help"}, {"-h"}, {"--help"}} {
@@ -37,6 +38,7 @@ func TestHelpAliases(t *testing.T) {
 }
 
 func TestHelpWithArgumentIsDelegated(t *testing.T) {
+	hostMode(t)
 	requireBash(t)
 	entry(t, echoArgs+"\n")
 	var out bytes.Buffer

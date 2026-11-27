@@ -30,6 +30,7 @@ func tracePath(t *testing.T) string {
 }
 
 func TestPortedCommandsDoNotUseBash(t *testing.T) {
+	hostMode(t)
 	// A ported command must run in Go: if it fell back to bash the trace
 	// file would appear, so its absence proves the routing.
 	requireBash(t)
@@ -66,6 +67,7 @@ func TestPortedCommandsDoNotUseBash(t *testing.T) {
 }
 
 func TestOtherCommandsUseBash(t *testing.T) {
+	hostMode(t)
 	// Witness: a command that is not ported must still go through bash, so the
 	// trace file exists and holds its arguments. This keeps the detection from
 	// being blind.

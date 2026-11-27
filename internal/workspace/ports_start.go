@@ -14,6 +14,10 @@ import (
 // test binary itself does not know the "workspace ports loop" command.
 var watcherExecutable = os.Executable
 
+// watcherEnv gives the environment of the watcher subprocess; tests override it
+// so a host binary launched as subprocess stays hermetic in the pod (#980).
+var watcherEnv = os.Environ
+
 // PortsStart starts the port watcher of the workstation, as ports_start does,
 // and only one: it exists so that the user types one command and the ports of
 // the cluster are on localhost afterwards, without keeping a terminal busy. It
@@ -112,6 +116,7 @@ func launchWatcher(dir string) (int, error) {
 	}
 	defer journal.Close()
 	cmd := exec.Command(exe, "workspace", "ports", "loop")
+	cmd.Env = watcherEnv()
 	cmd.Stdout, cmd.Stderr = journal, journal
 	return startDetached(cmd)
 }

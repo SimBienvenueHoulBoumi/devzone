@@ -7,6 +7,8 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/testkit"
 )
 
 // launcherSetup creates a temp copy of the devzone launcher and, when withBinary is true, a fake Go pod binary that handles "ported" and "build".
@@ -41,7 +43,7 @@ func launcherSetup(t *testing.T, withBinary bool) string {
 func runLauncher(t *testing.T, dir string, env []string, args ...string) (string, int) {
 	t.Helper()
 	cmd := exec.Command("bash", append([]string{filepath.Join(dir, "devzone")}, args...)...)
-	cmd.Env = append(os.Environ(), env...)
+	cmd.Env = append(testkit.CommandEnv(), env...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		exitErr, ok := err.(*exec.ExitError)

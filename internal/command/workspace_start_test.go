@@ -9,7 +9,9 @@ import (
 // TestWorkspaceStartWithoutServiceManagerSucceeds keeps a successful cluster
 // start on a host without systemctl or launchctl: Go installs nothing and says
 // nothing, without changing the status of the start.
+
 func TestWorkspaceStartWithoutServiceManagerSucceeds(t *testing.T) {
+	hostMode(t)
 	requireBash(t)
 	fakeClusterReady(t)
 	h := newAutoStartHarness(t)
@@ -33,6 +35,7 @@ func TestWorkspaceStartWithoutServiceManagerSucceeds(t *testing.T) {
 // successful when the single automatic-start function fails afterwards: the
 // reason is written on errOut, but the status stays 0.
 func TestWorkspaceStartEnableFailureIsWarning(t *testing.T) {
+	hostMode(t)
 	requireBash(t)
 	fakeClusterReady(t)
 	h := newAutoStartHarness(t)
