@@ -16,7 +16,7 @@ func launcherWithoutBinary(t *testing.T) string {
 	dir := launcherSetup(t, false)
 	for _, name := range []string{
 		"state-gitops.sh", "devzone-modules.sh", "devzone-services.sh",
-		"devzone-repair.sh", "devzone-platform.sh", "devzone-version.sh", "devzone-status.sh",
+		"devzone-platform.sh", "devzone-version.sh", "devzone-status.sh",
 	} {
 		p := filepath.Join(dir, name)
 		os.MkdirAll(filepath.Dir(p), 0o755)
@@ -34,7 +34,7 @@ func TestLauncherAgentWithoutPodBinary(t *testing.T) {
 		t.Skip()
 	}
 	dir := launcherWithoutBinary(t)
-	for _, name := range []string{"agent", "postgres", "mysql", "gitlab", "test-gitlab", "argocd", "cluster", "clusters", "metrics", "use", "kube", "help", "-h", "--help"} {
+	for _, name := range []string{"agent", "postgres", "mysql", "gitlab", "test-gitlab", "argocd", "cluster", "clusters", "metrics", "use", "kube", "help", "-h", "--help", "repair", "apply-repowarden"} {
 		out, code := runLauncher(t, dir, nil, name, "state")
 		want := "devzone " + name + ": Go binary of the pod unavailable (.devcontainer/bin)\n"
 		if code != 1 || out != want {

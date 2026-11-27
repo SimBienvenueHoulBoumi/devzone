@@ -35,6 +35,14 @@ func newDefaultRegistry() *cli.Registry {
 		Run:  runTicket,
 	})
 	r.Register(cli.Command{
+		Name: "repair",
+		Run:  runRepair,
+	})
+	r.Register(cli.Command{
+		Name: "apply-repowarden",
+		Run:  runApplyRepowarden,
+	})
+	r.Register(cli.Command{
 		Name: "cluster",
 		Run:  runCluster,
 	})

@@ -41,7 +41,7 @@ show_state() {
             echo "  ✔ GitHub          connected"
         fi
     fi
-    if late="$(outdated_tools)"; then
+    if late="$("${DEVZONE_HOST_BIN:?devzone: Go pod binary unavailable}" state outdated-tools 2>/dev/null)"; then
         if [ -z "$late" ]; then
             echo "  ✔ tools          pinned versions"
         else
@@ -54,7 +54,7 @@ show_state() {
     while IFS= read -r path; do
         [ -n "$path" ] || continue
         echo "  ⚠ worktree        $path absent here (created outside the container?): manage it on that side, never git worktree prune here (manage/docs/reference.md, Git worktrees)"
-    done < <(missing_worktrees)
+    done < <("${DEVZONE_HOST_BIN:?devzone: Go pod binary unavailable}" state missing-worktrees)
     for m in "${MODULES[@]}"; do
         if in_pod && service_module "$m"; then
             # Kubernetes workspace pod (#528): presence by the cluster DNS
