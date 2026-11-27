@@ -46,6 +46,10 @@ func workspaceCommand(ctx *cli.Context) int {
 	if len(args) == 1 && args[0] == "agents-guard" {
 		return agentsGuardCommand(ctx)
 	}
+	// The zombie report reads the pod's /proc (#973); it is not in the help.
+	if len(args) == 1 && args[0] == "zombies" {
+		return zombiesCommand(ctx)
+	}
 	if len(args) >= 1 && args[0] == "wait" {
 		sub := &cli.Context{Args: args[1:], Out: out, Err: errOut, Stdin: ctx.Stdin, Runner: ctx.Runner}
 		return podWaitCommand(sub)
