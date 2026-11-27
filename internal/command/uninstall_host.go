@@ -8,16 +8,16 @@ import (
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec"
 )
 
-// hostPlan lists what this folder left on the host: Docker containers, images
+// hostPlan lists what this folder left on the host: host engine containers, images
 // and volumes, the kind clusters and labeled containers of the instance, and the
 // metrics-server devzone installed on host clusters. It is read before anything
 // is removed, and printed before the confirmation.
 type hostPlan struct {
-	inside         bool     // inside the pod: the host Docker is not inventoried
+	inside         bool     // inside the pod: the host engine is not inventoried
 	stateFile      bool     // .devzone.state exists
 	containers     []string // containers created for this folder
 	images         []string // their images (or the image named by the state file)
-	dind           []string // former internal Docker volumes (installs before #291)
+	dind           []string // former internal volumes (before #291)
 	volumes        []string // devcontainer volumes of the instance
 	kept           []string // volumes kept by KEEP (logins)
 	kindClusters   []string // containers of the instance kind clusters
@@ -34,7 +34,7 @@ func (h hostPlan) count() int {
 		len(h.kindClusters) + len(h.labeled) + len(h.metrics)
 }
 
-// collectHostPlan reads the host resources of the folder. Docker inventory
+// collectHostPlan reads the host resources of the folder. engine inventory
 // failures count as nothing found, as the shell did; only an unreadable
 // devcontainer configuration stops the command.
 func collectHostPlan(ctx context.Context, runner exec.Runner, root, instance, keep string, inside bool) (hostPlan, error) {
@@ -43,7 +43,7 @@ func collectHostPlan(ctx context.Context, runner exec.Runner, root, instance, ke
 		h.stateFile = true
 	}
 	if !inside {
-		if err := h.inventoryDocker(dockerCall{ctx: ctx, runner: runner, cmd: dockerCommand()}, root, instance, keep); err != nil {
+		if err := h.inventoryEngine(engineCall{ctx: ctx, runner: runner, cmd: engineCommand()}, root, instance, keep); err != nil {
 			return hostPlan{}, err
 		}
 	}
@@ -52,10 +52,10 @@ func collectHostPlan(ctx context.Context, runner exec.Runner, root, instance, ke
 	return h, nil
 }
 
-// inventoryDocker fills the Docker part of the plan. Containers come first; the
+// inventoryEngine fills the engine part of the plan. Containers come first; the
 // state file names the image and the volume of a folder whose container is gone.
 // Each list keeps a resource in one place only, so a removal never runs twice.
-func (h *hostPlan) inventoryDocker(d dockerCall, root, instance, keep string) error {
+func (h *hostPlan) inventoryEngine(d engineCall, root, instance, keep string) error {
 	h.containers, h.images, h.dind = folderContainers(d, root)
 	if len(h.containers) == 0 && h.stateFile {
 		image, dind := stateImageAndDind(filepath.Join(root, stateFileName))

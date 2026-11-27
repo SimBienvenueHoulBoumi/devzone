@@ -21,7 +21,7 @@ func printRemains(out io.Writer, root string, host hostPlan) {
 	if host.kubectlMissing {
 		fmt.Fprintln(out, "  metrics-server: kubectl not on host, host clusters not checked")
 	}
-	fmt.Fprintln(out, "  base image mcr.microsoft.com/devcontainers/base (shared): docker rmi mcr.microsoft.com/devcontainers/base:ubuntu-24.04")
+	fmt.Fprintln(out, "  base image mcr.microsoft.com/devcontainers/base (shared): "+engineCommand()+" rmi mcr.microsoft.com/devcontainers/base:ubuntu-24.04")
 	fmt.Fprintln(out, "  devcontainer CLI npx cache: ~/.npm/_npx")
 	fmt.Fprintln(out, "  \"GitHub CLI\" authorization on your account: GitHub → Settings → Applications")
 	if repo := (argocd.Conf{Path: filepath.Join(root, ".argocd.conf")}).Get("argocd", "repo"); repo != "" && repo != "none" {

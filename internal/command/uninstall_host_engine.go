@@ -11,17 +11,17 @@ import (
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec"
 )
 
-// dockerCall runs the Docker command of the host through the injected Runner.
+// engineCall runs the host engine command through the injected Runner.
 // Only the Runner starts a process: tests give a fake one.
-type dockerCall struct {
+type engineCall struct {
 	ctx    context.Context
 	runner exec.Runner
 	cmd    string
 }
 
-// run runs docker with args. The error is non-nil when the command could not
+// run runs the engine with args. The error is non-nil when the command could not
 // start or exited non-zero; the result keeps the output for the message.
-func (d dockerCall) run(args ...string) (exec.Result, error) {
+func (d engineCall) run(args ...string) (exec.Result, error) {
 	res, err := d.runner.Run(d.ctx, d.cmd, args, exec.Opts{})
 	if err == nil && res.Code != 0 {
 		err = fmt.Errorf("exit %d", res.Code)
@@ -29,15 +29,15 @@ func (d dockerCall) run(args ...string) (exec.Result, error) {
 	return res, err
 }
 
-// ok reports whether docker run with args succeeds.
-func (d dockerCall) ok(args ...string) bool {
+// ok reports whether the engine run with args succeeds.
+func (d engineCall) ok(args ...string) bool {
 	_, err := d.run(args...)
 	return err == nil
 }
 
 // lines returns the words of a successful call: container or volume ids. A
 // failing call gives none, as the shell inventory did with "|| true".
-func (d dockerCall) lines(args ...string) []string {
+func (d engineCall) lines(args ...string) []string {
 	res, err := d.run(args...)
 	if err != nil {
 		return nil
@@ -46,7 +46,7 @@ func (d dockerCall) lines(args ...string) []string {
 }
 
 // text returns the trimmed output of a successful call, "" otherwise.
-func (d dockerCall) text(args ...string) string {
+func (d engineCall) text(args ...string) string {
 	res, err := d.run(args...)
 	if err != nil {
 		return ""
@@ -86,9 +86,9 @@ func without(values []string, drop ...[]string) []string {
 }
 
 // folderContainers returns the containers created for this folder, with their
-// image and their former internal Docker volume (installs before #291). The
+// image and their former internal volume (installs before #291). The
 // folder is searched under its logical and its physical path.
-func folderContainers(d dockerCall, root string) (containers, images, dind []string) {
+func folderContainers(d engineCall, root string) (containers, images, dind []string) {
 	paths := []string{root}
 	if phys, err := filepath.EvalSymlinks(root); err == nil && phys != root {
 		paths = append(paths, phys)
@@ -107,8 +107,8 @@ func folderContainers(d dockerCall, root string) (containers, images, dind []str
 
 // kindClusterContainers returns the containers of the instance kind clusters
 // (devzone and gitlab): a kind cluster is nothing more than containers carrying
-// its label on the host Docker.
-func kindClusterContainers(d dockerCall, instance string) []string {
+// its label on the host engine.
+func kindClusterContainers(d engineCall, instance string) []string {
 	suffix := ""
 	if instance != "devzone" {
 		suffix = "-" + instance
@@ -121,7 +121,7 @@ func kindClusterContainers(d dockerCall, instance string) []string {
 }
 
 // labeledContainers returns the containers labeled devzone.instance=<instance>.
-func labeledContainers(d dockerCall, instance string) []string {
+func labeledContainers(d engineCall, instance string) []string {
 	return uniqueSorted(d.lines("ps", "-aq", "--filter", "label=devzone.instance="+instance))
 }
 

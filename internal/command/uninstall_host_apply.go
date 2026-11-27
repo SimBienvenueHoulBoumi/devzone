@@ -24,7 +24,7 @@ func failureText(res fwexec.Result, err error) string {
 // removeEach runs one removal per id with the arguments args builds. A success
 // prints "✔ <label> removed: <id>"; a failure is reported on errOut. It returns 1
 // when at least one removal failed, and goes on with the others.
-func removeEach(d dockerCall, ids []string, label string, args func(id string) []string, out, errOut io.Writer) int {
+func removeEach(d engineCall, ids []string, label string, args func(id string) []string, out, errOut io.Writer) int {
 	status := 0
 	for _, id := range ids {
 		res, err := d.run(args(id)...)
@@ -38,13 +38,13 @@ func removeEach(d dockerCall, ids []string, label string, args func(id string) [
 	return status
 }
 
-// forceRemove is the arguments of "docker rm -f <id>".
+// forceRemove is the arguments of "<engine> rm -f <id>".
 func forceRemove(id string) []string { return []string{"rm", "-f", id} }
 
 // removeHostFirst removes what the folder created on the host: its containers,
-// then their images, then the former internal Docker and devcontainer volumes.
+// then their images, then the former internal and devcontainer volumes.
 // It returns 1 when one removal failed.
-func removeHostFirst(d dockerCall, h hostPlan, out, errOut io.Writer) int {
+func removeHostFirst(d engineCall, h hostPlan, out, errOut io.Writer) int {
 	status := removeEach(d, h.containers, "container", forceRemove, out, errOut)
 	status = max(status, removeEach(d, h.images, "image", func(id string) []string {
 		return []string{"rmi", id}
@@ -58,7 +58,7 @@ func removeHostFirst(d dockerCall, h hostPlan, out, errOut io.Writer) int {
 // removeHostLast removes the kind clusters of the instance, then the kind network
 // when no container uses it any more, then the labeled containers of the instance.
 // It returns 1 when one removal failed.
-func removeHostLast(d dockerCall, h hostPlan, out, errOut io.Writer) int {
+func removeHostLast(d engineCall, h hostPlan, out, errOut io.Writer) int {
 	status := removeEach(d, h.kindClusters, "kind cluster container", forceRemove, out, errOut)
 	if !h.inside {
 		status = max(status, removeKindNetwork(d, out, errOut))
@@ -66,22 +66,22 @@ func removeHostLast(d dockerCall, h hostPlan, out, errOut io.Writer) int {
 	return max(status, removeEach(d, h.labeled, "labeled container", forceRemove, out, errOut))
 }
 
-// removeKindNetwork removes the kind Docker network when its inspection shows no
+// removeKindNetwork removes the kind network when its inspection shows no
 // container on it. A network in use, or one that does not exist, is left alone.
-func removeKindNetwork(d dockerCall, out, errOut io.Writer) int {
+func removeKindNetwork(d engineCall, out, errOut io.Writer) int {
 	res, err := d.run("network", "inspect", "kind")
 	if err != nil || !networkEmpty(res.Stdout) {
 		return 0
 	}
 	if res, err := d.run("network", "rm", "kind"); err != nil {
-		fmt.Fprintf(errOut, "✖ kind Docker network: %s\n", failureText(res, err))
+		fmt.Fprintf(errOut, "✖ kind network: %s\n", failureText(res, err))
 		return 1
 	}
-	fmt.Fprintln(out, "✔ kind Docker network removed")
+	fmt.Fprintln(out, "✔ kind network removed")
 	return 0
 }
 
-// networkEmpty reports whether a "docker network inspect" document lists no
+// networkEmpty reports whether a "<engine> network inspect" document lists no
 // container: every network in it has an empty Containers map.
 func networkEmpty(data []byte) bool {
 	var nets []struct {

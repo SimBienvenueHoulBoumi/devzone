@@ -161,21 +161,21 @@ func TestParseUninstallArgsRefusesUnknown(t *testing.T) {
 	}
 }
 
-// TestDockerCommandAndNameFromEnvironment checks the Docker command name (the
+// TestEngineCommandAndNameFromEnvironment checks the engine command name (the
 // override DEVZONE_DOCKER, used by the tests and the CI) and the command name
 // the host check asks to run again (DEVZONE_COMMAND, else devzone uninstall).
-func TestDockerCommandAndNameFromEnvironment(t *testing.T) {
+func TestEngineCommandAndNameFromEnvironment(t *testing.T) {
 	t.Setenv("DEVZONE_DOCKER", "")
 	t.Setenv("DEVZONE_COMMAND", "")
-	if got := dockerCommand(); got != "docker" {
-		t.Fatalf("dockerCommand = %q, want docker", got)
+	if got := engineCommand(); got != "docker" {
+		t.Fatalf("engineCommand = %q, want docker", got)
 	}
 	if got := uninstallCommandName(); got != "devzone uninstall" {
 		t.Fatalf("uninstallCommandName = %q", got)
 	}
-	t.Setenv("DEVZONE_DOCKER", "docker-test")
+	t.Setenv("DEVZONE_DOCKER", "engine-test")
 	t.Setenv("DEVZONE_COMMAND", "make desinstaller")
-	if dockerCommand() != "docker-test" || uninstallCommandName() != "make desinstaller" {
+	if engineCommand() != "engine-test" || uninstallCommandName() != "make desinstaller" {
 		t.Fatal("environment overrides not read")
 	}
 }

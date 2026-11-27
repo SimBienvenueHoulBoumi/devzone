@@ -54,7 +54,7 @@ func uninstallCommand(ctx *cli.Context) int {
 	}
 	bg := context.Background()
 	// Host engine first: without it every call would show its raw error
-	if !hostcheck.Ready(bg, runner, dockerCommand(), uninstallCommandName(), ctx.Err) {
+	if !hostcheck.Ready(bg, runner, engineCommand(), uninstallCommandName(), ctx.Err) {
 		return 1
 	}
 	instance := devzoneInstance()
@@ -104,7 +104,7 @@ func uninstallCommand(ctx *cli.Context) int {
 // Kubernetes objects, then the kind clusters and labeled containers. A failure is
 // reported and the others go on; the result is 1 when one of them failed.
 func removeAll(ctx context.Context, runner exec.Runner, host hostPlan, kube uninstallPlan, out, errOut io.Writer) int {
-	d := dockerCall{ctx: ctx, runner: runner, cmd: dockerCommand()}
+	d := engineCall{ctx: ctx, runner: runner, cmd: engineCommand()}
 	status := removeHostFirst(d, host, out, errOut)
 	status = max(status, removeMetricsServers(ctx, runner, host, out, errOut))
 	status = max(status, applyUninstallPlan(ctx, runner, out, errOut, kube))

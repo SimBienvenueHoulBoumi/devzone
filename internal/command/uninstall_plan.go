@@ -31,9 +31,9 @@ func devzoneInstance() string {
 	return "devzone"
 }
 
-// dockerCommand returns the Docker command the host calls: DEVZONE_DOCKER when
+// engineCommand returns the engine command the host calls: DEVZONE_DOCKER when
 // a test or a user names another one, else "docker".
-func dockerCommand() string {
+func engineCommand() string {
 	if v := os.Getenv("DEVZONE_DOCKER"); v != "" {
 		return v
 	}
@@ -50,7 +50,7 @@ func uninstallCommandName() string {
 }
 
 // insideContainer reports whether the command runs inside the devzone pod. Then
-// docker talks to the host Docker, so the host resources are not inventoried.
+// the engine command talks to the host engine, so the host resources are not inventoried.
 // DEVZONE_IN_CONTAINER=yes|no forces the answer (tests run in a container).
 func insideContainer() bool {
 	switch os.Getenv("DEVZONE_IN_CONTAINER") {

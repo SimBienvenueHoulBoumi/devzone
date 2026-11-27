@@ -18,7 +18,7 @@ import (
 var lookPath = exec.LookPath
 
 // localContextPattern selects the kubeconfig contexts of the host local clusters
-// (kind, Docker Desktop, Rancher Desktop, OrbStack, minikube).
+// (kind, the desktop engine, Rancher Desktop, OrbStack, minikube).
 var localContextPattern = regexp.MustCompile(`^(kind-.*|docker-desktop|rancher-desktop|orbstack|minikube)$`)
 
 // metricsLabelValues are the values of the devzone label on a metrics-server

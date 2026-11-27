@@ -11,12 +11,12 @@ import (
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec/fake"
 )
 
-// TestHostDockerStoppedStopsBeforeInventory: with Docker stopped, the command says
+// TestHostEngineStoppedStopsBeforeInventory: with the engine stopped, the command says
 // so once and stops; no container, image or volume is looked at.
-func TestHostDockerStoppedStopsBeforeInventory(t *testing.T) {
+func TestHostEngineStoppedStopsBeforeInventory(t *testing.T) {
 	root := devzoneDir(t, "postgres=on")
 	runner := fake.New()
-	runner.OnResponse("docker", []string{"info"}, fake.Response{
+	runner.OnResponse(engineCommand(), []string{"info"}, fake.Response{
 		Stderr: []byte("failed to connect to the docker API"), Code: 1,
 	})
 	code, _, errOut := runUninstall(t, runner, root, []string{"--yes"}, "")
@@ -26,8 +26,8 @@ func TestHostDockerStoppedStopsBeforeInventory(t *testing.T) {
 	if strings.Count(errOut, "Start Docker Desktop") != 1 || !strings.Contains(errOut, "then run devzone uninstall again") {
 		t.Fatalf("stderr = %q", errOut)
 	}
-	if got := dockerCalls(runner); len(got) != 1 || got[0] != "info" {
-		t.Fatalf("docker calls = %v, want only info", got)
+	if got := engineCalls(runner); len(got) != 1 || got[0] != "info" {
+		t.Fatalf("engine calls = %v, want only info", got)
 	}
 }
 
@@ -44,9 +44,9 @@ func TestHostRemovesFolderResourcesInOrder(t *testing.T) {
 	want := []string{
 		"info", "ps -aq --filter label=devcontainer.local_folder=" + root,
 	}
-	calls := dockerCalls(runner)
+	calls := engineCalls(runner)
 	if len(calls) < len(want) || calls[0] != want[0] {
-		t.Fatalf("docker calls = %v", calls)
+		t.Fatalf("engine calls = %v", calls)
 	}
 	order := []string{"rm -f c1", "rmi vsc-img", "volume rm dind-vol", "volume rm devzone-m2", "volume rm devzone-gh",
 		"rm -f k1", "network rm kind", "rm -f l1"}
@@ -65,7 +65,7 @@ func TestHostRemovesFolderResourcesInOrder(t *testing.T) {
 		t.Fatalf("container c1 removed more than once: %v", calls)
 	}
 	for _, line := range []string{"✔ container removed: c1", "✔ image removed: vsc-img", "✔ volume removed: dind-vol",
-		"✔ kind cluster container removed: k1", "✔ kind Docker network removed", "✔ labeled container removed: l1",
+		"✔ kind cluster container removed: k1", "✔ kind network removed", "✔ labeled container removed: l1",
 		"✔ file removed: .devzone.modules"} {
 		if !strings.Contains(out, line) {
 			t.Fatalf("output lacks %q:\n%s", line, out)
@@ -89,10 +89,10 @@ func TestHostKeepsLoginsWithKeep(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("code = %d, err = %q", code, errOut)
 	}
-	if indexOf(dockerCalls(runner), "volume rm devzone-gh") >= 0 {
+	if indexOf(engineCalls(runner), "volume rm devzone-gh") >= 0 {
 		t.Fatal("login volume removed with KEEP=logins")
 	}
-	if indexOf(dockerCalls(runner), "volume rm devzone-m2") < 0 {
+	if indexOf(engineCalls(runner), "volume rm devzone-m2") < 0 {
 		t.Fatal("non-login volume kept with KEEP=logins")
 	}
 	if !strings.Contains(out, "Kept (KEEP=logins):\n  devzone-gh") {
@@ -101,7 +101,7 @@ func TestHostKeepsLoginsWithKeep(t *testing.T) {
 }
 
 // TestHostRefusesUnknownKeep: an unknown KEEP value stops the command before
-// any Docker call, with the shell's message.
+// any engine call, with the shell's message.
 func TestHostRefusesUnknownKeep(t *testing.T) {
 	root := devzoneDir(t)
 	t.Setenv("KEEP", "all")
@@ -124,7 +124,7 @@ func TestHostNothingRemovedWithoutConfirmation(t *testing.T) {
 	if code != 1 || !strings.Contains(errOut, "✖ Cannot confirm without a terminal: CONFIRM=yes make desinstaller") {
 		t.Fatalf("code = %d, err = %q", code, errOut)
 	}
-	for _, c := range dockerCalls(runner) {
+	for _, c := range engineCalls(runner) {
 		if strings.HasPrefix(c, "rm ") || strings.HasPrefix(c, "rmi ") || strings.HasPrefix(c, "volume rm") || strings.HasPrefix(c, "network rm") {
 			t.Fatalf("removal call %q without confirmation", c)
 		}
@@ -140,8 +140,8 @@ func TestHostConfirmedByEnvironment(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("code = %d, err = %q", code, errOut)
 	}
-	if indexOf(dockerCalls(runner), "rm -f c1") < 0 {
-		t.Fatalf("container not removed with CONFIRM=yes: %v", dockerCalls(runner))
+	if indexOf(engineCalls(runner), "rm -f c1") < 0 {
+		t.Fatalf("container not removed with CONFIRM=yes: %v", engineCalls(runner))
 	}
 }
 
@@ -150,7 +150,7 @@ func TestHostConfirmedByEnvironment(t *testing.T) {
 func TestHostFailureKeepsStateFiles(t *testing.T) {
 	root := devzoneDir(t, "postgres=on")
 	runner := folderRunner(t, root)
-	runner.OnError("docker", []string{"rm", "-f", "c1"}, exec.Result{Stderr: []byte("device busy")}, errors.New("exit 1"))
+	runner.OnError(engineCommand(), []string{"rm", "-f", "c1"}, exec.Result{Stderr: []byte("device busy")}, errors.New("exit 1"))
 	code, _, errOut := runUninstall(t, runner, root, []string{"--yes"}, "")
 	if code != 1 || !strings.Contains(errOut, "✖ container c1: device busy") {
 		t.Fatalf("code = %d, err = %q", code, errOut)
@@ -158,7 +158,7 @@ func TestHostFailureKeepsStateFiles(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(root, ".devzone.modules")); err != nil {
 		t.Fatalf("state file removed after a failure: %v", err)
 	}
-	if indexOf(dockerCalls(runner), "rm -f l1") < 0 {
+	if indexOf(engineCalls(runner), "rm -f l1") < 0 {
 		t.Fatal("the other removals did not go on after a failure")
 	}
 }
@@ -178,8 +178,8 @@ func TestHostNothingToRemove(t *testing.T) {
 	}
 }
 
-// TestHostInsideContainerDoesNotInventory: inside the pod, docker reaches the host
-// Docker: the folder's resources are not looked at, and the command says so.
+// TestHostInsideContainerDoesNotInventory: inside the pod, the engine command reaches the host
+// engine: the folder's resources are not looked at, and the command says so.
 func TestHostInsideContainerDoesNotInventory(t *testing.T) {
 	root := devzoneDir(t)
 	t.Setenv("DEVZONE_IN_CONTAINER", "yes")
@@ -192,7 +192,7 @@ func TestHostInsideContainerDoesNotInventory(t *testing.T) {
 		t.Fatalf("no pod notice:\n%s", out)
 	}
 	for _, c := range runner.Calls() {
-		if c.Name == "npx" || (c.Name == "docker" && len(c.Args) > 0 && c.Args[0] != "info") {
+		if c.Name == "npx" || (c.Name == engineCommand() && len(c.Args) > 0 && c.Args[0] != "info") {
 			t.Fatalf("host call inside the container: %s %v", c.Name, c.Args)
 		}
 	}
@@ -203,7 +203,7 @@ func TestHostInsideContainerDoesNotInventory(t *testing.T) {
 func TestHostUnreadableConfigurationStops(t *testing.T) {
 	root := devzoneDir(t)
 	runner := fake.New()
-	runner.On("docker", []string{"info"}, exec.Result{})
+	runner.On(engineCommand(), []string{"info"}, exec.Result{})
 	code, _, errOut := runUninstall(t, runner, root, []string{"--yes"}, "")
 	if code != 1 || !strings.Contains(errOut, "cannot read .devcontainer/devcontainer.json (npx @devcontainers/cli)") {
 		t.Fatalf("code = %d, err = %q", code, errOut)
@@ -215,12 +215,12 @@ func TestHostUnreadableConfigurationStops(t *testing.T) {
 func TestHostKindNetworkKeptWhenInUse(t *testing.T) {
 	root := devzoneDir(t)
 	runner := folderRunner(t, root)
-	runner.On("docker", []string{"network", "inspect", "kind"}, exec.Result{Stdout: []byte(`[{"Containers": {"abc": {}}}]`)})
+	runner.On(engineCommand(), []string{"network", "inspect", "kind"}, exec.Result{Stdout: []byte(`[{"Containers": {"abc": {}}}]`)})
 	code, _, errOut := runUninstall(t, runner, root, []string{"--yes"}, "")
 	if code != 0 {
 		t.Fatalf("code = %d, err = %q", code, errOut)
 	}
-	if indexOf(dockerCalls(runner), "network rm kind") >= 0 {
+	if indexOf(engineCalls(runner), "network rm kind") >= 0 {
 		t.Fatal("kind network removed while a container is attached")
 	}
 }

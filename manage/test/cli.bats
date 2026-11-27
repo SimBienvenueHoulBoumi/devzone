@@ -216,7 +216,7 @@ fake_docker() {
     export PATH="$BATS_TEST_TMPDIR/faux:$PATH"
 }
 
-@test "devzone uninstall: Docker stopped → clear message, once, nothing else started" {
+@test "devzone uninstall: host engine stopped → clear message, once, nothing else started" {
     bash "$CLI" dz-test --kubernetes
     fake_cli 'exit 1'
     fake_docker arrete

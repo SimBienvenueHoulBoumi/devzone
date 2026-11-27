@@ -11,7 +11,7 @@ import (
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec/fake"
 )
 
-// dindFormat is the --format of the former internal Docker volume of a container.
+// dindFormat is the --format of the former internal volume of a container.
 const dindFormat = `{{range .Mounts}}{{if eq .Destination "/var/lib/docker"}}{{.Name}}{{end}}{{end}}`
 
 // folderMounts is the devcontainer configuration of the folder: two volumes of
@@ -20,45 +20,45 @@ const folderMounts = `{"configuration":{"mounts":["source=devzone-m2,target=/hom
 	`"source=devzone-gh,target=/home/vscode/.config/gh,type=volume",` +
 	`{"source":"/host/path","target":"/x","type":"bind"}]}}`
 
-// folderRunner programs the Docker and npx answers of a folder with one
+// folderRunner programs the engine and npx answers of a folder with one
 // container (c1), its image, its former volume, a kind cluster (k1), a labeled
 // container (l1) and two volumes. Every removal call succeeds. No real command
 // runs: the Runner is the only way the host is read.
 func folderRunner(t *testing.T, root string) *fake.Runner {
 	t.Helper()
 	runner := fake.New()
-	runner.On("docker", []string{"info"}, exec.Result{})
+	runner.On(engineCommand(), []string{"info"}, exec.Result{})
 	paths := []string{root}
 	if phys, err := filepath.EvalSymlinks(root); err == nil && phys != root {
 		paths = append(paths, phys)
 	}
 	for _, p := range paths {
-		runner.On("docker", []string{"ps", "-aq", "--filter", "label=devcontainer.local_folder=" + p}, exec.Result{Stdout: []byte("c1\n")})
+		runner.On(engineCommand(), []string{"ps", "-aq", "--filter", "label=devcontainer.local_folder=" + p}, exec.Result{Stdout: []byte("c1\n")})
 		runner.On("npx", []string{"-y", "@devcontainers/cli", "read-configuration", "--workspace-folder", p}, exec.Result{Stdout: []byte(folderMounts)})
 	}
-	runner.On("docker", []string{"inspect", "c1", "--format", "{{.Config.Image}}"}, exec.Result{Stdout: []byte("vsc-img\n")})
-	runner.On("docker", []string{"inspect", "c1", "--format", dindFormat}, exec.Result{Stdout: []byte("dind-vol\n")})
-	runner.On("docker", []string{"ps", "-aq", "--filter", "label=io.x-k8s.kind.cluster=devzone"}, exec.Result{Stdout: []byte("k1\n")})
-	runner.On("docker", []string{"ps", "-aq", "--filter", "label=io.x-k8s.kind.cluster=gitlab"}, exec.Result{})
-	runner.On("docker", []string{"ps", "-aq", "--filter", "label=devzone.instance=devzone"}, exec.Result{Stdout: []byte("c1\nl1\n")})
-	runner.On("docker", []string{"volume", "inspect", "devzone-m2"}, exec.Result{})
-	runner.On("docker", []string{"volume", "inspect", "devzone-gh"}, exec.Result{})
-	runner.On("docker", []string{"network", "inspect", "kind"}, exec.Result{Stdout: []byte(`[{"Containers": {}}]`)})
+	runner.On(engineCommand(), []string{"inspect", "c1", "--format", "{{.Config.Image}}"}, exec.Result{Stdout: []byte("vsc-img\n")})
+	runner.On(engineCommand(), []string{"inspect", "c1", "--format", dindFormat}, exec.Result{Stdout: []byte("dind-vol\n")})
+	runner.On(engineCommand(), []string{"ps", "-aq", "--filter", "label=io.x-k8s.kind.cluster=devzone"}, exec.Result{Stdout: []byte("k1\n")})
+	runner.On(engineCommand(), []string{"ps", "-aq", "--filter", "label=io.x-k8s.kind.cluster=gitlab"}, exec.Result{})
+	runner.On(engineCommand(), []string{"ps", "-aq", "--filter", "label=devzone.instance=devzone"}, exec.Result{Stdout: []byte("c1\nl1\n")})
+	runner.On(engineCommand(), []string{"volume", "inspect", "devzone-m2"}, exec.Result{})
+	runner.On(engineCommand(), []string{"volume", "inspect", "devzone-gh"}, exec.Result{})
+	runner.On(engineCommand(), []string{"network", "inspect", "kind"}, exec.Result{Stdout: []byte(`[{"Containers": {}}]`)})
 	for _, args := range [][]string{
 		{"rm", "-f", "c1"}, {"rmi", "vsc-img"}, {"volume", "rm", "dind-vol"},
 		{"volume", "rm", "devzone-m2"}, {"volume", "rm", "devzone-gh"},
 		{"rm", "-f", "k1"}, {"network", "rm", "kind"}, {"rm", "-f", "l1"},
 	} {
-		runner.On("docker", args, exec.Result{})
+		runner.On(engineCommand(), args, exec.Result{})
 	}
 	return runner
 }
 
-// dockerCalls returns the docker calls of the runner as "docker <args>" lines.
-func dockerCalls(runner *fake.Runner) []string {
+// engineCalls returns the arguments of the engine calls of the runner, one line per call.
+func engineCalls(runner *fake.Runner) []string {
 	var out []string
 	for _, c := range runner.Calls() {
-		if c.Name == "docker" {
+		if c.Name == engineCommand() {
 			out = append(out, strings.Join(c.Args, " "))
 		}
 	}

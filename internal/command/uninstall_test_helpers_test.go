@@ -56,11 +56,11 @@ func devzoneDir(t *testing.T, stateLines ...string) string {
 var errNoKubectlTest = errors.New("kubectl not found (test)")
 
 // registerHostProbe answers the host calls of an uninstall that finds nothing on
-// the host: docker info succeeds, and the devcontainer configuration has no
-// mount. Every other Docker call of the inventory fails, which counts as none.
+// the host: the engine info succeeds, and the devcontainer configuration has no
+// mount. Every other engine call of the inventory fails, which counts as none.
 func registerHostProbe(t *testing.T, runner *fake.Runner, root string) {
 	t.Helper()
-	runner.On("docker", []string{"info"}, exec.Result{})
+	runner.On(engineCommand(), []string{"info"}, exec.Result{})
 	paths := []string{root}
 	if phys, err := filepath.EvalSymlinks(root); err == nil && phys != root {
 		paths = append(paths, phys)

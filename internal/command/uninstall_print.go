@@ -25,7 +25,7 @@ func printUninstallPlan(out io.Writer, root, instance string, kube uninstallPlan
 	printList(out, host.containers)
 	fmt.Fprintln(out, " image(s):")
 	printList(out, host.images)
-	fmt.Fprintln(out, " former internal Docker (installs before #291):")
+	fmt.Fprintln(out, " former internal volumes (installs before #291):")
 	printList(out, host.dind)
 	fmt.Fprintln(out, " volumes:")
 	printList(out, host.volumes)
@@ -37,7 +37,7 @@ func printUninstallPlan(out io.Writer, root, instance string, kube uninstallPlan
 	printList(out, kube.applications)
 	fmt.Fprintln(out, " temporary accounts:")
 	printList(out, kube.tempAccounts)
-	fmt.Fprintln(out, " kind clusters of the instance on host Docker:")
+	fmt.Fprintln(out, " kind clusters of the instance on the host engine:")
 	printList(out, host.kindClusters)
 	fmt.Fprintf(out, " containers labeled devzone.instance=%s:\n", instance)
 	printList(out, host.labeled)
@@ -51,7 +51,7 @@ func printUninstallPlan(out io.Writer, root, instance string, kube uninstallPlan
 	}
 	if !host.inside && len(host.containers) == 0 && len(host.images) == 0 && !host.stateFile {
 		fmt.Fprintln(out, "ℹ No container and no image trace: if an older removal left them,")
-		fmt.Fprintf(out, "  find them with: docker images 'vsc-%s-*' ; docker volume ls -q -f name=dind-var-lib-docker\n", filepath.Base(root))
+		fmt.Fprintf(out, "  find them with: %[2]s images 'vsc-%[1]s-*' ; %[2]s volume ls -q -f name=dind-var-lib-docker\n", filepath.Base(root), engineCommand())
 	}
 }
 
