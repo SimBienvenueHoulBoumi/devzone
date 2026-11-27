@@ -26,10 +26,9 @@ case "$KEEP" in "" | logins | connexions) ;; *)
     ;;
 esac
 
-# Docker first: without it every docker call would show its raw error
-# shellcheck source=SCRIPTDIR/docker.sh
-. "$(dirname "${BASH_SOURCE[0]}")/docker.sh"
-docker_ready "${DEVZONE_COMMAND:-make desinstaller}" || exit 1
+# Host engine first: without it every call would show its raw error. The check
+# is the Go program's (#884), found through DEVZONE_HOST_BIN, exported by manage/devzone
+"${DEVZONE_HOST_BIN:?devzone: Go program not found (DEVZONE_HOST_BIN), run it through manage/devzone}" host-check "${DEVZONE_COMMAND:-make desinstaller}" || exit 1
 
 # .argocd.conf of the devzone folder: the GitOps repository is never removed
 # with the devzone, only its designation can be changed later

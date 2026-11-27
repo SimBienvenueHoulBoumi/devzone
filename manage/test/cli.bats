@@ -1,6 +1,13 @@
 #!/usr/bin/env bats
 # devzone command on the host (npm package, manage/devzone) and package content.
 
+setup_file() {
+    # uninstall.sh asks the Go program for the host engine check (#884): built once for the file
+    RACINE="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
+    export DEVZONE_HOST_BIN="$BATS_FILE_TMPDIR/devzone"
+    (cd "$RACINE" && go build -o "$DEVZONE_HOST_BIN" ./cmd/devzone) || { echo "go build failed"; return 1; }
+}
+
 setup() {
     load commun
     kube_isole
