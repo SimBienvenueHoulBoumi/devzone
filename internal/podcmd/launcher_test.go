@@ -21,7 +21,7 @@ func launcherSetup(t *testing.T, withBinary bool) string {
 	if err := os.WriteFile(filepath.Join(dir, "devzone"), src, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "devzone-platform.sh"), []byte("echo SHELL-PATH-REACHED\nexit 42\n"), 0o755); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "workspace-build.sh"), []byte("echo SHELL-PATH-REACHED\nexit 42\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -140,7 +140,7 @@ func TestLauncherKeepsShellForUnportedCommand(t *testing.T) {
 		t.Skip()
 	}
 	dir := launcherSetup(t, true)
-	out, code := runLauncher(t, dir, nil, "other")
+	out, code := runLauncher(t, dir, nil, "build")
 	if code != 42 {
 		t.Fatalf("code = %d, want 42", code)
 	}
@@ -155,7 +155,7 @@ func TestLauncherNoGoForcesShell(t *testing.T) {
 		t.Skip()
 	}
 	dir := launcherSetup(t, true)
-	out, code := runLauncher(t, dir, []string{"DEVZONE_NO_GO=1"}, "ported")
+	out, code := runLauncher(t, dir, []string{"DEVZONE_NO_GO=1"}, "build")
 	if code != 42 {
 		t.Fatalf("code = %d, want 42", code)
 	}
@@ -170,7 +170,7 @@ func TestLauncherFromGoAvoidsLoop(t *testing.T) {
 		t.Skip()
 	}
 	dir := launcherSetup(t, true)
-	out, code := runLauncher(t, dir, []string{"DEVZONE_FROM_GO=1"}, "ported")
+	out, code := runLauncher(t, dir, []string{"DEVZONE_FROM_GO=1"}, "build")
 	if code != 42 {
 		t.Fatalf("code = %d, want 42", code)
 	}
@@ -185,7 +185,7 @@ func TestLauncherWithoutBinaryUsesShell(t *testing.T) {
 		t.Skip()
 	}
 	dir := launcherSetup(t, false)
-	out, code := runLauncher(t, dir, nil, "ported")
+	out, code := runLauncher(t, dir, nil, "build")
 	if code != 42 {
 		t.Fatalf("code = %d, want 42", code)
 	}
@@ -202,10 +202,10 @@ func TestLauncherFromGoNotInherited(t *testing.T) {
 	}
 	dir := launcherSetup(t, true)
 	help := "printf 'from=%s\\n' \"${DEVZONE_FROM_GO-unset}\"; exit 42\n"
-	if err := os.WriteFile(filepath.Join(dir, "devzone-platform.sh"), []byte(help), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "workspace-build.sh"), []byte(help), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	out, code := runLauncher(t, dir, []string{"DEVZONE_FROM_GO=1"}, "ported")
+	out, code := runLauncher(t, dir, []string{"DEVZONE_FROM_GO=1"}, "build")
 	if code != 42 || !strings.Contains(out, "from=unset") {
 		t.Fatalf("code = %d, out = %q, want 42 and from=unset", code, out)
 	}

@@ -13,17 +13,7 @@ import (
 // command can reach the case without a pod binary or a full devzone checkout.
 func launcherWithoutBinary(t *testing.T) string {
 	t.Helper()
-	dir := launcherSetup(t, false)
-	for _, name := range []string{
-		"state-gitops.sh", "devzone-platform.sh", "devzone-status.sh",
-	} {
-		p := filepath.Join(dir, name)
-		os.MkdirAll(filepath.Dir(p), 0o755)
-		if err := os.WriteFile(p, []byte("devzone_aide() { :; }\n"), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
-	return dir
+	return launcherSetup(t, false)
 }
 
 // TestLauncherAgentWithoutPodBinary checks that `devzone agent` without the pod

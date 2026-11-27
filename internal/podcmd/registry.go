@@ -135,6 +135,10 @@ func newDefaultRegistry() *cli.Registry {
 		Name: "apply",
 		Run:  runApply,
 	})
+	r.Register(cli.Command{
+		Name: "platform",
+		Run:  runPlatform,
+	})
 	return r
 }
 

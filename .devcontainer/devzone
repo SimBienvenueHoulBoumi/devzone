@@ -77,24 +77,7 @@ IA_OPENCODE=opencode-ai@1.19.6
 IA_PAQUETS=("$IA_CLAUDE" "$IA_OPENCODE")
 IA_NOMS=("${IA_CLAUDE%@*}" "${IA_OPENCODE%@*}")
 
-# glab (GitLab CLI), installed only when the gitlab platform is chosen: binary
-# of the official release (gitlab.com/gitlab-org/cli) in ~/.local/bin, SHA-256
-# sum of its archive checked; removed when going back to github. All its calls
-# go through this path (never PATH: ~/.local/bin is not necessarily in it); the
-# state and the login too.
-GLAB="$HOME/.local/bin/glab"
-GLAB_VERSION=v1.126.0
-GLAB_SOMME_ARM64=de5e92c9c8b306eeebb19daa854d48101b78328850e7b9cd677ecd6f98cd4391
-GLAB_SOMME_AMD64=f386519ba83e9482979992ee7f60eeebee4d95b950f95f4fe7289e0a1b1ea74c
-# gitlab module instance: its default URL and the root token of its seed
-GITLAB_URL_MODULE=http://gitlab.localhost:8929
 
-# Functions of devzone, by topic (sourced here, defined before any command runs)
-# The modules (enable, disable, is-enabled, apply) and their services are handled
-# by the Go command of the pod (#882, #885).
-# shellcheck source=SCRIPTDIR/devzone-platform.sh
-# shellcheck disable=SC1091
-. "$ICI/devzone-platform.sh"
 
 case "${1:-}" in
     "" | status | modules)
@@ -128,7 +111,7 @@ case "${1:-}" in
         ;;
     # Go only: reached when the binary did not take the call. Never call
     # "devzone" again from here, it would loop forever, see #864
-    -h | --help | help | repair | apply-repowarden | cluster | clusters | metrics | use | kube | ai | agent | postgres | mysql | gitlab | test-gitlab | catalog | catalog-watcher | enable | disable | is-enabled | apply)
+    -h | --help | help | repair | apply-repowarden | cluster | clusters | metrics | use | kube | ai | agent | postgres | mysql | gitlab | test-gitlab | catalog | catalog-watcher | enable | disable | is-enabled | apply | platform)
         echo "devzone $1: Go binary of the pod unavailable (.devcontainer/bin)" >&2
         exit 1
         ;;
@@ -149,13 +132,6 @@ case "${1:-}" in
         exit 1
         ;;
     test-bash32) bash "$RACINE/manage/test/bash32.sh" ;;
-    platform)
-        if [ -n "${2:-}" ]; then
-            change_platform "${@:2}"
-        else
-            platform_summary
-        fi
-        ;;
     *)
         echo "devzone : unknown command : $1 (devzone --help)" >&2
         exit 1
