@@ -32,7 +32,7 @@ func newFixture(answers string, found bool) *fixture {
 		Runner: f.runner,
 		LookPath: func(file string) (string, error) {
 			if file == "minikube" && f.found {
-				return "/usr/local/bin/minikube", nil
+				return file, nil
 			}
 			return "", errNotFound
 		},

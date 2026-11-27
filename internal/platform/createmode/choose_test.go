@@ -16,7 +16,7 @@ func modeLookPath(names ...string) func(string) (string, error) {
 	return func(name string) (string, error) {
 		for _, n := range names {
 			if n == name {
-				return "/fake/" + name, nil
+				return name, nil
 			}
 		}
 		return "", errors.New(name + " not found")

@@ -12,25 +12,19 @@ import (
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec/fake"
 )
 
-// createModeRun runs the internal command with a fake runner and only the named
-// programs in PATH; no real cluster, script or program is used.
+// createModeRun runs the internal command with a fake runner and an injected
+// lookup that finds only the named programs; no real cluster, script or program
+// is used, and the PATH is left alone. Stdin is empty, so no menu can open.
 func createModeRun(t *testing.T, args, programs []string, setup func(*fake.Runner)) (int, string, string) {
 	t.Helper()
 	t.Setenv("DEVZONE_TERMINAL", "")
-	dir := t.TempDir()
-	for _, name := range programs {
-		if err := os.WriteFile(filepath.Join(dir, name), nil, 0o755); err != nil {
-			t.Fatalf("write fake program %s: %v", name, err)
-		}
-	}
-	t.Setenv("PATH", dir)
 	r := fake.New()
 	if setup != nil {
 		setup(r)
 	}
 	var out, errOut bytes.Buffer
-	ctx := &cli.Context{Args: args, Out: &out, Err: &errOut, Runner: r}
-	return createModeCommand(ctx), out.String(), errOut.String()
+	ctx := &cli.Context{Args: args, Out: &out, Err: &errOut, Stdin: strings.NewReader(""), Runner: r}
+	return createModeCommandWith(ctx, programLookPath(programs...)), out.String(), errOut.String()
 }
 
 // createModeReady programs a reachable devzone context for the command tests.
@@ -84,8 +78,10 @@ func TestCreateModeWrite(t *testing.T) {
 // when DEVZONE_NO_START is set.
 func TestCreateModeStartPrinted(t *testing.T) {
 	t.Setenv("DEVZONE_NO_START", "1")
-	code, out, errOut := createModeRun(t, []string{"start", "/new/folder", "/package/manage/workspace.sh"}, nil, nil)
-	if code != 0 || !strings.Contains(out, "To start the workspace: cd /new/folder") || errOut != "" {
+	folder := filepath.Join(t.TempDir(), "new")
+	script := filepath.Join(t.TempDir(), "workspace.sh")
+	code, out, errOut := createModeRun(t, []string{"start", folder, script}, nil, nil)
+	if code != 0 || !strings.Contains(out, "To start the workspace: cd "+folder) || errOut != "" {
 		t.Fatalf("code = %d, stdout = %q, stderr = %q", code, out, errOut)
 	}
 }

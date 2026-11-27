@@ -1,6 +1,7 @@
 package createmode
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -13,11 +14,12 @@ import (
 func TestStartOnlyPrinted(t *testing.T) {
 	t.Setenv("DEVZONE_NO_START", "1")
 	t.Setenv("DEVZONE_WORKSPACE_SH", "")
+	folder := filepath.Join(t.TempDir(), "new")
 	s, r, out, _ := modeSession(t, nil, nil)
-	if err := s.Start("/new/folder", "/package/manage/workspace.sh"); err != nil {
+	if err := s.Start(folder, filepath.Join(t.TempDir(), "workspace.sh")); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
-	if !strings.Contains(out.String(), "To start the workspace: cd /new/folder && devzone workspace start") {
+	if !strings.Contains(out.String(), "To start the workspace: cd "+folder+" && devzone workspace start") {
 		t.Fatalf("out = %q", out.String())
 	}
 	if len(r.Calls()) != 0 {
@@ -29,13 +31,14 @@ func TestStartOnlyPrinted(t *testing.T) {
 // folder and that its output is forwarded.
 func TestStartRunsFromFolder(t *testing.T) {
 	t.Setenv("DEVZONE_NO_START", "")
-	t.Setenv("DEVZONE_WORKSPACE_SH", "/fake/ws.sh")
+	script := filepath.Join(t.TempDir(), "ws.sh")
+	t.Setenv("DEVZONE_WORKSPACE_SH", script)
 	setup := func(r *fake.Runner) {
-		r.On("bash", []string{"/fake/ws.sh", "start"}, exec.Result{Stdout: []byte("workspace start in folder\n")})
+		r.On("bash", []string{script, "start"}, exec.Result{Stdout: []byte("workspace start in folder\n")})
 	}
 	s, r, out, errOut := modeSession(t, nil, setup)
 	folder := t.TempDir()
-	if err := s.Start(folder, "/package/manage/workspace.sh"); err != nil {
+	if err := s.Start(folder, filepath.Join(t.TempDir(), "workspace.sh")); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
 	calls := r.Calls()
@@ -54,15 +57,17 @@ func TestStartRunsFromFolder(t *testing.T) {
 // keeps the folder by returning an error.
 func TestStartFailure(t *testing.T) {
 	t.Setenv("DEVZONE_NO_START", "")
-	t.Setenv("DEVZONE_WORKSPACE_SH", "/fake/ws.sh")
+	script := filepath.Join(t.TempDir(), "ws.sh")
+	t.Setenv("DEVZONE_WORKSPACE_SH", script)
 	setup := func(r *fake.Runner) {
-		r.On("bash", []string{"/fake/ws.sh", "start"}, exec.Result{Code: 1})
+		r.On("bash", []string{script, "start"}, exec.Result{Code: 1})
 	}
+	folder := filepath.Join(t.TempDir(), "new")
 	s, _, _, errOut := modeSession(t, nil, setup)
-	if err := s.Start("/new/folder", "/package/manage/workspace.sh"); err == nil {
+	if err := s.Start(folder, filepath.Join(t.TempDir(), "workspace.sh")); err == nil {
 		t.Fatal("Start must fail")
 	}
-	want := "✖ Workspace not started. The folder is ready: only the start remains (cd /new/folder && devzone workspace start)"
+	want := "✖ Workspace not started. The folder is ready: only the start remains (cd " + folder + " && devzone workspace start)"
 	if !strings.Contains(errOut.String(), want) {
 		t.Fatalf("err = %q; want %q", errOut.String(), want)
 	}

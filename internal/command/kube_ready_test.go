@@ -2,8 +2,6 @@ package command
 
 import (
 	"bytes"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -12,24 +10,18 @@ import (
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec/fake"
 )
 
-// kubeReadyRun runs the internal command with a fake runner and with only the
-// named programs in PATH, so no real cluster or installed program is touched.
+// kubeReadyRun runs the internal command with a fake runner and an injected
+// lookup that finds only the named programs, so no cluster, PATH or installed
+// program is touched.
 func kubeReadyRun(t *testing.T, args, programs []string, setup func(*fake.Runner)) (int, string, string, *fake.Runner) {
 	t.Helper()
-	dir := t.TempDir()
-	for _, name := range programs {
-		if err := os.WriteFile(filepath.Join(dir, name), nil, 0o755); err != nil {
-			t.Fatalf("write fake program %s: %v", name, err)
-		}
-	}
-	t.Setenv("PATH", dir)
 	r := fake.New()
 	if setup != nil {
 		setup(r)
 	}
 	var out, errOut bytes.Buffer
 	ctx := &cli.Context{Args: args, Out: &out, Err: &errOut, Runner: r}
-	return kubeReadyCommand(ctx), out.String(), errOut.String(), r
+	return kubeReadyCommandWith(ctx, programLookPath(programs...)), out.String(), errOut.String(), r
 }
 
 // kubeReadyPrograms programs the fake answers of a reachable devzone context.

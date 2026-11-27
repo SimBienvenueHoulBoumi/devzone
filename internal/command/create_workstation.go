@@ -16,6 +16,12 @@ import (
 // first, then the creation options; a failure exits 1, a usage error 2 only
 // for a missing folder name.
 func createWorkstationCommand(ctx *cli.Context) int {
+	return createWorkstationCommandWith(ctx, exec.LookPath)
+}
+
+// createWorkstationCommandWith runs the command with an injected program lookup,
+// so the creation tests never depend on kubectl or helm being installed.
+func createWorkstationCommandWith(ctx *cli.Context, lookPath func(string) (string, error)) int {
 	out, errOut := ctx.Out, ctx.Err
 	if out == nil {
 		out = io.Discard
@@ -54,7 +60,7 @@ func createWorkstationCommand(ctx *cli.Context) int {
 		Out:        out,
 		Err:        errOut,
 		Runner:     runner,
-		LookPath:   exec.LookPath,
+		LookPath:   lookPath,
 		Terminal:   terminal,
 		StdinTTY:   tty,
 	}

@@ -27,7 +27,7 @@ func readyKube(r *fake.Runner) {
 // TestCreateWorkstationUsage checks a missing folder name is a usage error.
 func TestCreateWorkstationUsage(t *testing.T) {
 	ctx, _, errOut := ctxWith(nil, fake.New())
-	if code := createWorkstationCommand(ctx); code != 2 {
+	if code := createWorkstationCommandWith(ctx, programLookPath("kubectl", "helm")); code != 2 {
 		t.Fatalf("code=%d", code)
 	}
 	if !strings.Contains(errOut.String(), "usage") {
@@ -41,7 +41,7 @@ func TestCreateWorkstationUnknownOption(t *testing.T) {
 	dir := t.TempDir()
 	target := filepath.Join(dir, "mon")
 	ctx, _, errOut := ctxWith([]string{target, "--docker"}, fake.New())
-	if code := createWorkstationCommand(ctx); code != 1 {
+	if code := createWorkstationCommandWith(ctx, programLookPath("kubectl", "helm")); code != 1 {
 		t.Fatalf("code=%d", code)
 	}
 	if !strings.Contains(errOut.String(), "unknown option: --docker") {
@@ -55,7 +55,7 @@ func TestCreateWorkstationUnknownOption(t *testing.T) {
 // TestCreateWorkstationGitopsNeedsValue checks a trailing --gitops is refused.
 func TestCreateWorkstationGitopsNeedsValue(t *testing.T) {
 	ctx, _, errOut := ctxWith([]string{filepath.Join(t.TempDir(), "mon"), "--gitops"}, fake.New())
-	if code := createWorkstationCommand(ctx); code != 1 {
+	if code := createWorkstationCommandWith(ctx, programLookPath("kubectl", "helm")); code != 1 {
 		t.Fatalf("code=%d", code)
 	}
 	if !strings.Contains(errOut.String(), "--gitops expects a value") {
@@ -93,7 +93,7 @@ func TestCreateWorkstationNoTerminalNotice(t *testing.T) {
 	runner := fake.New()
 	readyKube(runner)
 	ctx, out, errOut := ctxWith([]string{target, "--kubernetes"}, runner)
-	if code := createWorkstationCommand(ctx); code != 0 {
+	if code := createWorkstationCommandWith(ctx, programLookPath("kubectl", "helm")); code != 0 {
 		t.Fatalf("code=%d stderr=%s", code, errOut.String())
 	}
 	want := "⚠ no GitOps repository for Argo CD: pass --gitops <github|none|https://github.com/<login>/<name>.git> to create a devzone without a terminal; using none\n"
@@ -136,7 +136,7 @@ func TestCreateWorkstationCreates(t *testing.T) {
 	runner := fake.New()
 	readyKube(runner)
 	ctx, out, errOut := ctxWith([]string{target, "--kubernetes", "--gitops", "none"}, runner)
-	if code := createWorkstationCommand(ctx); code != 0 {
+	if code := createWorkstationCommandWith(ctx, programLookPath("kubectl", "helm")); code != 0 {
 		t.Fatalf("code=%d stderr=%s", code, errOut.String())
 	}
 	if !strings.Contains(out.String(), "devzone 1.2.3 created in") {
@@ -183,7 +183,7 @@ func TestCreateWorkstationDevNullStdinNoPrompt(t *testing.T) {
 	readyKube(runner)
 	ctx, _, errOut := ctxWith([]string{target, "--kubernetes"}, runner)
 	ctx.Stdin = null
-	if code := createWorkstationCommand(ctx); code != 0 {
+	if code := createWorkstationCommandWith(ctx, programLookPath("kubectl", "helm")); code != 0 {
 		t.Fatalf("code=%d stderr=%s", code, errOut.String())
 	}
 	if strings.Contains(errOut.String(), "GitOps repository for Argo CD?") {

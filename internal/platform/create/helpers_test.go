@@ -23,7 +23,7 @@ func readyRunner() *fake.Runner {
 // fakeLookPath finds kubectl and helm only, so no real PATH is consulted.
 func fakeLookPath(name string) (string, error) {
 	if name == "kubectl" || name == "helm" || name == "gh" {
-		return "/fake/" + name, nil
+		return name, nil
 	}
 	return "", os.ErrNotExist
 }

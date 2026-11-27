@@ -17,6 +17,12 @@ const createModeUsage = "✖ usage: devzone create-mode choose [--kubernetes] | 
 // still copies the package (#884). Notices go to stderr on choose so stdout
 // holds only the mode captured by that caller.
 func createModeCommand(ctx *cli.Context) int {
+	return createModeCommandWith(ctx, exec.LookPath)
+}
+
+// createModeCommandWith runs the command with an injected program lookup, so
+// tests decide which programs exist without touching the process PATH.
+func createModeCommandWith(ctx *cli.Context, lookPath func(string) (string, error)) int {
 	if len(ctx.Args) == 0 {
 		fmt.Fprintln(ctx.Err, createModeUsage)
 		return 2
@@ -38,7 +44,7 @@ func createModeCommand(ctx *cli.Context) int {
 	}
 	switch ctx.Args[0] {
 	case "choose":
-		return createModeChoose(ctx, out, errOut, runner, in)
+		return createModeChoose(ctx, out, errOut, runner, in, lookPath)
 	case "write":
 		if len(ctx.Args) != 3 {
 			fmt.Fprintln(errOut, createModeUsage)
@@ -54,7 +60,7 @@ func createModeCommand(ctx *cli.Context) int {
 			fmt.Fprintln(errOut, createModeUsage)
 			return 2
 		}
-		session := createModeSession(out, errOut, runner, in, false)
+		session := createModeSession(out, errOut, runner, in, false, lookPath)
 		if err := session.Start(ctx.Args[1], ctx.Args[2]); err != nil {
 			return 1
 		}
@@ -66,7 +72,7 @@ func createModeCommand(ctx *cli.Context) int {
 }
 
 // createModeChoose runs the mode decision and prints the chosen mode on stdout.
-func createModeChoose(ctx *cli.Context, out, errOut io.Writer, runner fexec.Runner, in io.Reader) int {
+func createModeChoose(ctx *cli.Context, out, errOut io.Writer, runner fexec.Runner, in io.Reader, lookPath func(string) (string, error)) int {
 	if len(ctx.Args) > 2 {
 		fmt.Fprintln(errOut, createModeUsage)
 		return 2
@@ -76,7 +82,7 @@ func createModeChoose(ctx *cli.Context, out, errOut io.Writer, runner fexec.Runn
 		option = ctx.Args[1]
 	}
 	terminal := option == "" && (os.Getenv("DEVZONE_TERMINAL") != "" || inTerminal(in))
-	session := createModeSession(errOut, errOut, runner, in, terminal)
+	session := createModeSession(errOut, errOut, runner, in, terminal, lookPath)
 	mode, ok := session.Choose(option)
 	if !ok {
 		return 1
@@ -85,11 +91,11 @@ func createModeChoose(ctx *cli.Context, out, errOut io.Writer, runner fexec.Runn
 	return 0
 }
 
-// createModeSession builds the platform session with the process program lookup.
-func createModeSession(out, errOut io.Writer, runner fexec.Runner, in io.Reader, terminal bool) *createmode.Session {
+// createModeSession builds the platform session with the given program lookup.
+func createModeSession(out, errOut io.Writer, runner fexec.Runner, in io.Reader, terminal bool, lookPath func(string) (string, error)) *createmode.Session {
 	return &createmode.Session{
 		Runner:   runner,
-		LookPath: exec.LookPath,
+		LookPath: lookPath,
 		In:       in,
 		Out:      out,
 		Err:      errOut,

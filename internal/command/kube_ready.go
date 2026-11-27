@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os/exec"
 
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/cli"
 	fexec "github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec"
@@ -15,6 +16,12 @@ import (
 // script (#884): the reason goes to stdout and status 0 means the cluster
 // answers. Keeping it internal avoids adding an entry to the user help.
 func kubeReadyCommand(ctx *cli.Context) int {
+	return kubeReadyCommandWith(ctx, exec.LookPath)
+}
+
+// kubeReadyCommandWith runs the command with an injected program lookup, so
+// tests never ask the process PATH whether kubectl or helm is installed.
+func kubeReadyCommandWith(ctx *cli.Context, lookPath func(string) (string, error)) int {
 	hint := false
 	for _, arg := range ctx.Args {
 		if arg != "--hint" {
@@ -27,7 +34,7 @@ func kubeReadyCommand(ctx *cli.Context) int {
 	if runner == nil {
 		runner = fexec.ExecRunner{}
 	}
-	reason, ready := workspace.KubeReady(kubeRunner{runner}, hint)
+	reason, ready := workspace.KubeReadyWith(kubeRunner{runner}, lookPath, hint)
 	if reason != "" {
 		fmt.Fprintln(ctx.Out, reason)
 	}
