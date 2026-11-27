@@ -3,6 +3,7 @@ package agent
 import (
 	"fmt"
 	"io"
+	"os/exec"
 )
 
 // ResumeSuffix appended to brief when resuming a previous session.
@@ -13,11 +14,12 @@ const NetworkRetries = 3
 
 // Options carries dependencies for `devzone agent`.
 type Options struct {
-	Runner  Runner
-	Clock   Clock
-	Starter SessionStarter
-	Out     io.Writer
-	Err     io.Writer
+	Runner   Runner
+	Clock    Clock
+	Starter  SessionStarter
+	LookPath func(string) (string, error)
+	Out      io.Writer
+	Err      io.Writer
 	// DevcontainerDir is $ICI (.devcontainer); agent.json + devzone + agent-rights.
 	DevcontainerDir string
 	// Racine is $RACINE (DEVZONE_ROOT or parent of DevcontainerDir).
@@ -51,6 +53,15 @@ func (o Options) starter() SessionStarter {
 		return ExecSessionStarter{}
 	}
 	return o.Starter
+}
+
+// lookPath returns the program lookup of this run. Tests inject it so they
+// never have to put a fake binary in PATH.
+func (o Options) lookPath() func(string) (string, error) {
+	if o.LookPath == nil {
+		return exec.LookPath
+	}
+	return o.LookPath
 }
 
 func (o Options) err() io.Writer {

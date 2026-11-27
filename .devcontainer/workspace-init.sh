@@ -4,6 +4,9 @@
 # step. No Docker socket is used and no kubeconfig is fabricated.
 set -uo pipefail
 
+# A crash must not leave a multi-gigabyte core file in a worktree (#961).
+ulimit -c 0 2>/dev/null || true
+
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VERSIONS_ENV="$HERE/versions.env"
 PROMPT_START="# >>> devzone prompt >>>"
@@ -77,6 +80,8 @@ init_prompt() {
     fi
     cat >>"$bashrc" <<'PROMPT'
 # >>> devzone prompt >>>
+# Interactive shells in the pod must not write core files either (#961).
+ulimit -c 0 2>/dev/null || true
 PS1='$(devzone kube prompt) '"$PS1"
 # <<< devzone prompt <<<
 PROMPT

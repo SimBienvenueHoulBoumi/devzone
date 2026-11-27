@@ -70,6 +70,9 @@ func TestAgentWorkspace(t *testing.T) {
 	if !hasKC(k, "exec devzone-workspace-0 -c workspace -- env DEVZONE_ROOT=/home/vscode/.local/share/devzone") {
 		t.Fatal("exec env", k.calls)
 	}
+	if !hasKC(k, "ulimit -c 0; devzone agent") {
+		t.Fatal("core dumps not disabled in the pod", k.calls)
+	}
 	if !hasKC(k, "/workspaces/projets/projet /tmp/devzone-agent-projet.md") {
 		t.Fatal("in-pod args", k.calls)
 	}
