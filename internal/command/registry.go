@@ -41,6 +41,10 @@ func newDefaultRegistry() *cli.Registry {
 		Run:  uninstallCommand,
 	})
 	r.Register(cli.Command{
+		Name: "update",
+		Run:  updateCommand,
+	})
+	r.Register(cli.Command{
 		Name: "cluster-offer",
 		Run:  clusterOfferCommand,
 	})

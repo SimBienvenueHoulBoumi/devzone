@@ -74,7 +74,7 @@ func TestOtherCommandsUseBash(t *testing.T) {
 		name string
 		args []string
 	}{
-		{"update", []string{"update"}},
+		{"ai", []string{"ai"}},
 		{"workspace ports restart", []string{"workspace", "ports", "restart"}},
 		{"workspace ports status extra", []string{"workspace", "ports", "status", "extra"}},
 		{"workspace nope", []string{"workspace", "nope"}},
