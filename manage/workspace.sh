@@ -122,10 +122,6 @@ shell_workspace() {
 
 # shellcheck source=manage/scripts/kube-ready.sh
 . "$HERE/scripts/kube-ready.sh"
-# shellcheck source=manage/scripts/workspace/ports-workspace.sh
-. "$HERE/scripts/workspace/ports-workspace.sh"
-# shellcheck source=manage/scripts/workspace/services-workspace.sh
-. "$HERE/scripts/workspace/services-workspace.sh"
 # shellcheck source=manage/scripts/workspace/argocd-workspace.sh
 . "$HERE/scripts/workspace/argocd-workspace.sh"
 # shellcheck source=manage/scripts/workspace/argocd-services.sh
@@ -138,7 +134,7 @@ case "${1:-}" in
     status) "${DEVZONE_HOST_BIN:?devzone: Go program not found (DEVZONE_HOST_BIN), run it through manage/devzone}" workspace status ;;
     shell) shell_workspace ;;
     ports) "${DEVZONE_HOST_BIN:?devzone: Go program not found (DEVZONE_HOST_BIN), run it through manage/devzone}" workspace ports "${@:2}" ;;
-    services) services "${@:2}" ;;
+    services) "${DEVZONE_HOST_BIN:?devzone: Go program not found (DEVZONE_HOST_BIN), run it through manage/devzone}" workspace services "${@:2}" ;;
     argocd) argocd_cmd "${@:2}" ;;
     egress) "${DEVZONE_HOST_BIN:?devzone: Go program not found (DEVZONE_HOST_BIN), run it through manage/devzone}" workspace egress "${@:2}" ;;
     '' | -h | --help | help)

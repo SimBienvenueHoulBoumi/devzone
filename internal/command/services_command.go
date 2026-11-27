@@ -23,7 +23,11 @@ func commandServices(args []string, out, errOut io.Writer) int {
 	}
 	held := service == "postgres" || service == "mysql"
 	if held && workspace.ArgoCDHoldsCharts(workspace.ExecRunner{}, modulesFile()) {
-		return delegate(append([]string{"workspace"}, args...), out, errOut)
+		if len(args) < 2 {
+			return 1
+		}
+		ctx := &cli.Context{Args: args, Out: out, Err: errOut}
+		return servicesArgocdToggle(ctx, service, args[1], args[3:])
 	}
 	env := workspace.ServicesEnv{
 		Runner:  workspace.ExecRunner{},

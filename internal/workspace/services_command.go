@@ -8,7 +8,7 @@ import (
 )
 
 // servicesAdminSA and the default token duration are the constants of
-// services-workspace.sh, shared with the pod installer.
+// workspace services (Go), shared with the pod installer.
 const (
 	servicesAdminSA = "devzone-services-admin"
 	servicesScript  = "/usr/local/share/devzone/.devcontainer/services-admin.sh"
@@ -50,7 +50,7 @@ type ServicesEnv struct {
 	Token   string
 }
 
-// Run dispatches enable, disable and seed, as services in services-workspace.sh.
+// Run dispatches enable, disable and seed, as services in workspace services (Go).
 func (e ServicesEnv) Run(args []string) int {
 	sub := ""
 	if len(args) > 0 {
@@ -165,7 +165,7 @@ func (e ServicesEnv) removeAdmin(flag []string) {
 }
 
 // adminManifest is the ServiceAccount and its cluster-admin binding, as in
-// services_admin_create of services-workspace.sh.
+// services_admin_create of workspace services (Go).
 func adminManifest() string {
 	return "apiVersion: v1\nkind: ServiceAccount\nmetadata:\n  name: " + servicesAdminSA +
 		"\n  namespace: " + namespace + "\n---\napiVersion: rbac.authorization.k8s.io/v1\n" +
