@@ -11,9 +11,11 @@ import (
 
 // PortsStatus writes the status of the workstation port watcher, as ports_status
 // does: the watcher line, then the automatic start of the watcher, the relays, the
-// ports reported taken, the relayed applications and those without a ready pod. It
-// reads the state folder of portsDir() and returns 0 even when that folder is
-// missing or unreadable.
+// ports reported taken, the relayed applications and those without a ready pod.
+// It repairs an automatic start that is present but not loaded, or missing while
+// still wanted, and says so in place of the enabled line. It reads the state
+// folder of portsDir() and returns 0 even when that folder is missing or
+// unreadable.
 func PortsStatus(out io.Writer) int {
 	dir := portsDir()
 	pid := readPid(filepath.Join(dir, "pid"))
@@ -22,7 +24,9 @@ func PortsStatus(out io.Writer) int {
 	} else {
 		fmt.Fprintln(out, "Port watcher: stopped")
 	}
-	if portsAutoStartActive() {
+	if line := portsRepairAutoStart(out); line != "" {
+		fmt.Fprintln(out, line)
+	} else if portsAutoStartActive() {
 		fmt.Fprintln(out, "Port watcher automatic start: enabled")
 	} else {
 		fmt.Fprintln(out, "Port watcher automatic start: disabled")

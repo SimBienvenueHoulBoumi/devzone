@@ -60,6 +60,7 @@ func PortsEnable(out, errOut io.Writer) int {
 			return portsEnableFailed(errOut, tool, next, status, wasRunning)
 		}
 	}
+	rememberPortsAutoStartWanted()
 	fmt.Fprintln(out, "✔ port watcher: automatic start enabled")
 	return 0
 }
@@ -76,6 +77,7 @@ func PortsDisable(out, errOut io.Writer) int {
 		return 0
 	}
 	existed := portsAgentExists()
+	wanted := portsAutoStartWanted()
 	tool := portsDaemonTool()
 	if existed {
 		args := portsDaemonDisableArgs()
@@ -92,6 +94,9 @@ func PortsDisable(out, errOut io.Writer) int {
 			return 1
 		}
 		portsDaemonReload(tool)
+	}
+	if wanted {
+		forgetPortsAutoStartWanted()
 	}
 	stopPorts()
 	if existed {

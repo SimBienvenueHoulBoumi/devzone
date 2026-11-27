@@ -131,6 +131,8 @@ func newLiveEnv(t *testing.T) *liveEnv {
 	t.Setenv("FAKE_LOG", "")
 	t.Setenv("FAKE_SS", listenLine(le.port))
 	t.Setenv("FAKE_CONTEXTS", "")
+	t.Setenv("DEVZONE_ROOT", le.h.dir)
+	writeFile(t, filepath.Join(le.h.dir, ".devzone.modules"), "")
 	t.Cleanup(le.reap)
 	return le
 }
