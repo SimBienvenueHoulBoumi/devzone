@@ -98,12 +98,9 @@ case "${1:-}" in
             exit 127
         fi
         ;;
-    build)
-        bash "$ICI/workspace-build.sh" "${@:2}"
-        ;;
     # Go only: reached when the binary did not take the call. Never call
     # "devzone" again from here, it would loop forever, see #864
-    -h | --help | help | repair | apply-repowarden | cluster | clusters | metrics | use | kube | ai | agent | postgres | mysql | gitlab | test-gitlab | catalog | catalog-watcher | enable | disable | is-enabled | apply | platform)
+    -h | --help | help | repair | apply-repowarden | cluster | clusters | metrics | use | kube | ai | agent | build | postgres | mysql | gitlab | test-gitlab | catalog | catalog-watcher | enable | disable | is-enabled | apply | platform)
         echo "devzone $1: Go binary of the pod unavailable (.devcontainer/bin)" >&2
         exit 1
         ;;

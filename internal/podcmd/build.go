@@ -20,8 +20,7 @@ func buildRefusal(ctx *cli.Context) int {
 
 // runBuild handles the build command of the pod in Go: it runs the BuildKit
 // client of the workspace sidecar in the foreground, with the folder and the
-// optional image tag of the removed workspace-build.sh, and returns the status
-// of buildctl.
+// optional image tag given by the caller, and returns the status of buildctl.
 func runBuild(ctx *cli.Context) int {
 	if os.Getenv("DEVZONE_WORKSPACE") != "kubernetes" {
 		return buildRefusal(ctx)

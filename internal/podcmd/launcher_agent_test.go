@@ -99,7 +99,7 @@ func TestAgentCommandListsKeepAgent(t *testing.T) {
 		file  string
 		names []string
 	}{
-		{"../../.devcontainer/devzone", []string{"agent", "postgres", "mysql", "gitlab", "test-gitlab", "catalog", "catalog-watcher"}},
+		{"../../.devcontainer/devzone", []string{"agent", "build", "postgres", "mysql", "gitlab", "test-gitlab", "catalog", "catalog-watcher"}},
 		{"../../manage/devzone", []string{"agent", "catalog", "catalog-watcher", "ai", "apply"}},
 	} {
 		data, err := os.ReadFile(tc.file)
