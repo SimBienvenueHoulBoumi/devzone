@@ -192,7 +192,11 @@ func (m *module) servicesSecretAdmin(svc, ns, secret string) int {
 		}
 	}
 	if password != "" {
-		return nilErr(writeFile0600(file, []byte(password)))
+		if err := writeFile0600(file, []byte(password)); err != nil {
+			return 1
+		}
+		m.regenerateCredentials()
+		return 0
 	}
 	if data, err := os.ReadFile(file); err == nil && len(data) > 0 {
 		password = string(data)
@@ -207,14 +211,10 @@ func (m *module) servicesSecretAdmin(svc, ns, secret string) int {
 	if err != nil || res.Code != 0 {
 		return 1
 	}
-	return nilErr(writeFile0600(file, []byte(password)))
-}
-
-// nilErr converts error to exit code.
-func nilErr(err error) int {
-	if err != nil {
+	if err := writeFile0600(file, []byte(password)); err != nil {
 		return 1
 	}
+	m.regenerateCredentials()
 	return 0
 }
 

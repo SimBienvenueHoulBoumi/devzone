@@ -11,6 +11,7 @@ import (
 
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/domain/argocd"
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/cli"
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/workspace"
 )
 
 // TestWorkstationArgoCDCommands checks that init, apply and app reach the
@@ -20,7 +21,13 @@ func TestWorkstationArgoCDCommands(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv("DEVZONE_ROOT", root)
 	previous := workstationArgoCDRun
-	t.Cleanup(func() { workstationArgoCDRun = previous })
+	installed, holds := commandArgoCDInstalled, commandArgoCDHoldsCharts
+	t.Cleanup(func() {
+		workstationArgoCDRun = previous
+		commandArgoCDInstalled, commandArgoCDHoldsCharts = installed, holds
+	})
+	commandArgoCDInstalled = func(workspace.Runner) bool { return true }
+	commandArgoCDHoldsCharts = func(workspace.Runner, string) bool { return false }
 	var calls [][]string
 	var seen argocd.Options
 	workstationArgoCDRun = func(_ context.Context, args []string, _, _ io.Writer, opts argocd.Options) int {

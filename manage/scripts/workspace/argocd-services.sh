@@ -6,8 +6,6 @@
 #   workspace_deploy <repository> <tag> <with-image>   start: Application, else helm direct
 #   workspace_undeploy                                 stop: Application, else helm uninstall
 #   argocd_toggle enable|disable                       devzone workspace services … argocd
-#   services_secret_postgres                           postgres secret created apart
-#   postgres_argocd enable|disable [--yes]             postgres: [services] written, then reconciled
 #   argocd_cmd status | init | apply | app add|list|remove   devzone workspace argocd …
 # Secrets stay out of Git: created here, only referenced by the charts.
 # bash 3.2 (macOS).
@@ -62,13 +60,7 @@ argocd_kubectl() { ak "$@"; }
 
 # workspace start and argocd apply: the declarations of .argocd.conf held
 argocd_reconcile() {
-    argocd_installed || return 0
-    gitops_init || return 1
-    gitops_root || return 1
-    apps_reconcile
-    if argocd_holds_charts; then
-        services_reconcile
-    fi
+    "${DEVZONE_HOST_BIN:?devzone: Go program not found (DEVZONE_HOST_BIN), run it through manage/devzone}" workspace argocd reconcile
 }
 
 # Root token of the devzone GitLab for app add: the file of the workstation,
@@ -146,11 +138,6 @@ argocd_toggle() {
         disable) argocd_uninstall && state_note argocd off ;;
     esac
 }
-
-# Service hooks (secrets, mysql chart parameters, services switch)
-# shellcheck source=argocd-services-svc.sh
-# shellcheck disable=SC1091
-. "$(dirname "${BASH_SOURCE[0]}")/argocd-services-svc.sh"
 
 # devzone workspace argocd status | app …
 argocd_cmd() {
