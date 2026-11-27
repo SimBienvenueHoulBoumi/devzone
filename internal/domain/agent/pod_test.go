@@ -55,7 +55,7 @@ func TestBuildManifest(t *testing.T) {
 		"subPath: devzone-wt/dz-222", "mountPath: " + folder, "subPath: devzone/.git", "mountPath: " + filepath.Join(root, "devzone", ".git"),
 		"name: agent-dz-222-test-consigne", "mountPath: /agent-consigne", "readOnly: true",
 		"mountPath: /workspaces/projets/.devzone.modules", "subPath: .devzone.modules",
-		"devzone agent --local " + folder + " /agent-consigne/consigne.md", "exit \\$code",
+		"ulimit -c 0; devzone agent --local " + folder + " /agent-consigne/consigne.md", "exit \\$code",
 		"value: \"kubernetes\"", `value: "/workspaces/projets"`,
 		"claimName: workspace-devzone-workspace-0", "claimName: etat-devzone-workspace-0",
 		"emptyDir:", "sizeLimit: 256Mi", "mountPath: /workspaces/projets/workspace",

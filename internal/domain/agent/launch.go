@@ -108,7 +108,7 @@ func AgentLaunch(ctx context.Context, opts Options, folder, brief string) int {
 		ModelRequestedChosen(m, journal, requested)
 		appendLine(journal, "=== model opencode/"+m+" start "+clock.Now().UTC().Format("2006-01-02T15:04:05Z"))
 		offset := int64(fileSize(journal))
-		proc, err := OpenCodeLaunch(ctx, r, opts.starter(), folder, m, briefCurrent, journal, state, local)
+		proc, err := OpenCodeLaunch(ctx, r, opts.lookPath(), opts.starter(), folder, m, briefCurrent, journal, state, local)
 		if err != nil {
 			// could not start: treat as error on this model, next
 			appendLine(journal, "=== opencode/"+m+" stopped on error (code 127): next model")
