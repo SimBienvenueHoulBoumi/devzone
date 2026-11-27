@@ -37,7 +37,7 @@ func newStartHarness(t *testing.T) *startHarness {
 		},
 		Wait:       func(image string) int { h.calls = append(h.calls, "wait "+image); return h.status },
 		Guard:      func() { h.calls = append(h.calls, "guard") },
-		PortsStart: func() { h.calls = append(h.calls, "ports") },
+		PortsStart: func() int { h.calls = append(h.calls, "ports"); return 0 },
 	}
 	return h
 }
@@ -137,5 +137,31 @@ func TestArgoCDWantedAndInstalled(t *testing.T) {
 	r := &fakeRunner{replies: []reply{{match: "get namespace devzone-argocd", status: 1}}}
 	if ArgoCDInstalled(r) {
 		t.Fatal("a namespace that cannot be found counts as installed")
+	}
+}
+
+// TestStartEnablesArgoCDThenReconciles checks the order of start_workspace:
+// Argo CD is enabled before the deploy, and the declarations are reconciled
+// right after it, before the pod wait.
+func TestStartEnablesArgoCDThenReconciles(t *testing.T) {
+	h := newStartHarness(t)
+	h.env.EnableArgoCD = func() { h.calls = append(h.calls, "enable") }
+	h.env.Reconcile = func() int { h.calls = append(h.calls, "reconcile"); return 1 }
+	if status := h.env.Run(nil); status != 0 {
+		t.Fatalf("status = %d, errOut = %q", status, h.errOut.String())
+	}
+	want := "enable deploy " + imageRepo + ":latest no reconcile wait " + imageRepo + ":latest guard ports"
+	if strings.Join(h.calls, " ") != want {
+		t.Fatalf("calls = %q, want %q", h.calls, want)
+	}
+}
+
+// TestStartKeepsPortsFailureStatus checks that a refused port watcher start
+// keeps its status, as the last command of the shell function did.
+func TestStartKeepsPortsFailureStatus(t *testing.T) {
+	h := newStartHarness(t)
+	h.env.PortsStart = func() int { h.calls = append(h.calls, "ports"); return 1 }
+	if status := h.env.Run(nil); status != 1 {
+		t.Fatalf("status = %d, want 1 from the port watcher", status)
 	}
 }

@@ -218,7 +218,9 @@ case "${1:-}" in
         "${DEVZONE_HOST_BIN:?devzone: Go program not found (DEVZONE_HOST_BIN), run it through manage/devzone}" uninstall "${@:2}"
         ;;
     workspace)
-        bash "$PAQUET/manage/workspace.sh" "${@:2}"
+        # The workspace is Go since #934: the bash entry point only forwards to
+        # the Go program, as update and uninstall do, so no logic stays here.
+        "${DEVZONE_HOST_BIN:?devzone: Go program not found (DEVZONE_HOST_BIN), run it through manage/devzone}" workspace "${@:2}"
         ;;
     -*)
         echo "✖ option inconnue : $1 (devzone --help)" >&2

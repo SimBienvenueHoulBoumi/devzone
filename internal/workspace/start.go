@@ -22,22 +22,24 @@ func ArgoCDInstalled(r Runner) bool {
 // libraries are ported. Every external action is injected, so no test starts
 // a watcher or reaches a cluster.
 type StartEnv struct {
-	Runner     Runner
-	Modules    string
-	Root       string
-	Out        io.Writer
-	ErrOut     io.Writer
-	Ready      func() (string, bool)
-	Deploy     func(repository, tag string, withImage bool) int
-	Reconcile  func() int
-	Wait       func(image string) int
-	Guard      func()
-	PortsStart func()
+	Runner       Runner
+	Modules      string
+	Root         string
+	Out          io.Writer
+	ErrOut       io.Writer
+	Ready        func() (string, bool)
+	EnableArgoCD func()
+	Deploy       func(repository, tag string, withImage bool) int
+	Reconcile    func() int
+	Wait         func(image string) int
+	Guard        func()
+	PortsStart   func() int
 }
 
-// Run parses --image, deploys the chart, waits for the pod, installs the guard
-// of the agents and starts the port watcher, as start_workspace does. The
-// automatic start of the watcher is added by the command layer afterwards.
+// Run parses --image, enables Argo CD when the workstation wants it, deploys the
+// chart, reconciles the Applications, waits for the pod, installs the guard of
+// the agents and starts the port watcher, as start_workspace does. The automatic
+// start of the watcher is added by the command layer afterwards.
 func (e StartEnv) Run(args []string) int {
 	repository, tag, withImage, ok := e.options(args)
 	if !ok {
@@ -48,15 +50,16 @@ func (e StartEnv) Run(args []string) int {
 		return 1
 	}
 	image := repository + ":" + tag
+	e.enableArgoCD()
 	if status := e.deploy(repository, tag, withImage); status != 0 {
 		return status
 	}
+	e.reconcile()
 	if status := e.wait(image); status != 0 {
 		return status
 	}
 	e.guard()
-	e.startPorts()
-	return 0
+	return e.startPorts()
 }
 
 // options reads the only option of start, --image <repository:tag>.
@@ -108,6 +111,23 @@ func (e StartEnv) ready() (string, bool) {
 	return KubeReady(e.Runner, true)
 }
 
+// enableArgoCD installs Argo CD when the workstation wants it. A failure is
+// only a warning: the deploy then falls back to the direct chart, as the shell
+// did with "|| echo warning".
+func (e StartEnv) enableArgoCD() {
+	if e.EnableArgoCD != nil {
+		e.EnableArgoCD()
+	}
+}
+
+// reconcile follows the Argo CD declarations after the deploy. Its failure is
+// ignored, as the shell's "|| true": the workspace itself is already declared.
+func (e StartEnv) reconcile() {
+	if e.Reconcile != nil {
+		_ = e.Reconcile()
+	}
+}
+
 func (e StartEnv) deploy(repository, tag string, withImage bool) int {
 	if e.Deploy != nil {
 		return e.Deploy(repository, tag, withImage)
@@ -132,12 +152,11 @@ func (e StartEnv) guard() {
 	AgentsGuard(e.Runner, e.Out)
 }
 
-func (e StartEnv) startPorts() {
+func (e StartEnv) startPorts() int {
 	if e.PortsStart != nil {
-		e.PortsStart()
-		return
+		return e.PortsStart()
 	}
-	_ = PortsStart(io.Discard, e.ErrOut)
+	return PortsStart(e.Out, e.ErrOut)
 }
 
 // Undeploy removes the helm release of the workspace, as workspace_undeploy

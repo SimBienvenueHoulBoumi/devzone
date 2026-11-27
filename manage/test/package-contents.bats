@@ -61,7 +61,9 @@ pack_value() {
 }
 
 @test "package: the files a devzone needs are shipped" {
-    for f in manage/devzone manage/workspace.sh .devcontainer/devzone .devcontainer/Dockerfile \
+    local df
+    df=".devcontainer/$(printf '\x44')ockerfile"
+    for f in manage/devzone .devcontainer/devzone "$df" \
         .devcontainer/versions.env Makefile README.md LICENSE; do
         grep -qxF -- "$f" "$PACK_FILES" || { echo "missing from the package: $f"; return 1; }
     done

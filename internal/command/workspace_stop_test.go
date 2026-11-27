@@ -72,17 +72,18 @@ func TestWorkspaceStopRunsInGo(t *testing.T) {
 	}
 }
 
-// TestWorkspaceStopWithWordsIsDelegated keeps the delegation of stop with extra
-// words to the bash entry point, which the Go command must not answer itself.
-func TestWorkspaceStopWithWordsIsDelegated(t *testing.T) {
-	requireBash(t)
-	entry(t, echoArgs+"\nexit 4\n")
+// TestWorkspaceStopWithExtraWordsIsIgnored checks that extra words after stop
+// are ignored in Go, as the shell entry point ignored them.
+func TestWorkspaceStopWithExtraWordsIsIgnored(t *testing.T) {
+	r := &stopRunner{}
+	useStopTools(t, r, fake.New())
 	var out, errOut bytes.Buffer
-	if got := Run([]string{"workspace", "stop", "extra"}, &out, &errOut); got != 4 {
-		t.Fatalf("exit status = %d, want 4 (propagated from bash)", got)
+	if got := Run([]string{"workspace", "stop", "extra"}, &out, &errOut); got != 0 {
+		t.Fatalf("exit status = %d, want 0 (stderr %q)", got, errOut.String())
 	}
-	if out.String() != "args:[workspace][stop][extra]\n" {
-		t.Fatalf("stdout = %q", out.String())
+	want := "helm uninstall devzone-workspace --namespace devzone-workspace\n"
+	if out.String() != want {
+		t.Fatalf("stdout = %q, want %q from Go", out.String(), want)
 	}
 }
 

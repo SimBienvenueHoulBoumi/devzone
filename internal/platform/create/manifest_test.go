@@ -46,17 +46,10 @@ func TestWriteManifest(t *testing.T) {
 		t.Fatalf("not sorted: %v", rels)
 	}
 	for _, want := range []string{"Makefile", "README.md", "LICENSE", ".gitattributes",
-		".devcontainer/devzone", "manage/scripts/uninstall.sh", "manage/workspace.sh"} {
+		".devcontainer/devzone", "manage/scripts/uninstall.sh"} {
 		if !strings.Contains(string(data), "  "+want+"\n") {
-			// manage/workspace.sh is not a package item; only listed if under a copied root
-			if want == "manage/workspace.sh" {
-				continue
-			}
 			t.Fatalf("%s not listed:\n%s", want, data)
 		}
-	}
-	if strings.Contains(string(data), "manage/workspace.sh") {
-		t.Fatalf("manage/workspace.sh listed:\n%s", data)
 	}
 }
 

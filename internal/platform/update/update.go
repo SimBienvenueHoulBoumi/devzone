@@ -37,7 +37,7 @@ type Options struct {
 	Err       io.Writer
 	// RebuildCmd replaces "make -C <folder> rebuild" when set (DEVZONE_REBUILD)
 	RebuildCmd string
-	// PortsCmd replaces "bash manage/workspace.sh ports start" when set (DEVZONE_PORTS_RESTART)
+	// PortsCmd replaces "devzone workspace ports start" when set (DEVZONE_PORTS_RESTART)
 	PortsCmd string
 	// Now gives the time of the backup folder name; nil means the real clock
 	Now func() string
@@ -161,7 +161,7 @@ func restartPortsWatcher(o Options) {
 	if o.PortsCmd != "" {
 		code = o.Run(o.Folder, o.Out, o.Err, "sh", "-c", o.PortsCmd)
 	} else {
-		code = o.Run(o.Folder, o.Out, o.Err, "bash", "manage/workspace.sh", "ports", "start")
+		code = o.Run(o.Folder, o.Out, o.Err, "devzone", "workspace", "ports", "start")
 	}
 	if code != 0 {
 		fmt.Fprintln(o.Err, "devzone : port watcher not restarted: devzone workspace ports start")

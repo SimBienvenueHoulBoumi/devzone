@@ -1,13 +1,11 @@
 package command
 
 import (
-	"os"
-
-	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/cli"
-	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/cli"
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec/fake"
 )
 
 // runWorkspace runs workspaceCommand with the given args and returns the stderr
@@ -98,66 +96,44 @@ func TestCloneWithTooManyWordsGivesUsage(t *testing.T) {
 	}
 }
 
-// fakeKubectlLogging creates a fake kubectl script in a temp directory and
-// prepends it to PATH so that workspaceCommand runs as if via kubectl logging.
-// It returns the path to the kubectl log file.
-func fakeKubectlLogging(t *testing.T) string {
-	t.Helper()
-	dir := t.TempDir()
-	logPath := filepath.Join(dir, "kubectl.log")
-	if err := os.WriteFile(filepath.Join(dir, "kubectl"), []byte("#!/bin/sh\necho \"$*\" >>"+logPath+"\ncase \"$*\" in\n    *\"get pods\"*) echo 'devzone-workspace-0  1/1  Running' ;;\n    *\"exec\"*) cat >/dev/null ;;\nesac\n exit 0\n"), 0o755); err != nil {
-		t.Fatalf("failed to write fake kubectl: %v", err)
-	}
-	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
-	return logPath
-}
-
 // TestCloneRoutesUrlAndNameToGo checks that clone with a URL and a name routes
-// to /workspaces/projets/<name> and logs the URL.
+// to /workspaces/projets/<name> and runs the clone in the pod.
 func TestCloneRoutesUrlAndNameToGo(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("the fake kubectl is a shell script")
-	}
-	logPath := fakeKubectlLogging(t)
+	r := &statusRunner{}
+	useStopTools(t, r, fake.New())
 	var out, errOut strings.Builder
 	code := workspaceCommand(&cli.Context{Args: []string{"clone", "https://github.com/acme/mine.git", "custom"}, Out: &out, Err: &errOut})
 	if code != 0 {
 		t.Fatalf("exit status = %d, want 0", code)
 	}
-	logOutput, err := os.ReadFile(logPath)
-	if err != nil {
-		t.Fatalf("failed to read kubectl log: %v", err)
+	found := false
+	for _, c := range r.calls {
+		if strings.Contains(c, "/workspaces/projets/custom") && strings.Contains(c, "https://github.com/acme/mine.git") {
+			found = true
+		}
 	}
-	logStr := string(logOutput)
-	if !strings.Contains(logStr, "/workspaces/projets/custom") {
-		t.Fatalf("log does not contain /workspaces/projets/custom, got %q", logStr)
-	}
-	if !strings.Contains(logStr, "https://github.com/acme/mine.git") {
-		t.Fatalf("log does not contain https://github.com/acme/mine.git, got %q", logStr)
+	if !found {
+		t.Fatalf("kubectl not called with the clone of /workspaces/projets/custom: %v", r.calls)
 	}
 }
 
 // TestCloneRoutesUrlOnlyToGo checks that clone with only a URL routes to
-// /workspaces/projets/<last-segment-of-url> and logs the URL.
+// /workspaces/projets/<last-segment-of-url> and runs the clone in the pod.
 func TestCloneRoutesUrlOnlyToGo(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("the fake kubectl is a shell script")
-	}
-	logPath := fakeKubectlLogging(t)
+	r := &statusRunner{}
+	useStopTools(t, r, fake.New())
 	var out, errOut strings.Builder
 	code := workspaceCommand(&cli.Context{Args: []string{"clone", "https://github.com/acme/mine.git"}, Out: &out, Err: &errOut})
 	if code != 0 {
 		t.Fatalf("exit status = %d, want 0", code)
 	}
-	logOutput, err := os.ReadFile(logPath)
-	if err != nil {
-		t.Fatalf("failed to read kubectl log: %v", err)
+	found := false
+	for _, c := range r.calls {
+		if strings.Contains(c, "/workspaces/projets/mine") {
+			found = true
+		}
 	}
-	logStr := string(logOutput)
-	if !strings.Contains(logStr, "/workspaces/projets/mine") {
-		t.Fatalf("log does not contain /workspaces/projets/mine, got %q", logStr)
-	}
-	if strings.Contains(logStr, "/workspaces/projets/custom") {
-		t.Fatalf("log must not contain /workspaces/projets/custom, got %q", logStr)
+	if !found {
+		t.Fatalf("kubectl not called with the clone of /workspaces/projets/mine: %v", r.calls)
 	}
 }
