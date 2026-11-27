@@ -67,9 +67,8 @@ setup() {
     kind_vide
     export DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
     # Go binary of the pod, built outside the image: the launcher uses it for
-    # the commands ported to Go (help, repair, state helpers).
-    export DEVZONE_HOST_BIN="$BATS_TEST_TMPDIR/devzone-go"
-    (cd "$BATS_TEST_DIRNAME/../.." && go build -o "$DEVZONE_HOST_BIN" ./cmd/devzone-pod) || { echo "go build failed"; return 1; }
+    # the commands ported to Go (help, repair, state helpers). Built once per file.
+    devzone_go_pret ./cmd/devzone-pod
     # Pinned versions read from the files: an automatic bump (versions
     # workflow) does not break these tests
     REPOWARDEN_FIGE="$(sed -nE 's/^REPOWARDEN_VERSION=([^[:space:]]+)$/\1/p' "$BATS_TEST_DIRNAME/../../.devcontainer/versions.env" | head -1)"

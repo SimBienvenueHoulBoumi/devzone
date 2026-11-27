@@ -15,13 +15,21 @@ type kubeEnv struct {
 }
 
 // KubeReady reports whether kubectl and helm are present and the cluster
-// answers within five seconds, as kube_ready_reason in manage/scripts/kube-ready.sh.
-// It returns an empty reason and true when ready. With hint, the reason is the
-// user message ("✖ …" plus the contexts tip) instead of the short one. The
-// product-specific message of the shell original is retired here: the cluster
-// is described as it is, whatever machine it runs on.
+// answers within five seconds, as the former kube_ready_reason did. It returns
+// an empty reason and true when ready. With hint, the reason is the user message
+// ("✖ …" plus the contexts tip) instead of the short one. The wording is
+// product-neutral: the cluster is described as it is, wherever it runs.
 func KubeReady(r Runner, hint bool) (string, bool) {
-	return kubeEnv{runner: r, lookPath: exec.LookPath}.ready(hint)
+	return KubeReadyWith(r, exec.LookPath, hint)
+}
+
+// KubeReadyWith runs the check with an injected program lookup, so callers
+// outside this package can keep their tests independent of the process PATH.
+func KubeReadyWith(r Runner, lookPath func(string) (string, error), hint bool) (string, bool) {
+	if lookPath == nil {
+		lookPath = exec.LookPath
+	}
+	return kubeEnv{runner: r, lookPath: lookPath}.ready(hint)
 }
 
 // ready is the check itself. A missing program is reported before any call; a
@@ -40,9 +48,6 @@ func (e kubeEnv) ready(hint bool) (string, bool) {
 	}
 	context, server := e.describe(flag)
 	if hint {
-		if specific := unreachableHint(context, server); specific != "" {
-			return specific, false
-		}
 		return fmt.Sprintf("✖ Kubernetes cluster %s unreachable (%s)\n  Check the contexts: kubectl config get-contexts", context, server), false
 	}
 	return fmt.Sprintf("cluster %s unreachable (%s)", context, server), false

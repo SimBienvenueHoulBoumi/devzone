@@ -6,6 +6,8 @@
 # binary, to prove that the bridge towards bash does not loop.
 
 setup() {
+    load commun
+    devzone_go_pret
     RACINE="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
     # Real platform, read before the fake uname hides it
     HOST_OS="$(uname -s)"

@@ -3,15 +3,10 @@
 # the Go program's (internal/platform/update, `devzone update`): its tests are in Go.
 # The fake packages are built under $BATS_TEST_TMPDIR.
 
-setup_file() {
-    # The creation calls the Go program for its checks (#884): built once for the file
-    RACINE="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
-    export DEVZONE_HOST_BIN="$BATS_FILE_TMPDIR/devzone-go"
-    (cd "$RACINE" && go build -o "$DEVZONE_HOST_BIN" ./cmd/devzone) || { echo "go build failed"; return 1; }
-}
-
 setup() {
     load commun
+    # The creation calls the Go program for its checks (#884)
+    devzone_go_pret
     kube_isole
     cluster_pret
     RACINE="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
@@ -28,9 +23,8 @@ build_package() {
     cp "$CLI" "$folder/manage/devzone"
     chmod +x "$folder/manage/devzone"
     cp "$RACINE/.devcontainer/argocd/conf.sh" "$folder/.devcontainer/argocd/conf.sh"
-    # devzone <folder> sources the mode check (#497) from the package
-    cp "$RACINE/manage/scripts/create-mode.sh" "$RACINE/manage/scripts/kube-ready.sh" "$folder/manage/scripts/"
-    cp "$RACINE/manage/scripts/devzone-manifest.sh" "$RACINE/manage/scripts/devzone-create.sh" "$folder/manage/scripts/"
+    # Creation and update live in Go (#884); only the manifest is copied
+    cp "$RACINE/manage/scripts/devzone-manifest.sh" "$folder/manage/scripts/"
     printf '{"name":"devzone","version":"%s"}\n' "$version" >"$folder/package.json"
     printf '# makefile %s\n' "$mark" >"$folder/Makefile"
     printf '*.sh text eol=lf\n' >"$folder/.gitattributes"
