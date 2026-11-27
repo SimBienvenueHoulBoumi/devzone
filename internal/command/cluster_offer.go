@@ -13,8 +13,8 @@ import (
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/platform/clustermenu"
 )
 
-// clusterOfferCommand is called by manage/scripts/create-mode.sh when no cluster
-// answers at creation (#884): "devzone cluster-offer" shows the menu in a
+// clusterOfferCommand was called by the former create-mode.sh when no cluster
+// answered at creation (#884): "devzone cluster-offer" shows the menu in a
 // terminal and exits 0 once a cluster was selected or created. Without a
 // terminal (and DEVZONE_TERMINAL unset) nothing is asked and it exits 1. Not in
 // the help: internal.

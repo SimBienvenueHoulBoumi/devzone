@@ -47,9 +47,7 @@ create_workstation() {
     fi
 
     # Mode before any copy: --kubernetes without a cluster creates nothing (#497)
-    # shellcheck source=SCRIPTDIR/create-mode.sh
-    . "$PAQUET/manage/scripts/create-mode.sh"
-    create_mode_choose "$option" || exit 1
+    CREATE_MODE="$("${DEVZONE_HOST_BIN:?devzone: Go program not found (DEVZONE_HOST_BIN), run it through manage/devzone}" create-mode choose "$option")" || exit 1
 
     if [ -z "$gitops" ]; then
         if [ -t 0 ]; then
@@ -67,7 +65,7 @@ create_workstation() {
     : >"$target/.gitignore"
     complete_gitignore "$target"
     chmod +x "$target/manage/scripts/uninstall.sh"
-    create_mode_write "$target" "$CREATE_MODE"
+    "${DEVZONE_HOST_BIN:?devzone: Go program not found (DEVZONE_HOST_BIN), run it through manage/devzone}" create-mode write "$target" "$CREATE_MODE" || exit 1
     # The GitOps repository of the new devzone (#539): github, an existing URL,
     # or none, written in the .argocd.conf of the new devzone (conf.sh writes
     # the header of the file when absent)
@@ -105,6 +103,6 @@ create_workstation() {
     target="$(cd "$target" && pwd)"
     write_manifest "$target"
     echo "✔ devzone $(version) created in $target"
-    # The workspace goes to the cluster (kube check done by create_mode_choose)
-    create_mode_start "$target" "$PAQUET/manage/workspace.sh"
+    # The workspace goes to the cluster (kube check done by create-mode choose)
+    "${DEVZONE_HOST_BIN:?devzone: Go program not found (DEVZONE_HOST_BIN), run it through manage/devzone}" create-mode start "$target" "$PAQUET/manage/workspace.sh" || exit 1
 }

@@ -52,6 +52,10 @@ func newDefaultRegistry() *cli.Registry {
 		Name: "kube-ready",
 		Run:  kubeReadyCommand,
 	})
+	r.Register(cli.Command{
+		Name: "create-mode",
+		Run:  createModeCommand,
+	})
 	return r
 }
 
