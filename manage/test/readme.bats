@@ -7,6 +7,9 @@
 #   - the Makefile targets
 
 setup() {
+    load commun
+    # manage/devzone --help may reach the Go program through DEVZONE_HOST_BIN (#884)
+    devzone_go_pret
     RACINE="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
     AUTHORIZED=""
     : > "$BATS_TEST_TMPDIR/words.txt"
