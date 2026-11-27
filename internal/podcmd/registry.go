@@ -16,6 +16,12 @@ func newDefaultRegistry() *cli.Registry {
 			Run:  printVersion,
 		})
 	}
+	for _, name := range []string{"help", "-h", "--help"} {
+		r.Register(cli.Command{
+			Name: name,
+			Run:  printHelp,
+		})
+	}
 	r.Register(cli.Command{
 		Name: "agent",
 		Run:  runAgent,

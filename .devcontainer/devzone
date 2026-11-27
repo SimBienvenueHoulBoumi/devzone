@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2034 # shared variables, read by the sourced devzone-*.sh
-# devzone help (devzone --help): .devcontainer/help.sh, sourced below.
+# devzone help (devzone --help): the Go command of the pod, below.
 #
 # Per-instance state: $RACINE/.devzone.modules (a folder mounted from the host,
 # survives rebuilds), one line "module=on|off"; the chosen platform is kept
@@ -21,6 +21,7 @@ while [ -L "$SOURCE" ]; do
 done
 ICI="$(cd -P "$(dirname "$SOURCE")" && pwd)"
 # Go first (#754): a command ported to Go runs in the devzone-pod binary of the image.
+# DEVZONE_HOST_BIN also names that binary when a test builds it outside the image.
 # DEVZONE_NO_GO=1 forces the shell, DEVZONE_FROM_GO=1 avoids loops.
 # DEVZONE_FROM_GO only concerns this call: not inherited, so that a "devzone …"
 # run by this script reaches the Go command again (#864).
@@ -33,13 +34,13 @@ if [ -z "${DEVZONE_NO_GO:-}" ] && [ -z "$FROM_GO" ]; then
         *) POD_GO_ARCH="" ;;
     esac
     POD_GO="$ICI/bin/devzone-pod-$(uname -s | tr '[:upper:]' '[:lower:]')-$POD_GO_ARCH"
+    if [ -n "${DEVZONE_HOST_BIN:-}" ] && [ -x "$DEVZONE_HOST_BIN" ]; then
+        POD_GO="$DEVZONE_HOST_BIN"
+    fi
     if [ -n "$POD_GO_ARCH" ] && [ -x "$POD_GO" ] && "$POD_GO" handles "${1:-}" >/dev/null 2>&1; then
         DEVZONE_POD_SCRIPT="$ICI/devzone" exec "$POD_GO" "$@"
     fi
 fi
-# shellcheck source=SCRIPTDIR/help.sh
-# shellcheck disable=SC1091
-. "$ICI/help.sh"
 VERSIONS="$ICI/../manage/scripts/ci/versions.sh"
 # devzone folder (/workspaces/devzone); DEVZONE_ROOT for the tests
 RACINE="${DEVZONE_ROOT:-$(dirname "$ICI")}"
@@ -156,7 +157,7 @@ case "${1:-}" in
     repair) repair_workstation ;;
     # Go only: reached when the binary did not take the call. Never call
     # "devzone" again from here, it would loop forever, see #864
-    cluster | clusters | metrics | use | kube | ai | agent | postgres | mysql | gitlab | test-gitlab | catalog | catalog-watcher)
+    -h | --help | help | cluster | clusters | metrics | use | kube | ai | agent | postgres | mysql | gitlab | test-gitlab | catalog | catalog-watcher)
         echo "devzone $1: Go binary of the pod unavailable (.devcontainer/bin)" >&2
         exit 1
         ;;
@@ -176,7 +177,6 @@ case "${1:-}" in
         echo "devzone passwords: Go binary of the pod unavailable (.devcontainer/bin)" >&2
         exit 1
         ;;
-    -h | --help | help) devzone_aide ;;
     test-bash32) bash "$RACINE/manage/test/bash32.sh" ;;
     platform)
         if [ -n "${2:-}" ]; then

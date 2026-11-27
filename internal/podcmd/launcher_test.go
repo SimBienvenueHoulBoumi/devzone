@@ -21,7 +21,7 @@ func launcherSetup(t *testing.T, withBinary bool) string {
 	if err := os.WriteFile(filepath.Join(dir, "devzone"), src, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "help.sh"), []byte("echo SHELL-PATH-REACHED\nexit 42\n"), 0o755); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "devzone-modules.sh"), []byte("echo SHELL-PATH-REACHED\nexit 42\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -91,6 +91,27 @@ func TestLauncherRoutesAgentToGo(t *testing.T) {
 	}
 	if strings.Contains(out, "SHELL-PATH-REACHED") {
 		t.Fatalf("out = %q, must not contain %q", out, "SHELL-PATH-REACHED")
+	}
+}
+
+// TestLauncherUsesHostBinFromEnvironment checks that a Go binary built outside
+// the image is used by the launcher when DEVZONE_HOST_BIN names it.
+func TestLauncherUsesHostBinFromEnvironment(t *testing.T) {
+	if runtime.GOOS == "windows" || (runtime.GOARCH != "amd64" && runtime.GOARCH != "arm64") {
+		t.Skip()
+	}
+	dir := launcherSetup(t, false)
+	bin := filepath.Join(dir, "devzone-go")
+	binary := "#!/usr/bin/env bash\nif [ \"$1\" = handles ]; then [ \"$2\" = help ] && exit 0; exit 1; fi\necho \"go:$*\"\nexit 0\n"
+	if err := os.WriteFile(bin, []byte(binary), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	out, code := runLauncher(t, dir, []string{"DEVZONE_HOST_BIN=" + bin}, "help")
+	if code != 0 || !strings.Contains(out, "go:help") {
+		t.Fatalf("code = %d, out = %q, want 0 and go:help", code, out)
+	}
+	if strings.Contains(out, "SHELL-PATH-REACHED") {
+		t.Fatalf("out = %q, must not contain the shell stub", out)
 	}
 }
 
@@ -181,7 +202,7 @@ func TestLauncherFromGoNotInherited(t *testing.T) {
 	}
 	dir := launcherSetup(t, true)
 	help := "printf 'from=%s\\n' \"${DEVZONE_FROM_GO-unset}\"; exit 42\n"
-	if err := os.WriteFile(filepath.Join(dir, "help.sh"), []byte(help), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "devzone-modules.sh"), []byte(help), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	out, code := runLauncher(t, dir, []string{"DEVZONE_FROM_GO=1"}, "ported")

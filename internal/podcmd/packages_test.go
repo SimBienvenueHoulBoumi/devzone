@@ -168,14 +168,15 @@ func (failingInstaller) Remove([]string) error { return nil }
 // TestHelpListsPackages checks both command listings of the workstation and
 // the pod for the packages command.
 func TestHelpListsPackages(t *testing.T) {
-	for _, file := range []string{"../../.devcontainer/help.sh", "../../README.md"} {
-		data, err := os.ReadFile(file)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !strings.Contains(string(data), "devzone packages") {
-			t.Fatalf("%s misses the packages command", file)
-		}
+	if !strings.Contains(podHelpText, "devzone packages") {
+		t.Fatal("pod help text misses the packages command")
+	}
+	data, err := os.ReadFile("../../README.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "devzone packages") {
+		t.Fatal("README.md misses the packages command")
 	}
 }
 

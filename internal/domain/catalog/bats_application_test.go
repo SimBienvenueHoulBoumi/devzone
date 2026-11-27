@@ -24,7 +24,7 @@ func shellApp(t *testing.T) (appDir, actions, state string) {
 	}
 	repo := repoPath(".devcontainer")
 	copyFile(t, filepath.Join(repo, "devzone"), filepath.Join(app, "devzone"), 0o755)
-	for _, name := range []string{"help.sh", "host-check.message"} {
+	for _, name := range []string{"host-check.message"} {
 		src := filepath.Join(repo, name)
 		if strings.HasPrefix(name, "host-") {
 			src = filepath.Join(repo, "ai", name)
@@ -160,19 +160,9 @@ func shellLog(t *testing.T, path, want string) string {
 	return ""
 }
 
-// TestShellHelpAndDocs checks that the entry point is the documented command
-// and that the contributor docs no longer expose direct scripts or variables.
-func TestShellHelpAndDocs(t *testing.T) {
-	app, _, _ := shellApp(t)
-	out, code := runShellApp(t, app, "--help")
-	if code != 0 {
-		t.Fatalf("help: code %d", code)
-	}
-	for _, cmd := range []string{"devzone repair", "devzone metrics", "devzone use", "devzone catalog"} {
-		if !strings.Contains(out, cmd) {
-			t.Fatalf("help misses %s", cmd)
-		}
-	}
+// TestShellDocsHideDirectScripts checks that the contributor docs no longer
+// expose direct scripts or variables; the help list belongs to the Go pod.
+func TestShellDocsHideDirectScripts(t *testing.T) {
 	for _, name := range []string{"README.md", "manage/docs/reference.md"} {
 		data, err := os.ReadFile(repoPath(name))
 		if err != nil {
