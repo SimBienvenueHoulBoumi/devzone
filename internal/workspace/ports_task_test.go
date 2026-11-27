@@ -134,7 +134,10 @@ func TestPortsStartWindowsRunsTask(t *testing.T) {
 	if code := PortsStart(&out, &errOut); code != 0 {
 		t.Fatalf("start status = %d, err %q", code, errOut.String())
 	}
-	want := []portsDaemonCall{{tool: "schtasks", args: []string{"/Run", "/TN", name}}}
+	want := []portsDaemonCall{
+		{tool: "schtasks", quiet: true, args: []string{"/Query", "/TN", name}},
+		{tool: "schtasks", args: []string{"/Run", "/TN", name}},
+	}
 	if !sameCalls(h.calls, want) {
 		t.Fatalf("calls = %+v, want %+v", h.calls, want)
 	}
@@ -150,7 +153,7 @@ func TestPortsStartWindowsKeepsLiveWatcher(t *testing.T) {
 	if code := PortsStart(&out, &errOut); code != 0 {
 		t.Fatalf("start status = %d", code)
 	}
-	if len(h.calls) != 0 || !strings.Contains(out.String(), "already running") {
+	if len(h.calls) != 1 || h.calls[0].args[0] != "/Query" || !strings.Contains(out.String(), "already running") {
 		t.Fatalf("calls = %+v, out = %q", h.calls, out.String())
 	}
 }

@@ -76,6 +76,9 @@ func TestWindowsWatcherRound(t *testing.T) {
 // files and reports a live watcher with the process primitives of this platform.
 func TestWindowsWatcherStatus(t *testing.T) {
 	dir := t.TempDir()
+	root := t.TempDir()
+	t.Setenv("DEVZONE_ROOT", root)
+	writeFile(t, filepath.Join(root, ".devzone.modules"), "")
 	t.Setenv("DEVZONE_PORTS_WORKSPACE_DIR", dir)
 	t.Setenv("DEVZONE_PORTS_AGENT_DIR", filepath.Join(dir, "agents"))
 	pid := os.Getpid()

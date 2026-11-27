@@ -31,6 +31,11 @@ func portsState(t *testing.T, files map[string]string) string {
 func portsOut(t *testing.T, dir string) string {
 	t.Helper()
 	t.Setenv("DEVZONE_PORTS_WORKSPACE_DIR", dir)
+	if os.Getenv("DEVZONE_ROOT") == "" {
+		root := t.TempDir()
+		t.Setenv("DEVZONE_ROOT", root)
+		writeFile(t, filepath.Join(root, ".devzone.modules"), "")
+	}
 	if os.Getenv("DEVZONE_PORTS_AGENT_DIR") == "" {
 		t.Setenv("DEVZONE_PORTS_AGENT_DIR", filepath.Join(t.TempDir(), "agents"))
 	}
