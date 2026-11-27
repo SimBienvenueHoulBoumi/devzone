@@ -109,7 +109,7 @@ func TestServicesEnable(t *testing.T) {
 	for _, want := range []string{
 		"--context devzone apply -f -",
 		"--context devzone create token devzone-services-admin --namespace devzone-workspace --duration 1h",
-		"--context devzone exec -i devzone-workspace-0 --namespace devzone-workspace -c workspace -- bash /fake/services-admin.sh enable gitlab --yes",
+		"--context devzone exec -i devzone-workspace-0 --namespace devzone-workspace -c workspace -- devzone services-admin enable gitlab --yes",
 		"--context devzone delete clusterrolebinding devzone-services-admin --ignore-not-found",
 		"--context devzone delete serviceaccount devzone-services-admin --namespace devzone-workspace --ignore-not-found",
 	} {
@@ -180,7 +180,7 @@ func TestServicesDisablePostgresYes(t *testing.T) {
 		t.Fatalf("status = %d, errOut = %q", status, h.errOut.String())
 	}
 	calls := strings.Join(h.env.Runner.(*fakeRunner).calls, "\n")
-	if !strings.Contains(calls, "services-admin.sh disable postgres --yes") {
+	if !strings.Contains(calls, "devzone services-admin disable postgres --yes") {
 		t.Fatalf("calls = %q", calls)
 	}
 	if strings.Contains(h.errOut.String(), "deprecated") {
@@ -196,7 +196,7 @@ func TestServicesSeedRunsInPod(t *testing.T) {
 		t.Fatalf("status = %d, errOut = %q", status, h.errOut.String())
 	}
 	calls := strings.Join(h.env.Runner.(*fakeRunner).calls, "\n")
-	if !strings.Contains(calls, "services-admin.sh seed gitlab") {
+	if !strings.Contains(calls, "devzone services-admin seed gitlab") {
 		t.Fatalf("calls = %q", calls)
 	}
 }
