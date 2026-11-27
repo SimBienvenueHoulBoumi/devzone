@@ -12,7 +12,7 @@ import (
 // Run runs a pod command: handles <command> tells whether it is ported, a ported command runs in Go, any other command is delegated to the shell.
 func Run(args []string, out, errOut io.Writer) int {
 	if len(args) == 0 {
-		return delegate(args, out, errOut)
+		args = []string{""}
 	}
 
 	switch args[0] {

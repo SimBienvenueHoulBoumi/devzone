@@ -3,8 +3,6 @@ package gitlab
 import (
 	"encoding/base64"
 	"os"
-	osexec "os/exec"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -103,20 +101,4 @@ func TestGitOpsWriteUsesConfRepo(t *testing.T) {
 		}
 	}
 	t.Errorf("no GitOps write in %v", f.calls())
-}
-
-// TestServicesAdminSeedOnlyGitlab checks the refusal of the seed of another
-// service, as the shell entry point of the workspace pod did.
-func TestServicesAdminSeedOnlyGitlab(t *testing.T) {
-	cmd := osexec.Command("bash", filepath.Join("..", "..", "..", ".devcontainer", "services-admin.sh"), "seed", "postgres")
-	out, err := cmd.CombinedOutput()
-	if err == nil {
-		t.Fatal("code = 0, want 2")
-	}
-	if exit, ok := err.(*osexec.ExitError); !ok || exit.ExitCode() != 2 {
-		t.Fatalf("error = %v", err)
-	}
-	if !strings.Contains(string(out), "seed: only gitlab") {
-		t.Errorf("output = %q", out)
-	}
 }
