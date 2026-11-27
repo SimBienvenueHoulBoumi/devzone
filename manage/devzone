@@ -171,9 +171,10 @@ devzone $(version): development workspace in a Kubernetes cluster
                            the installed package, after backing up the replaced files in
                            .devzone.backup/ (the new image is used at the next workspace start)
   devzone uninstall [--yes]
-                           in a devzone folder: removes Kubernetes objects of this devzone
-                           instance (namespaces, Argo CD Applications, temporary accounts,
-                           .devzone.* files); workspace/ is kept; asks for confirmation
+                           in a devzone folder: removes what this devzone instance created on
+                           the host (containers, images, volumes, kind clusters, metrics-server)
+                           and in the cluster (namespaces, Argo CD Applications, temporary
+                           accounts); workspace/ is kept; asks for confirmation
   devzone ai [check|rapport|guard]         host models, update report or tool-call guard
   devzone workspace start|stop|status|shell|update|deploy
   devzone workspace vscode|copy-to|copy-from|clone
@@ -212,19 +213,9 @@ case "${1:-}" in
         DEVZONE_BASH_ENTRY="$PAQUET/manage/devzone" "${DEVZONE_HOST_BIN:?devzone: Go program not found (DEVZONE_HOST_BIN), run it through manage/devzone}" update "${@:2}"
         ;;
     uninstall)
-        # Devzone folder (.devcontainer/); an older devzone has its uninstall.sh
-        # in manage/scripts/ (new), core/scripts or scripts/ (old), or at the root
-        uninstaller=""
-        if [ -d .devcontainer ]; then
-            for f in manage/scripts/uninstall.sh core/scripts/uninstall.sh scripts/uninstall.sh uninstall.sh; do
-                if [ -f "$f" ]; then uninstaller="$f" && break; fi
-            done
-        fi
-        if [ -z "$uninstaller" ]; then
-            echo "✖ Run this in a devzone folder (uninstall.sh not found here)." >&2
-            exit 1
-        fi
-        DEVZONE_COMMAND="devzone uninstall" bash "$uninstaller"
+        # The uninstall is the Go program's (#884), as update is: an older devzone
+        # keeps its own uninstall.sh, which the Go command runs from its folder
+        "${DEVZONE_HOST_BIN:?devzone: Go program not found (DEVZONE_HOST_BIN), run it through manage/devzone}" uninstall "${@:2}"
         ;;
     workspace)
         bash "$PAQUET/manage/workspace.sh" "${@:2}"

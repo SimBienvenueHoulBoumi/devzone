@@ -309,7 +309,7 @@ jobs:
   # Unit tests (bats manage/test/) on every PR and every push of develop and
   # main (#192). ubuntu: the whole suite. macOS: /bin/bash (3.2, the system one)
   # first in PATH, for the scripts that run on the host or in CI (npm command,
-  # launch.sh, uninstall.sh, versions.sh, ci-container.sh);
+  # launch.sh, versions.sh, ci-container.sh);
   # devzone.bats tests the container command (Linux)
   bats:
     # Whole suite on ubuntu split into four shards (manage/test/shard.sh):

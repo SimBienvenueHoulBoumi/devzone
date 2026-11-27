@@ -19,6 +19,7 @@ func TestUninstallRefusesOutsideDevzoneFolder(t *testing.T) {
 	t.Setenv("DEVZONE_VOLUMES", "")
 	t.Setenv("DEVZONE_ROOT", "")
 	runner := fake.New()
+	registerHostProbe(t, runner, root)
 	chdir(t, root)
 	var out, errOut bytes.Buffer
 	code := uninstallCommand(&cli.Context{Args: nil, Out: &out, Err: &errOut, Stdin: strings.NewReader(""), Runner: runner})
@@ -33,6 +34,7 @@ func TestUninstallRefusesOutsideDevzoneFolder(t *testing.T) {
 func TestUninstallRejectsUnknownOption(t *testing.T) {
 	root := devzoneDir(t)
 	runner := fake.New()
+	registerHostProbe(t, runner, root)
 	chdir(t, root)
 	var out, errOut bytes.Buffer
 	code := uninstallCommand(&cli.Context{Args: []string{"--bogus"}, Out: &out, Err: &errOut, Stdin: strings.NewReader(""), Runner: runner})
@@ -47,6 +49,7 @@ func TestUninstallRejectsUnknownOption(t *testing.T) {
 func TestUninstallTargetsServicesClusterContext(t *testing.T) {
 	root := devzoneDir(t, "cluster=kind-devzone-ci")
 	runner := fake.New()
+	registerHostProbe(t, runner, root)
 	registerLists(t, runner, "kind-devzone-ci", "devzone-workspace\n", "", "")
 	runner.On("kubectl", []string{"--context", "kind-devzone-ci", "delete", "namespace", "devzone-workspace", "--ignore-not-found"}, exec.Result{})
 	chdir(t, root)
@@ -61,18 +64,19 @@ func TestUninstallTargetsServicesClusterContext(t *testing.T) {
 	assertContextCalls(t, runner, "kind-devzone-ci")
 }
 
-func TestUninstallRefusesWithoutServicesCluster(t *testing.T) {
+func TestUninstallSkipsKubernetesWithoutServicesCluster(t *testing.T) {
 	root := devzoneDir(t)
 	runner := fake.New()
+	registerHostProbe(t, runner, root)
 	runner.On("kubectl", []string{"config", "get-contexts", "-o", "name"}, exec.Result{Stdout: []byte("minikube\n")})
 	chdir(t, root)
 	var out, errOut bytes.Buffer
 	code := uninstallCommand(&cli.Context{Args: []string{"--yes"}, Out: &out, Err: &errOut, Stdin: strings.NewReader(""), Runner: runner})
-	if code != 1 {
-		t.Fatalf("code = %d, want 1; out=%s err=%s", code, out.String(), errOut.String())
+	if code != 0 {
+		t.Fatalf("code = %d, want 0; out=%s err=%s", code, out.String(), errOut.String())
 	}
-	if !strings.Contains(errOut.String(), "no devzone services cluster identified") {
-		t.Fatalf("stderr = %q", errOut.String())
+	if !strings.Contains(out.String(), "no devzone services cluster identified") {
+		t.Fatalf("plan does not say the Kubernetes part was skipped:\n%s", out.String())
 	}
 	if _, err := os.Stat(filepath.Join(root, "workspace")); err != nil {
 		t.Fatalf("workspace: %v", err)
@@ -82,6 +86,7 @@ func TestUninstallRefusesWithoutServicesCluster(t *testing.T) {
 func TestUninstallUsesDevzoneContextWhenDeclared(t *testing.T) {
 	root := devzoneDir(t)
 	runner := fake.New()
+	registerHostProbe(t, runner, root)
 	runner.On("kubectl", []string{"config", "get-contexts", "-o", "name"}, exec.Result{Stdout: []byte("minikube\ndevzone\n")})
 	registerLists(t, runner, "devzone", "devzone-workspace\n", "", "")
 	runner.On("kubectl", []string{"--context", "devzone", "delete", "namespace", "devzone-workspace", "--ignore-not-found"}, exec.Result{})
@@ -100,6 +105,7 @@ func TestUninstallUsesDevzoneContextWhenDeclared(t *testing.T) {
 func TestUninstallStopsOnNamespaceListError(t *testing.T) {
 	root := devzoneDir(t, "cluster=kind-devzone-ci")
 	runner := fake.New()
+	registerHostProbe(t, runner, root)
 	runner.SetErr("kubectl", nsArgs("kind-devzone-ci"), exec.Result{}, context.DeadlineExceeded)
 	runner.On("kubectl", appsArgs("kind-devzone-ci"), exec.Result{})
 	runner.On("kubectl", saArgs("kind-devzone-ci"), exec.Result{})
@@ -121,6 +127,7 @@ func TestUninstallStopsOnNamespaceListError(t *testing.T) {
 func TestUninstallStopsOnApplicationListError(t *testing.T) {
 	root := devzoneDir(t, "cluster=kind-devzone-ci")
 	runner := fake.New()
+	registerHostProbe(t, runner, root)
 	runner.On("kubectl", nsArgs("kind-devzone-ci"), exec.Result{})
 	runner.SetErr("kubectl", appsArgs("kind-devzone-ci"), exec.Result{}, context.DeadlineExceeded)
 	runner.On("kubectl", saArgs("kind-devzone-ci"), exec.Result{})

@@ -1,6 +1,7 @@
 package command
 
 import (
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -31,13 +32,43 @@ func devzoneDir(t *testing.T, stateLines ...string) string {
 	t.Setenv("DEVZONE_INSTANCE", "")
 	t.Setenv("DEVZONE_VOLUMES", "")
 	t.Setenv("DEVZONE_ROOT", "")
+	// Not in the pod, and no kubectl on the host: the tests never read the host
+	t.Setenv("DEVZONE_IN_CONTAINER", "no")
+	t.Setenv("DEVZONE_DOCKER", "")
+	t.Setenv("DEVZONE_COMMAND", "")
+	t.Setenv("KEEP", "")
+	t.Setenv("GARDER", "")
+	t.Setenv("CONFIRM", "")
+	t.Setenv("CONFIRMER", "")
 	previous, previousExists := commandPortsDisable, commandPortsAutoStartExists
+	previousLook := lookPath
 	commandPortsDisable = func(io.Writer, io.Writer) int { return 0 }
 	commandPortsAutoStartExists = func() bool { return true }
+	lookPath = func(string) (string, error) { return "", errNoKubectlTest }
 	t.Cleanup(func() {
 		commandPortsDisable, commandPortsAutoStartExists = previous, previousExists
+		lookPath = previousLook
 	})
 	return root
+}
+
+// errNoKubectlTest is the lookup failure of a host without kubectl.
+var errNoKubectlTest = errors.New("kubectl not found (test)")
+
+// registerHostProbe answers the host calls of an uninstall that finds nothing on
+// the host: the engine info succeeds, and the devcontainer configuration has no
+// mount. Every other engine call of the inventory fails, which counts as none.
+func registerHostProbe(t *testing.T, runner *fake.Runner, root string) {
+	t.Helper()
+	runner.On(engineCommand(), []string{"info"}, exec.Result{})
+	paths := []string{root}
+	if phys, err := filepath.EvalSymlinks(root); err == nil && phys != root {
+		paths = append(paths, phys)
+	}
+	for _, p := range paths {
+		runner.On("npx", []string{"-y", "@devcontainers/cli", "read-configuration", "--workspace-folder", p},
+			exec.Result{Stdout: []byte(`{"configuration":{"mounts":[]}}`)})
+	}
 }
 
 // chdir runs the test inside dir and restores the previous working directory.
