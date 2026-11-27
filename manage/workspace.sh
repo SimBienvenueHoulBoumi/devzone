@@ -88,7 +88,7 @@ start_workspace() {
     if [ -n "${DEVZONE_FROM_GO:-}" ] && argocd_active; then devzone workspace deploy "$repo" "$tag" "$with_image"; else workspace_deploy "$repo" "$tag" "$with_image"; fi
     # Projects of .argocd.conf held too (#516)
     argocd_reconcile || true
-    wait_for_pod "$image" || return 1
+    "${DEVZONE_HOST_BIN:?devzone: Go program not found (DEVZONE_HOST_BIN), run it through manage/devzone}" workspace wait "$image" || return 1
     "${DEVZONE_HOST_BIN:-false}" workspace agents-guard || true
     ports_start silence
 }
@@ -122,8 +122,6 @@ shell_workspace() {
 
 # shellcheck source=manage/scripts/kube-ready.sh
 . "$HERE/scripts/kube-ready.sh"
-# shellcheck source=manage/scripts/workspace/workspace-wait.sh
-. "$HERE/scripts/workspace/workspace-wait.sh"
 # shellcheck source=manage/scripts/workspace/ports-workspace.sh
 . "$HERE/scripts/workspace/ports-workspace.sh"
 # shellcheck source=manage/scripts/workspace/services-workspace.sh

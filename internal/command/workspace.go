@@ -30,10 +30,14 @@ func workspaceCommand(ctx *cli.Context) int {
 	if len(args) >= 1 && args[0] == "deploy" {
 		return workspaceDeploy(ctx)
 	}
-	// The internal guard command is called by the shell start path; it has no
-	// user-facing help and always succeeds.
+	// The internal guard and wait commands are called by the shell start path;
+	// they have no user-facing help.
 	if len(args) == 1 && args[0] == "agents-guard" {
 		return agentsGuardCommand(ctx)
+	}
+	if len(args) >= 1 && args[0] == "wait" {
+		sub := &cli.Context{Args: args[1:], Out: out, Err: errOut, Stdin: ctx.Stdin, Runner: ctx.Runner}
+		return podWaitCommand(sub)
 	}
 	if len(args) >= 1 && args[0] == "clone" {
 		url, name := "", ""
