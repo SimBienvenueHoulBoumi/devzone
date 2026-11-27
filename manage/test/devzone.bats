@@ -66,6 +66,10 @@ setup() {
     kube_isole
     kind_vide
     export DEVZONE="$BATS_TEST_DIRNAME/../../.devcontainer/devzone"
+    # Go binary of the pod, built outside the image: the launcher uses it for
+    # the commands ported to Go (help, repair, state helpers).
+    export DEVZONE_HOST_BIN="$BATS_TEST_TMPDIR/devzone-go"
+    (cd "$BATS_TEST_DIRNAME/../.." && go build -o "$DEVZONE_HOST_BIN" ./cmd/devzone-pod) || { echo "go build failed"; return 1; }
     # Pinned versions read from the files: an automatic bump (versions
     # workflow) does not break these tests
     REPOWARDEN_FIGE="$(sed -nE 's/^REPOWARDEN_VERSION=([^[:space:]]+)$/\1/p' "$BATS_TEST_DIRNAME/../../.devcontainer/versions.env" | head -1)"
@@ -475,16 +479,6 @@ KUBE
     premier_deny="$(grep -n '": "deny"' "$modele" | head -1 | cut -d: -f1)"
     [ -n "$dernier_allow" ] && [ -n "$premier_deny" ]
     [ "$premier_deny" -gt "$dernier_allow" ]
-}
-
-@test "devzone --help cite --version (#707)" {
-    run bash "$DEVZONE" --help
-    [[ "$output" == *"--version"* ]] || false
-}
-
-@test "devzone --help cite test-bash32" {
-    run bash "$DEVZONE" --help
-    [[ "$output" == *"test-bash32"* ]] || false
 }
 
 @test ".gitignore: state and failure invisible to git status" {

@@ -24,7 +24,7 @@ func shellApp(t *testing.T) (appDir, actions, state string) {
 	}
 	repo := repoPath(".devcontainer")
 	copyFile(t, filepath.Join(repo, "devzone"), filepath.Join(app, "devzone"), 0o755)
-	for _, name := range []string{"help.sh", "host-check.message"} {
+	for _, name := range []string{"host-check.message"} {
 		src := filepath.Join(repo, name)
 		if strings.HasPrefix(name, "host-") {
 			src = filepath.Join(repo, "ai", name)
@@ -160,19 +160,9 @@ func shellLog(t *testing.T, path, want string) string {
 	return ""
 }
 
-// TestShellHelpAndDocs checks that the entry point is the documented command
-// and that the contributor docs no longer expose direct scripts or variables.
-func TestShellHelpAndDocs(t *testing.T) {
-	app, _, _ := shellApp(t)
-	out, code := runShellApp(t, app, "--help")
-	if code != 0 {
-		t.Fatalf("help: code %d", code)
-	}
-	for _, cmd := range []string{"devzone repair", "devzone metrics", "devzone use", "devzone catalog"} {
-		if !strings.Contains(out, cmd) {
-			t.Fatalf("help misses %s", cmd)
-		}
-	}
+// TestShellDocsHideDirectScripts checks that the contributor docs no longer
+// expose direct scripts or variables; the help list belongs to the Go pod.
+func TestShellDocsHideDirectScripts(t *testing.T) {
 	for _, name := range []string{"README.md", "manage/docs/reference.md"} {
 		data, err := os.ReadFile(repoPath(name))
 		if err != nil {
@@ -187,54 +177,5 @@ func TestShellHelpAndDocs(t *testing.T) {
 				t.Fatalf("%s still exposes %s", name, forbidden)
 			}
 		}
-	}
-}
-
-// TestShellRepair checks the watcher and credentials repair items.
-func TestShellRepair(t *testing.T) {
-	app, actions, _ := shellApp(t)
-	out, code := runShellApp(t, app, "repair")
-	if code != 0 {
-		t.Fatalf("repair: code %d, output %q", code, out)
-	}
-	if !strings.Contains(out, "✔ catalog watcher") || !strings.Contains(out, "✔ credentials") {
-		t.Fatalf("repair output = %q", out)
-	}
-	if shellLog(t, actions, "catalog-watcher start") == "" {
-		t.Fatalf("actions = %q, want the watcher start", readLog(t, actions))
-	}
-	if shellLog(t, actions, "devzone passwords regenerate") == "" {
-		t.Fatalf("actions = %q, want the credentials regeneration", readLog(t, actions))
-	}
-}
-
-// TestShellRepairActiveServices checks that active modules are repaired too.
-func TestShellRepairActiveServices(t *testing.T) {
-	app, actions, state := shellApp(t)
-	writeTestFile(t, state, "gitlab=on\npostgres=on\n")
-	if _, code := runShellApp(t, app, "repair"); code != 0 {
-		t.Fatalf("repair: code %d", code)
-	}
-	for _, want := range []string{"gitlab host-set", "gitlab relay-start", "postgres relay-start"} {
-		if shellLog(t, actions, want) == "" {
-			t.Fatalf("actions = %q, want %s", readLog(t, actions), want)
-		}
-	}
-}
-
-// TestShellRepairFailedCredentials checks the reason and status of a failure.
-func TestShellRepairFailedCredentials(t *testing.T) {
-	app, actions, _ := shellApp(t)
-	failed := os.Getenv("TEST_FAILED_PASSWORD")
-	writeTestFile(t, failed, "")
-	out, code := runShellApp(t, app, "repair")
-	if code != 1 {
-		t.Fatalf("repair: code %d, want 1", code)
-	}
-	if !strings.Contains(out, "✖ credentials : credentials unavailable") {
-		t.Fatalf("repair output = %q", out)
-	}
-	if shellLog(t, actions, "devzone passwords regenerate") == "" {
-		t.Fatalf("actions = %q", readLog(t, actions))
 	}
 }
