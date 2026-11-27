@@ -32,12 +32,23 @@ func TestPortsAgentDirInjectable(t *testing.T) {
 }
 
 // TestPortsWatcherBinDirUsesStableFolder checks that the watcher copy does not
-// live in a temporary folder and can be redirected by XDG_CACHE_HOME.
+// live in a temporary folder and can be redirected by XDG_CACHE_HOME. The
+// platform is pinned so the expected name does not depend on the host: Windows
+// adds the .exe extension, the other platforms do not.
 func TestPortsWatcherBinDirUsesStableFolder(t *testing.T) {
 	cache := t.TempDir()
 	t.Setenv("XDG_CACHE_HOME", cache)
-	want := filepath.Join(cache, "devzone", "ports", "bin", "devzone")
-	if got := portsWatcherCopyPath(); got != want {
-		t.Fatalf("copy = %q, want %q", got, want)
+	old := portsPlatform
+	t.Cleanup(func() { portsPlatform = old })
+	cases := []struct{ platform, name string }{
+		{"linux", "devzone"},
+		{"windows", "devzone.exe"},
+	}
+	for _, c := range cases {
+		portsPlatform = c.platform
+		want := filepath.Join(cache, "devzone", "ports", "bin", c.name)
+		if got := portsWatcherCopyPath(); got != want {
+			t.Fatalf("%s copy = %q, want %q", c.platform, got, want)
+		}
 	}
 }
