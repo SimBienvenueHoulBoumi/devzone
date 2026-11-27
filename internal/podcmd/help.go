@@ -1,10 +1,14 @@
-#!/usr/bin/env bash
-# Help of devzone (devzone --help, #557), sourced by devzone : English command
-# names only ; the French names are refused and print the new name (#695).
-# devzone_aide prints the list, indented like the other usage texts.
-devzone_aide() {
-    cat <<'AIDE'
-  Optional modules of devzone, enabled on demand, without rebuild:
+package podcmd
+
+import (
+	"io"
+
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/cli"
+)
+
+// podHelpText is the command list of the pod CLI, kept identical to the help of
+// the removed shell library so existing documentation and scripts still match.
+const podHelpText = `  Optional modules of devzone, enabled on demand, without rebuild:
   devzone                                  state of the modules
   devzone --version                        version of the workspace image (DEVZONE_VERSION)
   devzone platform                         GitHub (default) or GitLab
@@ -20,7 +24,7 @@ devzone_aide() {
   devzone clusters                         view of the connected clusters (work and services)
   devzone kube saved|choose|save|local|reachable|prompt  cluster helpers, in Go
   devzone is-enabled <module>              code 0 if enabled
-  devzone test-bash32                      run the bats tests under bash 3.2 (Docker container)
+  devzone test-bash32                      run the bats tests under bash 3.2 (legacy image)
   devzone test-gitlab                      end-to-end test of the GitLab module and platform
   devzone agent <folder> <instructions>    drive opencode with the instructions file
   devzone ai                               list the host (Ollama) models detected and the default model
@@ -42,5 +46,11 @@ devzone_aide() {
   devzone port [--close <n>]              list or remove a relay of the workstation
   devzone passwords                        regenerate .password and print its path
   devzone packages [add|remove|apply] …    system packages kept after a rebuild
-AIDE
+`
+
+// printHelp writes the pod command list to the CLI output, ignoring extra
+// arguments, because the removed shell function did the same.
+func printHelp(ctx *cli.Context) int {
+	_, _ = io.WriteString(ctx.Out, podHelpText)
+	return 0
 }

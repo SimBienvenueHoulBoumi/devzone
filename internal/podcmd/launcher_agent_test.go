@@ -15,8 +15,8 @@ func launcherWithoutBinary(t *testing.T) string {
 	t.Helper()
 	dir := launcherSetup(t, false)
 	for _, name := range []string{
-		"help.sh", "state-gitops.sh", "devzone-modules.sh", "devzone-services.sh",
-		"devzone-repair.sh", "devzone-platform.sh", "devzone-version.sh", "devzone-status.sh",
+		"state-gitops.sh", "devzone-modules.sh", "devzone-services.sh",
+		"devzone-platform.sh", "devzone-status.sh",
 	} {
 		p := filepath.Join(dir, name)
 		os.MkdirAll(filepath.Dir(p), 0o755)
@@ -34,7 +34,7 @@ func TestLauncherAgentWithoutPodBinary(t *testing.T) {
 		t.Skip()
 	}
 	dir := launcherWithoutBinary(t)
-	for _, name := range []string{"agent", "postgres", "mysql", "gitlab", "test-gitlab", "argocd", "cluster", "clusters", "metrics", "use", "kube"} {
+	for _, name := range []string{"agent", "postgres", "mysql", "gitlab", "test-gitlab", "argocd", "cluster", "clusters", "metrics", "use", "kube", "help", "-h", "--help", "repair", "apply-repowarden"} {
 		out, code := runLauncher(t, dir, nil, name, "state")
 		want := "devzone " + name + ": Go binary of the pod unavailable (.devcontainer/bin)\n"
 		if code != 1 || out != want {
@@ -127,13 +127,9 @@ func TestAgentCommandListsKeepAgent(t *testing.T) {
 			}
 		}
 	}
-	data, err := os.ReadFile("../../.devcontainer/help.sh")
-	if err != nil {
-		t.Fatal(err)
-	}
 	for _, text := range []string{"devzone agent <folder> <instructions>", "devzone catalog "} {
-		if !strings.Contains(string(data), text) {
-			t.Errorf(".devcontainer/help.sh misses %q", text)
+		if !strings.Contains(podHelpText, text) {
+			t.Errorf("pod help text misses %q", text)
 		}
 	}
 }

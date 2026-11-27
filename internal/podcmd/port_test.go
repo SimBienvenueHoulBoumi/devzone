@@ -122,14 +122,15 @@ func TestPortCommandRefusals(t *testing.T) {
 
 // TestHelpListsPort checks that both command listings still cite devzone port.
 func TestHelpListsPort(t *testing.T) {
-	for _, file := range []string{"../../.devcontainer/help.sh", "../../README.md"} {
-		data, err := os.ReadFile(file)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !strings.Contains(string(data), "devzone port [--close <n>]") {
-			t.Fatalf("%s misses the port command", file)
-		}
+	if !strings.Contains(podHelpText, "devzone port [--close <n>]") {
+		t.Fatal("pod help text misses the port command")
+	}
+	data, err := os.ReadFile("../../README.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "devzone port [--close <n>]") {
+		t.Fatal("README.md misses the port command")
 	}
 }
 

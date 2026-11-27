@@ -3,7 +3,7 @@
 # (devzone, make, npx devzone) must use a known CLI command name.
 # The authorized names are built by the test itself from:
 #   - bash manage/devzone --help
-#   - the "  devzone" lines of the help text of .devcontainer/help.sh (#557)
+#   - the "  devzone" lines of the pod help text in internal/podcmd/help.go (#557)
 #   - the Makefile targets
 
 setup() {
@@ -30,7 +30,7 @@ setup() {
         esac
     done
 
-    # 2. .devcontainer/help.sh : lines beginning with "  devzone" (the help text)
+    # 2. Go pod help: lines beginning with "  devzone" (the help text)
     while IFS= read -r line; do
         case "$line" in
             '  devzone'*)
@@ -44,7 +44,7 @@ setup() {
                 esac
                 ;;
         esac
-    done < "$RACINE/.devcontainer/help.sh"
+    done < "$RACINE/internal/podcmd/help.go"
 
     # 3. top-level pod command cited by the reference, absent from the help text
     add_word status
@@ -75,17 +75,17 @@ verify_command() {
     # Leading spaces and tabs.
     cmd="${cmd#"${cmd%%[![:space:]]*}"}"
     [ -n "$cmd" ] || return 0
-    if [[ $cmd == npx\ devzone* ]]; then
+    if [[ $cmd == npx\ devzone* ]] || false; then
         rest="${cmd#npx devzone}"
-        if [[ $rest == @* ]]; then
+        if [[ $rest == @* ]] || false; then
             rest="${rest#* }"
         fi
         rest="${rest#"${rest%%[! ]*}"}"
         word="${rest%% *}"
-    elif [[ $cmd == make\ * ]]; then
+    elif [[ $cmd == make\ * ]] || false; then
         word="${cmd#make }"
         word="${word%% *}"
-    elif [[ $cmd == devzone\ * ]]; then
+    elif [[ $cmd == devzone\ * ]] || false; then
         word="${cmd#devzone }"
         word="${word%% *}"
     else
