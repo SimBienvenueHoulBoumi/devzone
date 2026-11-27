@@ -66,7 +66,7 @@ printf 'argocd=off\n' > "$DEVZONE_DIR/.devzone.modules"
 ok "devzone folder prepared"
 
 echo "▶ Go program of the workspace commands"
-DEVZONE_HOST_BIN="$TMP/devzone"
+DEVZONE_HOST_BIN="$TMP/devzone-go"
 (cd "$ROOT" && go build -o "$DEVZONE_HOST_BIN" ./cmd/devzone) || exit 1
 export DEVZONE_HOST_BIN
 echo "▶ workspace start/status/stop"
