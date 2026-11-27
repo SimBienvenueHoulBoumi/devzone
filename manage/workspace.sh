@@ -120,8 +120,6 @@ shell_workspace() {
     kubectl $(kubectl_flag) exec -it devzone-workspace-0 --namespace devzone-workspace -c workspace -- bash
 }
 
-# shellcheck source=manage/scripts/kube-ready.sh
-. "$HERE/scripts/kube-ready.sh"
 # shellcheck source=manage/scripts/workspace/argocd-workspace.sh
 . "$HERE/scripts/workspace/argocd-workspace.sh"
 # shellcheck source=manage/scripts/workspace/argocd-services.sh
