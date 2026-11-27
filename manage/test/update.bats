@@ -1,6 +1,14 @@
 #!/usr/bin/env bats
-# Update of an existing devzone (#349): fake packages v1 and v2 under
-# $BATS_TEST_TMPDIR. No real rebuild, no system script.
+# Creation of a devzone and the manifest it writes (#349). The update itself is
+# the Go program's (internal/platform/update, `devzone update`): its tests are in Go.
+# The fake packages are built under $BATS_TEST_TMPDIR.
+
+setup_file() {
+    # The creation calls the Go program for its checks (#884): built once for the file
+    RACINE="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
+    export DEVZONE_HOST_BIN="$BATS_FILE_TMPDIR/devzone-go"
+    (cd "$RACINE" && go build -o "$DEVZONE_HOST_BIN" ./cmd/devzone) || { echo "go build failed"; return 1; }
+}
 
 setup() {
     load commun
@@ -11,13 +19,7 @@ setup() {
     T="$BATS_TEST_TMPDIR"
     cd "$T"
     export DEVZONE_NO_START=1
-    export DEVZONE_REBUILD="$T/reconstruire"
-    printf '#!/usr/bin/env bash\necho "reconstruit" >>"%s/reconstruction.log"\n' "$T" >"$DEVZONE_REBUILD"
-    chmod +x "$DEVZONE_REBUILD"
     build_package v1 0.0.1 ancien
-    build_package v2 0.0.2 nouveau
-    MAJ="$T/v2/manage/devzone"
-    MAJ1="$T/v1/manage/devzone"
 }
 
 build_package() {
@@ -28,7 +30,7 @@ build_package() {
     cp "$RACINE/.devcontainer/argocd/conf.sh" "$folder/.devcontainer/argocd/conf.sh"
     # devzone <folder> sources the mode check (#497) from the package
     cp "$RACINE/manage/scripts/create-mode.sh" "$RACINE/manage/scripts/kube-ready.sh" "$folder/manage/scripts/"
-    cp "$RACINE/manage/scripts/devzone-manifest.sh" "$RACINE/manage/scripts/devzone-update.sh" "$RACINE/manage/scripts/devzone-create.sh" "$folder/manage/scripts/"
+    cp "$RACINE/manage/scripts/devzone-manifest.sh" "$RACINE/manage/scripts/devzone-create.sh" "$folder/manage/scripts/"
     printf '{"name":"devzone","version":"%s"}\n' "$version" >"$folder/package.json"
     printf '# makefile %s\n' "$mark" >"$folder/Makefile"
     printf '*.sh text eol=lf\n' >"$folder/.gitattributes"
@@ -41,407 +43,13 @@ build_package() {
     chmod +x "$folder/.devcontainer/devzone" "$folder/manage/scripts/uninstall.sh"
 }
 
-create_v1() {
+@test "creation: .devzone.version holds the version and one checksum per copied file" {
     DZ="$T/devzone"
     bash "$T/v1/manage/devzone" "$DZ" --kubernetes >/dev/null
-}
-
-backup_of() {
-    find "$DZ/.devzone.backup" -mindepth 1 -maxdepth 1 -type d | head -1
-}
-
-# Poisoned manifest: the path must be ignored with a warning, and the
-# file outside the devzone folder must survive the update.
-poisoned_manifest() {
-    local rel="$1"
-    create_v1
-    mkdir -p "$T/dehors"
-    printf 'secret\n' >"$T/dehors/secret"
-    printf '%064d  %s\n' 0 "$rel" >>"$DZ/.devzone.version"
-    cd "$DZ"
-    run bash "$MAJ" update --yes --no-rebuild
-    [ "$status" -eq 0 ]
-    [ "$(cat "$T/dehors/secret")" = secret ]
-    [[ "$output" == *"devzone: manifest: refused path: $rel"* ]] || false
-}
-
-@test "creation: .devzone.version holds the version and one checksum per copied file" {
-    create_v1
     [ "$(sed -n '1p' "$DZ/.devzone.version")" = "version 0.0.1" ]
     for f in .devcontainer/devcontainer.json .devcontainer/devzone Makefile .gitattributes manage/scripts/uninstall.sh README.md LICENSE; do
         attendue="$(node -e 'const fs = require("fs"), crypto = require("crypto"); const h = crypto.createHash("sha256"); h.update(fs.readFileSync(process.argv[1])); process.stdout.write(h.digest("hex"))' "$DZ/$f")"
         grep -qxF "$attendue  $f" "$DZ/.devzone.version" || { echo "empreinte absente : $f"; return 1; }
     done
     ! grep -q 'manage/devzone' "$DZ/.devzone.version" || false
-}
-
-@test "up to date: same version, files present → exit 0, nothing touched, npx suggested" {
-    create_v1
-    avant="$(cat "$DZ/.devzone.version")"
-    cd "$DZ"
-    run bash "$MAJ1" update
-    [ "$status" -eq 0 ]
-    [[ "$output" == *"already up to date"* ]] || false
-    [[ "$output" == *"npx devzone@latest update"* ]] || false
-    [ "$(cat "$DZ/.devzone.version")" = "$avant" ]
-    [ ! -e "$DZ/.devzone.backup" ]
-    [ ! -e "$T/reconstruction.log" ]
-}
-
-@test "same version but a package file missing → the file is restored" {
-    create_v1
-    rm "$DZ/Makefile"
-    cd "$DZ"
-    run bash "$MAJ1" update
-    [ "$status" -eq 0 ]
-    grep -q '# makefile ancien' "$DZ/Makefile"
-    [ "$(sed -n '1p' "$DZ/.devzone.version")" = "version 0.0.1" ]
-    [ ! -e "$T/reconstruction.log" ]
-}
-
-@test "v1 → v2: files replaced, old removed, backup made, user files intact" {
-    printf '#!/usr/bin/env bash\necho ancien\n' >"$T/v1/manage/scripts/ancien.sh"
-    printf 'nouveau\n' >"$T/v2/.devcontainer/nouveau.txt"
-    create_v1
-    mkdir -p "$DZ/workspace/projet"
-    printf 'projet\n' >"$DZ/workspace/projet/file"
-    printf 'ai=on\n' >"$DZ/.devzone.modules"
-    printf 'secret\n' >"$DZ/.password"
-    printf 'app\n' >"$DZ/.app"
-    printf 'journal\n' >"$DZ/.devzone.log"
-    cd "$DZ"
-    run bash "$MAJ" update --no-rebuild
-    [ "$status" -eq 0 ]
-    grep -q '# makefile nouveau' "$DZ/Makefile"
-    grep -qx 'nouveau' "$DZ/.devcontainer/nouveau.txt"
-    [ ! -e "$DZ/manage/scripts/ancien.sh" ]
-    [ "$(sed -n '1p' "$DZ/.devzone.version")" = "version 0.0.2" ]
-    backup="$(backup_of)"
-    [ -n "$backup" ]
-    grep -q '# makefile ancien' "$backup/Makefile"
-    grep -q 'echo ancien' "$backup/manage/scripts/ancien.sh"
-    [ "$(cat "$DZ/workspace/projet/file")" = projet ]
-    [ "$(cat "$DZ/.devzone.modules")" = 'ai=on' ]
-    [ "$(cat "$DZ/.password")" = secret ]
-    [ "$(cat "$DZ/.app")" = app ]
-    [ "$(cat "$DZ/.devzone.log")" = journal ]
-    [ ! -e "$T/reconstruction.log" ]
-}
-
-@test "modified file without --yes and without terminal → refused with exit 1, nothing touched" {
-    create_v1
-    printf 'modifie a la main\n' >"$DZ/Makefile"
-    cd "$DZ"
-    run bash "$MAJ" update
-    [ "$status" -eq 1 ]
-    [[ "$output" == *"Makefile"* ]] || false
-    [[ "$output" == *"--yes"* ]] || false
-    [ "$(cat "$DZ/Makefile")" = 'modifie a la main' ]
-    [ "$(sed -n '1p' "$DZ/.devzone.version")" = "version 0.0.1" ]
-    [ ! -e "$DZ/.devzone.backup" ]
-    [ ! -e "$T/reconstruction.log" ]
-}
-
-@test "modified file with --yes → backed up, then replaced" {
-    create_v1
-    printf 'modifie a la main\n' >"$DZ/Makefile"
-    cd "$DZ"
-    run bash "$MAJ" update --yes
-    [ "$status" -eq 0 ]
-    grep -q '# makefile nouveau' "$DZ/Makefile"
-    backup="$(backup_of)"
-    [ -n "$backup" ]
-    [ "$(cat "$backup/Makefile")" = 'modifie a la main' ]
-    [[ "$output" == *"Sauvegarde :"* ]] || false
-    [ ! -e "$T/reconstruction.log" ]
-}
-
-@test "update: .argocd.conf is never replaced nor backed up" {
-    create_v1
-    printf '[argocd]\n    repo = https://github.com/tester/devzone-argocd.git\n' >"$DZ/.argocd.conf"
-    cd "$DZ"
-    run bash "$MAJ" update --yes --no-rebuild
-    [ "$status" -eq 0 ]
-    grep -q '^    repo = https://github.com/tester/devzone-argocd.git$' "$DZ/.argocd.conf"
-    [ ! -e "$DZ/.devzone.backup/.argocd.conf" ]
-}
-
-@test "scripts/ created by the user with a manifest: kept intact" {
-    create_v1
-    mkdir -p "$DZ/scripts"
-    printf '#!/usr/bin/env bash\necho moi\n' >"$DZ/scripts/mon-outil.sh"
-    cd "$DZ"
-    run bash "$MAJ" update --no-rebuild
-    [ "$status" -eq 0 ]
-    [ "$(cat "$DZ/scripts/mon-outil.sh")" = '#!/usr/bin/env bash
-echo moi' ]
-    backup="$(backup_of)"
-    [ ! -e "$backup/scripts/mon-outil.sh" ]
-    [ "$(sed -n '1p' "$DZ/.devzone.version")" = "version 0.0.2" ]
-}
-
-@test "scripts/ created by the user without a manifest: kept intact" {
-    create_v1
-    rm "$DZ/.devzone.version"
-    mkdir -p "$DZ/scripts"
-    printf 'mon outil\n' >"$DZ/scripts/mon-outil.sh"
-    cd "$DZ"
-    run bash "$MAJ" update --yes --no-rebuild
-    [ "$status" -eq 0 ]
-    [ "$(cat "$DZ/scripts/mon-outil.sh")" = 'mon outil' ]
-    [ "$(sed -n '1p' "$DZ/.devzone.version")" = "version 0.0.2" ]
-}
-
-@test "old devzone scripts/ with a user file: only the devzone files are removed" {
-    create_v1
-    mkdir -p "$DZ/scripts"
-    printf 'vieux desinstaller\n' >"$DZ/scripts/uninstall.sh"
-    printf 'vieux lancer\n' >"$DZ/scripts/launch.sh"
-    printf 'mon outil\n' >"$DZ/scripts/mon-outil.sh"
-    cd "$DZ"
-    run bash "$MAJ" update --yes --no-rebuild
-    [ "$status" -eq 0 ]
-    [ ! -e "$DZ/scripts/uninstall.sh" ]
-    # The package no longer ships launch.sh: it is not a known devzone file any more,
-    # so an old scripts/launch.sh is left where it is (never removed by mistake)
-    [ "$(cat "$DZ/scripts/launch.sh")" = 'vieux lancer' ]
-    [ "$(cat "$DZ/scripts/mon-outil.sh")" = 'mon outil' ]
-    backup="$(backup_of)"
-    [ "$(cat "$backup/scripts/uninstall.sh")" = 'vieux desinstaller' ]
-    [ ! -e "$backup/scripts/launch.sh" ]
-    [ ! -e "$backup/scripts/mon-outil.sh" ]
-}
-
-@test "old core/ recognized: known files backed up, then the tree removed" {
-    create_v1
-    mkdir -p "$DZ/core/scripts" "$DZ/core/test" "$DZ/core/docs"
-    printf 'vieux devzone\n' >"$DZ/core/devzone"
-    printf 'vieux desinstaller\n' >"$DZ/core/scripts/uninstall.sh"
-    printf 'vieux test\n' >"$DZ/core/test/ancien.bats"
-    printf 'vieille doc\n' >"$DZ/core/docs/ancien.md"
-    cd "$DZ"
-    run bash "$MAJ" update --yes --no-rebuild
-    [ "$status" -eq 0 ]
-    [ ! -e "$DZ/core" ]
-    backup="$(backup_of)"
-    [ "$(cat "$backup/core/devzone")" = 'vieux devzone' ]
-    [ "$(cat "$backup/core/scripts/uninstall.sh")" = 'vieux desinstaller' ]
-    [ "$(cat "$backup/core/test/ancien.bats")" = 'vieux test' ]
-    [ "$(cat "$backup/core/docs/ancien.md")" = 'vieille doc' ]
-}
-
-@test "old core/ recognized without a manifest: unknown file kept, known files backed up" {
-    create_v1
-    rm "$DZ/.devzone.version"
-    mkdir -p "$DZ/core/scripts" "$DZ/core/autre" "$DZ/workspace/projet"
-    printf 'vieux desinstaller\n' >"$DZ/core/scripts/uninstall.sh"
-    printf 'file of mine\n' >"$DZ/core/autre/my-file"
-    printf 'projet\n' >"$DZ/workspace/projet/file"
-    cd "$DZ"
-    run bash "$MAJ" update --yes --no-rebuild
-    [ "$status" -eq 0 ]
-    [[ "$output" == *"inconnue"* ]] || false
-    [ ! -e "$DZ/core/scripts" ]
-    [ "$(cat "$DZ/core/autre/my-file")" = 'file of mine' ]
-    backup="$(backup_of)"
-    [ "$(cat "$backup/core/scripts/uninstall.sh")" = 'vieux desinstaller' ]
-    [ ! -e "$backup/core/autre/my-file" ]
-    [ "$(cat "$DZ/workspace/projet/file")" = projet ]
-    [ "$(sed -n '1p' "$DZ/.devzone.version")" = "version 0.0.2" ]
-}
-
-@test "old trees without a terminal: refused, nothing touched" {
-    create_v1
-    mkdir -p "$DZ/scripts" "$DZ/core/scripts"
-    printf 'vieux desinstaller\n' >"$DZ/scripts/uninstall.sh"
-    printf 'vieux lancer\n' >"$DZ/scripts/launch.sh"
-    printf 'mon outil\n' >"$DZ/scripts/mon-outil.sh"
-    printf 'vieux devzone\n' >"$DZ/core/devzone"
-    printf 'vieux core\n' >"$DZ/core/scripts/uninstall.sh"
-    cd "$DZ"
-    run bash "$MAJ" update
-    [ "$status" -eq 1 ]
-    [[ "$output" == *"scripts/uninstall.sh"* ]] || false
-    [[ "$output" == *"--yes"* ]] || false
-    [ "$(cat "$DZ/scripts/uninstall.sh")" = 'vieux desinstaller' ]
-    [ "$(cat "$DZ/scripts/launch.sh")" = 'vieux lancer' ]
-    [ "$(cat "$DZ/scripts/mon-outil.sh")" = 'mon outil' ]
-    [ "$(cat "$DZ/core/devzone")" = 'vieux devzone' ]
-    [ "$(cat "$DZ/core/scripts/uninstall.sh")" = 'vieux core' ]
-    [ "$(sed -n '1p' "$DZ/.devzone.version")" = "version 0.0.1" ]
-    [ ! -e "$DZ/.devzone.backup" ]
-}
-
-@test "old folder without a manifest: all differing files are modified → --yes required" {
-    create_v1
-    rm "$DZ/.devzone.version"
-    cd "$DZ"
-    run bash "$MAJ" update
-    [ "$status" -eq 1 ]
-    [[ "$output" == *"Makefile"* ]] || false
-    [ ! -e "$DZ/.devzone.backup" ]
-}
-
-@test ".gitignore completed without overwriting the custom lines" {
-    create_v1
-    printf 'mon-regle-a-moi\n' >>"$DZ/.gitignore"
-    grep -v '^\.devzone\.backup/$' "$DZ/.gitignore" >"$T/gitignore.tmp"
-    mv "$T/gitignore.tmp" "$DZ/.gitignore"
-    cd "$DZ"
-    run bash "$MAJ" update --no-rebuild
-    [ "$status" -eq 0 ]
-    grep -qx 'mon-regle-a-moi' "$DZ/.gitignore"
-    grep -qx '.devzone.backup/' "$DZ/.gitignore"
-    grep -qx 'workspace/\*' "$DZ/.gitignore"
-    [ "$(grep -c '^\.devzone\.backup/$' "$DZ/.gitignore")" -eq 1 ]
-}
-
-@test "without a terminal: rebuild suggested, never started" {
-    create_v1
-    # A folder of the former Docker workstation (#735): the rebuild is suggested
-    printf 'workspace=docker\n' >"$DZ/.devzone.modules"
-    cd "$DZ"
-    run bash "$MAJ" update --yes
-    [ "$status" -eq 0 ]
-    [[ "$output" == *"make -C $DZ rebuild"* ]] || false
-    [ ! -e "$T/reconstruction.log" ]
-}
-
-@test "--no-rebuild: no rebuild, even with --yes" {
-    create_v1
-    printf 'workspace=docker\n' >"$DZ/.devzone.modules"
-    cd "$DZ"
-    run bash "$MAJ" update --yes --no-rebuild
-    [ "$status" -eq 0 ]
-    [[ "$output" == *"Rebuild not started (--no-rebuild)"* ]] || false
-    [ ! -e "$T/reconstruction.log" ]
-}
-
-@test "kubernetes mode: rebuild never offered" {
-    cp "$RACINE/manage/scripts/kube-ready.sh" "$T/v2/manage/scripts/"
-    create_v1
-    printf 'workspace=kubernetes\n' >"$DZ/.devzone.modules"
-    cd "$DZ"
-    run bash "$MAJ" update --yes
-    [ "$status" -eq 0 ]
-    [[ "$output" != *"rebuild"* ]] || false
-    [ "$(cat "$DZ/.devzone.modules")" = 'workspace=kubernetes' ]
-    [ ! -e "$T/reconstruction.log" ]
-}
-
-@test "poisoned manifest: ../dehors/secret refused" {
-    poisoned_manifest '../dehors/secret'
-}
-
-@test "poisoned manifest: /etc/x refused" {
-    poisoned_manifest '/etc/x'
-}
-
-@test "poisoned manifest: a/../../dehors/secret refused" {
-    poisoned_manifest 'a/../../dehors/secret'
-}
-
-@test "poisoned manifest: .devcontainer/../../dehors/secret refused" {
-    poisoned_manifest '.devcontainer/../../dehors/secret'
-}
-
-@test "poisoned manifest: workspace/x outside the managed folders refused" {
-    create_v1
-    mkdir -p "$T/dehors" "$DZ/workspace"
-    printf 'secret\n' >"$T/dehors/secret"
-    printf 'a moi\n' >"$DZ/workspace/x"
-    printf '%064d  %s\n' 0 'workspace/x' >>"$DZ/.devzone.version"
-    cd "$DZ"
-    run bash "$MAJ" update --yes --no-rebuild
-    [ "$status" -eq 0 ]
-    [ "$(cat "$T/dehors/secret")" = secret ]
-    [ "$(cat "$DZ/workspace/x")" = 'a moi' ]
-    [[ "$output" == *"devzone: manifest: refused path: workspace/x"* ]] || false
-}
-
-@test "poisoned manifest: outgoing symbolic link refused" {
-    create_v1
-    mkdir -p "$T/dehors"
-    printf 'secret\n' >"$T/dehors/secret"
-    ln -s "$T/dehors" "$DZ/.devcontainer/lien"
-    printf '%064d  %s\n' 0 '.devcontainer/lien/secret' >>"$DZ/.devzone.version"
-    cd "$DZ"
-    run bash "$MAJ" update --yes --no-rebuild
-    [ "$status" -eq 0 ]
-    [ "$(cat "$T/dehors/secret")" = secret ]
-    [[ "$output" == *"devzone: manifest: refused path: .devcontainer/lien/secret"* ]] || false
-}
-
-@test "symbolic link on the last element: replaced by a real file, target intact" {
-    create_v1
-    mkdir -p "$T/dehors"
-    printf 'intact\n' >"$T/dehors/cible"
-    rm -f "$DZ/.devcontainer/devcontainer.json"
-    ln -s "$T/dehors/cible" "$DZ/.devcontainer/devcontainer.json"
-    cd "$DZ"
-    run bash "$MAJ" update --yes --no-rebuild
-    [ "$status" -eq 0 ]
-    [ "$(cat "$T/dehors/cible")" = intact ]
-    [ ! -L "$DZ/.devcontainer/devcontainer.json" ] || false
-    [ "$(cat "$DZ/.devcontainer/devcontainer.json")" = '{"marque":"nouveau"}' ]
-    [[ "$output" == *"link replaced: .devcontainer/devcontainer.json"* ]] || false
-}
-
-@test "symbolic link: the backup keeps the link, not a copy of the target" {
-    create_v1
-    mkdir -p "$T/dehors"
-    printf 'intact\n' >"$T/dehors/cible"
-    rm -f "$DZ/.devcontainer/devcontainer.json"
-    ln -s "$T/dehors/cible" "$DZ/.devcontainer/devcontainer.json"
-    cd "$DZ"
-    run bash "$MAJ" update --yes --no-rebuild
-    [ "$status" -eq 0 ]
-    [ -L "$(backup_of)/.devcontainer/devcontainer.json" ] || false
-    [ "$(cat "$T/dehors/cible")" = intact ]
-}
-
-@test "outside a devzone folder and unknown option → refused" {
-    mkdir pas-devzone
-    cd pas-devzone
-    run bash "$MAJ" update
-    [ "$status" -eq 1 ]
-    [[ "$output" == *"devzone folder"* ]] || false
-    create_v1
-    cd "$DZ"
-    run bash "$MAJ" update --truc
-    [ "$status" -eq 1 ]
-    [[ "$output" == *"unknown option"* ]] || false
-}
-
-@test "update: an unknown option is refused in English, code 1, nothing changed" {
-    bats_require_minimum_version 1.5.0
-    create_v1
-    cd "$DZ"
-    run --separate-stderr bash "$MAJ" update --bogus
-    [ "$status" -eq 1 ]
-    [ "$stderr" = "✖ unknown option: --bogus (devzone update [--yes] [--no-rebuild])" ]
-    [ ! -e "$DZ/.devzone.backup" ]
-}
-
-@test "update: the restart signal of the port watcher starts it again once, then is removed" {
-    create_v1
-    local d="$DZ/.devzone.workspace-ports"
-    mkdir -p "$d"
-    : >"$d/restart"
-    export DEVZONE_PORTS_RESTART="pwd >>$T/restart.log"
-    cd "$DZ"
-    run bash "$MAJ" update --yes --no-rebuild
-    [ "$status" -eq 0 ]
-    [ "$(cat "$T/restart.log")" = "$DZ" ]
-    [ ! -e "$d/restart" ]
-}
-
-@test "update: without the restart signal the port watcher is not started" {
-    create_v1
-    mkdir -p "$DZ/.devzone.workspace-ports"
-    export DEVZONE_PORTS_RESTART="pwd >>$T/restart.log"
-    cd "$DZ"
-    run bash "$MAJ" update --yes --no-rebuild
-    [ "$status" -eq 0 ]
-    [ ! -e "$T/restart.log" ]
 }
