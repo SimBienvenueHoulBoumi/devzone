@@ -194,7 +194,6 @@ open_tickets() {
 @test "two simultaneous upgrades (Claude Code, opencode): merged one after another without conflict" {
     # Real devzone file, to check its layout
     cp "$ROOT/.devcontainer/devzone" "$DEVZONE"
-    cp "$ROOT"/.devcontainer/devzone-*.sh "$(dirname "$DEVZONE")/"
     export GIT_CONFIG_NOSYSTEM=1 GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@example.invalid \
         GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@example.invalid
     cd "$BATS_TEST_TMPDIR/dz"

@@ -146,7 +146,7 @@ const pipelineTimeout = 600 * time.Second
 
 // pipelineLaunch starts the pipeline of the demo project of the instance at
 // the end of the installation and, when it fails, records the reason in the
-// failure marker of the module, like apply_gitlab of devzone-services.sh.
+// failure marker of the module, like applyGitlab of internal/podcmd/modules_change.go.
 func (r *run) pipelineLaunch() {
 	token, ok := r.readSecret(r.rootTokenFile())
 	if !ok {

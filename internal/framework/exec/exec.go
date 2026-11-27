@@ -20,6 +20,9 @@ type Opts struct {
 	Stdin io.Reader
 	Env   []string
 	Dir   string
+	// Inherit sends the standard output and error of the command to this
+	// process instead of capturing them (an interactive login prompts there).
+	Inherit bool
 }
 
 // Result holds the captured output and exit status of a finished command.
@@ -67,6 +70,9 @@ func (ExecRunner) Run(ctx context.Context, name string, args []string, opts Opts
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
+	if opts.Inherit {
+		cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
+	}
 	err := cmd.Run()
 	res := Result{Stdout: stdout.Bytes(), Stderr: stderr.Bytes()}
 	if err == nil {
