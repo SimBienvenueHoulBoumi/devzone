@@ -163,3 +163,32 @@ func TestCreateClusterUnreachable(t *testing.T) {
 
 // fileExists tells whether path exists.
 func fileExists(path string) bool { _, err := os.Stat(path); return err == nil }
+
+// TestCreateEmptyGitopsAnswerWritesNone checks that an empty answer at the
+// GitOps prompt (or end of input) never writes an empty repository: it is none,
+// with the same notice as the non-terminal path, and the devzone is created.
+func TestCreateEmptyGitopsAnswerWritesNone(t *testing.T) {
+	t.Setenv("DEVZONE_NO_START", "1")
+	for _, answer := range []string{"\n", ""} {
+		opts, target, out, errOut := createOptions(t, readyRunner())
+		opts.Gitops = ""
+		opts.StdinTTY = true
+		opts.In = strings.NewReader(answer)
+		if err := Create(opts); err != nil {
+			t.Fatalf("answer %q: Create: %v", answer, err)
+		}
+		conf, err := os.ReadFile(filepath.Join(target, ".argocd.conf"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(string(conf), "repo = none") || strings.Contains(string(conf), "repo = \n") {
+			t.Fatalf("answer %q: .argocd.conf:\n%s", answer, conf)
+		}
+		if !strings.Contains(errOut.String(), "no GitOps repository for Argo CD: pass --gitops") {
+			t.Fatalf("answer %q: stderr:\n%s", answer, errOut.String())
+		}
+		if strings.Contains(out.String(), "GitOps repository:  (") {
+			t.Fatalf("answer %q: empty GitOps line on stdout:\n%s", answer, out.String())
+		}
+	}
+}

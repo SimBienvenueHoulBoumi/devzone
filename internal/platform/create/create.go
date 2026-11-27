@@ -133,13 +133,14 @@ func Create(opts Options) error {
 	}
 
 	gitops := opts.Gitops
+	if gitops == "" && opts.StdinTTY {
+		gitops = askGitops(opts.In, opts.Err, opts.Runner, opts.Ctx)
+	}
+	// Without a terminal, or with an empty answer (no default), no repository is
+	// named: none, never an empty repo written to .argocd.conf
 	if gitops == "" {
-		if opts.StdinTTY {
-			gitops = askGitops(opts.In, opts.Err, opts.Runner, opts.Ctx)
-		} else {
-			fmt.Fprintln(opts.Err, "⚠ no GitOps repository for Argo CD: pass --gitops <github|none|https://github.com/<login>/<name>.git> to create a devzone without a terminal; using none")
-			gitops = "none"
-		}
+		fmt.Fprintln(opts.Err, "⚠ no GitOps repository for Argo CD: pass --gitops <github|none|https://github.com/<login>/<name>.git> to create a devzone without a terminal; using none")
+		gitops = "none"
 	}
 
 	if err := os.MkdirAll(filepath.Join(target, "workspace"), 0o755); err != nil {

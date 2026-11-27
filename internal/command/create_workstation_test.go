@@ -147,3 +147,53 @@ func TestCreateWorkstationCreates(t *testing.T) {
 		t.Fatalf(".devzone.modules %q", modules)
 	}
 }
+
+// TestCreateWorkstationDevNullStdinNoPrompt checks that the null device as
+// standard input (what bats and cron give) is not a terminal: no GitOps prompt,
+// the notice naming --gitops, and repo = none.
+func TestCreateWorkstationDevNullStdinNoPrompt(t *testing.T) {
+	t.Setenv("DEVZONE_NO_START", "1")
+	t.Setenv("DEVZONE_TERMINAL", "")
+	pkg := t.TempDir()
+	for _, d := range []string{".devcontainer", "manage/scripts"} {
+		if err := os.MkdirAll(filepath.Join(pkg, d), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for name, body := range map[string]string{
+		"manage/scripts/uninstall.sh": "#!/usr/bin/env bash\n",
+		"Makefile":                    "all:\n",
+		".gitattributes":              "*\n",
+		"README.md":                   "#\n",
+		"LICENSE":                     "l\n",
+		"package.json":                `{"version":"1.2.3"}`,
+	} {
+		if err := os.WriteFile(filepath.Join(pkg, filepath.FromSlash(name)), []byte(body), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("DEVZONE_PAQUET", pkg)
+	null, err := os.Open(os.DevNull)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer null.Close()
+	target := filepath.Join(t.TempDir(), "mon")
+	runner := fake.New()
+	readyKube(runner)
+	ctx, _, errOut := ctxWith([]string{target, "--kubernetes"}, runner)
+	ctx.Stdin = null
+	if code := createWorkstationCommand(ctx); code != 0 {
+		t.Fatalf("code=%d stderr=%s", code, errOut.String())
+	}
+	if strings.Contains(errOut.String(), "GitOps repository for Argo CD?") {
+		t.Fatalf("prompt on /dev/null:\n%s", errOut.String())
+	}
+	if !strings.Contains(errOut.String(), "no GitOps repository for Argo CD: pass --gitops") {
+		t.Fatalf("stderr %q", errOut.String())
+	}
+	conf, _ := os.ReadFile(filepath.Join(target, ".argocd.conf"))
+	if !strings.Contains(string(conf), "repo = none") {
+		t.Fatalf(".argocd.conf %q", conf)
+	}
+}
