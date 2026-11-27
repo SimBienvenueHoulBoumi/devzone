@@ -89,7 +89,7 @@ start_workspace() {
     # Projects of .argocd.conf held too (#516)
     argocd_reconcile || true
     wait_for_pod "$image" || return 1
-    workspace_agents_guard || true
+    "${DEVZONE_HOST_BIN:-false}" workspace agents-guard || true
     ports_start silence
 }
 
@@ -124,8 +124,6 @@ shell_workspace() {
 . "$HERE/scripts/kube-ready.sh"
 # shellcheck source=manage/scripts/workspace/workspace-wait.sh
 . "$HERE/scripts/workspace/workspace-wait.sh"
-# shellcheck source=manage/scripts/workspace/workspace-clone.sh
-. "$HERE/scripts/workspace/workspace-clone.sh"
 # shellcheck source=manage/scripts/workspace/workspace-copies.sh
 . "$HERE/scripts/workspace/workspace-copies.sh"
 # shellcheck source=manage/scripts/workspace/ports-workspace.sh

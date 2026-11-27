@@ -30,6 +30,11 @@ func workspaceCommand(ctx *cli.Context) int {
 	if len(args) >= 1 && args[0] == "deploy" {
 		return workspaceDeploy(ctx)
 	}
+	// The internal guard command is called by the shell start path; it has no
+	// user-facing help and always succeeds.
+	if len(args) == 1 && args[0] == "agents-guard" {
+		return agentsGuardCommand(ctx)
+	}
 	if len(args) >= 1 && args[0] == "clone" {
 		url, name := "", ""
 		if len(args) == 2 || len(args) == 3 {

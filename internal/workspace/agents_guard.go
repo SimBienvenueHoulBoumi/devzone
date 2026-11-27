@@ -5,11 +5,10 @@ import (
 	"io"
 )
 
-// AgentsGuard runs the idempotent guard of the agents in the pod, as
-// workspace_agents_guard in manage/scripts/workspace/workspace-clone.sh: when
-// the ai module is on there, repowarden installs its guard globally, so an
-// agent started in the pod cannot edit develop. It never fails the start: a
-// guard that cannot run is silent.
+// AgentsGuard runs the idempotent guard of the agents in the pod, as the former
+// shell helper did: when the ai module is on there, repowarden installs its
+// guard globally, so an agent started in the pod cannot edit develop. It never
+// fails the start: a guard that cannot run is silent.
 func AgentsGuard(r Runner, out io.Writer) {
 	args := append(contextFlag(r), "exec", pod, "--namespace", namespace, "-c", container, "--",
 		"bash", "-lc", "devzone is-enabled ai && repowarden agents init --global")

@@ -19,7 +19,6 @@ var embeddedCRLFScript string
 // seen from this package
 var bashScriptsFiles = []string{
 	"../../manage/scripts/workspace/workspace-copies.sh",
-	"../../manage/scripts/workspace/workspace-clone.sh",
 }
 
 // bashPodScript returns the script that the bash function function sends to the
