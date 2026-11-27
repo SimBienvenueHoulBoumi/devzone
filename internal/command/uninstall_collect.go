@@ -11,6 +11,9 @@ import (
 
 func collectUninstallPlan(ctx context.Context, runner exec.Runner, root, instance string) (uninstallPlan, error) {
 	kubeCtx, err := servicesContext(ctx, runner, root)
+	if errors.Is(err, errNoServicesCluster) {
+		return uninstallPlan{workspaceKept: filepath.Join(root, "workspace"), noCluster: true, devzoneFiles: listDevzoneFiles(root)}, nil
+	}
 	if err != nil {
 		return uninstallPlan{}, err
 	}
