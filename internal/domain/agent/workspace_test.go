@@ -38,6 +38,7 @@ func (k *kcFake) Run(ctx context.Context, name string, args []string, opts dzexe
 }
 
 func TestWorkspaceAvailable(t *testing.T) {
+	t.Setenv("DEVZONE_WORKSPACE", "")
 	k := &kcFake{phase: "Running"}
 	if !WorkspaceAvailable(context.Background(), k) {
 		t.Fatal("not available")
