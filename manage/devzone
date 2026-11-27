@@ -211,7 +211,7 @@ EOT
 # of .devcontainer/devzone (consistency test in manage/test/cli.bats)
 container_command() {
     case "$1" in
-        ai | agent | apply | argocd | build | catalog | catalog-watcher | cluster | clusters | disable | \
+        ai | agent | apply | apply-repowarden | argocd | build | catalog | catalog-watcher | cluster | clusters | disable | \
             enable | gitlab | is-enabled | kube | llm | metrics | modules | mysql | packages | \
             passwords | platform | port | postgres | repair | start | state | status | \
             test-bash32 | test-gitlab | ticket | use) return 0 ;;

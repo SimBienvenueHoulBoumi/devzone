@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2034 # shared variables, read by the sourced devzone-*.sh
-# devzone help (devzone --help): .devcontainer/help.sh, sourced below.
+# devzone help (devzone --help): the Go command of the pod, below.
 #
 # Per-instance state: $RACINE/.devzone.modules (a folder mounted from the host,
 # survives rebuilds), one line "module=on|off"; the chosen platform is kept
@@ -20,7 +20,9 @@ while [ -L "$SOURCE" ]; do
     esac
 done
 ICI="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+export DEVZONE_POD_SCRIPT="${DEVZONE_POD_SCRIPT:-$ICI/devzone}"
 # Go first (#754): a command ported to Go runs in the devzone-pod binary of the image.
+# DEVZONE_HOST_BIN also names that binary when a test builds it outside the image.
 # DEVZONE_NO_GO=1 forces the shell, DEVZONE_FROM_GO=1 avoids loops.
 # DEVZONE_FROM_GO only concerns this call: not inherited, so that a "devzone …"
 # run by this script reaches the Go command again (#864).
@@ -33,18 +35,23 @@ if [ -z "${DEVZONE_NO_GO:-}" ] && [ -z "$FROM_GO" ]; then
         *) POD_GO_ARCH="" ;;
     esac
     POD_GO="$ICI/bin/devzone-pod-$(uname -s | tr '[:upper:]' '[:lower:]')-$POD_GO_ARCH"
+    if [ -n "${DEVZONE_HOST_BIN:-}" ] && [ -x "$DEVZONE_HOST_BIN" ]; then
+        POD_GO="$DEVZONE_HOST_BIN"
+    fi
+    if [ -x "$POD_GO" ]; then
+        # Shell helpers still in use call the Go program by this variable.
+        export DEVZONE_HOST_BIN="$POD_GO"
+    fi
     if [ -n "$POD_GO_ARCH" ] && [ -x "$POD_GO" ] && "$POD_GO" handles "${1:-}" >/dev/null 2>&1; then
         DEVZONE_POD_SCRIPT="$ICI/devzone" exec "$POD_GO" "$@"
     fi
 fi
-# shellcheck source=SCRIPTDIR/help.sh
-# shellcheck disable=SC1091
-. "$ICI/help.sh"
 VERSIONS="$ICI/../manage/scripts/ci/versions.sh"
 # devzone folder (/workspaces/devzone); DEVZONE_ROOT for the tests
 RACINE="${DEVZONE_ROOT:-$(dirname "$ICI")}"
 # Default state of the instance; DEVZONE_STATE takes precedence (tests, CI)
 ETAT="${DEVZONE_STATE:-$RACINE/.devzone.modules}"
+export DEVZONE_STATE="$ETAT"
 MODULES=(ai kubernetes gitlab postgres argocd mysql)
 INSTANCE_SUFFIX=""
 [ "${DEVZONE_INSTANCE:-devzone}" = devzone ] || INSTANCE_SUFFIX="-${DEVZONE_INSTANCE}"
@@ -90,15 +97,9 @@ GITLAB_URL_MODULE=http://gitlab.localhost:8929
 # shellcheck source=SCRIPTDIR/devzone-services.sh
 # shellcheck disable=SC1091
 . "$ICI/devzone-services.sh"
-# shellcheck source=SCRIPTDIR/devzone-repair.sh
-# shellcheck disable=SC1091
-. "$ICI/devzone-repair.sh"
 # shellcheck source=SCRIPTDIR/devzone-platform.sh
 # shellcheck disable=SC1091
 . "$ICI/devzone-platform.sh"
-# shellcheck source=SCRIPTDIR/devzone-version.sh
-# shellcheck disable=SC1091
-. "$ICI/devzone-version.sh"
 # shellcheck source=SCRIPTDIR/devzone-status.sh
 # shellcheck disable=SC1091
 . "$ICI/devzone-status.sh"
@@ -109,11 +110,11 @@ case "${1:-}" in
     state)
         export DEVZONE_STATE="$ETAT"
         case "${2:-}" in
-            write|remove|replace|init|recovery-mark|recovery-wait|recovery-pending|recovery-confirm|catalog-sync|gitops-line|held|json)
+            write|remove|replace|init|recovery-mark|recovery-wait|recovery-pending|recovery-confirm|catalog-sync|gitops-line|held|outdated-tools|missing-worktrees|json)
                 # shellcheck disable=SC2034 # DEVZONE_STATE used by state helpers
                 ETAT="$DEVZONE_STATE"
                 ;;
-            *) echo "devzone state: write|remove|replace|init|recovery-mark|recovery-wait|recovery-pending|recovery-confirm|catalog-sync|gitops-line|held|json" >&2; exit 1 ;;
+            *) echo "devzone state: write|remove|replace|init|recovery-mark|recovery-wait|recovery-pending|recovery-confirm|catalog-sync|gitops-line|held|outdated-tools|missing-worktrees|json" >&2; exit 1 ;;
         esac
         ici_state="$ICI"
         pod_state=""
@@ -135,7 +136,7 @@ case "${1:-}" in
         # The user confirms the current state (#417, step 4): the watchers
         # may uninstall again
         DEVZONE_STATE="$ETAT" bash "$ICI/devzone" state recovery-confirm
-        apply_repowarden
+        "${DEVZONE_HOST_BIN:?devzone: Go pod binary unavailable}" apply-repowarden
         [ "$(value_of ai)" = off ] || DEVZONE_STATE="$ETAT" "$ICI/devzone" ai apply on
         # gitlab, postgres, argocd: installed from the workstation in the
         # Kubernetes workspace pod (#528), by their installer elsewhere
@@ -153,10 +154,9 @@ case "${1:-}" in
     build)
         bash "$ICI/workspace-build.sh" "${@:2}"
         ;;
-    repair) repair_workstation ;;
     # Go only: reached when the binary did not take the call. Never call
     # "devzone" again from here, it would loop forever, see #864
-    cluster | clusters | metrics | use | kube | ai | agent | postgres | mysql | gitlab | test-gitlab | catalog | catalog-watcher)
+    -h | --help | help | repair | apply-repowarden | cluster | clusters | metrics | use | kube | ai | agent | postgres | mysql | gitlab | test-gitlab | catalog | catalog-watcher)
         echo "devzone $1: Go binary of the pod unavailable (.devcontainer/bin)" >&2
         exit 1
         ;;
@@ -176,7 +176,6 @@ case "${1:-}" in
         echo "devzone passwords: Go binary of the pod unavailable (.devcontainer/bin)" >&2
         exit 1
         ;;
-    -h | --help | help) devzone_aide ;;
     test-bash32) bash "$RACINE/manage/test/bash32.sh" ;;
     platform)
         if [ -n "${2:-}" ]; then
