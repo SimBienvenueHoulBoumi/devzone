@@ -25,16 +25,14 @@ var directInstallMarkers = []string{
 // rule, which creates an Application or fails. The inventory is:
 //   - argocd module (install.go, install_ns.go): Argo CD itself and its
 //     namespace, account and network policy, exception before Argo CD exists;
-//   - GitOps bootstrap (gitops_root.go, apps.sh, services.sh):
-//     repository secret, root Application and secrets held apart from Git;
+//   - GitOps bootstrap (gitops_root.go): repository secret, root
+//     Application and secrets held apart from Git;
 //   - platform/helm/chart.go: helm implementation, used only by the rule's
 //     disabled branch;
 //   - gitlab/chart.go and secrets.go: chart dependency and kept secrets;
 //   - workspace scripts: the workstation installs the pod and Argo CD;
 //   - workspace services (Go): secrets of the services, not charts.
 var allowedDirectInstalls = map[string]string{
-	".devcontainer/argocd/apps.sh":                 "repository secrets and Applications of projects added by hand",
-	".devcontainer/argocd/services.sh":             "service namespaces and secrets, kept out of Git",
 	"internal/domain/argocd/install.go":            "Argo CD itself, the only exception",
 	"internal/domain/argocd/install_ns.go":         "namespace and account needed before Argo CD",
 	"internal/domain/argocd/gitops_root.go":        "repository secret and root Application",
