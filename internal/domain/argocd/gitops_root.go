@@ -25,7 +25,7 @@ func (m *module) gitopsRoot() int {
 		token = m.gitlabGitopsRootToken()
 	}
 	if token != "" {
-		manifest := fmt.Sprintf("apiVersion: v1\nkind: Secret\nmetadata:\n  name: repo-%s\n  namespace: %s\n  labels:\n    argocd.argoproj.io/secret-type: repository\n    app.kubernetes.io/managed-by: devzone\ntype: Opaque\nstringData:\n  type: git\n  url: %s\n  username: %s\n  password: %s\n", gitopsRepoName, gitopsNS, url, user, token)
+		manifest := fmt.Sprintf("apiVersion: v1\nkind: Secret\nmetadata:\n  name: repo-%s\n  namespace: %s\n  labels:\n    argocd.argoproj.io/secret-type: repository\n    app.kubernetes.io/managed-by: devzone\ntype: Opaque\nstringData:\n  type: git\n  url: %s\n  username: %s\n  password: %s\n", gitopsRepoNameValue(), gitopsNS, url, user, token)
 		res, err := m.runner.Run(m.ctx, "kubectl", []string{"--context", "devzone", "-n", gitopsNS, "apply", "-f", "-"}, fexec.Opts{Stdin: strings.NewReader(manifest)})
 		if err != nil || res.Code != 0 {
 			if err != nil {
