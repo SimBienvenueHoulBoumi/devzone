@@ -19,13 +19,15 @@ const (
 type AppRemover func(name string) int
 
 // Stop removes the workspace from the cluster, as stop_workspace does in
-// manage/workspace.sh. When Argo CD holds the workspace (its Application
-// exists), the Application file leaves the GitOps repository first (remove),
-// then the Application is deleted, which removes the pod while the volumes stay.
-// A refused removal stops here with status 1 and the Application is kept, so
-// the root Application never recreates it. Otherwise the port watcher is
-// stopped, then the helm release is uninstalled, and the status of helm is returned.
+// manage/workspace.sh. The port watcher is stopped first in every case, as the
+// shell did before calling the Go command. When Argo CD holds the workspace,
+// the Application file leaves the GitOps repository first (remove), then the
+// Application is deleted, which removes the pod while the volumes stay. A
+// refused removal stops here with status 1 and the Application is kept, so the
+// root Application never recreates it. Otherwise the helm release is uninstalled
+// and the status of helm is returned.
 func Stop(r Runner, remove AppRemover, out, errOut io.Writer) int {
+	stopPorts()
 	if argocdHoldsWorkspace(r) {
 		fmt.Fprintln(out, "▶ Application devzone-workspace deleted (Argo CD removes the pod, the volumes stay)…")
 		if code := remove(argocdApp); code != 0 {
@@ -37,7 +39,6 @@ func Stop(r Runner, remove AppRemover, out, errOut io.Writer) int {
 		}
 		return status
 	}
-	stopPorts()
 	return uninstallRelease(r, out, errOut)
 }
 

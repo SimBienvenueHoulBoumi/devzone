@@ -98,8 +98,8 @@ func TestStopArgocdHoldsWorkspaceDeletesApplication(t *testing.T) {
 			t.Fatalf("helm called although Argo CD holds the workspace: %q", c)
 		}
 	}
-	if !exists(dir + "/relays/5432") {
-		t.Fatal("the port state changed")
+	if exists(dir + "/relays/5432") {
+		t.Fatal("the port state must be cleaned by stopPorts, as the shell did")
 	}
 }
 
