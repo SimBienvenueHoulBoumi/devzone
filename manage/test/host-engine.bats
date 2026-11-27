@@ -13,6 +13,8 @@ setup() {
     export ETAT="$BATS_TEST_TMPDIR/state"
     : >"$ETAT"
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
+    # the Go program calls the fake engine of each test, never the engine of the machine
+    export DEVZONE_DOCKER=engine
 }
 
 # Devzone folder of the test: its devcontainer configuration is a copy of the
