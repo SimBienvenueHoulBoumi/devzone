@@ -64,6 +64,7 @@ func printPlatform(ctx *cli.Context, d jsonDeps) {
 		} else {
 			fmt.Fprintf(ctx.Out, "  ⚠ platform       gitlab: %s, glab not connected: glab auth login --hostname %s\n", url, host)
 		}
+		printGitCredential(ctx, d, url)
 		fmt.Fprintln(ctx.Out, "  ○ GitHub          not needed here (gitlab platform chosen)")
 		fmt.Fprintln(ctx.Out, "  ⚠ repowarden      stays on GitHub (bots and tickets): GitLab support coming (simdevWarden/repowarden#531)")
 		return
@@ -78,6 +79,18 @@ func printPlatform(ctx *cli.Context, d jsonDeps) {
 	default:
 		fmt.Fprintln(ctx.Out, "  ✔ GitHub          connected")
 	}
+}
+
+// printGitCredential reports the glab credential helper of the GitLab instance,
+// set by "devzone platform gitlab"; the former shell summary showed the same
+// line, so a ported status keeps telling whether git can use the helper.
+func printGitCredential(ctx *cli.Context, d jsonDeps, url string) {
+	helper, _, _ := d.run("git", "config", "--global", "--get", "credential."+url+".helper")
+	if strings.Contains(helper, "glab auth git-credential") {
+		fmt.Fprintln(ctx.Out, "  ✔ git via glab")
+		return
+	}
+	fmt.Fprintln(ctx.Out, "  ⚠ git via glab    to set: devzone platform gitlab")
 }
 
 // gitlabHost strips the protocol and the trailing slash of a GitLab URL, like

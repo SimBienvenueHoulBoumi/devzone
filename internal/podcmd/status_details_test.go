@@ -15,10 +15,14 @@ func TestStatusGitlabPlatform(t *testing.T) {
 	r.program(nil, 0, "", "gh", "auth", "status")
 	glab := filepath.Join(os.Getenv("HOME"), ".local", "bin", "glab")
 	r.program(nil, 0, "", glab, "auth", "status", "--hostname", "gitlab.localhost:8929")
+	helper := []string{"git", "config", "--global", "--get", "credential.http://gitlab.localhost:8929/.helper"}
+	r.program(nil, 0, "!glab auth git-credential\n", helper[0], helper[1:]...)
 	contains(t, runStatusText(t, r), "  ✔ platform       gitlab: http://gitlab.localhost:8929/, glab connected",
-		"  ○ GitHub          not needed here", "simdevWarden/repowarden#531")
+		"  ✔ git via glab", "  ○ GitHub          not needed here", "simdevWarden/repowarden#531")
 	r.program(nil, 1, "", glab, "auth", "status", "--hostname", "gitlab.localhost:8929")
-	contains(t, runStatusText(t, r), "  ⚠ platform       gitlab: http://gitlab.localhost:8929/, glab not connected: glab auth login --hostname gitlab.localhost:8929")
+	r.program(nil, 1, "", helper[0], helper[1:]...)
+	contains(t, runStatusText(t, r), "  ⚠ platform       gitlab: http://gitlab.localhost:8929/, glab not connected: glab auth login --hostname gitlab.localhost:8929",
+		"  ⚠ git via glab    to set: devzone platform gitlab")
 }
 
 // TestStatusGitopsAndCatalog checks the GitOps repository line, the pod

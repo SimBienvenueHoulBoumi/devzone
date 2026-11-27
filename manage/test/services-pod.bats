@@ -6,6 +6,7 @@
 
 setup() {
     load commun
+    devzone_pod_pret
     kube_isole
     RACINE="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
     DEVZONE="$RACINE/.devcontainer/devzone"
