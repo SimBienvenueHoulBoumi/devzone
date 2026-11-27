@@ -23,8 +23,7 @@ build_package() {
     cp "$CLI" "$folder/manage/devzone"
     chmod +x "$folder/manage/devzone"
     cp "$RACINE/.devcontainer/argocd/conf.sh" "$folder/.devcontainer/argocd/conf.sh"
-    # Creation and update live in Go (#884); only the manifest is copied
-    cp "$RACINE/manage/scripts/devzone-manifest.sh" "$folder/manage/scripts/"
+    # Creation and update live in Go (#884): no manifest script is copied
     printf '{"name":"devzone","version":"%s"}\n' "$version" >"$folder/package.json"
     printf '# makefile %s\n' "$mark" >"$folder/Makefile"
     printf '*.sh text eol=lf\n' >"$folder/.gitattributes"

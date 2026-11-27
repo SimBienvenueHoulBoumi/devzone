@@ -1,7 +1,7 @@
 // Package manifest reads and writes the .devzone.version manifest of a devzone
 // folder: the version of the package the folder was made from, then the SHA-256
 // of each file copied from the package. It is the Go port of
-// manage/scripts/devzone-manifest.sh (#884). The update compares the files of a
+// manage/scripts/devzone-manifest.sh (#884, script removed). The update compares the files of a
 // folder with this manifest before it replaces any of them, so the list of
 // package files lives here once for both.
 package manifest
