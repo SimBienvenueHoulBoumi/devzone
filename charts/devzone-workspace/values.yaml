@@ -77,6 +77,23 @@ resources:
     cpu: "500m"
     memory: "4Gi"
 
+# Liveness probe of the workspace container (#982). It fails when pids.current
+# goes past thresholdPercent of pids.max (the process limit), and the kubelet
+# then restarts the container: the volumes are kept, only the processes go.
+# PID 1 reaps the zombies (#967), but nothing stops another runaway (a fork loop,
+# processes that never exit): the probe catches that case. The values are
+# deliberately cautious, a short spike must never restart the workspace: the
+# probe waits 120 s after the start, runs every 60 s and needs 5 failures in a
+# row (5 minutes above the threshold at least). Unreadable or unlimited cgroup
+# files count as a success. enabled: false removes the probe.
+livenessProbe:
+  enabled: true
+  thresholdPercent: 85
+  periodSeconds: 60
+  failureThreshold: 5
+  initialDelaySeconds: 120
+  timeoutSeconds: 10
+
 persistence:
   # Identities, logins and caches, kept from one restart to the next. Each path
   # (relative to the home of vscode) is mounted from this volume at its usual
