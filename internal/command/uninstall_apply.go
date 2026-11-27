@@ -4,13 +4,14 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec"
 )
 
+// applyUninstallPlan deletes the Kubernetes objects of the plan, in the order
+// that keeps Applications before their namespaces. Failures are reported and do
+// not stop the other deletions; it returns 1 when one failed.
 func applyUninstallPlan(ctx context.Context, runner exec.Runner, out, errOut io.Writer, plan uninstallPlan) int {
 	status := 0
 	for _, app := range plan.applications {
@@ -48,27 +49,5 @@ func applyUninstallPlan(ctx context.Context, runner exec.Runner, out, errOut io.
 			fmt.Fprintf(out, "✔ namespace removed: %s\n", ns)
 		}
 	}
-	if status == 0 {
-		for _, f := range plan.devzoneFiles {
-			if err := os.RemoveAll(f); err != nil {
-				fmt.Fprintf(errOut, "✖ file %s: %v\n", f, err)
-				status = 1
-			} else {
-				fmt.Fprintf(out, "✔ file removed: %s\n", filepath.Base(f))
-			}
-		}
-	}
 	return status
-}
-
-func isTerminal(r io.Reader) bool {
-	f, ok := r.(*os.File)
-	if !ok {
-		return false
-	}
-	info, err := f.Stat()
-	if err != nil {
-		return false
-	}
-	return info.Mode()&os.ModeCharDevice != 0
 }

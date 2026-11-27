@@ -68,6 +68,7 @@ func existsTrace(path string) bool {
 func TestUninstallWithoutObjectsStillDisables(t *testing.T) {
 	root := devzoneDir(t, "cluster=kind-devzone-ci")
 	runner := fake.New()
+	registerHostProbe(t, runner, root)
 	registerLists(t, runner, "kind-devzone-ci", "", "", "")
 	chdir(t, root)
 	calls := 0
@@ -93,6 +94,7 @@ func TestUninstallDisablesAutomaticStart(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			root := devzoneDir(t, "cluster=kind-devzone-ci")
 			runner := fake.New()
+			registerHostProbe(t, runner, root)
 			registerLists(t, runner, "kind-devzone-ci", "devzone-workspace\n", "", "")
 			runner.On("kubectl", []string{"--context", "kind-devzone-ci", "delete", "namespace", "devzone-workspace", "--ignore-not-found"}, exec.Result{})
 			chdir(t, root)

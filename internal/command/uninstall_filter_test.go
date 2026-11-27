@@ -15,8 +15,9 @@ import (
 
 func TestUninstallKeepsUnsuffixedForNamedInstance(t *testing.T) {
 	root := devzoneDir(t, "cluster=kind-devzone-ci")
-	t.Setenv("DEVZONE_INSTANCE", "mon")
+	t.Setenv("DEVZONE_VOLUMES", "mon")
 	runner := fake.New()
+	registerHostProbe(t, runner, root)
 	registerLists(t, runner, "kind-devzone-ci", "devzone-workspace\ndevzone-gitlab-mon\n", "", "")
 	runner.On("kubectl", []string{"--context", "kind-devzone-ci", "delete", "namespace", "devzone-gitlab-mon", "--ignore-not-found"}, exec.Result{})
 	chdir(t, root)
@@ -78,6 +79,7 @@ func TestCollectUninstallPlanStopsWhenClusterUnreachable(t *testing.T) {
 		t.Fatal(err)
 	}
 	runner := fake.New()
+	registerHostProbe(t, runner, root)
 	runner.SetErr("kubectl", nsArgs("kind-devzone-ci"), exec.Result{}, context.DeadlineExceeded)
 	runner.On("kubectl", appsArgs("kind-devzone-ci"), exec.Result{})
 	runner.On("kubectl", saArgs("kind-devzone-ci"), exec.Result{})

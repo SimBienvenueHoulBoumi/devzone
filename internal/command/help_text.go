@@ -17,9 +17,10 @@ const helpTemplate = `devzone {version}: development workspace in a Kubernetes c
                            the installed package, after backing up the replaced files in
                            .devzone.backup/ (the new image is used at the next workspace start)
   devzone uninstall [--yes]
-                           in a devzone folder: removes Kubernetes objects of this devzone
-                           instance (namespaces, Argo CD Applications, temporary accounts,
-                           .devzone.* files); workspace/ is kept; asks for confirmation
+                           in a devzone folder: removes what this devzone instance created on
+                           the host (containers, images, volumes, kind clusters, metrics-server)
+                           and in the cluster (namespaces, Argo CD Applications, temporary
+                           accounts); workspace/ is kept; asks for confirmation
   devzone ai [check|rapport|guard]         host models, update report or tool-call guard
   devzone workspace start|stop|status|shell|update|deploy
   devzone workspace vscode|copy-to|copy-from|clone

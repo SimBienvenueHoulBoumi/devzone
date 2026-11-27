@@ -13,6 +13,7 @@ import (
 func TestUninstallRemovesTemporaryAccountByName(t *testing.T) {
 	root := devzoneDir(t, "cluster=kind-devzone-ci")
 	runner := fake.New()
+	registerHostProbe(t, runner, root)
 	registerLists(t, runner, "kind-devzone-ci", "", "", "devzone-workspace/devzone-services-admin\n")
 	runner.On("kubectl", []string{"--context", "kind-devzone-ci", "-n", "devzone-workspace", "delete", "serviceaccount", "devzone-services-admin", "--ignore-not-found"}, exec.Result{})
 	chdir(t, root)
@@ -30,6 +31,7 @@ func TestUninstallRemovesTemporaryAccountByName(t *testing.T) {
 func TestUninstallDefaultOwnsAppNamespaces(t *testing.T) {
 	root := devzoneDir(t, "cluster=kind-devzone-ci")
 	runner := fake.New()
+	registerHostProbe(t, runner, root)
 	registerLists(t, runner, "kind-devzone-ci", "devzone-app-demo\ndevzone-gitlab-mon\n", "devzone-argocd/app-1\n", "")
 	runner.On("kubectl", []string{"--context", "kind-devzone-ci", "delete", "namespace", "devzone-app-demo", "--ignore-not-found"}, exec.Result{})
 	runner.On("kubectl", []string{"--context", "kind-devzone-ci", "-n", "devzone-argocd", "delete", "application.argoproj.io", "app-1", "--ignore-not-found"}, exec.Result{})
@@ -64,6 +66,7 @@ func TestUninstallDefaultOwnsAppNamespaces(t *testing.T) {
 func TestUninstallKeepsUnrecognizedObjects(t *testing.T) {
 	root := devzoneDir(t, "cluster=kind-devzone-ci")
 	runner := fake.New()
+	registerHostProbe(t, runner, root)
 	registerLists(t, runner, "kind-devzone-ci", "custom-ns\ndevzone-workspace\ndevzone-workspace-mon\n", "", "")
 	runner.On("kubectl", []string{"--context", "kind-devzone-ci", "delete", "namespace", "devzone-workspace", "--ignore-not-found"}, exec.Result{})
 	chdir(t, root)

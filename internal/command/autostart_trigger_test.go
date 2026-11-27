@@ -146,6 +146,7 @@ func TestPortsCommandsMemoriseAndClearRefusal(t *testing.T) {
 func TestUninstallMemorisesRefusal(t *testing.T) {
 	root := devzoneDir(t, "cluster=kind-devzone-ci")
 	runner := fake.New()
+	registerHostProbe(t, runner, root)
 	registerLists(t, runner, "kind-devzone-ci", "", "", "")
 	chdir(t, root)
 	t.Setenv("PWD", root)

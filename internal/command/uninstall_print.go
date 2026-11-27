@@ -3,25 +3,59 @@ package command
 import (
 	"fmt"
 	"io"
+	"path/filepath"
 )
 
-func printUninstallPlan(out io.Writer, plan uninstallPlan) {
-	fmt.Fprintf(out, "Services cluster context: %s\n", plan.kubeContext)
+// printUninstallPlan prints the inventory and the list of what will be removed:
+// the host resources of the folder and the Kubernetes objects of the instance,
+// then what is kept. Nothing is removed by this function.
+func printUninstallPlan(out io.Writer, root, instance string, kube uninstallPlan, host hostPlan) {
+	fmt.Fprintf(out, "▶ Inventory (folder %s)\n", root)
+	if host.inside {
+		fmt.Fprintln(out, "ℹ Inside the container: only metrics-server and devzone services are handled.")
+		fmt.Fprintln(out, "  Container, image, volumes and kind clusters: make desinstaller on your machine.")
+	}
+	if kube.noCluster {
+		fmt.Fprintln(out, "Services cluster context: none (no devzone services cluster identified: Kubernetes objects not checked)")
+	} else {
+		fmt.Fprintf(out, "Services cluster context: %s\n", kube.kubeContext)
+	}
 	fmt.Fprintln(out, "To remove:")
+	fmt.Fprintln(out, " container(s):")
+	printList(out, host.containers)
+	fmt.Fprintln(out, " image(s):")
+	printList(out, host.images)
+	fmt.Fprintln(out, " former internal Docker (installs before #291):")
+	printList(out, host.dind)
+	fmt.Fprintln(out, " volumes:")
+	printList(out, host.volumes)
+	fmt.Fprintln(out, " metrics-server installed by devzone on:")
+	printList(out, host.metrics)
 	fmt.Fprintln(out, " namespaces:")
-	printList(out, plan.namespaces)
+	printList(out, kube.namespaces)
 	fmt.Fprintln(out, " Argo CD Applications:")
-	printList(out, plan.applications)
+	printList(out, kube.applications)
 	fmt.Fprintln(out, " temporary accounts:")
-	printList(out, plan.tempAccounts)
-	fmt.Fprintln(out, " .devzone.* files:")
-	printList(out, plan.devzoneFiles)
-	fmt.Fprintf(out, "Kept:\n  workspace/: %s\n", plan.workspaceKept)
-	for _, o := range plan.keptObjects {
+	printList(out, kube.tempAccounts)
+	fmt.Fprintln(out, " kind clusters of the instance on host Docker:")
+	printList(out, host.kindClusters)
+	fmt.Fprintf(out, " containers labeled devzone.instance=%s:\n", instance)
+	printList(out, host.labeled)
+	if len(host.kept) > 0 {
+		fmt.Fprintln(out, "Kept (KEEP=logins):")
+		printList(out, host.kept)
+	}
+	fmt.Fprintf(out, "Kept:\n  workspace/: %s\n", kube.workspaceKept)
+	for _, o := range kube.keptObjects {
 		fmt.Fprintf(out, "  %s: not attributable to this instance\n", o)
+	}
+	if !host.inside && len(host.containers) == 0 && len(host.images) == 0 && !host.stateFile {
+		fmt.Fprintln(out, "ℹ No container and no image trace: if an older removal left them,")
+		fmt.Fprintf(out, "  find them with: docker images 'vsc-%s-*' ; docker volume ls -q -f name=dind-var-lib-docker\n", filepath.Base(root))
 	}
 }
 
+// printList prints one indented item per line, or "(none)" for an empty list.
 func printList(out io.Writer, items []string) {
 	if len(items) == 0 {
 		fmt.Fprintln(out, "  (none)")
@@ -31,7 +65,3 @@ func printList(out io.Writer, items []string) {
 		fmt.Fprintf(out, "  %s\n", i)
 	}
 }
-
-// applyUninstallPlan deletes the planned objects. Failures are reported but do
-// not stop cleanup of other objects; the .devzone.* files are removed only
-// when every cluster deletion succeeded, so a retry can still finish the job.

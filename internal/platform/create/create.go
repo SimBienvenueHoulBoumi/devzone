@@ -162,15 +162,6 @@ func Create(opts Options) error {
 	if err := completeGitignore(target); err != nil {
 		return err
 	}
-	// `chmod +x`: add execute to whatever permissions the copy has
-	uninstall := filepath.Join(target, "manage", "scripts", "uninstall.sh")
-	info, err := os.Stat(uninstall)
-	if err != nil {
-		return err
-	}
-	if err := os.Chmod(uninstall, info.Mode().Perm()|0o111); err != nil {
-		return err
-	}
 	if err := createmode.Write(target, mode); err != nil {
 		return fmt.Errorf("✖ cannot write the workspace mode: %w", err)
 	}

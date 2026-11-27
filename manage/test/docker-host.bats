@@ -1,23 +1,32 @@
 #!/usr/bin/env bats
-# Tests of the host Docker (fakes in $BATS_TEST_TMPDIR/bin).
+# Tests of the host Docker (fakes in $BATS_TEST_TMPDIR/bin): the uninstall of the
+# Go command, run on a copy of the devcontainer configuration in a temporary folder.
 
 setup() {
     load commun
-    # uninstall.sh asks the Go program for the host engine check (#884)
     devzone_go_pret
     export BATS_TEST_TMPDIR="${BATS_TEST_TMPDIR:-/tmp/bats}"
     kube_isole
     mkdir -p "$BATS_TEST_TMPDIR/bin"
     export HOME="$BATS_TEST_TMPDIR/home"
     mkdir -p "$HOME"
-    export DEVZONE_INSTANCE="${DEVZONE_INSTANCE:-devzone}"
     export ETAT="$BATS_TEST_TMPDIR/state"
     : >"$ETAT"
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
 }
 
+# Devzone folder of the test: its devcontainer configuration is a copy of the
+# repository's, read by the devcontainer CLI; the uninstall never touches the repository
+dossier_devzone() {
+    local dz="$BATS_TEST_TMPDIR/dz"
+    mkdir -p "$dz/.devcontainer" "$dz/workspace"
+    cp "$BATS_TEST_DIRNAME/../../.devcontainer/devcontainer.json" "$dz/.devcontainer/"
+    export DEVZONE_ROOT="$dz"
+}
+
 # --- uninstall ---------------------------------------------------------
 @test "uninstall : filter by instance, no kind" {
+    dossier_devzone
     export DEVZONE_VOLUMES="mon-devzone"
     export CONFIRMER=yes
     export DEVZONE_IN_CONTAINER=no
@@ -39,7 +48,7 @@ DOCKER
     printf '#!/usr/bin/env bash\necho "kind $*" >>"$BATS_TEST_TMPDIR/kind.log"\n' >"$BATS_TEST_TMPDIR/bin/kind"
     chmod +x "$BATS_TEST_TMPDIR/bin/kind"
     : >"$BATS_TEST_TMPDIR/kind.log"
-    run bash "$BATS_TEST_DIRNAME/../../manage/scripts/uninstall.sh"
+    run "$DEVZONE_HOST_BIN" uninstall
     [ "$status" -eq 0 ]
     grep -q "docker rm -f KIND_DEVZONE_ID" "$BATS_TEST_TMPDIR/docker.log"
     grep -q "docker rm -f KIND_GITLAB_ID" "$BATS_TEST_TMPDIR/docker.log"
@@ -50,6 +59,7 @@ DOCKER
 
 @test "uninstall in the container: no Docker action on the workstation" {
     # docker talks to the host Docker there: the volumes seen would be the workstation's
+    dossier_devzone
     export CONFIRMER=yes
     export DEVZONE_IN_CONTAINER=yes
     cat >"$BATS_TEST_TMPDIR/bin/docker" <<'DOCKER'
@@ -63,9 +73,8 @@ exit 0
 DOCKER
     chmod +x "$BATS_TEST_TMPDIR/bin/docker"
     : >"$BATS_TEST_TMPDIR/docker.log"
-    run bash "$BATS_TEST_DIRNAME/../../manage/scripts/uninstall.sh"
+    run "$DEVZONE_HOST_BIN" uninstall
     [ "$status" -eq 0 ]
     [[ "$output" == *"make desinstaller on your machine"* ]] || false
     ! grep -qE "docker (rm|rmi|volume rm|network rm)" "$BATS_TEST_TMPDIR/docker.log" || false
 }
-

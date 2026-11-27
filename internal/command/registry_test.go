@@ -10,7 +10,7 @@ import (
 func noop(ctx *cli.Context) int { return 0 }
 
 func TestPortedCommands(t *testing.T) {
-	want := []string{"--help", "--version", "-h", "-v", "cluster-offer", "create-mode", "create-workstation", "help", "host-check", "kube-ready", "uninstall", "update", "workspace"}
+	want := []string{"--help", "--version", "-h", "-v", "cluster-offer", "create-mode", "create-workstation", "help", "kube-ready", "uninstall", "update", "workspace"}
 	if got := Ported(); !reflect.DeepEqual(got, want) {
 		t.Fatalf("Ported() = %v, want %v", got, want)
 	}
@@ -24,7 +24,7 @@ func TestPortedSorted(t *testing.T) {
 		// rebuild registry to original state
 		Registry = newDefaultRegistry()
 	})
-	want := []string{"--help", "--version", "-h", "-v", "alpha", "cluster-offer", "create-mode", "create-workstation", "help", "host-check", "kube-ready", "mid", "uninstall", "update", "workspace", "zeta"}
+	want := []string{"--help", "--version", "-h", "-v", "alpha", "cluster-offer", "create-mode", "create-workstation", "help", "kube-ready", "mid", "uninstall", "update", "workspace", "zeta"}
 	if got := Ported(); !reflect.DeepEqual(got, want) {
 		t.Fatalf("Ported() = %v, want %v", got, want)
 	}

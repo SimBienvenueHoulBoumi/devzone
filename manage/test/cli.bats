@@ -3,7 +3,6 @@
 
 setup() {
     load commun
-    # uninstall.sh asks the Go program for the host engine check (#884)
     devzone_go_pret
     kube_isole
     cluster_pret
@@ -17,10 +16,9 @@ setup() {
     run bash "$CLI" mon-devzone --kubernetes
     [ "$status" -eq 0 ]
     [[ "$output" == *"created in"* ]] || false
-    for f in .devcontainer/devcontainer.json .devcontainer/devzone Makefile .gitattributes manage/scripts/uninstall.sh README.md LICENSE workspace/.gitkeep .gitignore .devzone.version; do
+    for f in .devcontainer/devcontainer.json .devcontainer/devzone Makefile .gitattributes README.md LICENSE workspace/.gitkeep .gitignore .devzone.version; do
         [ -e "mon-devzone/$f" ] || { echo "manquant : $f"; return 1; }
     done
-    [ -x mon-devzone/manage/scripts/uninstall.sh ]
     # Neither the npm command nor the tests in a devzone
     [ ! -e mon-devzone/manage/devzone ]
     [ ! -e mon-devzone/manage/test ]
@@ -31,7 +29,7 @@ setup() {
 @test "devzone <folder>: .devzone.version holds the version and one checksum per copied file" {
     bash "$CLI" mon-devzone --kubernetes
     [ "$(sed -n '1p' mon-devzone/.devzone.version)" = "version $(bash "$CLI" --version)" ]
-    for f in .devcontainer/devcontainer.json .devcontainer/devzone Makefile .gitattributes manage/scripts/uninstall.sh README.md LICENSE; do
+    for f in .devcontainer/devcontainer.json .devcontainer/devzone Makefile .gitattributes README.md LICENSE; do
         attendue="$(node -e 'const fs = require("fs"), crypto = require("crypto"); const h = crypto.createHash("sha256"); h.update(fs.readFileSync(process.argv[1])); process.stdout.write(h.digest("hex"))' "mon-devzone/$f")"
         grep -qxF "$attendue  $f" mon-devzone/.devzone.version || { echo "empreinte absente : $f"; return 1; }
     done
@@ -155,7 +153,7 @@ GH
 @test "npm package: expected content, no local nor development file" {
     command -v npm >/dev/null || skip "npm absent"
     fichiers="$(cd "$RACINE" && npm pack --dry-run --json --ignore-scripts 2>/dev/null | node -e 'for (const f of JSON.parse(require("fs").readFileSync(0))[0].files) console.log(f.path)')"
-    for f in manage/devzone .devcontainer/devcontainer.json .devcontainer/devzone Makefile manage/scripts/uninstall.sh README.md LICENSE package.json; do
+    for f in manage/devzone .devcontainer/devcontainer.json .devcontainer/devzone Makefile README.md LICENSE package.json; do
         grep -qx "$f" <<<"$fichiers" || { echo "absent du paquet : $f"; return 1; }
     done
     ! grep -qE '^(manage/test/|\.github/|workspace/|\.devzone\.|\.repowarden\.conf)' <<<"$fichiers" || false
@@ -218,13 +216,14 @@ fake_docker() {
     export PATH="$BATS_TEST_TMPDIR/faux:$PATH"
 }
 
-@test "uninstall.sh: Docker stopped → clear message, once, nothing else started" {
+@test "devzone uninstall: Docker stopped → clear message, once, nothing else started" {
     bash "$CLI" dz-test --kubernetes
     fake_cli 'exit 1'
     fake_docker arrete
-    run bash dz-test/manage/scripts/uninstall.sh
+    cd dz-test
+    run bash "$CLI" uninstall
     [ "$status" -ne 0 ]
-    [[ "$output" == *"Start Docker Desktop"*"make desinstaller"* ]] || false
+    [[ "$output" == *"Start Docker Desktop"*"devzone uninstall"* ]] || false
     [[ "$output" != *"failed to connect"* ]] || false
     [[ "$output" != *Inventaire* ]] || false
     [ "$(grep -c "Start Docker Desktop" <<<"$output")" -eq 1 ]
