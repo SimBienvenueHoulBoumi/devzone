@@ -103,7 +103,7 @@ workspace_helm_deploy() {
     # the old one with IfNotPresent (#515)
     [ "$tag" != latest ] || args+=(--set "image.pullPolicy=Always")
     # egress proxy settings (#633), replayed at each start: commas escaped for helm
-    for p in $(egress_params | sed 's/,/\\,/g'); do args+=(--set "$p"); done
+    for p in $("${DEVZONE_HOST_BIN:?devzone: Go program not found (DEVZONE_HOST_BIN), run it through manage/devzone}" workspace egress params | sed 's/,/\\,/g'); do args+=(--set "$p"); done
     # shellcheck disable=SC2046
     helm $(helm_flag) upgrade --install devzone-workspace "$(chart_path)" "${args[@]}"
 }
@@ -130,8 +130,6 @@ shell_workspace() {
 . "$HERE/scripts/workspace/argocd-workspace.sh"
 # shellcheck source=manage/scripts/workspace/argocd-services.sh
 . "$HERE/scripts/workspace/argocd-services.sh"
-# shellcheck source=manage/scripts/workspace/workspace-egress.sh
-. "$HERE/scripts/workspace/workspace-egress.sh"
 
 case "${1:-}" in
     start) start_workspace "${@:2}" ;;
@@ -142,7 +140,7 @@ case "${1:-}" in
     ports) ports "${@:2}" ;;
     services) services "${@:2}" ;;
     argocd) argocd_cmd "${@:2}" ;;
-    egress) egress_workspace "${@:2}" ;;
+    egress) "${DEVZONE_HOST_BIN:?devzone: Go program not found (DEVZONE_HOST_BIN), run it through manage/devzone}" workspace egress "${@:2}" ;;
     '' | -h | --help | help)
         echo "devzone workspace start|stop|status|shell|ports|services|argocd|update|egress"
         echo "  start [--image repository:tag]  install workspace (image for devzone version by default)"
