@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec/fake"
@@ -54,4 +55,37 @@ func Golden(t *testing.T, name string, got any) {
 	if string(want) != text {
 		t.Fatalf("golden mismatch for %s:\n--- want ---\n%s\n--- got ---\n%s", path, string(want), text)
 	}
+}
+
+// podWorkspaceVars lists the variables that make the host program refuse to run
+// in the pod; subprocess tests must remove them to stay hermetic in that context.
+var podWorkspaceVars = []string{"DEVZONE_WORKSPACE", "DEVZONE_ROOT"}
+
+// CommandEnv returns the process environment without the pod workspace
+// variables, so subprocesses that launch the host program are not refused in
+// the pod (#980).
+func CommandEnv() []string {
+	return FilterEnv(os.Environ(), podWorkspaceVars...)
+}
+
+// FilterEnv returns env without the named variables, preserving every other
+// entry as-is.
+func FilterEnv(env []string, names ...string) []string {
+	drop := make(map[string]struct{}, len(names))
+	for _, name := range names {
+		drop[name] = struct{}{}
+	}
+	out := make([]string, 0, len(env))
+	for _, entry := range env {
+		key, _, ok := strings.Cut(entry, "=")
+		if !ok {
+			out = append(out, entry)
+			continue
+		}
+		if _, found := drop[key]; found {
+			continue
+		}
+		out = append(out, entry)
+	}
+	return out
 }

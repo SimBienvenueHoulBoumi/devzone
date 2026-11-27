@@ -76,6 +76,7 @@ func TestPackageVersionSearchOrder(t *testing.T) {
 }
 
 func TestVersionOfOtherValues(t *testing.T) {
+	hostMode(t)
 	cases := []struct {
 		name, body, want string
 	}{
@@ -95,6 +96,7 @@ func TestVersionOfOtherValues(t *testing.T) {
 }
 
 func TestPrintVersionAliases(t *testing.T) {
+	hostMode(t)
 	setupPackage(t, "1.4.2")
 	for _, name := range []string{"--version", "-v"} {
 		var out, errOut bytes.Buffer
@@ -111,6 +113,7 @@ func TestPrintVersionAliases(t *testing.T) {
 }
 
 func TestVersionWithArgumentIsDelegated(t *testing.T) {
+	hostMode(t)
 	requireBash(t)
 	entry(t, echoArgs+"\n")
 	var out bytes.Buffer

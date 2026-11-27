@@ -39,7 +39,9 @@ func kubeReadyUnreachable(r *fake.Runner) {
 }
 
 // TestKubeReadyReady checks that a reachable cluster gives status 0 and no output.
+
 func TestKubeReadyReady(t *testing.T) {
+	hostMode(t)
 	code, out, errOut, _ := kubeReadyRun(t, nil, []string{"kubectl", "helm"}, kubeReadyPrograms)
 	if code != 0 || out != "" || errOut != "" {
 		t.Fatalf("code = %d, stdout = %q, stderr = %q; want 0 and no output", code, out, errOut)
@@ -49,6 +51,7 @@ func TestKubeReadyReady(t *testing.T) {
 // TestKubeReadyShortOutput checks that the shell caller captures one short line
 // on stdout and the failure status.
 func TestKubeReadyShortOutput(t *testing.T) {
+	hostMode(t)
 	code, out, errOut, _ := kubeReadyRun(t, nil, []string{"kubectl", "helm"}, kubeReadyUnreachable)
 	want := "cluster devzone unreachable (https://127.0.0.1:6443)\n"
 	if code != 1 || out != want || errOut != "" {
@@ -58,6 +61,7 @@ func TestKubeReadyShortOutput(t *testing.T) {
 
 // TestKubeReadyHintOutput checks that --hint switches to the user message.
 func TestKubeReadyHintOutput(t *testing.T) {
+	hostMode(t)
 	code, out, _, _ := kubeReadyRun(t, []string{"--hint"}, []string{"kubectl", "helm"}, kubeReadyUnreachable)
 	want := "✖ Kubernetes cluster devzone unreachable (https://127.0.0.1:6443)\n  Check the contexts: kubectl config get-contexts\n"
 	if code != 1 || out != want {
@@ -68,6 +72,7 @@ func TestKubeReadyHintOutput(t *testing.T) {
 // TestKubeReadyMissingProgram checks that a missing program is reported without
 // running any fake command.
 func TestKubeReadyMissingProgram(t *testing.T) {
+	hostMode(t)
 	code, out, _, r := kubeReadyRun(t, nil, []string{"helm"}, nil)
 	if code != 1 || out != "kubectl missing\n" {
 		t.Fatalf("code = %d, stdout = %q; want 1 and kubectl missing", code, out)
@@ -79,6 +84,7 @@ func TestKubeReadyMissingProgram(t *testing.T) {
 
 // TestKubeReadyUsage checks that an unknown argument is refused with status 2.
 func TestKubeReadyUsage(t *testing.T) {
+	hostMode(t)
 	code, out, errOut, r := kubeReadyRun(t, []string{"--other"}, []string{"kubectl", "helm"}, nil)
 	if code != 2 || out != "" || !strings.Contains(errOut, "usage: devzone kube-ready") {
 		t.Fatalf("code = %d, stdout = %q, stderr = %q", code, out, errOut)

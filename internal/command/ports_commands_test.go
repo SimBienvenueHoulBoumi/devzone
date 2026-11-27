@@ -13,6 +13,7 @@ import (
 
 // TestPortsAutomaticStartRouting checks that enable, disable and the internal
 // agent run in Go, never in the shell entry point.
+
 func TestPortsAutomaticStartRouting(t *testing.T) {
 	var calls []string
 	oldEnable, oldDisable, oldAgent := commandPortsEnable, commandPortsDisable, commandPortsAgent
@@ -70,6 +71,7 @@ func TestUninstallWithoutObjectsStillDisables(t *testing.T) {
 // TestUninstallDisablesAutomaticStart checks that uninstall retires the
 // automatic start, and returns its status when the retirement fails.
 func TestUninstallDisablesAutomaticStart(t *testing.T) {
+	hostMode(t)
 	for _, tc := range []struct {
 		name   string
 		status int
