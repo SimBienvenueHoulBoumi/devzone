@@ -20,10 +20,16 @@ const (
 )
 
 // Status writes the status of the workspace pod, as "kubectl get pods" prints
-// it, then the legacy copies still in the pod. It returns the status of the
-// "kubectl get pods" call: the legacy check cannot fail the command. A kubectl
-// that cannot start gives 127, as a shell does.
+// it, then the legacy copies and a warning for a large core dump in a work
+// folder. It returns the status of the "kubectl get pods" call: the extra checks
+// cannot fail the command. A kubectl that cannot start gives 127, as a shell.
 func Status(r Runner, out, errOut io.Writer) int {
+	return StatusWith(r, out, errOut, projectsDir, coreDumpSize)
+}
+
+// StatusWith is Status with the pod work folder and the core file size function
+// injected, so the warning can be tested with a fake folder and no large file.
+func StatusWith(r Runner, out, errOut io.Writer, root string, size func(string) int64) int {
 	args := append(contextFlag(r), "get", "pods", "--namespace", namespace)
 	status, err := r.Kubectl(args, nil, out, errOut)
 	if err != nil {
@@ -34,6 +40,7 @@ func Status(r Runner, out, errOut io.Writer) int {
 		return status
 	}
 	reportLegacyCopies(r, out)
+	reportLargeCoreDumps(out, root, size)
 	return 0
 }
 
