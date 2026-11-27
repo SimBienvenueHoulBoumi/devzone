@@ -29,9 +29,9 @@ build_package() {
     cp "$CLI" "$folder/manage/devzone"
     chmod +x "$folder/manage/devzone"
     cp "$RACINE/.devcontainer/argocd/conf.sh" "$folder/.devcontainer/argocd/conf.sh"
-    # devzone <folder> sources the mode check (#497) from the package
+    # Creation lives in Go (#884); only the package files are copied from here
 
-    cp "$RACINE/manage/scripts/devzone-manifest.sh" "$RACINE/manage/scripts/devzone-update.sh" "$RACINE/manage/scripts/devzone-create.sh" "$folder/manage/scripts/"
+    cp "$RACINE/manage/scripts/devzone-manifest.sh" "$RACINE/manage/scripts/devzone-update.sh" "$folder/manage/scripts/"
     printf '{"name":"devzone","version":"%s"}\n' "$version" >"$folder/package.json"
     printf '# makefile %s\n' "$mark" >"$folder/Makefile"
     printf '*.sh text eol=lf\n' >"$folder/.gitattributes"

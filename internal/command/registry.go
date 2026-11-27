@@ -56,6 +56,10 @@ func newDefaultRegistry() *cli.Registry {
 		Name: "create-mode",
 		Run:  createModeCommand,
 	})
+	r.Register(cli.Command{
+		Name: "create-workstation",
+		Run:  createWorkstationCommand,
+	})
 	return r
 }
 

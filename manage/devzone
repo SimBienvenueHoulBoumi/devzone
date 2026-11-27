@@ -108,13 +108,38 @@ go_install() {
 
 # Runs the Go binary when it applies (never returns then); otherwise returns
 go_launch() {
-    local platform ext="" name bin want have ver base target
+    local platform ext="" name bin want have ver base target tmpgo
     if [ -n "${DEVZONE_NO_GO:-}" ] || [ -n "${DEVZONE_FROM_GO:-}" ]; then return 0; fi
     platform="$(go_platform)" || return 0
     case "$platform" in windows-*) ext=.exe ;; esac
     name="devzone-$platform$ext"
     bin="$PAQUET/bin/$name"
-    [ -f "$bin" ] || return 0
+    if [ ! -f "$bin" ]; then
+        # No packaged binary (a checkout): resolve one with go when it is
+        # available, into the cache, and export it; stay in bash then (#884)
+        ver="$(version)"
+        base="${XDG_CACHE_HOME:-}"
+        if [ -z "$base" ] && [ -n "${HOME:-}" ]; then base="$HOME/.cache"; fi
+        target=""
+        if [ -n "$base" ] && [ "$ver" != inconnue ] && command -v go >/dev/null 2>&1; then
+            target="$base/devzone/bin/$ver/devzone$ext"
+            if [ ! -x "$target" ] || [ "$(cat "$target.sha256" 2>/dev/null)" != built ]; then
+                tmpgo="$(mktemp "${TMPDIR:-/tmp}/devzone-go.XXXXXX")" || tmpgo=""
+                if [ -n "$tmpgo" ] && (cd "$PAQUET" && go build -o "$tmpgo" ./cmd/devzone 2>/dev/null) \
+                    && mkdir -p "$(dirname "$target")" && mv -f "$tmpgo" "$target" && printf 'built\n' >"$target.sha256"; then
+                    :
+                else
+                    rm -f "$tmpgo"
+                    target=""
+                fi
+            fi
+        fi
+        if [ -n "$target" ]; then export DEVZONE_HOST_BIN="$target"; fi
+        return 0
+    fi
+    # The shell scripts still run call the Go program for their checks (#884):
+    # the launcher exports it first; the exec path below refines it to the cache
+    export DEVZONE_HOST_BIN="$bin"
     ver="$(version)"
     [ "$ver" != inconnue ] || return 0
     base="${XDG_CACHE_HOME:-}"
@@ -233,10 +258,7 @@ case "${1:-}" in
             echo "✖ devzone $1: pod command; run it in the pod (make shell), or choose another folder name" >&2
             exit 2
         fi
-        # shellcheck source=SCRIPTDIR/scripts/devzone-manifest.sh
-        . "$PAQUET/manage/scripts/devzone-manifest.sh"
-        # shellcheck source=SCRIPTDIR/scripts/devzone-create.sh
-        . "$PAQUET/manage/scripts/devzone-create.sh"
-        create_workstation "$1" "${@:2}"
+        # Creation lives in Go (#884): the shell only names the folder and the package
+        DEVZONE_PAQUET="$PAQUET" "${DEVZONE_HOST_BIN:?devzone: Go program not found (DEVZONE_HOST_BIN), run it through manage/devzone}" create-workstation "$1" "${@:2}"
         ;;
 esac
