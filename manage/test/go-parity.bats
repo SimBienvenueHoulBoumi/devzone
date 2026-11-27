@@ -11,6 +11,9 @@ setup_file() {
     RACINE="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
     export DZ_GO="$BATS_FILE_TMPDIR/dz"
     (cd "$RACINE" && go build -o "$DZ_GO" ./cmd/devzone) || { echo "go build failed"; return 1; }
+    # Since #934 the workspace commands run in the Go program: the bash entry
+    # point calls them through DEVZONE_HOST_BIN, the binary of this file
+    export DEVZONE_HOST_BIN="$DZ_GO"
 }
 
 setup() {
