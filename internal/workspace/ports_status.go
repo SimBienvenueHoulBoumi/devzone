@@ -15,8 +15,11 @@ import (
 // It repairs an automatic start that is present but not loaded, or missing while
 // still wanted, and says so in place of the enabled line. It reads the state
 // folder of portsDir() and returns 0 even when that folder is missing or
-// unreadable.
+// unreadable. Outside a devzone folder it refuses with status 1.
 func PortsStatus(out io.Writer) int {
+	if portsDevzoneGuard(out) {
+		return 1
+	}
 	dir := portsDir()
 	pid := readPid(filepath.Join(dir, "pid"))
 	if alive(pid) {

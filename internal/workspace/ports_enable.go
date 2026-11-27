@@ -16,10 +16,14 @@ import (
 // it is the manager, not enable, that owns the process afterwards. On Linux a
 // replaced copy is followed by an explicit restart, because enable --now leaves
 // an already active unit running the old binary. On Windows the task is created
-// for the logon of the user and started at once (#903).
+// for the logon of the user and started at once (#903). Outside a devzone
+// folder it refuses with status 1 and creates nothing.
 func PortsEnable(out, errOut io.Writer) int {
 	if portsAutoStartGuard(errOut) {
 		return 0
+	}
+	if portsDevzoneGuard(errOut) {
+		return 1
 	}
 	env, err := portsAgentEnvironment()
 	if err != nil {

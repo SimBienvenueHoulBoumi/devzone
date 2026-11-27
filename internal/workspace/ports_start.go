@@ -18,6 +18,7 @@ var watcherExecutable = os.Executable
 // and only one: it exists so that the user types one command and the ports of
 // the cluster are on localhost afterwards, without keeping a terminal busy. It
 // first repairs a wanted automatic start that lost its definition or its load.
+// Outside a devzone folder it refuses with status 1 and creates nothing.
 //
 // Under bats, without DEVZONE_PORTS_WORKSPACE_REAL=yes, it only prints a
 // refusal on errOut (a test must never start a real watcher). Otherwise the
@@ -30,6 +31,9 @@ func PortsStart(out, errOut io.Writer) int {
 	if os.Getenv("BATS_TEST_TMPDIR") != "" && os.Getenv("DEVZONE_PORTS_WORKSPACE_REAL") != "yes" {
 		fmt.Fprintln(errOut, "✖ port watcher refused under bats (DEVZONE_PORTS_WORKSPACE_REAL=yes required)")
 		return 0
+	}
+	if portsDevzoneGuard(errOut) {
+		return 1
 	}
 	if line := portsRepairAutoStart(errOut); line != "" {
 		fmt.Fprintln(out, line)
