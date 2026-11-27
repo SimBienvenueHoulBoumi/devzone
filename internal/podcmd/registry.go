@@ -27,6 +27,10 @@ func newDefaultRegistry() *cli.Registry {
 		Run:  runAgent,
 	})
 	r.Register(cli.Command{
+		Name: "subreaper",
+		Run:  runSubreaper,
+	})
+	r.Register(cli.Command{
 		Name: "ai",
 		Run:  runAI,
 	})
