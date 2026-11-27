@@ -43,6 +43,10 @@ func newDefaultRegistry() *cli.Registry {
 		Run:  runRepair,
 	})
 	r.Register(cli.Command{
+		Name: "build",
+		Run:  runBuild,
+	})
+	r.Register(cli.Command{
 		Name: "services-admin",
 		Run:  runServicesAdmin,
 	})
