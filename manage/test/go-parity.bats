@@ -349,7 +349,9 @@ ports_state() {
     [ ! -s "$BATS_TEST_TMPDIR/go.out" ]
     [ ! -s "$BATS_TEST_TMPDIR/go.err" ]
     [ ! -e "$dgo/pid" ] && [ ! -e "$dgo/lock" ] && [ ! -e "$dgo/restart" ]
-    [ -z "$(ls -A "$dgo/relays" 2>/dev/null)" ]
+    [ ! -e "$dgo/relays/5432" ] && [ ! -e "$dgo/relays/8080" ] && [ ! -e "$dgo/relays/7070" ]
+    [ -f "$dgo/relays/.6000" ] && process_dead "$(cat "$dgo/relays/.6000")" || false
+    [ -e "$dgo/taken/3000" ]
     process_dead "$pidg" || false
 }
 
