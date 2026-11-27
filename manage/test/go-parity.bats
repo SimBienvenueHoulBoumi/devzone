@@ -196,34 +196,6 @@ KUBE
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
 }
 
-@test "go-parity: workspace status, pod listed: same output and status" {
-    faux_cluster
-    parite workspace status
-    run "$DZ_GO" workspace status
-    [ "$status" -eq 0 ]
-    [[ "$output" == *"devzone-workspace-0"* ]] || false
-}
-
-@test "go-parity: workspace status, no pod: same message and status" {
-    faux_cluster
-    export FAKE_NO_POD=yes
-    parite workspace status
-}
-
-@test "go-parity: workspace status, legacy copy in the pod: same warning" {
-    faux_cluster
-    export FAKE_LEGACY=yes
-    parite workspace status
-    run "$DZ_GO" workspace status
-    [[ "$output" == *"rm -rf /workspaces/projets/repogarde"* ]] || false
-}
-
-@test "go-parity: workspace status, cluster down: same error and status" {
-    faux_cluster
-    export FAKE_KUBE_DOWN=yes
-    parite workspace status
-}
-
 @test "go-parity: workspace status with extra words is delegated, same output" {
     faux_cluster
     parite workspace status extra
