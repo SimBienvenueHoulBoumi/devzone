@@ -9,8 +9,6 @@
 # shellcheck disable=SC2034 # CREATE_MODE is read by manage/devzone (creer)
 # shellcheck source=manage/scripts/kube-ready.sh
 . "$(dirname "${BASH_SOURCE[0]}")/kube-ready.sh"
-# shellcheck source=manage/scripts/create-cluster.sh
-. "$(dirname "${BASH_SOURCE[0]}")/create-cluster.sh"
 
 # Context shown to the user: devzone if declared, otherwise the current one.
 kube_context() {
@@ -50,7 +48,9 @@ create_mode_choose() {
     fi
     # No option, in a terminal: a menu (remote cluster, minikube) instead of a
     # failure (#653); the choice is accepted only if the cluster then answers.
-    if [ -z "$option" ] && create_cluster_offer && reason="$(kube_ready_reason)"; then
+    # The menu is the Go program's (#884), found through DEVZONE_HOST_BIN; without
+    # it no menu is offered (false), and the failure below lists the ways to get a cluster
+    if [ -z "$option" ] && "${DEVZONE_HOST_BIN:-false}" cluster-offer && reason="$(kube_ready_reason)"; then
         CREATE_MODE=kubernetes
         echo "✔ Kubernetes ready ($(kube_context)): workspace in the cluster"
         create_mode_existing

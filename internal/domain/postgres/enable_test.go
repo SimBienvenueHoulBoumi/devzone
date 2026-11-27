@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"io/fs"
 	"os"
 	osexec "os/exec"
 	"path/filepath"
@@ -8,10 +9,64 @@ import (
 	"testing"
 )
 
-// runDevzone runs the real entry point with the isolated environment of a test.
+// launcherCopy copies the .devcontainer folder of the repository to a temp
+// folder, with a fake Go pod for both architectures: the launcher then runs
+// without the program built by the image (bin/ is not copied). The fake pod
+// accepts every command and prints nothing; the state file is the one the test
+// writes, since the pod is what creates it in the image.
+func launcherCopy(t *testing.T) string {
+	t.Helper()
+	src := repoDevcontainer(t)
+	dst := t.TempDir()
+	err := filepath.WalkDir(src, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(src, path)
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			if rel == "bin" {
+				return filepath.SkipDir
+			}
+			return os.MkdirAll(filepath.Join(dst, rel), 0o755)
+		}
+		info, err := d.Info()
+		if err != nil {
+			return err
+		}
+		body, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		return os.WriteFile(filepath.Join(dst, rel), body, info.Mode().Perm())
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	bin := filepath.Join(dst, "bin")
+	if err := os.MkdirAll(bin, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// The summary (no command, status, modules) stays in the shell, as in the image.
+	fakePod := "#!/usr/bin/env bash\n" +
+		"case \"${1:-}\" in\n" +
+		"    handles) case \"${2:-}\" in '' | status | modules) exit 1 ;; *) exit 0 ;; esac ;;\n" +
+		"esac\n" +
+		"exit 0\n"
+	for _, arch := range []string{"amd64", "arm64"} {
+		if err := os.WriteFile(filepath.Join(bin, "devzone-pod-linux-"+arch), []byte(fakePod), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return dst
+}
+
+// runDevzone runs the launcher of a copy of the repository with the isolated environment of a test.
 func runDevzone(t *testing.T, args ...string) (string, int) {
 	t.Helper()
-	command := osexec.Command("bash", append([]string{filepath.Join(repoDevcontainer(t), "devzone")}, args...)...)
+	command := osexec.Command("bash", append([]string{filepath.Join(launcherCopy(t), "devzone")}, args...)...)
 	command.Stdin = strings.NewReader("")
 	out, err := command.CombinedOutput()
 	if err == nil {
@@ -28,6 +83,8 @@ func runDevzone(t *testing.T, args ...string) (string, int) {
 // postgres as optional with the enable command, as postgres.bats did.
 func TestPostgresModuleKnownDisabled(t *testing.T) {
 	newFixture(t)
+	// The state every module off, as the Go pod writes it on the first start.
+	writeState(t, "ai=off", "kubernetes=off", "gitlab=off", "postgres=off", "argocd=off", "mysql=off")
 	out, code := runDevzone(t)
 	if code != 0 {
 		t.Fatalf("devzone: code %d, output %q", code, out)
@@ -42,8 +99,10 @@ func TestPostgresModuleKnownDisabled(t *testing.T) {
 func TestEnableContextMismatch(t *testing.T) {
 	f := newFixture(t)
 	writeState(t, "cluster=kind-devzone")
+	writeDevzoneStub(t, `if [ "$1 $2" = "kube saved" ]; then printf 'kind-devzone'; exit 0; fi
+exit 1
+`)
 	body := `
-devzone() { [ "$1 $2" = "kube saved" ] && printf 'kind-devzone'; }
 apply_postgres on --context host-cluster
 `
 	out, code := shellServices(t, body, "")

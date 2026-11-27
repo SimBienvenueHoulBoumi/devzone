@@ -2,6 +2,8 @@ package gitlab
 
 import (
 	"encoding/base64"
+	"errors"
+	"io"
 	"os"
 	"strings"
 	"testing"
@@ -39,26 +41,80 @@ func TestInstallArgoCDModuleOn(t *testing.T) {
 	if !applied {
 		t.Errorf("no apply of the Application in calls: %v", f.calls())
 	}
-	if !f.hasCall("delete secret -l owner=helm,name=gitlab") {
-		t.Errorf("no release secret adoption in calls: %v", f.calls())
+	for _, forbidden := range []string{"delete secret", "delete pvc", "delete namespace"} {
+		if f.hasCall(forbidden) {
+			t.Errorf("data was removed during adoption (%s): %v", forbidden, f.calls())
+		}
+	}
+	if f.hasCall("upgrade --install gitlab") {
+		t.Errorf("helm direct was used with Argo CD on: %v", f.calls())
 	}
 }
 
-// TestInstallArgoCDUnknownRevision checks the direct helm path on a
-// development clone (version 0.0.0, gitlab-argocd.bats).
-func TestInstallArgoCDUnknownRevision(t *testing.T) {
+// TestInstallArgoCDUnknownRevisionFails checks that a development clone with
+// no usable revision fails before installing anything, with no helm fallback.
+func TestInstallArgoCDUnknownRevisionFails(t *testing.T) {
 	f := newFixture(t)
 	f.programInstallFull()
 	f.writeFile(".devzone.modules", "argocd=on\n")
 	f.writeFile("package.json", `{"version": "0.0.0"}`+"\n")
+	if err := os.MkdirAll(f.root+"/charts/devzone-gitlab", 0o755); err != nil {
+		t.Fatal(err)
+	}
+	f.writeFile("charts/devzone-gitlab/Chart.yaml", "name: devzone-gitlab\n")
+	f.r.On("kubectl", []string{"--kubeconfig=" + kube.AdminKubeconfig("devzone-services"),
+		"--context", "devzone-services", "get", "namespace", "devzone-argocd"}, exec.Result{})
+	f.r.OnError("git", []string{"ls-remote", "--tags", "--refs", "https://github.com/SimBienvenueHoulBoumi/devzone.git"},
+		exec.Result{}, errors.New("network unreachable"))
+	if code := f.run("install"); code == 0 {
+		t.Fatalf("install succeeded without a revision: %v / %q", f.calls(), f.outStr())
+	}
+	if !strings.Contains(f.errStr(), "cannot list the tags") || !strings.Contains(f.errStr(), "DEVZONE_ARGOCD_REVISION") {
+		t.Fatalf("unclear failure: %q", f.errStr())
+	}
+	if f.hasCall("apply -f -") || f.hasCall("upgrade --install gitlab") {
+		t.Errorf("partial installation after a revision failure: %v", f.calls())
+	}
+}
+
+// TestInstallArgoCDPublishedTag checks that a development clone adopts the
+// newest published tag containing the chart instead of installing with helm.
+func TestInstallArgoCDPublishedTag(t *testing.T) {
+	f := newFixture(t)
+	f.programInstallFull()
+	f.writeFile(".devzone.modules", "argocd=on\n")
+	f.writeFile("package.json", `{"version": "0.0.0"}`+"\n")
+	if err := os.MkdirAll(f.root+"/charts/devzone-gitlab", 0o755); err != nil {
+		t.Fatal(err)
+	}
+	f.writeFile("charts/devzone-gitlab/Chart.yaml", "name: devzone-gitlab\n")
+	f.r.On("kubectl", []string{"--kubeconfig=" + kube.AdminKubeconfig("devzone-services"),
+		"--context", "devzone-services", "get", "namespace", "devzone-argocd"}, exec.Result{})
+	repo := "https://github.com/SimBienvenueHoulBoumi/devzone.git"
+	f.r.On("git", []string{"ls-remote", "--tags", "--refs", repo}, exec.Result{
+		Stdout: []byte("sha\trefs/tags/v9.0.0\nsha\trefs/tags/v2.1.0\n"),
+	})
+	f.r.On("gh", []string{"api", "repos/SimBienvenueHoulBoumi/devzone/contents/charts/devzone-gitlab?ref=v9.0.0", "--jq", ".type"}, exec.Result{Code: 1})
+	f.r.On("gh", []string{"api", "repos/SimBienvenueHoulBoumi/devzone/contents/charts/devzone-gitlab?ref=v2.1.0", "--jq", ".type"}, exec.Result{Stdout: []byte("dir\n")})
+	f.r.On("kubectl", []string{"--context", "devzone", "-n", "devzone-argocd", "apply", "-f", "-"}, exec.Result{})
 	if code := f.run("install"); code != 0 {
 		t.Fatalf("code = %d, stderr = %q", code, f.errStr())
 	}
-	if f.hasCall("--context devzone -n devzone-argocd apply") {
-		t.Errorf("an Application was applied: %v", f.calls())
+	manifest := ""
+	for _, c := range f.r.Calls() {
+		if c.Name == "kubectl" && strings.Join(c.Args, " ") == "--context devzone -n devzone-argocd apply -f -" && c.Opts.Stdin != nil {
+			data, err := io.ReadAll(c.Opts.Stdin)
+			if err != nil {
+				t.Fatal(err)
+			}
+			manifest = string(data)
+		}
 	}
-	if !f.hasCall("upgrade --install gitlab") {
-		t.Errorf("no helm upgrade in calls: %v", f.calls())
+	if !strings.Contains(manifest, "targetRevision: v2.1.0") {
+		t.Errorf("the published tag was not used: %s / %v", manifest, f.calls())
+	}
+	if f.hasCall("upgrade --install gitlab") {
+		t.Errorf("helm direct was used with Argo CD on: %v", f.calls())
 	}
 }
 

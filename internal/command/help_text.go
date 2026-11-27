@@ -20,7 +20,8 @@ const helpTemplate = `devzone {version}: development workspace in a Kubernetes c
                            in a devzone folder: removes Kubernetes objects of this devzone
                            instance (namespaces, Argo CD Applications, temporary accounts,
                            .devzone.* files); workspace/ is kept; asks for confirmation
-  devzone workspace start|stop|status|shell|update
+  devzone ai [check|rapport|guard]         host models, update report or tool-call guard
+  devzone workspace start|stop|status|shell|update|deploy
   devzone workspace vscode|copy-to|copy-from|clone
                            Kubernetes workspace: drives the devzone-workspace chart
                            (start installs it, stop removes it from the cluster)

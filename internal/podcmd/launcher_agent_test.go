@@ -15,10 +15,8 @@ func launcherWithoutBinary(t *testing.T) string {
 	t.Helper()
 	dir := launcherSetup(t, false)
 	for _, name := range []string{
-		"help.sh", "state-gitops.sh", "devzone-modules.sh", "devzone-ai.sh",
-		"devzone-ai-guard.sh", "devzone-skill.sh", "devzone-services.sh",
+		"help.sh", "state-gitops.sh", "devzone-modules.sh", "devzone-services.sh",
 		"devzone-repair.sh", "devzone-platform.sh", "devzone-version.sh", "devzone-status.sh",
-		"ai/host-models.sh", "ai/host-check.sh",
 	} {
 		p := filepath.Join(dir, name)
 		os.MkdirAll(filepath.Dir(p), 0o755)

@@ -7,7 +7,9 @@ import "syscall"
 // terminate asks process pid to stop, as kill does in the Unix watcher. It
 // opens the process with the terminate right and asks it to exit; a process
 // that is gone or that cannot be opened is already stopped, so there is nothing
-// to report. The handle is always closed, including on failure.
+// to report. The handle is always closed, including on failure. The exit code
+// is 0, as the Unix watcher exits 0 on SIGTERM: Task Scheduler relaunches a task
+// whose run failed, so a watcher stopped on purpose must not look like a failure.
 func terminate(pid int) {
 	if pid < 1 {
 		return
@@ -17,7 +19,7 @@ func terminate(pid int) {
 		return
 	}
 	defer syscall.CloseHandle(handle)
-	_ = syscall.TerminateProcess(handle, 1)
+	_ = syscall.TerminateProcess(handle, 0)
 }
 
 // alive reports whether process pid exists and is still running (kill -0 in

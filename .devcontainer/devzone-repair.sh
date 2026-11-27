@@ -66,20 +66,20 @@ repair_item() {
 repair_workstation() {
     repair_failed=0
     if [ "$(value_of gitlab)" = on ]; then
-        repair_item "gitlab name" devzone gitlab host-set
-        repair_item "gitlab relay" devzone gitlab relay-start
+        repair_item "gitlab name" "$ICI/devzone" gitlab host-set
+        repair_item "gitlab relay" "$ICI/devzone" gitlab relay-start
     fi
     if [ "$(value_of postgres)" = on ]; then
-        repair_item "postgres relay" devzone postgres relay-start
+        repair_item "postgres relay" "$ICI/devzone" postgres relay-start
     fi
     if [ "$(value_of argocd)" = on ]; then
         repair_item "argocd relay" "$ICI/devzone" argocd relay-start
     fi
     if [ "$(value_of mysql)" = on ]; then
-        repair_item "mysql relay" devzone mysql relay-start
+        repair_item "mysql relay" "$ICI/devzone" mysql relay-start
     fi
-    repair_item "catalog watcher" env DEVZONE_STATE="$ETAT" DEVZONE_CATALOG_REAL=yes devzone catalog-watcher start
-    repair_item "credentials" devzone passwords regenerate
-    devzone cluster clean || true
+    repair_item "catalog watcher" env DEVZONE_STATE="$ETAT" DEVZONE_CATALOG_REAL=yes "$ICI/devzone" catalog-watcher start
+    repair_item "credentials" "$ICI/devzone" passwords regenerate
+    "$ICI/devzone" cluster clean || true
     return "$repair_failed"
 }

@@ -21,6 +21,10 @@ func newDefaultRegistry() *cli.Registry {
 		Run:  runAgent,
 	})
 	r.Register(cli.Command{
+		Name: "ai",
+		Run:  runAI,
+	})
+	r.Register(cli.Command{
 		Name: "ticket",
 		Run:  runTicket,
 	})
@@ -39,6 +43,10 @@ func newDefaultRegistry() *cli.Registry {
 	r.Register(cli.Command{
 		Name: "argocd",
 		Run:  runArgocd,
+	})
+	r.Register(cli.Command{
+		Name: "metrics",
+		Run:  runMetrics,
 	})
 	r.Register(cli.Command{
 		Name: "gitlab",
@@ -75,10 +83,6 @@ func newDefaultRegistry() *cli.Registry {
 	r.Register(cli.Command{
 		Name: "clusters",
 		Run:  runClusters,
-	})
-	r.Register(cli.Command{
-		Name: "metrics",
-		Run:  runMetrics,
 	})
 	r.Register(cli.Command{
 		Name: "use",

@@ -38,9 +38,23 @@ func runClusters(ctx *cli.Context) int {
 	return kube.Kube{Runner: ctx.Runner}.View(context.Background(), kube.SavedContext(statePath()), ctx.Out, ctx.Err)
 }
 
-// runMetrics installs or removes metrics-server in Go.
+// runMetrics installs or removes metrics-server. With Argo CD active and no
+// explicit context, the install is an Application and a bare remove also
+// deletes it; explicit contexts keep the direct Go installer and leave the
+// Application alone, since the user targeted another cluster.
 func runMetrics(ctx *cli.Context) int {
-	return kube.Kube{Runner: ctx.Runner}.Metrics(context.Background(), ctx.Args, ctx.Out, ctx.Err)
+	held := metricsHeldByArgoCD(ctx)
+	if held && len(ctx.Args) == 0 {
+		return metricsApplication(ctx, "on")
+	}
+	remove := len(ctx.Args) > 0 && ctx.Args[0] == "remove"
+	code := kube.Kube{Runner: ctx.Runner}.Metrics(context.Background(), ctx.Args, ctx.Out, ctx.Err)
+	if remove && held && len(ctx.Args) == 1 {
+		if appCode := metricsApplication(ctx, "off"); appCode != 0 {
+			code = appCode
+		}
+	}
+	return code
 }
 
 // runUse switches the working cluster without changing the services cluster.

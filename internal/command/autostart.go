@@ -40,28 +40,26 @@ var containerEnvironmentVars = []string{
 }
 
 // portsServiceManagerAvailable tells whether this host can run the automatic
-// start of the port watcher: Windows has none (#883), and a Unix host without
-// systemctl or launchctl cannot manage it. It is a variable so a test can
-// exercise both cases without touching a real service manager.
+// start of the port watcher: a Unix host without systemctl or launchctl cannot
+// manage it, and Windows needs schtasks, the Task Scheduler command line (#903).
+// It is a variable so a test can exercise the cases without touching a real
+// service manager.
 var portsServiceManagerAvailable = func() bool {
-	if workspace.PortsPlatform() == "windows" {
-		return false
-	}
 	tool := "systemctl"
-	if workspace.PortsPlatform() == "darwin" {
+	switch workspace.PortsPlatform() {
+	case "darwin":
 		tool = "launchctl"
+	case "windows":
+		tool = "schtasks"
 	}
 	_, err := osexec.LookPath(tool)
 	return err == nil
 }
 
 // portsIsWorkstation reports whether the command runs on the user's workstation
-// and not in the pod or in a development container. It is injectable so every
-// case can be tested on the same machine.
+// and not in the pod or in a development container. Windows is a workstation
+// too (#903). It is injectable so every case can be tested on the same machine.
 var portsIsWorkstation = func() bool {
-	if workspace.PortsPlatform() == "windows" {
-		return false
-	}
 	for _, key := range containerEnvironmentVars {
 		if os.Getenv(key) != "" {
 			return false
@@ -94,8 +92,8 @@ var portsIsTest = func() bool {
 
 // EnsurePortsAutoStart installs or repairs the automatic start of the watcher
 // of this devzone folder, silently once everything is current. It does nothing
-// in the pod, in a development container, in CI, under tests, on Windows,
-// without a service manager, after a refusal the user memorised, or after a
+// in the pod, in a development container, in CI, under tests, without a
+// service manager, after a refusal the user memorised, or after a
 // failure of the service manager with this program. It never changes the
 // status of the command that triggered it: an installation problem is reported
 // on errOut but stays a warning. Only the first installation says

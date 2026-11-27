@@ -65,6 +65,18 @@ bash() {
 	return shellCommand(t, program, stdin, append(scripts, args...))
 }
 
+// writeDevzoneStub installs a stand-in for the launcher at "$ICI/devzone", the
+// path the services call for the Go commands, and points ICI to its folder for
+// the test. The script is the body of the stand-in, after the shebang.
+func writeDevzoneStub(t *testing.T, script string) {
+	t.Helper()
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "devzone"), []byte("#!/usr/bin/env bash\n"+script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("ICI", dir)
+}
+
 // shellCommand runs a sourced bash program and reports its output and status.
 func shellCommand(t *testing.T, program, stdin string, args []string) (string, int) {
 	t.Helper()

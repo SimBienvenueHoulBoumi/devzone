@@ -19,14 +19,16 @@ import (
 // workspace, stop is delegated too. shell gets the terminal of the user as its
 // standard input. The watcher commands start, loop and agent run in Go on
 // Windows too (#883): the relays are real processes there, as on the other
-// systems. Only the automatic start stays out of Go on Windows; it belongs to
-// another ticket.
+// systems, and so does their automatic start, a scheduled task on Windows (#903).
 func workspaceCommand(ctx *cli.Context) int {
 	args := ctx.Args
 	out := ctx.Out
 	errOut := ctx.Err
 	if len(args) >= 1 && args[0] == "start" {
 		return startWorkspace(ctx)
+	}
+	if len(args) >= 1 && args[0] == "deploy" {
+		return workspaceDeploy(ctx)
 	}
 	if len(args) >= 1 && args[0] == "clone" {
 		url, name := "", ""

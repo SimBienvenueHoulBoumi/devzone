@@ -5,12 +5,18 @@ import (
 	"os"
 )
 
-// catalogActiveCmd reports whether Argo CD can hold an app (exit 0/1).
+// catalogActiveCmd reports whether Argo CD holds an app: 0 yes, 1 no, 2 when
+// the module is on but no revision can be resolved, with the reason printed.
 func (m *module) catalogActiveCmd(args []string) int {
 	if len(args) != 1 {
 		return 2
 	}
-	if m.catalogArgocdActive(args[0]) {
+	active, err := m.catalogArgocdActive(args[0])
+	if err != nil {
+		fmt.Fprintln(m.errOut, err)
+		return 2
+	}
+	if active {
 		return 0
 	}
 	return 1
@@ -59,15 +65,26 @@ func (m *module) catalogApplyCmd(args []string) int {
 	if repoURL == "" {
 		repoURL = "https://github.com/SimBienvenueHoulBoumi/devzone.git"
 	}
-	if code := m.gitopsApplyApplication("devzone-"+app, "service", ns, repoURL, m.argocdRevision(), "charts/devzone-"+app, params...); code != 0 {
+	revision, err := m.argocdRevision()
+	if err != nil {
+		fmt.Fprintln(m.errOut, err)
+		return 1
+	}
+	if code := m.gitopsApplyApplication("devzone-"+app, "service", ns, repoURL, revision, "charts/devzone-"+app, params...); code != 0 {
 		return code
 	}
 	_, _ = m.kubectl("-n", "devzone-argocd", "annotate", "application.argoproj.io", "devzone-"+app, "argocd.argoproj.io/refresh=normal", "--overwrite")
 	return 0
 }
 
-// catalogStatus prints argocd revision; helper for shell callers.
+// catalogRevisionCmd prints the resolved revision; a failure says why no
+// revision can be used instead of printing an empty line.
 func (m *module) catalogRevisionCmd(args []string) int {
-	fmt.Fprintln(m.out, m.argocdRevision())
+	revision, err := m.argocdRevision()
+	if err != nil {
+		fmt.Fprintln(m.errOut, err)
+		return 1
+	}
+	fmt.Fprintln(m.out, revision)
 	return 0
 }

@@ -28,7 +28,12 @@ func (m *module) servicesApplicationApply(svc string) int {
 		}
 		params = append(params, p...)
 	}
-	return m.gitopsApplyApplication("devzone-"+svc, "service", "devzone-"+svc, repoURL, m.argocdRevision(), "charts/devzone-"+svc, params...)
+	revision, err := m.argocdRevision()
+	if err != nil {
+		fmt.Fprintln(m.errOut, err)
+		return 1
+	}
+	return m.gitopsApplyApplication("devzone-"+svc, "service", "devzone-"+svc, repoURL, revision, "charts/devzone-"+svc, params...)
 }
 
 // servicesChartMySQL returns Helm params for mysql chart.

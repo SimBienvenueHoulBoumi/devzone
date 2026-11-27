@@ -1,49 +1,33 @@
 package mysql
 
 import (
+	"bytes"
 	"fmt"
 	"io"
-	"os"
-	"path/filepath"
-	"regexp"
 
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/domain/argocd"
 )
 
-var versionLine = regexp.MustCompile(`"version"\s*:\s*"([^"]*)"`)
-
-// argocdActive reports whether the Argo CD module holds this application: the
-// module is on, the chart exists, Argo CD is installed and a revision is known.
-func (e *env) argocdActive() bool {
+// argocdState reports whether the Argo CD module holds MySQL. Exit status 2
+// means that the module is on without a usable revision: that is an error and
+// not a reason to install with helm, so the reason is returned to the caller.
+func (e *env) argocdState() (bool, error) {
+	var reason bytes.Buffer
 	opts := argocd.Options{
 		Runner:    e.runner(),
 		Out:       io.Discard,
-		Err:       io.Discard,
+		Err:       &reason,
 		Root:      e.root,
 		StatePath: e.state.Path(),
 	}
-	return argocd.Run(e.ctx, []string{"catalog-active", "mysql"}, io.Discard, io.Discard, opts) == 0
-}
-
-// revision is the Git revision of the Applications: the explicit override, or
-// the version tag of the package; a development clone has no published chart.
-func (e *env) revision() string {
-	if value := os.Getenv("DEVZONE_ARGOCD_REVISION"); value != "" {
-		return value
+	code := argocd.Run(e.ctx, []string{"catalog-active", "mysql"}, io.Discard, &reason, opts)
+	if code == 0 {
+		return true, nil
 	}
-	data, err := os.ReadFile(filepath.Join(e.root, "package.json"))
-	if err != nil {
-		return ""
+	if code == 2 {
+		return false, fmt.Errorf("%s", reason.String())
 	}
-	match := versionLine.FindSubmatch(data)
-	if len(match) < 2 {
-		return ""
-	}
-	version := string(match[1])
-	if version == "" || version == "0.0.0" {
-		return ""
-	}
-	return "v" + version
+	return false, nil
 }
 
 // installArgoCD installs the Application devzone-mysql, waits for its pods and
