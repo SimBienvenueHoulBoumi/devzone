@@ -15,6 +15,24 @@ kube_isole() {
     mkdir -p "$HOME" "$BATS_TEST_TMPDIR" "$HOME/.kube"
 }
 
+# Go program of the workstation commands (#884): manage/devzone and
+# manage/workspace.sh call it through DEVZONE_HOST_BIN for the commands ported to
+# Go, so every bats file that runs them calls this helper in its setup. The
+# binary of the package (default ./cmd/devzone, or ./cmd/devzone-pod for the pod
+# launcher) is built once per file in $BATS_FILE_TMPDIR/<package>-go: the guard
+# keeps the later tests from building it again. DEVZONE_HOST_BIN is exported.
+# Without go, the file is skipped.
+devzone_go_pret() {
+    local paquet="${1:-./cmd/devzone}" bin racine
+    bin="$BATS_FILE_TMPDIR/${paquet##*/}-go"
+    command -v go >/dev/null 2>&1 || skip "go is not installed"
+    racine="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
+    if [ ! -x "$bin" ]; then
+        (cd "$racine" && go build -o "$bin" "$paquet") || { echo "go build failed"; return 1; }
+    fi
+    export DEVZONE_HOST_BIN="$bin"
+}
+
 # Helper for tests that simulate a missing tool (#497): creates <folder> with
 # links to the only tools called by the scripts and tests. Call it in setup,
 # before reducing PATH to <folder>: never all of /usr/bin or /bin, so a kubectl

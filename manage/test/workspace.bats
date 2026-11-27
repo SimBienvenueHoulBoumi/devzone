@@ -4,17 +4,9 @@
 # for the file: the shell start path calls it for the wait and the guard, and the
 # status branch calls it for a command already ported.
 
-setup_file() {
-    if ! command -v go >/dev/null 2>&1; then
-        skip "go is not installed"
-    fi
-    ROOT="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
-    export DEVZONE_HOST_BIN="$BATS_FILE_TMPDIR/devzone-go"
-    (cd "$ROOT" && go build -o "$DEVZONE_HOST_BIN" ./cmd/devzone) || { echo "go build failed"; return 1; }
-}
-
 setup() {
     load commun
+    devzone_go_pret
     kube_isole
     ROOT="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
     CLI="$ROOT/manage/devzone"

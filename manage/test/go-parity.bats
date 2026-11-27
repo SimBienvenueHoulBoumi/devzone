@@ -4,19 +4,12 @@
 # exit status are the same as those of manage/devzone. The binary is built once
 # for the file; without go, the file is skipped.
 
-setup_file() {
-    if ! command -v go >/dev/null 2>&1; then
-        skip "go is not installed"
-    fi
-    RACINE="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
-    export DZ_GO="$BATS_FILE_TMPDIR/dz"
-    (cd "$RACINE" && go build -o "$DZ_GO" ./cmd/devzone) || { echo "go build failed"; return 1; }
+setup() {
+    load commun
     # Since #934 the workspace commands run in the Go program: the bash entry
     # point calls them through DEVZONE_HOST_BIN, the binary of this file
-    export DEVZONE_HOST_BIN="$DZ_GO"
-}
-
-setup() {
+    devzone_go_pret
+    DZ_GO="$DEVZONE_HOST_BIN"
     RACINE="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
     CLI="$RACINE/manage/devzone"
     # Absolute path: the binary finds the package.json of the checkout through it

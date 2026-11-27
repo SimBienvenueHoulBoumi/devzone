@@ -3,23 +3,15 @@
 # the Go program's (internal/platform/update, `devzone update`): its tests are in Go.
 # The fake packages are built under $BATS_TEST_TMPDIR.
 
-setup_file() {
-    # The creation calls the Go program for its checks (#884): built once for the file
-    RACINE="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
-    export DEVZONE_HOST_BIN="$BATS_FILE_TMPDIR/devzone-go"
-    (cd "$RACINE" && go build -o "$DEVZONE_HOST_BIN" ./cmd/devzone) || { echo "go build failed"; return 1; }
-}
-
 setup() {
     load commun
+    # The creation calls the Go program for its checks (#884)
+    devzone_go_pret
     kube_isole
     cluster_pret
     RACINE="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
     CLI="$RACINE/manage/devzone"
     T="$BATS_TEST_TMPDIR"
-    command -v go >/dev/null 2>&1 || skip "go is not installed"
-    export DEVZONE_HOST_BIN="$T/devzone-go"
-    (cd "$RACINE" && go build -o "$DEVZONE_HOST_BIN" ./cmd/devzone) || { echo "go build failed"; return 1; }
     cd "$T"
     export DEVZONE_NO_START=1
     build_package v1 0.0.1 ancien
