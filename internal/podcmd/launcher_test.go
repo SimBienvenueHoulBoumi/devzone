@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-// launcherSetup creates a temp copy of the devzone launcher and, when withBinary is true, a fake Go pod binary that handles only "ported".
+// launcherSetup creates a temp copy of the devzone launcher and, when withBinary is true, a fake Go pod binary that handles "ported" and "build".
 func launcherSetup(t *testing.T, withBinary bool) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -21,16 +21,13 @@ func launcherSetup(t *testing.T, withBinary bool) string {
 	if err := os.WriteFile(filepath.Join(dir, "devzone"), src, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "workspace-build.sh"), []byte("echo SHELL-PATH-REACHED\nexit 42\n"), 0o755); err != nil {
-		t.Fatal(err)
-	}
 
 	if withBinary {
 		binDir := filepath.Join(dir, "bin")
 		if err := os.MkdirAll(binDir, 0o755); err != nil {
 			t.Fatal(err)
 		}
-		binary := "#!/usr/bin/env bash\nif [ \"$1\" = handles ]; then [ \"$2\" = ported ] && exit 0; exit 1; fi\necho \"go:$*\"\necho \"script:$DEVZONE_POD_SCRIPT\"\nexit 0\n"
+		binary := "#!/usr/bin/env bash\nif [ \"$1\" = handles ]; then case \"$2\" in ported|build) exit 0 ;; *) exit 1 ;; esac; fi\necho \"go:$*\"\necho \"script:$DEVZONE_POD_SCRIPT\"\nexit 0\n"
 		binPath := filepath.Join(binDir, "devzone-pod-linux-"+runtime.GOARCH)
 		if err := os.WriteFile(binPath, []byte(binary), 0o755); err != nil {
 			t.Fatal(err)
@@ -69,9 +66,6 @@ func TestLauncherRunsPortedCommandInGo(t *testing.T) {
 	if !strings.Contains(out, "go:ported a b") {
 		t.Fatalf("out = %q, want it to contain %q", out, "go:ported a b")
 	}
-	if strings.Contains(out, "SHELL-PATH-REACHED") {
-		t.Fatalf("out = %q, must not contain %q", out, "SHELL-PATH-REACHED")
-	}
 }
 
 // TestLauncherRoutesAgentToGo checks that devzone agent reaches the Go binary and never the removed shell script (Ticket #878).
@@ -88,9 +82,6 @@ func TestLauncherRoutesAgentToGo(t *testing.T) {
 	out, code := runLauncher(t, dir, nil, "agent", "state")
 	if code != 0 || !strings.Contains(out, "go:agent state") {
 		t.Fatalf("code = %d, out = %q, want 0 and go:agent state", code, out)
-	}
-	if strings.Contains(out, "SHELL-PATH-REACHED") {
-		t.Fatalf("out = %q, must not contain %q", out, "SHELL-PATH-REACHED")
 	}
 }
 
@@ -109,9 +100,6 @@ func TestLauncherUsesHostBinFromEnvironment(t *testing.T) {
 	out, code := runLauncher(t, dir, []string{"DEVZONE_HOST_BIN=" + bin}, "help")
 	if code != 0 || !strings.Contains(out, "go:help") {
 		t.Fatalf("code = %d, out = %q, want 0 and go:help", code, out)
-	}
-	if strings.Contains(out, "SHELL-PATH-REACHED") {
-		t.Fatalf("out = %q, must not contain the shell stub", out)
 	}
 }
 
@@ -134,79 +122,41 @@ func TestLauncherPassesItsOwnShellToGo(t *testing.T) {
 	}
 }
 
-// TestLauncherKeepsShellForUnportedCommand checks that an unported command stays in the shell.
-func TestLauncherKeepsShellForUnportedCommand(t *testing.T) {
+// TestLauncherBuildUsesGoBinary checks that the pod binary runs build, with all arguments.
+func TestLauncherBuildUsesGoBinary(t *testing.T) {
 	if runtime.GOOS == "windows" || (runtime.GOARCH != "amd64" && runtime.GOARCH != "arm64") {
 		t.Skip()
 	}
 	dir := launcherSetup(t, true)
-	out, code := runLauncher(t, dir, nil, "build")
-	if code != 42 {
-		t.Fatalf("code = %d, want 42", code)
-	}
-	if !strings.Contains(out, "SHELL-PATH-REACHED") {
-		t.Fatalf("out = %q, want it to contain %q", out, "SHELL-PATH-REACHED")
+	out, code := runLauncher(t, dir, nil, "build", "folder")
+	if code != 0 || !strings.Contains(out, "go:build folder") {
+		t.Fatalf("code = %d, out = %q, want 0 and go:build folder", code, out)
 	}
 }
 
-// TestLauncherNoGoForcesShell checks that DEVZONE_NO_GO=1 forces the shell path.
-func TestLauncherNoGoForcesShell(t *testing.T) {
-	if runtime.GOOS == "windows" || (runtime.GOARCH != "amd64" && runtime.GOARCH != "arm64") {
-		t.Skip()
-	}
-	dir := launcherSetup(t, true)
-	out, code := runLauncher(t, dir, []string{"DEVZONE_NO_GO=1"}, "build")
-	if code != 42 {
-		t.Fatalf("code = %d, want 42", code)
-	}
-	if !strings.Contains(out, "SHELL-PATH-REACHED") {
-		t.Fatalf("out = %q, want it to contain %q", out, "SHELL-PATH-REACHED")
-	}
-}
-
-// TestLauncherFromGoAvoidsLoop checks that DEVZONE_FROM_GO=1 avoids re-entering Go.
-func TestLauncherFromGoAvoidsLoop(t *testing.T) {
-	if runtime.GOOS == "windows" || (runtime.GOARCH != "amd64" && runtime.GOARCH != "arm64") {
-		t.Skip()
-	}
-	dir := launcherSetup(t, true)
-	out, code := runLauncher(t, dir, []string{"DEVZONE_FROM_GO=1"}, "build")
-	if code != 42 {
-		t.Fatalf("code = %d, want 42", code)
-	}
-	if !strings.Contains(out, "SHELL-PATH-REACHED") {
-		t.Fatalf("out = %q, want it to contain %q", out, "SHELL-PATH-REACHED")
-	}
-}
-
-// TestLauncherWithoutBinaryUsesShell checks that a missing binary falls back to the shell.
-func TestLauncherWithoutBinaryUsesShell(t *testing.T) {
+// TestLauncherBuildWithoutBinaryRefuses checks that build has no shell fallback: without the pod binary the launcher reports Go as unavailable.
+func TestLauncherBuildWithoutBinaryRefuses(t *testing.T) {
 	if runtime.GOOS == "windows" || (runtime.GOARCH != "amd64" && runtime.GOARCH != "arm64") {
 		t.Skip()
 	}
 	dir := launcherSetup(t, false)
 	out, code := runLauncher(t, dir, nil, "build")
-	if code != 42 {
-		t.Fatalf("code = %d, want 42", code)
-	}
-	if !strings.Contains(out, "SHELL-PATH-REACHED") {
-		t.Fatalf("out = %q, want it to contain %q", out, "SHELL-PATH-REACHED")
+	if code != 1 || out != "devzone build: Go binary of the pod unavailable (.devcontainer/bin)\n" {
+		t.Fatalf("code = %d, out = %q, want 1 and the Go-only message", code, out)
 	}
 }
 
-// TestLauncherFromGoNotInherited checks that a command run by the shell path does
-// not inherit DEVZONE_FROM_GO: its own devzone calls must reach Go again.
-func TestLauncherFromGoNotInherited(t *testing.T) {
+// TestLauncherBuildIgnoresGoSwitches checks that the Go switches cannot send build to a shell fallback.
+func TestLauncherBuildIgnoresGoSwitches(t *testing.T) {
 	if runtime.GOOS == "windows" || (runtime.GOARCH != "amd64" && runtime.GOARCH != "arm64") {
 		t.Skip()
 	}
 	dir := launcherSetup(t, true)
-	help := "printf 'from=%s\\n' \"${DEVZONE_FROM_GO-unset}\"; exit 42\n"
-	if err := os.WriteFile(filepath.Join(dir, "workspace-build.sh"), []byte(help), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	out, code := runLauncher(t, dir, []string{"DEVZONE_FROM_GO=1"}, "build")
-	if code != 42 || !strings.Contains(out, "from=unset") {
-		t.Fatalf("code = %d, out = %q, want 42 and from=unset", code, out)
+	want := "devzone build: Go binary of the pod unavailable (.devcontainer/bin)\n"
+	for _, env := range [][]string{{"DEVZONE_NO_GO=1"}, {"DEVZONE_FROM_GO=1"}} {
+		out, code := runLauncher(t, dir, env, "build")
+		if code != 1 || out != want {
+			t.Fatalf("%v: code = %d, out = %q, want 1 and %q", env, code, out, want)
+		}
 	}
 }
