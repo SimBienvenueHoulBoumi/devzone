@@ -9,7 +9,7 @@ import (
 
 // OpenCodeLaunch starts opencode run in background appending to journal;
 // KUBECONFIG setup. Shell opencode_launch. Returns started process.
-func OpenCodeLaunch(ctx context.Context, r Runner, starter SessionStarter, folder, model, brief, journal, state string, local LocalModel) (SessionProcess, error) {
+func OpenCodeLaunch(ctx context.Context, r Runner, lookPath func(string) (string, error), starter SessionStarter, folder, model, brief, journal, state string, local LocalModel) (SessionProcess, error) {
 	briefText := readFileString(brief)
 	args := []string{"run", "--print-logs", "--log-level", "ERROR", "--auto", "-m", local.ModelRef(model), briefText}
 	agentKube := filepath.Join(state, "kubeconfig")
@@ -58,7 +58,7 @@ func OpenCodeLaunch(ctx context.Context, r Runner, starter SessionStarter, folde
 		Stdout: journalFile,
 		Stderr: journalFile,
 	}
-	proc, err := starter.Start(cmd)
+	proc, err := starter.Start(noCoreSession(cmd, lookPath))
 	if err != nil {
 		journalFile.Close()
 		return nil, err
@@ -66,6 +66,25 @@ func OpenCodeLaunch(ctx context.Context, r Runner, starter SessionStarter, folde
 	// child has its own dup of the fd; parent's copy can close immediately
 	journalFile.Close()
 	return proc, nil
+}
+
+// noCoreSession wraps a session in a shell that sets the core file size limit
+// to zero before replacing itself with the target process. Without this guard a
+// crashed opencode writes a multi-gigabyte core file into the worktree. The
+// lookup is injected so tests never need a fake binary in PATH; without a shell
+// the direct command is kept, since there is no ulimit to set on that host.
+func noCoreSession(cmd SessionCmd, lookPath func(string) (string, error)) SessionCmd {
+	if lookPath == nil {
+		return cmd
+	}
+	shell, err := lookPath("bash")
+	if err != nil || shell == "" {
+		return cmd
+	}
+	wrapped := cmd
+	wrapped.Name = shell
+	wrapped.Args = append([]string{"-c", `ulimit -c 0 || exit 1; exec "$@"`, cmd.Name, cmd.Name}, cmd.Args...)
+	return wrapped
 }
 
 func fileSize(p string) int64 {
