@@ -12,8 +12,7 @@ import (
 
 // gitopsWriteApp writes the Application manifest into the GitOps repository
 // designated in .argocd.conf, like gitops_apply_application of gitops.sh:
-// GitHub through the gh API (gitops_put), GitLab through its files endpoint
-// (gitops-gitlab.sh).
+// GitHub through the gh API (gitops_put), GitLab through its files endpoint.
 func (r *run) gitopsWriteApp(name, manifest, message string) error {
 	if r.gitopsProvider() == "gitlab" {
 		return r.gitopsWriteFileGitLab("apps/"+name+".yaml", manifest, message)
@@ -51,8 +50,8 @@ func (r *run) gitopsWriteFileGitHub(name, content, message string) error {
 }
 
 // gitopsWriteFileGitLab writes a file of the GitLab GitOps repository of Argo
-// CD (gitops-gitlab.sh gitlab_gitops_put: files endpoint, no clone); the same
-// blob is not written again.
+// CD through its files endpoint (no clone); the same blob is not written
+// again.
 func (r *run) gitopsWriteFileGitLab(path, content, message string) error {
 	token, ok := r.readSecret(r.rootTokenFile())
 	if !ok {
