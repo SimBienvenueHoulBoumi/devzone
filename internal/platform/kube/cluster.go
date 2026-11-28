@@ -36,7 +36,7 @@ func (k Kube) DevzoneContextSet(ctx context.Context, name string) bool {
 	}
 	user := strings.TrimSpace(string(userRes.Stdout))
 	res, err := k.runner().Run(ctx, "kubectl", []string{
-		"config", "set-context", "devzone", "--cluster=" + cluster, "--user=" + user}, exec.Opts{})
+		"config", "set-context", exec.ContextName(), "--cluster=" + cluster, "--user=" + user}, exec.Opts{})
 	return err == nil && res.Code == 0
 }
 
