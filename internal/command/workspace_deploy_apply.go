@@ -42,6 +42,9 @@ func workspaceApplyApplication(ctx *cli.Context, root, repo, revision string, pa
 	if code := writeWorkspaceGitops(ctx, gitops, b.String()); code != 0 {
 		return code
 	}
+	if code := runWorkstationArgoCD(ctx, "values-ensure"); code != 0 {
+		return code
+	}
 	_, _ = ctx.Runner.Run(context.Background(), "kubectl", []string{"--context", "devzone",
 		"-n", "devzone-argocd", "annotate", "application.argoproj.io", "devzone-workspace",
 		"argocd.argoproj.io/refresh=normal", "--overwrite"}, fexec.Opts{})
