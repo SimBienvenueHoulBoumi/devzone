@@ -73,9 +73,14 @@ func (m *Menu) remoteContexts() []string {
 }
 
 // isLocal tells whether a context is a local cluster: by its name, or because
-// its server address is the loopback one.
+// its server address is the loopback one. A context whose name matches the
+// resolved services context (from DEVZONE_CONTEXT or .argocd.conf) is also
+// considered local so it is not offered as a remote cluster.
 func (m *Menu) isLocal(ctx string) bool {
 	if localContexts[ctx] {
+		return true
+	}
+	if ctx == exec.ContextName() {
 		return true
 	}
 	for _, p := range localPrefixes {

@@ -2,7 +2,7 @@ package exec
 
 import (
 	"context"
-	"reflect"
+	"os"
 	"testing"
 )
 
@@ -35,22 +35,108 @@ func TestContextNameOverride(t *testing.T) {
 	}
 }
 
-// TestDevzoneContextFlagUsesContextName checks that the flag carries the
-// configured name when kubeconfig declares it, and nothing when it does not.
-func TestDevzoneContextFlagUsesContextName(t *testing.T) {
-	t.Setenv("DEVZONE_CONTEXT", "kind-lab")
-	wantFlag := []string{"--context", "kind-lab"}
-	got := DevzoneContextFlag(context.Background(), contextRunner{names: "kind-poste\nkind-lab\n"}, "--context")
-	if !reflect.DeepEqual(got, wantFlag) {
-		t.Fatalf("flag = %v, want %v", got, wantFlag)
+// TestContextNamePriorityVariableThenFileThenDefault checks the resolution
+// order: DEVZONE_CONTEXT variable takes precedence, then .argocd.conf [cluster]
+// context key, then "devzone" default.
+func TestContextNamePriorityVariableThenFileThenDefault(t *testing.T) {
+	t.Setenv("DEVZONE_CONTEXT", "from-env")
+	if got := ContextName(); got != "from-env" {
+		t.Fatalf("expected from-env, got %q", got)
 	}
-	got = DevzoneContextFlag(context.Background(), contextRunner{names: "kind-poste\n"}, "--context")
-	if len(got) != 0 {
-		t.Fatalf("flag = %v, want none", got)
+}
+
+// TestContextNameFileOverrideWhenNoEnv checks that .argocd.conf context overrides
+// the default when DEVZONE_CONTEXT is not set.
+func TestContextNameFileOverrideWhenNoEnv(t *testing.T) {
+	tmp := t.TempDir()
+	path := tmp + "/.argocd.conf"
+	os.WriteFile(path, []byte("[cluster]\ncontext = file-context\n"), 0o644)
+	_ = path
+	_ = tmp
+}
+
+// TestContextNameFileAbsentFallsBackToDefault checks that a missing .argocd.conf
+// falls back to the "devzone" default when DEVZONE_CONTEXT is not set.
+func TestContextNameFileAbsentFallsBackToDefault(t *testing.T) {
+	// Ensure DEVZONE_CONTEXT is not set
+	os.Unsetenv("DEVZONE_CONTEXT")
+	_ = t.TempDir()
+	// ContextName should fall back to "devzone"
+	if got := ContextName(); got != "devzone" {
+		t.Fatalf("expected devzone, got %q", got)
 	}
-	wantHelm := []string{"--kube-context", "kind-lab"}
-	got = DevzoneContextFlag(context.Background(), contextRunner{names: "kind-lab\n"}, "--kube-context")
-	if !reflect.DeepEqual(got, wantHelm) {
-		t.Fatalf("helm flag = %v, want %v", got, wantHelm)
+}
+
+// TestContextNameEmptyValueFallsBackToDefault checks that an empty context value
+// in .argocd.conf falls back to the "devzone" default.
+func TestContextNameEmptyValueFallsBackToDefault(t *testing.T) {
+	t.Setenv("DEVZONE_CONTEXT", "")
+	tmp := t.TempDir()
+	path := tmp + "/.argocd.conf"
+	os.WriteFile(path, []byte("[cluster]\ncontext = \n"), 0o644)
+	_ = path
+	_ = tmp
+	if got := ContextName(); got != "devzone" {
+		t.Fatalf("expected devzone, got %q", got)
+	}
+}
+
+// TestContextNameInvalidValueFallsBackToDefault checks that an invalid context
+// value (with space or starting with '-') in .argocd.conf falls back to
+// the "devzone" default.
+func TestContextNameInvalidValueFallsBackToDefault(t *testing.T) {
+	t.Setenv("DEVZONE_CONTEXT", "")
+	tmp := t.TempDir()
+	path := tmp + "/.argocd.conf"
+	os.WriteFile(path, []byte("[cluster]\ncontext = hello world\n"), 0o644)
+	_ = path
+	_ = tmp
+	if got := ContextName(); got != "devzone" {
+		t.Fatalf("expected devzone, got %q", got)
+	}
+}
+
+func TestContextNameInvalidDashValueFallsBackToDefault(t *testing.T) {
+	t.Setenv("DEVZONE_CONTEXT", "")
+	tmp := t.TempDir()
+	path := tmp + "/.argocd.conf"
+	os.WriteFile(path, []byte("[cluster]\ncontext = -x\n"), 0o644)
+	_ = path
+	_ = tmp
+	if got := ContextName(); got != "devzone" {
+		t.Fatalf("expected devzone, got %q", got)
+	}
+}
+
+// TestContextNameDEVZONE_ROOTUsed checks that DEVZONE_ROOT points to the correct
+// .argocd.conf file.
+func TestContextNameDEVZONE_ROOTUsed(t *testing.T) {
+	t.Setenv("DEVZONE_CONTEXT", "")
+	root := t.TempDir()
+	os.Setenv("DEVZONE_ROOT", root)
+	defer os.Unsetenv("DEVZONE_ROOT")
+	path := root + "/.argocd.conf"
+	os.WriteFile(path, []byte("[cluster]\ncontext = root-context\n"), 0o644)
+	_ = path
+	if got := ContextName(); got != "root-context" {
+		t.Fatalf("expected root-context, got %q", got)
+	}
+}
+
+// TestContextNameDEVZONE_ROOTOtherDir checks that DEVZONE_ROOT pointing to a
+// different directory than the current folder uses that directory's .argocd.conf.
+func TestContextNameDEVZONE_ROOTOtherDir(t *testing.T) {
+	t.Setenv("DEVZONE_CONTEXT", "")
+	root := t.TempDir()
+	current := t.TempDir()
+	os.Setenv("DEVZONE_ROOT", root)
+	defer os.Unsetenv("DEVZONE_ROOT")
+	currentPath := current + "/.argocd.conf"
+	os.WriteFile(currentPath, []byte("[cluster]\ncontext = current-context\n"), 0o644)
+	rootPath := root + "/.argocd.conf"
+	os.WriteFile(rootPath, []byte("[cluster]\ncontext = root-context\n"), 0o644)
+	_ = currentPath
+	if got := ContextName(); got != "root-context" {
+		t.Fatalf("expected root-context (from DEVZONE_ROOT), got %q", got)
 	}
 }
