@@ -10,7 +10,7 @@ import (
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 )
 
-const appsNS = "devzone-argocd"
+const appsNS = config.NamespaceArgoCD
 
 // appsUsage prints app usage and returns 2.
 func appsUsage(errOut io.Writer, cmd string) int {
@@ -73,7 +73,7 @@ func appsRepoInternal(url, gitlabNS string) string {
 		path = "/" + strings.SplitN(path[1:], "/", 2)[1]
 	}
 	if gitlabNS == "" {
-		gitlabNS = "devzone-gitlab"
+		gitlabNS = config.NamespaceGitLab
 	}
 	return "http://gitlab-webservice-default." + gitlabNS + ".svc:8181" + path
 }
@@ -81,7 +81,7 @@ func appsRepoInternal(url, gitlabNS string) string {
 // appsGitLabNS returns the GitLab namespace for this instance.
 func (m *module) appsGitLabNS() string {
 	suffix := instanceSuffix()
-	return "devzone-gitlab" + suffix
+	return config.NamespaceGitLab + suffix
 }
 
 // instanceSuffix returns the devzone instance suffix like cluster.sh.

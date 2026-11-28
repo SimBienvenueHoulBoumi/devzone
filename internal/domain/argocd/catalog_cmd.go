@@ -3,6 +3,8 @@ package argocd
 import (
 	"fmt"
 	"os"
+
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 )
 
 // catalogActiveCmd reports whether Argo CD holds an app: 0 yes, 1 no, 2 when
@@ -73,7 +75,7 @@ func (m *module) catalogApplyCmd(args []string) int {
 	if code := m.gitopsApplyApplication("devzone-"+app, "service", ns, repoURL, revision, "charts/devzone-"+app, params...); code != 0 {
 		return code
 	}
-	_, _ = m.kubectl("-n", "devzone-argocd", "annotate", "application.argoproj.io", "devzone-"+app, "argocd.argoproj.io/refresh=normal", "--overwrite")
+	_, _ = m.kubectl("-n", config.NamespaceArgoCD, "annotate", "application.argoproj.io", "devzone-"+app, "argocd.argoproj.io/refresh=normal", "--overwrite")
 	return 0
 }
 

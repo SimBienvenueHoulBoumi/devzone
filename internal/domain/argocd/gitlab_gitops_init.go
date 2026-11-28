@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 	fexec "github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec"
 )
 
@@ -42,7 +43,7 @@ func (m *module) gitlabGitopsInit() int {
 	id := m.gitlabGitopsProjectID()
 	internalURL := os.Getenv("GITLAB_GITOPS_URL_INTERNE")
 	if internalURL == "" {
-		internalURL = "http://gitlab-webservice-default.devzone-gitlab.svc:8181/" + group + "/" + proj + ".git"
+		internalURL = "http://gitlab-webservice-default." + config.NamespaceGitLab + ".svc:8181/" + group + "/" + proj + ".git"
 	}
 	if id == "" {
 		res, err := m.runner.Run(m.ctx, "curl", []string{"-s", "--request", "POST", "--header", "PRIVATE-TOKEN: " + token, "--data-urlencode", "name=" + proj, "--data", "namespace_id=" + g.ID.String(), "--data", "visibility=private", "--data", "initialize_with_readme=true", "--data-urlencode", "default_branch=main", m.gitlabAPIURL() + "/api/v4/projects"}, fexec.Opts{})
