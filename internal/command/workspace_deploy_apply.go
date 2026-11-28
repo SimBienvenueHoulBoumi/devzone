@@ -28,14 +28,14 @@ func workspaceChartRequire(root string) int {
 // repository when one is designated, or applies it directly. A helm release
 // already in place is left as it is: nothing is deleted during adoption.
 func workspaceApplyApplication(ctx *cli.Context, root, repo, revision string, params []string) int {
+	conf := filepath.Join(root, ".argocd.conf")
+	gitops := confValue(conf, "argocd", "repo")
 	var b bytes.Buffer
 	if err := rule.RenderApplication(&b, "devzone-workspace", "workspace", "devzone-workspace",
-		repo, revision, "charts/devzone-workspace", params); err != nil {
+		repo, revision, "charts/devzone-workspace", params, gitops); err != nil {
 		fmt.Fprintln(ctx.Err, err)
 		return 1
 	}
-	conf := filepath.Join(root, ".argocd.conf")
-	gitops := confValue(conf, "argocd", "repo")
 	if gitops == "" || gitops == "none" {
 		return applyWorkspaceManifest(ctx, b.String())
 	}

@@ -8,7 +8,7 @@ import (
 
 func TestRenderApplication(t *testing.T) {
 	var b bytes.Buffer
-	if err := RenderApplication(&b, "devzone-postgres", "service", "devzone-postgres", "https://github.com/x/devzone.git", "v1.2.3", "charts/devzone-postgres", nil); err != nil {
+	if err := RenderApplication(&b, "devzone-postgres", "service", "devzone-postgres", "https://github.com/x/devzone.git", "v1.2.3", "charts/devzone-postgres", nil, ""); err != nil {
 		t.Fatal(err)
 	}
 	out := b.String()
@@ -40,7 +40,7 @@ func TestRenderApplication(t *testing.T) {
 
 func TestRenderApplicationHelmParams(t *testing.T) {
 	var b bytes.Buffer
-	err := RenderApplication(&b, "devzone-workspace", "workspace", "devzone-workspace", "https://x/devzone.git", "main", "charts/devzone-workspace", []string{"image.tag=latest", "image.pullPolicy=Always"})
+	err := RenderApplication(&b, "devzone-workspace", "workspace", "devzone-workspace", "https://x/devzone.git", "main", "charts/devzone-workspace", []string{"image.tag=latest", "image.pullPolicy=Always"}, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,7 +55,7 @@ func TestRenderApplicationHelmParams(t *testing.T) {
 		t.Fatalf("missing image.pullPolicy:\n%s", out)
 	}
 	var b2 bytes.Buffer
-	err = RenderApplication(&b2, "devzone-workspace", "workspace", "devzone-workspace", "https://x/devzone.git", "main", "charts/devzone-workspace", []string{"image.tag"})
+	err = RenderApplication(&b2, "devzone-workspace", "workspace", "devzone-workspace", "https://x/devzone.git", "main", "charts/devzone-workspace", []string{"image.tag"}, "")
 	if err == nil || !strings.Contains(err.Error(), "parameter without value: image.tag") {
 		t.Fatalf("got err=%v", err)
 	}
@@ -63,16 +63,16 @@ func TestRenderApplicationHelmParams(t *testing.T) {
 
 func TestRenderApplicationValidation(t *testing.T) {
 	var b bytes.Buffer
-	if err := RenderApplication(&b, "x", "other", "ns", "https://x", "r", "p", nil); err == nil || !strings.Contains(err.Error(), "unknown kind: other") {
+	if err := RenderApplication(&b, "x", "other", "ns", "https://x", "r", "p", nil, ""); err == nil || !strings.Contains(err.Error(), "unknown kind: other") {
 		t.Fatalf("err=%v", err)
 	}
-	if err := RenderApplication(&b, "Bad Name", "project", "ns", "https://x", "r", "p", nil); err == nil || !strings.Contains(err.Error(), "invalid name") {
+	if err := RenderApplication(&b, "Bad Name", "project", "ns", "https://x", "r", "p", nil, ""); err == nil || !strings.Contains(err.Error(), "invalid name") {
 		t.Fatalf("err=%v", err)
 	}
-	if err := RenderApplication(&b, "-x", "project", "ns", "https://x", "r", "p", nil); err == nil || !strings.Contains(err.Error(), "invalid name") {
+	if err := RenderApplication(&b, "-x", "project", "ns", "https://x", "r", "p", nil, ""); err == nil || !strings.Contains(err.Error(), "invalid name") {
 		t.Fatalf("err=%v", err)
 	}
-	if err := RenderApplication(&b, "x", "project", "", "https://x", "r", "p", nil); err == nil || !strings.Contains(err.Error(), "usage:") {
+	if err := RenderApplication(&b, "x", "project", "", "https://x", "r", "p", nil, ""); err == nil || !strings.Contains(err.Error(), "usage:") {
 		t.Fatalf("err=%v", err)
 	}
 }

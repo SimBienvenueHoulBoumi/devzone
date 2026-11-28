@@ -63,7 +63,7 @@ func (m *module) ghAuthToken() string {
 // renderApp renders an Application manifest.
 func (m *module) renderApp(name, kind, namespace, repo, revision, path string, params ...string) (string, error) {
 	var b bytes.Buffer
-	if err := RenderApplication(&b, name, kind, namespace, repo, revision, path, params); err != nil {
+	if err := RenderApplication(&b, name, kind, namespace, repo, revision, path, params, m.gitopsRepo()); err != nil {
 		return "", err
 	}
 	return b.String(), nil

@@ -6,11 +6,21 @@ import (
 	"strings"
 )
 
+const (
+	workspaceAppName = "devzone-workspace"
+	// WorkspaceValuesPath is the values file of the workspace chart in a GitOps
+	// repository, shared by the Application renderer and by the commands that
+	// create, validate and report it.
+	WorkspaceValuesPath = "values/devzone-workspace.yaml"
+)
+
 // RenderApplication writes an Argo CD Application manifest to w. It mirrors
 // the former application.sh shell generator byte for byte in its meaningful output:
 // automated sync with prune and selfHeal, the destination namespace created,
 // resources deleted with the Application, and the Application in devzone-argocd.
-func RenderApplication(w io.Writer, name, kind, namespace, repo, revision, path string, params []string) error {
+// The workspace with a GitOps repository uses two sources: its chart reads the
+// values file of that repository, while helm parameters stay authoritative.
+func RenderApplication(w io.Writer, name, kind, namespace, repo, revision, path string, params []string, valuesRepo string) error {
 	switch kind {
 	case "workspace", "service", "project", "root":
 	default:
@@ -28,17 +38,42 @@ func RenderApplication(w io.Writer, name, kind, namespace, repo, revision, path 
 		}
 	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "apiVersion: argoproj.io/v1alpha1\nkind: Application\nmetadata:\n  name: %s\n  namespace: devzone-argocd\n  labels:\n    app.kubernetes.io/managed-by: devzone\n    devzone.io/kind: %s\n  finalizers:\n    - resources-finalizer.argocd.argoproj.io\nspec:\n  project: default\n  source:\n    repoURL: %s\n    targetRevision: %s\n    path: %s\n", name, kind, repo, revision, path)
-	if len(params) > 0 {
-		b.WriteString("    helm:\n      parameters:\n")
-		for _, kv := range params {
-			k, v, _ := strings.Cut(kv, "=")
-			fmt.Fprintf(&b, "        - name: %s\n          value: \"%s\"\n", k, v)
-		}
+	fmt.Fprintf(&b, "apiVersion: argoproj.io/v1alpha1\nkind: Application\nmetadata:\n  name: %s\n  namespace: devzone-argocd\n  labels:\n    app.kubernetes.io/managed-by: devzone\n    devzone.io/kind: %s\n  finalizers:\n    - resources-finalizer.argocd.argoproj.io\nspec:\n  project: default\n", name, kind)
+	twoSources := name == workspaceAppName && valuesRepo != "" && valuesRepo != "none"
+	if twoSources {
+		fmt.Fprintf(&b, "  sources:\n    - repoURL: %s\n      targetRevision: %s\n      path: %s\n", repo, revision, path)
+		writeHelm(&b, params, "      ", true)
+		fmt.Fprintf(&b, "    - repoURL: %s\n      targetRevision: HEAD\n      ref: values\n", valuesRepo)
+	} else {
+		fmt.Fprintf(&b, "  source:\n    repoURL: %s\n    targetRevision: %s\n    path: %s\n", repo, revision, path)
+		writeHelm(&b, params, "    ", false)
 	}
 	fmt.Fprintf(&b, "  destination:\n    server: https://kubernetes.default.svc\n    namespace: %s\n  syncPolicy:\n    automated:\n      prune: true\n      selfHeal: true\n    syncOptions:\n      - CreateNamespace=true\n", namespace)
 	_, err := io.WriteString(w, b.String())
 	return err
+}
+
+// writeHelm writes the Helm block of one Application source. The multi-source
+// workspace adds the shared values file; parameters are written last so that
+// Argo CD applies them over the values file.
+func writeHelm(b *strings.Builder, params []string, indent string, values bool) {
+	if len(params) == 0 && !values {
+		return
+	}
+	b.WriteString(indent + "helm:\n")
+	if values {
+		b.WriteString(indent + "  valueFiles:\n")
+		fmt.Fprintf(b, indent+"    - $values/%s\n", WorkspaceValuesPath)
+		b.WriteString(indent + "  ignoreMissingValueFiles: true\n")
+	}
+	if len(params) == 0 {
+		return
+	}
+	b.WriteString(indent + "  parameters:\n")
+	for _, kv := range params {
+		k, v, _ := strings.Cut(kv, "=")
+		fmt.Fprintf(b, indent+"    - name: %s\n"+indent+"      value: \"%s\"\n", k, v)
+	}
 }
 
 // RenderChartApplication writes an Application whose source is an external
