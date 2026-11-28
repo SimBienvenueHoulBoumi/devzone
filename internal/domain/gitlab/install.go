@@ -26,7 +26,7 @@ func (r *run) rootTokenFile() string {
 // account_helm of kube-account.sh.
 func (r *run) helmAdmin(args []string) (exec.Result, error) {
 	conf := r.adminKubeconfig(r.accountContext())
-	all := append([]string{"--kubeconfig", conf, "--kube-context", r.accountContext()}, args...)
+	all := append([]string{"--kubeconfig", conf, exec.HelmContextFlagName, r.accountContext()}, args...)
 	return r.runner().Run(r.ctx, "helm", all, exec.Opts{})
 }
 
