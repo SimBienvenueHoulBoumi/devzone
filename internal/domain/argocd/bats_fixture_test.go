@@ -21,9 +21,9 @@ func mgmtKubectl(f *modFixture, args ...string) []string {
 	return append([]string{"--context", mgmtContext(f)}, args...)
 }
 
-// devzoneKubectl yields kubectl arguments with the devzone context.
+// devzoneKubectl yields kubectl arguments with the configured services context.
 func devzoneKubectl(args ...string) []string {
-	return append([]string{"--context", "devzone"}, args...)
+	return append([]string{"--context", fexec.ContextName()}, args...)
 }
 
 // heldFixture prepares an installed Argo CD with a chart and a known revision

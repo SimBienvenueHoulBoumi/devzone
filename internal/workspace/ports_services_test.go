@@ -8,20 +8,22 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	fexec "github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec"
 )
 
-// TestContextFlag checks that only a context named exactly devzone is selected
+// TestContextFlag checks that only the services context name is selected
 func TestContextFlag(t *testing.T) {
-	devzone := []string{"--context", "devzone"}
+	devzone := []string{"--context", fexec.ContextName()}
 	cases := []struct {
 		name string
 		r    reply
 		want []string
 	}{
-		{"listed", reply{stdout: "minikube\ndevzone\n"}, devzone},
-		{"alone without newline", reply{stdout: "devzone"}, devzone},
-		{"other names", reply{stdout: "minikube\ndevzone2\nmy-devzone\n"}, nil},
-		{"spaces around", reply{stdout: " devzone\n"}, nil},
+		{"listed", reply{stdout: "minikube\n" + fexec.ContextName() + "\n"}, devzone},
+		{"alone without newline", reply{stdout: fexec.ContextName()}, devzone},
+		{"other names", reply{stdout: "minikube\n" + fexec.ContextName() + "2\nmy-" + fexec.ContextName() + "\n"}, nil},
+		{"spaces around are trimmed", reply{stdout: " " + fexec.ContextName() + "\n"}, devzone},
 		{"none", reply{}, nil},
 		{"failing call", reply{status: 1}, nil},
 		{"call that cannot start", reply{err: errors.New("no kubectl")}, nil},
@@ -104,7 +106,7 @@ func TestWatchedServices(t *testing.T) {
 func TestWatchedServicesCalls(t *testing.T) {
 	t.Setenv("DEVZONE_ARGOCD_PORT", "")
 	f := &fakeRunner{replies: []reply{
-		{match: "config get-contexts", stdout: "devzone\n"},
+		{match: "config get-contexts", stdout: fexec.ContextName() + "\n"},
 		{match: "pgadmin", stdout: "5050"},
 		{match: "argocd-server", stdout: "443"},
 	}}
@@ -116,8 +118,8 @@ func TestWatchedServicesCalls(t *testing.T) {
 		}
 	}
 	want := []string{
-		"--context devzone --namespace devzone-postgres get svc pgadmin -o jsonpath={.spec.ports[0].port}",
-		`--context devzone --namespace devzone-argocd get svc argocd-server -o jsonpath={.spec.ports[?(@.name=="https")].port}`,
+		"--context " + fexec.ContextName() + " --namespace devzone-postgres get svc pgadmin -o jsonpath={.spec.ports[0].port}",
+		`--context ` + fexec.ContextName() + ` --namespace devzone-argocd get svc argocd-server -o jsonpath={.spec.ports[?(@.name=="https")].port}`,
 	}
 	if !reflect.DeepEqual(calls, want) {
 		t.Fatalf("calls = %q, want %q", calls, want)

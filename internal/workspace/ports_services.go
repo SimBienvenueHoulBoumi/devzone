@@ -44,19 +44,12 @@ type relayService struct {
 	remote    int
 }
 
-// watcherContext returns the kubectl arguments that select the devzone context
-// when kubectl lists exactly that name, and none otherwise, so the current
-// context is used (pw_ctx). The status of kubectl is ignored, as grep decides in
-// the shell: a failing call lists nothing.
+// watcherContext returns the kubectl arguments that select the services
+// context when kubeconfig declares it, and none otherwise, so the current
+// context is used (pw_ctx). It shares the chooser of the framework, which
+// honors DEVZONE_CONTEXT, and a failing context list gives no flag.
 func watcherContext(r Runner) []string {
-	var out bytes.Buffer
-	_, _ = r.Kubectl([]string{"config", "get-contexts", "-o", "name"}, nil, &out, io.Discard)
-	for _, line := range strings.Split(out.String(), "\n") {
-		if line == "devzone" {
-			return []string{"--context", "devzone"}
-		}
-	}
-	return nil
+	return contextFlag(r)
 }
 
 // watcherKubectl runs kubectl with the context flag in front and returns its

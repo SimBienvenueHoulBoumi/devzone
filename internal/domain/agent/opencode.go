@@ -5,7 +5,24 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	fexec "github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec"
 )
+
+// kubeconfigRunner makes a runner read the given kubeconfig on context queries,
+// so the shared chooser checks the same file as the following kubectl view.
+type kubeconfigRunner struct {
+	Runner
+	config string
+}
+
+// Run adds the workstation kubeconfig to a context query and delegates the run.
+func (r kubeconfigRunner) Run(ctx context.Context, name string, args []string, opts Opts) (Result, error) {
+	if len(opts.Env) == 0 {
+		opts.Env = []string{"KUBECONFIG=" + r.config}
+	}
+	return r.Runner.Run(ctx, name, args, opts)
+}
 
 // OpenCodeLaunch starts opencode run in background appending to journal;
 // KUBECONFIG setup. Shell opencode_launch. Returns started process.
@@ -24,7 +41,9 @@ func OpenCodeLaunch(ctx context.Context, r Runner, lookPath func(string) (string
 		if home != "" && fileExists(kubeConfig) {
 			_ = os.WriteFile(agentKube, nil, 0o600)
 			if r != nil {
-				res, _ := r.Run(ctx, "kubectl", []string{"config", "view", "--minify", "--flatten", "--context", "devzone"}, Opts{Env: []string{"KUBECONFIG=" + kubeConfig}})
+				flag := fexec.DevzoneContextFlag(ctx, kubeconfigRunner{Runner: r, config: kubeConfig}, "--context")
+				args := append([]string{"config", "view", "--minify", "--flatten"}, flag...)
+				res, _ := r.Run(ctx, "kubectl", args, Opts{Env: []string{"KUBECONFIG=" + kubeConfig}})
 				if res.Code == 0 && len(strings.TrimSpace(string(res.Stdout))) > 0 {
 					_ = os.WriteFile(agentKube, res.Stdout, 0o600)
 				} else {

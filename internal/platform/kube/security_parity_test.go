@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec"
+	fexec "github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec"
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec/fake"
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/testkit"
 )
@@ -28,7 +28,7 @@ func accountSetup(t *testing.T) (*Kube, *fake.Runner, string) {
 	t.Setenv("DEVZONE_KUBE_HOST", filepath.Join(home, ".kube", "hote.config"))
 	t.Setenv("DEVZONE_KUBE_CONFIG", conf)
 	r := fake.New()
-	r.On("kubectl", nil, exec.Result{})
+	r.On("kubectl", nil, fexec.Result{})
 	return &Kube{Runner: r}, r, conf
 }
 
@@ -84,19 +84,25 @@ func TestAccountAllowFreezesRoleBinding(t *testing.T) {
 // TestNamespaceIsolateFreezesPolicy freezes the manifest of isolation.sh sent
 // on standard input by namespace_isolate.
 func TestNamespaceIsolateFreezesPolicy(t *testing.T) {
+	t.Setenv("DEVZONE_CONTEXT", "")
 	k, r, _ := accountSetup(t)
+	r.On("kubectl", []string{"config", "get-contexts", "-o", "name"}, fexec.Result{Stdout: []byte(fexec.ContextName() + "\n")})
 	if err := k.NamespaceIsolate(context.Background(), "devzone-postgres", nil); err != nil {
 		t.Fatal(err)
 	}
 	calls := r.Calls()
-	if len(calls) != 1 {
+	if len(calls) != 2 {
 		t.Fatalf("calls = %+v", calls)
 	}
-	wantArgs := []string{"--context", "devzone", "-n", "devzone-postgres", "apply", "-f", "-"}
-	if strings.Join(calls[0].Args, "\x00") != strings.Join(wantArgs, "\x00") {
-		t.Fatalf("args = %q", calls[0].Args)
+	query := []string{"config", "get-contexts", "-o", "name"}
+	if strings.Join(calls[0].Args, "\x00") != strings.Join(query, "\x00") {
+		t.Fatalf("context query = %q, want %q", calls[0].Args, query)
 	}
-	manifest := stdinText(t, calls[0].Opts.Stdin)
+	wantArgs := []string{"--context", fexec.ContextName(), "-n", "devzone-postgres", "apply", "-f", "-"}
+	if strings.Join(calls[1].Args, "\x00") != strings.Join(wantArgs, "\x00") {
+		t.Fatalf("args = %q", calls[1].Args)
+	}
+	manifest := stdinText(t, calls[1].Opts.Stdin)
 	for _, line := range []string{"apiVersion: networking.k8s.io/v1", "kind: NetworkPolicy",
 		"name: devzone-meme-namespace", "app.kubernetes.io/managed-by: devzone",
 		"podSelector: {}", "- podSelector: {}"} {
@@ -120,7 +126,7 @@ func stdinText(t *testing.T, reader io.Reader) string {
 // the requested context, never with the administrator kubeconfig.
 func TestMetricsCallsNeverUseAdminContext(t *testing.T) {
 	k, r, _ := accountSetup(t)
-	r.On("kubectl", []string{"config", "get-contexts", "-o", "name"}, exec.Result{Stdout: []byte("host-context\n")})
+	r.On("kubectl", []string{"config", "get-contexts", "-o", "name"}, fexec.Result{Stdout: []byte("host-context\n")})
 	code := k.Metrics(context.Background(), []string{"remove", "host-context"}, nil, nil)
 	if code != 0 {
 		t.Fatalf("code = %d", code)

@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	fexec "github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec"
 )
 
 // TestArgocdWanted checks that argocd is wanted by default and that only the
@@ -81,7 +83,7 @@ func TestArgocdInstalledContextFlag(t *testing.T) {
 	if !argocdInstalled(r) {
 		t.Fatal("argocdInstalled = false, want true")
 	}
-	wantCalls(t, r.calls, contextsCall, "--context devzone get namespace devzone-argocd")
+	wantCalls(t, r.calls, contextsCall, "--context "+fexec.ContextName()+" get namespace devzone-argocd")
 
 	r = &fakeRunner{replies: []reply{
 		{match: contextsCall, stdout: currentContext},
@@ -106,7 +108,7 @@ func TestArgocdActive(t *testing.T) {
 		if !argocdActive(r, modules) {
 			t.Fatal("argocdActive = false, want true")
 		}
-		wantCalls(t, r.calls, contextsCall, "--context devzone get namespace devzone-argocd")
+		wantCalls(t, r.calls, contextsCall, "--context "+fexec.ContextName()+" get namespace devzone-argocd")
 	})
 	t.Run("wanted and absent", func(t *testing.T) {
 		dir := t.TempDir()

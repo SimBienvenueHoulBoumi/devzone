@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	fexec "github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec"
 )
 
 // AgentInPod true in the workspace container (DEVZONE_WORKSPACE=kubernetes).
@@ -15,37 +17,16 @@ func AgentInPod() bool { return os.Getenv("DEVZONE_WORKSPACE") == "kubernetes" }
 // AgentKC kubectl of the workstation: devzone context if it exists, then
 // workspace namespace. Shell agent_kc; kubectl via Runner.
 func AgentKC(ctx context.Context, r Runner, args ...string) Result {
-	var prefix []string
-	if kubectlHasContext(ctx, r, "devzone") {
-		prefix = []string{"--context", "devzone", "--namespace", "devzone-workspace"}
-	} else {
-		prefix = []string{"--namespace", "devzone-workspace"}
-	}
-	full := append(prefix, args...)
 	if r == nil {
 		return Result{Code: 1}
 	}
+	prefix := append(fexec.DevzoneContextFlag(ctx, r, "--context"), "--namespace", "devzone-workspace")
+	full := append(prefix, args...)
 	res, err := r.Run(ctx, "kubectl", full, Opts{})
 	if err != nil {
 		return Result{Code: 1, Stderr: []byte(err.Error())}
 	}
 	return res
-}
-
-func kubectlHasContext(ctx context.Context, r Runner, name string) bool {
-	if r == nil {
-		return false
-	}
-	res, err := r.Run(ctx, "kubectl", []string{"config", "get-contexts", "-o", "name"}, Opts{})
-	if err != nil {
-		return false
-	}
-	for _, line := range strings.Split(string(res.Stdout), "\n") {
-		if strings.TrimSpace(line) == name {
-			return true
-		}
-	}
-	return false
 }
 
 // WorkspaceAvailable true when workspace pod runs and command from workstation.

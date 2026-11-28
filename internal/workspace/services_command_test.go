@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	fexec "github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec"
 )
 
 // TestHelmDeployArgs checks the helm call of a direct deployment: the devzone
@@ -16,7 +18,7 @@ func TestHelmDeployArgs(t *testing.T) {
 		t.Fatal(err)
 	}
 	r := &fakeRunner{replies: []reply{
-		{match: "config get-contexts", stdout: "devzone\n"},
+		{match: "config get-contexts", stdout: fexec.ContextName() + "\n"},
 		{match: "", status: 0},
 	}}
 	var out, errOut bytes.Buffer
@@ -28,7 +30,7 @@ func TestHelmDeployArgs(t *testing.T) {
 	}
 	call := r.calls[1]
 	for _, want := range []string{
-		"helm --kube-context devzone upgrade --install devzone-workspace",
+		"helm --kube-context " + fexec.ContextName() + " upgrade --install devzone-workspace",
 		"--namespace devzone-workspace --create-namespace",
 		"--set image.repository=" + imageRepo,
 		"--set image.tag=1.2.3",
@@ -75,7 +77,7 @@ func newServicesHarness(t *testing.T) *servicesHarness {
 	t.Helper()
 	h := &servicesHarness{t: t, modules: filepath.Join(t.TempDir(), ".devzone.modules")}
 	r := &fakeRunner{replies: []reply{
-		{match: "config get-contexts", stdout: "devzone\n"},
+		{match: "config get-contexts", stdout: fexec.ContextName() + "\n"},
 		{match: "get pod", stdout: "Running"},
 		{match: "apply -f -", status: 0},
 		{match: "create token", stdout: "TOKEN-123\n"},
@@ -107,11 +109,11 @@ func TestServicesEnable(t *testing.T) {
 	calls := h.env.Runner.(*fakeRunner).calls
 	joined := strings.Join(calls, "\n")
 	for _, want := range []string{
-		"--context devzone apply -f -",
-		"--context devzone create token devzone-services-admin --namespace devzone-workspace --duration 1h",
-		"--context devzone exec -i devzone-workspace-0 --namespace devzone-workspace -c workspace -- devzone services-admin enable gitlab --yes",
-		"--context devzone delete clusterrolebinding devzone-services-admin --ignore-not-found",
-		"--context devzone delete serviceaccount devzone-services-admin --namespace devzone-workspace --ignore-not-found",
+		"--context " + fexec.ContextName() + " apply -f -",
+		"--context " + fexec.ContextName() + " create token devzone-services-admin --namespace devzone-workspace --duration 1h",
+		"--context " + fexec.ContextName() + " exec -i devzone-workspace-0 --namespace devzone-workspace -c workspace -- devzone services-admin enable gitlab --yes",
+		"--context " + fexec.ContextName() + " delete clusterrolebinding devzone-services-admin --ignore-not-found",
+		"--context " + fexec.ContextName() + " delete serviceaccount devzone-services-admin --namespace devzone-workspace --ignore-not-found",
 	} {
 		if !strings.Contains(joined, want) {
 			t.Fatalf("calls %q do not contain %q", joined, want)

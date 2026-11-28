@@ -41,9 +41,8 @@ func Forbid(ctx context.Context, opts Options, args []string) int {
 		e.showErr(patch)
 		return 1
 	}
-	res, err := e.exec("kubectl", []string{
-		"--context", "devzone", "-n", ns, "patch", "networkpolicy", "devzone-meme-namespace",
-		"-p", strings.TrimSuffix(string(patch.Stdout), "\n")}, nil)
+	res, err := e.exec("kubectl", e.kubectlArgs(ns, "patch", "networkpolicy", "devzone-meme-namespace",
+		"-p", strings.TrimSuffix(string(patch.Stdout), "\n")), nil)
 	if err != nil || res.Code != 0 {
 		if e.opts.Err != nil {
 			fmt.Fprintf(e.opts.Err, "devzone : postgres : cannot remove the access rule of %s: %s\n", target, strings.TrimSpace(string(res.Stderr)))

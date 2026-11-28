@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	fexec "github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec"
 )
 
 // noOrigin is the origin of a folder without remote
@@ -139,10 +141,10 @@ func TestCopyToGuardUnreachablePodCopies(t *testing.T) {
 
 func TestCopyToDevzoneContext(t *testing.T) {
 	f := copyFake(0, "")
-	f.replies[0].stdout = "lab\ndevzone\n"
+	f.replies[0].stdout = "lab\n" + fexec.ContextName() + "\n"
 	CopyTo(f, noOrigin, t.TempDir(), &bytes.Buffer{}, &bytes.Buffer{})
-	if got := lastCall(t, f); !strings.HasPrefix(got, "--context devzone cp ") {
-		t.Fatalf("kubectl call = %q: want --context devzone", got)
+	if got := lastCall(t, f); !strings.HasPrefix(got, "--context "+fexec.ContextName()+" cp ") {
+		t.Fatalf("kubectl call = %q: want the services context flag", got)
 	}
 }
 

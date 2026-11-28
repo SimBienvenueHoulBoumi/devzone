@@ -7,22 +7,29 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	fexec "github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec"
 )
 
 // podTable is what kubectl get pods prints for a running workspace pod
 const podTable = "NAME                 READY   STATUS    RESTARTS   AGE\n" +
 	"devzone-workspace-0  1/1     Running   0          2d\n"
 
-// Joined arguments of the calls of Status, with the devzone context
+// Joined arguments of the calls of Status, without a context name
 const (
-	podsWithContext  = "--context devzone get pods --namespace devzone-workspace"
-	podsCurrent      = "get pods --namespace devzone-workspace"
-	execWithContext  = "--context devzone exec -i devzone-workspace-0 --namespace devzone-workspace -c workspace -- bash -s -- /workspaces/projets"
 	contextsCall     = "config get-contexts -o name"
 	noLegacyCopies   = "exec -i"
-	devzoneContexts  = "lab\ndevzone\n"
-	currentContext   = "lab\n"
 	absentPodMessage = "No resources found in devzone-workspace namespace.\n"
+)
+
+// Joined arguments of the calls of Status, with the services context name and
+// the kubeconfig answers that declare it or not.
+var (
+	podsWithContext = "--context " + fexec.ContextName() + " get pods --namespace devzone-workspace"
+	podsCurrent     = "get pods --namespace devzone-workspace"
+	execWithContext = "--context " + fexec.ContextName() + " exec -i devzone-workspace-0 --namespace devzone-workspace -c workspace -- bash -s -- /workspaces/projets"
+	devzoneContexts = "lab\n" + fexec.ContextName() + "\n"
+	currentContext  = "lab\n"
 )
 
 // runStatus runs Status on r with an empty fake work folder, so the real pod

@@ -12,7 +12,7 @@ import (
 )
 
 // DevzoneContextSet points the devzone context at the context named ctx, so
-// that "--context devzone" installs on the chosen services cluster (#396).
+// that the services context installs on the chosen services cluster (#396).
 func (k Kube) DevzoneContextSet(ctx context.Context, name string) bool {
 	if ctx == nil {
 		ctx = context.Background()

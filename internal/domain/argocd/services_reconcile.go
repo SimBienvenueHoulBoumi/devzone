@@ -150,13 +150,13 @@ func (m *module) servicesNamespacePrepare(svc string) int {
 	if err != nil {
 		return 1
 	}
-	res, err = m.runner.Run(m.ctx, "kubectl", []string{"--context", "devzone", "apply", "-f", "-"}, fexec.Opts{Stdin: strings.NewReader(string(res.Stdout))})
+	res, err = m.runner.Run(m.ctx, "kubectl", m.kubectlArgs("apply", "-f", "-"), fexec.Opts{Stdin: strings.NewReader(string(res.Stdout))})
 	if err != nil || res.Code != 0 {
 		return 1
 	}
 	_, _ = m.kubectl("label", "namespace", ns, "app.kubernetes.io/managed-by=devzone", "--overwrite")
 	manifest := "apiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: devzone-meme-namespace\n  labels:\n    app.kubernetes.io/managed-by: devzone\nspec:\n  podSelector: {}\n  ingress:\n  - from:\n    - podSelector: {}\n"
-	res, err = m.runner.Run(m.ctx, "kubectl", []string{"--context", "devzone", "-n", ns, "apply", "-f", "-"}, fexec.Opts{Stdin: strings.NewReader(manifest)})
+	res, err = m.runner.Run(m.ctx, "kubectl", m.kubectlArgs("-n", ns, "apply", "-f", "-"), fexec.Opts{Stdin: strings.NewReader(manifest)})
 	if err != nil || res.Code != 0 {
 		return 1
 	}

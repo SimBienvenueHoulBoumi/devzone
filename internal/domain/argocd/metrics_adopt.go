@@ -36,8 +36,8 @@ func (m *module) metricsApplicationExists() (bool, error) {
 // "" when absent, "devzone" when the legacy installer marked it, "other" otherwise.
 func (m *module) metricsOwner() (string, error) {
 	res, err := m.runner.Run(m.ctx, "kubectl",
-		[]string{"--context", "devzone", "-n", metricsNS, "get", "deployment", "metrics-server",
-			"-o", "jsonpath={.metadata.labels.devzone}"}, fexec.Opts{})
+		m.kubectlArgs("-n", metricsNS, "get", "deployment", "metrics-server",
+			"-o", "jsonpath={.metadata.labels.devzone}"), fexec.Opts{})
 	if err != nil {
 		return "", err
 	}
@@ -62,8 +62,8 @@ func (m *module) replaceLegacyMetrics() (bool, error) {
 	removed := false
 	for _, kind := range []string{"deployment", "service"} {
 		res, err := m.runner.Run(m.ctx, "kubectl",
-			[]string{"--context", "devzone", "-n", metricsNS, "delete", kind, "metrics-server",
-				"--ignore-not-found", "--wait=true"}, fexec.Opts{})
+			m.kubectlArgs("-n", metricsNS, "delete", kind, "metrics-server",
+				"--ignore-not-found", "--wait=true"), fexec.Opts{})
 		if err != nil {
 			return removed, err
 		}
