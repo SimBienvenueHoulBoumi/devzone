@@ -76,6 +76,7 @@ func newFixture(t *testing.T) *fixture {
 	t.Setenv("DEVZONE_KUBE_CONFIG", filepath.Join(home, ".kube", "config"))
 	t.Setenv("DEVZONE_WORKSPACE", "")
 	t.Setenv("DEVZONE_INSTANCE", "")
+	t.Setenv("DEVZONE_CONTEXT", "")
 	// The shell run by some tests (the devzone summary) must never reach the
 	// cluster of the machine: fake kubectl, kind and helm (no cluster), a fake
 	// devzone (Go commands it calls) and a kubeconfig inside the temporary home.
@@ -96,6 +97,8 @@ func newFixture(t *testing.T) *fixture {
 	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
 	t.Setenv("KUBECONFIG", filepath.Join(home, ".kube", "config"))
 	base := fake.New()
+	base.On("kubectl", []string{"config", "get-contexts", "-o", "name"},
+		exec.Result{Stdout: []byte(exec.ContextName() + "\n")})
 	base.On("kubectl", nil, exec.Result{})
 	base.On("kind", nil, exec.Result{})
 	base.On("helm", nil, exec.Result{})

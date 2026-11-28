@@ -118,9 +118,16 @@ func (e *env) exec(name string, args []string, envVars ...string) (exec.Result, 
 	return e.runner().Run(e.ctx, name, args, opts)
 }
 
-// k runs kubectl on the devzone context in the namespace ns.
+// kubectlArgs builds namespace-scoped kubectl arguments with the shared
+// context flag, so every catalog call selects the context the same way.
+func (e *env) kubectlArgs(ns string, args ...string) []string {
+	all := exec.DevzoneContextFlag(e.ctx, e.runner(), "--context")
+	return append(append(all, "-n", ns), args...)
+}
+
+// k runs kubectl on the services cluster in the namespace ns.
 func (e *env) k(ns string, args ...string) (exec.Result, error) {
-	return e.exec("kubectl", append([]string{"--context", "devzone", "-n", ns}, args...))
+	return e.exec("kubectl", e.kubectlArgs(ns, args...))
 }
 
 // out writes one line on the standard output of the command.

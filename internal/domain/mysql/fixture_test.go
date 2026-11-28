@@ -77,7 +77,10 @@ func newFixture(t *testing.T) *fixture {
 	t.Setenv("DEVZONE_KUBE_CONFIG", filepath.Join(home, ".kube", "config"))
 	t.Setenv("DEVZONE_WORKSPACE", "")
 	t.Setenv("DEVZONE_INSTANCE", "")
+	t.Setenv("DEVZONE_CONTEXT", "")
 	base := fake.New()
+	base.On("kubectl", []string{"config", "get-contexts", "-o", "name"},
+		exec.Result{Stdout: []byte(exec.ContextName() + "\n")})
 	base.On("kubectl", nil, exec.Result{})
 	base.On("helm", nil, exec.Result{})
 	base.On("bash", nil, exec.Result{})

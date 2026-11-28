@@ -65,7 +65,7 @@ func (e *env) deleteVolume(name string, yes bool) int {
 			return 0
 		}
 	}
-	res, err := e.exec("kubectl", []string{"--context", "devzone", "-n", ns, "delete", "pvc", pvc}, nil)
+	res, err := e.exec("kubectl", e.kubectlArgs(ns, "delete", "pvc", pvc), nil)
 	if err != nil || res.Code != 0 {
 		e.showErr(res)
 		return 1
@@ -93,8 +93,7 @@ func (e *env) listVolumes() {
 
 // volumes lists the PVCs of namespace whose name ends with -mysql-0.
 func (e *env) volumes(namespace string) []string {
-	res, err := e.exec("kubectl", []string{
-		"--context", "devzone", "-n", namespace, "get", "pvc", "-o", "jsonpath=" + volumeJSONPath}, nil)
+	res, err := e.exec("kubectl", e.kubectlArgs(namespace, "get", "pvc", "-o", "jsonpath="+volumeJSONPath), nil)
 	if err != nil || res.Code != 0 {
 		return nil
 	}
@@ -110,8 +109,8 @@ func (e *env) volumes(namespace string) []string {
 
 // claimMounted returns the claim prefix of the StatefulSet, empty if absent.
 func (e *env) claimMounted(namespace string) string {
-	res, err := e.exec("kubectl", []string{
-		"--context", "devzone", "-n", namespace, "get", "statefulset", "mysql", "-o", "jsonpath=" + claimJSONPath}, nil)
+	res, err := e.exec("kubectl", e.kubectlArgs(namespace, "get", "statefulset", "mysql",
+		"-o", "jsonpath="+claimJSONPath), nil)
 	if err != nil || res.Code != 0 {
 		return ""
 	}
