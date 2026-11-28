@@ -49,15 +49,17 @@ buildkit:
 # Workspace container and the volume of its projects (#399): the workspace PVC
 # is mounted on /workspaces/projets, where the container starts (workingDir).
 workspace:
-  # Command: run workspace-init.sh in the foreground first, then keep the pod
-  # alive as PID 1 (like VS Code for a devcontainer) (#503). The init script
-  # runs before the loop, its errors are ignored (|| true) and its journal is
-  # ~/.local/state/devzone/init.log. Empty = image default command.
+  # Command: run the pod's init in the foreground first, then keep the pod
+  # alive as PID 1 (like VS Code for a devcontainer) (#503). The Go init runs
+  # before the loop; its exit status is ignored by the pod but a failure is
+  # written to ~/.local/state/devzone/init.log. The absolute binary path avoids
+  # an npm-installed devzone hiding the pod one in PATH (#980). Empty = image
+  # default command.
   # PID 1 must reap the orphans (#967): sleep infinity did not, so the zombies
   # piled up (20 000 in 2.5 days). The loop calls wait, which reaps every child
   # of the shell, orphans included (they are re-parented to PID 1). TERM and INT
   # exit at once, so the pod stops on time.
-  command: ["bash", "-c", "mkdir -p \"$HOME/.local/state/devzone\"; bash /usr/local/share/devzone/.devcontainer/workspace-init.sh >>\"$HOME/.local/state/devzone/init.log\" 2>&1 || true; trap 'exit 0' TERM INT; while true; do wait -n 2>/dev/null; sleep 1; done"]
+  command: ["bash", "-c", "mkdir -p \"$HOME/.local/state/devzone\"; /usr/local/bin/devzone init >>\"$HOME/.local/state/devzone/init.log\" 2>&1 || echo \"devzone init: failed (exit $?)\" >>\"$HOME/.local/state/devzone/init.log\"; trap 'exit 0' TERM INT; while true; do wait -n 2>/dev/null; sleep 1; done"]
   # Size of the projects volume.
   size: 20Gi
   storageClass: ""
