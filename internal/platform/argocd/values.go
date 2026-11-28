@@ -49,6 +49,10 @@ func ValidateWorkspaceValues(data []byte) []string {
 			levels = levels[:len(levels)-1]
 		}
 		name := strings.TrimSpace(key)
+		if len(levels) == 0 && strings.Contains(name, ".") {
+			problems = append(problems, fmt.Sprintf("line %d: %s is a flat key that Helm ignores: write it nested", number+1, name))
+			continue
+		}
 		if len(levels) > 0 {
 			name = levels[len(levels)-1].name + "." + name
 		}

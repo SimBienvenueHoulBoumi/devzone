@@ -27,12 +27,12 @@ func TestEnsureWorkspaceValuesCreatesThenKeepsUserFile(t *testing.T) {
 		t.Fatalf("values file was not created: %v", f.r.Calls())
 	}
 	for _, want := range []string{
-		"# livenessProbe.thresholdPercent: 85 (allowed range: 50 to 95)",
-		"# livenessProbe.periodSeconds: 60",
-		"# livenessProbe.failureThreshold: 5",
-		"# livenessProbe.initialDelaySeconds: 120",
-		"# resources.limits.memory: 8Gi",
-		"# resources.requests.memory: 4Gi",
+		"# livenessProbe:\n#   thresholdPercent: 85",
+		"#   periodSeconds: 60",
+		"#   failureThreshold: 5",
+		"#   initialDelaySeconds: 120",
+		"# resources:\n#   limits:\n#     memory: 8Gi",
+		"#   requests:\n#     memory: 4Gi",
 	} {
 		if !strings.Contains(workspaceValuesContent, want) {
 			t.Fatalf("template misses %q", want)

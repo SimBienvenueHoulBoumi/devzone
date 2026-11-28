@@ -7,15 +7,19 @@ import rule "github.com/SimBienvenueHoulBoumi/devzone/internal/platform/argocd"
 // the user can choose which settings to keep under version control.
 const workspaceValuesContent = `# Values of the devzone-workspace chart, read by Argo CD from this GitOps
 # repository. devzone creates this file once and never rewrites it: edit the
-# keys below to change the liveness probe or the memory of the workspace pod.
+# nested keys below to change the liveness probe or the memory of the workspace pod.
 # The defaults are kept as comments; uncomment only what you want to change.
 
-# livenessProbe.thresholdPercent: 85 (allowed range: 50 to 95)
-# livenessProbe.periodSeconds: 60
-# livenessProbe.failureThreshold: 5
-# livenessProbe.initialDelaySeconds: 120
-# resources.limits.memory: 8Gi
-# resources.requests.memory: 4Gi
+# livenessProbe:
+#   thresholdPercent: 85    # allowed range: 50 to 95
+#   periodSeconds: 60
+#   failureThreshold: 5
+#   initialDelaySeconds: 120
+# resources:
+#   limits:
+#     memory: 8Gi
+#   requests:
+#     memory: 4Gi
 `
 
 // ensureWorkspaceValuesFile creates the workspace values file only when the
