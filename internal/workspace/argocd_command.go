@@ -5,6 +5,8 @@ import (
 	"io"
 	"os"
 	"strings"
+
+	rule "github.com/SimBienvenueHoulBoumi/devzone/internal/platform/argocd"
 )
 
 // argocdStatus writes the installed state, the GitOps repository and the
@@ -31,6 +33,7 @@ func argocdStatus(r Runner, confPath, modules string, out io.Writer) int {
 	} else {
 		fmt.Fprintln(out, "  no GitOps repository: Applications applied directly (devzone workspace argocd init)")
 	}
+	fmt.Fprint(out, workspaceValuesLine(repo, rule.WorkspaceValuesPath))
 	args := append(contextFlag(r), "-n", "devzone-argocd", "get", "applications.argoproj.io",
 		"-o", `custom-columns=APPLICATION:.metadata.name,KIND:.metadata.labels.devzone\.io/kind,SYNC:.status.sync.status,HEALTH:.status.health.status,REVISION:.spec.source.targetRevision`)
 	var list strings.Builder

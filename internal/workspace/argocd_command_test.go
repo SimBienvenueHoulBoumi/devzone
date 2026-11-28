@@ -30,6 +30,7 @@ func TestArgocdStatusNotInstalled(t *testing.T) {
 // TestArgocdStatusInstalled checks the installed line, the GitOps repository
 // read from .argocd.conf through the shared library, and the indented table.
 func TestArgocdStatusInstalled(t *testing.T) {
+	stubValuesExists(t, true)
 	dir := t.TempDir()
 	conf := filepath.Join(dir, ".argocd.conf")
 	content := "[argocd]\n    repo = https://github.com/tester/devzone-argocd.git\n"
@@ -50,6 +51,7 @@ func TestArgocdStatusInstalled(t *testing.T) {
 	}
 	want := "✔ argocd installed: https://localhost:9443 (devzone workspace ports), user admin, password in .password\n" +
 		"  GitOps repository: https://github.com/tester/devzone-argocd.git (apps/, root Application devzone)\n" +
+		"  devzone-workspace values: values/devzone-workspace.yaml (present)\n" +
 		"  APPLICATION KIND SYNC HEALTH REVISION\n" +
 		"  workspace workspace Synced Healthy v1.2.3\n"
 	if out.String() != want {
@@ -60,6 +62,7 @@ func TestArgocdStatusInstalled(t *testing.T) {
 // TestArgocdStatusOffAndDirect checks the warning for argocd=off and the
 // direct-apply line when no GitOps repository is designated.
 func TestArgocdStatusOffAndDirect(t *testing.T) {
+	stubValuesExists(t, false)
 	dir := t.TempDir()
 	modules := filepath.Join(dir, ".devzone.modules")
 	if err := os.WriteFile(modules, []byte("argocd=off\n"), 0o644); err != nil {
