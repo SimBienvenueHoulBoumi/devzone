@@ -46,6 +46,7 @@ func TestMinikubeAnswerNo(t *testing.T) {
 
 // TestMinikubeAnswerYes: the profile devzone is started, then selected
 func TestMinikubeAnswerYes(t *testing.T) {
+	t.Setenv("DEVZONE_CONTEXT", "")
 	f := newFixture("2\ny\n", true)
 	f.runner.On("minikube", []string{"start", "-p", "devzone"}, exec.Result{})
 	f.runner.On("kubectl", []string{"config", "use-context", "devzone"}, exec.Result{})
@@ -57,6 +58,27 @@ func TestMinikubeAnswerYes(t *testing.T) {
 	}
 	if !strings.Contains(f.out.String(), "✔ minikube cluster devzone started") {
 		t.Fatalf("out = %q", f.out.String())
+	}
+}
+
+// TestMinikubeUsesOverriddenContext: DEVZONE_CONTEXT names the context that
+// use-context selects, while the minikube profile keeps its own name.
+func TestMinikubeUsesOverriddenContext(t *testing.T) {
+	t.Setenv("DEVZONE_CONTEXT", "autre")
+	f := newFixture("2\ny\n", true)
+	f.runner.On("minikube", []string{"start", "-p", "devzone"}, exec.Result{})
+	f.runner.On("kubectl", []string{"config", "use-context", "autre"}, exec.Result{})
+	if !f.menu.Offer() {
+		t.Fatalf("Offer = false, err = %q", f.errOut.String())
+	}
+	if !f.calledWith("minikube", "start", "-p", "devzone") {
+		t.Fatal("the minikube profile must keep its own name")
+	}
+	if !f.calledWith("kubectl", "config", "use-context", "autre") {
+		t.Fatal("use-context with the overridden name not called")
+	}
+	if f.calledWith("kubectl", "config", "use-context", "devzone") {
+		t.Fatal("use-context called with the default name")
 	}
 }
 
