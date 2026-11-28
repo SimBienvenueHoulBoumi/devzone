@@ -2,6 +2,7 @@ package gitlab
 
 import (
 	"fmt"
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 	"os"
 
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec"
@@ -116,7 +117,7 @@ func (r *run) install() int {
 	r.secretsWarn()
 
 	fmt.Fprintln(r.out(), "▶ Installation complete.")
-	fmt.Fprintln(r.out(), "  URL: http://gitlab.localhost:8929")
+	fmt.Fprintln(r.out(), "  URL: "+config.GitLab().WebURL())
 	fmt.Fprintln(r.out(), "  User: root")
 	fmt.Fprintf(r.out(), "  Root password: %s/root-password (chmod 600)\n", r.secretsDir())
 	r.pipelineLaunch()

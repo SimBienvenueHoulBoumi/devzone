@@ -3,6 +3,7 @@ package gitlab
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 	"io"
 	"net/http"
 	"os"
@@ -136,7 +137,7 @@ func (r *run) status() int {
 			runnerStatus = "online"
 		}
 	}
-	fmt.Fprintf(r.out(), "ready: http://gitlab.localhost:8929, runner %s\n", runnerStatus)
+	fmt.Fprintf(r.out(), "ready: %s, runner %s\n", config.GitLab().WebURL(), runnerStatus)
 	return 0
 }
 

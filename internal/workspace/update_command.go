@@ -52,7 +52,7 @@ func (e UpdateEnv) Run(args []string) int {
 		return 1
 	}
 	if e.ImageExists == nil || !e.ImageExists(version) {
-		fmt.Fprintf(e.ErrOut, "✖ image %s:%s not found on ghcr.io (the release may still be publishing, or the network is down): nothing changed\n", imageRepo, version)
+		fmt.Fprintf(e.ErrOut, "✖ image %s:%s not found on ghcr.io (the release may still be publishing, or the network is down): nothing changed\n", imageRepo(), version)
 		return 1
 	}
 	if upToDate(e.Runner, version) {
@@ -83,7 +83,7 @@ func (e UpdateEnv) Run(args []string) int {
 	if e.Deploy == nil {
 		return 1
 	}
-	if status := e.Deploy(imageRepo, version, revision); status != 0 {
+	if status := e.Deploy(imageRepo(), version, revision); status != 0 {
 		return status
 	}
 	if argocdActive(e.Runner, e.Modules) && e.Reconcile != nil {

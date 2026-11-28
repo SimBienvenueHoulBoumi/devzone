@@ -84,7 +84,7 @@ func TestUpdateRelease(t *testing.T) {
 	if status := h.env.Run([]string{"--version", "0.48.0", "--yes"}); status != 0 {
 		t.Fatalf("status = %d, errOut = %q", status, h.errOut.String())
 	}
-	if len(h.deploy) != 1 || strings.Join(h.deploy[0], " ") != imageRepo+" 0.48.0 v0.48.0" {
+	if len(h.deploy) != 1 || strings.Join(h.deploy[0], " ") != imageRepo()+" 0.48.0 v0.48.0" {
 		t.Fatalf("deploy = %v", h.deploy)
 	}
 	if !strings.Contains(h.out.String(), "✔ workspace on v0.48.0") {

@@ -6,6 +6,7 @@ package gitlab
 import (
 	"context"
 	"fmt"
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 	"io"
 	"os"
 	"strings"
@@ -13,9 +14,6 @@ import (
 
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec"
 )
-
-// url is the address of the GitLab of the module (readiness, API, web).
-const url = "http://gitlab.localhost:8929"
 
 // testBaseURL, when not empty, replaces the GitLab address in the HTTP calls
 // (the tests of the Go port point it at a local server).
@@ -26,7 +24,7 @@ func baseURL() string {
 	if testBaseURL != "" {
 		return testBaseURL
 	}
-	return url
+	return config.GitLab().WebURL()
 }
 
 // Options carries the collaborators and the switches of one gitlab run.

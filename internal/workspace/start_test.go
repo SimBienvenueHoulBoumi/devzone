@@ -57,7 +57,7 @@ func TestStartDefault(t *testing.T) {
 	if status := h.env.Run(nil); status != 0 {
 		t.Fatalf("status = %d, errOut = %q", status, h.errOut.String())
 	}
-	want := "deploy " + imageRepo + ":latest no wait " + imageRepo + ":latest guard ports"
+	want := "deploy " + imageRepo() + ":latest no wait " + imageRepo() + ":latest guard ports"
 	if strings.Join(h.calls, " ") != want {
 		t.Fatalf("calls = %q, want %q", h.calls, want)
 	}
@@ -150,7 +150,7 @@ func TestStartEnablesArgoCDThenReconciles(t *testing.T) {
 	if status := h.env.Run(nil); status != 0 {
 		t.Fatalf("status = %d, errOut = %q", status, h.errOut.String())
 	}
-	want := "enable deploy " + imageRepo + ":latest no reconcile wait " + imageRepo + ":latest guard ports"
+	want := "enable deploy " + imageRepo() + ":latest no reconcile wait " + imageRepo() + ":latest guard ports"
 	if strings.Join(h.calls, " ") != want {
 		t.Fatalf("calls = %q, want %q", h.calls, want)
 	}
