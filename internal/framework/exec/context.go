@@ -3,7 +3,10 @@ package exec
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"strings"
+
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 )
 
 // DevzoneContextName is the default name of the services cluster context in
@@ -19,9 +22,19 @@ const KubectlContextFlagName = "--context"
 const HelmContextFlagName = "--kube-context"
 
 // ContextName returns the services context name, letting a workstation choose
-// another kubeconfig entry through DEVZONE_CONTEXT without changing the code.
+// another kubeconfig entry without changing the code. Resolution order: the
+// DEVZONE_CONTEXT variable when set, then the context key of the [cluster]
+// section of .argocd.conf, then "devzone". The file is read from DEVZONE_ROOT
+// when that is set, otherwise from the current folder; parents are never searched.
 func ContextName() string {
 	if name := os.Getenv("DEVZONE_CONTEXT"); name != "" {
+		return name
+	}
+	dir := os.Getenv("DEVZONE_ROOT")
+	if dir == "" {
+		dir = "."
+	}
+	if name := config.GetKeyInSection(filepath.Join(dir, ".argocd.conf"), "cluster", "context"); name != "" {
 		return name
 	}
 	return DevzoneContextName

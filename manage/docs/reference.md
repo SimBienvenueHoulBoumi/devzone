@@ -283,7 +283,7 @@ devzone workspace egress status                  # mode, ready or not, domains c
 devzone workspace egress allow|deny <domain>    # adds or removes a domain from the strict list
 ```
 
-The commands use the workstation's helm and kubectl, with the devzone context if it exists, otherwise the current context. The image is built by CI at each PR and published to ghcr.io at delivery.
+The commands use the workstation's helm and kubectl, with the devzone context determined by priority: the DEVZONE_CONTEXT variable, if set; otherwise the `context` key from the `[cluster]` section of ~/.argocd.conf (or $DEVZONE_ROOT/.argocd.conf); otherwise the default "devzone".
 
 The image comes from ghcr.io, tagged with the devzone version (`latest` from a clone of the repository); if missing, start reports it and uninstalls the workspace.
 
@@ -692,7 +692,7 @@ The modules that deploy a service (`postgres`, `gitlab`) are installed on **a si
 ### Services cluster and devzone context
 
 - **Single cluster**: all services (PostgreSQL, GitLab, etc.) live on a single cluster chosen via `devzone cluster CTX`. The choice is kept in the state (`cluster=` in `$RACINE/.devzone.modules`) and survives restarts.
-- **devzone context**: the kubectl `devzone` context is set on the services cluster (cluster and user taken from the current context). It is restored on the new cluster when `devzone cluster` moves the services. The command is implemented in `internal/domain/cluster`.
+- **devzone context**: the kubectl `devzone` context is set on the services cluster (cluster and user taken from the current context). Its name follows priority: the DEVZONE_CONTEXT variable, if set; otherwise the `context` key from the `[cluster]` section of ~/.argocd.conf (or $DEVZONE_ROOT/.argocd.conf); otherwise the default "devzone". It is restored on the new cluster when `devzone cluster` moves the services. The command is implemented in `internal/domain/cluster`.
 - **Cluster move**: `devzone cluster CTX [--yes]` moves PostgreSQL: deletion in the old cluster, installation in the new one. The data is not migrated, hence the required confirmation.
 - **Local vs remote contexts**: a cluster is local when its server listens on a loopback address (`127.0.0.1`, `localhost`, `::1`, `host.docker.internal`), read from the kubeconfig, with no network call. The dedicated kind cluster (`kind-devzone`) is always local. Any other cluster (server on a remote address) is remote. The default choice is first the host's current context (in practice `docker-desktop`), then the dedicated kind cluster `kind-devzone`.
 - **Remote cluster**: choosing a remote cluster requires a confirmation in a terminal, or `--confirm CTX` without a terminal. Without the exact confirmation, the choice is refused. When the devzone cluster is remote, the `devzone` summary shows a warning `⚠ cluster distant : <context>`.
