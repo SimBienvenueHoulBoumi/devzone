@@ -69,18 +69,17 @@ func initPrompt(ctx *cli.Context) bool {
 	return true
 }
 
-// needsPromptMigration reports whether the file has old prompt symbols, a
-// different block under the current markers, or a dangling end marker.
+// needsPromptMigration reports whether the file still holds symbols of the
+// shell libraries that no longer exist. A block under the current markers is
+// never rewritten, as the startup script left it: dropping only its markers
+// would leave its PS1 line and double the prompt.
 func needsPromptMigration(content string) bool {
 	for _, token := range legacyPromptTokens {
 		if strings.Contains(content, token) {
 			return true
 		}
 	}
-	if strings.Contains(content, promptStart) && !strings.Contains(content, promptBlock) {
-		return true
-	}
-	return strings.Contains(content, promptEnd) && !strings.Contains(content, promptStart)
+	return false
 }
 
 // removePromptLines drops the old prompt symbols and both marker lines while
