@@ -2,11 +2,12 @@ package workspace
 
 import (
 	"fmt"
-	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 	"os/exec"
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 )
 
 // imageRepository is the GitHub repository whose vX.Y.Z tags are the stable

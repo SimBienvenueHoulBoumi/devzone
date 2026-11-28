@@ -2,8 +2,9 @@ package workspace
 
 import (
 	"fmt"
-	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 	"io"
+
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 )
 
 // Names of the workspace in the cluster, as manage/workspace.sh has them.

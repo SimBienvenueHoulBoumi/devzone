@@ -2,8 +2,9 @@ package workspace
 
 import (
 	"fmt"
-	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 	"io"
+
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 )
 
 // ServicesStatus writes one line per service of the cluster, in the order

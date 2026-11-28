@@ -2,10 +2,11 @@ package workspace
 
 import (
 	"fmt"
-	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 	"io"
 	"os"
 	"strings"
+
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 )
 
 // servicesAdminSA and the default token duration are the constants of

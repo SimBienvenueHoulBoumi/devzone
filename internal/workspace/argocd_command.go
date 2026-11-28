@@ -2,11 +2,11 @@ package workspace
 
 import (
 	"fmt"
-	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 	"io"
 	"os"
 	"strings"
 
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 	rule "github.com/SimBienvenueHoulBoumi/devzone/internal/platform/argocd"
 )
 

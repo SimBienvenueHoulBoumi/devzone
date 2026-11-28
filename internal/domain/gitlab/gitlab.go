@@ -6,12 +6,12 @@ package gitlab
 import (
 	"context"
 	"fmt"
-	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 	"io"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec"
 )
 

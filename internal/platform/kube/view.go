@@ -3,9 +3,10 @@ package kube
 import (
 	"context"
 	"fmt"
-	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 	"io"
 	"strings"
+
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 )
 
 // View prints the table of connected clusters with the working and services

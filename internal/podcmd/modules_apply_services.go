@@ -2,8 +2,9 @@ package podcmd
 
 import (
 	"fmt"
-	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 	"strings"
+
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 )
 
 // applyGitlab installs or removes the GitLab module (apply_gitlab). The

@@ -2,12 +2,12 @@ package podcmd
 
 import (
 	"fmt"
-	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/cli"
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 )
 
 // printStatusDetails writes the GitOps, catalog, cluster, relay and credentials

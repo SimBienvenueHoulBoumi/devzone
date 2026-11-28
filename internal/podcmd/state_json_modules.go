@@ -1,9 +1,10 @@
 package podcmd
 
 import (
-	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 	"os"
 	"path/filepath"
+
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 )
 
 // moduleNames are the modules of devzone status, in the shell order.

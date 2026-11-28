@@ -2,8 +2,9 @@ package workspace
 
 import (
 	"errors"
-	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 	"strings"
+
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 )
 
 // portsSkipNamespaces lists the namespaces never relayed as applications: the

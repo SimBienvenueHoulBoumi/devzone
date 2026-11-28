@@ -3,12 +3,12 @@ package command
 import (
 	"context"
 	"fmt"
-	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/cli"
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 	fexec "github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec"
 	rule "github.com/SimBienvenueHoulBoumi/devzone/internal/platform/argocd"
 )
