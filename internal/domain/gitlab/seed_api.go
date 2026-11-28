@@ -48,7 +48,7 @@ func (r *run) apiJSONField(token, path, field string) string {
 
 // execStdin runs kubectl with the script on the standard input.
 func (r *run) execStdin(args []string, script string) (exec.Result, error) {
-	return r.runner().Run(r.ctx, "kubectl", append([]string{"--context", "devzone"}, args...),
+	return r.runner().Run(r.ctx, "kubectl", r.devzoneKubectlArgs(args),
 		exec.Opts{Stdin: strings.NewReader(script)})
 }
 
@@ -221,7 +221,7 @@ func (r *run) seedRunnerSecret() int {
 		return 1
 	}
 	res, err := r.runner().Run(r.ctx, "kubectl",
-		[]string{"--context", "devzone", "-n", r.namespace(), "apply", "-f", "-"},
+		r.devzoneKubectlArgs([]string{"-n", r.namespace(), "apply", "-f", "-"}),
 		exec.Opts{Stdin: strings.NewReader(yaml)})
 	if err != nil || res.Code != 0 {
 		fmt.Fprintln(r.errOut(), "devzone : seed GitLab : secret gitlab-runner-secret not created, seed stopped.")

@@ -69,12 +69,3 @@ func uninstallRelease(r Runner, out, errOut io.Writer) int {
 	}
 	return status
 }
-
-// helmContextFlag returns the helm arguments that select the devzone context when
-// the kubeconfig declares it, and none otherwise (helm_flag in manage/workspace.sh).
-func helmContextFlag(r Runner) []string {
-	if !declaresDevzone(r) {
-		return nil
-	}
-	return []string{"--kube-context", kubeContext}
-}

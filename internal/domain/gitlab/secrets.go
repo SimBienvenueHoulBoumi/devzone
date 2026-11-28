@@ -133,7 +133,7 @@ func (r *run) newPassword(args []string) int {
 // returns its stdout (the runner cannot be replaced by an error: the
 // caller decides by err).
 func (r *run) execStdinOut(args []string, script string) (string, error) {
-	res, err := r.runner().Run(r.ctx, "kubectl", append([]string{"--context", "devzone"}, args...),
+	res, err := r.runner().Run(r.ctx, "kubectl", r.devzoneKubectlArgs(args),
 		exec.Opts{Stdin: strings.NewReader(script)})
 	if err != nil {
 		return "", err

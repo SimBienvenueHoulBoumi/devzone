@@ -68,7 +68,8 @@ func (r *run) argocdActive() bool {
 // apps/devzone-gitlab.yaml; without a repository it is applied directly.
 func (r *run) applicationApply(revision string) int {
 	fmt.Fprintf(r.out(), "▶ Application devzone-gitlab (Argo CD, charts/devzone-gitlab at %s)…\n", revision)
-	manifest := applicationManifest(r.namespace(), r.repoURL(), revision,
+	manifest := applicationManifestWithRelease(r.namespace(), r.repoURL(), revision, r.applicationReleaseName(),
+		!r.applicationPresent(),
 		"gitlab-runner.gitlabUrl=http://gitlab-webservice-default."+r.namespace()+".svc:8181")
 	if repo := r.gitopsRepo(); repo != "" {
 		if err := r.gitopsWriteApp("devzone-gitlab", manifest, "devzone: application devzone-gitlab"); err != nil {
@@ -153,10 +154,39 @@ func (r *run) applicationRetirer() {
 		"devzone-gitlab", "--ignore-not-found", "--wait=true"})
 }
 
-// applicationManifest returns the Application manifest of the gitlab service,
-// generated like application.sh of the devzone repository: one Helm
-// parameter per key=value of params.
+// applicationPresent reports whether the Application devzone-gitlab exists in
+// the cluster. An existing one keeps its manual synchronization.
+func (r *run) applicationPresent() bool {
+	res, err := r.kubectlDevzone([]string{"-n", "devzone-argocd", "get", "application.argoproj.io", "devzone-gitlab"})
+	return err == nil && res.Code == 0
+}
+
+// applicationReleaseName reads the Helm release name of an existing
+// Application so an adopted GitLab keeps its object names and its data. An
+// absent or empty release name falls back to "gitlab".
+func (r *run) applicationReleaseName() string {
+	res, err := r.kubectlDevzone([]string{"-n", "devzone-argocd", "get", "application.argoproj.io",
+		"devzone-gitlab", "-o", "jsonpath={.spec.source.helm.releaseName}"})
+	if err != nil || res.Code != 0 {
+		return "gitlab"
+	}
+	name := strings.TrimSpace(string(res.Stdout))
+	if name == "" {
+		return "gitlab"
+	}
+	return name
+}
+
+// applicationManifest returns the safe Application manifest with the default
+// Helm release name "gitlab".
 func applicationManifest(namespace, repo, revision string, params ...string) string {
+	return applicationManifestWithRelease(namespace, repo, revision, "gitlab", false, params...)
+}
+
+// applicationManifestWithRelease returns the Application manifest of the
+// gitlab service: releaseName is a field of spec.source.helm, no cascade
+// finalizer removes data and synchronization stays manual with PruneLast.
+func applicationManifestWithRelease(namespace, repo, revision, releaseName string, first bool, params ...string) string {
 	var b strings.Builder
 	b.WriteString(`apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -166,19 +196,22 @@ metadata:
   labels:
     app.kubernetes.io/managed-by: devzone
     devzone.io/kind: service
-  finalizers:
-    - resources-finalizer.argocd.argoproj.io
 spec:
   project: default
   source:
     repoURL: ` + repo + `
     targetRevision: ` + revision + `
-    path: charts/devzone-gitlab`)
+    path: charts/devzone-gitlab
+    helm:
+      releaseName: ` + releaseName)
 	if len(params) > 0 {
-		b.WriteString("\n    helm:\n      parameters:\n")
+		b.WriteString(`
+      parameters:`)
 		for _, p := range params {
 			name, value, _ := strings.Cut(p, "=")
-			b.WriteString("        - name: " + name + "\n          value: \"" + value + "\"\n")
+			b.WriteString(`
+        - name: ` + name + `
+          value: "` + value + `"`)
 		}
 	}
 	b.WriteString(`
@@ -186,11 +219,18 @@ spec:
     server: https://kubernetes.default.svc
     namespace: ` + namespace + `
   syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-    syncOptions:
+`)
+	if first {
+		// A first install must deploy by itself; it never prunes nor self-heals,
+		// so no object of an existing GitLab can be removed by Argo CD.
+		b.WriteString(`    automated:
+      prune: false
+      selfHeal: false
+`)
+	}
+	b.WriteString(`    syncOptions:
       - CreateNamespace=true
+      - PruneLast=true
 `)
 	return b.String()
 }

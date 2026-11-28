@@ -47,8 +47,9 @@ func argoCDHoldsWorkspace(runner fexec.Runner, state string) bool {
 	if stateLine(state, "argocd") == "off" {
 		return false
 	}
-	res, err := runner.Run(context.Background(), "kubectl",
-		[]string{"--context", "devzone", "get", "namespace", "devzone-argocd"}, fexec.Opts{})
+	args := append(fexec.DevzoneContextFlag(context.Background(), runner, "--context"),
+		"get", "namespace", "devzone-argocd")
+	res, err := runner.Run(context.Background(), "kubectl", args, fexec.Opts{})
 	return err == nil && res.Code == 0
 }
 
