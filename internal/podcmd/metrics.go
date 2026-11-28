@@ -47,8 +47,10 @@ func metricsHeldByArgoCD(ctx *cli.Context) bool {
 	if !wanted {
 		return false
 	}
-	res, err := ctx.Runner.Run(context.Background(), "kubectl",
-		[]string{"--context", "devzone", "get", "namespace", "devzone-argocd"}, fexec.Opts{})
+	bg := context.Background()
+	args := append(fexec.DevzoneContextFlag(bg, ctx.Runner, "--context"),
+		"get", "namespace", "devzone-argocd")
+	res, err := ctx.Runner.Run(bg, "kubectl", args, fexec.Opts{})
 	if err != nil || res.Code != 0 {
 		return false
 	}
