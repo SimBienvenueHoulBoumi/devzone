@@ -38,11 +38,16 @@ func (r *run) kubectlAdmin(args []string) (exec.Result, error) {
 	return r.runner().Run(r.ctx, "kubectl", all, exec.Opts{})
 }
 
-// kubectlDevzone runs kubectl on the devzone context, as the seed and the
-// relay do (`kubectl --context devzone ...`).
+// devzoneKubectlArgs prepends the shared context flag to a kubectl call, so
+// the services context is selected only when the kubeconfig declares it (#916).
+func (r *run) devzoneKubectlArgs(args []string) []string {
+	return append(exec.DevzoneContextFlag(r.ctx, r.runner(), "--context"), args...)
+}
+
+// kubectlDevzone runs kubectl on the services cluster, as the seed and the
+// relay do, with the current context when no services context is declared.
 func (r *run) kubectlDevzone(args []string) (exec.Result, error) {
-	all := append([]string{"--context", "devzone"}, args...)
-	return r.runner().Run(r.ctx, "kubectl", all, exec.Opts{})
+	return r.runner().Run(r.ctx, "kubectl", r.devzoneKubectlArgs(args), exec.Opts{})
 }
 
 // install installs GitLab and its runner in the services cluster, then

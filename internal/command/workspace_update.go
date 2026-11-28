@@ -1,6 +1,7 @@
 package command
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/cli"
@@ -34,11 +35,10 @@ func updateWorkspace(ctx *cli.Context) int {
 	return env.Run(ctx.Args[1:])
 }
 
-// deployWorkspaceAt deploys the workspace at one release: the Argo CD
-// Application when it holds the charts, otherwise the helm release directly.
-// The revision reaches the Argo CD resolver through DEVZONE_ARGOCD_REVISION, as
-// the shell update exported it, and is restored afterwards so a test or a
-// caller keeps its environment.
+// deployWorkspaceAt deploys the workspace Application at one release. A missing
+// Argo CD stops the update with the command to enable it: there is no direct
+// chart fallback. The revision reaches the Argo CD resolver through
+// DEVZONE_ARGOCD_REVISION and is restored afterwards for the caller.
 func deployWorkspaceAt(ctx *cli.Context, repository, tag, revision string) int {
 	previous, had := os.LookupEnv("DEVZONE_ARGOCD_REVISION")
 	_ = os.Setenv("DEVZONE_ARGOCD_REVISION", revision)
@@ -50,10 +50,13 @@ func deployWorkspaceAt(ctx *cli.Context, repository, tag, revision string) int {
 		_ = os.Unsetenv("DEVZONE_ARGOCD_REVISION")
 	}()
 	deployCtx := &cli.Context{Args: []string{"deploy", repository, tag, ""}, Out: ctx.Out, Err: ctx.Err, Runner: ctx.Runner}
-	if code := workspaceDeploy(deployCtx); code != 3 {
-		return code
+	code := workspaceDeploy(deployCtx)
+	if code == 3 {
+		fmt.Fprintln(ctx.Err, "devzone : workspace : Argo CD is required but not running,")
+		fmt.Fprintln(ctx.Err, "please run: devzone enable argocd")
+		return 1
 	}
-	return workspace.HelmDeploy(updateRunner, modulesFile(), repository, tag, false, ctx.Out, ctx.Err)
+	return code
 }
 
 // reconcileServices applies or releases the service Applications after the

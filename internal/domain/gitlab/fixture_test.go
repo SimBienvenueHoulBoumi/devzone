@@ -44,8 +44,16 @@ func newFixture(t *testing.T) *fixture {
 	t.Setenv("DEVZONE_INTERACTIVE", "")
 	t.Setenv("GITLAB_ATTENTE", "1")
 	f := &fixture{r: fake.New(), root: root, tb: t, clock: &fakeClock{t: time.Unix(0, 0)}}
+	f.programContext()
 	f.fakeBin()
 	return f
+}
+
+// programContext declares the services context to the fake kubectl, so the
+// historical tests keep exercising the explicit flag of the fixture.
+func (f *fixture) programContext() {
+	f.r.On("kubectl", []string{"config", "get-contexts", "-o", "name"},
+		exec.Result{Stdout: []byte("devzone\n")})
 }
 
 // fakeBin prepends a bin folder with the fake tools to PATH: setsid, nohup,
@@ -109,6 +117,7 @@ func (f *fixture) calls() []string {
 // reset clears the recorded calls and the outputs of the run.
 func (f *fixture) reset() {
 	f.r = fake.New()
+	f.programContext()
 	f.out.Reset()
 	f.err.Reset()
 }
