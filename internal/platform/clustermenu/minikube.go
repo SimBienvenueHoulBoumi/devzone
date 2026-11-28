@@ -6,9 +6,13 @@ import (
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec"
 )
 
+// minikubeProfile is the minikube profile of the local cluster. A profile is a
+// different concept from a kubeconfig context, so it keeps its own literal name.
+const minikubeProfile = "devzone"
+
 // minikube offers the local cluster: when minikube is missing, it displays the
 // official install command (never runs it); otherwise it creates the profile
-// devzone after a confirmation.
+// devzone after a confirmation, then selects the shared context name.
 func (m *Menu) minikube() bool {
 	if _, err := m.LookPath("minikube"); err != nil {
 		fmt.Fprintln(m.Out, "minikube is not installed. Official command (devzone does not run it):")
@@ -23,7 +27,7 @@ func (m *Menu) minikube() bool {
 		fmt.Fprintln(m.Err, "✖ cancelled")
 		return false
 	}
-	res, err := m.Runner.Run(m.Ctx, "minikube", []string{"start", "-p", "devzone"}, exec.Opts{})
+	res, err := m.Runner.Run(m.Ctx, "minikube", []string{"start", "-p", minikubeProfile}, exec.Opts{})
 	// The captured output of minikube is shown after the run, not during it
 	m.Out.Write(res.Stdout)
 	m.Err.Write(res.Stderr)
@@ -31,7 +35,7 @@ func (m *Menu) minikube() bool {
 		fmt.Fprintln(m.Err, "✖ minikube start failed: nothing else done")
 		return false
 	}
-	m.run("kubectl", "config", "use-context", "devzone")
+	m.run("kubectl", "config", "use-context", exec.ContextName())
 	fmt.Fprintln(m.Out, "✔ minikube cluster devzone started")
 	return true
 }

@@ -15,7 +15,7 @@ import (
 var errNoServicesCluster = errors.New("no devzone services cluster identified")
 
 // servicesContext returns the kubeconfig context of the devzone services: the
-// cluster= line of the state file, else the "devzone" context when declared.
+// cluster= line of the state file, else the shared context name when declared.
 func servicesContext(ctx context.Context, runner exec.Runner, root string) (string, error) {
 	if c, ok := state.New(root).GetOK("cluster"); ok {
 		if c = strings.TrimSpace(c); c != "" {
@@ -23,18 +23,22 @@ func servicesContext(ctx context.Context, runner exec.Runner, root string) (stri
 		}
 	}
 	if declaresDevzoneContext(ctx, runner) {
-		return "devzone", nil
+		return exec.ContextName(), nil
 	}
-	return "", fmt.Errorf("%w: no cluster= line in the state, no \"devzone\" context in the kubeconfig", errNoServicesCluster)
+	return "", fmt.Errorf("%w: no cluster= line in the state, no %q context in the kubeconfig",
+		errNoServicesCluster, exec.ContextName())
 }
 
+// declaresDevzoneContext reports whether the kubeconfig lists the context that
+// ContextName names, so the uninstall knows which one to remove from.
 func declaresDevzoneContext(ctx context.Context, runner exec.Runner) bool {
 	res, err := runner.Run(ctx, "kubectl", []string{"config", "get-contexts", "-o", "name"}, exec.Opts{})
 	if err != nil || res.Code != 0 {
 		return false
 	}
+	wanted := exec.ContextName()
 	for _, name := range strings.Split(string(res.Stdout), "\n") {
-		if strings.TrimSpace(name) == "devzone" {
+		if strings.TrimSpace(name) == wanted {
 			return true
 		}
 	}

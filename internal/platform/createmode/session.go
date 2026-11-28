@@ -77,11 +77,12 @@ func (k kubeAdapter) run(name string, args []string, stdin io.Reader, stdout, st
 	return res.Code, err
 }
 
-// ContextName returns devzone when that context is declared, otherwise the
-// current context, or none when kubectl cannot name one.
+// ContextName returns the shared services context when kubeconfig declares it,
+// otherwise the current context, or none when kubectl cannot name one.
 func (s *Session) ContextName() string {
-	if res, ok := s.run("kubectl", "config", "get-contexts", "-o", "name"); ok && hasContext(res.Stdout, "devzone") {
-		return "devzone"
+	wanted := fexec.ContextName()
+	if res, ok := s.run("kubectl", "config", "get-contexts", "-o", "name"); ok && hasContext(res.Stdout, wanted) {
+		return wanted
 	}
 	if res, ok := s.run("kubectl", "config", "current-context"); ok {
 		if value := strings.TrimSpace(string(res.Stdout)); value != "" {
