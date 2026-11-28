@@ -2,6 +2,7 @@ package podcmd
 
 import (
 	"fmt"
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 	"strings"
 )
 
@@ -37,7 +38,7 @@ func (m *modules) applyGitlab(verb string) int {
 		}
 		return m.call(out, "gitlab", "uninstall")
 	}
-	fmt.Fprintln(out, "devzone : gitlab already deactivated (no devzone-gitlab namespace).")
+	fmt.Fprintln(out, "devzone : gitlab already deactivated (no "+config.NamespaceGitLab+" namespace).")
 	return 0
 }
 

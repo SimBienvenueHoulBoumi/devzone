@@ -1,6 +1,7 @@
 package podcmd
 
 import (
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 	"os"
 	"path/filepath"
 )
@@ -50,11 +51,11 @@ func serviceDNS(name string) string {
 	}
 	switch name {
 	case "gitlab":
-		return "gitlab-webservice-default.devzone-gitlab" + suffix + ".svc"
+		return "gitlab-webservice-default." + config.NamespaceGitLab + suffix + ".svc"
 	case "postgres":
-		return "postgres.devzone-postgres.svc"
+		return "postgres." + config.NamespacePostgres + ".svc"
 	case "argocd":
-		return "argocd-server.devzone-argocd.svc"
+		return "argocd-server." + config.NamespaceArgoCD + ".svc"
 	}
 	return ""
 }

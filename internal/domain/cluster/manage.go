@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 	"io"
 	"os"
 	"strings"
@@ -141,8 +142,8 @@ func Change(ctx context.Context, opts ManageOptions, args []string) int {
 				return 0
 			}
 		}
-		_ = k.AccountRemove(ctx, current, "devzone-postgres")
-		_, _ = k.AccountAdmin(ctx, current, "delete", "namespace", "devzone-postgres", "--wait=true")
+		_ = k.AccountRemove(ctx, current, config.NamespacePostgres)
+		_, _ = k.AccountAdmin(ctx, current, "delete", "namespace", config.NamespacePostgres, "--wait=true")
 		_ = k.ClusterRelease(ctx, current, opts.out(), opts.errOut())
 	}
 	if err := kube.SaveContext(opts.StatePath, next); err != nil {

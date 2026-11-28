@@ -3,6 +3,7 @@ package podcmd
 import (
 	"context"
 	"fmt"
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 	"os"
 	"strings"
 
@@ -35,7 +36,7 @@ func gitopsNamespace() string {
 	if v := strings.TrimSpace(getenv("GITOPS_NS")); v != "" {
 		return v
 	}
-	return "devzone-argocd"
+	return config.NamespaceArgoCD
 }
 
 // getenv isolates os.Getenv for small helpers.

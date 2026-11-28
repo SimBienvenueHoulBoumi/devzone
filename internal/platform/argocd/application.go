@@ -2,6 +2,7 @@ package argocd
 
 import (
 	"fmt"
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 	"io"
 	"strings"
 )
@@ -38,7 +39,7 @@ func RenderApplication(w io.Writer, name, kind, namespace, repo, revision, path 
 		}
 	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "apiVersion: argoproj.io/v1alpha1\nkind: Application\nmetadata:\n  name: %s\n  namespace: devzone-argocd\n  labels:\n    app.kubernetes.io/managed-by: devzone\n    devzone.io/kind: %s\n  finalizers:\n    - resources-finalizer.argocd.argoproj.io\nspec:\n  project: default\n", name, kind)
+	fmt.Fprintf(&b, "apiVersion: argoproj.io/v1alpha1\nkind: Application\nmetadata:\n  name: %s\n  namespace: "+config.NamespaceArgoCD+"\n  labels:\n    app.kubernetes.io/managed-by: devzone\n    devzone.io/kind: %s\n  finalizers:\n    - resources-finalizer.argocd.argoproj.io\nspec:\n  project: default\n", name, kind)
 	twoSources := name == workspaceAppName && valuesRepo != "" && valuesRepo != "none"
 	if twoSources {
 		fmt.Fprintf(&b, "  sources:\n    - repoURL: %s\n      targetRevision: %s\n      path: %s\n", repo, revision, path)
@@ -85,7 +86,7 @@ func RenderChartApplication(w io.Writer, name, namespace, repo, chart, version s
 		return fmt.Errorf("chart application: name, namespace, repo, chart and version are required")
 	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "apiVersion: argoproj.io/v1alpha1\nkind: Application\nmetadata:\n  name: %s\n  namespace: devzone-argocd\n  labels:\n    app.kubernetes.io/managed-by: devzone\n    devzone.io/kind: dependency\n  finalizers:\n    - resources-finalizer.argocd.argoproj.io\nspec:\n  project: default\n  source:\n    repoURL: %s\n    chart: %s\n    targetRevision: %s\n", name, repo, chart, version)
+	fmt.Fprintf(&b, "apiVersion: argoproj.io/v1alpha1\nkind: Application\nmetadata:\n  name: %s\n  namespace: "+config.NamespaceArgoCD+"\n  labels:\n    app.kubernetes.io/managed-by: devzone\n    devzone.io/kind: dependency\n  finalizers:\n    - resources-finalizer.argocd.argoproj.io\nspec:\n  project: default\n  source:\n    repoURL: %s\n    chart: %s\n    targetRevision: %s\n", name, repo, chart, version)
 	if len(params) > 0 {
 		b.WriteString("    helm:\n      parameters:\n")
 		for _, kv := range params {
