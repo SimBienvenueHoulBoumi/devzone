@@ -1,6 +1,7 @@
 package passwords
 
 import (
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 	"os"
 	"path/filepath"
 	"sort"
@@ -80,8 +81,9 @@ func collect(root string) []string {
 	ar := filepath.Join(workspace, ".argocd")
 	my := filepath.Join(workspace, ".mysql")
 	var entries []string
-	appendEntry(&entries, "gitlab", "http://gitlab.localhost:8929", "root", readFileNoNl(filepath.Join(gl, "root-password")))
-	appendEntry(&entries, "gitlab", "http://gitlab.localhost:8929", "dev", readFileNoNl(filepath.Join(gl, "dev-password")))
+	glURL := config.GitLab().WebURL()
+	appendEntry(&entries, "gitlab", glURL, "root", readFileNoNl(filepath.Join(gl, "root-password")))
+	appendEntry(&entries, "gitlab", glURL, "dev", readFileNoNl(filepath.Join(gl, "dev-password")))
 	appendEntry(&entries, "postgres", "127.0.0.1:5432", "postgres", readFileNoNl(filepath.Join(pg, "admin-password")))
 	appendEntry(&entries, "mysql", "127.0.0.1:3306", "root", readFileNoNl(filepath.Join(my, "admin-password")))
 	appendEntry(&entries, "argocd", "https://127.0.0.1:8443",

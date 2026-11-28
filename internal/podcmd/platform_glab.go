@@ -99,7 +99,7 @@ func moveFile(src, dst string) error {
 // the browser asking for the login code. The connection is checked afterwards.
 func (p *platformCmd) connectGlab(host, url string) int {
 	errOut := p.m.ctx.Err
-	if url == gitlabURLModule {
+	if url == gitlabURLModule() {
 		tokenPath := filepath.Join(p.m.root, "workspace", ".gitlab", "root-token")
 		if !fileExists(tokenPath) {
 			fmt.Fprintf(errOut, "devzone : root token of the gitlab module not found (%s): devzone enable gitlab, or by hand: glab auth login --hostname %s\n", tokenPath, host)
