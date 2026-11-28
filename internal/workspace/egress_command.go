@@ -8,11 +8,13 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 )
 
-// imageRepo is the repository of the published workspace image, from
-// manage/workspace.sh. It is shared by start, update and egress.
-const imageRepo = "ghcr.io/simbienvenuehoulboumi/devzone-workspace"
+// imageRepo returns the workspace image repository from the shared install
+// configuration, so start, update and egress see the same environment override.
+func imageRepo() string { return config.ImageRepo() }
 
 // EgressEnv holds what a workspace egress command touches. Everything that
 // would reach the machine is injected: the Runner for kubectl, the modules
@@ -143,7 +145,7 @@ func (e EgressEnv) redeploy() int {
 	if e.Deploy == nil {
 		return 1
 	}
-	if status := e.Deploy(imageRepo, tag, revision); status != 0 {
+	if status := e.Deploy(imageRepo(), tag, revision); status != 0 {
 		return status
 	}
 	if EgressParams(e.Modules) == "" {

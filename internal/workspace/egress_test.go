@@ -136,7 +136,7 @@ func TestEgressSetModeWithApplication(t *testing.T) {
 	if status != 0 {
 		t.Fatalf("status = %d, errOut = %q", status, h.errOut.String())
 	}
-	if len(deployed) != 1 || strings.Join(deployed[0], " ") != imageRepo+" 0.48.0 v0.48.0" {
+	if len(deployed) != 1 || strings.Join(deployed[0], " ") != imageRepo()+" 0.48.0 v0.48.0" {
 		t.Fatalf("deploy = %v", deployed)
 	}
 	if !strings.Contains(h.out.String(), "▶ waiting for the egress proxy…") {

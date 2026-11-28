@@ -87,7 +87,7 @@ func TestInstallGlabAlreadyThere(t *testing.T) {
 // TestConnectGlabModuleNeedsToken checks that the gitlab module needs its root token.
 func TestConnectGlabModuleNeedsToken(t *testing.T) {
 	f := newPlatformFixture(t)
-	if code := f.p.connectGlab("gitlab.localhost:8929", gitlabURLModule); code != 1 {
+	if code := f.p.connectGlab("gitlab.localhost:8929", gitlabURLModule()); code != 1 {
 		t.Fatalf("code %d, want 1", code)
 	}
 	if !strings.Contains(f.errOut.String(), "root token of the gitlab module not found") {
@@ -106,7 +106,7 @@ func TestConnectGlabModuleLogsIn(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(tokenDir, "root-token"), []byte("tok-secret\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if code := f.p.connectGlab("gitlab.localhost:8929", gitlabURLModule); code != 0 {
+	if code := f.p.connectGlab("gitlab.localhost:8929", gitlabURLModule()); code != 0 {
 		t.Fatalf("code %d, stderr %q", code, f.errOut.String())
 	}
 	if !f.run.called(f.p.glab+" auth login --hostname gitlab.localhost:8929 --api-protocol http --git-protocol http --token tok-secret") &&

@@ -3,6 +3,7 @@ package podcmd
 import (
 	"context"
 	"fmt"
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 	"path/filepath"
 	"runtime"
 
@@ -23,7 +24,7 @@ const (
 )
 
 // gitlabURLModule is the URL of the GitLab instance of the gitlab module.
-const gitlabURLModule = "http://gitlab.localhost:8929"
+func gitlabURLModule() string { return config.GitLab().WebURL() }
 
 // platformCmd runs the platform commands: GitHub (default) or GitLab (#240).
 // The choice is kept in the state file (platform=, gitlab_url=); glab lives in
@@ -145,7 +146,7 @@ func (p *platformCmd) changeToGitlab(args []string) int {
 			fmt.Fprintln(errOut, "devzone : missing URL: devzone platform gitlab --url URL (or an active gitlab module for the local instance)")
 			return 1
 		}
-		url = gitlabURLModule
+		url = gitlabURLModule()
 	}
 	host := gitlabHost(url)
 	if p.installGlab() != 0 {
