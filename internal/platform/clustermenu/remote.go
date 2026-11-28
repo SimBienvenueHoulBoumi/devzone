@@ -9,9 +9,10 @@ import (
 )
 
 // localContexts are the names of contexts that are always local (never offered
-// as a remote cluster); desktop-, kind- and k3d- prefixes are local too.
+// as a remote cluster); desktop-, kind- and k3d- prefixes are local too. The
+// services context name comes from the shared helper, never from a copy.
 var localContexts = map[string]bool{
-	"docker-desktop": true, "minikube": true, "devzone": true,
+	"docker-desktop": true, "minikube": true, exec.DevzoneContextName: true,
 	"rancher-desktop": true, "orbstack": true, "colima": true,
 }
 
