@@ -80,7 +80,7 @@ spec:
     - podSelector: {}
 `
 	res, err := k.runner().Run(ctx, "kubectl",
-		[]string{"--context", "devzone", "-n", ns, "apply", "-f", "-"},
+		append(exec.DevzoneContextFlag(ctx, k.runner(), "--context"), "-n", ns, "apply", "-f", "-"),
 		exec.Opts{Stdin: bytes.NewBufferString(manifest)})
 	if err != nil {
 		return err
