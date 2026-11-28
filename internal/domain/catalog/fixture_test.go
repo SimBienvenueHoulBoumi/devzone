@@ -68,11 +68,14 @@ func newFixture(t *testing.T) *fixture {
 	t.Setenv("DEVZONE_CATALOG_WATCHER_DIR", filepath.Join(root, "watcher"))
 	t.Setenv("DEVZONE_CATALOG_REAL", "")
 	t.Setenv("DEVZONE_WORKSPACE", "")
+	t.Setenv("DEVZONE_CONTEXT", "")
 	t.Setenv("BATS_TEST_TMPDIR", "")
 	for _, key := range []string{"GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_CONFIG_GLOBAL", "GIT_CONFIG_SYSTEM"} {
 		t.Setenv(key, "")
 	}
 	r := fake.New()
+	r.On("kubectl", []string{"config", "get-contexts", "-o", "name"},
+		fexec.Result{Stdout: []byte(fexec.ContextName() + "\n")})
 	r.On("kubectl", nil, fexec.Result{})
 	r.On("helm", nil, fexec.Result{})
 	r.On("bash", nil, fexec.Result{})

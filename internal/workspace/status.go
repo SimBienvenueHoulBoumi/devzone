@@ -11,8 +11,6 @@ const (
 	pod         = "devzone-workspace-0"
 	container   = "workspace"
 	projectsDir = "/workspaces/projets"
-	// kubeContext is the kubeconfig context of the cluster, used when declared
-	kubeContext = "devzone"
 	// notStarted is the status of a shell when the command cannot be found
 	notStarted = 127
 )

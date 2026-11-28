@@ -54,7 +54,7 @@ func (m *module) metricsServerApply() int {
 		return 1
 	}
 	res, err := m.runner.Run(m.ctx, "kubectl",
-		[]string{"--context", "devzone", "apply", "-f", "-"}, stdinOpt(manifest))
+		m.kubectlArgs("apply", "-f", "-"), stdinOpt(manifest))
 	if err != nil || res.Code != 0 {
 		if err != nil {
 			fmt.Fprintln(m.errOut, err)

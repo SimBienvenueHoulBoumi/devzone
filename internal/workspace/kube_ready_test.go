@@ -3,6 +3,8 @@ package workspace
 import (
 	"errors"
 	"testing"
+
+	fexec "github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec"
 )
 
 // kubeLookup finds only the named programs, so a test never asks the real PATH
@@ -29,14 +31,14 @@ func kubeReadyTest(r *fakeRunner, lookup func(string) (string, error), hint bool
 // probed and that a ready cluster has no reason to print.
 func TestKubeReadyDevzoneContext(t *testing.T) {
 	r := &fakeRunner{replies: []reply{
-		{match: "get-contexts", stdout: "devzone\n"},
+		{match: "get-contexts", stdout: fexec.ContextName() + "\n"},
 		{match: "cluster-info"},
 	}}
 	reason, ready, calls := kubeReadyTest(r, kubeLookup("kubectl", "helm"), false)
 	if !ready || reason != "" {
 		t.Fatalf("reason = %q, ready = %v; want ready with no reason", reason, ready)
 	}
-	if len(calls) != 2 || calls[1] != "cluster-info --request-timeout=5s --context devzone" {
+	if len(calls) != 2 || calls[1] != "cluster-info --request-timeout=5s --context "+fexec.ContextName() {
 		t.Fatalf("calls = %q", calls)
 	}
 }
@@ -53,7 +55,7 @@ func TestKubeReadyCurrentContext(t *testing.T) {
 		t.Fatalf("reason = %q, ready = %v; want ready with no reason", reason, ready)
 	}
 	for _, call := range calls {
-		if call == "cluster-info --request-timeout=5s --context devzone" {
+		if call == "cluster-info --request-timeout=5s --context "+fexec.ContextName() {
 			t.Fatalf("call %q must not force the devzone context", call)
 		}
 	}
@@ -87,12 +89,12 @@ func TestKubeReadyMissingPrograms(t *testing.T) {
 // other program is probed and the server of the context is named.
 func TestKubeReadyShortReason(t *testing.T) {
 	r := &fakeRunner{replies: []reply{
-		{match: "get-contexts", stdout: "devzone\n"},
+		{match: "get-contexts", stdout: fexec.ContextName() + "\n"},
 		{match: "cluster-info", status: 1},
 		{match: "clusters[0].cluster.server", stdout: "https://127.0.0.1:6443\n"},
 	}}
 	reason, ready, calls := kubeReadyTest(r, kubeLookup("kubectl", "helm"), false)
-	want := "cluster devzone unreachable (https://127.0.0.1:6443)"
+	want := "cluster " + fexec.ContextName() + " unreachable (https://127.0.0.1:6443)"
 	if ready || reason != want {
 		t.Fatalf("reason = %q, ready = %v; want %q and not ready", reason, ready, want)
 	}
@@ -121,12 +123,12 @@ func TestKubeReadyShortReasonCurrentContext(t *testing.T) {
 // with no machine-specific wording and no extra probe.
 func TestKubeReadyHint(t *testing.T) {
 	r := &fakeRunner{replies: []reply{
-		{match: "get-contexts", stdout: "devzone\n"},
+		{match: "get-contexts", stdout: fexec.ContextName() + "\n"},
 		{match: "cluster-info", status: 1},
 		{match: "clusters[0].cluster.server", stdout: "https://127.0.0.1:6443\n"},
 	}}
 	reason, ready, calls := kubeReadyTest(r, kubeLookup("kubectl", "helm"), true)
-	want := "✖ Kubernetes cluster devzone unreachable (https://127.0.0.1:6443)\n  Check the contexts: kubectl config get-contexts"
+	want := "✖ Kubernetes cluster " + fexec.ContextName() + " unreachable (https://127.0.0.1:6443)\n  Check the contexts: kubectl config get-contexts"
 	if ready || reason != want {
 		t.Fatalf("reason = %q, ready = %v; want %q and not ready", reason, ready, want)
 	}
@@ -149,11 +151,11 @@ func TestKubeReadyHintMissingProgram(t *testing.T) {
 // read from the kubeconfig.
 func TestKubeReadyUnknownServer(t *testing.T) {
 	r := &fakeRunner{replies: []reply{
-		{match: "get-contexts", stdout: "devzone\n"},
+		{match: "get-contexts", stdout: fexec.ContextName() + "\n"},
 		{match: "cluster-info", status: 1},
 	}}
 	reason, ready, _ := kubeReadyTest(r, kubeLookup("kubectl", "helm"), false)
-	want := "cluster devzone unreachable (unknown server)"
+	want := "cluster " + fexec.ContextName() + " unreachable (unknown server)"
 	if ready || reason != want {
 		t.Fatalf("reason = %q, ready = %v; want %q and not ready", reason, ready, want)
 	}

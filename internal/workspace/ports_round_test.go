@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	fexec "github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec"
 )
 
 // goRound runs one round of the Go code on dir with the fake kubectl; the ports
@@ -60,7 +62,7 @@ func TestRoundRelaysEverything(t *testing.T) {
 	h := newRoundHarness(t)
 	p := freePorts(t, 5)
 	sc := scenario{
-		contexts: "devzone\n", modules: "postgres=on\nmysql=on\n", pgadmin: strconv.Itoa(p[1]), argocd: "443", argoPort: strconv.Itoa(p[0]),
+		contexts: fexec.ContextName() + "\n", modules: "postgres=on\nmysql=on\n", pgadmin: strconv.Itoa(p[1]), argocd: "443", argoPort: strconv.Itoa(p[0]),
 		ss:  listenLine(p[2]) + listenLine(p[0]) + listenLine(2475) + listenLine(80),
 		svc: svcLine("shop", "web", p[3]) + svcLine("shop", "off", p[4]), ready: readyLine("shop", "web"),
 	}
@@ -79,7 +81,7 @@ func TestRoundRelaysEverything(t *testing.T) {
 		t.Fatalf("%d live relays, want 6", n)
 	}
 	format := func(ns, target string, local, remote int) string {
-		return "--context devzone --namespace " + ns + " port-forward --address 127.0.0.1 " + target + " " +
+		return "--context " + fexec.ContextName() + " --namespace " + ns + " port-forward --address 127.0.0.1 " + target + " " +
 			strconv.Itoa(local) + ":" + strconv.Itoa(remote)
 	}
 	waitFor(t, "port-forward calls", func() bool {

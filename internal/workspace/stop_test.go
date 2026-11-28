@@ -5,15 +5,19 @@ import (
 	"errors"
 	"strings"
 	"testing"
+
+	fexec "github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec"
 )
 
 // Joined arguments of the calls of Stop: the Argo CD checks and the helm release
 const (
 	argocdNamespaceCall   = "get namespace devzone-argocd"
 	argocdApplicationCall = "-n devzone-argocd get application.argoproj.io devzone-workspace"
-	helmUninstallCall     = "helm --kube-context devzone uninstall devzone-workspace --namespace devzone-workspace"
 	helmUninstallCurrent  = "helm uninstall devzone-workspace --namespace devzone-workspace"
 )
+
+// helmUninstallCall is the helm release removal with the services context flag.
+var helmUninstallCall = "helm --kube-context " + fexec.ContextName() + " uninstall devzone-workspace --namespace devzone-workspace"
 
 // noRemove is an AppRemover of a repository that is not designated: nothing to remove.
 func noRemove(string) int { return 0 }
@@ -45,7 +49,7 @@ func TestStopUninstallsReleaseWhenArgocdAbsent(t *testing.T) {
 	if status != 0 || out != "release \"devzone-workspace\" uninstalled\n" || errOut != "" {
 		t.Fatalf("status %d, stdout %q, stderr %q", status, out, errOut)
 	}
-	wantCalls(t, r.calls, contextsCall, "--context devzone "+argocdNamespaceCall,
+	wantCalls(t, r.calls, contextsCall, "--context "+fexec.ContextName()+" "+argocdNamespaceCall,
 		contextsCall, helmUninstallCall)
 }
 
@@ -74,8 +78,8 @@ func TestStopNamespaceWithoutApplicationUninstalls(t *testing.T) {
 	if status != 0 {
 		t.Fatalf("status %d: want the helm release removed", status)
 	}
-	wantCalls(t, r.calls, contextsCall, "--context devzone "+argocdNamespaceCall,
-		contextsCall, "--context devzone "+argocdApplicationCall,
+	wantCalls(t, r.calls, contextsCall, "--context "+fexec.ContextName()+" "+argocdNamespaceCall,
+		contextsCall, "--context "+fexec.ContextName()+" "+argocdApplicationCall,
 		contextsCall, helmUninstallCall)
 }
 
@@ -160,9 +164,9 @@ func TestStopArgocdHoldsWorkspaceExactCallsAndOutput(t *testing.T) {
 	if out != wantOut {
 		t.Fatalf("stdout = %q, want %q", out, wantOut)
 	}
-	wantCalls(t, r.calls, contextsCall, "--context devzone "+argocdNamespaceCall,
-		contextsCall, "--context devzone "+argocdApplicationCall,
-		contextsCall, "--context devzone -n devzone-argocd delete application.argoproj.io devzone-workspace --ignore-not-found --wait=true")
+	wantCalls(t, r.calls, contextsCall, "--context "+fexec.ContextName()+" "+argocdNamespaceCall,
+		contextsCall, "--context "+fexec.ContextName()+" "+argocdApplicationCall,
+		contextsCall, "--context "+fexec.ContextName()+" -n devzone-argocd delete application.argoproj.io devzone-workspace --ignore-not-found --wait=true")
 }
 
 // A GitOps repository that refuses the removal of the Application file keeps the
@@ -200,8 +204,8 @@ func TestStopRemovesFileBeforeDelete(t *testing.T) {
 	if status := Stop(r, recordingRemover(r, 0), &o, &e); status != 0 {
 		t.Fatalf("status %d, stderr %q", status, e.String())
 	}
-	wantCalls(t, r.calls, contextsCall, "--context devzone "+argocdNamespaceCall,
-		contextsCall, "--context devzone "+argocdApplicationCall,
+	wantCalls(t, r.calls, contextsCall, "--context "+fexec.ContextName()+" "+argocdNamespaceCall,
+		contextsCall, "--context "+fexec.ContextName()+" "+argocdApplicationCall,
 		"remove devzone-workspace",
-		contextsCall, "--context devzone -n devzone-argocd delete application.argoproj.io devzone-workspace --ignore-not-found --wait=true")
+		contextsCall, "--context "+fexec.ContextName()+" -n devzone-argocd delete application.argoproj.io devzone-workspace --ignore-not-found --wait=true")
 }

@@ -18,6 +18,7 @@ func (e *env) argocdState() (bool, error) {
 		Out:       io.Discard,
 		Err:       &reason,
 		Root:      e.root,
+		CodeRoot:  e.codeRoot,
 		StatePath: e.state.Path(),
 	}
 	code := argocd.Run(e.ctx, []string{"catalog-active", "mysql"}, io.Discard, &reason, opts)
@@ -71,6 +72,7 @@ func (e *env) argocdApply(namespace, extra string) error {
 		Out:       e.opts.Out,
 		Err:       e.opts.Err,
 		Root:      e.root,
+		CodeRoot:  e.codeRoot,
 		StatePath: e.state.Path(),
 	}
 	args := []string{"catalog-apply", "mysql", namespace,
@@ -93,6 +95,7 @@ func (e *env) argocdDelete() error {
 		Out:       e.opts.Out,
 		Err:       e.opts.Err,
 		Root:      e.root,
+		CodeRoot:  e.codeRoot,
 		StatePath: e.state.Path(),
 	}
 	if code := argocd.Run(e.ctx, []string{"catalog-delete", "mysql"}, e.opts.Out, e.opts.Err, opts); code != 0 {

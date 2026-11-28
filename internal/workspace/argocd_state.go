@@ -22,9 +22,10 @@ func argocdWanted(modules string) bool {
 }
 
 // argocdInstalled reports whether the namespace of Argo CD exists: the call
-// "kubectl [--context devzone] get namespace devzone-argocd" must succeed.
-// Output and errors of kubectl are ignored, and a kubectl that cannot start
-// counts as not installed, like argocd_installed in argocd-workspace.sh.
+// "kubectl get namespace devzone-argocd", with the services context flag when
+// kubeconfig declares it, must succeed. Output and errors of kubectl are
+// ignored, and a kubectl that cannot start counts as not installed, like
+// argocd_installed in argocd-workspace.sh.
 func argocdInstalled(r Runner) bool {
 	status, err := r.Kubectl(append(contextFlag(r), "get", "namespace", argocdNamespace),
 		nil, io.Discard, io.Discard)

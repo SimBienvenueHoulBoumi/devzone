@@ -4,6 +4,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"testing"
+
+	fexec "github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec"
 )
 
 // TestRoundRelaysGitlabModule checks the relays the module gitlab asks for:
@@ -11,7 +13,7 @@ import (
 // instance, then their removal at the next round when the module is off.
 func TestRoundRelaysGitlabModule(t *testing.T) {
 	h := newRoundHarness(t)
-	sc := scenario{contexts: "devzone\n", modules: "gitlab=on\n", ss: "", svc: "", ready: "", argocd: ""}
+	sc := scenario{contexts: fexec.ContextName() + "\n", modules: "gitlab=on\n", ss: "", svc: "", ready: "", argocd: ""}
 	log := filepath.Join(h.dir, "kubectl.log")
 	h.use(sc, log)
 	dir := h.stateDir("state")
@@ -24,7 +26,7 @@ func TestRoundRelaysGitlabModule(t *testing.T) {
 		t.Fatalf("%d live relays, want 2", n)
 	}
 	format := func(ns, target string, local, remote int) string {
-		return "--context devzone --namespace " + ns + " port-forward --address 127.0.0.1 " + target + " " +
+		return "--context " + fexec.ContextName() + " --namespace " + ns + " port-forward --address 127.0.0.1 " + target + " " +
 			strconv.Itoa(local) + ":" + strconv.Itoa(remote)
 	}
 	waitFor(t, "port-forward calls", func() bool {
@@ -35,7 +37,7 @@ func TestRoundRelaysGitlabModule(t *testing.T) {
 	if out, errOut = h.goRound(dir, nil, appsMax); out != "" || errOut != "" {
 		t.Fatalf("second round printed %q %q", out, errOut)
 	}
-	h.use(scenario{contexts: "devzone\n", modules: "gitlab=off\n", ss: "", svc: "", ready: "", argocd: ""}, log)
+	h.use(scenario{contexts: fexec.ContextName() + "\n", modules: "gitlab=off\n", ss: "", svc: "", ready: "", argocd: ""}, log)
 	if out, errOut = h.goRound(dir, nil, appsMax); out != "" || errOut != "" {
 		t.Fatalf("round after switching the module off printed %q %q", out, errOut)
 	}

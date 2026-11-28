@@ -3,6 +3,7 @@ package workspace
 import (
 	"bytes"
 	"errors"
+	fexec "github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec"
 	"os"
 	"strings"
 	"testing"
@@ -105,8 +106,8 @@ func TestServicesStatusContextFlag(t *testing.T) {
 		t.Fatalf("status %d, want 0", status)
 	}
 	for _, call := range r.calls {
-		if strings.Contains(call, "get namespace") && !strings.HasPrefix(call, "--context devzone ") {
-			t.Errorf("call %q: want the --context devzone flag", call)
+		if strings.Contains(call, "get namespace") && !strings.HasPrefix(call, "--context "+fexec.ContextName()+" ") {
+			t.Errorf("call %q: want the services context flag", call)
 		}
 	}
 	// The devzone context is not declared: the calls carry no flag.

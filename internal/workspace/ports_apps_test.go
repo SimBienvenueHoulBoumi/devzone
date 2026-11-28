@@ -6,6 +6,8 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	fexec "github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec"
 )
 
 // TestServiceExcluded checks each exclusion rule of serviceExcluded, and that a
@@ -75,13 +77,13 @@ func TestParseDiscovered(t *testing.T) {
 func TestDiscoverServices(t *testing.T) {
 	f := &fakeRunner{replies: []reply{
 		{match: "get svc -A", stdout: "shop|web|10.0.0.1|ClusterIP||80/TCP,\n", status: 1},
-		{match: "config get-contexts", stdout: "devzone\n"},
+		{match: "config get-contexts", stdout: fexec.ContextName() + "\n"},
 	}}
 	got := discoverServices(f)
 	if len(got) != 1 || got[0].name != "web" {
 		t.Fatalf("discoverServices = %v", got)
 	}
-	want := "--context devzone get svc -A -o " + discoverJSONPath
+	want := "--context " + fexec.ContextName() + " get svc -A -o " + discoverJSONPath
 	if last := f.calls[len(f.calls)-1]; last != want {
 		t.Fatalf("call = %q, want %q", last, want)
 	}

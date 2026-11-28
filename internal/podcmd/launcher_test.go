@@ -43,7 +43,10 @@ func launcherSetup(t *testing.T, withBinary bool) string {
 func runLauncher(t *testing.T, dir string, env []string, args ...string) (string, int) {
 	t.Helper()
 	cmd := exec.Command("bash", append([]string{filepath.Join(dir, "devzone")}, args...)...)
-	cmd.Env = append(testkit.CommandEnv(), env...)
+	// Drop the pod binary and script inherited from a workspace session, so the
+	// copied launcher picks the fake binary or refuses, and explicit env wins.
+	base := testkit.FilterEnv(testkit.CommandEnv(), "DEVZONE_HOST_BIN", "DEVZONE_POD_SCRIPT")
+	cmd.Env = append(base, env...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		exitErr, ok := err.(*exec.ExitError)

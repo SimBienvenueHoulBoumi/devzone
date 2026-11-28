@@ -96,14 +96,21 @@ func (e *env) exec(name string, args []string, stdin io.Reader) (exec.Result, er
 	return e.runner().Run(e.ctx, name, args, exec.Opts{Stdin: stdin})
 }
 
-// k runs kubectl on the devzone context in the postgres namespace.
+// kubectlArgs builds namespace-scoped kubectl arguments with the shared
+// context flag, so every PostgreSQL call selects the context the same way.
+func (e *env) kubectlArgs(namespace string, args ...string) []string {
+	all := exec.DevzoneContextFlag(e.ctx, e.runner(), "--context")
+	return append(append(all, "-n", namespace), args...)
+}
+
+// k runs kubectl on the services cluster in the postgres namespace.
 func (e *env) k(args ...string) (exec.Result, error) {
-	return e.exec("kubectl", append([]string{"--context", "devzone", "-n", ns}, args...), nil)
+	return e.exec("kubectl", e.kubectlArgs(ns, args...), nil)
 }
 
 // kInput runs kubectl with data on standard input.
 func (e *env) kInput(stdin io.Reader, args ...string) (exec.Result, error) {
-	return e.exec("kubectl", append([]string{"--context", "devzone", "-n", ns}, args...), stdin)
+	return e.exec("kubectl", e.kubectlArgs(ns, args...), stdin)
 }
 
 // show writes the captured output of a command as the shell would.

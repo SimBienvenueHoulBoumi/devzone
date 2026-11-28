@@ -5,6 +5,8 @@ import (
 	"errors"
 	"strings"
 	"testing"
+
+	fexec "github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec"
 )
 
 // shellExec is the joined arguments of the kubectl exec of Shell, without the context
@@ -26,7 +28,7 @@ func TestShellWithDevzoneContext(t *testing.T) {
 	if status != 0 || out != "bash prompt\n" || errOut != "" {
 		t.Fatalf("status %d, stdout %q, stderr %q", status, out, errOut)
 	}
-	wantCalls(t, r.calls, contextsCall, "--context devzone "+shellExec)
+	wantCalls(t, r.calls, contextsCall, "--context "+fexec.ContextName()+" "+shellExec)
 }
 
 func TestShellCurrentContextWhenDevzoneMissing(t *testing.T) {

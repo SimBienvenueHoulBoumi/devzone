@@ -39,7 +39,7 @@ func Install(ctx context.Context, runner exec.Runner, codeRoot, svc, ns string, 
 		return "", 1
 	}
 	adopt(ctx, runner, ns, svc, rendered.Stdout)
-	args = []string{"--kube-context", "devzone", "upgrade", "--install", svc, chart, "-n", ns}
+	args = append(exec.DevzoneHelmContextFlag(ctx, runner), "upgrade", "--install", svc, chart, "-n", ns)
 	for _, set := range sets {
 		args = append(args, "--set", set)
 	}
@@ -58,17 +58,18 @@ func Install(ctx context.Context, runner exec.Runner, codeRoot, svc, ns string, 
 // them. The rendered manifest is passed on stdin to the kubectl get call.
 func adopt(ctx context.Context, runner exec.Runner, ns, svc string, manifest []byte) {
 	found, err := runner.Run(ctx, "kubectl",
-		[]string{"--context", "devzone", "-n", ns, "get", "-f", "-", "-o", "name", "--ignore-not-found"},
+		append(exec.DevzoneKubectlContextFlag(ctx, runner),
+			"-n", ns, "get", "-f", "-", "-o", "name", "--ignore-not-found"),
 		exec.Opts{Stdin: strings.NewReader(string(manifest))})
 	if err != nil || found.Code != 0 {
 		return
 	}
 	for _, object := range strings.Fields(string(found.Stdout)) {
-		_, _ = runner.Run(ctx, "kubectl", []string{
-			"--context", "devzone", "-n", ns, "annotate", object,
-			"meta.helm.sh/release-name=" + svc, "meta.helm.sh/release-namespace=" + ns, "--overwrite"}, exec.Opts{})
-		_, _ = runner.Run(ctx, "kubectl", []string{
-			"--context", "devzone", "-n", ns, "label", object,
-			"app.kubernetes.io/managed-by=Helm", "--overwrite"}, exec.Opts{})
+		_, _ = runner.Run(ctx, "kubectl", append(exec.DevzoneKubectlContextFlag(ctx, runner),
+			"-n", ns, "annotate", object,
+			"meta.helm.sh/release-name="+svc, "meta.helm.sh/release-namespace="+ns, "--overwrite"), exec.Opts{})
+		_, _ = runner.Run(ctx, "kubectl", append(exec.DevzoneKubectlContextFlag(ctx, runner),
+			"-n", ns, "label", object,
+			"app.kubernetes.io/managed-by=Helm", "--overwrite"), exec.Opts{})
 	}
 }

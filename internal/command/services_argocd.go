@@ -122,17 +122,8 @@ func workspaceRoot() string {
 	return root
 }
 
-// contextFlag returns the kubectl context flag for the devzone context.
+// contextFlag returns the shared kubectl context flag when kubeconfig declares
+// that context, and no flag otherwise so the current context is used.
 func contextFlag(r workspace.Runner) []string {
-	var out strings.Builder
-	status, _ := r.Kubectl([]string{"config", "get-contexts", "-o", "name"}, nil, &out, io.Discard)
-	if status != 0 {
-		return nil
-	}
-	for _, line := range strings.Split(out.String(), "\n") {
-		if line == "devzone" {
-			return []string{"--context", "devzone"}
-		}
-	}
-	return nil
+	return fexec.DevzoneContextFlag(context.Background(), workspace.ContextRunner{Runner: r}, "--context")
 }

@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"errors"
 	"testing"
+
+	fexec "github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec"
 )
 
 // argocdMemoryRun runs argocdMemoryOK on r and returns its status and error
@@ -99,7 +101,7 @@ func TestArgocdMemoryOKContextFlag(t *testing.T) {
 	if status, _ := argocdMemoryRun(r); status != 0 {
 		t.Fatalf("argocdMemoryOK = %d, want 0", status)
 	}
-	wantCalls(t, r.calls, contextsCall, `--context devzone get nodes -o jsonpath={range .items[*]}{.status.allocatable.memory}{"\n"}{end}`)
+	wantCalls(t, r.calls, contextsCall, "--context "+fexec.ContextName()+` get nodes -o jsonpath={range .items[*]}{.status.allocatable.memory}{"\n"}{end}`)
 
 	r = &fakeRunner{replies: []reply{
 		{match: contextsCall, stdout: currentContext},

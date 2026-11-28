@@ -7,11 +7,11 @@ import (
 
 // ServicesStatus writes one line per service of the cluster, in the order
 // gitlab, postgres, mysql, argocd: "  ✔ s installed (namespace ns): devzone
-// workspace services disable s" when the call "kubectl [--context devzone] get
-// namespace ns" succeeds, "  ○ s not installed: devzone workspace services
-// enable s" otherwise (also when kubectl cannot start: all the lines are then
-// "not installed"). It exists to show at once which services of the cluster
-// are installed, as services_status in
+// workspace services disable s" when the call "kubectl get namespace ns", with
+// the services context flag when kubeconfig declares it, succeeds, "  ○ s not
+// installed: devzone workspace services enable s" otherwise (also when kubectl
+// cannot start: all the lines are then "not installed"). It exists to show at
+// once which services of the cluster are installed, as services_status in
 // manage/scripts/workspace/workspace services (Go). The kubectl calls print
 // nothing: the lines carry the answer; the status is 0.
 func ServicesStatus(r Runner, out io.Writer) int {

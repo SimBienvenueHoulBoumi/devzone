@@ -2,11 +2,30 @@ package exec
 
 import (
 	"context"
+	"os"
 	"strings"
 )
 
-// DevzoneContextName is the name of the services cluster context in kubeconfig.
+// DevzoneContextName is the default name of the services cluster context in
+// kubeconfig. Keep the literal here so no command writes it by hand.
 const DevzoneContextName = "devzone"
+
+// KubectlContextFlagName is the kubectl flag that selects a kubeconfig context.
+// Kept here so the flag name has a single home.
+const KubectlContextFlagName = "--context"
+
+// HelmContextFlagName is the helm flag that selects a kubeconfig context.
+// Kept here so the flag name has a single home.
+const HelmContextFlagName = "--kube-context"
+
+// ContextName returns the services context name, letting a workstation choose
+// another kubeconfig entry through DEVZONE_CONTEXT without changing the code.
+func ContextName() string {
+	if name := os.Getenv("DEVZONE_CONTEXT"); name != "" {
+		return name
+	}
+	return DevzoneContextName
+}
 
 // DevzoneContextFlag returns the flag that selects the services context for the
 // given program when kubeconfig declares it. Without that context it returns no
@@ -20,10 +39,23 @@ func DevzoneContextFlag(ctx context.Context, r Runner, flagName string) []string
 	if err != nil || res.Code != 0 {
 		return nil
 	}
+	name := ContextName()
 	for _, line := range strings.Split(string(res.Stdout), "\n") {
-		if strings.TrimSpace(line) == DevzoneContextName {
-			return []string{flagName, DevzoneContextName}
+		if strings.TrimSpace(line) == name {
+			return []string{flagName, name}
 		}
 	}
 	return nil
+}
+
+// DevzoneKubectlContextFlag selects the services context for kubectl, returning
+// the flag only when kubeconfig declares that context.
+func DevzoneKubectlContextFlag(ctx context.Context, r Runner) []string {
+	return DevzoneContextFlag(ctx, r, KubectlContextFlagName)
+}
+
+// DevzoneHelmContextFlag selects the services context for helm, returning the
+// flag only when kubeconfig declares that context.
+func DevzoneHelmContextFlag(ctx context.Context, r Runner) []string {
+	return DevzoneContextFlag(ctx, r, HelmContextFlagName)
 }
