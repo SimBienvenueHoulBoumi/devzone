@@ -12,13 +12,14 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec"
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/state"
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/platform/kube"
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/platform/relay"
 )
 
-const ns = "devzone-postgres"
+const ns = config.NamespacePostgres
 
 // Options carries the collaborators, the paths and the switches of a run.
 type Options struct {

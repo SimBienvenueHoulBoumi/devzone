@@ -42,7 +42,25 @@ func runGuard(ctx *cli.Context) int {
 		in = os.Stdin
 	}
 	allowHost := os.Getenv("DEVZONE_ALLOW_"+"\x44\x4f\x43\x4b\x45\x52") == "1"
-	return guard.Run(in, format, allowHost, ctx.Err, guard.DefaultMessages())
+	protocol, announced := protocolFlag(ctx.Args)
+	if !announced {
+		return guard.Run(in, format, allowHost, ctx.Err, guard.DefaultMessages())
+	}
+	return guard.RunProtocol(in, format, protocol, allowHost, ctx.Out, ctx.Err, guard.DefaultMessages())
+}
+
+// protocolFlag returns the announced protocol and whether the flag was given.
+// A flag without a value is an empty protocol, which the guard refuses.
+func protocolFlag(args []string) (string, bool) {
+	for i, arg := range args {
+		if arg == "--protocol" {
+			if i+1 < len(args) {
+				return args[i+1], true
+			}
+			return "", true
+		}
+	}
+	return "", false
 }
 
 // aiOptions builds the AI domain options from the process environment.

@@ -8,13 +8,14 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 	fexec "github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec"
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/state"
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/platform/relay"
 )
 
 const (
-	defaultNS            = "devzone-argocd"
+	defaultNS            = config.NamespaceArgoCD
 	defaultVersion       = "10.14.0"
 	defaultPort          = "8443"
 	defaultWait          = "600"

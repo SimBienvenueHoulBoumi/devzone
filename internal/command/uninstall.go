@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/cli"
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec"
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/platform/hostcheck"
 )
@@ -70,8 +71,8 @@ func uninstallCommand(ctx *cli.Context) int {
 	}
 	printUninstallPlan(ctx.Out, root, instance, kube, host)
 	for _, ns := range kube.namespaces {
-		if ns == "devzone-workspace" {
-			fmt.Fprintln(ctx.Out, "⚠ namespace devzone-workspace holds the pod volumes: deleting it loses the pod data.")
+		if ns == config.NamespaceWorkspace {
+			fmt.Fprintln(ctx.Out, "⚠ namespace "+config.NamespaceWorkspace+" holds the pod volumes: deleting it loses the pod data.")
 			break
 		}
 	}

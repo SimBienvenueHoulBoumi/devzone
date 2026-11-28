@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 	fexec "github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec"
 )
 
@@ -60,11 +61,11 @@ func (m *module) hookOff(svc string) int {
 func (m *module) hookRelease() int {
 	for _, svc := range []string{"postgres", "mysql", "gitlab"} {
 		app := "devzone-" + svc
-		res, err := m.kubectl("-n", "devzone-argocd", "get", "application.argoproj.io", app)
+		res, err := m.kubectl("-n", config.NamespaceArgoCD, "get", "application.argoproj.io", app)
 		if err != nil || res.Code != 0 {
 			continue
 		}
-		_, _ = m.kubectl("-n", "devzone-argocd", "patch", "application.argoproj.io", app, "--type", "merge", "-p", `{"metadata":{"finalizers":null}}`)
+		_, _ = m.kubectl("-n", config.NamespaceArgoCD, "patch", "application.argoproj.io", app, "--type", "merge", "-p", `{"metadata":{"finalizers":null}}`)
 		if code := m.gitopsDeleteApplication(app, "keep"); code != 0 {
 			return 1
 		}
@@ -90,7 +91,7 @@ func (m *module) catalogArgocdApplicationExists(app string) bool {
 	if !on {
 		return false
 	}
-	res, err := m.kubectl("-n", "devzone-argocd", "get", "application.argoproj.io", "devzone-"+app)
+	res, err := m.kubectl("-n", config.NamespaceArgoCD, "get", "application.argoproj.io", "devzone-"+app)
 	return err == nil && res.Code == 0
 }
 
@@ -167,7 +168,7 @@ func (m *module) servicesNamespacePrepare(svc string) int {
 func (m *module) servicesSecret(svc string) int {
 	switch svc {
 	case "postgres":
-		return m.servicesSecretAdmin("postgres", "devzone-postgres", "postgres-admin")
+		return m.servicesSecretAdmin("postgres", config.NamespacePostgres, "postgres-admin")
 	case "mysql":
 		return m.servicesSecretAdmin("mysql", "devzone-mysql", "mysql-admin")
 	default:

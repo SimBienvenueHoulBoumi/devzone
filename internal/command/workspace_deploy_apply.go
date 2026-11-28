@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/cli"
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 	fexec "github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec"
 	rule "github.com/SimBienvenueHoulBoumi/devzone/internal/platform/argocd"
 )
@@ -31,7 +32,7 @@ func workspaceApplyApplication(ctx *cli.Context, root, repo, revision string, pa
 	conf := filepath.Join(root, ".argocd.conf")
 	gitops := confValue(conf, "argocd", "repo")
 	var b bytes.Buffer
-	if err := rule.RenderApplication(&b, "devzone-workspace", "workspace", "devzone-workspace",
+	if err := rule.RenderApplication(&b, "devzone-workspace", "workspace", config.NamespaceWorkspace,
 		repo, revision, "charts/devzone-workspace", params, gitops); err != nil {
 		fmt.Fprintln(ctx.Err, err)
 		return 1
@@ -46,7 +47,7 @@ func workspaceApplyApplication(ctx *cli.Context, root, repo, revision string, pa
 		return code
 	}
 	_, _ = ctx.Runner.Run(context.Background(), "kubectl", append(fexec.DevzoneContextFlag(context.Background(), ctx.Runner, "--context"),
-		"-n", "devzone-argocd", "annotate", "application.argoproj.io", "devzone-workspace",
+		"-n", config.NamespaceArgoCD, "annotate", "application.argoproj.io", "devzone-workspace",
 		"argocd.argoproj.io/refresh=normal", "--overwrite"), fexec.Opts{})
 	return 0
 }

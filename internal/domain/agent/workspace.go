@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 	fexec "github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec"
 )
 
@@ -20,7 +21,7 @@ func AgentKC(ctx context.Context, r Runner, args ...string) Result {
 	if r == nil {
 		return Result{Code: 1}
 	}
-	prefix := append(fexec.DevzoneContextFlag(ctx, r, "--context"), "--namespace", "devzone-workspace")
+	prefix := append(fexec.DevzoneContextFlag(ctx, r, "--context"), "--namespace", config.NamespaceWorkspace)
 	full := append(prefix, args...)
 	res, err := r.Run(ctx, "kubectl", full, Opts{})
 	if err != nil {

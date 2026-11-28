@@ -6,6 +6,7 @@ import (
 	"io"
 	"runtime"
 
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec"
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/platform/clustermenu"
 )
@@ -76,11 +77,11 @@ func (emptyInput) Read(p []byte) (int, error) {
 // existing prints a notice when a workspace already runs in this cluster: the
 // new folder drives it too and the start becomes an upgrade.
 func (s *Session) existing(context string) {
-	if _, ok := s.run("helm", "status", "devzone-workspace", "--namespace", "devzone-workspace", exec.HelmContextFlagName, context); ok {
+	if _, ok := s.run("helm", "status", "devzone-workspace", "--namespace", config.NamespaceWorkspace, exec.HelmContextFlagName, context); ok {
 		s.notice()
 		return
 	}
-	if _, ok := s.run("kubectl", "get", "application.argoproj.io", "devzone-workspace", "--namespace", "devzone-argocd", exec.KubectlContextFlagName, context); ok {
+	if _, ok := s.run("kubectl", "get", "application.argoproj.io", "devzone-workspace", "--namespace", config.NamespaceArgoCD, exec.KubectlContextFlagName, context); ok {
 		s.notice()
 	}
 }

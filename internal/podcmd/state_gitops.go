@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/cli"
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec"
 )
 
@@ -35,7 +36,7 @@ func gitopsNamespace() string {
 	if v := strings.TrimSpace(getenv("GITOPS_NS")); v != "" {
 		return v
 	}
-	return "devzone-argocd"
+	return config.NamespaceArgoCD
 }
 
 // getenv isolates os.Getenv for small helpers.

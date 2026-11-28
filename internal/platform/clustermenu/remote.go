@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec"
 )
 
@@ -42,7 +43,7 @@ func (m *Menu) remote() bool {
 		return false
 	}
 	ctx := list[n-1]
-	fmt.Fprintf(m.Out, "remote cluster: %s. devzone will install a pod, a volume and the namespace devzone-workspace in it: it needs enough rights and may cost.\n", ctx)
+	fmt.Fprintf(m.Out, "remote cluster: %s. devzone will install a pod, a volume and the namespace "+config.NamespaceWorkspace+" in it: it needs enough rights and may cost.\n", ctx)
 	if m.ask("Type its name to confirm: ") != ctx {
 		fmt.Fprintln(m.Err, "✖ name not typed back: nothing done")
 		return false

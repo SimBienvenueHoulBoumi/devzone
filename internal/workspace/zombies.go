@@ -7,12 +7,14 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 )
 
 // ZombiesRemedy is the only remedy for zombies left by a PID 1 that never calls
 // wait. A zombie cannot be killed from outside, so the pod must be recreated.
 // The command never does it: it is printed for the person who decides.
-const ZombiesRemedy = "Only recreating the pod removes them. From a workstation, delete devzone-workspace-0 in the devzone-workspace namespace (its volumes are kept), then start the workspace again. This command does not do it."
+const ZombiesRemedy = "Only recreating the pod removes them. From a workstation, delete devzone-workspace-0 in the " + config.NamespaceWorkspace + " namespace (its volumes are kept), then start the workspace again. This command does not do it."
 
 // ReadZombies lists the zombie processes of the proc folder root (normally /proc).
 // The folder is a parameter so that tests use a fake one. A process that exits

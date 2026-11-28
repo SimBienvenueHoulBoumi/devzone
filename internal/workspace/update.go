@@ -6,6 +6,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 )
 
 // imageRepository is the GitHub repository whose vX.Y.Z tags are the stable
@@ -76,7 +78,7 @@ func GitTags(repository string) []string {
 // Application, or two empty strings with helm direct (update_current).
 func applicationCurrent(r Runner) (string, string) {
 	flag := contextFlag(r)
-	text := kubectlText(r, append(flag, "-n", "devzone-argocd", "get", "application.argoproj.io",
+	text := kubectlText(r, append(flag, "-n", config.NamespaceArgoCD, "get", "application.argoproj.io",
 		"devzone-workspace", "-o", `jsonpath={.spec.source.targetRevision} {.spec.source.helm.parameters[?(@.name=="image.tag")].value}`))
 	fields := strings.Fields(text)
 	if len(fields) < 2 {
