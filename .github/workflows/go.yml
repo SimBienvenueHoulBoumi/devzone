@@ -1,6 +1,6 @@
 # Go checks of the migration to Go (#358, #710): go vet, gofmt, unit tests, a
 # cross build of ./cmd/devzone (linux, darwin, windows; amd64, arm64) and the
-# 250-line limit of the Go files (manage/scripts/ci/check-go-layout.sh). The bash
+# 250-line limit of the Go files (devzone-checks layout). The bash
 # entry point is checked by the bats job of fonctionnel.yml, not here. The package
 # job builds the binaries of the npm package (#773) as the publication does:
 # setup-node only, no setup-go, so the Go of the runner may be older than go.mod
@@ -48,7 +48,7 @@ jobs:
             done
           done
       - name: line limit of the Go files
-        run: bash manage/scripts/ci/check-go-layout.sh
+        run: go run ./cmd/devzone-checks layout
 
   go-windows:
     runs-on: windows-latest
