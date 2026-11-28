@@ -9,6 +9,10 @@
 | CLI in a real terminal: host CLI checks with a maximum delay; no container mode | `make test-cli` | on your machine (Node, Python 3, make) | under a minute |
 | Windows (local and CI) | `bash manage/test/windows.sh` | macOS/Linux (local) or Windows Git Bash (CI) | a few seconds |
 
+## Repository checks
+
+Run these from the repository root: `go run ./cmd/devzone-checks english`, `go run ./cmd/devzone-checks layout` and `go run ./cmd/devzone-checks names`. The layout check refuses any Go file over 250 lines; the names check refuses a forbidden word in a tracked file or folder name. Both cover tracked files and new files that git does not ignore.
+
 **GitLab rule**: a PR that touches `.devcontainer/gitlab/` or the platform runs `devzone test-gitlab --statut` before it is ready; the `gitlab-integration` status is then visible on its commit. This test is the end-to-end test of the GitLab module and platform, impossible in GitHub CI (8 GB of RAM): the lead runs it on the container. Details of the steps, options and variables in [Reference, GitLab](reference.md#gitlab).
 
 **Removed tests**: the `repowarden` check refuses a change that removes tests. When the removal is intended (tests ported to Go, for example), write a `Tests removed: <reason>` line (or its French form) in a **commit message**. The PR description is read by the run of the PR only: the run started by the push to `develop` still fails, and the delivery PR stays blocked.
