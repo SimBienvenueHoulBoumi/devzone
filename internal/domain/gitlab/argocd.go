@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/domain/argocd"
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 )
 
 // repoURL is the default GitOps repository URL of the Applications
@@ -56,7 +57,7 @@ func (r *run) argocdActive() bool {
 	if _, err := os.Stat(r.root + "/charts/devzone-gitlab"); err != nil {
 		return false
 	}
-	res, err := r.kubectlAdmin([]string{"get", "namespace", "devzone-argocd"})
+	res, err := r.kubectlAdmin([]string{"get", "namespace", config.NamespaceArgoCD})
 	return err == nil && res.Code == 0
 }
 
@@ -76,10 +77,10 @@ func (r *run) applicationApply(revision string) int {
 			fmt.Fprintf(r.errOut(), "devzone : application devzone-gitlab not written to the GitOps repository (%s): %v\n", repo, err)
 			return 1
 		}
-	} else if _, err := r.kubectlDevzoneWithStdin([]string{"-n", "devzone-argocd", "apply", "-f", "-"}, manifest); err != nil {
+	} else if _, err := r.kubectlDevzoneWithStdin([]string{"-n", config.NamespaceArgoCD, "apply", "-f", "-"}, manifest); err != nil {
 		return 1
 	}
-	_, _ = r.kubectlDevzone([]string{"-n", "devzone-argocd", "annotate", "application.argoproj.io",
+	_, _ = r.kubectlDevzone([]string{"-n", config.NamespaceArgoCD, "annotate", "application.argoproj.io",
 		"devzone-gitlab", "argocd.argoproj.io/refresh=normal", "--overwrite"})
 	return 0
 }
@@ -140,7 +141,7 @@ func (r *run) applicationExists() bool {
 	if r.stateValue("argocd") != "on" {
 		return false
 	}
-	_, err := r.kubectlDevzone([]string{"-n", "devzone-argocd", "get", "application.argoproj.io", "devzone-gitlab"})
+	_, err := r.kubectlDevzone([]string{"-n", config.NamespaceArgoCD, "get", "application.argoproj.io", "devzone-gitlab"})
 	return err == nil
 }
 
@@ -150,14 +151,14 @@ func (r *run) applicationRetirer() {
 	if !r.applicationExists() {
 		return
 	}
-	_, _ = r.kubectlDevzone([]string{"-n", "devzone-argocd", "delete", "application.argoproj.io",
+	_, _ = r.kubectlDevzone([]string{"-n", config.NamespaceArgoCD, "delete", "application.argoproj.io",
 		"devzone-gitlab", "--ignore-not-found", "--wait=true"})
 }
 
 // applicationPresent reports whether the Application devzone-gitlab exists in
 // the cluster. An existing one keeps its manual synchronization.
 func (r *run) applicationPresent() bool {
-	res, err := r.kubectlDevzone([]string{"-n", "devzone-argocd", "get", "application.argoproj.io", "devzone-gitlab"})
+	res, err := r.kubectlDevzone([]string{"-n", config.NamespaceArgoCD, "get", "application.argoproj.io", "devzone-gitlab"})
 	return err == nil && res.Code == 0
 }
 
@@ -165,7 +166,7 @@ func (r *run) applicationPresent() bool {
 // Application so an adopted GitLab keeps its object names and its data. An
 // absent or empty release name falls back to "gitlab".
 func (r *run) applicationReleaseName() string {
-	res, err := r.kubectlDevzone([]string{"-n", "devzone-argocd", "get", "application.argoproj.io",
+	res, err := r.kubectlDevzone([]string{"-n", config.NamespaceArgoCD, "get", "application.argoproj.io",
 		"devzone-gitlab", "-o", "jsonpath={.spec.source.helm.releaseName}"})
 	if err != nil || res.Code != 0 {
 		return "gitlab"
@@ -192,7 +193,7 @@ func applicationManifestWithRelease(namespace, repo, revision, releaseName strin
 kind: Application
 metadata:
   name: devzone-gitlab
-  namespace: devzone-argocd
+  namespace: ` + config.NamespaceArgoCD + `
   labels:
     app.kubernetes.io/managed-by: devzone
     devzone.io/kind: service

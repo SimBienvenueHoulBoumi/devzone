@@ -103,7 +103,7 @@ func (r *run) errOut() io.Writer {
 // namespace is the namespace of the instance: devzone-gitlab + suffix.
 func (r *run) namespace() string {
 	if r.ns == "" {
-		r.ns = "devzone-gitlab" + instanceSuffix()
+		r.ns = config.NamespaceGitLab + instanceSuffix()
 	}
 	return r.ns
 }
