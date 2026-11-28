@@ -379,7 +379,7 @@ jobs:
       - name: english check (Go)
         run: go run ./cmd/devzone-checks english
       - name: names check (files and folders in English, #716)
-        run: bash manage/scripts/ci/check-names.sh
+        run: go run ./cmd/devzone-checks names
       # helm is installed on the runner: lint and render of each chart, wrapper
       # dependency pulled anonymously (OCI)
       - name: charts convention (manage/scripts/ci/check-charts.sh)
