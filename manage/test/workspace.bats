@@ -88,17 +88,6 @@ DOCKER
     printf 'workspace=kubernetes\nargocd=off\n' >"$T/.devzone.modules"
 }
 
-@test "workspace start: helm upgrade --install with devzone context when it exists" {
-    export FAKE_CONTEXTS="devzone docker-desktop"
-    : >"$T/helm.log"
-    run bash "$CLI" workspace start
-    [ "$status" -eq 0 ]
-    grep -q -- "--kube-context devzone" "$T/helm.log" || false
-    grep -q -- "upgrade --install devzone-workspace" "$T/helm.log" || false
-    grep -q "charts/devzone-workspace" "$T/helm.log" || false
-    grep -q -- "--namespace devzone-workspace" "$T/helm.log" || false
-}
-
 @test "workspace start: cluster stopped (Docker Desktop), one message, no helm, no Argo CD" {
     export FAKE_KUBE_CLUSTER_INFO=fail FAKE_DOCKER=down FAKE_CONTEXTS=docker-desktop
     export FAKE_CURRENT_CONTEXT=docker-desktop
@@ -114,14 +103,14 @@ DOCKER
     ! grep -q 'namespace\|get pod\|apply\|get statefulset' "$T/kubectl.log" || false
 }
 
-@test "workspace start: current context when devzone is missing" {
-    export FAKE_CONTEXTS="docker-desktop"
-    export FAKE_CURRENT_CONTEXT="docker-desktop"
+@test "workspace start: no Argo CD, code 1, exact message, no helm" {
+    printf 'workspace=kubernetes\nargocd=off\n' >"$T/.devzone.modules"
     : >"$T/helm.log"
     run bash "$CLI" workspace start
-    [ "$status" -eq 0 ]
-    ! grep -q -- "--kube-context" "$T/helm.log" || false
-    grep -q -- "upgrade --install devzone-workspace" "$T/helm.log" || false
+    [ "$status" -eq 1 ] || false
+    [[ "$output" == "devzone : workspace : Argo CD is required but not running,
+please run: devzone enable argocd" ]] || false
+    [ ! -s "$T/helm.log" ] || false
 }
 
 @test "workspace stop: helm uninstall" {
@@ -156,81 +145,6 @@ DOCKER
     run bash "$CLI" workspace
     [ "$status" -eq 0 ]
     [[ "$output" == *"start|stop|status|shell|ports"* ]] || false
-}
-
-@test "workspace start: without option, latest tag (package.json at 0.0.0)" {
-    export FAKE_CONTEXTS="docker-desktop"
-    export FAKE_CURRENT_CONTEXT="docker-desktop"
-    : >"$T/helm.log"
-    run bash "$CLI" workspace start
-    [ "$status" -eq 0 ]
-    grep -q -- "--set image.tag=latest" "$T/helm.log" || false
-    # latest is always pulled again (#515)
-    grep -q -- "--set image.pullPolicy=Always" "$T/helm.log" || false
-}
-
-@test "workspace start: --image repo:tag passes repository and tag" {
-    export FAKE_CONTEXTS="docker-desktop"
-    : >"$T/helm.log"
-    run bash "$CLI" workspace start --image registry.local/ws:trial
-    [ "$status" -eq 0 ]
-    grep -q -- "--set image.repository=registry.local/ws" "$T/helm.log" || false
-    grep -q -- "--set image.tag=trial" "$T/helm.log" || false
-    # a fixed tag keeps the chart pull policy (#515)
-    ! grep -q -- "image.pullPolicy=Always" "$T/helm.log" || false
-}
-
-@test "workspace start: image not found, message and uninstall" {
-    export FAKE_CONTEXTS="docker-desktop"
-    export FAKE_POD="Pending ImagePullBackOff"
-    : >"$T/helm.log"
-    run bash "$CLI" workspace start
-    [ "$status" -eq 1 ]
-    [[ "$output" == *"not found"* ]] || false
-    [[ "$output" == *"--image"* ]] || false
-    grep -q -- "uninstall devzone-workspace" "$T/helm.log" || false
-}
-
-@test "workspace start: image without build for node architecture" {
-    export FAKE_CONTEXTS="docker-desktop"
-    export FAKE_POD="Pending ImagePullBackOff"
-    export FAKE_EVENTS="failed to resolve reference : no match for platform in manifest list"
-    export FAKE_ARCH="arm64"
-    : >"$T/helm.log"
-    run bash "$CLI" workspace start
-    [ "$status" -eq 1 ]
-    [[ "$output" == *"no build for arm64"* ]] || false
-    [[ "$output" != *"not found"* ]] || false
-    [[ "$output" == *"amd64 and arm64"* ]] || false
-    grep -q -- "uninstall devzone-workspace" "$T/helm.log" || false
-}
-
-@test "workspace start: old pod Running then new revision in ImagePullBackOff" {
-    export FAKE_CONTEXTS="docker-desktop"
-    export FAKE_REVISION="rev-new"
-    export FAKE_POD_REVISIONS="rev-old rev-new"
-    # Two polling rounds at least: 1 s is too short on a loaded CI runner (#522)
-    export DEVZONE_WORKSPACE_WAIT=10
-    export FAKE_POD_STATES="Running ImagePullBackOff"
-    : >"$T/helm.log"
-    run bash "$CLI" workspace start
-    [ "$status" -eq 1 ]
-    [[ "$output" == *"not found"* ]] || false
-    grep -q -- "uninstall devzone-workspace" "$T/helm.log" || false
-}
-
-@test "workspace start: old pod ErrImagePull then new revision Running" {
-    export FAKE_CONTEXTS="docker-desktop"
-    export FAKE_REVISION="rev-new"
-    export FAKE_POD_REVISIONS="rev-old rev-new"
-    # Two polling rounds at least: 1 s is too short on a loaded CI runner (#522)
-    export DEVZONE_WORKSPACE_WAIT=10
-    export FAKE_POD_STATES="ErrImagePull Running"
-    : >"$T/helm.log"
-    run bash "$CLI" workspace start
-    [ "$status" -eq 0 ]
-    [[ "$output" == *"✔ workspace started"* ]] || false
-    ! grep -q -- "uninstall devzone-workspace" "$T/helm.log" || false
 }
 
 @test "workspace start: --image without value, usage and no helm" {
