@@ -75,6 +75,11 @@ func Run(ctx context.Context, args []string, out, errOut io.Writer, opts Options
 			return 2
 		}
 		return m.gitopsApplyApplication(args[1], args[2], args[3], args[4], args[5], args[6], args[7:]...)
+	case "values-ensure":
+		if len(args) != 1 {
+			return 2
+		}
+		return m.ensureWorkspaceValuesFile()
 	case "conf-get":
 		if len(args) != 4 {
 			return 2

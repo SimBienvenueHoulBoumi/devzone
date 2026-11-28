@@ -1,0 +1,37 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: devzone-workspace
+  namespace: devzone-argocd
+  labels:
+    app.kubernetes.io/managed-by: devzone
+    devzone.io/kind: workspace
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  sources:
+    - repoURL: https://github.com/acme/devzone.git
+      targetRevision: v1.2.3
+      path: charts/devzone-workspace
+      helm:
+        valueFiles:
+          - $values/values/devzone-workspace.yaml
+        ignoreMissingValueFiles: true
+        parameters:
+          - name: image.tag
+            value: "1.2.3"
+          - name: networkPolicy.restrictEgress
+            value: "true"
+    - repoURL: https://github.com/acme/devzone-argocd.git
+      targetRevision: HEAD
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: devzone-workspace
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
