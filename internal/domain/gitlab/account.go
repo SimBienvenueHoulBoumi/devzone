@@ -90,6 +90,5 @@ func (r *run) namespaceIsolate(ns string) {
 
 // kubectlDevzoneWithStdin runs kubectl on the devzone context with options.
 func (r *run) kubectlDevzoneWithStdin(args []string, stdin string) (exec.Result, error) {
-	all := append([]string{"--context", "devzone"}, args...)
-	return r.runner().Run(r.ctx, "kubectl", all, exec.Opts{Stdin: strings.NewReader(stdin)})
+	return r.runner().Run(r.ctx, "kubectl", r.devzoneKubectlArgs(args), exec.Opts{Stdin: strings.NewReader(stdin)})
 }

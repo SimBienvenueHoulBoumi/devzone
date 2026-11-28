@@ -31,6 +31,8 @@ func deployFixture(t *testing.T, argoCD string) (*fake.Runner, string, *bytes.Bu
 	writeDeployFile(t, filepath.Join(root, ".devzone.modules"), state)
 	writeDeployFile(t, filepath.Join(root, "charts", "devzone-workspace", "Chart.yaml"), "name: devzone-workspace\n")
 	r := fake.New()
+	r.On("kubectl", []string{"config", "get-contexts", "-o", "name"},
+		fexec.Result{Stdout: []byte("devzone\n")})
 	r.On("kubectl", []string{"--context", "devzone", "get", "namespace", "devzone-argocd"}, fexec.Result{})
 	out, errOut := &bytes.Buffer{}, &bytes.Buffer{}
 	return r, root, out, errOut
@@ -99,7 +101,7 @@ func TestWorkspaceDeployUnknownRevisionFails(t *testing.T) {
 	if !strings.Contains(errOut.String(), "cannot list the tags") || !strings.Contains(errOut.String(), "DEVZONE_ARGOCD_REVISION") {
 		t.Fatalf("unclear failure: %q", errOut.String())
 	}
-	if len(r.Calls()) != 2 {
+	if len(r.Calls()) != 3 {
 		t.Fatalf("partial installation: %v", r.Calls())
 	}
 	for _, call := range r.Calls() {
