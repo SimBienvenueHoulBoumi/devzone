@@ -21,11 +21,6 @@ var forbiddenInstallDefaults = []string{
 var installDefaultExceptions = map[string]string{
 	"internal/framework/config/image.go":  "image definition",
 	"internal/framework/config/gitlab.go": "GitLab definition",
-	"internal/domain/gitlab/gitlab.go":    "module default outside this lot",
-	"internal/domain/gitlab/install.go":   "installation text outside this lot",
-	"internal/domain/gitlab/status.go":    "status text outside this lot",
-	"internal/podcmd/platform.go":         "platform default outside this lot",
-	"internal/passwords/collect.go":       "credential entries outside this lot",
 }
 
 // TestNoHardcodedInstallDefaults fails when a GitLab address or the workspace
