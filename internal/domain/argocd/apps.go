@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 )
 
 const appsNS = "devzone-argocd"
@@ -51,12 +53,13 @@ func appsNameValid(name string) bool {
 
 // appsIsDevzoneGitLab reports whether url points to the local devzone GitLab.
 func appsIsDevzoneGitLab(url string) bool {
-	for _, p := range []string{"http://gitlab.localhost:8929/", "http://gitlab.localhost/", "https://gitlab.localhost/"} {
+	gitlab := config.GitLab()
+	for _, p := range []string{gitlab.WebURL() + "/", "http://" + gitlab.Host + "/", "https://" + gitlab.Host + "/"} {
 		if strings.HasPrefix(url, p) {
 			return true
 		}
 	}
-	return strings.HasPrefix(url, "https://gitlab.localhost:") && strings.Contains(url, "/")
+	return strings.HasPrefix(url, "https://"+gitlab.Host+":") && strings.Contains(url, "/")
 }
 
 // appsRepoInternal rewrites local GitLab URLs to the cluster-internal service URL.

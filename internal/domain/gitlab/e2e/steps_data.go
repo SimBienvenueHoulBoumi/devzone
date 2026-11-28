@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 )
 
 // stepClones clones devzone/demo over SSH and HTTP with a throwaway key. The
@@ -37,10 +39,11 @@ func stepClones(s *session) (int, string) {
 	}
 	sshCmd := fmt.Sprintf("ssh -i %s -o UserKnownHostsFile=%s -o StrictHostKeyChecking=accept-new",
 		key, filepath.Join(dir, "known_hosts"))
+	sshURL := "ssh://git@" + config.GitLab().SSHHostPort() + "/devzone/demo.git"
 	res, err = s.run("git", []string{"clone", "-q", "-c", "core.sshCommand=" + sshCmd,
-		"ssh://git@gitlab.localhost:2224/devzone/demo.git", filepath.Join(dir, "ssh-demo")})
+		sshURL, filepath.Join(dir, "ssh-demo")})
 	if err != nil || res.Code != 0 {
-		return 1, "SSH clone (ssh://git@gitlab.localhost:2224/devzone/demo.git) impossible"
+		return 1, fmt.Sprintf("SSH clone (%s) impossible", sshURL)
 	}
 	helper := "!f() { echo username=oauth2; printf 'password='; cat \"" +
 		filepath.Join(s.root, "workspace", ".gitlab", "root-token") + "\"; echo; }; f"
