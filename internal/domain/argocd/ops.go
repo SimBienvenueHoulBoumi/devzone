@@ -123,7 +123,7 @@ func (m *module) hMgmt(ctxName string, args ...string) (fexec.Result, error) {
 	conf := m.mgmtCfg(ctxName)
 	full := []string{"--kubeconfig", conf}
 	if ctxName != "" {
-		full = append(full, "--kube-context", ctxName)
+		full = append(full, fexec.HelmContextFlagName, ctxName)
 	}
 	full = append(full, args...)
 	return m.runner.Run(m.ctx, "helm", full, fexec.Opts{})
