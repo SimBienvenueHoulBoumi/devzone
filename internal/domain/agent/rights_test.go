@@ -31,7 +31,7 @@ func gitInit(t *testing.T, dir string) {
 }
 
 func TestRightsFilesList(t *testing.T) {
-	want := []string{".devcontainer/opencode/agent.json", ".devcontainer/opencode.jsonc", ".repowarden.conf", ".devcontainer/agent-rights.sh"}
+	want := []string{".devcontainer/opencode/agent.json", ".devcontainer/opencode.jsonc", ".repowarden.conf", "internal/domain/agent/rights.go"}
 	if len(RightsFiles) != 4 {
 		t.Fatal("len", RightsFiles)
 	}
@@ -48,7 +48,7 @@ func TestRightsSnapshotRestore(t *testing.T) {
 	proj := filepath.Join(dir, "projet")
 	writeFileT(t, filepath.Join(proj, ".devcontainer", "opencode", "agent.json"), `{"permission":{}}`)
 	writeFileT(t, filepath.Join(proj, ".devcontainer", "opencode.jsonc"), "defaut")
-	writeFileT(t, filepath.Join(proj, ".devcontainer", "agent-rights.sh"), "# rights\n")
+	writeFileT(t, filepath.Join(proj, "internal", "domain", "agent", "rights.go"), "# rights\n")
 	// .repowarden.conf absent
 	ctx := context.Background()
 	RightsSnapshot(ctx, ExecRunner{}, state, proj)
@@ -81,9 +81,9 @@ func TestRightsSnapshotRestore(t *testing.T) {
 	if !strings.Contains(readFileString(filepath.Join(state, "droits-projet", "absents")), ".repowarden.conf") {
 		t.Fatal("absents not noted")
 	}
-	// agent-rights.sh protected (not modified, still listed)
-	if got := readFileString(filepath.Join(proj, ".devcontainer", "agent-rights.sh")); got != "# rights\n" {
-		t.Fatal("agent-rights.sh touched")
+	// rights.go protected (not modified, still listed)
+	if got := readFileString(filepath.Join(proj, "internal", "domain", "agent", "rights.go")); got != "# rights\n" {
+		t.Fatal("rights.go touched")
 	}
 }
 

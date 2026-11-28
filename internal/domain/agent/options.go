@@ -20,7 +20,7 @@ type Options struct {
 	LookPath func(string) (string, error)
 	Out      io.Writer
 	Err      io.Writer
-	// DevcontainerDir is $ICI (.devcontainer); agent.json + devzone + agent-rights.
+	// DevcontainerDir is $ICI (.devcontainer); agent.json + devzone.
 	DevcontainerDir string
 	// Racine is $RACINE (DEVZONE_ROOT or parent of DevcontainerDir).
 	Racine string

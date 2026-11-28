@@ -8,13 +8,13 @@ import (
 )
 
 // RightsFiles are protected rights files, relative to project root. Fixed list,
-// no environment changes it, agent cannot add; agent-rights.sh is in it,
-// otherwise an agent could empty the list. Identical to the shell RIGHTS_FILES.
+// no environment changes it, agent cannot add; this file (rights.go) is in it,
+// otherwise an agent could empty the list.
 var RightsFiles = []string{
 	".devcontainer/opencode/agent.json",
 	".devcontainer/opencode.jsonc",
 	".repowarden.conf",
-	".devcontainer/agent-rights.sh",
+	"internal/domain/agent/rights.go",
 }
 
 // RightsDir is snapshot dir of a project's rights files in agent state.
