@@ -31,7 +31,8 @@ var directInstallMarkers = []string{
 //     disabled branch;
 //   - gitlab/chart.go and secrets.go: chart dependency and kept secrets;
 //   - workspace scripts: the workstation installs the pod and Argo CD;
-//   - workspace services (Go): secrets of the services, not charts.
+//   - workspace services (Go): secrets of the services, not charts;
+//   - workspace init (Go): npm installs of tools, not charts.
 var allowedDirectInstalls = map[string]string{
 	"internal/domain/argocd/install.go":            "Argo CD itself, the only exception",
 	"internal/domain/argocd/install_ns.go":         "namespace and account needed before Argo CD",
@@ -48,6 +49,7 @@ var allowedDirectInstalls = map[string]string{
 	"internal/domain/postgres/install.go":          "namespace of PostgreSQL, when Argo CD is off",
 	"internal/platform/helm/chart.go":              "helm implementation of the disabled branch",
 	"internal/podcmd/repowarden.go":                "npm global install of the repowarden tool, not a chart",
+	"internal/podcmd/init_repowarden.go":           "npm global install of the repowarden tool, not a chart",
 	"internal/platform/kube/namespace.go":          "namespace helper of the modules",
 	"internal/workspace/helm_deploy.go":            "workspace chart by helm, only when Argo CD is neither wanted nor installed",
 	"internal/workspace/services_command.go":       "temporary administrator account of the services installer, removed at the end",
