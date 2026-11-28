@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	fexec "github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec"
 )
 
 // TestWindowsWatcherRound relays the services of the modules file on Windows
@@ -25,7 +27,7 @@ func TestWindowsWatcherRound(t *testing.T) {
 	t.Setenv("DEVZONE_INSTANCE", "devzone")
 	t.Setenv("DEVZONE_ARGOCD_PORT", "8443")
 	runner := &fakeRunner{replies: []reply{
-		{match: "config get-contexts", stdout: "devzone\n"},
+		{match: "config get-contexts", stdout: fexec.ContextName() + "\n"},
 		{match: "", stdout: ""},
 	}}
 	var started []string

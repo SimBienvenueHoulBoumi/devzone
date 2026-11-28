@@ -21,13 +21,10 @@ func (c ContextRunner) Run(ctx context.Context, name string, args []string, opts
 
 // contextFlag returns the shared kubectl flag that selects services context.
 func contextFlag(r Runner) []string {
-	return fexec.DevzoneContextFlag(context.Background(), ContextRunner{Runner: r}, "--context")
+	return fexec.DevzoneKubectlContextFlag(context.Background(), ContextRunner{Runner: r})
 }
 
 // helmContextFlag returns the shared helm flag that selects services context.
 func helmContextFlag(r Runner) []string {
-	return fexec.DevzoneContextFlag(context.Background(), ContextRunner{Runner: r}, "--kube-context")
+	return fexec.DevzoneHelmContextFlag(context.Background(), ContextRunner{Runner: r})
 }
-
-// declaresDevzone reports whether the shared chooser found the services context.
-func declaresDevzone(r Runner) bool { return len(contextFlag(r)) != 0 }

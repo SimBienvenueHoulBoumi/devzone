@@ -34,12 +34,10 @@ func packageRoot() string {
 }
 
 // helmFlag returns the context argument of helm, as helm_flag in
-// manage/workspace.sh: --kube-context devzone when the kubeconfig declares it.
+// manage/workspace.sh: the services context flag when the kubeconfig declares
+// it, and none otherwise, through the shared chooser.
 func helmFlag(r Runner) []string {
-	if !declaresDevzone(r) {
-		return nil
-	}
-	return []string{"--kube-context", kubeContext}
+	return helmContextFlag(r)
 }
 
 // DefaultImageTag reads the version of package.json, as default_image_tag in
