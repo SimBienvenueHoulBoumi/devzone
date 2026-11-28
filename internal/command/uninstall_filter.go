@@ -1,11 +1,15 @@
 package command
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
+)
 
 // the list also holds the unsuffixed names of namespaces and Applications.
 var devzoneObjectBases = []string{
-	"devzone-workspace", "devzone-argocd", "devzone-postgres", "devzone-mysql",
-	"devzone-gitlab", "devzone-llm", "devzone-system", "devzone",
+	config.NamespaceWorkspace, config.NamespaceArgoCD, config.NamespacePostgres, "devzone-mysql",
+	config.NamespaceGitLab, "devzone-llm", "devzone-system", "devzone",
 }
 
 // matchBase returns the known base of name when name is exactly a base, or a

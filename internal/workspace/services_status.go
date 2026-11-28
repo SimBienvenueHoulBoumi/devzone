@@ -2,6 +2,7 @@ package workspace
 
 import (
 	"fmt"
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 	"io"
 )
 
@@ -19,10 +20,10 @@ func ServicesStatus(r Runner, out io.Writer) int {
 		name      string
 		namespace string
 	}{
-		{"gitlab", "devzone-gitlab"},
-		{"postgres", "devzone-postgres"},
+		{"gitlab", config.NamespaceGitLab},
+		{"postgres", config.NamespacePostgres},
 		{"mysql", "devzone-mysql"},
-		{"argocd", "devzone-argocd"},
+		{"argocd", config.NamespaceArgoCD},
 	} {
 		status, err := r.Kubectl(append(contextFlag(r), "get", "namespace", s.namespace),
 			nil, io.Discard, io.Discard)

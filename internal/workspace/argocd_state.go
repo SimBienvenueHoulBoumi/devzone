@@ -1,6 +1,7 @@
 package workspace
 
 import (
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 	"io"
 	"os"
 	"path/filepath"
@@ -11,7 +12,7 @@ import (
 
 // argocdNamespace is the namespace of Argo CD in the cluster, as ARGOCD_NS in
 // argocd-workspace.sh.
-const argocdNamespace = "devzone-argocd"
+const argocdNamespace = config.NamespaceArgoCD
 
 // argocdWanted reports whether the workspace wants Argo CD: the key argocd of
 // the modules file must not be exactly "off". An absent key or any other value

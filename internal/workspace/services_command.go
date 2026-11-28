@@ -2,6 +2,7 @@ package workspace
 
 import (
 	"fmt"
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 	"io"
 	"os"
 	"strings"
@@ -18,13 +19,13 @@ const (
 func servicesNamespace(service string) string {
 	switch service {
 	case "gitlab":
-		return "devzone-gitlab"
+		return config.NamespaceGitLab
 	case "postgres":
-		return "devzone-postgres"
+		return config.NamespacePostgres
 	case "mysql":
 		return "devzone-mysql"
 	case "argocd":
-		return "devzone-argocd"
+		return config.NamespaceArgoCD
 	}
 	return ""
 }

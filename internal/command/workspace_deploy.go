@@ -3,6 +3,7 @@ package command
 import (
 	"context"
 	"fmt"
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 	"os"
 	"path/filepath"
 	"strings"
@@ -48,7 +49,7 @@ func argoCDHoldsWorkspace(runner fexec.Runner, state string) bool {
 		return false
 	}
 	args := append(fexec.DevzoneContextFlag(context.Background(), runner, "--context"),
-		"get", "namespace", "devzone-argocd")
+		"get", "namespace", config.NamespaceArgoCD)
 	res, err := runner.Run(context.Background(), "kubectl", args, fexec.Opts{})
 	return err == nil && res.Code == 0
 }

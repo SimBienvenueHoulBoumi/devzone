@@ -2,12 +2,13 @@ package workspace
 
 import (
 	"fmt"
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 	"io"
 )
 
 // Names of the workspace in the cluster, as manage/workspace.sh has them.
 const (
-	namespace   = "devzone-workspace"
+	namespace   = config.NamespaceWorkspace
 	pod         = "devzone-workspace-0"
 	container   = "workspace"
 	projectsDir = "/workspaces/projets"

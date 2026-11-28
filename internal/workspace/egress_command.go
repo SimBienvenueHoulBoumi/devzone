@@ -124,7 +124,7 @@ func (e EgressEnv) edit(action, domain string) int {
 // direct (update_current in workspace-update.sh).
 func (e EgressEnv) currentApplication() (string, string) {
 	flag := contextFlag(e.Runner)
-	text := kubectlText(e.Runner, append(flag, "-n", "devzone-argocd", "get", "application.argoproj.io",
+	text := kubectlText(e.Runner, append(flag, "-n", config.NamespaceArgoCD, "get", "application.argoproj.io",
 		"devzone-workspace", "-o", `jsonpath={.spec.source.targetRevision} {.spec.source.helm.parameters[?(@.name=="image.tag")].value}`))
 	fields := strings.Fields(text)
 	if len(fields) < 2 {

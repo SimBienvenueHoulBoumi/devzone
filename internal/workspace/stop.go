@@ -2,6 +2,7 @@ package workspace
 
 import (
 	"fmt"
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 	"io"
 )
 
@@ -9,7 +10,7 @@ import (
 // as manage/workspace.sh and manage/scripts/workspace/argocd-workspace.sh have them.
 const (
 	releaseName = "devzone-workspace"
-	argocdNS    = "devzone-argocd"
+	argocdNS    = config.NamespaceArgoCD
 	argocdApp   = "devzone-workspace"
 )
 

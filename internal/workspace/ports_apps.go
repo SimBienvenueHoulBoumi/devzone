@@ -2,6 +2,7 @@ package workspace
 
 import (
 	"errors"
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 	"strings"
 )
 
@@ -9,7 +10,7 @@ import (
 // system ones and those of the devzone modules, which have their own relay or
 // no interface (PA_NS_SKIP in manage/scripts/workspace/ports-apps.sh). The
 // spaces around each name make a plain substring test exact, as the shell does.
-const portsSkipNamespaces = " kube-system kube-public kube-node-lease local-path-storage devzone-system devzone-workspace devzone-postgres devzone-mysql devzone-argocd devzone-gitlab devzone-llm "
+const portsSkipNamespaces = " kube-system kube-public kube-node-lease local-path-storage devzone-system " + config.NamespaceWorkspace + " " + config.NamespacePostgres + " devzone-mysql " + config.NamespaceArgoCD + " " + config.NamespaceGitLab + " devzone-llm "
 
 // Local port choice (pa_new): the first port tried for a privileged Service
 // port is port + localOffset, a candidate past localMax restarts at localWrap,
