@@ -28,23 +28,26 @@ func workspaceChartRequire(root string) int {
 // repository when one is designated, or applies it directly. A helm release
 // already in place is left as it is: nothing is deleted during adoption.
 func workspaceApplyApplication(ctx *cli.Context, root, repo, revision string, params []string) int {
+	conf := filepath.Join(root, ".argocd.conf")
+	gitops := confValue(conf, "argocd", "repo")
 	var b bytes.Buffer
 	if err := rule.RenderApplication(&b, "devzone-workspace", "workspace", "devzone-workspace",
-		repo, revision, "charts/devzone-workspace", params); err != nil {
+		repo, revision, "charts/devzone-workspace", params, gitops); err != nil {
 		fmt.Fprintln(ctx.Err, err)
 		return 1
 	}
-	conf := filepath.Join(root, ".argocd.conf")
-	gitops := confValue(conf, "argocd", "repo")
 	if gitops == "" || gitops == "none" {
 		return applyWorkspaceManifest(ctx, b.String())
 	}
 	if code := writeWorkspaceGitops(ctx, gitops, b.String()); code != 0 {
 		return code
 	}
-	_, _ = ctx.Runner.Run(context.Background(), "kubectl", []string{"--context", "devzone",
+	if code := runWorkstationArgoCD(ctx, "values-ensure"); code != 0 {
+		return code
+	}
+	_, _ = ctx.Runner.Run(context.Background(), "kubectl", append(fexec.DevzoneContextFlag(context.Background(), ctx.Runner, "--context"),
 		"-n", "devzone-argocd", "annotate", "application.argoproj.io", "devzone-workspace",
-		"argocd.argoproj.io/refresh=normal", "--overwrite"}, fexec.Opts{})
+		"argocd.argoproj.io/refresh=normal", "--overwrite"), fexec.Opts{})
 	return 0
 }
 
