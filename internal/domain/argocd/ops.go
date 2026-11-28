@@ -129,10 +129,15 @@ func (m *module) hMgmt(ctxName string, args ...string) (fexec.Result, error) {
 	return m.runner.Run(m.ctx, "helm", full, fexec.Opts{})
 }
 
-// kubectl runs kubectl with the devzone context, as the limited account does.
+// kubectlArgs prepends the shared services context flag to a kubectl call, so
+// every Argo CD command selects that context only when kubeconfig declares it.
+func (m *module) kubectlArgs(args ...string) []string {
+	return append(fexec.DevzoneContextFlag(m.ctx, m.runner, "--context"), args...)
+}
+
+// kubectl runs kubectl on the services cluster, as the limited account does.
 func (m *module) kubectl(args ...string) (fexec.Result, error) {
-	full := append([]string{"--context", "devzone"}, args...)
-	return m.runner.Run(m.ctx, "kubectl", full, fexec.Opts{})
+	return m.runner.Run(m.ctx, "kubectl", m.kubectlArgs(args...), fexec.Opts{})
 }
 
 // isInstalled reports whether the Argo CD namespace exists.

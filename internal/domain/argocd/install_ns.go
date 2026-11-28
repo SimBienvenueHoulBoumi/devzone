@@ -100,7 +100,7 @@ func (m *module) accountAllow(ctxName, ns string) int {
 // namespaceIsolate applies the default NetworkPolicy blocking cross-namespace ingress.
 func (m *module) namespaceIsolate() int {
 	manifest := "apiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: devzone-meme-namespace\n  labels:\n    app.kubernetes.io/managed-by: devzone\nspec:\n  podSelector: {}\n  ingress:\n  - from:\n    - podSelector: {}\n"
-	res, err := m.runWithStdinCtx("kubectl", []string{"--context", "devzone", "-n", m.ns, "apply", "-f", "-"}, manifest, nil)
+	res, err := m.runWithStdinCtx("kubectl", m.kubectlArgs("-n", m.ns, "apply", "-f", "-"), manifest, nil)
 	if err != nil {
 		fmt.Fprintln(m.errOut, err)
 		return 1

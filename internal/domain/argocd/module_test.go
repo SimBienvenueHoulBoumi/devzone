@@ -38,6 +38,7 @@ func newModFixture(t *testing.T) *modFixture {
 	t.Setenv("DEVZONE_KUBE_CONFIG", filepath.Join(root, "config"))
 	t.Setenv("DEVZONE_POD_SCRIPT", "")
 	t.Setenv("DEVZONE_WORKSPACE", "")
+	t.Setenv("DEVZONE_CONTEXT", "")
 	t.Setenv("HOME", t.TempDir())
 	if err := os.MkdirAll(filepath.Join(root, "workspace"), 0o755); err != nil {
 		t.Fatal(err)
@@ -52,7 +53,8 @@ func newModFixture(t *testing.T) *modFixture {
 	r := fake.New()
 	f := &modFixture{r: r, root: root, state: filepath.Join(root, ".devzone.modules"), secrets: filepath.Join(root, "workspace", ".argocd")}
 	// common kubectl responses
-	r.On("kubectl", []string{"config", "get-contexts", "-o", "name"}, fexec.Result{Stdout: []byte("docker-desktop\n")})
+	r.On("kubectl", []string{"config", "get-contexts", "-o", "name"},
+		fexec.Result{Stdout: []byte(mgmtContext(f) + "\n" + fexec.ContextName() + "\n")})
 	r.On("kubectl", []string{"--context", "docker-desktop", "get", "nodes", "-o", "jsonpath={range .items[*]}{.status.allocatable.memory}{\"\\n\"}{end}"}, fexec.Result{Stdout: []byte("2Gi\n")})
 	r.On("kubectl", []string{"--context", "devzone", "get", "nodes", "-o", "jsonpath={range .items[*]}{.status.allocatable.memory}{\"\\n\"}{end}"}, fexec.Result{Stdout: []byte("2Gi\n")})
 	r.On("kubectl", []string{"--context", "docker-desktop", "get", "namespace", "devzone-argocd"}, fexec.Result{Code: 1})

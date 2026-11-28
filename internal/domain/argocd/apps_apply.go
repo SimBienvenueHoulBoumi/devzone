@@ -61,7 +61,7 @@ func (m *module) appsApplyOne(name string) int {
 // appsRepoSecret creates or updates the repository Secret for an app.
 func (m *module) appsRepoSecret(name, url, username, token string) int {
 	manifest := fmt.Sprintf("apiVersion: v1\nkind: Secret\nmetadata:\n  name: repo-%s\n  namespace: %s\n  labels:\n    argocd.argoproj.io/secret-type: repository\n    app.kubernetes.io/managed-by: devzone\ntype: Opaque\nstringData:\n  type: git\n  url: %s\n  username: %s\n  password: %s\n", name, appsNS, url, username, token)
-	res, err := m.runner.Run(m.ctx, "kubectl", []string{"--context", "devzone", "-n", appsNS, "apply", "-f", "-"}, stdinOpt(manifest))
+	res, err := m.runner.Run(m.ctx, "kubectl", m.kubectlArgs("-n", appsNS, "apply", "-f", "-"), stdinOpt(manifest))
 	if err != nil || res.Code != 0 {
 		if err != nil {
 			fmt.Fprintln(m.errOut, err)
@@ -74,7 +74,8 @@ func (m *module) appsRepoSecret(name, url, username, token string) int {
 // appsGitLabAllowArgoCD patches the GitLab NetworkPolicy to allow devzone namespaces.
 func (m *module) appsGitLabAllowArgoCD() {
 	patch := `{"spec":{"ingress":[{"from":[{"podSelector":{},"namespaceSelector":{"matchLabels":{"app.kubernetes.io/managed-by":"devzone"}}}]}]}}`
-	res, err := m.runner.Run(m.ctx, "kubectl", []string{"--context", "devzone", "-n", m.appsGitLabNS(), "patch", "networkpolicy", "devzone-meme-namespace", "--type", "merge", "-p", patch}, noStdin())
+	res, err := m.runner.Run(m.ctx, "kubectl", m.kubectlArgs("-n", m.appsGitLabNS(),
+		"patch", "networkpolicy", "devzone-meme-namespace", "--type", "merge", "-p", patch), noStdin())
 	if err != nil || res.Code != 0 {
 		fmt.Fprintf(m.errOut, "⚠ NetworkPolicy of %s not opened to Argo CD: devzone postgres authorize %s, or the sync will fail\n", m.appsGitLabNS(), appsNS)
 	}

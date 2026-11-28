@@ -26,7 +26,7 @@ func (m *module) gitopsRoot() int {
 	}
 	if token != "" {
 		manifest := fmt.Sprintf("apiVersion: v1\nkind: Secret\nmetadata:\n  name: repo-%s\n  namespace: %s\n  labels:\n    argocd.argoproj.io/secret-type: repository\n    app.kubernetes.io/managed-by: devzone\ntype: Opaque\nstringData:\n  type: git\n  url: %s\n  username: %s\n  password: %s\n", gitopsRepoNameValue(), gitopsNS, url, user, token)
-		res, err := m.runner.Run(m.ctx, "kubectl", []string{"--context", "devzone", "-n", gitopsNS, "apply", "-f", "-"}, fexec.Opts{Stdin: strings.NewReader(manifest)})
+		res, err := m.runner.Run(m.ctx, "kubectl", m.kubectlArgs("-n", gitopsNS, "apply", "-f", "-"), fexec.Opts{Stdin: strings.NewReader(manifest)})
 		if err != nil || res.Code != 0 {
 			if err != nil {
 				fmt.Fprintln(m.errOut, err)
@@ -41,7 +41,7 @@ func (m *module) gitopsRoot() int {
 		fmt.Fprintln(m.errOut, err)
 		return 1
 	}
-	res, err := m.runner.Run(m.ctx, "kubectl", []string{"--context", "devzone", "apply", "-f", "-"}, fexec.Opts{Stdin: strings.NewReader(app)})
+	res, err := m.runner.Run(m.ctx, "kubectl", m.kubectlArgs("apply", "-f", "-"), fexec.Opts{Stdin: strings.NewReader(app)})
 	if err != nil || res.Code != 0 {
 		if err != nil {
 			fmt.Fprintln(m.errOut, err)
@@ -77,7 +77,7 @@ func (m *module) gitopsApplyApplication(name, kind, namespace, repo, revision, p
 		return 1
 	}
 	if !m.gitopsEnabled() {
-		res, err := m.runner.Run(m.ctx, "kubectl", []string{"--context", "devzone", "apply", "-f", "-"}, fexec.Opts{Stdin: strings.NewReader(manifest)})
+		res, err := m.runner.Run(m.ctx, "kubectl", m.kubectlArgs("apply", "-f", "-"), fexec.Opts{Stdin: strings.NewReader(manifest)})
 		if err != nil || res.Code != 0 {
 			if err != nil {
 				fmt.Fprintln(m.errOut, err)
@@ -108,9 +108,11 @@ func (m *module) gitopsApplyApplication(name, kind, namespace, repo, revision, p
 // gitopsDirectDeleteApplication deletes an Application from the cluster.
 func (m *module) gitopsDirectDeleteApplication(name, mode string) int {
 	if mode == "keep" {
-		_, _ = m.runner.Run(m.ctx, "kubectl", []string{"--context", "devzone", "-n", gitopsNS, "patch", "application.argoproj.io", name, "--type", "merge", "-p", `{"metadata":{"finalizers":null}}`}, fexec.Opts{})
+		_, _ = m.runner.Run(m.ctx, "kubectl", m.kubectlArgs("-n", gitopsNS, "patch", "application.argoproj.io",
+			name, "--type", "merge", "-p", `{"metadata":{"finalizers":null}}`), fexec.Opts{})
 	}
-	res, err := m.runner.Run(m.ctx, "kubectl", []string{"--context", "devzone", "-n", gitopsNS, "delete", "application.argoproj.io", name, "--ignore-not-found", "--wait=true"}, fexec.Opts{})
+	res, err := m.runner.Run(m.ctx, "kubectl", m.kubectlArgs("-n", gitopsNS, "delete", "application.argoproj.io",
+		name, "--ignore-not-found", "--wait=true"), fexec.Opts{})
 	if err != nil || res.Code != 0 {
 		if err != nil {
 			fmt.Fprintln(m.errOut, err)
