@@ -54,8 +54,9 @@ func workspaceApplyApplication(ctx *cli.Context, root, repo, revision string, pa
 // applyWorkspaceManifest applies one Application manifest through the
 // injected Runner, without touching any other object of the cluster.
 func applyWorkspaceManifest(ctx *cli.Context, manifest string) int {
-	res, err := ctx.Runner.Run(context.Background(), "kubectl",
-		[]string{"--context", "devzone", "apply", "-f", "-"},
+	args := append(fexec.DevzoneContextFlag(context.Background(), ctx.Runner, "--context"),
+		"apply", "-f", "-")
+	res, err := ctx.Runner.Run(context.Background(), "kubectl", args,
 		fexec.Opts{Stdin: strings.NewReader(manifest)})
 	if err != nil || res.Code != 0 {
 		if err != nil {
