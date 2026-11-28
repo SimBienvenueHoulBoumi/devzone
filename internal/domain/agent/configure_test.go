@@ -31,8 +31,8 @@ func TestConfigureDefault(t *testing.T) {
 	if !strings.Contains(out, `"ln *bash32*":"deny"`) {
 		t.Fatal("bash32 not denied")
 	}
-	if !strings.Contains(out, `".devcontainer/agent-rights.sh":"deny"`) {
-		t.Fatal("agent-rights not protected", out)
+	if !strings.Contains(out, `"internal/domain/agent/rights.go":"deny"`) {
+		t.Fatal("rights.go not protected", out)
 	}
 	// 8 rights denies on permission.edit last
 	cfg, _ := ParseJSON([]byte(out))

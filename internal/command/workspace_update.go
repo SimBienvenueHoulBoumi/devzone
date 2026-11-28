@@ -1,7 +1,6 @@
 package command
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/cli"
@@ -52,9 +51,7 @@ func deployWorkspaceAt(ctx *cli.Context, repository, tag, revision string) int {
 	deployCtx := &cli.Context{Args: []string{"deploy", repository, tag, ""}, Out: ctx.Out, Err: ctx.Err, Runner: ctx.Runner}
 	code := workspaceDeploy(deployCtx)
 	if code == 3 {
-		fmt.Fprintln(ctx.Err, "devzone : workspace : Argo CD is required but not running,")
-		fmt.Fprintln(ctx.Err, "please run: devzone enable argocd")
-		return 1
+		return argoCDRequired(ctx.Err)
 	}
 	return code
 }
