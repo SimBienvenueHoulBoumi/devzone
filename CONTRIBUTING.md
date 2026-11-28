@@ -7,7 +7,7 @@
 
 ## Progressive switch by batch (#502)
 
-All tracked code files are written in English. The Go check `go run ./cmd/devzone-checks english` scans them on every run, including comments and test names; data and documentation are excluded by path.
+All tracked code files are written in English. The Go checks `go run ./cmd/devzone-checks english`, `go run ./cmd/devzone-checks layout` and `go run ./cmd/devzone-checks names` scan them on every run: the English scan includes comments and test names (data and documentation are excluded by path), the layout scan applies the 250-line ceiling, and the names scan checks file and folder names.
 
 ## devzone charts
 
