@@ -12,11 +12,9 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec"
 )
-
-// defaultURL is the address of the GitLab of the module.
-const defaultURL = "http://gitlab.localhost:8929"
 
 // Options carries the collaborators and the settings of one test run.
 type Options struct {
@@ -107,7 +105,7 @@ func newSession(opts Options) *session {
 		base = os.Getenv("GITLAB_TEST_URL")
 	}
 	if base == "" {
-		base = defaultURL
+		base = config.GitLab().WebURL()
 	}
 	s.api = &apiClient{base: base, client: &httpClient}
 	s.timeout, s.interval = opts.Timeout, opts.Interval

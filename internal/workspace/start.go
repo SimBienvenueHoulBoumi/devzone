@@ -64,7 +64,7 @@ func (e StartEnv) Run(args []string) int {
 
 // options reads the only option of start, --image <repository:tag>.
 func (e StartEnv) options(args []string) (repository, tag string, withImage, ok bool) {
-	repository, tag = imageRepo, "latest"
+	repository, tag = imageRepo(), "latest"
 	if root := e.root(); root != "" {
 		if version := DefaultImageTag(root); version != "latest" {
 			tag = version

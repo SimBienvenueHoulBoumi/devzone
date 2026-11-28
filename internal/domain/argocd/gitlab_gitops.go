@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 	fexec "github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec"
 )
 
@@ -26,7 +27,7 @@ func (m *module) gitlabAPIURL() string {
 	if v := os.Getenv("GITLAB_GITOPS_API"); v != "" {
 		return v
 	}
-	return "http://gitlab.localhost:8929"
+	return config.GitLab().WebURL()
 }
 
 // gitlabGitopsProject returns the GitLab project path (group/project).
