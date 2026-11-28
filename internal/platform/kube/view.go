@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"strings"
+
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 )
 
 // View prints the table of connected clusters with the working and services
@@ -47,7 +49,7 @@ func (k Kube) View(ctx context.Context, saved string, out, errOut io.Writer) int
 	fmt.Fprintln(errOutOrDiscard(out))
 	fmt.Fprintln(errOutOrDiscard(out), "★ working cluster (kubectl, k9s, helm) · ● devzone services cluster (devzone cluster)")
 	if saved != "" && k.IsLocal(saved) {
-		res, err := k.raw(ctx, "--context", saved, "get", "networkpolicy", "devzone-meme-namespace", "-n", "devzone-postgres")
+		res, err := k.raw(ctx, "--context", saved, "get", "networkpolicy", "devzone-meme-namespace", "-n", config.NamespacePostgres)
 		if err == nil && res.Code == 0 {
 			fmt.Fprintf(errOutOrDiscard(out), "  ✔ isolated (NetworkPolicy) → %s\n", saved)
 		} else {

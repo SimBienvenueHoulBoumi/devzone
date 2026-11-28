@@ -3,13 +3,15 @@ package workspace
 import (
 	"fmt"
 	"io"
+
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 )
 
 // Names of the workspace release and of its Argo CD namespace and Application,
 // as manage/workspace.sh and manage/scripts/workspace/argocd-workspace.sh have them.
 const (
 	releaseName = "devzone-workspace"
-	argocdNS    = "devzone-argocd"
+	argocdNS    = config.NamespaceArgoCD
 	argocdApp   = "devzone-workspace"
 )
 

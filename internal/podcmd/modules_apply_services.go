@@ -3,6 +3,8 @@ package podcmd
 import (
 	"fmt"
 	"strings"
+
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 )
 
 // applyGitlab installs or removes the GitLab module (apply_gitlab). The
@@ -37,7 +39,7 @@ func (m *modules) applyGitlab(verb string) int {
 		}
 		return m.call(out, "gitlab", "uninstall")
 	}
-	fmt.Fprintln(out, "devzone : gitlab already deactivated (no devzone-gitlab namespace).")
+	fmt.Fprintln(out, "devzone : gitlab already deactivated (no "+config.NamespaceGitLab+" namespace).")
 	return 0
 }
 

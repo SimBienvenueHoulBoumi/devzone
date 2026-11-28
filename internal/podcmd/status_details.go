@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/cli"
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 )
 
 // printStatusDetails writes the GitOps, catalog, cluster, relay and credentials
@@ -110,9 +111,9 @@ func instanceSuffix() string {
 
 // printRBACLine warns when the pod service account can read PostgreSQL secrets.
 func printRBACLine(ctx *cli.Context, d jsonDeps) {
-	out, _, _ := d.run("kubectl", "auth", "can-i", "--as=system:serviceaccount:default:default", "get", "secrets", "-n", "devzone-postgres")
+	out, _, _ := d.run("kubectl", "auth", "can-i", "--as=system:serviceaccount:default:default", "get", "secrets", "-n", config.NamespacePostgres)
 	if trimNewlines(out) == "yes" {
-		fmt.Fprintln(ctx.Out, "  ⚠ rbac          : access to devzone-postgres secrets not restricted")
+		fmt.Fprintln(ctx.Out, "  ⚠ rbac          : access to "+config.NamespacePostgres+" secrets not restricted")
 	}
 }
 

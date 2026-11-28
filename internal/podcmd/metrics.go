@@ -9,6 +9,7 @@ import (
 
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/domain/argocd"
 	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/cli"
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 	fexec "github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec"
 )
 
@@ -49,7 +50,7 @@ func metricsHeldByArgoCD(ctx *cli.Context) bool {
 	}
 	bg := context.Background()
 	args := append(fexec.DevzoneContextFlag(bg, ctx.Runner, "--context"),
-		"get", "namespace", "devzone-argocd")
+		"get", "namespace", config.NamespaceArgoCD)
 	res, err := ctx.Runner.Run(bg, "kubectl", args, fexec.Opts{})
 	if err != nil || res.Code != 0 {
 		return false

@@ -6,11 +6,12 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 	fexec "github.com/SimBienvenueHoulBoumi/devzone/internal/framework/exec"
 )
 
 const (
-	gitopsNS       = "devzone-argocd"
+	gitopsNS       = config.NamespaceArgoCD
 	gitopsRootApp  = "devzone"
 	gitopsRepoName = "devzone-argocd"
 )

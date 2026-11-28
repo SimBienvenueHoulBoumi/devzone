@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 )
 
 // Fixed names of the watcher, as in manage/scripts/workspace/ports-workspace.sh.
@@ -112,9 +114,9 @@ func watchedServices(r Runner, file string) []relayService {
 	var services []relayService
 	lines := moduleLines(file)
 	if moduleOn(lines, "postgres") {
-		services = append(services, relayService{local: 5432, namespace: "devzone-postgres", target: "svc/postgres"})
-		if port, ok := serviceNumber(r, "devzone-postgres", "pgadmin", pgAdminPath); ok {
-			services = append(services, relayService{local: port, namespace: "devzone-postgres", target: "svc/pgadmin"})
+		services = append(services, relayService{local: 5432, namespace: config.NamespacePostgres, target: "svc/postgres"})
+		if port, ok := serviceNumber(r, config.NamespacePostgres, "pgadmin", pgAdminPath); ok {
+			services = append(services, relayService{local: port, namespace: config.NamespacePostgres, target: "svc/pgadmin"})
 		}
 	}
 	if moduleOn(lines, "mysql") {
@@ -126,12 +128,12 @@ func watchedServices(r Runner, file string) []relayService {
 		services = append(services, relayService{local: gitlabSSHLocal, namespace: namespace, target: gitlabSSHService, remote: gitlabSSHRemote})
 	}
 	if !lines["argocd=off"] {
-		if port, ok := serviceNumber(r, "devzone-argocd", "argocd-server", argocdPath); ok {
+		if port, ok := serviceNumber(r, config.NamespaceArgoCD, "argocd-server", argocdPath); ok {
 			local, valid := toPort(os.Getenv("DEVZONE_ARGOCD_PORT"))
 			if !valid {
 				local = argocdDefault
 			}
-			services = append(services, relayService{local: local, namespace: "devzone-argocd", target: "svc/argocd-server", remote: port})
+			services = append(services, relayService{local: local, namespace: config.NamespaceArgoCD, target: "svc/argocd-server", remote: port})
 		}
 	}
 	return services
@@ -142,7 +144,7 @@ func watchedServices(r Runner, file string) []relayService {
 // gitlab module of internal/domain/gitlab (DEVZONE_INSTANCE, "devzone" without
 // suffix).
 func gitlabNamespace() string {
-	return "devzone-gitlab" + instanceSuffix()
+	return config.NamespaceGitLab + instanceSuffix()
 }
 
 // instanceSuffix returns the instance suffix of a devzone module: the value of

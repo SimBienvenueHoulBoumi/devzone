@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 	rule "github.com/SimBienvenueHoulBoumi/devzone/internal/platform/argocd"
 )
 
@@ -34,7 +35,7 @@ func argocdStatus(r Runner, confPath, modules string, out io.Writer) int {
 		fmt.Fprintln(out, "  no GitOps repository: Applications applied directly (devzone workspace argocd init)")
 	}
 	fmt.Fprint(out, workspaceValuesLine(repo, rule.WorkspaceValuesPath))
-	args := append(contextFlag(r), "-n", "devzone-argocd", "get", "applications.argoproj.io",
+	args := append(contextFlag(r), "-n", config.NamespaceArgoCD, "get", "applications.argoproj.io",
 		"-o", `custom-columns=APPLICATION:.metadata.name,KIND:.metadata.labels.devzone\.io/kind,SYNC:.status.sync.status,HEALTH:.status.health.status,REVISION:.spec.source.targetRevision`)
 	var list strings.Builder
 	_, _ = r.Kubectl(args, nil, &list, io.Discard)
