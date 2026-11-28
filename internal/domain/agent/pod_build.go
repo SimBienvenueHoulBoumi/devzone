@@ -4,6 +4,8 @@ import (
 	"context"
 	"os"
 	"strings"
+
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/config"
 )
 
 func kubectlOut(ctx context.Context, r Runner, args ...string) string {
@@ -21,7 +23,7 @@ func kubectlOut(ctx context.Context, r Runner, args ...string) string {
 func AgentPodImageWorkspace(ctx context.Context, r Runner) string {
 	v := kubectlOut(ctx, r, "get", "pod", "devzone-workspace-0", "-o", `jsonpath={.spec.containers[?(@.name=="workspace")].image}`)
 	if v == "" {
-		return "ghcr.io/simbienvenuehoulboumi/devzone-workspace:latest"
+		return config.ImageRepo() + ":latest"
 	}
 	return v
 }

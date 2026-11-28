@@ -22,7 +22,7 @@ func TestHelmDeployArgs(t *testing.T) {
 		{match: "", status: 0},
 	}}
 	var out, errOut bytes.Buffer
-	if status := HelmDeploy(r, modules, imageRepo, "1.2.3", true, &out, &errOut); status != 0 {
+	if status := HelmDeploy(r, modules, imageRepo(), "1.2.3", true, &out, &errOut); status != 0 {
 		t.Fatalf("status = %d, errOut = %q", status, errOut.String())
 	}
 	if len(r.calls) != 2 {
@@ -32,7 +32,7 @@ func TestHelmDeployArgs(t *testing.T) {
 	for _, want := range []string{
 		"helm --kube-context " + fexec.ContextName() + " upgrade --install devzone-workspace",
 		"--namespace devzone-workspace --create-namespace",
-		"--set image.repository=" + imageRepo,
+		"--set image.repository=" + imageRepo(),
 		"--set image.tag=1.2.3",
 		`--set egressProxy.enabled=true`,
 		`--set egressProxy.mode=strict`,
@@ -52,7 +52,7 @@ func TestHelmDeployArgs(t *testing.T) {
 func TestHelmDeployLatest(t *testing.T) {
 	r := &fakeRunner{replies: []reply{{match: "config get-contexts"}, {match: "", status: 0}}}
 	var out, errOut bytes.Buffer
-	HelmDeploy(r, filepath.Join(t.TempDir(), "modules"), imageRepo, "latest", false, &out, &errOut)
+	HelmDeploy(r, filepath.Join(t.TempDir(), "modules"), imageRepo(), "latest", false, &out, &errOut)
 	call := r.calls[len(r.calls)-1]
 	if !strings.Contains(call, "helm upgrade") || !strings.Contains(call, "--set image.pullPolicy=Always") {
 		t.Fatalf("helm call = %q", call)

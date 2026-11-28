@@ -17,7 +17,7 @@ var registryTokenPattern = regexp.MustCompile(`"token" *: *"([^"]*)"`)
 // curl is used rather than a Go HTTP client so that the workstation binary
 // keeps the same small dependency set as the shell command.
 func RegistryImageExists(tag string) bool {
-	path := strings.TrimPrefix(imageRepo, "ghcr.io/")
+	path := strings.TrimPrefix(imageRepo(), "ghcr.io/")
 	answer, err := exec.Command("curl", "-fsS", "https://ghcr.io/token?scope=repository:"+path+":pull").Output()
 	if err != nil {
 		return false
