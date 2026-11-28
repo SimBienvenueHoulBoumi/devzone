@@ -51,7 +51,7 @@ The log is `workspace/.agents/<folder>.log`. `--auto` avoids waiting for a permi
 
 With `ai` active, the repowarden guard is plugged in for Claude Code and opencode: the agent is stopped before modifying `main`/`develop`, committing without `repowarden cc` or bypassing the hooks. `repowarden cc -m "…"` to commit.
 
-Protected rights files (never written by an agent, fixed list, no variable changes it): `.devcontainer/opencode/agent.json`, `.devcontainer/opencode.jsonc`, `.repowarden.conf`, `.devcontainer/agent-rights.sh`. An agent that touches them is refused and the change is reverted in the tree.
+Protected rights files (never written by an agent, fixed list, no variable changes it): `.devcontainer/opencode/agent.json`, `.devcontainer/opencode.jsonc`, `.repowarden.conf`, `internal/domain/agent/rights.go`. An agent that touches them is refused and the change is reverted in the tree.
 
 ## Kubernetes only
 
