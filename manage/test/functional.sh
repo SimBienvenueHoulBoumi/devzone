@@ -4,7 +4,7 @@
 # name used by CI and make. It builds the workspace image, loads it into kind,
 # prepares a devzone folder and builds the Go program.
 #
-# le deploiement du workspace passe par Argo CD, qui ne sert que des charts publies ; il est couvert par les tests Go, pas par ce scenario
+# Deploying the workspace goes through Argo CD, which only serves published charts; it is covered by the Go tests, not by this scenario.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
