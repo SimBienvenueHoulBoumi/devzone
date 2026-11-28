@@ -64,6 +64,7 @@ func TestWorkspaceShellWithWordsIsIgnored(t *testing.T) {
 }
 
 func TestWorkspaceVSCodeRunsInGo(t *testing.T) {
+	hostMode(t)
 	requireBash(t)
 	entry(t, echoArgs+"\n")
 	var out, errOut bytes.Buffer

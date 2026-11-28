@@ -57,7 +57,9 @@ func deployRun(r *fake.Runner, out, errOut *bytes.Buffer, args ...string) int {
 
 // TestWorkspaceDeployApplication checks that an active Argo CD creates the
 // Application with the image parameters, without helm or destructive calls.
+
 func TestWorkspaceDeployApplication(t *testing.T) {
+	hostMode(t)
 	r, root, out, errOut := deployFixture(t, "on")
 	writeDeployFile(t, filepath.Join(root, "package.json"), `{"version": "1.2.3"}`+"\n")
 	r.On("kubectl", []string{"--context", "devzone", "apply", "-f", "-"}, fexec.Result{})
@@ -91,6 +93,7 @@ func TestWorkspaceDeployApplication(t *testing.T) {
 // TestWorkspaceDeployUnknownRevisionFails checks that no namespace, secret or
 // helm step is started when the revision cannot be resolved.
 func TestWorkspaceDeployUnknownRevisionFails(t *testing.T) {
+	hostMode(t)
 	r, root, out, errOut := deployFixture(t, "on")
 	writeDeployFile(t, filepath.Join(root, "package.json"), `{"version": "0.0.0"}`+"\n")
 	r.OnError("git", []string{"ls-remote", "--tags", "--refs", "https://github.com/SimBienvenueHoulBoumi/devzone.git"},
@@ -115,6 +118,7 @@ func TestWorkspaceDeployUnknownRevisionFails(t *testing.T) {
 // nothing when Argo CD is off: the shell entry point keeps the historical
 // helm path, with the same adoption of volumes and secrets.
 func TestWorkspaceDeployHandsOffWithoutArgoCD(t *testing.T) {
+	hostMode(t)
 	r, _, out, errOut := deployFixture(t, "off")
 	r.On("kubectl", []string{"--context", "devzone", "get", "namespace", "devzone-argocd"}, fexec.Result{Code: 1})
 	if code := deployRun(r, out, errOut, "registry/example", "2.0.0", "no"); code != 3 {

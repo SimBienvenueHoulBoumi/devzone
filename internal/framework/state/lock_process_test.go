@@ -9,6 +9,8 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/testkit"
 )
 
 // TestBinaryLockExcludesProcesses checks that two separate devzone-pod
@@ -20,7 +22,7 @@ func TestBinaryLockExcludesProcesses(t *testing.T) {
 	binary := filepath.Join(dir, "devzone-pod")
 	build := osexec.Command("go", "build", "-o", binary, "./cmd/devzone-pod")
 	build.Dir = repo
-	build.Env = append(os.Environ(), "GOTOOLCHAIN=local")
+	build.Env = append(testkit.CommandEnv(), "GOTOOLCHAIN=local")
 	if out, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("build: %v\n%s", err, out)
 	}
@@ -28,7 +30,7 @@ func TestBinaryLockExcludesProcesses(t *testing.T) {
 	if err := os.WriteFile(stateFile, []byte("ai=off\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	env := append(os.Environ(), "DEVZONE_STATE="+stateFile)
+	env := append(testkit.CommandEnv(), "DEVZONE_STATE="+stateFile)
 	var wg sync.WaitGroup
 	errs := make(chan error, 2)
 	for _, prefix := range []string{"a", "b"} {

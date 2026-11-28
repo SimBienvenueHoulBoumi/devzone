@@ -11,7 +11,9 @@ import (
 // TestAutoStartGuardsLeaveDisposableHomeEmpty proves that under bats and in CI
 // the automatic start opens nothing: no file appears in a disposable HOME and
 // no call reaches the service manager, even from a devzone folder.
+
 func TestAutoStartGuardsLeaveDisposableHomeEmpty(t *testing.T) {
+	hostMode(t)
 	for _, tc := range []struct {
 		name string
 		bats bool

@@ -31,12 +31,12 @@ func newAutoStartHarness(t *testing.T) *autoStartHarness {
 	oldEnsure, oldEnable, oldExists := commandEnsureAutoStart, commandPortsEnable, commandPortsAutoStartExists
 	oldUpToDate, oldWorkstation, oldCI := commandPortsWatcherUpToDate, portsIsWorkstation, portsIsCI
 	oldTest, oldAvailable, oldRefused := portsIsTest, portsServiceManagerAvailable, commandPortsRefusalIsSet
-	oldMemorize, oldForget := commandMemorizePortsRefusal, commandForgetPortsRefusal
+	oldMemorize, oldForget, oldFailed := commandMemorizePortsRefusal, commandForgetPortsRefusal, commandPortsAutoStartFailed
 	t.Cleanup(func() {
 		commandEnsureAutoStart, commandPortsEnable, commandPortsAutoStartExists = oldEnsure, oldEnable, oldExists
 		commandPortsWatcherUpToDate, portsIsWorkstation, portsIsCI = oldUpToDate, oldWorkstation, oldCI
 		portsIsTest, portsServiceManagerAvailable, commandPortsRefusalIsSet = oldTest, oldAvailable, oldRefused
-		commandMemorizePortsRefusal, commandForgetPortsRefusal = oldMemorize, oldForget
+		commandMemorizePortsRefusal, commandForgetPortsRefusal, commandPortsAutoStartFailed = oldMemorize, oldForget, oldFailed
 	})
 	commandEnsureAutoStart = EnsurePortsAutoStart
 	commandPortsEnable = func(_ io.Writer, errOut io.Writer) int {
@@ -55,6 +55,7 @@ func newAutoStartHarness(t *testing.T) *autoStartHarness {
 	portsIsTest = func() bool { return h.underTest }
 	portsServiceManagerAvailable = func() bool { return h.available }
 	commandPortsRefusalIsSet = func() bool { return h.refused }
+	commandPortsAutoStartFailed = func() bool { return false }
 	commandMemorizePortsRefusal = func() {}
 	commandForgetPortsRefusal = func() {}
 	return h
@@ -62,6 +63,7 @@ func newAutoStartHarness(t *testing.T) *autoStartHarness {
 
 // TestEnsureFirstInstallSaysOnce checks that the first installation prints one
 // line with the command that removes the automatic start.
+
 func TestEnsureFirstInstallSaysOnce(t *testing.T) {
 	h := newAutoStartHarness(t)
 	var out, errOut bytes.Buffer
@@ -114,6 +116,7 @@ func TestEnsureNeverFailsCommand(t *testing.T) {
 // TestEnsureDoesNothingOnGuardedHosts checks every case where no installation
 // may happen, including a memorised refusal, without reaching any real effect.
 func TestEnsureDoesNothingOnGuardedHosts(t *testing.T) {
+	hostMode(t)
 	cases := []struct {
 		name  string
 		setup func(*autoStartHarness)

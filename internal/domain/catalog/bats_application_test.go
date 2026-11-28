@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/SimBienvenueHoulBoumi/devzone/internal/framework/testkit"
 )
 
 // shellApp copies the devzone entry point and its libraries into a temporary
@@ -134,6 +136,7 @@ func makeExecutable(t *testing.T, app, bin string) {
 func runShellApp(t *testing.T, app string, args ...string) (string, int) {
 	t.Helper()
 	cmd := osexec.Command(filepath.Join(app, "devzone"), args...)
+	cmd.Env = testkit.CommandEnv()
 	out, err := cmd.CombinedOutput()
 	if err == nil {
 		return string(out), 0

@@ -43,6 +43,7 @@ func requireMake(t *testing.T) {
 }
 
 func TestMakefileRemovedTargetsReportWorkspaceCommand(t *testing.T) {
+	hostMode(t)
 	requireMake(t)
 	root := repoRoot(t)
 	// Removed legacy targets must fail with a clear migration message so users

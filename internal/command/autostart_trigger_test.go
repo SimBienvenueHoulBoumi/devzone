@@ -15,7 +15,9 @@ import (
 // TestAutoStartExcludedCommands lists the commands that never install anything:
 // read-only help and version, the two refusals, and stop, which must keep its
 // effect until the next start or session.
+
 func TestAutoStartExcludedCommands(t *testing.T) {
+	hostMode(t)
 	cases := []struct {
 		name string
 		args []string
@@ -48,6 +50,7 @@ func TestAutoStartExcludedCommands(t *testing.T) {
 // an update and the creation of a folder all reach the single ensure function,
 // with the new folder as the devzone folder for a creation.
 func TestAutoStartTriggersOnCreateUpdateAndCommand(t *testing.T) {
+	hostMode(t)
 	requireBash(t)
 	root := t.TempDir()
 	current := filepath.Join(root, "current")
@@ -99,6 +102,7 @@ func TestAutoStartTriggersOnCreateUpdateAndCommand(t *testing.T) {
 // TestAutoStartNotTriggeredByFailedCommand keeps a failed command from
 // installing anything, as a failed workspace start must not install a watcher.
 func TestAutoStartNotTriggeredByFailedCommand(t *testing.T) {
+	hostMode(t)
 	requireBash(t)
 	previous := commandEnsureAutoStart
 	calls := 0
@@ -117,6 +121,7 @@ func TestAutoStartNotTriggeredByFailedCommand(t *testing.T) {
 // TestPortsCommandsMemoriseAndClearRefusal checks that disable writes the
 // refusal in this devzone folder and enable clears it, with no real watcher.
 func TestPortsCommandsMemoriseAndClearRefusal(t *testing.T) {
+	hostMode(t)
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, ".devcontainer"), 0o755); err != nil {
 		t.Fatal(err)
